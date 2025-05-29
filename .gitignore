@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor directories and files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# Backup files
+*.bak
+*.backup
+
+# Local configuration
+*.local
+
+# Cache directories
+.cache/
+__pycache__/
+
+# Knowledge base data (if you want to exclude the actual data)
+# Uncomment the line below if you don't want to track the knowledge base content
+# /knowledge-management/coding-knowledge-base/

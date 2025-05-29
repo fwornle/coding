@@ -1,0 +1,67 @@
+#!/bin/bash
+# Quick launcher for knowledge base viewer
+# Usage: vkb
+
+# Memory file location
+MEMORY_FILE="/Users/q284340/.npm/_npx/15b07286cbcc3329/node_modules/@modelcontextprotocol/server-memory/dist/memory.json"
+
+# Always copy the latest memory.json to the dist directory
+cp "$MEMORY_FILE" /Users/q284340/Agentic/memory-visualizer/dist/memory.json 2>/dev/null || {
+    echo "Warning: Could not copy memory.json file"
+}
+
+# Check if server is already running
+if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "╔═══════════════════════════════════════════════════════════════╗"
+    echo "║          Knowledge Base Server Already Running!               ║"
+    echo "╠═══════════════════════════════════════════════════════════════╣"
+    echo "║  Opening browser at http://localhost:8080                    ║"
+    echo "║  Memory file updated - refresh the page to see changes       ║"
+    echo "╚═══════════════════════════════════════════════════════════════╝"
+    
+    # Just open the browser
+    open http://localhost:8080 2>/dev/null || true
+    exit 0
+fi
+
+# Navigate to the visualizer directory
+cd /Users/q284340/Agentic/memory-visualizer/dist
+
+# Copy latest memory.json
+cp "$MEMORY_FILE" ./memory.json 2>/dev/null
+
+# Start server in background
+(python3 -m http.server 8080 2>/dev/null || python -m SimpleHTTPServer 8080 2>/dev/null || npx -y http-server -p 8080) &
+SERVER_PID=$!
+
+# Wait a moment for server to start
+sleep 1
+
+# Check if server started successfully
+if ! lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "Failed to start server on port 8080"
+    exit 1
+fi
+
+# Open browser and show instructions
+echo "╔═══════════════════════════════════════════════════════════════╗"
+echo "║            Knowledge Base Visualizer Started!                 ║"
+echo "╠═══════════════════════════════════════════════════════════════╣"
+echo "║  Browser opened at http://localhost:8080                     ║"
+echo "║                                                               ║"
+echo "║  The memory.json file should load automatically!             ║"
+echo "║                                                               ║"
+echo "║  If the graph doesn't appear, you may need to rebuild:       ║"
+echo "║  cd ~/Agentic/memory-visualizer && npm run build             ║"
+echo "║                                                               ║"
+echo "║  Server PID: $SERVER_PID                                          ║"
+echo "║  To stop the server, run: kill $SERVER_PID                       ║"
+echo "╚═══════════════════════════════════════════════════════════════╝"
+
+# Open browser (works on macOS)
+open http://localhost:8080 2>/dev/null || true
+
+# Detach from the server process so the script can exit
+disown $SERVER_PID
+
+# Script exits, server continues running in background
