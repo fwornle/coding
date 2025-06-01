@@ -28,8 +28,8 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo -e "${YELLOW}Usage:${NC} ukb [OPTIONS]"
     echo ""
     echo -e "${YELLOW}Options:${NC}"
-    echo "  --auto, -a        Automated session capture (no prompts)"
-    echo "  --interactive, -i Interactive session capture (default)"
+    echo "  --auto, -a        Automated session capture (default)"
+    echo "  --interactive, -i Interactive session capture with prompts"
     echo "  --quick, -q       Quick capture of specific insight"
     echo "  --help, -h        Show this help message"
     echo ""
@@ -53,11 +53,11 @@ echo -e "${CYAN}║             The Ultimate Knowledge Base Updater             
 echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Check for auto mode
-AUTO_MODE=false
-if [ "$1" = "--auto" ] || [ "$1" = "-a" ]; then
-    AUTO_MODE=true
-    echo -e "${BLUE}🤖 Running in automated mode...${NC}"
+# Check for mode - default to auto for seamless team workflow
+AUTO_MODE=true
+if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
+    AUTO_MODE=false
+    echo -e "${BLUE}🎯 Running in interactive mode...${NC}"
 elif [ "$1" = "--quick" ] || [ "$1" = "-q" ]; then
     echo -e "${YELLOW}⚡ Quick insight capture mode${NC}"
     if [ -f "$KM_DIR/enhanced-capture-insight.sh" ]; then
@@ -67,7 +67,7 @@ elif [ "$1" = "--quick" ] || [ "$1" = "-q" ]; then
     fi
     exit 0
 else
-    echo -e "${BLUE}🎯 Running in interactive mode...${NC}"
+    echo -e "${BLUE}🤖 Running in automated mode (default for seamless team workflow)...${NC}"
 fi
 
 echo ""
