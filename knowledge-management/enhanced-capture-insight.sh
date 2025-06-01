@@ -90,8 +90,32 @@ create_mcp_entity() {
     echo -e "${BLUE}📝 Observations:${NC}"
     echo "$observations" | tr '|' '\n' | sed 's/^/    /'
     
-    # In real Claude Code environment, this would call MCP directly:
-    # mcp_memory_create_entities with proper JSON structure
+    # Store locally for now - MCP integration happens at session end
+    local insights_dir="$HOME/Claude/knowledge-management/insights"
+    mkdir -p "$insights_dir"
+    
+    # Convert observations to proper JSON array
+    local obs_json=""
+    IFS='|' read -ra obs_array <<< "$observations"
+    for obs in "${obs_array[@]}"; do
+        # Escape quotes and format as JSON string
+        local escaped_obs=$(echo "$obs" | sed 's/"/\\"/g')
+        obs_json+="\"$escaped_obs\","
+    done
+    obs_json=${obs_json%,} # Remove trailing comma
+    
+    cat > "$insights_dir/$entity_name.json" << EOF
+{
+  "name": "$entity_name",
+  "entityType": "CodingInsight",
+  "observations": [$obs_json],
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "project": "$project",
+  "category": "$category",
+  "tags": "$tags",
+  "language": "$language"
+}
+EOF
     
     echo -e "${GREEN}✅ Entity '$entity_name' created successfully${NC}"
     
@@ -102,7 +126,12 @@ create_mcp_entity() {
     
     # Always connect to main knowledge graph
     echo -e "${BLUE}🔗 Connecting to CodingKnowledgeBase...${NC}"
-    # create_relation "CodingKnowledgeBase" "captures" "$entity_name"
+    
+    # Store connection info for later MCP transfer
+    local relations_dir="$HOME/Claude/knowledge-management/relations"
+    mkdir -p "$relations_dir"
+    echo "CodingKnowledgeBase,captures,$entity_name" >> "$relations_dir/pending_relations.csv"
+    
     echo -e "${GREEN}✅ Connected to main knowledge graph${NC}"
 }
 

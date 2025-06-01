@@ -22,7 +22,12 @@
       "mcp__browser-access__screenshot",
       "Bash(./knowledge-management/update-knowledge-graph.sh:*)",
       "Bash(./knowledge-management/enhanced-capture-insight.sh:*)",
-      "Bash(./knowledge-management/view-knowledge-base.sh:*)"
+      "Bash(./knowledge-management/view-knowledge-base.sh:*)",
+      "mcp__memory__create_entities",
+      "mcp__memory__create_relations",
+      "Bash(rm:*)",
+      "mcp__memory__search_nodes",
+      "mcp__memory__read_graph"
     ],
     "deny": []
   }

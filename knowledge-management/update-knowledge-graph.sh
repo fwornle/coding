@@ -142,8 +142,18 @@ else
 fi
 echo ""
 
-# Step 7: Sync with team (if in git repo)
-echo -e "${PURPLE}🚀 Step 7: Syncing with team repository...${NC}"
+# Step 7: Transfer insights to MCP memory
+echo -e "${PURPLE}💾 Step 7: Transferring insights to MCP memory...${NC}"
+if [ -f "$KM_DIR/transfer-insights-to-mcp.sh" ]; then
+    "$KM_DIR/transfer-insights-to-mcp.sh"
+    echo -e "${GREEN}✅ Insights transferred to MCP memory${NC}"
+else
+    echo -e "${YELLOW}⚠️  MCP transfer script not found${NC}"
+fi
+echo ""
+
+# Step 8: Sync with team (if in git repo)
+echo -e "${PURPLE}🚀 Step 8: Syncing with team repository...${NC}"
 if [ -d "$HOME/Claude/.git" ]; then
     cd "$HOME/Claude"
     if git status >/dev/null 2>&1; then
