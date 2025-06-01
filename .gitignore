@@ -32,3 +32,8 @@ __pycache__/
 # Knowledge base data (if you want to exclude the actual data)
 # Uncomment the line below if you don't want to track the knowledge base content
 # /knowledge-management/coding-knowledge-base/
+
+# claude mcp servers etc. (fw-250601)
+node_modules/
+dist/
+claude-code-mcp.json

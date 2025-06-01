@@ -13,7 +13,16 @@
       "Bash(ls:*)",
       "Bash(browser:*)",
       "Bash(./knowledge-management/ukb)",
-      "Bash(./knowledge-management/vkb)"
+      "Bash(./knowledge-management/vkb)",
+      "Bash(mv:*)",
+      "Bash(ln:*)",
+      "Bash(vkb)",
+      "mcp__browser-access__stagehand_navigate",
+      "Bash(./start-chrome-debug.sh:*)",
+      "mcp__browser-access__screenshot",
+      "Bash(./knowledge-management/update-knowledge-graph.sh:*)",
+      "Bash(./knowledge-management/enhanced-capture-insight.sh:*)",
+      "Bash(./knowledge-management/view-knowledge-base.sh:*)"
     ],
     "deny": []
   }

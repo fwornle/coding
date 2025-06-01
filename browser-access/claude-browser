@@ -1,0 +1,66 @@
+#!/bin/bash
+# Claude Code with Browser Access - Convenience Script
+# This script starts Claude Code with the browser-access MCP server configured
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MCP_CONFIG="$SCRIPT_DIR/../claude-code-mcp.json"
+SERVER_FILE="$SCRIPT_DIR/dist/index.js"
+
+print_status "🤖 Starting Claude Code with Browser Access..."
+
+# Check if MCP config exists
+if [ ! -f "$MCP_CONFIG" ]; then
+    print_error "MCP config file not found: $MCP_CONFIG"
+    exit 1
+fi
+
+# Check if server exists
+if [ ! -f "$SERVER_FILE" ]; then
+    print_error "MCP server not found: $SERVER_FILE"
+    print_status "Run './setup-browser-access.sh' to build the server"
+    exit 1
+fi
+
+# Check if Chrome debug port is available (for local browser)
+if command -v lsof >/dev/null 2>&1; then
+    if lsof -i :9222 >/dev/null 2>&1; then
+        print_success "Chrome debug port (9222) is active"
+    else
+        print_warning "Chrome debug port (9222) not detected"
+        print_status "Start Chrome with: browser [url]"
+    fi
+fi
+
+print_success "Launching Claude Code with browser automation and memory tools..."
+print_status "Available tools:"
+print_status "  Browser: stagehand_navigate, stagehand_act, stagehand_extract, stagehand_observe, stagehand_screenshot"
+print_status "  Memory: knowledge graph storage and retrieval for coding sessions"
+
+# Launch Claude Code with MCP configuration
+exec claude code --mcp-config "$MCP_CONFIG" "$@"
