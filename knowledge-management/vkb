@@ -30,14 +30,25 @@ cd /Users/q284340/Agentic/memory-visualizer/dist
 # Copy latest memory.json
 cp "$MEMORY_FILE" ./memory.json 2>/dev/null
 
-# Start server in background
-(python3 -m http.server 8080 2>/dev/null || python -m SimpleHTTPServer 8080 2>/dev/null || npx -y http-server -p 8080) &
+# Start server in background with full detachment
+nohup bash -c "(python3 -m http.server 8080 || python -m SimpleHTTPServer 8080 || npx -y http-server -p 8080) >/dev/null 2>&1" >/dev/null 2>&1 &
 SERVER_PID=$!
 
-# Wait a moment for server to start
-sleep 1
+# Brief wait to allow server startup
+sleep 0.5
 
-# Check if server started successfully
+# Check if server started successfully (with timeout)
+TIMEOUT=3
+COUNTER=0
+while [ $COUNTER -lt $TIMEOUT ]; do
+    if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.5
+    COUNTER=$((COUNTER + 1))
+done
+
+# Verify server is running
 if ! lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo "Failed to start server on port 8080"
     exit 1
@@ -54,14 +65,14 @@ echo "║                                                               ║"
 echo "║  If the graph doesn't appear, you may need to rebuild:       ║"
 echo "║  cd ~/Agentic/memory-visualizer && npm run build             ║"
 echo "║                                                               ║"
-echo "║  Server PID: $SERVER_PID                                          ║"
-echo "║  To stop the server, run: kill $SERVER_PID                       ║"
+echo "║  Server running in background (detached process)             ║"
+echo "║  Use 'pkill -f \"http.server 8080\"' to stop if needed        ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 
 # Open browser (works on macOS)
 open http://localhost:8080 2>/dev/null || true
 
-# Detach from the server process so the script can exit
-disown $SERVER_PID
+# Fully detach from the server process
+disown $SERVER_PID 2>/dev/null || true
 
-# Script exits, server continues running in background
+# Script exits immediately, server continues running in background
