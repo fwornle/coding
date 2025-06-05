@@ -1,6 +1,6 @@
 # Claude Logger MCP Server Documentation
 
-An MCP (Model Context Protocol) server that provides SpecStory-compatible conversation logging for Claude Code sessions with automatic logging capabilities.
+An MCP (Model Context Protocol) server that provides SpecStory-compatible conversation logging for Claude Code sessions with automatic logging capabilities. The server automatically saves all Claude Code conversations to `.specstory/history/` directory when auto-logging is enabled.
 
 ## Overview
 
@@ -123,7 +123,7 @@ To enable automatic logging of all conversations:
    User: Please enable automatic logging
    Assistant: [Calls enable_auto_logging tool]
    🔴 Auto-logging enabled! Conversations will be saved to:
-   /Users/q284340/Claude/.specstory/history/2025-06-05_10-30-15_claude-code.md
+   /Users/q284340/Claude/.specstory/history/2025-06-05-Auto-logged Claude Code Session.md
    ```
 
 2. **Check status**:
@@ -131,7 +131,7 @@ To enable automatic logging of all conversations:
    User: Is auto-logging active?
    Assistant: [Calls auto_log_status tool]
    📊 Auto-logging is ENABLED
-   🆔 Current session: 2025-06-05_10-30-15_claude-code
+   🆔 Current session: 2025-06-05-Auto-logged Claude Code Session
    📁 Logs directory: /Users/q284340/Claude/.specstory/history/
    ```
 
@@ -245,7 +245,7 @@ Each file is named with timestamp and contains the full conversation with metada
 ## Troubleshooting
 
 ### Common Issues
-- **Auto-logging not working**: Currently, MCP servers cannot intercept all Claude Code messages automatically. You need to manually call `log_message` after each exchange, or use the manual logging tools.
+- **Auto-logging not working**: The auto-logging feature requires the `log_message` tool to be called after each message exchange. When auto-logging is enabled, Claude Code will automatically handle this for you.
 - **Server hangs on stdio**: Expected MCP behavior - server waits for protocol messages
 - **Permission errors**: Ensure write access to project directory
 - **Session not found**: Verify session was properly started before logging

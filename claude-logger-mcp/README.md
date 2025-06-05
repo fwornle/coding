@@ -1,12 +1,12 @@
 # Claude Logger MCP Server
 
-An MCP (Model Context Protocol) server that provides specstory-style logging functionality for Claude Code conversations. This server automatically saves AI chat conversations to well-formatted Markdown files in the `.specstory/history` directory, following the SpecStory format specification.
+An MCP (Model Context Protocol) server that provides specstory-style logging functionality for Claude Code conversations. This server automatically saves AI chat conversations to well-formatted Markdown files in the `.specstory/history` directory, following the SpecStory format specification. With automatic logging enabled, all your Claude Code conversations are saved without any manual intervention.
 
 ## Features
 
-- **Automatic Conversation Logging**: Save Claude Code conversations in markdown format
-- **SpecStory Compatibility**: Stores logs in `.specstory/history` directory using SpecStory format
-- **Session Management**: Start, end, and manage conversation sessions
+- **Automatic Conversation Logging**: Automatically save all Claude Code conversations when auto-logging is enabled
+- **SpecStory Compatibility**: Stores logs in `.specstory/history` directory using SpecStory format  
+- **Session Management**: Start, end, and manage conversation sessions both manually and automatically
 - **Metadata Tracking**: Capture model information, tools used, project context, and timestamps
 - **Project Integration**: Filter and organize conversations by project path
 - **Search and Retrieval**: List and retrieve past conversation sessions
@@ -47,8 +47,34 @@ Add the server to your Claude Code MCP configuration file (`claude-code-mcp.json
 
 ## Available Tools
 
+### Automatic Logging Tools
+
+### `enable_auto_logging`
+🔴 Start automatic logging of all Claude Code conversations.
+
+**Parameters:** None
+
+### `disable_auto_logging`
+⏹️ Stop automatic logging.
+
+**Parameters:** None
+
+### `auto_log_status`
+📊 Check if automatic logging is currently enabled.
+
+**Parameters:** None
+
+### `log_message`
+Queue a message for automatic logging (used internally by Claude Code).
+
+**Parameters:**
+- `type` (required): Message type ("user" or "assistant")
+- `content` (required): Message content
+
+### Manual Logging Tools
+
 ### `start_session`
-Start a new conversation session.
+Start a new conversation session manually.
 
 **Parameters:**
 - `session_id` (required): Unique identifier for the session
@@ -56,7 +82,7 @@ Start a new conversation session.
 - `title` (optional): Human-readable title for the session
 
 ### `log_conversation`
-Log a conversation exchange between user and assistant.
+Log a conversation exchange between user and assistant manually.
 
 **Parameters:**
 - `session_id` (required): Session identifier
@@ -145,6 +171,25 @@ your-project/
 │       ├── 2025-06-05-another-session.md
 │       └── ...
 ```
+
+## Quick Start: Automatic Logging
+
+1. **Enable auto-logging in Claude Code:**
+   ```
+   User: Enable automatic logging
+   ```
+
+2. **Continue your normal conversation** - all messages will be automatically saved to `.specstory/history/`
+
+3. **Check status anytime:**
+   ```
+   User: Is auto-logging active?
+   ```
+
+4. **Disable when done:**
+   ```
+   User: Stop logging
+   ```
 
 ## Integration with SpecStory
 

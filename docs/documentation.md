@@ -48,6 +48,7 @@ The system consists of three main layers:
 - **shared-memory.json**: Authoritative knowledge graph data (git-tracked)
 - **Backup System**: Automated backups in `.backups/` directory
 - **MCP Integration**: Persistent memory for Claude Code sessions
+- **Conversation Logging**: Automatic capture of Claude Code conversations in `.specstory/history/`
 
 ### 3. Visualization Layer
 
@@ -276,6 +277,48 @@ If multiple team members update the knowledge base simultaneously:
 2. Manually resolve conflicts (usually safe to keep both sets of entities)
 3. Update entity counts in metadata section
 4. Commit resolved version
+
+## Claude Code Conversation Logging
+
+### Automatic Conversation Capture
+
+The system includes automatic logging of all Claude Code conversations through the Claude Logger MCP server. This creates a searchable history of AI interactions that complements the knowledge graph.
+
+### Enabling Auto-Logging
+
+1. **Start automatic logging**:
+   ```
+   User: Enable automatic logging
+   ```
+   
+2. All subsequent conversations are automatically saved to:
+   ```
+   .specstory/history/YYYY-MM-DD-Auto-logged Claude Code Session.md
+   ```
+
+3. **Check logging status**:
+   ```
+   User: Is auto-logging active?
+   ```
+
+4. **Stop logging**:
+   ```
+   User: Stop logging
+   ```
+
+### SpecStory Integration
+
+- **Directory**: `.specstory/history/` contains all conversation logs
+- **Format**: SpecStory-compatible markdown with metadata
+- **Content**: Full conversation history with timestamps, tools used, and model info
+- **Searchable**: Compatible with SpecStory VS Code extension for searching past interactions
+
+### Benefits
+
+- **Learning from Past Sessions**: Review how problems were solved previously
+- **Team Knowledge Sharing**: Share AI conversation insights with team
+- **Pattern Recognition**: Identify recurring challenges and solutions
+- **Audit Trail**: Complete history of AI-assisted development work
 
 ## Configuration
 

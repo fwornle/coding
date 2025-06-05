@@ -37,7 +37,8 @@
       "Bash(./build-visualizer.sh:*)",
       "Bash(./vkb:*)",
       "Bash(./clean-rebuild-visualizer.sh:*)",
-      "Bash(plantuml:*)"
+      "Bash(plantuml:*)",
+      "mcp__claude-logger__log_message"
     ],
     "deny": []
   }

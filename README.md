@@ -31,6 +31,7 @@ vkb
 - 🔄 **Team sharing** via git-tracked knowledge base
 - 🎯 **Transferable patterns** in central green hub
 - 🔗 **MCP integration** for persistent memory
+- 📝 **Conversation logging** to `.specstory/history/` for AI interaction history
 
 ## 📁 Directory Structure
 
@@ -40,17 +41,23 @@ vkb
 ├── TEAM_KNOWLEDGE_SETUP.md    # Quick setup guide
 ├── docs/                      # Complete documentation
 │   ├── documentation.md       # Main documentation
+│   ├── claude-logger-mcp.md  # Conversation logging docs
 │   ├── puml/                  # PlantUML source files
 │   └── imag/                  # Generated diagrams
 ├── shared-memory.json         # Knowledge base (git-tracked)
+├── .specstory/               # Claude Code conversation history
+│   └── history/              # Auto-logged conversations
 ├── knowledge-management/      # Core KM system
 │   ├── ukb                   # Update Knowledge Base command
 │   ├── vkb                   # View Knowledge Base command
 │   ├── browser               # Browser integration
 │   └── dist/                 # Visualization files
-└── browser-access/           # Browser automation tools
+├── browser-access/           # Browser automation tools
+│   ├── src/                  # TypeScript source
+│   └── dist/                 # Compiled MCP server
+└── claude-logger-mcp/        # Conversation logging MCP server
     ├── src/                  # TypeScript source
-    └── dist/                 # Compiled MCP server
+    └── dist/                 # Compiled server
 ```
 
 ## 🚀 Core Commands
@@ -84,6 +91,13 @@ vkb
 - **Automatic Sharing**: Push/pull shares knowledge across team
 - **Conflict Resolution**: Merge strategies for concurrent updates
 - **Backup System**: Automated backups of knowledge base
+
+### Conversation Logging
+
+- **Automatic Capture**: Enable with "Enable automatic logging" in Claude Code
+- **SpecStory Format**: Conversations saved to `.specstory/history/`
+- **Full History**: Complete AI interaction logs with metadata
+- **Searchable Archive**: Compatible with SpecStory VS Code extension
 
 ## 🎨 Knowledge Graph Features
 
