@@ -1,0 +1,296 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2025-06-05T00:00:00Z",
+    "last_updated": "2025-06-05T13:35:00Z",
+    "contributors": ["q284340"],
+    "total_entities": 12,
+    "total_relations": 15,
+    "source": "clean_structure"
+  },
+  "entities": [
+    {
+      "type": "entity",
+      "name": "CodingKnowledge",
+      "entityType": "KnowledgeHub",
+      "observations": [
+        "Central hub for transferable programming knowledge and solutions",
+        "Collects reusable patterns, techniques, and solutions that apply across multiple projects",
+        "Green node in knowledge graph for easy identification",
+        "Examples: logging solutions, state management patterns, optimization techniques",
+        "Focus on solutions that can be adapted and reused in different project contexts",
+        "Bridges specific project insights to general programming knowledge",
+        "Repository of best practices and proven techniques"
+      ],
+      "significance": 10,
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "ConditionalLoggingPattern",
+      "entityType": "TransferableKnowledge",
+      "observations": [
+        "Logger class with conditional console output based on log levels",
+        "Enables debug visualization conditional on runtime log levels",
+        "Pattern: Check Logger.getActiveLevels() for dynamic state checking",
+        "Implementation: Use IIFE pattern for render-time level checking",
+        "Benefits: Production debugging without performance impact",
+        "Transferable to any project needing conditional debug output",
+        "From ConditionalDebugRendering in TimelineProject"
+      ],
+      "significance": 8,
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "ReduxStateManagementPattern",
+      "entityType": "TransferableKnowledge",
+      "observations": [
+        "Redux Toolkit implementation with typed hooks for React applications",
+        "Organized into feature-based slices (ui, timeline, repository, preferences)",
+        "State persistence integrated at slice level for user preferences",
+        "Serializable check disabled for complex objects (Three.js)",
+        "Central state management pattern for complex applications",
+        "Transferable to any React application needing predictable state",
+        "From Redux Store Architecture in TimelineProject"
+      ],
+      "significance": 8,
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "ThreeJSReactIntegrationPattern",
+      "entityType": "TransferableKnowledge",
+      "observations": [
+        "React Three Fiber integration pattern for 3D visualizations",
+        "Singleton pattern for cross-component state coordination",
+        "Global event listeners managed by component lifecycle",
+        "Performance optimization through viewport-based filtering",
+        "Camera state persistence with simple obfuscation",
+        "Transferable to any React application needing 3D graphics",
+        "From Three.js Integration in TimelineProject"
+      ],
+      "significance": 8,
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "MCPKnowledgeIntegrationPattern",
+      "entityType": "TransferableKnowledge",
+      "observations": [
+        "MCP (Model Context Protocol) integration for persistent knowledge graphs",
+        "Direct memory operations bypass local file simulation",
+        "Automated knowledge capture from git hooks and session analysis",
+        "Bidirectional sync between local storage and MCP memory",
+        "UKB/VKB command pattern for knowledge management workflow",
+        "Transferable to any development workflow needing knowledge persistence",
+        "From CodingKnowledgeBase system"
+      ],
+      "significance": 9,
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "TimelineProject",
+      "entityType": "Project",
+      "observations": [
+        "3D timeline visualization application",
+        "Built with React, Three.js, Redux Toolkit",
+        "MVI architecture pattern",
+        "Development period: May 26-28, 2025",
+        "Language: TypeScript"
+      ],
+      "significance": 7,
+      "created": "2025-05-28T00:00:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "KnowledgeManagementProject",
+      "entityType": "Project",
+      "observations": [
+        "Automated knowledge capture and visualization system",
+        "Built with bash scripts, Python, MCP integration",
+        "Supports git hook automation and session analysis",
+        "Development period: May-June 2025",
+        "Language: Bash, Python"
+      ],
+      "significance": 7,
+      "created": "2025-05-28T00:00:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "ReactPerformanceOptimization",
+      "entityType": "TechnicalInsight",
+      "observations": [
+        "Common issue: unnecessary re-renders",
+        "Solution: React.memo for component memoization",
+        "Solution: useMemo and useCallback for expensive computations",
+        "Solution: Proper dependency arrays in hooks",
+        "Key learning: Always profile before optimizing"
+      ],
+      "significance": 6,
+      "created": "2025-05-30T00:00:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "ViewportFilteringOptimization",
+      "entityType": "TechnicalInsight",
+      "observations": [
+        "Problem: Rendering performance in 3D timeline with many events",
+        "Solution: Distance-based viewport filtering for Three.js",
+        "Technique: Only render events visible in current camera view",
+        "Result: Reduced load from all events to ~20-50 visible events",
+        "Key learning: Spatial optimization crucial for 3D performance"
+      ],
+      "significance": 7,
+      "created": "2025-05-30T00:00:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "CrossPlatformBashScripting",
+      "entityType": "TechnicalInsight",
+      "observations": [
+        "Problem: Date command differences between macOS and Linux",
+        "Solution: OS detection with [[ $OSTYPE == darwin* ]]",
+        "Technique: Conditional syntax for date parsing",
+        "Pattern: Always provide fallback commands for robustness",
+        "Key learning: Test scripts on target platforms early"
+      ],
+      "significance": 5,
+      "created": "2025-05-30T00:00:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "MCP",
+      "entityType": "Technology",
+      "observations": [
+        "Model Context Protocol for persistent knowledge graphs",
+        "Enables cross-session memory for AI assistants",
+        "Supports entity-relation graph structures",
+        "Integrates with Claude Code development workflow"
+      ],
+      "significance": 8,
+      "created": "2025-06-01T00:00:00Z"
+    },
+    {
+      "type": "entity",
+      "name": "ThreeJS",
+      "entityType": "Technology",
+      "observations": [
+        "JavaScript 3D graphics library",
+        "React Three Fiber integration for React apps",
+        "Excellent for data visualization and interactive experiences",
+        "Performance considerations for large datasets"
+      ],
+      "significance": 6,
+      "created": "2025-05-28T00:00:00Z"
+    }
+  ],
+  "relations": [
+    {
+      "type": "relation",
+      "from": "CodingKnowledge",
+      "relationType": "contains",
+      "to": "ConditionalLoggingPattern",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "CodingKnowledge",
+      "relationType": "contains",
+      "to": "ReduxStateManagementPattern",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "CodingKnowledge",
+      "relationType": "contains",
+      "to": "ThreeJSReactIntegrationPattern",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "CodingKnowledge",
+      "relationType": "contains",
+      "to": "MCPKnowledgeIntegrationPattern",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "ConditionalLoggingPattern",
+      "relationType": "implemented in",
+      "to": "TimelineProject",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "ReduxStateManagementPattern",
+      "relationType": "implemented in",
+      "to": "TimelineProject",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "ThreeJSReactIntegrationPattern",
+      "relationType": "implemented in",
+      "to": "TimelineProject",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "MCPKnowledgeIntegrationPattern",
+      "relationType": "implemented in",
+      "to": "KnowledgeManagementProject",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "TimelineProject",
+      "relationType": "generated insight",
+      "to": "ViewportFilteringOptimization",
+      "created": "2025-05-30T00:00:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "TimelineProject",
+      "relationType": "generated insight",
+      "to": "ReactPerformanceOptimization",
+      "created": "2025-05-30T00:00:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "KnowledgeManagementProject",
+      "relationType": "generated insight",
+      "to": "CrossPlatformBashScripting",
+      "created": "2025-05-30T00:00:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "ThreeJSReactIntegrationPattern",
+      "relationType": "uses",
+      "to": "ThreeJS",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "MCPKnowledgeIntegrationPattern",
+      "relationType": "uses",
+      "to": "MCP",
+      "created": "2025-06-05T13:30:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "ViewportFilteringOptimization",
+      "relationType": "uses",
+      "to": "ThreeJS",
+      "created": "2025-05-30T00:00:00Z"
+    },
+    {
+      "type": "relation",
+      "from": "CodingKnowledge",
+      "relationType": "aggregates insights from",
+      "to": "TimelineProject",
+      "created": "2025-06-05T13:30:00Z"
+    }
+  ]
+}
