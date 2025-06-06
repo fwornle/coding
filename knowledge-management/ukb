@@ -10,6 +10,7 @@ SHARED_MEMORY="$CLAUDE_REPO/shared-memory.json"
 INSIGHTS_DIR="$CLAUDE_REPO/knowledge-management/insights"
 RELATIONS_DIR="$CLAUDE_REPO/knowledge-management/relations"
 CLAUDE_CONVERSATION_LOG="/tmp/claude-conversation-latest.log"
+SPECSTORY_DIR="$CLAUDE_REPO/.specstory/history"
 TMP_DIR="/tmp/ukb-$$"
 LOG_FILE="/tmp/ukb-session-$$.log"
 
@@ -117,6 +118,8 @@ show_help() {
     echo "  • Ranks insights by significance (1-10 scale)"
     echo "  • Interactive mode for detailed learning capture"
     echo "  • Auto mode analyzes Claude conversations & code changes"
+    echo "  • Integrates .specstory/history for AI-assisted insights"
+    echo "  • Creates transferable patterns from high-significance learnings"
     echo "  • Distinguishes between routine fixes and profound learnings"
     echo "  • Tracks problem-solving journeys and design rationales"
     echo ""
@@ -190,6 +193,229 @@ EOF
     # Merge conversation insights into main insights file
     jq -s '.[0] * .[1]' "$insights_file" "$conversation_insights" > "$insights_file.tmp" && \
         mv "$insights_file.tmp" "$insights_file"
+}
+
+# Analyze .specstory history for transferable insights
+analyze_specstory_history() {
+    local insights_file="$1"
+    local project="$2"
+    local language="$3"
+    
+    log "Analyzing .specstory history for transferable insights..."
+    
+    # Check if .specstory/history directory exists
+    if [[ ! -d "$SPECSTORY_DIR" ]]; then
+        log "No .specstory/history directory found"
+        return
+    fi
+    
+    # Get recent conversation files (last 7 days)
+    local recent_files
+    recent_files=$(find "$SPECSTORY_DIR" -name "*.md" -type f -mtime -7 2>/dev/null | sort -r)
+    
+    if [[ -z "$recent_files" ]]; then
+        log "No recent .specstory files found"
+        echo "  No recent .specstory files found in last 7 days"
+        return
+    fi
+    
+    log "Found $(echo "$recent_files" | wc -l) recent .specstory files"
+    
+    local insight_count=0
+    
+    # Process each conversation file
+    while IFS= read -r specstory_file; do
+        [[ -z "$specstory_file" ]] && continue
+        
+        log "Processing: $(basename "$specstory_file")"
+        
+        # Extract key patterns from conversation
+        # Look for problem-solving patterns, architectural decisions, debugging techniques
+        
+        # Extract user questions that indicate learning opportunities
+        local user_questions
+        user_questions=$(grep -A 5 "^## User" "$specstory_file" 2>/dev/null | grep -v "^--" | grep -v "^## User" || true)
+        
+        # Extract assistant responses that contain solutions
+        local assistant_solutions
+        assistant_solutions=$(grep -A 20 "^## Assistant" "$specstory_file" 2>/dev/null | grep -v "^--" | grep -v "^## Assistant" || true)
+        
+        # Look for specific patterns indicating transferable knowledge
+        local transferable_patterns=()
+        
+        # Pattern 1: Architecture/Design discussions
+        if echo "$assistant_solutions" | grep -qiE "(architecture|design pattern|refactor|restructure|modular|decoupl)"; then
+            transferable_patterns+=("architecture")
+        fi
+        
+        # Pattern 2: Debugging techniques
+        if echo "$assistant_solutions" | grep -qiE "(debug|troubleshoot|diagnose|root cause|stack trace)"; then
+            transferable_patterns+=("debugging")
+        fi
+        
+        # Pattern 3: Performance optimizations
+        if echo "$assistant_solutions" | grep -qiE "(performance|optimize|speed up|memory|efficient|cache)"; then
+            transferable_patterns+=("performance")
+        fi
+        
+        # Pattern 4: State management patterns
+        if echo "$assistant_solutions" | grep -qiE "(state management|redux|context|global state|store)"; then
+            transferable_patterns+=("state-management")
+        fi
+        
+        # Pattern 5: Error handling patterns
+        if echo "$assistant_solutions" | grep -qiE "(error handling|exception|try.catch|error boundary|fallback)"; then
+            transferable_patterns+=("error-handling")
+        fi
+        
+        # Pattern 6: Testing strategies
+        if echo "$assistant_solutions" | grep -qiE "(test|jest|pytest|unit test|integration|mock)"; then
+            transferable_patterns+=("testing")
+        fi
+        
+        # Create insights for identified patterns
+        for pattern in "${transferable_patterns[@]}"; do
+            ((insight_count++))
+            
+            local insight_name="${pattern}_pattern_from_ai_sessions_${insight_count}"
+            local significance=8  # High significance for AI-assisted learnings
+            
+            # Adjust significance based on pattern type
+            case "$pattern" in
+                "architecture") significance=10 ;;
+                "state-management") significance=9 ;;
+                "performance") significance=8 ;;
+                "debugging") significance=7 ;;
+                "testing") significance=6 ;;
+                "error-handling") significance=7 ;;
+            esac
+            
+            # Extract relevant context from the conversation (simplified to avoid hangs)
+            local context_snippet
+            context_snippet=$(echo "$assistant_solutions" | head -5 | tr '\n' ' ' | cut -c1-200)
+            
+            local timestamp
+            timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            
+            # Add insight with specstory source
+            jq --arg name "$insight_name" \
+               --arg type "AIAssistedInsight" \
+               --arg pattern "$pattern" \
+               --arg context "$context_snippet" \
+               --arg file "$(basename "$specstory_file")" \
+               --arg proj "$project" \
+               --arg lang "$language" \
+               --arg sig "$significance" \
+               --arg timestamp "$timestamp" \
+               '.insights += [{
+                   "name": $name,
+                   "entityType": $type,
+                   "observations": [
+                       "[specstory] Pattern: \($pattern)",
+                       "[specstory] Context: \($context)",
+                       "[specstory] Source: \($file)",
+                       "Project: \($proj)",
+                       "Language: \($lang)",
+                       "Significance: \($sig)/10",
+                       "Source: specstory",
+                       "Created: \($timestamp)"
+                   ],
+                   "significance": ($sig | tonumber),
+                   "metadata": {
+                       "pattern": $pattern,
+                       "source_file": $file,
+                       "source": "specstory"
+                   }
+               }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
+        done
+        
+    done <<< "$recent_files"
+    
+    if [[ $insight_count -gt 0 ]]; then
+        log "Extracted $insight_count transferable insights from .specstory history"
+        
+        # Create transferable patterns from high-significance insights
+        create_transferable_patterns "$insights_file" "$project"
+    fi
+}
+
+# Create transferable patterns from specstory insights
+create_transferable_patterns() {
+    local insights_file="$1"
+    local project="$2"
+    
+    log "Creating transferable patterns from AI-assisted insights..."
+    
+    # Extract unique patterns from high-significance specstory insights
+    local patterns
+    patterns=$(jq -r '.insights[] | select(.metadata.source == "specstory" and .significance >= 8) | .metadata.pattern' "$insights_file" 2>/dev/null | sort -u)
+    
+    while IFS= read -r pattern; do
+        [[ -z "$pattern" ]] && continue
+        
+        local pattern_name="${pattern^}Pattern"  # Capitalize first letter
+        local significance=9  # High significance for transferable patterns
+        
+        # Create pattern description based on type
+        local pattern_description
+        case "$pattern" in
+            "architecture")
+                pattern_description="Architectural decision-making pattern extracted from AI-assisted problem solving sessions. Includes system design, component organization, and scalability considerations."
+                ;;
+            "state-management")
+                pattern_description="State management pattern from AI-assisted development. Covers global state, local state, and state synchronization techniques."
+                ;;
+            "performance")
+                pattern_description="Performance optimization pattern derived from AI-assisted analysis. Includes profiling, bottleneck identification, and optimization strategies."
+                ;;
+            "debugging")
+                pattern_description="Debugging methodology pattern from AI-assisted troubleshooting. Systematic approach to problem diagnosis and resolution."
+                ;;
+            "error-handling")
+                pattern_description="Error handling pattern from AI-assisted development. Covers exception management, graceful degradation, and user feedback."
+                ;;
+            "testing")
+                pattern_description="Testing strategy pattern from AI-assisted development. Includes unit testing, integration testing, and test-driven development."
+                ;;
+            *)
+                pattern_description="Transferable ${pattern} pattern extracted from AI-assisted development sessions."
+                ;;
+        esac
+        
+        local timestamp
+        timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        
+        # Add transferable pattern
+        jq --arg name "$pattern_name" \
+           --arg type "TransferablePattern" \
+           --arg desc "$pattern_description" \
+           --arg pattern "$pattern" \
+           --arg proj "$project" \
+           --arg sig "$significance" \
+           --arg timestamp "$timestamp" \
+           '.insights += [{
+               "name": $name,
+               "entityType": $type,
+               "observations": [
+                   "[pattern] Type: \($pattern)",
+                   "[pattern] Description: \($desc)",
+                   "[pattern] Origin: AI-assisted development",
+                   "[pattern] Project: \($proj)",
+                   "Significance: \($sig)/10",
+                   "Source: specstory-pattern",
+                   "Created: \($timestamp)"
+               ],
+               "significance": ($sig | tonumber),
+               "metadata": {
+                   "pattern_type": $pattern,
+                   "source": "specstory-pattern",
+                   "transferable": true
+               }
+           }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
+        
+        log "Created transferable pattern: $pattern_name"
+        
+    done <<< "$patterns"
 }
 
 # Interactive insight capture
@@ -314,7 +540,10 @@ extract_auto_insights() {
     # 2. Analyze Claude conversation if available
     analyze_claude_conversation "$insights_file"
     
-    # 3. Analyze code changes for architectural patterns
+    # 3. Analyze .specstory history for transferable insights
+    analyze_specstory_history "$insights_file" "$project" "$language"
+    
+    # 4. Analyze code changes for architectural patterns
     analyze_code_changes "$insights_file" "$project" "$language"
 }
 
@@ -331,7 +560,7 @@ analyze_commits_deeply() {
         local category="general"
         local significance=5
         
-        # Enhanced classification with significance scoring
+        # Enhanced classification with significance scoring - focus on transferable insights only
         if [[ "$message" =~ refactor.*state|state.*management|redux|context.*api ]]; then
             category="state-management"
             significance=9
@@ -341,15 +570,12 @@ analyze_commits_deeply() {
         elif [[ "$message" =~ performance.*breakthrough|optimize.*algorithm ]]; then
             category="performance-optimization"
             significance=8
-        elif [[ "$message" =~ ^(refactor|Refactor): ]]; then
+        elif [[ "$message" =~ ^(refactor|Refactor):.*pattern|^(refactor|Refactor):.*architecture ]]; then
             category="refactoring"
             significance=7
-        elif [[ "$message" =~ ^(feat|Feat): ]]; then
-            category="feature"
-            significance=5
-        elif [[ "$message" =~ ^(fix|Fix): ]]; then
-            category="bug-fix"
-            significance=3
+        else
+            # Skip low-significance commits (features, bug fixes, etc.)
+            continue
         fi
         
         # Get commit diff to analyze changes
@@ -358,8 +584,8 @@ analyze_commits_deeply() {
             diff_summary=$(git show --stat "$hash" 2>/dev/null | tail -n 1 || echo "")
         fi
         
-        # Create insight entity
-        local insight_name="${category}_${project}_$(date +%Y%m%d)_${insight_id}"
+        # Create insight entity with generic naming
+        local insight_name="${category}_insight_${project}_${insight_id}"
         local timestamp
         timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         
@@ -505,16 +731,21 @@ create_project_relationships() {
     local project
     project=$(basename "$PWD")
     
-    # Ensure project entity exists
+    # Ensure project entity exists with high significance (so it's never filtered out)
     if ! jq -e --arg proj "$project" '.entities[] | select(.name == $proj)' "$SHARED_MEMORY" >/dev/null; then
-        add_to_shared_memory_entity "$project" "Project" "Software project: $project" "5"
+        add_to_shared_memory_entity "$project" "Project" "Software project: $project" "8"
+    fi
+    
+    # Ensure CodingKnowledge hub exists
+    if ! jq -e '.entities[] | select(.name == "CodingKnowledge")' "$SHARED_MEMORY" >/dev/null; then
+        add_to_shared_memory_entity "CodingKnowledge" "System" "Central hub for transferable programming patterns and insights" "10"
     fi
     
     # Link insights to project with relationship strength based on significance
     local insights
-    insights=$(jq -r '.entities[] | select(.entityType == "CodingInsight" or .entityType == "DeepInsight") | "\(.name):\(.significance // 5)"' "$SHARED_MEMORY" 2>/dev/null || echo "")
+    insights=$(jq -r '.entities[] | select(.entityType == "CodingInsight" or .entityType == "DeepInsight" or .entityType == "AIAssistedInsight" or .entityType == "TransferablePattern") | "\(.name):\(.significance // 5):\(.entityType)"' "$SHARED_MEMORY" 2>/dev/null || echo "")
     
-    while IFS=: read -r insight_name significance; do
+    while IFS=: read -r insight_name significance entity_type; do
         [[ -z "$insight_name" ]] && continue
         
         # Relationship type based on significance
@@ -525,7 +756,23 @@ create_project_relationships() {
             rel_type="enhances"
         fi
         
-        add_to_shared_memory_relation "$insight_name" "$rel_type" "$project"
+        # Link to project (except for transferable patterns which are cross-project)
+        if [[ "$entity_type" != "TransferablePattern" ]]; then
+            add_to_shared_memory_relation "$insight_name" "$rel_type" "$project"
+        fi
+        
+        # For high-significance AI-assisted insights, also link to CodingKnowledge hub
+        if [[ "$entity_type" == "AIAssistedInsight" ]] && [[ ${significance:-5} -ge 7 ]]; then
+            add_to_shared_memory_relation "$insight_name" "exemplifies" "CodingKnowledge"
+            log "Linked AI-assisted insight to CodingKnowledge hub: $insight_name"
+        fi
+        
+        # For transferable patterns, link directly to CodingKnowledge hub
+        if [[ "$entity_type" == "TransferablePattern" ]]; then
+            add_to_shared_memory_relation "CodingKnowledge" "contains" "$insight_name"
+            add_to_shared_memory_relation "$insight_name" "derived from" "$project"
+            log "Linked transferable pattern to CodingKnowledge hub: $insight_name"
+        fi
     done <<< "$insights"
 }
 

@@ -38,7 +38,9 @@
       "Bash(./vkb:*)",
       "Bash(./clean-rebuild-visualizer.sh:*)",
       "Bash(plantuml:*)",
-      "mcp__claude-logger__log_message"
+      "mcp__claude-logger__log_message",
+      "Bash(jq:*)",
+      "Bash(./knowledge-management/vkb restart:*)"
     ],
     "deny": []
   }
