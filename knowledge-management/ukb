@@ -54,6 +54,66 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
+# URL validation function
+validate_url() {
+    local url="$1"
+    local timeout=10
+    
+    # Check URL format first
+    if [[ ! "$url" =~ ^https?:// ]]; then
+        return 1
+    fi
+    
+    # Test URL accessibility
+    local status_code
+    status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$timeout" "$url" 2>/dev/null || echo "000")
+    
+    # Accept 200-399 status codes (including redirects)
+    if [[ "$status_code" =~ ^[23][0-9][0-9]$ ]]; then
+        return 0
+    else
+        log "URL validation failed: $url (status: $status_code)"
+        return 1
+    fi
+}
+
+# Validate and filter URLs
+validate_urls() {
+    local urls_input="$1"
+    local valid_urls=()
+    
+    if [[ -z "$urls_input" ]]; then
+        echo ""
+        return
+    fi
+    
+    echo -e "${BLUE}🔗 Validating reference URLs...${NC}"
+    
+    # Split URLs by comma and validate each
+    IFS=',' read -ra urls <<< "$urls_input"
+    for url in "${urls[@]}"; do
+        # Trim whitespace
+        url=$(echo "$url" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        if [[ -n "$url" ]]; then
+            echo -n "  Validating $url... "
+            if validate_url "$url"; then
+                valid_urls+=("$url")
+                echo -e "${GREEN}✓${NC}"
+            else
+                echo -e "${RED}✗ (invalid/unreachable)${NC}"
+            fi
+        fi
+    done
+    
+    # Return comma-separated valid URLs
+    if [[ ${#valid_urls[@]} -gt 0 ]]; then
+        printf "%s," "${valid_urls[@]}" | sed 's/,$//'
+    else
+        echo ""
+    fi
+}
+
 # Error handling
 error_exit() {
     echo -e "${RED}ERROR: $1${NC}" >&2
@@ -448,180 +508,362 @@ capture_interactive_insight() {
     echo -e "${BLUE}(Insights that will help in future projects)${NC}"
     read -r -p "> " key_learnings
     
+    # Applicability
+    echo -e "\n${YELLOW}5. Where else could this be applied?${NC}"
+    echo -e "${BLUE}(What types of projects/situations would benefit)${NC}"
+    read -r -p "> " applicability
+    
+    # Technologies
+    echo -e "\n${YELLOW}6. Technologies involved (comma-separated):${NC}"
+    echo -e "${BLUE}(e.g., React, TypeScript, Redis, Docker)${NC}"
+    read -r -p "> " technologies_input
+    
+    # References
+    echo -e "\n${YELLOW}7. Helpful references (URLs, comma-separated, optional):${NC}"
+    echo -e "${BLUE}(Documentation, tutorials, repos that help understand this pattern)${NC}"
+    read -r -p "> " references_input
+    
+    # Validate URLs if provided
+    local validated_references=""
+    if [[ -n "$references_input" ]]; then
+        validated_references=$(validate_urls "$references_input")
+        if [[ -z "$validated_references" ]]; then
+            echo -e "${YELLOW}⚠️  No valid URLs found, continuing without references${NC}"
+        fi
+    fi
+    
+    # Code files
+    echo -e "\n${YELLOW}8. Key code files (comma-separated, optional):${NC}"
+    echo -e "${BLUE}(Main files that implement this pattern)${NC}"
+    read -r -p "> " code_files_input
+    
     # Category
-    echo -e "\n${YELLOW}5. Category:${NC}"
+    echo -e "\n${YELLOW}9. Category:${NC}"
     echo "   1) Architecture Decision"
-    echo "   2) Refactoring"
-    echo "   3) State Management"
-    echo "   4) Design Pattern"
-    echo "   5) Performance Optimization"
-    echo "   6) Algorithm/Data Structure"
-    echo "   7) Debugging Technique"
-    echo "   8) Feature Implementation"
-    echo "   9) Bug Fix"
-    echo "   10) Other"
-    read -r -p "Select (1-10): " category_choice
+    echo "   2) Performance Optimization"
+    echo "   3) State Management Pattern"
+    echo "   4) Integration Pattern"
+    echo "   5) Development Workflow"
+    echo "   6) Security Pattern"
+    echo "   7) Testing Strategy"
+    echo "   8) Other"
+    read -r -p "Select (1-8): " category_choice
     
     local category_map=(
-        "" "architecture" "refactoring" "state-management" "design-pattern"
-        "performance-optimization" "algorithm" "debugging-technique"
-        "feature" "bug-fix" "general"
+        "" "architecture" "performance" "state-management" "integration"
+        "workflow" "security" "testing" "general"
     )
     local category="${category_map[$category_choice]:-general}"
     
-    # Calculate significance
-    local combined_content="$problem_context $solution_approach $design_rationale $key_learnings"
-    local significance
-    significance=$(calculate_significance "$combined_content" "$category")
+    # Process arrays
+    local technologies_array
+    if [[ -n "$technologies_input" ]]; then
+        technologies_array=$(echo "$technologies_input" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')
+        technologies_array="[$technologies_array]"
+    else
+        technologies_array="[]"
+    fi
     
-    # Create insight entity
-    local insight_name="${category}_${project}_$(date +%Y%m%d_%H%M%S)"
+    local references_array
+    if [[ -n "$validated_references" ]]; then
+        references_array=$(echo "$validated_references" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')
+        references_array="[$references_array]"
+    else
+        references_array="[]"
+    fi
+    
+    local code_files_array
+    if [[ -n "$code_files_input" ]]; then
+        code_files_array=$(echo "$code_files_input" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')
+        code_files_array="[$code_files_array]"
+    else
+        code_files_array="[]"
+    fi
+    
+    # Calculate significance (7-9 range for interactive entries)
+    local significance=8  # Default high significance for manually captured insights
+    if [[ "$category" == "architecture" ]]; then
+        significance=9
+    elif [[ "$category" == "performance" || "$category" == "state-management" ]]; then
+        significance=8
+    else
+        significance=7
+    fi
+    
+    # Create meaningful pattern name
+    local base_name=$(echo "$problem_context" | sed 's/[^a-zA-Z0-9 ]//g' | awk '{print $1$2$3}' | sed 's/ //g')
+    local insight_name="${base_name}Pattern"
+    [[ ${#insight_name} -lt 5 ]] && insight_name="${category}Pattern_${project}"
+    
     local timestamp
     timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    local author
+    author=$(whoami)
     
-    # Add to insights file
+    # Add to insights file with new structured format
     jq --arg name "$insight_name" \
-       --arg type "DeepInsight" \
+       --arg type "TransferablePattern" \
        --arg problem "$problem_context" \
        --arg solution "$solution_approach" \
-       --arg rationale "$design_rationale" \
+       --arg approach "$design_rationale" \
        --arg learnings "$key_learnings" \
-       --arg cat "$category" \
+       --arg applicability "$applicability" \
+       --argjson technologies "$technologies_array" \
+       --argjson references "$references_array" \
+       --argjson code_files "$code_files_array" \
+       --arg author "$author" \
        --arg proj "$project" \
        --arg lang "$language" \
        --arg sig "$significance" \
        --arg timestamp "$timestamp" \
-       --arg source "interactive" \
        '.insights += [{
+           "type": "entity",
            "name": $name,
            "entityType": $type,
+           "problem": $problem,
+           "solution": $solution,
+           "approach": $approach,
+           "applicability": $applicability,
+           "technologies": $technologies,
+           "references": $references,
+           "author": $author,
+           "project": $proj,
+           "code_files": $code_files,
            "observations": [
                "Problem: \($problem)",
                "Solution: \($solution)",
-               "Rationale: \($rationale)",
-               "Learnings: \($learnings)",
-               "Category: \($cat)",
-               "Project: \($proj)",
-               "Language: \($lang)",
+               "Approach: \($approach)",
+               "Key learnings: \($learnings)",
+               "Applicability: \($applicability)",
                "Significance: \($sig)/10",
-               "Source: \($source)",
                "Created: \($timestamp)"
-           ],
+           ] + (if ($references | length) > 0 then ["References: " + ($references | join(", "))] else [] end),
            "significance": ($sig | tonumber),
-           "metadata": {
-               "problem": $problem,
-               "solution": $solution,
-               "rationale": $rationale,
-               "learnings": $learnings,
-               "category": $cat,
-               "source": $source
-           }
+           "created": $timestamp
        }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
     
     echo -e "\n${GREEN}✅ Insight captured with significance: $significance/10${NC}"
 }
 
-# Enhanced automatic insight extraction
+# Enhanced automatic insight extraction - CONSERVATIVE MODE
 extract_auto_insights() {
     local insights_file="$1"
     local project="$2"
     local language="$3"
     
-    log "Extracting insights in automatic mode..."
+    log "Extracting insights in CONSERVATIVE mode - quality over quantity..."
     
     # Initialize insights file
     echo '{"insights": [], "entities": [], "relations": []}' > "$insights_file"
     
-    # 1. Analyze git commits with enhanced classification
+    # CONSERVATIVE: Only capture truly significant architectural changes
     if [[ -f "$TMP_DIR/recent_commits.txt" ]]; then
-        analyze_commits_deeply "$insights_file" "$project" "$language"
+        analyze_commits_conservatively "$insights_file" "$project" "$language"
     fi
     
-    # 2. Analyze Claude conversation if available
-    analyze_claude_conversation "$insights_file"
+    # Skip automatic .specstory analysis to prevent noise
+    # Only interactive mode or manual curation should add patterns
     
-    # 3. Analyze .specstory history for transferable insights
-    analyze_specstory_history "$insights_file" "$project" "$language"
-    
-    # 4. Analyze code changes for architectural patterns
-    analyze_code_changes "$insights_file" "$project" "$language"
+    log "Conservative analysis complete - focusing on high-value insights only"
 }
 
-# Deep commit analysis
-analyze_commits_deeply() {
+# Conservative commit analysis - only capture major architectural changes
+analyze_commits_conservatively() {
     local insights_file="$1"
     local project="$2"
     local language="$3"
     
-    local insight_id=1
+    log "Analyzing commits conservatively - high threshold for significance..."
+    
+    local significant_commits=0
     while IFS='|' read -r hash author date message; do
         [[ -z "$message" ]] && continue
         
-        local category="general"
-        local significance=5
+        # VERY HIGH THRESHOLD: Only capture truly architectural changes
+        local should_capture=false
+        local category=""
+        local significance=0
         
-        # Enhanced classification with significance scoring - focus on transferable insights only
-        if [[ "$message" =~ refactor.*state|state.*management|redux|context.*api ]]; then
-            category="state-management"
-            significance=9
-        elif [[ "$message" =~ architect|design.*pattern|restructure.*system ]]; then
+        # Only these patterns are significant enough to auto-capture
+        if [[ "$message" =~ ^(feat|refactor):.*implement.*architecture|^(feat|refactor):.*redesign.*system ]]; then
             category="architecture"
-            significance=10
-        elif [[ "$message" =~ performance.*breakthrough|optimize.*algorithm ]]; then
-            category="performance-optimization"
+            significance=9
+            should_capture=true
+        elif [[ "$message" =~ ^(perf|feat):.*optimization.*breakthrough|^(perf):.*algorithm.*improvement ]]; then
+            category="performance"
             significance=8
-        elif [[ "$message" =~ ^(refactor|Refactor):.*pattern|^(refactor|Refactor):.*architecture ]]; then
-            category="refactoring"
-            significance=7
-        else
-            # Skip low-significance commits (features, bug fixes, etc.)
+            should_capture=true
+        elif [[ "$message" =~ ^(feat|refactor):.*state.*management.*pattern|^(feat):.*redux.*implementation ]]; then
+            category="state-management"
+            significance=8
+            should_capture=true
+        fi
+        
+        # Skip everything else - let interactive mode handle nuanced insights
+        if [[ "$should_capture" == false ]]; then
             continue
         fi
         
-        # Get commit diff to analyze changes
-        local diff_summary=""
-        if command -v git >/dev/null 2>&1; then
-            diff_summary=$(git show --stat "$hash" 2>/dev/null | tail -n 1 || echo "")
-        fi
+        ((significant_commits++))
+        log "Found significant commit: $message (category: $category)"
         
-        # Create insight entity with generic naming
-        local insight_name="${category}_insight_${project}_${insight_id}"
-        local timestamp
-        timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        # Auto-capture clear architectural candidates
+        auto_capture_significant_commit "$hash" "$message" "$category" "$significance" "$insights_file" "$project" "$language"
         
-        # Add insight with auto-generated analysis
-        jq --arg name "$insight_name" \
-           --arg type "CodingInsight" \
-           --arg msg "$message" \
-           --arg cat "$category" \
-           --arg proj "$project" \
-           --arg lang "$language" \
-           --arg sig "$significance" \
-           --arg diff "$diff_summary" \
-           --arg timestamp "$timestamp" \
-           '.insights += [{
-               "name": $name,
-               "entityType": $type,
-               "observations": [
-                   "[auto] Commit: \($msg)",
-                   "[auto] Category: \($cat)",
-                   "[auto] Impact: \($diff)",
-                   "Project: \($proj)",
-                   "Language: \($lang)",
-                   "Significance: \($sig)/10",
-                   "Source: automatic",
-                   "Created: \($timestamp)"
-               ],
-               "significance": ($sig | tonumber),
-               "metadata": {
-                   "commit_message": $msg,
-                   "category": $cat,
-                   "source": "automatic"
-               }
-           }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
-        
-        ((insight_id++))
     done < "$TMP_DIR/recent_commits.txt"
+    
+    if [[ $significant_commits -eq 0 ]]; then
+        log "No commits met the high significance threshold"
+        echo -e "${BLUE}ℹ️  No significant architectural changes detected in recent commits${NC}"
+        echo -e "${BLUE}💡 Use 'ukb --interactive' to manually capture valuable insights${NC}"
+    else
+        log "Found $significant_commits potentially significant commits"
+        echo -e "${YELLOW}⚠️  Found $significant_commits potentially significant commits${NC}"
+        echo -e "${BLUE}💡 Use 'ukb --interactive' to properly capture these insights${NC}"
+    fi
+}
+
+# Auto-capture significant architectural commits
+auto_capture_significant_commit() {
+    local hash="$1"
+    local message="$2"
+    local category="$3"
+    local significance="$4"
+    local insights_file="$5"
+    local project="$6"
+    local language="$7"
+    
+    log "Auto-capturing significant commit: $message"
+    
+    # Extract meaningful name from commit message
+    local pattern_name
+    if [[ "$message" =~ implement.*([A-Z][a-z]+.*[A-Z][a-z]+) ]] || [[ "$message" =~ add.*([A-Z][a-z]+.*[A-Z][a-z]+) ]]; then
+        pattern_name="${BASH_REMATCH[1]// /}Pattern"
+    elif [[ "$category" == "architecture" ]]; then
+        pattern_name="ArchitecturalRefactoring_$(date +%Y%m%d)"
+    elif [[ "$category" == "performance" ]]; then
+        pattern_name="PerformanceOptimization_$(date +%Y%m%d)"
+    elif [[ "$category" == "state-management" ]]; then
+        pattern_name="StateManagementPattern_$(date +%Y%m%d)"
+    else
+        pattern_name="${category}Pattern_$(date +%Y%m%d)"
+    fi
+    
+    # Get commit details for context
+    local diff_summary=""
+    local changed_files=""
+    if command -v git >/dev/null 2>&1; then
+        diff_summary=$(git show --stat "$hash" 2>/dev/null | tail -n 1 || echo "")
+        changed_files=$(git show --name-only --pretty=format: "$hash" 2>/dev/null | head -5 | tr '\n' ', ' | sed 's/,$//' || echo "")
+    fi
+    
+    # Determine problem and solution from commit message and category
+    local problem solution approach
+    case "$category" in
+        "architecture")
+            problem="System architecture needed restructuring or new architectural pattern"
+            solution="Implemented architectural changes to improve system design"
+            approach="$message - $diff_summary"
+            ;;
+        "performance") 
+            problem="Performance bottleneck or optimization opportunity identified"
+            solution="Applied performance optimization techniques"
+            approach="$message - $diff_summary"
+            ;;
+        "state-management")
+            problem="State management complexity or inefficiency"
+            solution="Improved state management pattern or implementation"
+            approach="$message - $diff_summary"
+            ;;
+        *)
+            problem="Development challenge requiring systematic solution"
+            solution="Implemented structured approach to resolve issue"
+            approach="$message - $diff_summary"
+            ;;
+    esac
+    
+    # Set technologies based on language and file patterns
+    local technologies_array="[]"
+    case "$language" in
+        "typescript"|"javascript")
+            if [[ "$changed_files" =~ react|jsx|tsx ]]; then
+                technologies_array='["TypeScript", "React"]'
+            elif [[ "$changed_files" =~ node|express ]]; then
+                technologies_array='["TypeScript", "Node.js"]'
+            else
+                technologies_array='["TypeScript"]'
+            fi
+            ;;
+        "python")
+            technologies_array='["Python"]'
+            ;;
+        "rust")
+            technologies_array='["Rust"]'
+            ;;
+        "shell")
+            technologies_array='["Bash", "Shell Scripting"]'
+            ;;
+        *)
+            technologies_array="[\"$language\"]"
+            ;;
+    esac
+    
+    local code_files_array
+    if [[ -n "$changed_files" ]]; then
+        code_files_array=$(echo "$changed_files" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')
+        code_files_array="[$code_files_array]"
+    else
+        code_files_array="[]"
+    fi
+    
+    local timestamp
+    timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    local author
+    author=$(whoami)
+    
+    # Add structured pattern to insights file
+    jq --arg name "$pattern_name" \
+       --arg type "TransferablePattern" \
+       --arg problem "$problem" \
+       --arg solution "$solution" \
+       --arg approach "$approach" \
+       --arg applicability "Projects with similar architectural/performance challenges" \
+       --argjson technologies "$technologies_array" \
+       --argjson code_files "$code_files_array" \
+       --arg author "$author" \
+       --arg proj "$project" \
+       --arg sig "$significance" \
+       --arg timestamp "$timestamp" \
+       --arg commit_hash "$hash" \
+       '.insights += [{
+           "type": "entity",
+           "name": $name,
+           "entityType": $type,
+           "problem": $problem,
+           "solution": $solution,
+           "approach": $approach,
+           "applicability": $applicability,
+           "technologies": $technologies,
+           "author": $author,
+           "project": $proj,
+           "code_files": $code_files,
+           "observations": [
+               "Problem: \($problem)",
+               "Solution: \($solution)",
+               "Approach: \($approach)",
+               "Auto-captured from commit: \($commit_hash)",
+               "Significance: \($sig)/10",
+               "Created: \($timestamp)"
+           ],
+           "significance": ($sig | tonumber),
+           "created": $timestamp,
+           "metadata": {
+               "source": "auto-commit",
+               "commit_hash": $commit_hash
+           }
+       }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
+    
+    echo -e "${GREEN}✅ Auto-captured: $pattern_name (significance: $significance/10)${NC}"
 }
 
 # Analyze code changes for patterns
