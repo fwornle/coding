@@ -7,8 +7,44 @@
 ### Prerequisites
 - Git, Node.js, npm, Python 3, and jq installed
 - macOS, Linux, or Windows (via WSL/Git Bash)
-- SSH access to cc-github.bmwgroup.net (for team's memory-visualizer)
-- SSH access to github.com (optional, for browserbase)
+- SSH access to cc-github.bmwgroup.net (when inside Corporate Network)
+- SSH access to github.com (when outside Corporate Network)
+
+### Network-Aware Installation
+
+The installer automatically detects your network location and selects appropriate repositories:
+
+**🏢 Inside Corporate Network (CN):**
+- **Detection:** Tests SSH/HTTPS access to `cc-github.bmwgroup.net`
+- **memory-visualizer:** Uses CN mirror with team modifications
+- **browserbase:** Uses public repo with proxy detection and graceful fallback
+
+**🌍 Outside Corporate Network:**
+- **Detection:** `cc-github.bmwgroup.net` not accessible
+- **memory-visualizer:** Uses public fork (`github.com/fwornle/memory-visualizer`)
+- **browserbase:** Uses public repo (`github.com/browserbase/mcp-server-browserbase`)
+
+![Installation Flow](docs/imag/installation-flow.png)
+
+### Corporate Network Handling
+
+**🔍 Proxy Detection:**
+When inside CN, the installer tests external connectivity using `curl google.de` to determine if proxy access is available.
+
+**📦 Repository Strategy:**
+- **Mirrored repos** (memory-visualizer): Always use CN mirror when inside CN
+- **Non-mirrored repos** (browserbase): Intelligent handling based on proxy status
+
+**⚡ Graceful Degradation:**
+- **Repository exists + No proxy:** Skip updates, continue with existing version
+- **Repository missing + No proxy:** Report failure with helpful hints
+- **Repository exists + Proxy working:** Update successfully
+- **Repository missing + Proxy working:** Clone successfully
+
+**📊 Installation Status:**
+- **🟢 Success:** All components installed successfully
+- **🟡 Warnings:** Some updates skipped due to network restrictions
+- **🔴 Failures:** Some components missing and couldn't be installed
 
 ### Setup Process
 
@@ -156,11 +192,27 @@ The `.env` file supports the following variables:
 ## Troubleshooting
 
 ### Installation Issues
+
+**General Issues:**
+
 - **Missing dependencies**: The installer will list any missing dependencies and provide installation commands
 - **Permission denied**: Run `chmod +x install.sh` before running the installer
 - **Path not updated**: Manually source your shell config file or restart your terminal
 
+**Corporate Network Issues:**
+
+- **External repos fail to clone**: Check proxy configuration or run installer outside CN
+- **Updates fail inside CN**: Normal behavior when proxy blocks external access - uses existing versions
+- **SSH access fails**: Ensure your SSH keys are configured for both `cc-github.bmwgroup.net` and `github.com`
+
+**Repository Selection Issues:**
+
+- **Wrong repository used**: Installer auto-detects network location - verify you're on intended network
+- **CN mirror outdated**: Manual update required if CN mirror is behind public version
+- **Public fork outdated**: Update your public fork from upstream if needed
+
 ### Server Issues
+
 ```bash
 vkb stop    # Stop any stuck servers
 vkb start   # Start fresh

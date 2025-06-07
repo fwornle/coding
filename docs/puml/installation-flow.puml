@@ -1,0 +1,141 @@
+@startuml installation-flow
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam arrow {
+    Color black
+    FontColor black
+}
+
+title Installation Flow - Network Detection & Repository Selection
+
+start
+
+:Check Dependencies;
+note right: Git, Node.js, npm, Python3, jq
+
+:Network Detection;
+note right
+  Test SSH access to cc-github.bmwgroup.net
+  Fallback: HTTPS curl test
+end note
+
+if (cc-github.bmwgroup.net accessible?) then (yes)
+  :Inside Corporate Network (CN);
+  #lightblue:Set INSIDE_CN = true;
+  
+  :Test Proxy Connectivity;
+  note right: curl -s https://google.de
+  
+  if (Proxy working?) then (yes)
+    #lightgreen:PROXY_WORKING = true;
+  else (no)
+    #orange:PROXY_WORKING = false;
+  endif
+  
+  :Select CN Repository Strategy;
+  note right
+    Memory Visualizer: Use CN mirror
+    (cc-github.bmwgroup.net/frankwoernle/memory-visualizer)
+    
+    Browserbase: Use public repo with proxy handling
+    (github.com/browserbase/mcp-server-browserbase)
+  end note
+  
+else (no)
+  :Outside Corporate Network;
+  #lightgray:Set INSIDE_CN = false;
+  #lightgreen:PROXY_WORKING = true (assume direct access);
+  
+  :Test GitHub SSH Access;
+  note right: ssh -T git@github.com
+  
+  :Select Public Repository Strategy;
+  note right
+    Memory Visualizer: Use public fork
+    (github.com/fwornle/memory-visualizer)
+    
+    Browserbase: Use public repo
+    (github.com/browserbase/mcp-server-browserbase)
+  end note
+endif
+
+partition "Install Memory Visualizer" {
+  if (Repository exists?) then (yes)
+    :Update from current remote;
+    note right: Simple git pull
+  else (no)
+    :Clone from selected repository;
+    note right: Based on network detection
+  endif
+  
+  :Build & Install Dependencies;
+}
+
+partition "Install Browserbase" {
+  if (Inside CN?) then (yes)
+    if (Repository exists?) then (yes)
+      if (Proxy working?) then (yes)
+        :Attempt update with 5s timeout;
+        if (Update successful?) then (yes)
+          #lightgreen:Success;
+        else (no)
+          #orange:Warning: Could not update;
+        endif
+      else (no)
+        #orange:Warning: Skip update (no proxy);
+      endif
+    else (no - missing repo)
+      if (Proxy working?) then (yes)
+        :Attempt clone;
+        if (Clone successful?) then (yes)
+          #lightgreen:Success;
+        else (no)
+          #red:Failure: Could not clone;
+        endif
+      else (no)
+        #red:Failure: Cannot clone (no proxy);
+      endif
+    endif
+  else (no - outside CN)
+    :Normal clone/update process;
+    #lightgreen:Success;
+  endif
+}
+
+:Continue with remaining components;
+note right
+  - MCP servers build
+  - Shell environment setup
+  - Command wrappers
+  - Configuration processing
+end note
+
+:Generate Installation Report;
+
+if (Any failures?) then (yes)
+  #red:**Installation completed with failures**;
+  note right
+    Show failed components
+    Provide proxy/network hints
+    Suggest alternative installation methods
+  end note
+else (no)
+  if (Any warnings?) then (yes)
+    #orange:**Installation completed with warnings**;
+    note right
+      Show warning details
+      System mostly functional
+    end note
+  else (no)
+    #lightgreen:**Installation completed successfully**;
+  endif
+endif
+
+:Create .activate script;
+note right: For immediate command availability
+
+stop
+
+@enduml

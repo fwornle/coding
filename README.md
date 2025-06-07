@@ -8,6 +8,7 @@ This repository contains various scripts and tools created with Claude Code, foc
 
 - **[Complete Documentation](docs/documentation.md)** - Comprehensive system documentation
 - **[Team Setup Guide](TEAM_KNOWLEDGE_SETUP.md)** - Quick start for team collaboration
+- **[Installation Architecture](docs/installation-architecture.md)** - Network detection and repository strategy
 - **[Architecture Diagrams](docs/imag/)** - System architecture and workflow diagrams
 
 ## 🎯 Quick Start
@@ -35,20 +36,27 @@ vkb
 
 ## 🚀 Installation
 
-1. **Clone and setup**:
-   ```bash
-   git clone <repository-url> ~/Agentic/coding
-   cd ~/Agentic/coding
-   cp .env.example .env  # Configure API keys if needed
-   ./install.sh
-   source ~/.zshrc  # or ~/.bashrc on Linux
-   ```
+### Quick Setup
+```bash
+git clone <repository-url> ~/Agentic/coding
+cd ~/Agentic/coding
+cp .env.example .env  # Configure API keys if needed
+./install.sh        # Network-aware installation
+source .activate    # Activate commands immediately
+```
 
-2. **Start using**:
-   ```bash
-   ukb  # Update knowledge base
-   vkb  # View knowledge visualization
-   ```
+### Network-Aware Installation
+The installer automatically detects your network environment:
+- **🏢 Corporate Network**: Uses CN mirrors for modified repos, proxy detection for external repos
+- **🌍 Public Network**: Uses public repositories with your forks
+
+**📖 [Complete Installation Guide →](TEAM_KNOWLEDGE_SETUP.md)**
+
+### Start Using
+```bash
+ukb  # Update knowledge base
+vkb  # View knowledge visualization
+```
 
 ## 📁 Directory Structure
 
