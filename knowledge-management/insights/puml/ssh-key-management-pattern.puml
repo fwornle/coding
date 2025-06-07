@@ -1,0 +1,100 @@
+@startuml ssh-key-management-pattern
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+
+title SSH Key Management Pattern\nCorporate + Personal GitHub Access
+
+actor "Developer" as Dev
+participant "SSH Config" as Config
+participant "SSH Agent" as Agent
+participant "Corporate GitHub" as Corp
+participant "Public GitHub" as Pub
+
+== SSH Key Setup Pattern ==
+Dev -> Config: Create ~/.ssh/config
+note right
+  Host corporate-github
+    HostName cc-github.bmwgroup.net
+    User git
+    IdentityFile ~/.ssh/id_rsa_work
+    IdentitiesOnly yes
+  
+  Host github.com
+    User git
+    IdentityFile ~/.ssh/id_rsa
+    IdentitiesOnly yes
+end note
+
+Dev -> Agent: Add keys to SSH agent
+note right
+  ssh-add ~/.ssh/id_rsa          # Personal key
+  ssh-add ~/.ssh/id_rsa_work     # Corporate key
+end note
+
+== Network-Aware Key Selection ==
+alt Inside Corporate Network
+    Dev -> Corp: git clone git@corporate-github:repo/name.git
+    Corp -> Config: Check SSH config for host
+    Config -> Agent: Use corporate key (id_rsa_work)
+    Agent -> Corp: Authenticate with corporate key
+    Corp --> Dev: Repository access granted
+    
+    Dev -> Pub: git clone git@github.com:user/repo.git  
+    Pub -> Config: Check SSH config for github.com
+    Config -> Agent: Use personal key (id_rsa)
+    alt Corporate Proxy Allows
+        Agent -> Pub: Authenticate with personal key
+        Pub --> Dev: Repository access granted
+    else Corporate Proxy Blocks
+        Pub --> Dev: Connection timeout/refused
+        Dev -> Dev: Fallback to HTTPS with credentials
+    end
+    
+else Outside Corporate Network
+    Dev -> Pub: git clone git@github.com:user/repo.git
+    Pub -> Config: Check SSH config for github.com  
+    Config -> Agent: Use personal key (id_rsa)
+    Agent -> Pub: Authenticate with personal key
+    Pub --> Dev: Repository access granted
+    
+    Dev -> Corp: git clone git@corporate-github:repo/name.git
+    note right: Corporate network not accessible from outside
+    Corp --> Dev: Network unreachable
+end
+
+== Key Management Best Practices ==
+note over Dev, Agent
+  1. Separate keys for corporate vs personal use
+  2. SSH config for automatic key selection
+  3. SSH agent for key caching
+  4. IdentitiesOnly=yes prevents key confusion
+  5. Host aliases for different GitHub instances
+end note
+
+== Troubleshooting Pattern ==
+Dev -> Agent: ssh-add -l
+note right: List loaded keys
+Agent --> Dev: Show available keys
+
+Dev -> Corp: ssh -T git@corporate-github
+note right: Test corporate access
+alt Key Works
+    Corp --> Dev: "successfully authenticated"
+else Key Fails
+    Corp --> Dev: "Permission denied"
+    Dev -> Dev: Check key permissions (600)
+    Dev -> Dev: Re-add key to agent
+end
+
+Dev -> Pub: ssh -T git@github.com
+note right: Test public access
+alt Key Works
+    Pub --> Dev: "successfully authenticated"
+else Key Fails
+    Pub --> Dev: "Permission denied"
+    Dev -> Dev: Verify personal key setup
+end
+
+@enduml

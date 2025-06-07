@@ -1,1 +1,1 @@
-/Users/q284340/Claude/knowledge-management/vkb
+../bin/vkb

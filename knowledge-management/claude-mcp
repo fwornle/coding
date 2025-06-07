@@ -1,0 +1,19 @@
+#!/bin/bash
+# Claude MCP launcher - starts Claude with MCP config
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLAUDE_REPO="$(dirname "$SCRIPT_DIR")"
+
+# Path to the MCP config file
+MCP_CONFIG="$CLAUDE_REPO/claude-code-mcp-processed.json"
+
+# Check if the MCP config file exists
+if [[ ! -f "$MCP_CONFIG" ]]; then
+    echo "Error: MCP config file not found at $MCP_CONFIG"
+    exit 1
+fi
+
+# Launch Claude with the MCP config
+echo "Starting Claude with MCP config from: $MCP_CONFIG"
+exec claude --mcp-config "$MCP_CONFIG" "$@"

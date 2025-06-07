@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # Configuration
-CLAUDE_REPO="/Users/q284340/Agentic/coding"
+CLAUDE_REPO="${CLAUDE_REPO:-/Users/q284340/Agentic/coding}"
 SHARED_MEMORY="$CLAUDE_REPO/shared-memory.json"
 INSIGHTS_DIR="$CLAUDE_REPO/knowledge-management/insights"
 RELATIONS_DIR="$CLAUDE_REPO/knowledge-management/relations"
@@ -555,27 +555,25 @@ capture_interactive_insight() {
     )
     local category="${category_map[$category_choice]:-general}"
     
-    # Process arrays
+    # Process arrays with proper JSON escaping
     local technologies_array
     if [[ -n "$technologies_input" ]]; then
-        technologies_array=$(echo "$technologies_input" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')
-        technologies_array="[$technologies_array]"
+        # Split by comma, trim whitespace, and build JSON array properly
+        technologies_array=$(echo "$technologies_input" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R -s 'split("\n") | map(select(length > 0))')
     else
         technologies_array="[]"
     fi
     
     local references_array
     if [[ -n "$validated_references" ]]; then
-        references_array=$(echo "$validated_references" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')
-        references_array="[$references_array]"
+        references_array=$(echo "$validated_references" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R -s 'split("\n") | map(select(length > 0))')
     else
         references_array="[]"
     fi
     
     local code_files_array
     if [[ -n "$code_files_input" ]]; then
-        code_files_array=$(echo "$code_files_input" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')
-        code_files_array="[$code_files_array]"
+        code_files_array=$(echo "$code_files_input" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R -s 'split("\n") | map(select(length > 0))')
     else
         code_files_array="[]"
     fi
@@ -600,6 +598,14 @@ capture_interactive_insight() {
     local author
     author=$(whoami)
     
+    # Generate documentation link
+    local doc_filename="${insight_name,,}.md"
+    doc_filename=$(echo "$doc_filename" | sed 's/pattern//')  # Remove redundant "pattern"
+    doc_filename=$(echo "$doc_filename" | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+    doc_filename="${doc_filename}.md"
+    local doc_link="knowledge-management/insights/${doc_filename}"
+    local doc_url="http://localhost:8080/knowledge-management/insights/${doc_filename}"
+    
     # Add to insights file with new structured format
     jq --arg name "$insight_name" \
        --arg type "TransferablePattern" \
@@ -616,6 +622,8 @@ capture_interactive_insight() {
        --arg lang "$language" \
        --arg sig "$significance" \
        --arg timestamp "$timestamp" \
+       --arg doclink "$doc_link" \
+       --arg docurl "$doc_url" \
        '.insights += [{
            "type": "entity",
            "name": $name,
@@ -629,12 +637,14 @@ capture_interactive_insight() {
            "author": $author,
            "project": $proj,
            "code_files": $code_files,
+           "documentation_link": $doclink,
            "observations": [
                "Problem: \($problem)",
                "Solution: \($solution)",
                "Approach: \($approach)",
                "Key learnings: \($learnings)",
                "Applicability: \($applicability)",
+               "Details: \($docurl)",
                "Significance: \($sig)/10",
                "Created: \($timestamp)"
            ] + (if ($references | length) > 0 then ["References: " + ($references | join(", "))] else [] end),
@@ -810,8 +820,7 @@ auto_capture_significant_commit() {
     
     local code_files_array
     if [[ -n "$changed_files" ]]; then
-        code_files_array=$(echo "$changed_files" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')
-        code_files_array="[$code_files_array]"
+        code_files_array=$(echo "$changed_files" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R -s 'split("\n") | map(select(length > 0))')
     else
         code_files_array="[]"
     fi

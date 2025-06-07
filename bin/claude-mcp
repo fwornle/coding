@@ -1,0 +1,3 @@
+#!/bin/bash
+# Wrapper for claude-mcp command
+exec /Users/q284340/Agentic/coding/knowledge-management/claude-mcp "$@"

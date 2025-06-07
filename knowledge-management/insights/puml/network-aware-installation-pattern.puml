@@ -1,0 +1,165 @@
+@startuml network-aware-installation-pattern
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+
+title Network-Aware Installation Pattern\nTransferable Knowledge for Enterprise Environments
+
+participant "Installer" as I
+participant "Network Detection" as ND
+participant "Shell Configuration" as SC
+participant "Repository Manager" as RM
+participant "SSH Manager" as SSH
+participant "Corporate Network" as CN
+participant "Public Internet" as PI
+
+== Environment Setup ==
+I -> SC: Detect shell type (.zshrc, .bashrc, .bash_profile)
+note right: Different shells have different config files\nPriority: .zshrc > .bashrc > .bash_profile
+SC -> SC: Clean existing aliases/paths
+SC -> SC: Set PATH with bin directory first
+SC -> SC: Export environment variables
+
+== Network Detection Phase ==
+I -> ND: Test network environment
+ND -> CN: SSH test (timeout 5s)
+note right: ssh -T git@corporate-github.domain.com
+alt SSH Success
+    CN --> ND: "successfully authenticated"
+    ND -> ND: INSIDE_CORPORATE = true
+else SSH Fails
+    ND -> CN: HTTPS test (timeout 5s)
+    note right: curl -s --connect-timeout 5 https://corporate-github.domain.com
+    alt HTTPS Success
+        CN --> ND: HTTP 200
+        ND -> ND: INSIDE_CORPORATE = true (no SSH)
+    else HTTPS Fails
+        ND -> ND: INSIDE_CORPORATE = false
+    end
+end
+
+== Proxy Detection (Corporate Only) ==
+alt INSIDE_CORPORATE == true
+    ND -> PI: Test external connectivity
+    note right: timeout 5s curl -s https://google.de
+    alt Proxy Working
+        PI --> ND: HTTP 200
+        ND -> ND: PROXY_WORKING = true
+    else Proxy Blocked
+        ND -> ND: PROXY_WORKING = false
+    end
+end
+
+== SSH Key Management ==
+I -> SSH: Detect available SSH keys
+SSH -> SSH: Check ~/.ssh/id_rsa (personal)
+SSH -> SSH: Check ~/.ssh/id_rsa_work (corporate)
+SSH -> SSH: Check SSH agent status
+note right
+  Multiple SSH keys pattern:
+  - Personal key for public GitHub
+  - Corporate key for enterprise GitHub
+  - SSH config for host-specific keys
+end note
+
+== Repository Strategy Selection ==
+I -> RM: Select repository URLs
+alt INSIDE_CORPORATE == true
+    RM -> RM: Use corporate mirrors for modified repos
+    RM -> RM: Use public repos for unmodified deps
+    note right
+      Repository Types:
+      1. Corporate Mirror (has modifications)
+      2. Public Fork (your modifications)  
+      3. Public Original (upstream)
+    end note
+else INSIDE_CORPORATE == false
+    RM -> RM: Use public repositories/forks
+end
+
+== Repository Access Pattern ==
+loop For each repository
+    alt Repository Type: Corporate Mirror
+        RM -> CN: Clone/update from corporate GitHub
+        note right: Always use corporate version when inside network
+    else Repository Type: Public with Corporate Access
+        alt INSIDE_CORPORATE && Repository Exists
+            alt PROXY_WORKING == true
+                RM -> PI: Attempt update (timeout 5s)
+                alt Update Success
+                    PI --> RM: Updated successfully
+                else Update Fails
+                    RM -> RM: Log warning, continue with existing
+                end
+            else PROXY_WORKING == false
+                RM -> RM: Skip update, use existing version
+            end
+        else Repository Missing && INSIDE_CORPORATE
+            alt PROXY_WORKING == true
+                RM -> PI: Attempt clone
+                alt Clone Success
+                    PI --> RM: Cloned successfully
+                else Clone Fails
+                    RM -> RM: Log failure, continue installation
+                end
+            else PROXY_WORKING == false
+                RM -> RM: Log failure with proxy hint
+            end
+        else Outside Corporate
+            RM -> PI: Normal clone/update
+        end
+    end
+end
+
+== Protocol Fallback Pattern ==
+RM -> SSH: Try SSH first
+alt SSH Success
+    SSH --> RM: Repository accessed via SSH
+else SSH Fails
+    RM -> RM: Fallback to HTTPS
+    RM -> PI: Try HTTPS access
+    alt HTTPS Success
+        PI --> RM: Repository accessed via HTTPS  
+    else HTTPS Fails
+        RM -> RM: Log complete failure
+    end
+end
+
+== Shell Environment Activation ==
+I -> SC: Create activation script (.activate)
+SC -> SC: Export REPO_PATH
+SC -> SC: Update PATH
+SC -> SC: Create command aliases/wrappers
+note right
+  Immediate activation pattern:
+  1. source .activate (immediate)
+  2. Shell config update (persistent)
+  3. Command verification
+end note
+
+== Status Reporting ==
+I -> I: Collect installation status
+note right
+  Status Categories:
+  - Full Success (all components)
+  - Partial Success with Warnings (some updates skipped)
+  - Partial Success with Failures (some components missing)
+end note
+
+alt Has Failures
+    I -> I: Show prominent failure report
+    I -> I: Provide actionable remediation steps
+    note right
+      Corporate Network Hints:
+      - Proxy configuration
+      - SSH key setup
+      - Alternative installation methods
+    end note
+else Has Warnings Only
+    I -> I: Show warning summary
+else Full Success
+    I -> I: Show success message
+end
+
+@enduml

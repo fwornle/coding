@@ -498,6 +498,22 @@ configure_shell_environment() {
         fi
     done
     
+    # Clean up old wrapper scripts in ~/bin that point to wrong paths
+    local wrapper_scripts=("$HOME/bin/ukb" "$HOME/bin/vkb" "$HOME/bin/claude-mcp")
+    for wrapper in "${wrapper_scripts[@]}"; do
+        if [[ -f "$wrapper" ]] && grep -q "/Users/q284340/Claude/" "$wrapper" 2>/dev/null; then
+            info "Updating old wrapper script: $wrapper"
+            # Update wrapper to point to new location
+            local script_name=$(basename "$wrapper")
+            cat > "$wrapper" << EOF
+#!/bin/bash
+# Updated wrapper for $script_name command
+exec $CLAUDE_REPO/knowledge-management/$script_name "\$@"
+EOF
+            chmod +x "$wrapper"
+        fi
+    done
+    
     # Check if already configured
     if grep -q "CLAUDE_REPO.*$CLAUDE_REPO" "$SHELL_RC" 2>/dev/null; then
         info "Shell already configured with correct paths"
@@ -525,7 +541,21 @@ configure_shell_environment() {
         fi
     fi
     
+    # Create a cleanup script for the current shell session
+    cat > "$CLAUDE_REPO/.cleanup-aliases.sh" << 'EOF'
+#!/bin/bash
+# Cleanup aliases from current shell session
+unalias ukb 2>/dev/null || true
+unalias vkb 2>/dev/null || true
+unalias claude-mcp 2>/dev/null || true
+unset -f ukb 2>/dev/null || true
+unset -f vkb 2>/dev/null || true
+unset -f claude-mcp 2>/dev/null || true
+EOF
+    chmod +x "$CLAUDE_REPO/.cleanup-aliases.sh"
+    
     success "Shell environment configured and old aliases removed"
+    info "If you still see old aliases, run: source $CLAUDE_REPO/.cleanup-aliases.sh"
 }
 
 # Setup MCP configuration

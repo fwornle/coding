@@ -97,6 +97,12 @@ prepare_memory_data() {
     local memory_dist="$VISUALIZER_DIR/dist/memory.json"
     mkdir -p "$(dirname "$memory_dist")"
     
+    # Create symlink to knowledge-management directory for serving documentation
+    local km_link="$VISUALIZER_DIR/dist/knowledge-management"
+    if [[ ! -L "$km_link" ]]; then
+        ln -sf "$CLAUDE_REPO/knowledge-management" "$km_link" 2>/dev/null || true
+    fi
+    
     # Convert from our format to NDJSON format expected by visualizer
     # Also deduplicate entities to prevent orphans
     {
