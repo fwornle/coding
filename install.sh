@@ -17,8 +17,15 @@ NC='\033[0m' # No Color
 # Installation configuration
 CLAUDE_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_LOG="$CLAUDE_REPO/install.log"
-MEMORY_VISUALIZER_REPO="https://github.com/modelcontextprotocol/memory-visualizer.git"
+
+# Repository URLs - SSH by default, HTTPS as fallback
+MEMORY_VISUALIZER_REPO_SSH="git@cc-github.bmwgroup.net:frankwoernle/memory-visualizer.git"
+MEMORY_VISUALIZER_REPO_HTTPS="https://cc-github.bmwgroup.net/frankwoernle/memory-visualizer.git"
 MEMORY_VISUALIZER_DIR="$CLAUDE_REPO/memory-visualizer"
+
+BROWSERBASE_REPO_SSH="git@github.com:browserbase/mcp-server-browserbase.git"
+BROWSERBASE_REPO_HTTPS="https://github.com/browserbase/mcp-server-browserbase.git"
+BROWSERBASE_DIR="$CLAUDE_REPO/mcp-server-browserbase"
 
 # Platform detection
 PLATFORM=""
@@ -75,6 +82,38 @@ warning() {
     log "WARNING: $1"
 }
 
+# Test SSH connectivity to GitHub and corporate GitHub
+test_ssh_github() {
+    info "Testing SSH connectivity to Git repositories..."
+    
+    local github_ok=false
+    local bmw_github_ok=false
+    
+    # Test public GitHub
+    if ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+        success "SSH access to GitHub.com is configured"
+        github_ok=true
+    else
+        warning "SSH access to GitHub.com not configured"
+    fi
+    
+    # Test BMW GitHub
+    if ssh -T git@cc-github.bmwgroup.net 2>&1 | grep -q -E "(successfully authenticated|Welcome to GitLab)"; then
+        success "SSH access to cc-github.bmwgroup.net is configured"
+        bmw_github_ok=true
+    else
+        warning "SSH access to cc-github.bmwgroup.net not configured"
+    fi
+    
+    if [[ "$github_ok" == false ]] && [[ "$bmw_github_ok" == false ]]; then
+        warning "No SSH access configured. Will use HTTPS for cloning."
+        warning "To set up SSH keys, visit: https://docs.github.com/en/authentication/connecting-to-github-with-ssh"
+        return 1
+    fi
+    
+    return 0
+}
+
 # Check for required dependencies
 check_dependencies() {
     echo -e "${CYAN}🔍 Checking dependencies...${NC}"
@@ -109,6 +148,29 @@ check_dependencies() {
         fi
     fi
     
+# Clone repository with SSH first, fallback to HTTPS
+clone_repository() {
+    local ssh_url="$1"
+    local https_url="$2"
+    local target_dir="$3"
+    local repo_name=$(basename "$target_dir")
+    
+    info "Attempting to clone $repo_name using SSH..."
+    if git clone "$ssh_url" "$target_dir" 2>/dev/null; then
+        success "Successfully cloned $repo_name using SSH"
+        return 0
+    else
+        warning "SSH clone failed, trying HTTPS..."
+        if git clone "$https_url" "$target_dir"; then
+            success "Successfully cloned $repo_name using HTTPS"
+            return 0
+        else
+            error_exit "Failed to clone $repo_name using both SSH and HTTPS"
+            return 1
+        fi
+    fi
+}
+
     if [[ ${#missing_deps[@]} -ne 0 ]]; then
         echo -e "${RED}Missing required dependencies: ${missing_deps[*]}${NC}"
         echo -e "${YELLOW}Please install the missing dependencies and run the installer again.${NC}"
@@ -148,7 +210,7 @@ install_memory_visualizer() {
         git pull origin main || warning "Could not update memory-visualizer"
     else
         info "Cloning memory-visualizer repository..."
-        git clone "$MEMORY_VISUALIZER_REPO" "$MEMORY_VISUALIZER_DIR" || error_exit "Failed to clone memory-visualizer"
+        clone_repository "$MEMORY_VISUALIZER_REPO_SSH" "$MEMORY_VISUALIZER_REPO_HTTPS" "$MEMORY_VISUALIZER_DIR"
     fi
     
     cd "$MEMORY_VISUALIZER_DIR"
@@ -165,6 +227,29 @@ install_memory_visualizer() {
     sed -i.bak "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CLAUDE_REPO/knowledge-management/vkb"
     
     success "Memory visualizer installed successfully"
+}
+
+# Install mcp-server-browserbase
+install_browserbase() {
+    echo -e "\n${CYAN}🌐 Installing mcp-server-browserbase...${NC}"
+    
+    if [[ -d "$BROWSERBASE_DIR" ]]; then
+        info "mcp-server-browserbase already exists, skipping..."
+    else
+        info "Cloning mcp-server-browserbase repository..."
+        clone_repository "$BROWSERBASE_REPO_SSH" "$BROWSERBASE_REPO_HTTPS" "$BROWSERBASE_DIR" || warning "Failed to clone mcp-server-browserbase"
+    fi
+    
+    # Check if stagehand directory exists within browserbase
+    if [[ -d "$BROWSERBASE_DIR/stagehand" ]]; then
+        info "Installing stagehand dependencies..."
+        cd "$BROWSERBASE_DIR/stagehand"
+        npm install || warning "Failed to install stagehand dependencies"
+        npm run build || warning "Failed to build stagehand"
+        success "Stagehand (browserbase) installed successfully"
+    fi
+    
+    cd "$CLAUDE_REPO"
 }
 
 # Install MCP servers
@@ -271,21 +356,20 @@ configure_shell_environment() {
 setup_mcp_config() {
     echo -e "\n${CYAN}⚙️  Setting up MCP configuration...${NC}"
     
-    # Check if .env file exists
-    if [[ ! -f "$CLAUDE_REPO/.env" ]]; then
-        warning ".env file not found. Please copy .env.example to .env and configure your API keys."
-        return
-    fi
-    
-    # Source the .env file
-    set -a
-    source "$CLAUDE_REPO/.env"
-    set +a
-    
     # Check if template file exists
     if [[ ! -f "$CLAUDE_REPO/claude-code-mcp.json" ]]; then
         warning "claude-code-mcp.json template not found, skipping MCP configuration..."
         return
+    fi
+    
+    # Check if .env file exists and source it
+    if [[ -f "$CLAUDE_REPO/.env" ]]; then
+        info "Loading environment variables from .env file..."
+        set -a
+        source "$CLAUDE_REPO/.env"
+        set +a
+    else
+        warning ".env file not found. Using empty API keys - please configure them later."
     fi
     
     # Create a backup of the original template
@@ -295,10 +379,14 @@ setup_mcp_config() {
     local temp_file=$(mktemp)
     cp "$CLAUDE_REPO/claude-code-mcp.json" "$temp_file"
     
-    # Replace environment variables
-    sed -i.bak "s|{{CLAUDE_PROJECT_PATH}}|${CLAUDE_PROJECT_PATH:-$CLAUDE_REPO}|g" "$temp_file"
+    # Replace environment variables - use the actual CLAUDE_REPO path
+    sed -i.bak "s|{{CLAUDE_PROJECT_PATH}}|$CLAUDE_REPO|g" "$temp_file"
     sed -i.bak "s|{{LOCAL_CDP_URL}}|${LOCAL_CDP_URL:-ws://localhost:9222}|g" "$temp_file"
-    sed -i.bak "s|{{ANTHROPIC_API_KEY}}|${ANTHROPIC_API_KEY}|g" "$temp_file"
+    sed -i.bak "s|{{ANTHROPIC_API_KEY}}|${ANTHROPIC_API_KEY:-}|g" "$temp_file"
+    
+    # Save the processed version locally
+    cp "$temp_file" "$CLAUDE_REPO/claude-code-mcp-processed.json"
+    info "Processed configuration saved to: claude-code-mcp-processed.json"
     
     # Copy to user's Claude configuration directory
     local claude_config_dir=""
@@ -319,9 +407,10 @@ setup_mcp_config() {
     
     if [[ -n "$claude_config_dir" ]] && [[ -d "$claude_config_dir" ]]; then
         cp "$temp_file" "$claude_config_dir/claude-code-mcp.json"
-        success "MCP configuration installed to Claude app"
+        success "MCP configuration installed to Claude app at: $claude_config_dir/claude-code-mcp.json"
     else
-        warning "Claude configuration directory not found. Please manually copy claude-code-mcp.json to your Claude configuration directory."
+        warning "Claude configuration directory not found at: $claude_config_dir"
+        warning "Please manually copy claude-code-mcp-processed.json to your Claude configuration directory."
     fi
     
     # Clean up
@@ -453,7 +542,9 @@ main() {
     
     # Run installation steps
     check_dependencies
+    test_ssh_github
     install_memory_visualizer
+    install_browserbase
     install_mcp_servers
     create_command_wrappers
     configure_shell_environment
