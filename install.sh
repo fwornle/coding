@@ -267,6 +267,69 @@ configure_shell_environment() {
     success "Shell environment configured"
 }
 
+# Setup MCP configuration
+setup_mcp_config() {
+    echo -e "\n${CYAN}⚙️  Setting up MCP configuration...${NC}"
+    
+    # Check if .env file exists
+    if [[ ! -f "$CLAUDE_REPO/.env" ]]; then
+        warning ".env file not found. Please copy .env.example to .env and configure your API keys."
+        return
+    fi
+    
+    # Source the .env file
+    set -a
+    source "$CLAUDE_REPO/.env"
+    set +a
+    
+    # Check if template file exists
+    if [[ ! -f "$CLAUDE_REPO/claude-code-mcp.json" ]]; then
+        warning "claude-code-mcp.json template not found, skipping MCP configuration..."
+        return
+    fi
+    
+    # Create a backup of the original template
+    cp "$CLAUDE_REPO/claude-code-mcp.json" "$CLAUDE_REPO/claude-code-mcp.json.template"
+    
+    # Replace placeholders in the template
+    local temp_file=$(mktemp)
+    cp "$CLAUDE_REPO/claude-code-mcp.json" "$temp_file"
+    
+    # Replace environment variables
+    sed -i.bak "s|{{CLAUDE_PROJECT_PATH}}|${CLAUDE_PROJECT_PATH:-$CLAUDE_REPO}|g" "$temp_file"
+    sed -i.bak "s|{{LOCAL_CDP_URL}}|${LOCAL_CDP_URL:-ws://localhost:9222}|g" "$temp_file"
+    sed -i.bak "s|{{ANTHROPIC_API_KEY}}|${ANTHROPIC_API_KEY}|g" "$temp_file"
+    
+    # Copy to user's Claude configuration directory
+    local claude_config_dir=""
+    case "$PLATFORM" in
+        macos)
+            claude_config_dir="$HOME/Library/Application Support/Claude"
+            ;;
+        linux)
+            claude_config_dir="$HOME/.config/Claude"
+            ;;
+        windows)
+            claude_config_dir="$APPDATA/Claude"
+            if [[ -z "$claude_config_dir" ]]; then
+                claude_config_dir="$HOME/AppData/Roaming/Claude"
+            fi
+            ;;
+    esac
+    
+    if [[ -n "$claude_config_dir" ]] && [[ -d "$claude_config_dir" ]]; then
+        cp "$temp_file" "$claude_config_dir/claude-code-mcp.json"
+        success "MCP configuration installed to Claude app"
+    else
+        warning "Claude configuration directory not found. Please manually copy claude-code-mcp.json to your Claude configuration directory."
+    fi
+    
+    # Clean up
+    rm -f "$temp_file" "$temp_file.bak"
+    
+    success "MCP configuration setup completed"
+}
+
 # Initialize shared memory
 initialize_shared_memory() {
     echo -e "\n${CYAN}📝 Initializing shared memory...${NC}"
@@ -308,6 +371,9 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 BROWSERBASE_API_KEY=your-browserbase-api-key
 BROWSERBASE_PROJECT_ID=your-project-id
 LOCAL_CDP_URL=ws://localhost:9222
+
+# Project path - will be set automatically by installer
+CLAUDE_PROJECT_PATH=/path/to/claude/repo
 
 # For claude-logger MCP server
 # No specific environment variables required
@@ -393,6 +459,7 @@ main() {
     configure_shell_environment
     initialize_shared_memory
     create_example_configs
+    setup_mcp_config
     verify_installation
     
     # Final instructions

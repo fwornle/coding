@@ -36,4 +36,19 @@ __pycache__/
 # claude mcp servers etc. (fw-250601)
 node_modules/
 dist/
-claude-code-mcp.json
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+
+# MCP configuration (contains processed paths)
+claude-code-mcp.json.bak
+claude-code-mcp.json.template
+
+# Installation artifacts
+install.log
+memory-visualizer/
+
+# Shared memory (if you want to keep it local)
+shared-memory.json
