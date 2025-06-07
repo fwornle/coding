@@ -421,8 +421,7 @@ setup_mcp_config() {
         warning ".env file not found. Using empty API keys - please configure them later."
     fi
     
-    # Create a backup of the original template
-    cp "$CLAUDE_REPO/claude-code-mcp.json" "$CLAUDE_REPO/claude-code-mcp.json.template"
+    # Note: Original template is preserved as claude-code-mcp.json
     
     # Replace placeholders in the template
     local temp_file=$(mktemp)
