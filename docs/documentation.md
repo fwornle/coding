@@ -103,13 +103,36 @@ The system consists of three main layers:
 |-------------|--------|---------|----------|
 | `System` | Green | Central hubs and core systems | CodingKnowledge hub |
 | `Project` | Blue | Software projects | TimelineProject, KnowledgeManagementProject |
-| `TransferableKnowledge` | Default | Reusable patterns across projects | ConditionalLoggingPattern, ReduxStateManagementPattern |
+| `TransferablePattern` | Default | Reusable patterns across projects | ConditionalLoggingPattern, ReduxStateManagementPattern |
 | `TechnicalInsight` | Default | Project-specific technical learnings | ViewportFilteringOptimization, CrossPlatformBashScripting |
 | `CodingInsight` | Default | Insights from commit analysis | Bug fixes, feature implementations |
 | `Technology` | Default | Technologies and tools | MCP, ThreeJS, React |
 | `Component` | Default | Software components | TimelineAxis, BottomBar |
 | `Feature` | Default | Application features | Debug mode, camera cycling |
 | `Architecture` | Default | Architectural patterns | MVI, Redux store architecture |
+
+### Insight Naming Conventions
+
+#### Node Names
+- **Transferable Patterns**: Use clear, descriptive names ending with "Pattern" (e.g., `ReduxStateManagementPattern`, `NetworkAwareInstallationPattern`)
+- **Project-Specific Insights**: Include project context and specific functionality (e.g., `TimelineViewportOptimization`, `KnowledgeGraphVisualization`)
+- **Technical Components**: Use full descriptive names (e.g., `ClaudeLoggerMCPServer`, `StagehandBrowserAutomation`)
+
+#### Insight File Names
+- **Location**: All detailed insights go in `knowledge-management/insights/`
+- **Format**: Use kebab-case with descriptive names that match the node name but without "Pattern" suffix
+- **Examples**: 
+  - Node: `ReduxStateManagementPattern` → File: `redux-state-management.md`
+  - Node: `NetworkAwareInstallationPattern` → File: `network-aware-installation.md`
+  - Node: `KnowledgeManagementSystem` → File: `knowledge-management-system.md`
+
+#### Significance Scoring
+- **Architecture/System Design**: 9-10 (highest priority for transferability)
+- **State Management Patterns**: 8-9 (high value for complex applications)
+- **Performance Optimizations**: 7-8 (valuable but context-dependent)
+- **Integration Patterns**: 6-7 (useful for specific technology stacks)
+- **Bug Fixes**: 3-5 (lower transferability unless revealing systematic issues)
+- **Documentation/Style**: 1-3 (minimal transferable value)
 
 ### Relationship Types
 

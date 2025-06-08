@@ -1,0 +1,65 @@
+@startuml knowledge-management-system-architecture
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+skinparam maxMessageSize 60
+
+title Knowledge Management System - Compact Architecture
+
+' Vertical layout for narrower diagram
+top to bottom direction
+
+package "Data Sources" as DataSources {
+    [Git Repo] as GitRepo
+    [Claude Conv] as ClaudeConv  
+    [Expert Input] as ExpertInput
+    [Code Analysis] as CodeAnalysis
+}
+
+package "Processing" as Processing {
+    [UKB Engine] as UKB
+    [Pattern Rec] as PatternRec
+    [Scoring] as SigScore
+    [Dedup] as Dedup
+}
+
+package "Storage" as Storage {
+    [shared-memory.json] as SharedMemory
+    [Backups] as Backup
+    [MCP Persist] as MCP
+    [Docs] as Docs
+}
+
+package "Visualization" as Visualization {
+    [VKB Server] as VKB
+    [Graph UI] as Graph
+    [Search] as Search
+}
+
+package "MCP Servers" as MCPServers {
+    [Logger] as LoggerMCP
+    [Browser] as BrowserMCP
+    [Memory] as MemoryMCP
+}
+
+' Simplified flow connections
+DataSources --> Processing : data extraction
+Processing --> Storage : structured data
+Storage --> Visualization : knowledge graph
+MCPServers --> Storage : persistence
+
+' Key user flows
+actor Developer as Dev
+actor Team as Team
+
+Dev --> DataSources : creates data
+Team --> Visualization : explores knowledge
+
+note top of DataSources : Git commits, AI conversations,\nexpert input, code analysis
+note top of Processing : UKB engine, pattern recognition,\nsignificance scoring, deduplication
+note top of Storage : shared-memory.json, backups,\nMCP persistence, documentation
+note top of Visualization : VKB server, interactive graph,\nsearch and filtering
+note top of MCPServers : Claude Logger, Browser Access,\nMemory Management
+
+@enduml

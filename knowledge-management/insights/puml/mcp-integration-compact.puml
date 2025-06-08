@@ -1,0 +1,54 @@
+@startuml mcp-integration-compact
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontSize 10
+skinparam maxMessageSize 40
+
+title MCP Integration Architecture
+
+top to bottom direction
+
+package "Claude Code" as ClaudeEnv {
+    [Claude CLI] as CLI
+    [MCP Framework] as MCP
+}
+
+package "MCP Servers" as Servers {
+    [Logger Server] as Logger
+    [Browser Server] as Browser  
+    [Memory Server] as Memory
+}
+
+package "Knowledge System" as KnowledgeSystem {
+    [UKB Command] as UKB
+    [VKB Server] as VKB
+    [shared-memory.json] as SharedMem
+}
+
+package "Data Storage" as Storage {
+    [.specstory/] as SpecStory
+    [insights/] as Insights
+    [Git Repository] as Git
+}
+
+' Connections
+CLI <--> MCP : stdio transport
+MCP <--> Logger : conversation tools
+MCP <--> Browser : web automation
+MCP <--> Memory : graph operations
+
+Logger --> SpecStory : conversation logs
+Browser --> UKB : URL validation
+Memory <--> SharedMem : persistence
+
+UKB --> SharedMem : updates
+VKB --> SharedMem : visualization
+UKB --> Insights : documentation
+SharedMem --> Git : version control
+
+actor Developer as Dev
+Dev --> CLI : AI assistance
+Dev --> UKB : insight capture
+Dev --> VKB : knowledge exploration
+
+@enduml

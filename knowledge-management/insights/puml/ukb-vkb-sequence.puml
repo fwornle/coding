@@ -1,0 +1,156 @@
+@startuml ukb-vkb-sequence
+!theme plain
+skinparam backgroundColor white
+
+title UKB and VKB Command Sequence Diagrams
+
+== UKB (Update Knowledge Base) Flow ==
+
+participant "Developer" as Dev
+participant "UKB Command" as UKB
+participant "Git Repository" as Git
+participant "Claude Conversations" as Claude
+participant "Pattern Recognition" as Pattern
+participant "shared-memory.json" as Memory
+participant "MCP Memory Server" as MCP
+
+Dev -> UKB: ukb --auto
+activate UKB
+
+UKB -> Git: git log --oneline -10
+Git --> UKB: recent commits
+
+UKB -> UKB: analyze_commits_conservatively()
+note right: Only architectural changes\nSignificance threshold: 8+
+
+UKB -> Claude: check .specstory/history
+Claude --> UKB: recent conversations
+
+UKB -> Pattern: extract_transferable_patterns()
+Pattern --> UKB: identified patterns
+
+UKB -> UKB: calculate_significance()
+note right: Score 1-10 based on\ncategory + keywords
+
+UKB -> Memory: update entities & relations
+Memory --> UKB: success
+
+UKB -> MCP: sync to persistent memory
+MCP --> UKB: synchronized
+
+UKB --> Dev: ✅ Knowledge base updated\n📊 Entities: X, Relations: Y
+deactivate UKB
+
+== Interactive Mode ==
+
+Dev -> UKB: ukb --interactive
+activate UKB
+
+UKB -> Dev: 1. What problem did you face?
+Dev --> UKB: problem description
+
+UKB -> Dev: 2. How did you solve it?
+Dev --> UKB: solution approach
+
+UKB -> Dev: 3. Why this solution?
+Dev --> UKB: design rationale
+
+UKB -> Dev: 4. What did you learn?
+Dev --> UKB: key learnings
+
+UKB -> Dev: 5. Where else applicable?
+Dev --> UKB: applicability context
+
+UKB -> Dev: 6. Technologies involved?
+Dev --> UKB: technology list
+
+UKB -> Dev: 7. Helpful references (URLs)?
+Dev --> UKB: reference URLs
+
+UKB -> UKB: validate_urls()
+note right: Test each URL\nTimeout: 10s
+
+UKB -> Dev: 8. Key code files?
+Dev --> UKB: file paths
+
+UKB -> Dev: 9. Category (1-8)?
+Dev --> UKB: category selection
+
+UKB -> UKB: calculate_significance()
+note right: Interactive: 7-9 range\nBased on category
+
+UKB -> Memory: create structured insight
+Memory --> UKB: insight created
+
+UKB -> Dev: Add another insight? (y/n)
+Dev --> UKB: response
+
+alt More insights
+    UKB -> UKB: repeat interactive flow
+end
+
+UKB --> Dev: ✅ Insights captured
+deactivate UKB
+
+== VKB (View Knowledge Base) Flow ==
+
+participant "Developer" as Dev2
+participant "VKB Command" as VKB
+participant "HTTP Server" as Server
+participant "Memory Visualizer" as Viz
+participant "Browser" as Browser
+
+Dev2 -> VKB: vkb start
+activate VKB
+
+VKB -> VKB: is_server_running()
+alt Server already running
+    VKB -> VKB: prepare_memory_data()
+    VKB -> Browser: open localhost:8080
+    VKB --> Dev2: ✅ Data refreshed
+else Start new server
+    VKB -> VKB: prepare_memory_data()
+    note right: Convert to NDJSON\nDeduplicate entities
+    
+    VKB -> Server: python3 -m http.server 8080
+    activate Server
+    
+    VKB -> VKB: wait and verify server
+    
+    VKB -> Browser: open localhost:8080
+    activate Browser
+    
+    Browser -> Server: GET /
+    Server -> Viz: serve visualization
+    Viz -> Server: memory.json data
+    Server --> Browser: interactive graph
+    
+    VKB --> Dev2: ✅ Server started\n🔗 http://localhost:8080
+end
+deactivate VKB
+
+== Server Management ==
+
+Dev2 -> VKB: vkb stop
+activate VKB
+VKB -> Server: kill process
+deactivate Server
+VKB --> Dev2: ✅ Server stopped
+deactivate VKB
+
+Dev2 -> VKB: vkb restart
+activate VKB
+VKB -> Server: kill existing
+VKB -> VKB: prepare_memory_data()
+VKB -> Server: start new server
+activate Server
+VKB --> Dev2: ✅ Server restarted
+deactivate VKB
+
+Dev2 -> VKB: vkb status
+activate VKB
+VKB -> VKB: check PID file & port
+VKB --> Dev2: Server status info
+deactivate VKB
+
+@enduml

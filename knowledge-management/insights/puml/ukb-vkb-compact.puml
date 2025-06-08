@@ -1,0 +1,53 @@
+@startuml ukb-vkb-compact
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontSize 9
+skinparam maxMessageSize 40
+
+title UKB and VKB Commands - Key Flows
+
+== UKB Auto Mode ==
+
+participant Dev as D
+participant UKB as U
+participant Git as G
+participant Memory as M
+
+D -> U: ukb --auto
+activate U
+U -> G: analyze commits
+U -> U: score significance
+U -> M: update entities
+U --> D: ✅ updated
+deactivate U
+
+== UKB Interactive Mode ==
+
+D -> U: ukb --interactive
+activate U
+U -> D: structured prompts
+note right: problem, solution,\nrationale, learnings
+D -> U: expert knowledge
+U -> U: high significance
+U -> M: create insight
+U --> D: ✅ captured
+deactivate U
+
+== VKB Server ==
+
+participant VKB as V
+participant Server as S
+participant Browser as B
+
+D -> V: vkb start
+activate V
+V -> V: prepare data
+V -> S: start http server
+activate S
+V -> B: open browser
+B -> S: localhost:8080
+S -> B: interactive graph
+V --> D: ✅ running
+deactivate V
+
+@enduml

@@ -1,0 +1,109 @@
+@startuml mcp-integration
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontSize 10
+skinparam maxMessageSize 50
+
+title MCP Server Integration - Compact View
+
+' Use vertical layout to reduce width
+top to bottom direction
+
+package "Claude Code Environment" as ClaudeEnv {
+    [Claude Code CLI] as ClaudeCLI
+    [MCP Framework] as MCPFramework
+    
+    note right of ClaudeCLI : AI assistant with\nfile system access
+    note right of MCPFramework : Model Context Protocol\nfor tool integration
+}
+
+package "MCP Servers" as MCPServers {
+    package "Claude Logger MCP" as LoggerPackage {
+        [Logger Server] as LoggerServer
+        [Session Manager] as SessionMgr
+        [SpecStory Writer] as SpecWriter
+        
+        note right of LoggerServer : Auto-logging conversations\nSession lifecycle management
+        note right of SessionMgr : Session tracking\nMetadata capture
+        note right of SpecWriter : .specstory/history\nMarkdown format
+    }
+    
+    package "Browser Access MCP" as BrowserPackage {
+        [Stagehand Server] as StagehandServer
+        [Browser Automation] as BrowserAuto
+        [URL Validator] as URLValidator
+        
+        note right of StagehandServer : Web automation\nData extraction
+        note right of BrowserAuto : Page navigation\nContent interaction
+        note right of URLValidator : Reference validation\nLink verification
+    }
+    
+    package "Memory MCP" as MemoryPackage {
+        [Memory Server] as MemoryServer
+        [Graph Operations] as GraphOps
+        [Persistence] as Persistence
+        
+        note right of MemoryServer : Knowledge graph CRUD\nSearch capabilities
+        note right of GraphOps : Entity relationships\nQuery interface
+        note right of Persistence : shared-memory.json\nBackup management
+    }
+}
+
+package "Knowledge Management" as KMSystem {
+    [UKB Engine] as UKB
+    [VKB Server] as VKB
+    [shared-memory.json] as SharedMemory
+    [Insight Documentation] as InsightDocs
+    
+    note right of UKB : Knowledge extraction\nPattern recognition
+    note right of VKB : Visualization server\nInteractive graph
+    note right of SharedMemory : Authoritative store\nGit-tracked
+    note right of InsightDocs : Detailed patterns\nMarkdown files
+}
+
+package "File System" as FileSystem {
+    [.specstory/history/] as SpecStoryDir
+    [knowledge-management/] as KMDir
+    [insights/*.md] as InsightFiles
+    [shared-memory.json] as MemoryFile
+    
+    note right of SpecStoryDir : Conversation logs\nAuto-generated
+    note right of KMDir : Commands & visualization\nukb, vkb scripts
+    note right of InsightFiles : Pattern documentation\nDetailed insights
+    note right of MemoryFile : Knowledge graph\nJSON format
+}
+
+' MCP Protocol Connections
+ClaudeCLI <--> MCPFramework : MCP Protocol
+
+MCPFramework <--> LoggerServer : Tools:\n- enable_auto_logging\n- log_conversation\n- start/end_session
+MCPFramework <--> StagehandServer : Tools:\n- navigate\n- act/observe\n- extract/screenshot
+MCPFramework <--> MemoryServer : Tools:\n- create_entities\n- create_relations\n- search_nodes
+
+' Data Flow Connections
+LoggerServer --> SpecStoryDir : conversation logs
+SpecStoryDir --> UKB : conversation analysis
+
+StagehandServer --> URLValidator : reference validation
+URLValidator --> UKB : validated URLs
+
+MemoryServer <--> SharedMemory : graph operations
+SharedMemory <--> UKB : knowledge updates
+SharedMemory --> VKB : visualization data
+
+UKB --> InsightFiles : documentation generation
+InsightFiles --> VKB : linked content
+
+' User Interaction
+actor "Developer" as Dev
+actor "Claude Code" as Claude
+
+Dev -> ClaudeCLI : development tasks
+Claude -> MCPFramework : tool usage
+Dev -> UKB : ukb --interactive
+Dev -> VKB : vkb start
+
+' Data flow annotations
+note bottom : MCP Protocol uses stdio transport\nwith JSON-RPC messaging
+
+@enduml
