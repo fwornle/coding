@@ -465,9 +465,7 @@ exec "$CLAUDE_REPO/knowledge-management/vkb" "$@"
 EOF
     chmod +x "$bin_dir/vkb"
     
-    # Update paths in the original scripts
-    sed -i.bak "s|CLAUDE_REPO=.*|CLAUDE_REPO=\"$CLAUDE_REPO\"|" "$CLAUDE_REPO/knowledge-management/ukb"
-    sed -i.bak "s|CLAUDE_REPO=.*|CLAUDE_REPO=\"$CLAUDE_REPO\"|" "$CLAUDE_REPO/knowledge-management/vkb"
+    # Note: Original scripts now use dynamic repo detection, no need to update paths
     
     success "Command wrappers created"
 }
