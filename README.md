@@ -142,7 +142,6 @@ vkb  # View knowledge visualization
 - **Git-Tracked Knowledge**: `shared-memory.json` is version controlled
 - **Automatic Sharing**: Push/pull shares knowledge across team
 - **Conflict Resolution**: Merge strategies for concurrent updates
-- **Backup System**: Automated backups of knowledge base
 
 ### Conversation Logging
 

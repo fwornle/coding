@@ -47,7 +47,6 @@ The system consists of three main layers:
 ### 2. Data Storage Layer
 
 - **shared-memory.json**: Authoritative knowledge graph data (git-tracked)
-- **Backup System**: Automated backups in `.backups/` directory
 - **MCP Integration**: Persistent memory for Claude Code sessions
 - **Conversation Logging**: Automatic capture of Claude Code conversations in `.specstory/history/`
 
@@ -431,10 +430,7 @@ vkb logs          # Check server logs
 **Solutions**:
 
 ```bash
-# Restore from backup
-cp .backups/shared-memory-backup-*.json shared-memory.json
-
-# Or restore from git history
+# Restore from git history
 git log --oneline shared-memory.json
 git checkout <commit-hash> shared-memory.json
 ```
@@ -445,7 +441,7 @@ For large knowledge bases (100+ entities):
 
 1. **Regular Cleanup**: Remove outdated or duplicate insights
 2. **Selective Loading**: Use entity type filters to reduce rendering load
-3. **Backup Management**: Clean old backups periodically
+3. **Git Management**: Regularly commit knowledge updates
 
 ### Debug Mode
 

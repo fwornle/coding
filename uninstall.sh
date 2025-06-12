@@ -30,7 +30,7 @@ echo -e "\n${BLUE}🔧 Removing shell configuration...${NC}"
 # Remove from common shell configs
 for rc_file in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile"; do
     if [[ -f "$rc_file" ]]; then
-        sed -i.bak '/# Claude Knowledge Management System/,+3d' "$rc_file" 2>/dev/null || true
+        sed -i '/# Claude Knowledge Management System/,+3d' "$rc_file" 2>/dev/null || true
         echo "  Cleaned $rc_file"
     fi
 done

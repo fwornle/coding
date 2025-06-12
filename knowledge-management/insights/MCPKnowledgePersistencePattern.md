@@ -51,7 +51,6 @@ The system implements a multi-layered architecture with clear separation of conc
 
 ### 3. Storage Layer
 - **shared-memory.json**: Authoritative knowledge graph (git-tracked)
-- **Backup System**: Automated snapshots in .backups/ directory
 - **MCP Integration**: Persistent memory for Claude Code sessions
 - **Detailed Documentation**: Markdown files in knowledge-management/insights/
 
@@ -100,7 +99,7 @@ The system implements a multi-layered architecture with clear separation of conc
 // Key Features:
 - Entity and relationship CRUD operations
 - Graph querying and search capabilities
-- Backup and restoration
+- Git-based versioning
 - Cross-session persistence
 ```
 
@@ -422,7 +421,7 @@ interface KnowledgeMetrics {
 - [ ] Enable automatic conversation logging
 - [ ] Configure ukb for daily session analysis
 - [ ] Set up visualization server (vkb)
-- [ ] Establish backup and git tracking for shared-memory.json
+- [ ] Establish git tracking for shared-memory.json
 
 ### Phase 3: Expert Knowledge Integration
 

@@ -367,7 +367,7 @@ install_memory_visualizer() {
     npm run build || error_exit "Failed to build memory-visualizer"
     
     # Update vkb script to use local memory-visualizer
-    sed -i.bak "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CLAUDE_REPO/knowledge-management/vkb"
+    sed -i "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CLAUDE_REPO/knowledge-management/vkb"
     
     success "Memory visualizer installed successfully"
 }
@@ -617,7 +617,7 @@ setup_mcp_config() {
     fi
     
     # Clean up
-    rm -f "$temp_file" "$temp_file.bak"
+    rm -f "$temp_file"
     
     success "MCP configuration setup completed"
 }
