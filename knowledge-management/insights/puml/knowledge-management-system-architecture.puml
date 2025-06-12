@@ -26,7 +26,6 @@ package "Processing" as Processing {
 
 package "Storage" as Storage {
     [shared-memory.json] as SharedMemory
-    [Backups] as Backup
     [MCP Persist] as MCP
     [Docs] as Docs
 }
@@ -38,9 +37,13 @@ package "Visualization" as Visualization {
 }
 
 package "MCP Servers" as MCPServers {
-    [Logger] as LoggerMCP
     [Browser] as BrowserMCP
     [Memory] as MemoryMCP
+}
+
+package "Auto-Logging" as AutoLogging {
+    [start-auto-logger.sh] as AutoLogger
+    [I/O Interception] as IOIntercept
 }
 
 ' Simplified flow connections
@@ -48,6 +51,7 @@ DataSources --> Processing : data extraction
 Processing --> Storage : structured data
 Storage --> Visualization : knowledge graph
 MCPServers --> Storage : persistence
+AutoLogging --> DataSources : conversation logs
 
 ' Key user flows
 actor Developer as Dev
@@ -58,8 +62,9 @@ Team --> Visualization : explores knowledge
 
 note top of DataSources : Git commits, AI conversations,\nexpert input, code analysis
 note top of Processing : UKB engine, pattern recognition,\nsignificance scoring, deduplication
-note top of Storage : shared-memory.json, backups,\nMCP persistence, documentation
+note top of Storage : shared-memory.json,\nMCP persistence, documentation
 note top of Visualization : VKB server, interactive graph,\nsearch and filtering
-note top of MCPServers : Claude Logger, Browser Access,\nMemory Management
+note top of MCPServers : Browser Access,\nMemory Management
+note top of AutoLogging : I/O stream interception,\nsmart content routing
 
 @enduml
