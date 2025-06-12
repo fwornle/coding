@@ -1,0 +1,90 @@
+@startuml detailed-system-architecture
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontSize 10
+
+title Knowledge Management System - Detailed Architecture
+
+top to bottom direction
+
+actor Developer as Dev
+
+package "User Interface" as UI {
+    [Terminal] as Terminal
+    [Web Browser] as Browser
+}
+
+package "Claude Code with Auto-Logging" as ClaudeEnv {
+    [claude-mcp] as Launcher
+    [start-auto-logger.sh] as Logger
+    [Claude CLI] as Claude
+    [MCP Framework] as MCP
+}
+
+package "MCP Server Processes" as MCPServers {
+    [Memory Server] as MemoryMCP
+    [Browser Access Server] as BrowserMCP
+}
+
+package "Knowledge Management Tools" as Tools {
+    [UKB Engine] as UKB
+    [VKB Server] as VKB
+    [Knowledge Visualization] as Viz
+}
+
+package "Data Storage" as Storage {
+    [shared-memory.json] as SharedMem
+    [.specstory/history/] as SpecStory
+    [insights/] as Insights
+    [Git Repository] as Git
+}
+
+package "External Services" as External {
+    [Chrome DevTools] as Chrome
+    [Web Resources] as Web
+}
+
+' User interactions
+Dev --> Terminal : claude-mcp
+Dev --> Browser : http://localhost:8080
+
+' Main flow
+Terminal --> Launcher : starts
+Launcher --> Logger : launches with I/O interception
+Logger --> Claude : pipes stdin/stdout + monitors
+Claude --> MCP : JSON-RPC transport
+
+' MCP Server connections
+MCP <--> MemoryMCP : memory operations\n(CRUD, search)
+MCP <--> BrowserMCP : browser automation\n(navigate, extract)
+
+' Logging flow
+Logger --> SpecStory : smart content routing\n(coding vs project)
+
+' Knowledge management flow  
+Terminal --> UKB : manual invocation
+UKB --> SharedMem : updates knowledge graph
+UKB --> Insights : generates documentation
+VKB --> SharedMem : reads for visualization
+VKB --> Viz : serves web interface
+Browser --> Viz : displays knowledge graph
+
+' External integrations
+BrowserMCP --> Chrome : DevTools Protocol
+BrowserMCP --> Web : automated browsing
+MemoryMCP --> SharedMem : persistent storage
+
+' Version control
+SharedMem --> Git : git tracking
+SpecStory --> Git : conversation history
+Insights --> Git : documentation
+
+note right of Logger : I/O stream interception\nfor true automatic logging\nwith content-aware routing
+
+note bottom of MCP : MCP servers run as separate\nprocesses communicating via\nJSON-RPC over stdio
+
+note right of MemoryMCP : Provides tools:\n- add_entity\n- create_relation\n- search_memory
+
+note right of BrowserMCP : Provides tools:\n- navigate\n- extract_content\n- take_screenshot
+
+@enduml

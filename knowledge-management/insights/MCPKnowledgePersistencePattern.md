@@ -62,25 +62,39 @@ The system implements a multi-layered architecture with clear separation of conc
 
 ## Core Components
 
-### MCP Server Integration
+### System Integration Architecture
 
 ![MCP Integration Architecture](images/mcp-integration-compact.png)
 
-### MCP Servers
+### Detailed System Architecture
 
-#### 1. Claude Logger MCP Server
+![Detailed System Architecture](images/detailed-system-architecture.png)
 
-```typescript
-// Package: claude-logger-mcp
-// Purpose: Automatic conversation logging and session management
-// Key Features:
-- Automatic SpecStory-compatible logging
-- Session management with metadata
-- Real-time conversation capture
-- Integration with knowledge extraction pipeline
+**Key Architectural Points:**
+- **MCP Servers** run as separate processes communicating with Claude via JSON-RPC over stdio
+- **Memory Server** provides persistent knowledge graph operations (add_entity, create_relation, search_memory)
+- **Browser Server** enables web automation (navigate, extract_content, take_screenshot)
+- **I/O Logger** operates independently of MCP, intercepting conversation streams
+- **Smart Routing** ensures coding-related content goes to coding/.specstory/history/
+
+### System Components
+
+#### 1. Automatic Conversation Logging (I/O Stream Interception)
+
+```bash
+# Script: start-auto-logger.sh
+# Purpose: True automatic conversation logging via I/O interception
+# Key Features:
+- Real-time stdin/stdout interception
+- Smart content routing (coding vs project-specific)
+- Cross-project knowledge preservation
+- SpecStory-compatible logging format
+- Zero manual intervention required
 ```
 
-#### 2. Stagehand Browser Access MCP Server
+**Legacy MCP Server**: `claude-logger-mcp` still available for manual logging scenarios but not used for automatic logging due to MCP architectural limitations.
+
+#### 2. Browser Access MCP Server
 
 ```typescript
 // Package: @browserbasehq/mcp-stagehand  
