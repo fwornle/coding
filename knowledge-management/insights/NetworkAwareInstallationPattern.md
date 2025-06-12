@@ -340,5 +340,5 @@ These patterns enable robust, enterprise-ready installation systems that work re
 ## Related Documentation
 
 - [Detailed Implementation](../../docs/installation-architecture.md) - Technical deep-dive into our specific implementation
-- [User Guide](../../TEAM_KNOWLEDGE_SETUP.md) - End-user installation instructions
+- [User Guide](../../docs/team-knowledge-setup.md) - End-user installation instructions
 - [Network Troubleshooting](../../docs/network-troubleshooting.md) - Common issues and solutions

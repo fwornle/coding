@@ -1,6 +1,6 @@
 # Claude MCP Configuration Setup Guide
 
-This guide explains how to set up the MCP (Model Context Protocol) servers for the Claude Knowledge Management System.
+This guide explains how to set up the MCP (Model Context Protocol) servers for the Coding Knowledge Management System.
 
 ## Overview
 

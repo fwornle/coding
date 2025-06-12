@@ -286,7 +286,7 @@ If issues persist:
 
 1. **Check the installation logs** in `/tmp/ukb-session-*.log`
 2. **Test network connectivity** using the diagnostics above
-3. **Try manual installation steps** from `TEAM_KNOWLEDGE_SETUP.md`
+3. **Try manual installation steps** from [team-knowledge-setup.md](team-knowledge-setup.md)
 4. **Contact the team** with specific error messages and environment details
 
 Include this information when reporting issues:

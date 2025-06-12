@@ -1,4 +1,4 @@
-# Claude Knowledge Management System - Installation Guide
+# Coding Knowledge Management System - Installation Guide
 
 ## Quick Start
 

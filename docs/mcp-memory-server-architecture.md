@@ -85,7 +85,7 @@ When starting `claude-mcp`, the system:
 1. **Loads Knowledge Base Summary**:
    ```bash
    # From claude-mcp startup script
-   export CLAUDE_KNOWLEDGE_BASE="/path/to/shared-memory.json"
+   export CODING_KNOWLEDGE_BASE="/path/to/shared-memory.json"
    echo "📚 Knowledge Base: 12 entities, 21 relations"
    echo "🔍 Key Patterns Available: [pattern list]"
    echo "✅ Startup pattern knowledge loaded"

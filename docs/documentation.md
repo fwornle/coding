@@ -463,7 +463,7 @@ This provides detailed output about:
 
 ## See Also
 
-- [Team Knowledge Setup Guide](../TEAM_KNOWLEDGE_SETUP.md)
+- [Team Knowledge Setup Guide](team-knowledge-setup.md)
 - [Main Repository README](../README.md)
 - [PlantUML Source Files](puml/)
 - [Generated Diagrams](imag/)

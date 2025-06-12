@@ -2,6 +2,52 @@
 
 This file provides essential guidance to Claude Code when working in this repository.
 
+## 🚨 CRITICAL: AUTO-SYNC KNOWLEDGE BASE TO MCP MEMORY
+
+**IMPORTANT**: Every time you start a `claude-mcp` session, you MUST automatically load the knowledge base into MCP memory by executing the sync operations:
+
+1. **Check for sync trigger**: Look for `.mcp-sync/sync-required.json`
+2. **If sync required**: Execute the following MCP operations automatically
+3. **Load entities**: Use `mcp__memory__create_entities` with data from shared-memory.json
+4. **Load relations**: Use `mcp__memory__create_relations` with relationship data
+5. **Verify sync**: Use `mcp__memory__read_graph` to confirm successful loading
+
+**AUTO-SYNC PROCEDURE**: 
+```typescript
+// 1. Check if sync is required
+const syncPath = process.env.CODING_TOOLS_PATH + '/.mcp-sync/sync-required.json';
+if (fileExists(syncPath)) {
+  const syncInfo = JSON.parse(readFile(syncPath));
+  console.log(`🔄 Auto-syncing ${syncInfo.entity_count} entities, ${syncInfo.relation_count} relations`);
+  
+  // 2. Load entities from shared-memory.json
+  const sharedMemory = JSON.parse(readFile(process.env.CODING_KNOWLEDGE_BASE));
+  await mcp__memory__create_entities(sharedMemory.entities.map(entity => ({
+    name: entity.name,
+    entityType: entity.entityType,
+    observations: entity.observations || [entity.content || ""],
+    metadata: {
+      significance: entity.significance,
+      created: entity.created,
+      project: entity.project,
+      documentation_link: entity.documentation_link
+    }
+  })));
+  
+  // 3. Load relations
+  await mcp__memory__create_relations(sharedMemory.relations);
+  
+  // 4. Verify and report
+  const graph = await mcp__memory__read_graph();
+  console.log(`✅ Knowledge base synced: ${graph.nodes?.length} entities, ${graph.edges?.length} relations`);
+  
+  // 5. Remove sync trigger
+  unlinkFile(syncPath);
+}
+```
+
+**WHY THIS MATTERS**: Without this sync, Claude sessions cannot access the accumulated knowledge from previous sessions, making the cross-session learning system ineffective.
+
 ## 🔴 CRITICAL: AUTOMATIC CONVERSATION LOGGING
 
 **STATUS**: ✅ **WORKING** - Automatic conversation logging is now fully functional via I/O stream interception.

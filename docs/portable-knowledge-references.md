@@ -8,8 +8,8 @@ To ensure the Claude knowledge management system works across different installa
 
 When Claude Code is started with `claude-mcp`, the following environment variables are set:
 
-- `CLAUDE_KNOWLEDGE_BASE` - Full path to shared-memory.json
-- `CLAUDE_TOOLS_PATH` - Root directory of Claude tools installation
+- `CODING_KNOWLEDGE_BASE` - Full path to shared-memory.json
+- `CODING_TOOLS_PATH` - Root directory of coding tools installation
 
 ## Referencing Knowledge Base
 
@@ -36,11 +36,11 @@ Use:
 ```bash
 # Dynamic discovery based on script location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_REPO="$(dirname "$SCRIPT_DIR")"
-KNOWLEDGE_BASE="$CLAUDE_REPO/shared-memory.json"
+CODING_REPO="$(dirname "$SCRIPT_DIR")"
+KNOWLEDGE_BASE="$CODING_REPO/shared-memory.json"
 
 # Or use environment variable if available
-KNOWLEDGE_BASE="${CLAUDE_KNOWLEDGE_BASE:-$CLAUDE_REPO/shared-memory.json}"
+KNOWLEDGE_BASE="${CODING_KNOWLEDGE_BASE:-$CODING_REPO/shared-memory.json}"
 ```
 
 ### In CLAUDE.md Files

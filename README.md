@@ -12,7 +12,7 @@ This repository contains various scripts and tools created with Claude Code, foc
 - **[Enhanced Cross-Project Logging](docs/enhanced-cross-project-logging.md)** - Automatic dual logging for coding project work
 - **[Cross-Project Knowledge System](docs/cross-project-knowledge-system.md)** - How knowledge applies across all projects
 - **[Portable Knowledge References](docs/portable-knowledge-references.md)** - Avoiding hardcoded paths for team compatibility
-- **[Team Setup Guide](TEAM_KNOWLEDGE_SETUP.md)** - Quick start for team collaboration
+- **[Team Setup Guide](docs/team-knowledge-setup.md)** - Quick start for team collaboration
 - **[Installation Architecture](docs/installation-architecture.md)** - Network detection and repository strategy
 - **[Architecture Diagrams](docs/imag/)** - System architecture and workflow diagrams
 - **[Insights Library](knowledge-management/insights/)** - Detailed transferable patterns and solutions
@@ -65,7 +65,7 @@ The installer automatically detects your network environment:
 - **🏢 Corporate Network**: Uses CN mirrors for modified repos, proxy detection for external repos
 - **🌍 Public Network**: Uses public repositories with your forks
 
-**📖 [Complete Installation Guide →](TEAM_KNOWLEDGE_SETUP.md)**
+**📖 [Complete Installation Guide →](docs/team-knowledge-setup.md)**
 
 ### Start Using
 ```bash
@@ -78,7 +78,7 @@ vkb  # View knowledge visualization
 ```
 ~/coding/
 ├── README.md                  # This file
-├── TEAM_KNOWLEDGE_SETUP.md    # Quick setup guide
+├── docs/team-knowledge-setup.md # Quick setup guide
 ├── .env.example              # Environment variables template
 ├── .env                      # Your API keys (git-ignored)
 ├── install.sh                # Universal installer script
@@ -270,7 +270,7 @@ The installer automatically:
 ### Platform-Specific
 
 - **Windows Users**: Use `install.bat` for native Command Prompt, or `./install.sh` in Git Bash/WSL
-- **Full Guide**: See [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) for detailed instructions
+- **Full Guide**: See [Installation Guide](docs/installation-guide.md) for detailed instructions
 
 ### Uninstalling
 
