@@ -1,27 +1,6 @@
 #!/bin/bash
 # Activate Claude Knowledge Management environment
 export CLAUDE_REPO="/Users/q284340/Agentic/coding"
-
-# Force removal of old aliases
-unalias ukb 2>/dev/null || true
-unalias vkb 2>/dev/null || true
-unalias claude-mcp 2>/dev/null || true
-
-# Also unset any functions that might override
-unset -f ukb 2>/dev/null || true
-unset -f vkb 2>/dev/null || true
-unset -f claude-mcp 2>/dev/null || true
-
-# Clean PATH of any old entries and add our bin directory first
-export PATH="/Users/q284340/Agentic/coding/bin:${PATH//\/Users\/q284340\/Agentic\/coding\/bin:/}"
-
-# Verify commands work
-if command -v ukb >/dev/null 2>&1; then
-    echo "✅ Claude Knowledge Management environment activated!"
-    echo "Commands 'ukb' and 'vkb' are now available."
-    echo "✓ ukb: $(which ukb)"
-    echo "✓ vkb: $(which vkb)"
-else
-    echo "❌ Failed to activate - ukb command not found in PATH"
-    echo "PATH: $PATH"
-fi
+export PATH="/Users/q284340/Agentic/coding/bin:$PATH"
+echo "✅ Claude Knowledge Management environment activated!"
+echo "Commands 'ukb' and 'vkb' are now available."

@@ -1,12 +1,23 @@
 #!/bin/bash
-# Claude MCP launcher - starts Claude with MCP config
+# Claude MCP launcher - starts Claude with MCP config and loads shared knowledge
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_REPO="$(dirname "$SCRIPT_DIR")"
 
+# Export for Claude Code to know where the knowledge base is
+export CLAUDE_KNOWLEDGE_BASE="$CLAUDE_REPO/shared-memory.json"
+export CLAUDE_TOOLS_PATH="$CLAUDE_REPO"
+
 # Path to the MCP config file
 MCP_CONFIG="$CLAUDE_REPO/claude-code-mcp-processed.json"
+SHARED_MEMORY="$CLAUDE_REPO/shared-memory.json"
 
 # Check if the MCP config file exists
 if [[ ! -f "$MCP_CONFIG" ]]; then
@@ -14,6 +25,36 @@ if [[ ! -f "$MCP_CONFIG" ]]; then
     exit 1
 fi
 
+# Display startup information
+echo -e "${BLUE}🚀 Starting Claude Code with MCP Integration${NC}"
+echo -e "${GREEN}📋 MCP Config: $MCP_CONFIG${NC}"
+
+# Check if shared memory exists and show summary
+if [[ -f "$SHARED_MEMORY" ]]; then
+    entity_count=$(jq '.entities | length' "$SHARED_MEMORY" 2>/dev/null || echo "0")
+    relation_count=$(jq '.relations | length' "$SHARED_MEMORY" 2>/dev/null || echo "0")
+    echo -e "${GREEN}🧠 Knowledge Base: $entity_count entities, $relation_count relations${NC}"
+    
+    # Show critical patterns that should be remembered
+    echo -e "${YELLOW}📌 Key Patterns Available:${NC}"
+    jq -r '.entities[] | select(.entityType == "TransferablePattern" or .entityType == "WorkflowPattern" or .entityType == "TransferableKnowledge") | "  • \(.name)"' "$SHARED_MEMORY" 2>/dev/null | head -10
+    
+    # Check for critical startup knowledge
+    if jq -e '.entities[] | select(.name == "ClaudeCodeStartupPattern")' "$SHARED_MEMORY" >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Startup pattern knowledge loaded${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  No shared knowledge base found at: $SHARED_MEMORY${NC}"
+fi
+
+# Run knowledge sync preparation
+if [[ -x "$SCRIPT_DIR/sync-shared-knowledge.sh" ]]; then
+    echo -e "${BLUE}🔄 Preparing shared knowledge sync...${NC}"
+    "$SCRIPT_DIR/sync-shared-knowledge.sh"
+fi
+
+echo -e "${BLUE}📚 Cross-project knowledge ready${NC}"
+echo
+
 # Launch Claude with the MCP config
-echo "Starting Claude with MCP config from: $MCP_CONFIG"
 exec claude --mcp-config "$MCP_CONFIG" "$@"

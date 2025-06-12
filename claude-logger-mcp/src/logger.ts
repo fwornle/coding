@@ -48,9 +48,21 @@ export class SpecStoryLogger {
   }
 
   private generateFilename(sessionId: string, title?: string): string {
-    const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const sanitizedTitle = title ? sanitizeFilename(title) : sessionId;
-    return `${timestamp}-${sanitizedTitle}.md`;
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
+    const sanitizedTitle = title ? this.sanitizeForFilename(title) : 'claude-code-session';
+    return `${dateStr}_${timeStr.substring(0, 5)}-${sanitizedTitle}.md`; // YYYY-MM-DD_HH-MM-title.md
+  }
+
+  private sanitizeForFilename(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
+      .replace(/\s+/g, '-')         // Replace spaces with hyphens
+      .replace(/-+/g, '-')          // Collapse multiple hyphens
+      .replace(/^-|-$/g, '')        // Remove leading/trailing hyphens
+      .substring(0, 50);            // Limit length
   }
 
   private formatTimestamp(date?: Date): string {

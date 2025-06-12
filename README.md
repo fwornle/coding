@@ -7,6 +7,10 @@ This repository contains various scripts and tools created with Claude Code, foc
 ## 📚 Documentation
 
 - **[Complete Documentation](docs/documentation.md)** - Comprehensive system documentation
+- **[Knowledge Flow Architecture](docs/knowledge-flow-architecture.md)** - Information flow from projects to MCP memory to git storage  
+- **[Automatic Conversation Logging](docs/automatic-conversation-logging.md)** - How Claude Code sessions are automatically logged
+- **[Cross-Project Knowledge System](docs/cross-project-knowledge-system.md)** - How knowledge applies across all projects
+- **[Portable Knowledge References](docs/portable-knowledge-references.md)** - Avoiding hardcoded paths for team compatibility
 - **[Team Setup Guide](TEAM_KNOWLEDGE_SETUP.md)** - Quick start for team collaboration
 - **[Installation Architecture](docs/installation-architecture.md)** - Network detection and repository strategy
 - **[Architecture Diagrams](docs/imag/)** - System architecture and workflow diagrams
@@ -32,8 +36,8 @@ vkb
 - 🌐 **Interactive visualization** at localhost:8080
 - 🔄 **Team sharing** via git-tracked knowledge base
 - 🎯 **Transferable patterns** in central green hub
-- 🔗 **MCP integration** for persistent memory
-- 📝 **Conversation logging** to `.specstory/history/` for AI interaction history
+- 🔗 **MCP integration** for persistent memory with bidirectional sync
+- 📝 **Automatic conversation logging** to `.specstory/history/` - all Claude Code sessions are automatically logged
 
 ## 🚀 Installation
 
@@ -45,6 +49,14 @@ cp .env.example .env  # Configure API keys if needed
 ./install.sh        # Network-aware installation
 source .activate    # Activate commands immediately
 ```
+
+### Automatic Conversation Logging
+
+Starting Claude Code with the `claude-mcp` command automatically enables conversation logging:
+- All prompts and responses are captured to `.specstory/history/`
+- Each session creates a timestamped markdown file
+- Conversations are preserved for future reference and knowledge extraction
+- No manual activation needed - logging starts automatically with each session
 
 ### Network-Aware Installation
 The installer automatically detects your network environment:

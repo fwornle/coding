@@ -1,0 +1,117 @@
+@startuml Knowledge Management Architecture
+!define RECTANGLE class
+
+skinparam rectangle {
+    BackgroundColor LightBlue
+    BorderColor DarkBlue
+}
+
+skinparam database {
+    BackgroundColor LightGreen
+    BorderColor DarkGreen
+}
+
+skinparam cloud {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+title Knowledge Management System Architecture
+
+rectangle "Project Development" as PROJECT {
+    [Git Commits]
+    [Conversation Logs]  
+    [Manual Insights]
+    [File Changes]
+}
+
+rectangle "Insight Capture Layer" as CAPTURE {
+    [ukb --auto] as AUTO
+    [ukb --interactive] as INTERACTIVE
+    
+    AUTO : Analyzes commits
+    AUTO : Extracts patterns
+    AUTO : Identifies optimizations
+    
+    INTERACTIVE : Captures thought processes
+    INTERACTIVE : Documents decisions
+    INTERACTIVE : Records learnings
+}
+
+cloud "Temporary Storage" as TEMP {
+    [Insight JSON Files]
+    [MCP Operation Files]
+    [Sync Instructions]
+}
+
+rectangle "MCP Memory Layer" as MCP_LAYER {
+    database "MCP Memory Server" as MCP {
+        [Knowledge Graph]
+        [Entity Relations]
+        [Session State]
+    }
+    
+    [Claude Code] as CLAUDE
+    
+    CLAUDE : Executes MCP operations
+    CLAUDE : Manages entity lifecycle
+    CLAUDE : Builds knowledge graph
+}
+
+database "Persistent Storage" as STORAGE {
+    [shared-memory.json]
+    [Git Repository]
+    [Version History]
+}
+
+rectangle "Knowledge Access" as ACCESS {
+    [vkb Visualizer]
+    [Web Interface]
+    [Cross-Session Continuity]
+}
+
+' Data Flow Connections
+PROJECT --> CAPTURE : Development\nActivity
+CAPTURE --> TEMP : Generate\nInsights
+TEMP --> MCP_LAYER : MCP\nOperations
+MCP_LAYER --> STORAGE : Bidirectional\nSync
+STORAGE --> ACCESS : Knowledge\nVisualization
+
+' Bidirectional arrows for sync
+MCP_LAYER <--> STORAGE : Sync\nOperations
+
+' Internal connections
+[Git Commits] --> AUTO
+[Conversation Logs] --> AUTO  
+[Manual Insights] --> INTERACTIVE
+[File Changes] --> AUTO
+
+AUTO --> [Insight JSON Files]
+INTERACTIVE --> [Insight JSON Files]
+[Insight JSON Files] --> [MCP Operation Files]
+
+CLAUDE --> MCP : mcp__memory__*\noperations
+MCP --> CLAUDE : Knowledge\nretrieval
+
+[shared-memory.json] --> [Git Repository]
+[shared-memory.json] --> [vkb Visualizer]
+
+note right of MCP
+  Runtime knowledge graph
+  Session-persistent storage
+  Cross-component communication
+end note
+
+note right of STORAGE
+  Git-tracked persistence
+  Team knowledge sharing
+  Version-controlled evolution
+end note
+
+note bottom of CAPTURE
+  Two modes:
+  • Auto: Pattern extraction
+  • Interactive: Deep insights
+end note
+
+@enduml

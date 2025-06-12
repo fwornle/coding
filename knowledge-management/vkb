@@ -33,7 +33,7 @@ find_repo_root() {
 
 CLAUDE_REPO="$(find_repo_root)"
 SHARED_MEMORY="$CLAUDE_REPO/shared-memory.json"
-VISUALIZER_DIR="$CLAUDE_REPO/memory-visualizer"
+VISUALIZER_DIR="/Users/q284340/Agentic/coding/memory-visualizer"
 SERVER_PORT=8080
 PID_FILE="/tmp/vkb-server.pid"
 LOG_FILE="/tmp/vkb-server.log"

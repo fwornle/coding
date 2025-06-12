@@ -963,42 +963,122 @@ create_mcp_entities() {
     done <<< "$sorted_insights"
 }
 
-# Enhanced entity addition with significance
+# Enhanced entity addition with significance using MCP operations
 add_to_shared_memory_entity() {
     local name="$1"
     local type="$2"
     local observations="$3"
     local significance="${4:-5}"
     
-    # Check if entity already exists
-    if jq -e --arg name "$name" '.entities[] | select(.name == $name)' "$SHARED_MEMORY" >/dev/null 2>&1; then
-        echo "  Entity already exists: $name (skipping)"
-        return
-    fi
-    
-    # Convert observations to JSON array
+    # Convert observations to JSON array for MCP
     local obs_array
     obs_array=$(echo "$observations" | jq -R -s 'split("\n") | map(select(length > 0))')
     
-    # Add to shared memory with significance
-    local timestamp
-    timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    jq --arg name "$name" \
-       --arg type "$type" \
-       --argjson obs "$obs_array" \
-       --arg sig "$significance" \
-       --arg timestamp "$timestamp" \
-       '.entities += [{
-           "type": "entity",
-           "name": $name,
-           "entityType": $type,
-           "observations": $obs,
-           "significance": ($sig | tonumber),
-           "created": $timestamp
-       }] |
-       .metadata.total_entities = (.entities | length) |
-       .metadata.last_updated = $timestamp' \
-       "$SHARED_MEMORY" > "$SHARED_MEMORY.tmp" && mv "$SHARED_MEMORY.tmp" "$SHARED_MEMORY"
+    echo "  Adding to MCP memory: $name"
+    
+    # Create entity in MCP memory (this will be executed by Claude Code)
+    cat > "$TMP_DIR/mcp_entity_${name// /_}.json" << EOF
+{
+    "entities": [
+        {
+            "name": "$name",
+            "entityType": "$type",
+            "observations": $obs_array
+        }
+    ]
+}
+EOF
+    
+    # Also update local shared-memory.json as backup
+    # Check if entity already exists locally
+    if jq -e --arg name "$name" '.entities[] | select(.name == $name)' "$SHARED_MEMORY" >/dev/null 2>&1; then
+        echo "  Entity already exists locally: $name (updating observations)"
+        # Add new observations to existing entity
+        jq --arg name "$name" \
+           --argjson new_obs "$obs_array" \
+           --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+           '(.entities[] | select(.name == $name) | .observations) |= (. + $new_obs | unique) |
+            .metadata.last_updated = $timestamp' \
+           "$SHARED_MEMORY" > "$SHARED_MEMORY.tmp" && mv "$SHARED_MEMORY.tmp" "$SHARED_MEMORY"
+    else
+        # Create new entity locally
+        local timestamp
+        timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        jq --arg name "$name" \
+           --arg type "$type" \
+           --argjson obs "$obs_array" \
+           --arg sig "$significance" \
+           --arg timestamp "$timestamp" \
+           '.entities += [{
+               "type": "entity",
+               "name": $name,
+               "entityType": $type,
+               "observations": $obs,
+               "significance": ($sig | tonumber),
+               "created": $timestamp
+           }] |
+           .metadata.total_entities = (.entities | length) |
+           .metadata.last_updated = $timestamp' \
+           "$SHARED_MEMORY" > "$SHARED_MEMORY.tmp" && mv "$SHARED_MEMORY.tmp" "$SHARED_MEMORY"
+    fi
+}
+
+# Process MCP entities by creating operations for Claude Code to execute
+process_mcp_entities() {
+    local mcp_files=("$TMP_DIR"/mcp_entity_*.json)
+    
+    if [[ ! -e "${mcp_files[0]}" ]]; then
+        return  # No MCP files created
+    fi
+    
+    echo -e "${CYAN}📡 Preparing MCP operations for Claude Code...${NC}"
+    
+    # Create a script that Claude Code should execute to sync with MCP memory
+    cat > "$TMP_DIR/mcp_sync_operations.md" << 'EOF'
+# MCP Memory Sync Required
+
+The ukb script has captured insights and needs them synced to MCP memory. 
+Please execute the following MCP operations in Claude Code:
+
+## Entities to Create
+
+EOF
+    
+    # Process each MCP entity file
+    for mcp_file in "${mcp_files[@]}"; do
+        if [[ -f "$mcp_file" ]]; then
+            local entity_name entity_type
+            entity_name=$(jq -r '.entities[0].name' "$mcp_file")
+            entity_type=$(jq -r '.entities[0].entityType' "$mcp_file")
+            
+            echo "- Entity: **$entity_name** (Type: $entity_type)" >> "$TMP_DIR/mcp_sync_operations.md"
+            
+            # Append JSON for Claude Code to process
+            echo >> "$TMP_DIR/mcp_sync_operations.md"
+            echo '```json' >> "$TMP_DIR/mcp_sync_operations.md"
+            cat "$mcp_file" >> "$TMP_DIR/mcp_sync_operations.md"
+            echo >> "$TMP_DIR/mcp_sync_operations.md"
+            echo '```' >> "$TMP_DIR/mcp_sync_operations.md"
+            echo >> "$TMP_DIR/mcp_sync_operations.md"
+        fi
+    done
+    
+    cat >> "$TMP_DIR/mcp_sync_operations.md" << 'EOF'
+
+## Instructions for Claude Code
+
+1. Use `mcp__memory__create_entities` tool with the JSON data above
+2. Create appropriate relations between entities and existing knowledge graph
+3. Update the local shared-memory.json to reflect the MCP state
+
+This ensures bidirectional sync between MCP memory and local storage.
+EOF
+    
+    echo -e "${YELLOW}📋 MCP sync instructions created at: $TMP_DIR/mcp_sync_operations.md${NC}"
+    echo -e "${YELLOW}🤖 Claude Code should process this file to complete the sync${NC}"
+    
+    # Also show the path for easy access
+    echo -e "${BLUE}📁 Full path: $TMP_DIR/mcp_sync_operations.md${NC}"
 }
 
 # Create relationships with significance weighting
@@ -1221,6 +1301,9 @@ main() {
     if [[ -f "$insights_file" ]] && [[ $(jq '.insights | length' "$insights_file") -gt 0 ]]; then
         create_mcp_entities "$insights_file"
         create_project_relationships
+        
+        # Process MCP entities if any were created
+        process_mcp_entities
     else
         echo -e "${YELLOW}⚠️  No insights captured${NC}"
     fi

@@ -52,9 +52,35 @@ function extractTitle(content: string): string {
     if (title.length > 80) {
       title = title.substring(0, 77) + '...';
     }
-    return title || 'Claude Code Session';
+    return title || 'claude-code-session';
   }
-  return 'Claude Code Session';
+  return 'claude-code-session';
+}
+
+// Convert title to filename-safe format
+function sanitizeForFilename(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
+    .replace(/\s+/g, '-')         // Replace spaces with hyphens
+    .replace(/-+/g, '-')          // Collapse multiple hyphens
+    .replace(/^-|-$/g, '')        // Remove leading/trailing hyphens
+    .substring(0, 50);            // Limit length
+}
+
+// Detect if conversation is about coding project work
+function detectCodingProjectWork(userMessage: string, assistantMessage: string): boolean {
+  const content = `${userMessage} ${assistantMessage}`.toLowerCase();
+  
+  // Keywords that indicate coding project work
+  const codingKeywords = [
+    'ukb', 'vkb', 'shared-memory.json', 'knowledge-base', 'knowledge base',
+    'mcp', 'claude-mcp', 'specstory', 'claude-logger', 'coding project',
+    'claude tools', 'install.sh', 'knowledge management', 'transferable pattern',
+    'shared knowledge', 'cross-project', 'agentic/coding', '~/agentic/coding'
+  ];
+  
+  return codingKeywords.some(keyword => content.includes(keyword));
 }
 
 const server = new Server(
@@ -159,18 +185,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'auto_log_exchange':
+        const userMsg = args.user_message as string;
+        const assistantMsg = args.assistant_message as string;
+        
         // Start session if needed
         if (!currentSessionId) {
           currentSessionId = generateSessionId();
-          const title = extractTitle(args.user_message as string);
+          const title = extractTitle(userMsg);
           await logger.startSession(currentSessionId, projectPath, title);
         }
 
-        // Log the conversation
+        // Log the conversation to current project
         await logger.logConversation(
           currentSessionId,
-          args.user_message as string,
-          args.assistant_message as string,
+          userMsg,
+          assistantMsg,
           {
             timestamp: new Date().toISOString(),
             model: 'claude-opus-4-20250514',
@@ -179,11 +208,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         );
 
+        // Check if this is coding project work happening in another project
+        const isCodingWork = detectCodingProjectWork(userMsg, assistantMsg);
+        const codingProjectPath = process.env.CLAUDE_TOOLS_PATH || '/Users/q284340/Agentic/coding';
+        const isInCodingProject = projectPath.includes('coding') || projectPath === codingProjectPath;
+        
+        if (isCodingWork && !isInCodingProject) {
+          // Also log to coding project
+          try {
+            const codingLogger = new SpecStoryLogger(codingProjectPath);
+            const codingSessionId = `${generateSessionId()}-cross-project`;
+            const codingTitle = `cross-project-${sanitizeForFilename(extractTitle(userMsg))}`;
+            
+            await codingLogger.startSession(codingSessionId, codingProjectPath, codingTitle);
+            await codingLogger.logConversation(
+              codingSessionId,
+              userMsg,
+              assistantMsg,
+              {
+                timestamp: new Date().toISOString(),
+                model: 'claude-opus-4-20250514',
+                tools_used: args.tools_used as string[],
+                project_path: `${projectPath} (cross-project from coding tools)`,
+              }
+            );
+          } catch (error) {
+            console.error('Failed to log to coding project:', error);
+          }
+        }
+
         return {
           content: [
             {
               type: 'text',
-              text: 'Exchange logged successfully',
+              text: isCodingWork && !isInCodingProject 
+                ? 'Exchange logged to both current and coding projects'
+                : 'Exchange logged successfully',
             },
           ],
         };
