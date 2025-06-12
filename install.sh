@@ -367,7 +367,7 @@ install_memory_visualizer() {
     npm run build || error_exit "Failed to build memory-visualizer"
     
     # Update vkb script to use local memory-visualizer
-    sed -i "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CLAUDE_REPO/knowledge-management/vkb"
+    sed -i '' "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CLAUDE_REPO/knowledge-management/vkb"
     
     success "Memory visualizer installed successfully"
 }
@@ -428,13 +428,16 @@ install_mcp_servers() {
         warning "browser-access directory not found, skipping..."
     fi
     
-    # Install claude-logger MCP server
+    # Install claude-logger MCP server (optional - used for manual logging only)
     if [[ -d "$CLAUDE_REPO/claude-logger-mcp" ]]; then
         info "Installing claude-logger MCP server..."
         cd "$CLAUDE_REPO/claude-logger-mcp"
         npm install || error_exit "Failed to install claude-logger dependencies"
-        npm run build || error_exit "Failed to build claude-logger"
-        success "Claude-logger MCP server installed"
+        if npm run build; then
+            success "Claude-logger MCP server installed"
+        else
+            warning "Claude-logger build failed - continuing without it (automatic logging uses I/O interception)"
+        fi
     else
         warning "claude-logger-mcp directory not found, skipping..."
     fi

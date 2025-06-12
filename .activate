@@ -1,6 +1,6 @@
 #!/bin/bash
-# Activate Coding Knowledge Management environment
-export CODING_REPO="/Users/q284340/Agentic/coding"
+# Activate Claude Knowledge Management environment
+export CLAUDE_REPO="/Users/q284340/Agentic/coding"
 export PATH="/Users/q284340/Agentic/coding/bin:$PATH"
-echo "✅ Coding Knowledge Management environment activated!"
+echo "✅ Claude Knowledge Management environment activated!"
 echo "Commands 'ukb' and 'vkb' are now available."
