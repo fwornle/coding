@@ -1,0 +1,90 @@
+@startuml mcp-memory-data-flow
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontSize 10
+
+title MCP Memory Server Data Flow and Cross-Session Knowledge Access
+
+top to bottom direction
+
+package "Data Sources" as Sources {
+    [Git Commits] as Git
+    [Claude Conversations] as Conversations
+    [Expert Input] as Expert
+    [Code Analysis] as Code
+}
+
+package "UKB Processing" as UKB {
+    [Analysis Engine] as Analysis
+    [Significance Scoring] as Scoring
+    [Pattern Recognition] as Patterns
+}
+
+package "Authoritative Storage" as AuthStorage {
+    [shared-memory.json] as SharedJSON
+    [Documentation Files] as Docs
+    [Git Repository] as GitRepo
+}
+
+package "Runtime Storage" as Runtime {
+    [MCP Memory Server] as MCPServer
+    [Knowledge Graph] as Graph
+    [Query Engine] as Query
+}
+
+package "Claude Code Sessions" as Sessions {
+    [Session Startup] as Startup
+    [MCP Tools] as Tools
+    [Knowledge Queries] as Queries
+    [Enhanced Responses] as Responses
+}
+
+package "Cross-Session Benefits" as Benefits {
+    [Pattern Recognition] as Recognition
+    [Solution Suggestions] as Suggestions
+    [Knowledge Building] as Building
+}
+
+' Data flow from sources through UKB
+Sources --> Analysis : Raw data
+Analysis --> Scoring : Structured insights
+Scoring --> Patterns : Significance 1-10
+Patterns --> SharedJSON : Update JSON entities
+Patterns --> Docs : Generate documentation
+
+' Authoritative storage
+SharedJSON --> GitRepo : Git tracking
+Docs --> GitRepo : Version controlled
+
+' MCP Memory integration  
+Patterns --> MCPServer : Sync instructions\n(manual execution)
+SharedJSON --> Startup : Load summary at startup
+MCPServer --> Graph : Runtime knowledge graph
+Graph --> Query : Fast graph operations
+
+' Session interactions
+Startup --> Tools : mcp__memory__* tools available
+Tools --> MCPServer : create_entities, search_nodes
+Query --> Queries : Real-time knowledge lookup
+Queries --> Responses : Knowledge-enhanced answers
+Responses --> Recognition : "This looks like pattern X"
+Responses --> Suggestions : "Try solution from session Y"  
+Responses --> Building : "Extending previous insight"
+
+' Team collaboration
+GitRepo --> Sessions : Team knowledge sharing
+SharedJSON --> Sessions : Cross-session persistence
+
+' Current limitations (dashed lines)
+SharedJSON -.-> MCPServer : Manual sync required\n(not automatic)
+Startup -.-> Graph : Displays but doesn't load\ninto MCP memory
+
+note right of SharedJSON : Authoritative knowledge base\n• Git-tracked for team sharing\n• 12 entities, 21 relations\n• Updated by UKB engine
+
+note left of MCPServer : Runtime knowledge database\n• Session-persistent\n• Fast graph queries\n• Available MCP tools:\n  - create_entities\n  - create_relations\n  - search_nodes\n  - read_graph
+
+note bottom of Sessions : Every claude-mcp session:\n1. Loads knowledge summary\n2. Activates MCP memory server\n3. Enables knowledge queries\n4. Provides enhanced responses
+
+note top of Benefits : Cross-session examples:\n• "This Redux pattern worked in project X"\n• "Apply ViewportCulling from session Y"\n• "Combining insights A + B for solution"
+
+@enduml

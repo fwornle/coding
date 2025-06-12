@@ -1,0 +1,79 @@
+@startuml cross-session-knowledge-usage
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontSize 10
+
+title Cross-Session Knowledge Usage in Claude Code
+
+left to right direction
+
+actor Developer as Dev
+actor TeamMember as Team
+
+package "Session 1" as S1 {
+    [Claude Code] as Claude1
+    [UKB Engine] as UKB1
+}
+
+package "Session 2" as S2 {
+    [Claude Code] as Claude2
+    [Pattern Recognition] as Pattern2
+}
+
+package "Session 3" as S3 {
+    [Claude Code] as Claude3
+    [Solution Suggestion] as Solution3
+}
+
+package "Knowledge Storage" as Storage {
+    [shared-memory.json] as SharedMem
+    [MCP Memory Server] as MCPMem
+    [Insights Documentation] as Docs
+}
+
+package "Git Repository" as Git {
+    [Version Control] as VC
+    [Team Collaboration] as Collab
+}
+
+' Session 1: Initial Knowledge Capture
+Dev --> Claude1 : "Implement Redux state management"
+Claude1 --> UKB1 : Capture architectural decisions
+UKB1 --> SharedMem : Add ReduxStateManagementPattern\n(significance: 9)
+UKB1 --> Docs : Generate detailed documentation
+SharedMem --> VC : Git commit knowledge
+VC --> Collab : Share with team
+
+' Session 2: Pattern Recognition
+Team --> Claude2 : "Build state management for new feature"
+Claude2 --> MCPMem : Query existing patterns
+MCPMem --> Claude2 : "Found ReduxStateManagementPattern\nfrom previous session"
+Claude2 --> Pattern2 : Apply proven pattern
+Claude2 --> Team : "I recognize this pattern from\nprevious work. Applying\nReduxStateManagement solution."
+
+' Session 3: Solution Enhancement
+Dev --> Claude3 : "Performance issues with state updates"
+Claude3 --> MCPMem : Search for performance patterns
+MCPMem --> Claude3 : "ViewportCullingPattern +\nReduxStateManagement"
+Claude3 --> Solution3 : Combine existing patterns
+Claude3 --> UKB1 : Update knowledge with enhancement
+Claude3 --> Dev : "Based on previous sessions,\ncombining ViewportCulling with\nRedux will solve this."
+
+' Knowledge flows
+SharedMem <--> MCPMem : Sync operations
+MCPMem --> Claude2 : Runtime queries
+MCPMem --> Claude3 : Cross-pattern insights
+Docs --> Claude2 : Detailed implementation
+Docs --> Claude3 : Pattern combinations
+
+note right of MCPMem : Runtime knowledge graph\nenables fast queries during\nconversations
+
+note bottom of Storage : Dual storage ensures\nboth persistence and\nperformance
+
+note top of Git : Team knowledge sharing\nvia git-tracked insights
+
+note left of S2 : Claude recognizes patterns\nfrom previous sessions\nautomatically
+
+note right of S3 : Claude combines insights\nfrom multiple sessions\nto suggest solutions
+
+@enduml

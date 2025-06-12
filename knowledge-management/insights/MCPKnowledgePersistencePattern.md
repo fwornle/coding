@@ -49,10 +49,31 @@ The system implements a multi-layered architecture with clear separation of conc
 - **Significance Scoring**: AI-assisted ranking of insights (1-10 scale)
 - **Deduplication**: Entity consolidation and relationship mapping
 
-### 3. Storage Layer
-- **shared-memory.json**: Authoritative knowledge graph (git-tracked)
-- **MCP Integration**: Persistent memory for Claude Code sessions
+### 3. Storage Layer - Dual Architecture
+- **shared-memory.json**: Authoritative knowledge graph (git-tracked, team-shared)
+- **MCP Memory Server**: Runtime knowledge graph database (session-persistent, query-optimized)
 - **Detailed Documentation**: Markdown files in knowledge-management/insights/
+
+#### MCP Memory Server Integration
+The MCP memory server provides a runtime knowledge graph database that works alongside the file-based storage:
+
+**Available MCP Tools:**
+- `mcp__memory__create_entities` - Add new knowledge entities to runtime graph
+- `mcp__memory__create_relations` - Link entities together in memory
+- `mcp__memory__search_nodes` - Fast querying of the knowledge graph
+- `mcp__memory__read_graph` - Read current runtime graph state
+- `mcp__memory__add_observations` - Add details to existing entities
+
+**Data Flow:**
+```
+UKB Engine → shared-memory.json → MCP Sync Instructions → Claude Code → MCP Memory Server
+```
+
+**Key Benefits:**
+- **Cross-Session Persistence**: Knowledge survives Claude Code restarts
+- **Fast Querying**: Optimized graph operations during conversations  
+- **Team Collaboration**: Git-tracked authoritative storage enables knowledge sharing
+- **Real-Time Updates**: Live knowledge graph operations during Claude sessions
 
 ### 4. Visualization Layer
 - **VKB (View Knowledge Base)**: Server management and data conversion
@@ -79,7 +100,26 @@ The system implements a multi-layered architecture with clear separation of conc
 
 ### System Components
 
-#### 1. Automatic Conversation Logging (I/O Stream Interception)
+#### 1. Cross-Session Knowledge Access via MCP Memory
+
+**Claude Code sessions actively access accumulated knowledge through the MCP memory server:**
+
+```typescript
+// Every claude-mcp session startup:
+1. Loads shared-memory.json summary (12 entities, 21 relations)
+2. Displays available patterns (ReduxStateManagement, ViewportCulling, etc.)
+3. Activates MCP memory server for runtime queries
+4. Enables knowledge-enhanced conversations
+```
+
+**Cross-Session Use Cases:**
+- **Pattern Recognition**: "This looks like the ViewportCullingPattern from project X"
+- **Solution Suggestion**: "Based on previous sessions, ReduxStateManagement solved similar issues"
+- **Knowledge Building**: "This extends the ConditionalLoggingPattern - I'll update the knowledge base"
+
+**Current Limitation**: Manual sync required between shared-memory.json and MCP memory. Startup displays knowledge but doesn't automatically load into MCP memory server.
+
+#### 2. Automatic Conversation Logging (I/O Stream Interception)
 
 ```bash
 # Script: start-auto-logger.sh
@@ -94,7 +134,7 @@ The system implements a multi-layered architecture with clear separation of conc
 
 **Legacy MCP Server**: `claude-logger-mcp` still available for manual logging scenarios but not used for automatic logging due to MCP architectural limitations.
 
-#### 2. Browser Access MCP Server
+#### 3. Browser Access MCP Server
 
 ```typescript
 // Package: @browserbasehq/mcp-stagehand  
@@ -106,7 +146,7 @@ The system implements a multi-layered architecture with clear separation of conc
 - Screenshot capture for documentation
 ```
 
-#### 3. Memory Management MCP Server
+#### 4. Memory Management MCP Server
 
 ```typescript
 // Purpose: Persistent knowledge graph management
@@ -240,6 +280,38 @@ detect_network_environment() {
 - **Hybrid Approach**: Automatic detection followed by interactive refinement
 
 ## Use Cases and Workflows
+
+### Cross-Session Knowledge Usage
+
+![Cross-Session Knowledge Usage](images/cross-session-knowledge-usage.png)
+
+**How Claude Code Sessions Access Accumulated Knowledge:**
+
+Every `claude-mcp` session provides Claude with access to the accumulated knowledge base:
+
+1. **Session Startup**: Loads shared-memory.json summary showing available patterns and insights
+2. **MCP Memory Server**: Activates runtime knowledge graph for fast querying  
+3. **Pattern Recognition**: Claude can identify when current work matches previous patterns
+4. **Solution Suggestions**: Claude suggests proven solutions from past sessions
+5. **Knowledge Building**: Claude extends existing insights with new learnings
+
+### MCP Memory Server Data Flow
+
+![MCP Memory Data Flow](images/mcp-memory-data-flow.png)
+
+**Claude Code sessions actively consider everything in the knowledge base through:**
+
+- **Startup Knowledge Loading**: Every session displays available patterns and insights
+- **MCP Memory Tools**: Real-time access to `create_entities`, `search_nodes`, `read_graph`
+- **Cross-Session Persistence**: Knowledge survives Claude Code restarts
+- **Fast Graph Queries**: Optimized runtime database for knowledge operations
+- **Documentation Access**: Direct file system access to detailed insight markdown files
+
+**Current System Status:**
+- ✅ **Knowledge Base Available**: Every session has access to accumulated insights
+- ✅ **Pattern Recognition**: Claude can identify and apply previous solutions  
+- ✅ **Documentation Access**: Full read access to insights/ markdown files via file tools
+- ⚠️ **Manual Sync Required**: shared-memory.json updates need manual loading into MCP memory
 
 ### Daily Development Workflow
 
