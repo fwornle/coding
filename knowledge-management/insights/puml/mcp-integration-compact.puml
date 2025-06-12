@@ -4,17 +4,18 @@ skinparam backgroundColor white
 skinparam defaultFontSize 10
 skinparam maxMessageSize 40
 
-title MCP Integration Architecture
+title Knowledge Management System - Compact Architecture
 
 top to bottom direction
 
-package "Claude Code" as ClaudeEnv {
-    [Claude CLI] as CLI
+package "Claude Code with Auto-Logging" as ClaudeEnv {
+    [claude-mcp] as CLI
+    [start-auto-logger.sh] as Logger
+    [Claude CLI] as Claude
     [MCP Framework] as MCP
 }
 
 package "MCP Servers" as Servers {
-    [Logger Server] as Logger
     [Browser Server] as Browser  
     [Memory Server] as Memory
 }
@@ -31,24 +32,31 @@ package "Data Storage" as Storage {
     [Git Repository] as Git
 }
 
-' Connections
-CLI <--> MCP : stdio transport
-MCP <--> Logger : conversation tools
+' I/O Interception Flow
+CLI --> Logger : launches
+Logger --> Claude : I/O interception
+Claude <--> MCP : stdio transport
+
+' MCP Connections
 MCP <--> Browser : web automation
 MCP <--> Memory : graph operations
 
-Logger --> SpecStory : conversation logs
+' Logging Flow
+Logger --> SpecStory : smart routing\n(coding vs project)
 Browser --> UKB : URL validation
 Memory <--> SharedMem : persistence
 
+' Knowledge Flow
 UKB --> SharedMem : updates
 VKB --> SharedMem : visualization
 UKB --> Insights : documentation
 SharedMem --> Git : version control
 
 actor Developer as Dev
-Dev --> CLI : AI assistance
+Dev --> CLI : claude-mcp
 Dev --> UKB : insight capture
 Dev --> VKB : knowledge exploration
+
+note right of Logger : I/O stream interception\nfor automatic logging\nwith smart content routing
 
 @enduml

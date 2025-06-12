@@ -14,15 +14,6 @@
         "LOCAL_CDP_URL": "{{LOCAL_CDP_URL}}",
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
       }
-    },
-    "claude-logger": {
-      "command": "node",
-      "args": ["{{CLAUDE_PROJECT_PATH}}/claude-logger-mcp/dist/index-auto.js"],
-      "env": {
-        "PROJECT_PATH": "{{CLAUDE_PROJECT_PATH}}",
-        "CLAUDE_KNOWLEDGE_BASE": "{{CLAUDE_PROJECT_PATH}}/shared-memory.json",
-        "CLAUDE_TOOLS_PATH": "{{CLAUDE_PROJECT_PATH}}"
-      }
     }
   }
 }

@@ -8,44 +8,56 @@ The Claude Code MCP integration now includes automatic conversation logging that
 
 ### Architecture
 
-1. **MCP Server**: `claude-logger-mcp` runs as an MCP server alongside Claude Code
-2. **Auto Mode**: Uses `index-auto.js` instead of `index.js` for automatic capture
-3. **Session Management**: Each Claude Code session creates a new timestamped log file
-4. **Real-time Capture**: All prompts and responses are logged as they occur
+1. **I/O Stream Interception**: `start-auto-logger.sh` launches a Node.js process that intercepts stdin/stdout
+2. **Conversation Parsing**: Real-time analysis of conversation flow to detect user/assistant boundaries
+3. **Smart Content Routing**: Intelligent analysis determines whether content should go to coding or current project
+4. **Session Management**: Each session creates a timestamped log file in the appropriate repository
+5. **Pass-through Design**: All content is logged while maintaining normal Claude Code operation
 
 ### Implementation Details
 
-The auto-logging system consists of two versions of the claude-logger MCP server:
+The auto-logging system works independently of MCP and uses I/O stream interception:
 
-#### Manual Mode (`index.js`)
-- Requires explicit calls to `log_message` for each exchange
-- Provides tools like `enable_auto_logging`, `disable_auto_logging`, `log_message`
-- Used when fine-grained control over logging is needed
+#### Stream Interception (`start-auto-logger.sh`)
+- Launches Node.js monitoring process that intercepts Claude's stdin/stdout
+- Detects conversation boundaries using pattern matching
+- Maintains conversation state and buffers for user/assistant exchanges
+- Routes content to appropriate `.specstory/history/` directories based on content analysis
 
-#### Auto Mode (`index-auto.js`)
-- Automatically starts logging when Claude Code launches
-- Creates a session file immediately on startup
-- Intercepts all message exchanges without manual intervention
-- Extracts meaningful titles from first user messages
-- Provides `auto_log_exchange` tool for internal use
+#### Smart Content Detection
+- **Coding Keywords**: ukb, vkb, shared-memory.json, MCP, knowledge management, etc.
+- **Path Detection**: Matches coding repository paths and tool references
+- **Cross-project Routing**: Ensures coding-related discussions go to coding/.specstory/history/
+- **Dynamic Switching**: Can switch target repositories mid-conversation based on content
+
+#### Legacy MCP Tools (Still Useful)
+- `claude-logger-mcp` **kept for manual logging scenarios**:
+  - Manual conversation recording when I/O interception isn't available
+  - Debugging and testing logging functionality  
+  - Session management tools (`start_session`, `end_session`, `list_sessions`)
+  - Direct control over log formatting and metadata
+- **Not used for automatic logging** due to MCP architectural limitations
+- Tools: `enable_auto_logging`, `log_message`, `start_session`, `end_session`, `list_sessions`
 
 ### Configuration
 
-The MCP configuration template (`claude-code-mcp.json`) specifies which version to use:
+Automatic logging is configured through the `claude-mcp` launcher script:
 
-```json
-{
-  "claude-logger": {
-    "command": "node",
-    "args": ["{{CLAUDE_PROJECT_PATH}}/claude-logger-mcp/dist/index-auto.js"],
-    "env": {
-      "PROJECT_PATH": "{{CLAUDE_PROJECT_PATH}}"
-    }
-  }
-}
+```bash
+# claude-mcp script automatically detects and launches start-auto-logger.sh
+LOGGER_SCRIPT="$CODING_REPO_DIR/start-auto-logger.sh"
+if [[ -x "$LOGGER_SCRIPT" ]]; then
+    # Launch Claude with I/O interception
+    exec "$LOGGER_SCRIPT" "$(pwd)" "$CODING_REPO_DIR" "$@"
+else
+    # Fallback to Claude without logging
+    exec claude --mcp-config "$MCP_CONFIG" "$@"
+fi
 ```
 
-The `install.sh` script processes this template and replaces placeholders with actual paths.
+Environment variables:
+- `CODING_REPO`: Path to the coding repository (defaults to `/Users/q284340/Agentic/coding`)
+- Current working directory passed to determine project context
 
 ## File Structure
 
