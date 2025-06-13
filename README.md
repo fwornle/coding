@@ -160,7 +160,7 @@ The system uses a **green "CodingKnowledge" hub** that aggregates transferable p
 
 - **ConditionalLoggingPattern**: Advanced dual-axis debug logging with performance optimization
 - **ReduxStateManagementPattern**: React state management with TypeScript and MVI architecture
-- **MCPKnowledgePersistencePattern**: Comprehensive knowledge management system for teams
+- **KnowledgePersistencePattern**: Comprehensive knowledge management system for teams
 - **NetworkAwareInstallationPattern**: Enterprise-ready installation with network adaptation
 - **StateDrivenAnimationPipelinePattern**: Reactive animation systems with state management
 - **StrategyBasedModularRoutingPattern**: Flexible routing architectures
@@ -230,7 +230,7 @@ The system includes comprehensive documentation for transferable patterns:
 
 - **[Conditional Logging Pattern](knowledge-management/insights/ConditionalLoggingPattern.md)** - Zero-overhead debug logging with dual-axis filtering
 - **[Cross-Project Logging Pattern](knowledge-management/insights/CrossProjectLoggingPattern.md)** - Automatic dual logging for coding project work
-- **[MCP Knowledge Persistence](knowledge-management/insights/MCPKnowledgePersistencePattern.md)** - Complete knowledge management system architecture
+- **[Knowledge Persistence Pattern](knowledge-management/insights/KnowledgePersistencePattern.md)** - Complete knowledge management system architecture
 - **[Network-Aware Installation](knowledge-management/insights/NetworkAwareInstallationPattern.md)** - Enterprise installation patterns with network adaptation
 - **[Redux State Management](knowledge-management/insights/ReduxStateManagementPattern.md)** - MVI architecture with TypeScript
 - **[State-Driven Animation Pipeline](knowledge-management/insights/StateDrivenAnimationPipelinePattern.md)** - Reactive animation systems

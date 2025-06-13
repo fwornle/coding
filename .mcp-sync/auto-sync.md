@@ -59,7 +59,7 @@ console.log(`✅ MCP Memory loaded: ${graphState.nodes?.length || 0} entities, $
 - ConditionalLoggingPattern (significance: 8)
 - ViewportCullingPattern (significance: 8)
 - ReduxStateManagementPattern (significance: 8)
-- MCPKnowledgePersistencePattern (significance: 9)
+- KnowledgePersistencePattern (significance: 9)
 - NetworkAwareInstallationPattern (significance: 9)
 - StateDrivenAnimationPipelinePattern (significance: 8)
 - ClaudeCodeStartupPattern (significance: 10)

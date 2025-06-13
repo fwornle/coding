@@ -120,7 +120,7 @@ $PROJECT_ROOT/knowledge-management/normalize-specstory-filenames.sh /path/to/pro
 - `docs/automatic-conversation-logging.md` - Post-session logging architecture
 
 ## Related Patterns
-- **MCPKnowledgePersistencePattern** - MCP memory integration
+- **KnowledgePersistencePattern** - Cross-session knowledge persistence and memory integration
 - **ConditionalLoggingPattern** - Runtime logging control
 - **NetworkAwareInstallationPattern** - Cross-environment support
 

@@ -134,7 +134,7 @@ sequenceDiagram
 ### Documentation Structure
 ```
 knowledge-management/insights/
-├── MCPKnowledgePersistencePattern.md
+├── KnowledgePersistencePattern.md
 ├── ConditionalLoggingPattern.md
 ├── ViewportCullingPattern.md
 ├── images/
