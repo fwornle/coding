@@ -12,6 +12,7 @@ This repository contains various scripts and tools created with Claude Code, foc
 - **[Enhanced Cross-Project Logging](docs/enhanced-cross-project-logging.md)** - Automatic dual logging for coding project work
 - **[Cross-Project Knowledge System](docs/cross-project-knowledge-system.md)** - How knowledge applies across all projects
 - **[Portable Knowledge References](docs/portable-knowledge-references.md)** - Avoiding hardcoded paths for team compatibility
+- **[MCP Memory Server Architecture](docs/mcp-memory-server-architecture.md)** - Cross-session knowledge persistence via MCP
 - **[Team Setup Guide](docs/team-knowledge-setup.md)** - Quick start for team collaboration
 - **[Installation Architecture](docs/installation-architecture.md)** - Network detection and repository strategy
 - **[Architecture Diagrams](docs/imag/)** - System architecture and workflow diagrams
@@ -145,10 +146,11 @@ vkb  # View knowledge visualization
 
 ### Conversation Logging
 
-- **Automatic Capture**: Enable with "Enable automatic logging" in Claude Code
-- **SpecStory Format**: Conversations saved to `.specstory/history/`
-- **Full History**: Complete AI interaction logs with metadata
-- **Searchable Archive**: Compatible with SpecStory VS Code extension
+- **Automatic Capture**: Start with `claude-mcp` for automatic post-session logging
+- **Smart Routing**: Coding conversations → `coding/.specstory/history/`, others → current project
+- **Content Classification**: Intelligent detection of coding vs project-specific content
+- **SpecStory Format**: Conversations saved with complete metadata and tool usage
+- **Cross-Project**: Knowledge management conversations always route to coding repository
 
 ## 🎨 Knowledge Graph Features
 

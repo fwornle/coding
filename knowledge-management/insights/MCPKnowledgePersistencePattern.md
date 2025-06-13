@@ -117,22 +117,29 @@ UKB Engine → shared-memory.json → MCP Sync Instructions → Claude Code → 
 - **Solution Suggestion**: "Based on previous sessions, ReduxStateManagement solved similar issues"
 - **Knowledge Building**: "This extends the ConditionalLoggingPattern - I'll update the knowledge base"
 
-**Current Limitation**: Manual sync required between shared-memory.json and MCP memory. Startup displays knowledge but doesn't automatically load into MCP memory server.
+**Current Status**: ✅ **Auto-sync working** - shared-memory.json automatically syncs with MCP memory on startup via `.mcp-sync/sync-required.json` trigger.
 
-#### 2. Automatic Conversation Logging (I/O Stream Interception)
+#### 2. Automatic Conversation Logging (Post-Session Capture)
 
 ```bash
-# Script: start-auto-logger.sh
-# Purpose: True automatic conversation logging via I/O interception
+# Scripts: start-auto-logger.sh + post-session-logger.js + conversation-capture.js
+# Purpose: Automatic conversation logging via post-session capture
 # Key Features:
-- Real-time stdin/stdout interception
+- Post-session conversation capture when Claude exits
 - Smart content routing (coding vs project-specific)
 - Cross-project knowledge preservation
 - SpecStory-compatible logging format
 - Zero manual intervention required
+- Intelligent content classification for routing
 ```
 
-**Legacy MCP Server**: `claude-logger-mcp` still available for manual logging scenarios but not used for automatic logging due to MCP architectural limitations.
+**Implementation Details:**
+- `start-auto-logger.sh`: Main entry point that starts Claude and sets up session tracking
+- `post-session-logger.js`: Captures conversation after Claude exits and routes to appropriate repository
+- `conversation-capture.js`: Real-time backup capture system with signal handlers
+- **Content Classification**: Coding keywords → `coding/.specstory/history/`, others → current project
+
+**Legacy MCP Server**: `claude-logger-mcp` still available for manual logging scenarios but replaced by post-session system for automatic logging.
 
 #### 3. Browser Access MCP Server
 

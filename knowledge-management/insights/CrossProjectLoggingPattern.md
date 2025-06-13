@@ -86,9 +86,9 @@ normalize_filename() {
 ## Usage
 
 ### Setup
-1. Install enhanced MCP logger: `npm run build` in `claude-logger-mcp`
-2. Update MCP config to use `index-auto.js`
-3. Start Claude Code with `claude-mcp` script
+1. Use post-session logging system (automatically configured)
+2. Start Claude Code with `claude-mcp` script
+3. No additional setup required - system is automatic
 
 ### Verification
 ```bash
@@ -112,10 +112,12 @@ $PROJECT_ROOT/knowledge-management/normalize-specstory-filenames.sh /path/to/pro
 ```
 
 ## Key Files
-- `claude-logger-mcp/src/index-auto.ts` - Detection and dual logging logic
-- `claude-logger-mcp/src/logger.ts` - Filename generation and formatting
+- `scripts/start-auto-logger.sh` - Main entry point for automatic logging
+- `scripts/post-session-logger.js` - Post-session conversation capture and routing
+- `scripts/conversation-capture.js` - Real-time backup capture system
 - `knowledge-management/normalize-specstory-filenames.sh` - Batch filename fixes
 - `docs/enhanced-cross-project-logging.md` - Detailed documentation
+- `docs/automatic-conversation-logging.md` - Post-session logging architecture
 
 ## Related Patterns
 - **MCPKnowledgePersistencePattern** - MCP memory integration

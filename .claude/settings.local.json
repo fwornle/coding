@@ -51,7 +51,8 @@
       "Bash(./browser-access/start-chrome-debug.sh:*)",
       "Bash(./install.sh:*)",
       "Bash(./sync-shared-knowledge.sh:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(./knowledge-management/ukb:*)"
     ],
     "deny": []
   }
