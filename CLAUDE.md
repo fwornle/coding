@@ -50,20 +50,23 @@ if (fileExists(syncPath)) {
 
 ## 🔴 CRITICAL: AUTOMATIC CONVERSATION LOGGING
 
-**STATUS**: ✅ **WORKING** - Automatic conversation logging is now fully functional via I/O stream interception.
+**STATUS**: ✅ **WORKING** - Post-session conversation logging is now fully functional.
 
 **HOW IT WORKS**: 
-- `claude-mcp` automatically starts `start-auto-logger.sh` which intercepts stdin/stdout
-- Node.js monitoring process detects conversation boundaries and logs exchanges
+- `claude-mcp` automatically starts `start-auto-logger.sh` which sets up session tracking
+- **Post-session capture**: When Claude exits, `post-session-logger.js` captures the conversation
 - **Smart routing**: Content is intelligently analyzed and routed to appropriate `.specstory/history/` directories
 - **Coding-related content** (ukb, vkb, knowledge management, MCP, etc.) always goes to `coding/.specstory/history/`
 - **Other content** goes to the current project's `.specstory/history/`
 
 **KEY FEATURES**:
 - No manual intervention required
-- Content-aware logging (coding vs. project-specific)
+- Content-aware logging (coding vs. project-specific)  
 - Cross-project knowledge management preservation
-- Real-time logging during conversations
+- Post-session logging (designed for interactive mode limitations)
+- Automatic conversation classification and routing
+
+**WHY POST-SESSION**: Interactive mode Claude Code doesn't expose stdio properly for real-time interception, so post-session logging is the correct approach.
 
 ## 🚨 CRITICAL: How to Start Claude Code
 

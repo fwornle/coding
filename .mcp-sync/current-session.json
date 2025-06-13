@@ -1,7 +1,9 @@
 {
-  "sessionId": "2025-06-13_09-25-26",
-  "startTime": "2025-06-13T07:25:26.3NZ",
+  "sessionId": "2025-06-13_09-31-34",
+  "startTime": "2025-06-13T07:31:34.3NZ",
   "projectPath": "/Users/q284340/Agentic/coding",
   "codingRepo": "/Users/q284340/Agentic/coding",
-  "needsLogging": true
+  "needsLogging": false,
+  "loggedAt": "2025-06-13T07:41:27.453Z",
+  "logFile": "/Users/q284340/Agentic/coding/.specstory/history/2025-06-13_09-41-27_post-logged-coding-session.md"
 }

@@ -284,6 +284,12 @@ if [[ -z "$CLAUDE_ARGS" ]]; then
   CLAUDE_ARGS=""
 fi
 
+# Define colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
 # For now, create a session marker that the system can detect
 SESSION_ID="$(date '+%Y-%m-%d_%H-%M-%S')"
 echo -e "${GREEN}📝 Session ID: $SESSION_ID${NC}"
@@ -302,9 +308,20 @@ cat > "$CODING_REPO/.mcp-sync/current-session.json" << EOF
 }
 EOF
 
-echo -e "${YELLOW}💡 Note: This conversation will be logged post-session${NC}"
-echo -e "${BLUE}📋 Use 'ukb log-session' to manually log important exchanges${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}💡 IMPORTANT: This conversation will be logged post-session${NC}"
+echo -e "${YELLOW}📋 TIP: Use 'ukb --interactive' to capture deep insights manually${NC}"
+echo -e "${BLUE}🧠 Use 'ukb --auto' for quick session summaries${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════════${NC}"
 echo
 
-# Start Claude with MCP config
-exec claude --mcp-config "$CODING_REPO/claude-code-mcp-processed.json" $CLAUDE_ARGS
+# Start Claude with conversation capture using pipes
+echo -e "${GREEN}🎯 Starting Claude with real-time conversation capture...${NC}"
+
+# Use a pipeline to capture conversation while Claude runs
+(claude --mcp-config "$CODING_REPO/claude-code-mcp-processed.json" $CLAUDE_ARGS 2>&1) | \
+  tee >(node "$CODING_REPO/scripts/conversation-capture.js" "$PROJECT_PATH" "$CODING_REPO" "$SESSION_ID" >/dev/null)
+
+# POST-SESSION LOGGING (backup/cleanup)
+echo -e "${GREEN}🔄 Finalizing post-session logging...${NC}"
+node "$CODING_REPO/scripts/post-session-logger.js" "$PROJECT_PATH" "$CODING_REPO" "$SESSION_ID"
