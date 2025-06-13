@@ -45,6 +45,7 @@ vkb
 ## 🚀 Installation
 
 ### Quick Setup
+
 ```bash
 git clone <repository-url> ~/coding  # "coding" is just an example - use any folder name
 cd ~/coding
@@ -56,19 +57,23 @@ source .activate    # Activate commands immediately
 ### Automatic Conversation Logging
 
 Starting Claude Code with the `claude-mcp` command automatically enables conversation logging:
+
 - All prompts and responses are captured to `.specstory/history/`
 - Each session creates a timestamped markdown file
 - Conversations are preserved for future reference and knowledge extraction
 - No manual activation needed - logging starts automatically with each session
 
 ### Network-Aware Installation
+
 The installer automatically detects your network environment:
+
 - **🏢 Corporate Network**: Uses CN mirrors for modified repos, proxy detection for external repos
 - **🌍 Public Network**: Uses public repositories with your forks
 
 **📖 [Complete Installation Guide →](docs/team-knowledge-setup.md)**
 
 ### Start Using
+
 ```bash
 ukb  # Update knowledge base
 vkb  # View knowledge visualization
@@ -76,7 +81,7 @@ vkb  # View knowledge visualization
 
 ## 📁 Directory Structure
 
-```
+```text
 ~/coding/
 ├── README.md                  # This file
 ├── docs/team-knowledge-setup.md # Quick setup guide
@@ -262,6 +267,7 @@ source ~/.bashrc  # or ~/.zshrc on macOS
 ```
 
 The installer automatically:
+
 - ✅ Checks and installs dependencies
 - ✅ Clones and builds memory-visualizer
 - ✅ Builds MCP servers (browser-access, claude-logger)
