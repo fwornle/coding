@@ -5,6 +5,9 @@ This repository contains various scripts and tools created with Claude Code, foc
 ## Knowledge-Base Viewer:
 ![Knowledge Visualization](docs/imag/viewer.png)
 
+## Viewer Details Mode:
+![Knowledge Visualization Details](docs/imag/viewer-details.png)
+
 ## Session Startup with Key-Insights
 ![Claude MCP Auto-Logging](docs/imag/claude-mcp-autologging.png)
 

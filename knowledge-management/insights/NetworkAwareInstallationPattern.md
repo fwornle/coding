@@ -30,7 +30,7 @@ timeout 5s curl -s --connect-timeout 5 https://google.de
 - Provide clear success/failure criteria
 - Fall back gracefully through multiple detection methods
 
-![Network-Aware Installation Pattern](imag/network-aware-installation-pattern.png)
+![Network-Aware Installation Pattern](images/network-aware-installation-pattern.png)
 
 ### Repository Strategy Patterns
 
@@ -99,7 +99,7 @@ config_files=(
 
 **Common Scenario:** Developers need access to both corporate GitHub and public GitHub with different SSH keys.
 
-![SSH Key Management Pattern](imag/ssh-key-management-pattern.png)
+![SSH Key Management Pattern](images/ssh-key-management-pattern.png)
 
 **SSH Config Pattern:**
 

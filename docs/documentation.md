@@ -271,6 +271,15 @@ Clicking any node shows:
 - Creation date
 - All relationships (inbound/outbound)
 
+![Knowledge Visualization Details](imag/viewer-details.png)
+
+When a node contains references to detailed markdown documentation (e.g., transferable patterns), clicking the markdown link opens a full-screen viewer with:
+
+- Rich markdown formatting with syntax highlighting
+- Embedded diagrams and visualizations
+- Code examples and implementation details
+- Cross-references to related patterns
+
 ## Team Collaboration
 
 ### Git Integration
