@@ -24,7 +24,7 @@ The installer automatically detects your network location and selects appropriat
 - **memory-visualizer:** Uses public fork (`github.com/fwornle/memory-visualizer`)
 - **browserbase:** Uses public repo (`github.com/browserbase/mcp-server-browserbase`)
 
-![Installation Flow](docs/imag/installation-flow.png)
+![Installation Flow](imag/installation-flow.png)
 
 ### Corporate Network Handling
 
