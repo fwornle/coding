@@ -38,7 +38,7 @@ export CODING_TOOLS_PATH="$PROJECT_DIR"
 # Launch Claude with MCP config
 if [ -n "$MCP_CONFIG" ]; then
   log "Using MCP config: $MCP_CONFIG"
-  exec claude --config "$MCP_CONFIG" "$@"
+  exec claude-mcp "$@"
 else
   log "Launching Claude without MCP config"
   exec claude "$@"

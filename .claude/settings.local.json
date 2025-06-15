@@ -65,7 +65,8 @@
       "Bash(else)",
       "Bash(fi)",
       "Bash(done)",
-      "Bash(coding)"
+      "Bash(coding)",
+      "Bash(./bin/coding)"
     ],
     "deny": []
   }
