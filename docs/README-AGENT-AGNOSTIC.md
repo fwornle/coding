@@ -8,7 +8,7 @@ This repository now supports both **Claude Code** (with MCP servers) and **GitHu
 
 ```bash
 # Install the system
-./install.sh
+../install.sh
 
 # Or install Node.js dependencies only
 npm install
@@ -18,15 +18,15 @@ npm install
 
 ```bash
 # Use best available agent (defaults to Claude if available)
-coding-agent
+../bin/coding
 
 # Force specific agent
-coding-agent --claude
-coding-agent --copilot
+../bin/coding --claude
+../bin/coding --copilot
 
 # Use with commands
-coding-agent suggest "add error handling"
-coding-agent explain "this code block"
+../bin/coding suggest "add error handling"
+../bin/coding explain "this code block"
 ```
 
 ## 🏗️ Architecture
@@ -113,7 +113,7 @@ await adapter.browserAct('click the login button');
 ## 📁 Project Structure
 
 ```
-lib/
+../lib/
 ├── agent-detector.js       # Detects available agents
 ├── agent-adapter.js        # Abstract base class
 ├── agent-registry.js       # Manages adapters
@@ -129,11 +129,11 @@ lib/
 └── utils/
     └── system.js           # System utilities
 
-scripts/
+../scripts/
 ├── launch-claude.sh        # Claude launcher
 └── launch-copilot.sh       # CoPilot launcher
 
-coding-agent                # Unified launcher script
+../bin/coding         # Unified launcher script
 ```
 
 ## 🔧 Configuration
@@ -174,10 +174,10 @@ The system uses `coding-tools-config.json` for agent-specific settings:
 
 ```bash
 # Test agent detection
-node test-agent-detection.js
+node ../scripts/test-agent-detection.js
 
 # Test memory fallback
-node test-memory-fallback.js
+node ../scripts/test-memory-fallback.js
 
 # Test full system
 npm test
@@ -188,8 +188,8 @@ npm test
 Existing users can migrate seamlessly:
 
 1. **Backup your data**: `cp shared-memory.json shared-memory.json.backup`
-2. **Run new installer**: `./install.sh`
-3. **Update commands**: Replace `claude-mcp` with `coding-agent`
+2. **Run new installer**: `../install.sh`
+3. **Update commands**: Replace `claude-mcp` with `../bin/coding`
 
 All existing functionality continues to work with Claude Code!
 
@@ -234,4 +234,4 @@ vkb                    # Web visualization
 
 ---
 
-**Ready to try it?** Run `./install.sh` and start with `coding-agent`!
+**Ready to try it?** Run `../install.sh` and start with `../bin/coding`!

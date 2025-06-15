@@ -1,0 +1,73 @@
+@startuml Agent-Agnostic Architecture
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam BoxPadding 10
+skinparam BoxBorderColor #666
+skinparam BoxBackgroundColor #FFF
+skinparam BoxFontColor #333
+
+title Agent-Agnostic Coding Tools Architecture
+
+box "User Interface Layer" #E8F4F8
+    participant "coding CLI" as CLI
+    participant "Agent Detector" as Detector
+end box
+
+box "Agent Adapter Layer" #F0E6FF
+    participant "Agent Registry" as Registry
+    participant "Claude Adapter" as Claude
+    participant "CoPilot Adapter" as CoPilot
+end box
+
+box "Service Layer" #E6F7E6
+    participant "Memory Service" as Memory
+    participant "Browser Service" as Browser
+    participant "Logger Service" as Logger
+end box
+
+box "Implementation Layer" #FFE6E6
+    participant "MCP Servers" as MCP
+    participant "Fallback Services" as Fallback
+end box
+
+== Initialization ==
+CLI -> Detector: Detect available agents
+Detector -> Detector: Check for claude, copilot
+Detector -> Registry: Register available agents
+Registry -> Claude: Initialize if available
+Registry -> CoPilot: Initialize if available
+
+== Agent Selection ==
+CLI -> Registry: Get agent (--claude/--copilot/auto)
+alt Claude Code Selected
+    Registry -> Claude: Select Claude adapter
+    Claude -> MCP: Connect to MCP servers
+    MCP -> Memory: MCP Memory Server
+    MCP -> Browser: MCP Browser Server  
+    MCP -> Logger: MCP Logger Server
+else CoPilot Selected
+    Registry -> CoPilot: Select CoPilot adapter
+    CoPilot -> Fallback: Initialize fallbacks
+    Fallback -> Memory: Graphology DB
+    Fallback -> Browser: Playwright
+    Fallback -> Logger: File/Specstory
+end
+
+== Unified API Usage ==
+CLI -> Registry: adapter.memorySearch("pattern")
+Registry -> Claude: Forward to selected adapter
+alt Using Claude
+    Claude -> MCP: MCP memory operation
+else Using CoPilot  
+    CoPilot -> Fallback: Graphology query
+end
+
+note over CLI,Fallback
+    **Key Benefits:**
+    - Single interface for all agents
+    - Automatic fallback services
+    - Seamless agent switching
+    - Consistent API across implementations
+end note
+
+@enduml

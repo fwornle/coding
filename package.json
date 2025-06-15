@@ -4,7 +4,7 @@
   "description": "Unified coding tools that work with both Claude Code (MCP) and GitHub CoPilot (fallbacks)",
   "main": "lib/agent-registry.js",
   "bin": {
-    "coding-agent": "./coding-agent"
+    "coding": "./bin/coding"
   },
   "scripts": {
     "test": "jest",

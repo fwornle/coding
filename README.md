@@ -9,21 +9,24 @@ This repository provides intelligent coding tools that work seamlessly with both
 ./install.sh
 
 # Use best available agent (auto-detects)
-coding-agent
+./bin/coding
 
 # Force specific agent
-coding-agent --claude     # Use Claude Code with MCP
-coding-agent --copilot    # Use GitHub CoPilot with fallbacks
+./bin/coding --claude     # Use Claude Code with MCP
+./bin/coding --copilot    # Use GitHub CoPilot with fallbacks
 ```
 
-## Knowledge-Base Viewer:
-![Knowledge Visualization](docs/images/viewer.png)
+## Knowledge-Base Viewer
 
-## Viewer Details Mode:
-![Knowledge Visualization Details](docs/images/viewer-details.png)
+![Knowledge Visualization](docs/imag/viewer.png)
 
-## Agent-Agnostic Architecture:
-![Agent Architecture](docs/images/agent-agnostic-architecture.png)
+## Viewer Details Mode
+
+![Knowledge Visualization Details](docs/imag/viewer-details.png)
+
+## Agent-Agnostic Architecture
+
+![Agent-Agnostic Architecture](docs/imag/agent-agnostic-architecture.png)
 
 ## 🤖 Supported AI Agents
 
@@ -43,8 +46,16 @@ coding-agent --copilot    # Use GitHub CoPilot with fallbacks
 
 ## 📚 Documentation
 
+### Getting Started
+
+- **[Installation Guide](docs/installation-guide.md)** - Detailed installation instructions for all platforms
+- **[Claude MCP Setup](docs/claude-mcp-setup.md)** - Configure Claude Code with MCP servers
+- **[Team Knowledge Setup](docs/team-knowledge-setup.md)** - Quick start for team collaboration
+- **[Network Troubleshooting](docs/network-troubleshooting.md)** - Resolve proxy and enterprise network issues
+
 ### Agent-Agnostic Features
-- **[Agent-Agnostic Implementation Guide](README-AGENT-AGNOSTIC.md)** - Complete guide to the new architecture
+
+- **[Agent-Agnostic Implementation Guide](docs/README-AGENT-AGNOSTIC.md)** - Complete guide to the new architecture
 - **[Agent Detection & Switching](docs/agent-detection-architecture.md)** - How agent selection works
 - **[Fallback Services Architecture](docs/fallback-services-architecture.md)** - CoPilot fallback implementations
 - **[Graph Database Comparison](docs/graph-db-comparison.md)** - Why Graphology was chosen
@@ -65,10 +76,9 @@ coding-agent --copilot    # Use GitHub CoPilot with fallbacks
 - **[Cross-Project Knowledge System](docs/cross-project-knowledge-system.md)** - Knowledge sharing across projects and agents
 - **[Portable Knowledge References](docs/portable-knowledge-references.md)** - Agent-agnostic path handling
 - **[Team Setup Guide](docs/team-knowledge-setup.md)** - Multi-agent team collaboration
-- **[Migration Guide](docs/migration-to-agent-agnostic.md)** - Upgrading from Claude-only setup
 
 ### Development  
-- **[Architecture Diagrams](docs/images/)** - System architecture and workflow diagrams
+- **[Architecture Diagrams](docs/imag/)** - System architecture and workflow diagrams
 - **[Insights Library](knowledge-management/insights/)** - Transferable patterns and solutions
 - **[API Reference](docs/api-reference.md)** - Agent adapter APIs
 
@@ -100,7 +110,7 @@ vkb                 # Interactive visualization at localhost:8080
 ```mermaid
 graph TB
     subgraph "Unified Interface"
-        CLI[coding-agent CLI]
+        CLI[./bin/coding CLI]
         UKB[ukb tool]
         VKB[vkb viewer]
     end
@@ -173,7 +183,7 @@ npm install
 npx playwright install chromium
 
 # Set up unified launcher
-ln -sf $(pwd)/coding-agent ~/bin/coding-agent
+ln -sf $(pwd)/./bin/coding ~/bin/./bin/coding
 ```
 
 ## 🔧 Configuration
@@ -184,8 +194,8 @@ ln -sf $(pwd)/coding-agent ~/bin/coding-agent
 export CODING_AGENT="copilot"
 
 # Command-line flags (per-command)
-coding-agent --claude
-coding-agent --copilot
+./bin/coding --claude
+./bin/coding --copilot
 ```
 
 ### Agent-Specific Settings
@@ -224,7 +234,7 @@ Existing users can upgrade seamlessly:
 
 1. **Backup**: `cp shared-memory.json shared-memory.json.backup`
 2. **Install**: `./install.sh`  
-3. **Update**: Replace `claude-mcp` with `coding-agent`
+3. **Update**: Replace `claude-mcp` with `./bin/coding`
 
 All existing Claude functionality continues to work!
 
@@ -266,4 +276,4 @@ All existing Claude functionality continues to work!
 
 ---
 
-**Ready to get started?** Run `./install.sh` and use `coding-agent` to begin with your preferred AI coding assistant!
+**Ready to get started?** Run `./install.sh` and use `./bin/coding` to begin with your preferred AI coding assistant!

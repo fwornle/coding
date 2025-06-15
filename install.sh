@@ -804,10 +804,10 @@ setup_unified_launcher() {
     local bin_dir="$HOME/bin"
     mkdir -p "$bin_dir"
     
-    # Create symlink to coding-agent
-    if [ -f "$CODING_REPO/coding-agent" ]; then
-        ln -sf "$CODING_REPO/coding-agent" "$bin_dir/coding-agent"
-        success "✓ coding-agent launcher created in $bin_dir"
+    # Create symlink to coding
+    if [ -f "$CODING_REPO/bin/coding" ]; then
+        ln -sf "$CODING_REPO/bin/coding" "$bin_dir/coding"
+        success "✓ coding launcher created in $bin_dir"
         
         # Add to PATH if not already there
         if [[ ":$PATH:" != *":$bin_dir:"* ]]; then
@@ -815,7 +815,7 @@ setup_unified_launcher() {
             echo "export PATH=\"$bin_dir:\$PATH\"" >> "$SHELL_RC"
         fi
     else
-        error "coding-agent script not found"
+        error "coding script not found"
         return 1
     fi
 }
@@ -860,12 +860,12 @@ main() {
 export CODING_REPO="$CODING_REPO"
 export PATH="$CODING_REPO/bin:\$PATH"
 echo "✅ Agent-Agnostic Coding Tools environment activated!"
-echo "Commands 'ukb', 'vkb', and 'coding-agent' are now available."
+echo "Commands 'ukb', 'vkb', and 'coding' are now available."
 echo ""
 echo "Usage:"
-echo "  coding-agent           # Use best available agent"
-echo "  coding-agent --copilot # Force CoPilot"
-echo "  coding-agent --claude  # Force Claude Code"
+echo "  coding           # Use best available agent"
+echo "  coding --copilot # Force CoPilot"
+echo "  coding --claude  # Force Claude Code"
 EOF
     chmod +x "$CLAUDE_REPO/.activate"
     

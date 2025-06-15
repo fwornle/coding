@@ -395,7 +395,7 @@ class LoggerFallbackService {
 
 ```mermaid
 sequenceDiagram
-    participant CLI as coding-agent
+    participant CLI as coding
     participant AD as Agent Detector
     participant CP as CoPilot Adapter
     participant MS as Memory Service

@@ -11,7 +11,7 @@ The agent detection system provides automatic discovery and selection of availab
 ```mermaid
 graph TB
     subgraph "Detection Process"
-        CLI[coding-agent CLI]
+        CLI[coding CLI]
         AD[Agent Detector]
         ENV[Environment Check]
         CMD[Command Detection]
@@ -127,7 +127,7 @@ async detectSpecstoryExtension() {
 
 ```mermaid
 flowchart TD
-    START[coding-agent command]
+    START[coding command]
     CHECK_FORCE{Forced agent?}
     CHECK_ENV{Environment variable?}
     AUTO_DETECT[Auto-detect agents]
@@ -159,17 +159,17 @@ flowchart TD
 
 ```bash
 # Auto-detection (default)
-coding-agent
+coding
 
 # Force specific agent
-coding-agent --claude
-coding-agent --copilot
-coding-agent --agent claude
-coding-agent --agent copilot
+coding --claude
+coding --copilot
+coding --agent claude
+coding --agent copilot
 
 # With commands
-coding-agent --copilot suggest "add error handling"
-coding-agent --claude explain "this function"
+coding --copilot suggest "add error handling"
+coding --claude explain "this function"
 ```
 
 ### Environment Variables

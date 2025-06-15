@@ -465,7 +465,7 @@ class LoggerFallbackService {
 
 ### 4.1 Main Launcher Script
 
-**File**: `coding-agent` (new command)
+**File**: `coding` (new command)
 
 ```bash
 #!/bin/bash
@@ -637,10 +637,10 @@ fi
 
 # Create unified launcher
 echo "🚀 Creating unified launcher..."
-ln -sf $(pwd)/coding-agent ~/bin/coding-agent
+ln -sf $(pwd)/bin/coding ~/bin/coding
 
 echo "✅ Installation complete!"
-echo "Usage: coding-agent [--agent claude|copilot] [args...]"
+echo "Usage: coding [--agent claude|copilot] [args...]"
 ```
 
 **Tasks**:
@@ -716,7 +716,7 @@ describe('Agent Compatibility', () => {
    ```
 
 3. **Update your workflow**:
-   - Replace `claude-mcp` with `coding-agent`
+   - Replace `claude-mcp` with `coding`
    - Use `--agent copilot` to force CoPilot
    - All other commands remain the same
 
@@ -729,9 +729,9 @@ describe('Agent Compatibility', () => {
 
 2. **Start coding**:
    ```bash
-   coding-agent  # Uses best available agent
-   coding-agent --copilot  # Force CoPilot
-   coding-agent --claude   # Force Claude
+   coding  # Uses best available agent
+   coding --copilot  # Force CoPilot
+   coding --claude   # Force Claude
    ```
 ```
 
