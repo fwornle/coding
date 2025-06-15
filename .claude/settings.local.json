@@ -64,7 +64,8 @@
       "Bash(echo:*)",
       "Bash(else)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(coding)"
     ],
     "deny": []
   }

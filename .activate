@@ -1,6 +1,11 @@
 #!/bin/bash
-# Activate Claude Knowledge Management environment
+# Activate Agent-Agnostic Coding Tools environment
 export CODING_REPO="/Users/q284340/Agentic/coding"
 export PATH="/Users/q284340/Agentic/coding/bin:$PATH"
-echo "✅ Claude Knowledge Management environment activated!"
-echo "Commands 'ukb' and 'vkb' are now available."
+echo "✅ Agent-Agnostic Coding Tools environment activated!"
+echo "Commands 'ukb', 'vkb', and 'coding' are now available."
+echo ""
+echo "Usage:"
+echo "  coding           # Use best available agent"
+echo "  coding --copilot # Force CoPilot"
+echo "  coding --claude  # Force Claude Code"
