@@ -232,7 +232,7 @@ calculate_significance() {
     )
     
     for keyword in "${profound_keywords[@]}"; do
-        if [[ "${content,,}" =~ $keyword ]]; then
+        if [[ "$(echo "$content" | tr '[:upper:]' '[:lower:]')" =~ $keyword ]]; then
             ((score++))
             [[ $score -gt 10 ]] && score=10
         fi
@@ -579,7 +579,10 @@ capture_interactive_insight() {
         "" "architecture" "performance" "state-management" "integration"
         "workflow" "security" "testing" "general"
     )
-    local category="${category_map[$category_choice]:-general}"
+    local category="general"
+    if [[ "$category_choice" =~ ^[1-8]$ ]] && [[ -n "${category_map[$category_choice]}" ]]; then
+        category="${category_map[$category_choice]}"
+    fi
     
     # Process arrays with proper JSON escaping
     local technologies_array
@@ -625,7 +628,7 @@ capture_interactive_insight() {
     author=$(whoami)
     
     # Generate documentation link
-    local doc_filename="${insight_name,,}.md"
+    local doc_filename="$(echo "$insight_name" | tr '[:upper:]' '[:lower:]').md"
     doc_filename=$(echo "$doc_filename" | sed 's/pattern//')  # Remove redundant "pattern"
     doc_filename=$(echo "$doc_filename" | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
     doc_filename="${doc_filename}.md"
@@ -664,7 +667,7 @@ capture_interactive_insight() {
            "project": $proj,
            "code_files": $code_files,
            "documentation_link": $doclink,
-           "observations": [
+           "observations": ([
                "Problem: \($problem)",
                "Solution: \($solution)",
                "Approach: \($approach)",
@@ -673,7 +676,7 @@ capture_interactive_insight() {
                "Details: \($docurl)",
                "Significance: \($sig)/10",
                "Created: \($timestamp)"
-           ] + (if ($references | length) > 0 then ["References: " + ($references | join(", "))] else [] end),
+           ] + (if ($references | length) > 0 then ["References: " + ($references | join(", "))] else [] end)),
            "significance": ($sig | tonumber),
            "created": $timestamp
        }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
@@ -778,7 +781,10 @@ auto_capture_significant_commit() {
     # Extract meaningful name from commit message
     local pattern_name
     if [[ "$message" =~ implement.*([A-Z][a-z]+.*[A-Z][a-z]+) ]] || [[ "$message" =~ add.*([A-Z][a-z]+.*[A-Z][a-z]+) ]]; then
-        pattern_name="${BASH_REMATCH[1]// /}Pattern"
+        # Extract pattern from message using sed instead of BASH_REMATCH
+        local extracted_pattern
+        extracted_pattern=$(echo "$message" | sed -n 's/.*\(implement\|add\).*\([A-Z][a-z][^[:space:]]*[A-Z][a-z][^[:space:]]*\).*/\2/p' | sed 's/[[:space:]]//g')
+        pattern_name="${extracted_pattern}Pattern"
     elif [[ "$category" == "architecture" ]]; then
         pattern_name="ArchitecturalRefactoring_$(date +%Y%m%d)"
     elif [[ "$category" == "performance" ]]; then

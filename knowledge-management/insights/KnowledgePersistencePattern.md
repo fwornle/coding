@@ -1,10 +1,10 @@
-# Comprehensive Knowledge Management System Pattern
+# Agent-Agnostic Knowledge Persistence Pattern
 
-*A complete implementation pattern for automated knowledge capture, visualization, and sharing in development teams*
+*A universal implementation pattern for automated knowledge capture, visualization, and sharing that works with any AI coding agent*
 
 ## Overview
 
-This document captures a comprehensive knowledge management system that automatically extracts, structures, and visualizes development insights from multiple sources including git commits, AI-assisted conversations, and manual expert input. The system transforms conventional development artifacts into a persistent knowledge graph that enables pattern recognition, knowledge sharing, and transferable learning across projects and teams.
+This document captures an agent-agnostic knowledge management system that works with any AI coding agent (Claude, Copilot, Cursor, etc.). The system automatically extracts, structures, and visualizes development insights from multiple sources including git commits, AI-assisted conversations, and manual expert input. It transforms conventional development artifacts into a persistent knowledge graph that enables pattern recognition, knowledge sharing, and transferable learning across projects and teams regardless of which AI agent is being used.
 
 ## System Architecture
 
@@ -39,7 +39,7 @@ The system implements a multi-layered architecture with clear separation of conc
 
 ### 1. Data Sources Layer
 - **Git Repository**: Conventional commits with structured message format
-- **Claude Code Conversations**: AI-assisted development sessions (.specstory/history)
+- **AI Agent Conversations**: AI-assisted development sessions (.specstory/history) from any agent (Claude, Copilot, Cursor, etc.)
 - **Manual Expert Input**: Interactive insight capture sessions
 - **Code Analysis**: Static analysis of architectural patterns and changes
 
@@ -57,17 +57,19 @@ The system implements a multi-layered architecture with clear separation of conc
 #### MCP Memory Server Integration
 The MCP memory server provides a runtime knowledge graph database that works alongside the file-based storage:
 
-**Available MCP Tools:**
+**Available MCP Tools (when using Claude Code):**
 - `mcp__memory__create_entities` - Add new knowledge entities to runtime graph
 - `mcp__memory__create_relations` - Link entities together in memory
 - `mcp__memory__search_nodes` - Fast querying of the knowledge graph
 - `mcp__memory__read_graph` - Read current runtime graph state
 - `mcp__memory__add_observations` - Add details to existing entities
 
-**Data Flow:**
+**Data Flow (Agent-Agnostic):**
 ```
-UKB Engine → shared-memory.json → MCP Sync Instructions → Claude Code → MCP Memory Server
+UKB Engine → shared-memory.json → [Optional: MCP Sync Instructions → AI Agent] → Git-tracked Knowledge Base
 ```
+
+**Note**: MCP integration provides enhanced features when using Claude Code, but the core system works with any AI agent via the JSON knowledge base.
 
 **Key Benefits:**
 - **Cross-Session Persistence**: Knowledge survives Claude Code restarts
