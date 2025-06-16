@@ -381,60 +381,129 @@ analyze_specstory_history() {
             transferable_patterns+=("testing")
         fi
         
-        # Create insights for identified patterns
+        # Extract meaningful insights only if we find specific, actionable content
         for pattern in "${transferable_patterns[@]}"; do
-            ((insight_count++))
+            # Extract domain-specific context for meaningful naming
+            local domain_context=""
+            local specific_insight=""
             
-            local insight_name="${pattern}_pattern_from_ai_sessions_${insight_count}"
-            local significance=8  # High significance for AI-assisted learnings
+            # Look for specific technologies, frameworks, or domain concepts
+            domain_context=$(echo "$assistant_solutions" | grep -oiE "(react|redux|mcp|claude|three\.js|animation|state|performance|logging|memory|sync|api|database|auth|testing|webpack|babel|typescript|javascript|python|rust|docker|kubernetes|aws|azure|gcp)" | head -3 | tr '\n' ' ' | sed 's/ $//')
             
-            # Adjust significance based on pattern type
-            case "$pattern" in
-                "architecture") significance=10 ;;
-                "state-management") significance=9 ;;
-                "performance") significance=8 ;;
-                "debugging") significance=7 ;;
-                "testing") significance=6 ;;
-                "error-handling") significance=7 ;;
-            esac
+            # Extract the actual problem/solution pair
+            local problem_line=""
+            local solution_line=""
+            problem_line=$(echo "$user_questions" | grep -iE "(issue|problem|error|fail|bug|challenge|stuck|help)" | head -1 | cut -c1-100)
+            solution_line=$(echo "$assistant_solutions" | grep -iE "(solution|fix|resolve|implement|create|add|use)" | head -1 | cut -c1-100)
             
-            # Extract relevant context from the conversation (simplified to avoid hangs)
-            local context_snippet
-            context_snippet=$(echo "$assistant_solutions" | head -5 | tr '\n' ' ' | cut -c1-200)
-            
-            local timestamp
-            timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            
-            # Add insight with specstory source
-            jq --arg name "$insight_name" \
-               --arg type "AIAssistedInsight" \
-               --arg pattern "$pattern" \
-               --arg context "$context_snippet" \
-               --arg file "$(basename "$specstory_file")" \
-               --arg proj "$project" \
-               --arg lang "$language" \
-               --arg sig "$significance" \
-               --arg timestamp "$timestamp" \
-               '.insights += [{
-                   "name": $name,
-                   "entityType": $type,
-                   "observations": [
-                       "[specstory] Pattern: \($pattern)",
-                       "[specstory] Context: \($context)",
-                       "[specstory] Source: \($file)",
-                       "Project: \($proj)",
-                       "Language: \($lang)",
-                       "Significance: \($sig)/10",
-                       "Source: specstory",
-                       "Created: \($timestamp)"
-                   ],
-                   "significance": ($sig | tonumber),
-                   "metadata": {
-                       "pattern": $pattern,
-                       "source_file": $file,
-                       "source": "specstory"
-                   }
-               }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
+            # Only create insight if we have meaningful domain context
+            if [[ -n "$domain_context" ]] && [[ -n "$problem_line" ]] && [[ -n "$solution_line" ]]; then
+                ((insight_count++))
+                
+                # Create specific, meaningful name based on domain and pattern
+                local insight_name
+                local primary_tech=$(echo "$domain_context" | awk '{print $1}' | tr '[:lower:]' '[:upper:]')
+                
+                case "$pattern" in
+                    "architecture")
+                        insight_name="${primary_tech}ArchitecturalDesignPattern"
+                        ;;
+                    "state-management")
+                        insight_name="${primary_tech}StateManagementPattern"
+                        ;;
+                    "performance")
+                        insight_name="${primary_tech}PerformanceOptimizationPattern"
+                        ;;
+                    "debugging")
+                        insight_name="${primary_tech}DebuggingMethodologyPattern"
+                        ;;
+                    "error-handling")
+                        insight_name="${primary_tech}ErrorHandlingPattern"
+                        ;;
+                    "testing")
+                        insight_name="${primary_tech}TestingStrategyPattern"
+                        ;;
+                    *)
+                        insight_name="${primary_tech}${pattern^}Pattern"
+                        ;;
+                esac
+                
+                # Ensure name is not too generic
+                if [[ "$insight_name" =~ ^(Complex|Generic|Basic|Simple) ]] || [[ ${#insight_name} -lt 10 ]]; then
+                    log "Skipping generic insight name: $insight_name"
+                    continue
+                fi
+                
+                # Higher threshold for significance - only capture truly valuable insights
+                local significance=7  # Default for specstory patterns
+                case "$pattern" in
+                    "architecture") significance=9 ;;
+                    "state-management") significance=8 ;;
+                    "performance") significance=8 ;;
+                    *) significance=7 ;;
+                esac
+                
+                # Only proceed if high enough significance
+                if [[ $significance -lt 7 ]]; then
+                    continue
+                fi
+                
+                local timestamp
+                timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                
+                # Generate detailed insight page for this pattern
+                local doc_filepath
+                doc_filepath=$(generate_insight_page "$insight_name" "$problem_line" "$solution_line" "AI-assisted problem solving using $domain_context" "$domain_context" "Projects using $domain_context facing similar $pattern challenges" "" "" "$project")
+                local doc_filename=$(basename "$doc_filepath")
+                local doc_url="http://localhost:8080/knowledge-management/insights/${doc_filename}"
+                
+                # Create structured insight with proper problem/solution format
+                jq --arg name "$insight_name" \
+                   --arg type "TransferablePattern" \
+                   --arg pattern "$pattern" \
+                   --arg problem "$problem_line" \
+                   --arg solution "$solution_line" \
+                   --arg domain "$domain_context" \
+                   --arg file "$(basename "$specstory_file")" \
+                   --arg proj "$project" \
+                   --arg lang "$language" \
+                   --arg sig "$significance" \
+                   --arg timestamp "$timestamp" \
+                   --arg docurl "$doc_url" \
+                   '.insights += [{
+                       "type": "entity",
+                       "name": $name,
+                       "entityType": $type,
+                       "problem": $problem,
+                       "solution": $solution,
+                       "approach": "AI-assisted problem solving using \($domain)",
+                       "applicability": "Projects using \($domain) facing similar \($pattern) challenges",
+                       "technologies": ($domain | split(" ") | map(select(length > 0))),
+                       "author": "ai-assisted",
+                       "project": $proj,
+                       "observations": [
+                           "Problem: \($problem)",
+                           "Solution: \($solution)",
+                           "Domain: \($domain)",
+                           "Pattern type: \($pattern)",
+                           "Extracted from: \($file)",
+                           "Details: \($docurl)",
+                           "Significance: \($sig)/10"
+                       ],
+                       "significance": ($sig | tonumber),
+                       "created": $timestamp,
+                       "metadata": {
+                           "pattern_type": $pattern,
+                           "source_file": $file,
+                           "source": "specstory-analysis",
+                           "domain_context": $domain
+                       }
+                   }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
+                
+                log "Created meaningful insight: $insight_name (domain: $domain_context)"
+            else
+                log "Skipping pattern '$pattern' - insufficient meaningful context"
+            fi
         done
         
     done <<< "$recent_files"
@@ -447,83 +516,109 @@ analyze_specstory_history() {
     fi
 }
 
-# Create transferable patterns from specstory insights
+# Create transferable patterns from specstory insights - DISABLED to prevent generic patterns
 create_transferable_patterns() {
     local insights_file="$1"
     local project="$2"
     
-    log "Creating transferable patterns from AI-assisted insights..."
+    log "CONSERVATIVE MODE: Skipping automatic transferable pattern creation"
+    log "Use 'ukb --interactive' to manually capture high-value transferable patterns"
     
-    # Extract unique patterns from high-significance specstory insights
-    local patterns
-    patterns=$(jq -r '.insights[] | select(.metadata.source == "specstory" and .significance >= 8) | .metadata.pattern' "$insights_file" 2>/dev/null | sort -u)
+    # DISABLED: The automatic pattern creation was generating too many generic patterns
+    # Only the improved analyze_specstory_history() function should create patterns now
+    # This ensures all patterns have specific domain context and meaningful names
     
-    while IFS= read -r pattern; do
-        [[ -z "$pattern" ]] && continue
-        
-        local pattern_name="$(echo "$pattern" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')Pattern"  # Capitalize first letter
-        local significance=9  # High significance for transferable patterns
-        
-        # Create pattern description based on type
-        local pattern_description
-        case "$pattern" in
-            "architecture")
-                pattern_description="Architectural decision-making pattern extracted from AI-assisted problem solving sessions. Includes system design, component organization, and scalability considerations."
-                ;;
-            "state-management")
-                pattern_description="State management pattern from AI-assisted development. Covers global state, local state, and state synchronization techniques."
-                ;;
-            "performance")
-                pattern_description="Performance optimization pattern derived from AI-assisted analysis. Includes profiling, bottleneck identification, and optimization strategies."
-                ;;
-            "debugging")
-                pattern_description="Debugging methodology pattern from AI-assisted troubleshooting. Systematic approach to problem diagnosis and resolution."
-                ;;
-            "error-handling")
-                pattern_description="Error handling pattern from AI-assisted development. Covers exception management, graceful degradation, and user feedback."
-                ;;
-            "testing")
-                pattern_description="Testing strategy pattern from AI-assisted development. Includes unit testing, integration testing, and test-driven development."
-                ;;
-            *)
-                pattern_description="Transferable ${pattern} pattern extracted from AI-assisted development sessions."
-                ;;
-        esac
-        
-        local timestamp
-        timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        
-        # Add transferable pattern
-        jq --arg name "$pattern_name" \
-           --arg type "TransferablePattern" \
-           --arg desc "$pattern_description" \
-           --arg pattern "$pattern" \
-           --arg proj "$project" \
-           --arg sig "$significance" \
-           --arg timestamp "$timestamp" \
-           '.insights += [{
-               "name": $name,
-               "entityType": $type,
-               "observations": [
-                   "[pattern] Type: \($pattern)",
-                   "[pattern] Description: \($desc)",
-                   "[pattern] Origin: AI-assisted development",
-                   "[pattern] Project: \($proj)",
-                   "Significance: \($sig)/10",
-                   "Source: specstory-pattern",
-                   "Created: \($timestamp)"
-               ],
-               "significance": ($sig | tonumber),
-               "metadata": {
-                   "pattern_type": $pattern,
-                   "source": "specstory-pattern",
-                   "transferable": true
-               }
-           }]' "$insights_file" > "$insights_file.tmp" && mv "$insights_file.tmp" "$insights_file"
-        
-        log "Created transferable pattern: $pattern_name"
-        
-    done <<< "$patterns"
+    return 0
+}
+
+# Generate detailed insight page
+generate_insight_page() {
+    local insight_name="$1"
+    local problem="$2"
+    local solution="$3"
+    local approach="$4"
+    local technologies="$5"
+    local applicability="$6"
+    local code_files="$7"
+    local references="$8"
+    local project="$9"
+    
+    # Create filename from insight name
+    local filename=$(echo "$insight_name" | tr '[:upper:]' '[:lower:]' | sed 's/pattern$//' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+    filename="${filename}.md"
+    local filepath="$INSIGHTS_DIR/$filename"
+    
+    # Generate the insight page
+    cat > "$filepath" << EOF
+# $insight_name
+
+## Overview
+
+**Problem:** $problem
+
+**Solution:** $solution
+
+**Approach:** $approach
+
+## Applicability
+
+$applicability
+
+## Technologies
+
+$(echo "$technologies" | tr ',' '\n' | sed 's/^/- /')
+
+## Implementation Details
+
+### Problem Context
+
+$problem
+
+### Solution Strategy
+
+$solution
+
+### Key Implementation Points
+
+$approach
+
+$(if [[ -n "$code_files" ]]; then
+    echo "## Key Files"
+    echo ""
+    echo "$code_files" | tr ',' '\n' | sed 's/^/- /'
+    echo ""
+fi)
+
+$(if [[ -n "$references" ]]; then
+    echo "## References"
+    echo ""
+    echo "$references" | tr ',' '\n' | sed 's/^/- /'
+    echo ""
+fi)
+
+## Project Context
+
+**Origin Project:** $project
+
+## Usage Guidelines
+
+This pattern can be applied when:
+
+1. You encounter similar problems in projects using the same technologies
+2. The architectural challenges match the described context
+3. The solution approach aligns with your project constraints
+
+## Related Patterns
+
+- Consider checking other patterns in the same technology stack
+- Look for complementary architectural patterns in the knowledge base
+
+---
+
+*Generated by ukb (Update Knowledge Base) - $(date)*
+EOF
+    
+    echo "$filepath"
 }
 
 # Interactive insight capture
@@ -649,11 +744,10 @@ capture_interactive_insight() {
     local author
     author=$(whoami)
     
-    # Generate documentation link
-    local doc_filename="$(echo "$insight_name" | tr '[:upper:]' '[:lower:]').md"
-    doc_filename=$(echo "$doc_filename" | sed 's/pattern//')  # Remove redundant "pattern"
-    doc_filename=$(echo "$doc_filename" | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
-    doc_filename="${doc_filename}.md"
+    # Generate detailed insight page
+    local doc_filepath
+    doc_filepath=$(generate_insight_page "$insight_name" "$problem_context" "$solution_approach" "$design_rationale" "$technologies_input" "$applicability" "$code_files_input" "$validated_references" "$project_name")
+    local doc_filename=$(basename "$doc_filepath")
     local doc_link="knowledge-management/insights/${doc_filename}"
     local doc_url="http://localhost:8080/knowledge-management/insights/${doc_filename}"
     
