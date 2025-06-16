@@ -22,7 +22,7 @@ The Knowledge Management (KM) system is designed to automatically capture, organ
 - **Interactive Visualization**: Web-based graph interface for exploring knowledge relationships
 - **Transferable Patterns**: Central hub for cross-project reusable solutions including comprehensive insights
 - **Team Sharing**: Git-tracked knowledge base for seamless team collaboration
-- **MCP Integration**: Persistent memory across Claude Code sessions
+- **MCP Integration**: Persistent memory across coding agent sessions
 - **Detailed Pattern Documentation**: In-depth insights with implementation examples and diagrams
 
 ### Core Concepts
@@ -41,14 +41,16 @@ The system consists of three main layers:
 ### 1. Knowledge Capture Layer
 
 - **Git Repository**: Source of commit data and conventional commit messages
-- **UKB Command**: Analyzes commits and extracts structured insights
+- **Conversation Logs**: AI agent interactions in `.specstory/history/`
+- **UKB Command**: Analyzes commits, conversation logs, and extracts structured insights
+- **Semantic Analysis**: Deep analysis of both code changes and AI conversation patterns
 - **Commit Analysis**: Classifies commits by type (fix, feat, perf, etc.)
 
 ### 2. Data Storage Layer
 
 - **shared-memory.json**: Authoritative knowledge graph data (git-tracked)
-- **MCP Integration**: Persistent memory for Claude Code sessions
-- **Conversation Logging**: Automatic capture of Claude Code conversations in `.specstory/history/`
+- **MCP Integration**: Persistent memory for coding agent sessions
+- **Conversation Logging**: Automatic capture of coding agent conversations in `.specstory/history/`
 
 ### 3. Visualization Layer
 
@@ -69,8 +71,8 @@ The system consists of three main layers:
 
 2. **Knowledge Capture**:
    - Run `ukb` at end of coding session
-   - System automatically analyzes recent commits
-   - Extracts insights and updates knowledge graph
+   - System automatically analyzes recent commits AND conversation logs
+   - Extracts insights through semantic analysis and updates knowledge graph
 
 3. **Knowledge Exploration**:
    - Run `vkb` to start visualization server
@@ -84,14 +86,15 @@ The system consists of three main layers:
 ### Knowledge Discovery Workflow
 
 1. **Pattern Recognition**:
-   - Identify common solutions across projects
+   - Identify common solutions across projects and AI conversations
+   - Analyze recurring themes in both code commits and agent interactions
    - Tag patterns as transferable knowledge
    - Link to central CodingKnowledge hub
 
 2. **Cross-Project Learning**:
    - Use visualization to find similar patterns
-   - Apply successful solutions to new projects
-   - Build institutional knowledge
+   - Apply successful solutions from previous agent sessions
+   - Build institutional knowledge through code and conversation analysis
 
 ## Knowledge Base Schema
 
@@ -117,7 +120,7 @@ The system consists of three main layers:
 
 - **Transferable Patterns**: Use clear, descriptive names ending with "Pattern" (e.g., `ReduxStateManagementPattern`, `NetworkAwareInstallationPattern`)
 - **Project-Specific Insights**: Include project context and specific functionality (e.g., `TimelineViewportOptimization`, `KnowledgeGraphVisualization`)
-- **Technical Components**: Use full descriptive names (e.g., `ClaudeLoggerMCPServer`, `StagehandBrowserAutomation`)
+- **Technical Components**: Use full descriptive names (e.g., `ConversationLoggerMCPServer`, `StagehandBrowserAutomation`)
 
 #### Insight File Names
 
@@ -197,10 +200,12 @@ ukb [options]
 **What it does**:
 
 1. Analyzes git commits from current session
-2. Extracts metadata (language, project, impact)
-3. Classifies commits by conventional format
-4. Generates entities and relationships
-5. Updates `shared-memory.json`
+2. Processes conversation logs from `.specstory/history/` 
+3. Performs semantic analysis on both code changes and AI interactions
+4. Extracts metadata (language, project, impact, patterns)
+5. Classifies commits by conventional format
+6. Generates entities and relationships
+7. Updates `shared-memory.json`
 
 **Example output**:
 
@@ -313,11 +318,11 @@ If multiple team members update the knowledge base simultaneously:
 3. Update entity counts in metadata section
 4. Commit resolved version
 
-## Claude Code Conversation Logging
+## Coding Agent Conversation Logging
 
 ### Automatic Conversation Capture
 
-The system includes automatic logging of all Claude Code conversations through the Claude Logger MCP server. This creates a searchable history of AI interactions that complements the knowledge graph.
+The system includes automatic logging of all coding agent conversations (Claude Code, Cursor, etc.) through MCP servers. This creates a searchable history of AI interactions that complements the knowledge graph.
 
 ### Enabling Auto-Logging
 
@@ -330,7 +335,7 @@ The system includes automatic logging of all Claude Code conversations through t
 2. All subsequent conversations are automatically saved to:
 
    ```
-   .specstory/history/YYYY-MM-DD-Auto-logged Claude Code Session.md
+   .specstory/history/YYYY-MM-DD-Auto-logged-Agent-Session.md
    ```
 
 3. **Check logging status**:

@@ -4,8 +4,10 @@ title Knowledge Management System Architecture
 
 package "Knowledge Capture Layer" {
   [Git Repository] as git
+  [Conversation Logs] as logs
   [UKB Command] as ukb
   [Commit Analysis] as analysis
+  [Semantic Analysis] as semantic
 }
 
 package "Data Storage Layer" {
@@ -21,12 +23,14 @@ package "Visualization Layer" {
 }
 
 package "MCP Integration" {
-  [Claude Code] as claude
+  [Coding Agent] as agent
   [MCP Memory Server] as mcp
 }
 
 git --> analysis : Commit data
+logs --> semantic : Conversation data
 analysis --> ukb : Extracted insights
+semantic --> ukb : Pattern insights
 ukb --> storage : Knowledge graph updates
 storage --> backups : Automated backups
 
@@ -35,9 +39,10 @@ vkb --> server : Start/manage server
 server --> visualizer : Serve graph data
 visualizer --> browser : Interactive visualization
 
-claude <--> mcp : MCP operations
+agent <--> mcp : MCP operations
 mcp <--> storage : Sync operations
-claude --> ukb : Trigger knowledge capture
+agent --> ukb : Trigger knowledge capture
+agent --> logs : Generate conversations
 
 note right of storage : Authoritative data source\nGit-tracked for team sharing
 note right of visualizer : Interactive D3.js graph\nColor-coded by entity type

@@ -4,6 +4,7 @@ title Knowledge Management Workflow
 
 actor Developer as dev
 participant "Git Repository" as git
+participant "Conversation Logs" as logs
 participant "UKB Command" as ukb
 participant "Shared Memory" as memory
 participant "VKB Command" as vkb
@@ -13,12 +14,16 @@ participant "Browser" as browser
 == Daily Development ==
 dev -> git : Make commits with\nconventional format\n(fix:, feat:, etc.)
 git -> git : Store commit history
+dev -> logs : AI agent interactions\n(.specstory/history/)
+logs -> logs : Store conversation logs
 
 == Knowledge Capture ==
 dev -> ukb : Run 'ukb' command\n(auto mode)
 ukb -> git : Analyze recent commits
 git -> ukb : Return commit data
-ukb -> ukb : Extract insights\nClassify by type\nGenerate entities
+ukb -> logs : Process conversation logs
+logs -> ukb : Return semantic patterns
+ukb -> ukb : Extract insights\nClassify by type\nGenerate entities\nCombine code & conversation analysis
 ukb -> memory : Update shared-memory.json\nAdd entities & relations
 memory -> memory : Store knowledge graph
 
