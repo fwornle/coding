@@ -7,8 +7,19 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# Color definitions
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
 log() {
-  echo "[CoPilot] $1"
+  echo -e "${BLUE}[CoPilot]${NC} $1"
+}
+
+colored_log() {
+  echo -e "$1"
 }
 
 # Set environment variables
@@ -16,14 +27,16 @@ export CODING_AGENT="copilot"
 export CODING_TOOLS_PATH="$PROJECT_DIR"
 export CODING_TOOLS_GRAPH_DB="$HOME/.coding-tools/memory.graph"
 
-# Start fallback services
-log "Starting fallback services..."
+# Display colorful startup banner
+echo ""
+colored_log "${BLUE}🚀 Starting GitHub CoPilot with Knowledge Management Integration${NC}"
+colored_log "${CYAN}📋 Initializing fallback services...${NC}"
 
 # Create a service manager script
 SERVICE_SCRIPT="$PROJECT_DIR/lib/start-fallback-services.js"
 
 if [ ! -f "$SERVICE_SCRIPT" ]; then
-  log "Creating fallback services manager..."
+  colored_log "${CYAN}🔧 Creating fallback services manager...${NC}"
   cat > "$SERVICE_SCRIPT" << 'EOF'
 #!/usr/bin/env node
 
@@ -79,7 +92,7 @@ echo $FALLBACK_PID > "$PROJECT_DIR/.coding-tools/fallback-services.pid"
 
 # Ensure cleanup on exit
 cleanup() {
-  log "Cleaning up fallback services..."
+  colored_log "${CYAN}🧹 Cleaning up fallback services...${NC}"
   if [ -n "$FALLBACK_PID" ]; then
     kill $FALLBACK_PID 2>/dev/null || true
   fi
@@ -93,7 +106,7 @@ sleep 2
 
 # Check if running in service-only mode
 if [[ "$1" == "--service-only" ]]; then
-  log "Running in service-only mode for VSCode integration..."
+  colored_log "${CYAN}🔧 Running in service-only mode for VSCode integration...${NC}"
   
   # Start HTTP server for VSCode extension
   cat > "$PROJECT_DIR/lib/start-http-server.js" << 'EOF'
@@ -137,16 +150,29 @@ fi
 
 # Check if CoPilot is available
 if ! command -v gh &> /dev/null; then
-  log "Error: GitHub CLI (gh) not found. Please install it first."
+  colored_log "${YELLOW}⚠️  Error: GitHub CLI (gh) not found. Please install it first.${NC}"
   exit 1
 fi
 
 if ! gh extension list | grep -q copilot; then
-  log "Error: GitHub CoPilot extension not installed."
-  log "Install it with: gh extension install github/gh-copilot"
+  colored_log "${YELLOW}⚠️  Error: GitHub CoPilot extension not installed.${NC}"
+  colored_log "Install it with: ${CYAN}gh extension install github/gh-copilot${NC}"
   exit 1
 fi
 
 # Launch CoPilot
-log "Launching GitHub CoPilot..."
+colored_log "${GREEN}🎯 GitHub CoPilot ready! Knowledge Management services running in background...${NC}"
+colored_log ""
+colored_log "${YELLOW}🔧 VSCode Extension Integration Available:${NC}"
+colored_log "  • ${CYAN}@km ukb${NC} - Update Knowledge Base (capture insights during chat)"
+colored_log "  • ${CYAN}@km vkb${NC} - View Knowledge Base (visualize knowledge graph)"
+colored_log "  • ${CYAN}@km search${NC} - Search knowledge for relevant patterns"
+colored_log "  • ${CYAN}@km stats${NC} - View knowledge base statistics"
+colored_log ""
+colored_log "${YELLOW}💡 Usage in VSCode CoPilot Chat:${NC}"
+colored_log "  • Start questions with ${CYAN}@km${NC} to use Knowledge Management"
+colored_log "  • Example: ${CYAN}@km ukb 'How do I handle async errors in React?'${NC}"
+colored_log "  • Example: ${CYAN}@km search 'logging patterns'${NC}"
+colored_log ""
+colored_log "${BLUE}🚀 Launching GitHub CoPilot CLI...${NC}"
 exec gh copilot "$@"
