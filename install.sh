@@ -368,7 +368,11 @@ install_memory_visualizer() {
     npm run build || error_exit "Failed to build memory-visualizer"
     
     # Update vkb script to use local memory-visualizer
-    sed -i '' "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CODING_REPO/knowledge-management/vkb"
+    if [[ "$PLATFORM" == "macos" ]]; then
+        sed -i '' "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CODING_REPO/knowledge-management/vkb"
+    else
+        sed -i "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CODING_REPO/knowledge-management/vkb"
+    fi
     
     success "Memory visualizer installed successfully"
 }

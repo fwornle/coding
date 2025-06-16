@@ -31,8 +31,8 @@ find_repo_root() {
     echo "/Users/q284340/Agentic/coding"  # Default fallback
 }
 
-CLAUDE_REPO="$(find_repo_root)"
-SHARED_MEMORY="$CLAUDE_REPO/shared-memory.json"
+CODING_REPO="$(find_repo_root)"
+SHARED_MEMORY="$CODING_REPO/shared-memory.json"
 VISUALIZER_DIR="/Users/q284340/Agentic/coding/memory-visualizer"
 SERVER_PORT=8080
 PID_FILE="/tmp/vkb-server.pid"
@@ -126,7 +126,7 @@ prepare_memory_data() {
     # Create symlink to knowledge-management directory for serving documentation
     local km_link="$VISUALIZER_DIR/dist/knowledge-management"
     if [[ ! -L "$km_link" ]]; then
-        ln -sf "$CLAUDE_REPO/knowledge-management" "$km_link" 2>/dev/null || true
+        ln -sf "$CODING_REPO/knowledge-management" "$km_link" 2>/dev/null || true
     fi
     
     # Convert from our format to NDJSON format expected by visualizer

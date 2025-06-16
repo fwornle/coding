@@ -1,4 +1,4 @@
 #!/bin/bash
 # Universal ukb wrapper
-CLAUDE_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
-exec "$CLAUDE_REPO/knowledge-management/ukb" "$@"
+CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
+exec "$CODING_REPO/knowledge-management/ukb" "$@"
