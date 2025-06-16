@@ -16,6 +16,13 @@ This directory contains comprehensive documentation for the Coding Knowledge Man
 - **[cross-project-knowledge-system.md](cross-project-knowledge-system.md)** - Knowledge sharing across projects
 - **[portable-knowledge-references.md](portable-knowledge-references.md)** - Avoiding hardcoded paths for team compatibility
 
+## UKB (Update Knowledge Base) Documentation
+
+- **[ukb-comprehensive-guide.md](ukb-comprehensive-guide.md)** - Complete UKB system documentation with architecture and features
+- **[ukb-use-cases.md](ukb-use-cases.md)** - Detailed use cases and workflow examples
+- **[ukb-complete-project-analysis.md](ukb-complete-project-analysis.md)** - Step-by-step guide for comprehensive project analysis
+- **[ukb-diagrams-reference.md](ukb-diagrams-reference.md)** - Visual documentation with architecture and workflow diagrams
+
 ## Network & Installation
 
 - **[installation-architecture.md](installation-architecture.md)** - Network detection and repository strategies

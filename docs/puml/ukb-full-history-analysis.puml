@@ -1,0 +1,110 @@
+@startuml ukb-full-history-analysis
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title UKB Full History Analysis - Comprehensive Codebase Understanding
+
+participant Developer
+participant "UKB Engine" as ukb
+participant "Git Repository" as git
+participant "Commit Analyzer" as analyzer
+participant "Pattern Extractor" as extractor
+participant "Knowledge Base" as kb
+
+== Full History Initiation ==
+Developer -> ukb: ukb --full-history
+note right: Comprehensive codebase analysis
+
+ukb -> git: git log --oneline --pretty=format:'%h|%an|%ad|%s'
+git -> ukb: all_commits.txt (e.g., 1,247 commits)
+
+ukb -> ukb: echo "📊 FULL HISTORY: Analyzing entire git history (1,247 commits)"
+
+== Commit Processing (Chronological Order) ==
+ukb -> analyzer: process_commits_oldest_first()
+
+loop for each commit (1 to 1,247)
+  analyzer -> analyzer: extract_commit_info(hash, author, date, message)
+  
+  == Categorization ==
+  alt message contains (architect|design|structure|pattern)
+    analyzer -> analyzer: category = "architecture", significance = 8
+    analyzer -> analyzer: architectural_patterns.add(commit)
+  else message contains (feat|add|implement|introduce)
+    analyzer -> analyzer: category = "feature", significance = 6
+    analyzer -> analyzer: feature_evolution.add(commit)
+  else message contains (upgrade|update|migrate|dependency)
+    analyzer -> analyzer: category = "technology", significance = 7
+    analyzer -> analyzer: technology_adoptions.add(commit)
+  else message contains (perf|performance|optimize)
+    analyzer -> analyzer: category = "performance", significance = 7
+    analyzer -> analyzer: performance_improvements.add(commit)
+  else message contains (refactor|cleanup|reorganize)
+    analyzer -> analyzer: category = "refactoring", significance = 6
+    analyzer -> analyzer: refactoring_events.add(commit)
+  end
+  
+  == Progress Tracking ==
+  alt commit_count % 50 == 0 OR commit_count == total
+    analyzer -> Developer: "Progress: commit_count/total commits processed..."
+  end
+  
+  == Insight Creation ==
+  alt significance >= 6 AND category != "general"
+    analyzer -> git: git show --name-only --stat commit_hash
+    git -> analyzer: files_changed, diff_summary
+    
+    analyzer -> extractor: create_historical_insight()
+    extractor -> extractor: generate_insight_name(category, message, hash)
+    extractor -> extractor: extract_meaningful_details()
+    extractor -> kb: add_evolution_pattern()
+  end
+end
+
+== Evolution Pattern Synthesis ==
+analyzer -> extractor: create_evolution_patterns()
+extractor -> extractor: analyze_architectural_patterns()
+extractor -> extractor: analyze_feature_evolution()
+extractor -> extractor: analyze_technology_adoption()
+extractor -> extractor: analyze_performance_timeline()
+extractor -> extractor: analyze_refactoring_history()
+
+extractor -> kb: create_codebase_evolution_summary()
+
+== Results Summary ==
+ukb -> Developer: 
+note right
+  ✅ Comprehensive history analysis completed
+     📐 Architecture events: 23
+     🚀 Feature developments: 156
+     🔧 Technology adoptions: 34
+     ⚡ Performance improvements: 12
+     🔄 Refactoring events: 45
+end note
+
+== Knowledge Base Impact ==
+kb -> kb: 270+ new evolution patterns
+kb -> kb: complete technology adoption timeline
+kb -> kb: architectural decision history
+kb -> kb: feature development progression
+kb -> kb: performance optimization journey
+
+== Use Cases Enabled ==
+note over Developer
+  New Team Member Onboarding:
+  • Complete codebase understanding
+  • Why decisions were made
+  • Technology evolution rationale
+  
+  Architecture Reviews:
+  • Historical decision patterns
+  • Scalability evolution
+  • Technical debt identification
+  
+  Technical Debt Assessment:
+  • Frequently modified areas
+  • Refactoring opportunity identification
+  • Performance improvement history
+end note
+
+@enduml

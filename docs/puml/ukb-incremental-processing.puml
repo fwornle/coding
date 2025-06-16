@@ -1,0 +1,128 @@
+@startuml ukb-incremental-processing
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title UKB Incremental Processing System
+
+participant Developer
+participant "UKB Engine" as ukb
+participant "State Manager" as state
+participant "Git Analyzer" as git
+participant "Specstory Analyzer" as spec
+participant "Processing State File" as psf
+
+== Session Start ==
+Developer -> ukb: ukb (default incremental mode)
+ukb -> state: init_processing_state(project)
+
+== State File Management ==
+state -> psf: load ~/.ukb-processing-state.json
+alt State file exists
+  psf -> state: project_state
+else State file missing
+  state -> psf: create_initial_state()
+  note right
+    {
+      "projects": {},
+      "global": {
+        "last_updated": "2025-06-16T07:30:00Z",
+        "version": "3.0.0"
+      }
+    }
+  end note
+end
+
+state -> psf: ensure_project_entry(project)
+note right
+  {
+    "last_commit_analyzed": null,
+    "specstory_files_analyzed": [],
+    "last_analysis": null,
+    "schema_version": "2.0.0"
+  }
+end note
+
+== Git Incremental Analysis ==
+ukb -> state: get_last_analyzed_commit(project)
+state -> ukb: last_commit_hash OR "never"
+
+alt First run (last_commit == "never")
+  ukb -> git: git log --oneline -10
+  ukb -> ukb: echo "📊 FIRST RUN: Examining last 10 commits"
+else Incremental run
+  ukb -> git: git log --oneline last_commit..HEAD
+  ukb -> ukb: echo "📊 INCREMENTAL: Analyzing X new commits since last_commit"
+end
+
+git -> ukb: new_commits_only.txt
+
+== Specstory Incremental Analysis ==
+spec -> state: get_analyzed_files(project)
+state -> spec: files_already_analyzed[]
+
+spec -> spec: find_recent_specstory_files()
+loop for each specstory file
+  spec -> state: is_specstory_analyzed(project, filename)
+  alt File not analyzed before
+    spec -> spec: process_file(filename)
+    spec -> spec: extract_patterns()
+    spec -> state: mark_specstory_analyzed(project, filename)
+  else File already analyzed
+    spec -> spec: skip_file(filename)
+    note right: "Skipping already analyzed file: filename"
+  end
+end
+
+== Processing Efficiency ==
+note over ukb, spec
+  Efficiency Benefits:
+  • Only processes NEW commits since last run
+  • Skips already-analyzed conversation files
+  • Scales to large repositories
+  • Prevents duplicate pattern creation
+  • Maintains consistent state across sessions
+end note
+
+== State Updates ==
+ukb -> git: get current HEAD commit
+git -> ukb: current_commit_hash
+
+ukb -> state: update_last_analyzed_commit(project, current_commit_hash)
+ukb -> state: update_analysis_timestamp(project)
+
+state -> psf: save_updated_state()
+note right
+  {
+    "projects": {
+      "project-name": {
+        "last_commit_analyzed": "abc123def456",
+        "specstory_files_analyzed": [
+          "2025-06-16_session.md",
+          "2025-06-15_debugging.md"
+        ],
+        "last_analysis": "2025-06-16T14:30:00Z",
+        "schema_version": "2.0.0"
+      }
+    }
+  }
+end note
+
+== Force Reprocessing Override ==
+alt --force-reprocess flag
+  Developer -> ukb: ukb --force-reprocess
+  ukb -> spec: ignore_analyzed_files_tracking()
+  ukb -> git: analyze_all_recent_commits()
+  note right: Bypasses incremental state for complete reanalysis
+end
+
+== Results ==
+ukb -> Developer: 
+note right
+  Incremental processing completed:
+  • Processed 3 new commits
+  • Analyzed 2 new conversation files
+  • Skipped 15 already-analyzed files
+  • Updated processing state
+end note
+
+@enduml

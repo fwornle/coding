@@ -1,0 +1,105 @@
+@startuml ukb-workflow
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+
+title UKB Processing Workflow
+
+actor Developer
+participant "UKB CLI" as ukb
+participant "Session Analyzer" as session
+participant "Git Analyzer" as git
+participant "Specstory Analyzer" as spec
+participant "Pattern Engine" as pattern
+participant "Knowledge Base" as kb
+participant "MCP Memory" as mcp
+participant "Web Visualizer" as vkb
+
+== Initialization ==
+Developer -> ukb: ukb [--options]
+ukb -> session: analyze_session()
+session -> session: detect_project()
+session -> session: get_main_language()
+session -> ukb: session_info
+
+ukb -> ukb: init_processing_state(project)
+note right: Load ~/.ukb-processing-state.json\nTrack incremental processing
+
+== Schema Check ==
+ukb -> ukb: needs_schema_migration()
+alt Schema Migration Needed
+  ukb -> ukb: migrate_entities.js
+  ukb -> kb: update schema to v2.0
+end
+
+== Mode Selection ==
+alt Full History Mode
+  ukb -> git: get entire git history
+  note right: All commits for comprehensive understanding
+else Incremental Mode (Default)
+  ukb -> git: get commits since last analysis
+  note right: Only new commits since last run
+end
+
+== Git Analysis ==
+alt Full History Mode
+  git -> git: analyze_git_history_comprehensively()
+  loop for each commit
+    git -> git: categorize_commit(message)
+    git -> git: score_significance(category, content)
+    alt significance >= 6
+      git -> pattern: create_historical_insight()
+    end
+  end
+  git -> pattern: create_evolution_patterns()
+else Incremental Mode
+  git -> git: analyze_commits_conservatively()
+  git -> git: high_threshold_filtering()
+end
+
+== Specstory Analysis ==
+spec -> spec: find_recent_specstory_files()
+loop for each file
+  alt not analyzed before OR force_reprocess
+    spec -> spec: extract_domain_context()
+    spec -> spec: extract_problem_solution_pairs()
+    alt meaningful_context AND problem AND solution
+      spec -> pattern: create_domain_specific_insight()
+      spec -> spec: mark_specstory_analyzed(file)
+    end
+  else
+    spec -> spec: skip already analyzed file
+  end
+end
+
+== Pattern Creation ==
+pattern -> pattern: validate_pattern_quality()
+pattern -> pattern: generate_meaningful_names()
+pattern -> pattern: create_insight_pages()
+pattern -> kb: add_structured_entities()
+
+== Knowledge Storage ==
+kb -> kb: update_shared_memory_json()
+kb -> mcp: sync_to_mcp_memory()
+kb -> kb: create_project_relationships()
+
+== State Update ==
+ukb -> ukb: update_last_analyzed_commit()
+ukb -> ukb: mark_files_processed()
+ukb -> ukb: update_processing_timestamps()
+
+== Visualization ==
+Developer -> vkb: vkb
+vkb -> kb: load_knowledge_graph()
+vkb -> Developer: interactive_knowledge_browser
+
+== Results ==
+ukb -> Developer: processing_summary
+note right
+  ✅ Knowledge base updated!
+  📊 Total entities: X
+  🔗 Total relations: Y
+  💾 Shared memory: shared-memory.json
+end note
+
+@enduml

@@ -67,7 +67,8 @@
       "Bash(done)",
       "Bash(coding)",
       "Bash(./bin/coding)",
-      "Bash(./knowledge-management/vkb start:*)"
+      "Bash(./knowledge-management/vkb start:*)",
+      "Bash(do echo \"Converting $puml...\")"
     ],
     "deny": []
   }

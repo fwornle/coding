@@ -1,0 +1,126 @@
+@startuml ukb-architecture
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+
+title UKB (Update Knowledge Base) Architecture
+
+package "Input Sources" {
+  [Git Repository] as git
+  [Conversation Logs] as logs
+  [Interactive Input] as interactive
+  [Code Changes] as code
+}
+
+package "UKB Processing Engine" {
+  [Session Analysis] as session
+  [Git History Analyzer] as git_analyzer
+  [Specstory Analyzer] as spec_analyzer
+  [Pattern Extractor] as pattern
+  [Significance Scorer] as scorer
+  [Schema Manager] as schema
+}
+
+package "Processing Modes" {
+  [Incremental Mode] as incremental
+  [Full History Mode] as full_history
+  [Interactive Mode] as interactive_mode
+  [Agent Mode] as agent_mode
+}
+
+package "State Management" {
+  [Processing State] as state
+  [Commit Tracking] as commit_track
+  [File Tracking] as file_track
+  [Schema Versioning] as version_track
+}
+
+package "Knowledge Storage" {
+  [MCP Memory Server] as mcp
+  [shared-memory.json] as json_kb
+  [Insight Pages (.md)] as insights
+  [Processing State (.json)] as proc_state
+}
+
+package "Output & Visualization" {
+  [Knowledge Graph] as graph
+  [Web Visualizer] as vkb
+  [Team Collaboration] as team
+}
+
+' Input flow
+git --> git_analyzer
+logs --> spec_analyzer
+interactive --> interactive_mode
+code --> pattern
+
+' Processing flow
+session --> git_analyzer
+session --> spec_analyzer
+git_analyzer --> pattern
+spec_analyzer --> pattern
+pattern --> scorer
+scorer --> schema
+
+' Mode selection
+session --> incremental
+session --> full_history
+session --> interactive_mode
+session --> agent_mode
+
+' State management
+incremental --> state
+full_history --> state
+commit_track --> state
+file_track --> state
+version_track --> state
+
+' Storage flow
+schema --> mcp
+schema --> json_kb
+schema --> insights
+state --> proc_state
+
+' Output flow
+mcp --> graph
+json_kb --> vkb
+insights --> vkb
+graph --> team
+vkb --> team
+
+note right of git_analyzer
+  • Analyzes commit messages
+  • Categorizes by type
+  • Scores significance (1-10)
+  • Extracts domain context
+  • Tracks evolution patterns
+end note
+
+note right of spec_analyzer
+  • Parses conversation files
+  • Extracts problem-solution pairs
+  • Identifies transferable patterns
+  • Prevents re-analysis
+  • Domain context extraction
+end note
+
+note right of pattern
+  • Creates meaningful names
+  • Structures observations
+  • Generates insight pages
+  • Links related patterns
+  • Ensures transferability
+end note
+
+note bottom of state
+  ~/.ukb-processing-state.json
+  
+  Tracks per-project:
+  • Last analyzed commit
+  • Processed specstory files
+  • Schema version
+  • Analysis timestamps
+end note
+
+@enduml
