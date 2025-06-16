@@ -52,5 +52,11 @@ install.log
 memory-visualizer/
 .activate
 
+# VSCode extension build artifacts
+vscode-km-copilot/*.vsix
+
+# Process ID files
+*.pid
+
 # Shared memory (if you want to keep it local)
 shared-memory.json
