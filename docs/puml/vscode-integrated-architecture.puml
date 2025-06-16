@@ -1,0 +1,91 @@
+@startuml vscode-integrated-architecture
+!theme amiga
+title Knowledge Management System Architecture with VSCode Integration
+
+package "Developer Environment" {
+  [Visual Studio Code] as vscode
+  [GitHub Copilot Chat] as copilot
+  [VSCode Extension Bridge] as extension
+  [Command Palette] as palette
+}
+
+package "Knowledge Capture Layer" {
+  [Git Repository] as git
+  [Conversation Logs] as logs
+  [UKB Command] as ukb
+  [Commit Analysis] as analysis
+  [Semantic Analysis] as semantic
+}
+
+package "Integration Layer" {
+  [Fallback Service Client] as client
+  [HTTP Server :8765] as httpserver
+  [WebSocket Connection] as websocket
+  [Service Manager] as servicemanager
+}
+
+package "Data Storage Layer" {
+  [shared-memory.json] as storage
+  [.backups/] as backups
+}
+
+package "Visualization Layer" {
+  [VKB Command] as vkb
+  [Memory Visualizer :8080] as visualizer
+  [Web Browser] as browser
+}
+
+package "MCP Integration" {
+  [Coding Agent] as agent
+  [MCP Memory Server] as mcp
+}
+
+' VSCode Integration Flow
+vscode --> copilot : User interaction
+copilot --> extension : @km commands
+extension --> client : HTTP requests
+client --> httpserver : API calls
+httpserver --> servicemanager : Route commands
+servicemanager --> ukb : Execute UKB
+servicemanager --> vkb : Execute VKB
+palette --> extension : Direct commands
+
+' WebSocket real-time updates
+httpserver --> websocket : Status updates
+websocket --> client : Real-time notifications
+client --> extension : Service messages
+extension --> copilot : UI updates
+
+' Traditional Knowledge Flow
+git --> analysis : Commit data
+logs --> semantic : Conversation data
+analysis --> ukb : Extracted insights
+semantic --> ukb : Pattern insights
+ukb --> storage : Knowledge graph updates
+storage --> backups : Automated backups
+
+' Visualization Flow
+storage --> vkb : Read memory data
+vkb --> visualizer : Start/manage server
+visualizer --> browser : Interactive visualization
+httpserver --> visualizer : Launch requests
+
+' MCP Integration
+agent <--> mcp : MCP operations
+mcp <--> storage : Sync operations
+agent --> ukb : Trigger knowledge capture
+agent --> logs : Generate conversations
+
+' Extension Integration Points
+extension --> ukb : Direct UKB calls
+extension --> vkb : Launch VKB viewer
+extension --> storage : Search operations
+httpserver --> storage : Knowledge updates
+
+note right of extension : VSCode Extension Bridge\nIntegrates ukb/vkb into Copilot\nReal-time WebSocket updates
+note right of httpserver : HTTP API Server\nHandles VSCode requests\nManages service lifecycle
+note right of storage : Authoritative data source\nGit-tracked for team sharing
+note right of visualizer : Interactive D3.js graph\nColor-coded by entity type
+note right of mcp : Persistent memory\nCross-session knowledge
+
+@enduml

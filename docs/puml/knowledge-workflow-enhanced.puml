@@ -1,0 +1,99 @@
+@startuml knowledge-workflow-enhanced
+!theme amiga
+title Enhanced Knowledge Management Workflow with VSCode Integration
+
+actor Developer as dev
+participant "Git Repository" as git
+participant "Conversation Logs" as logs
+participant "VSCode + Copilot" as vscode
+participant "Extension Bridge" as ext
+participant "HTTP Server" as http
+participant "UKB Command" as ukb
+participant "Shared Memory" as memory
+participant "VKB Command" as vkb
+participant "Visualization Server" as viz
+participant "Browser" as browser
+
+== Daily Development ==
+dev -> git : Make commits with\nconventional format\n(fix:, feat:, etc.)
+git -> git : Store commit history
+dev -> logs : AI agent interactions\n(.specstory/history/)
+logs -> logs : Store conversation logs
+dev -> vscode : Development in VSCode\nwith Copilot integration
+
+== VSCode-Integrated Knowledge Capture ==
+dev -> vscode : "@km ukb Problem: X, Solution: Y"
+vscode -> ext : Route chat command
+ext -> http : HTTP API request
+http -> ukb : Execute UKB with pattern
+ukb -> memory : Update shared-memory.json\nAdd entities & relations
+memory -> http : Confirmation
+http -> ext : Success response
+ext -> vscode : Formatted response\nwith action buttons
+
+== Auto-Analysis via VSCode ==
+dev -> vscode : "@km ukb" (no pattern)
+vscode -> ext : Route auto-analysis command
+ext -> http : Trigger session analysis
+http -> git : Analyze recent commits
+git -> http : Return commit data
+http -> logs : Process conversation logs
+logs -> http : Return semantic patterns
+http -> ukb : Extract transferable insights
+ukb -> memory : Store discovered patterns
+memory -> http : Analysis results
+http -> ext : Insights array
+ext -> vscode : Show discovered patterns\nwith significance scores
+
+== VSCode-Integrated Visualization ==
+dev -> vscode : "@km vkb"
+vscode -> ext : Route visualization command
+ext -> http : Launch viewer request
+http -> vkb : Execute VKB command
+vkb -> memory : Read shared-memory.json
+vkb -> viz : Start HTTP server\n(localhost:8080)
+viz -> http : Viewer URL
+http -> ext : Launch confirmation
+ext -> vscode : Show URL + statistics
+vscode -> browser : Open knowledge graph\n(optional auto-open)
+browser -> viz : Request memory.json
+viz -> browser : Serve interactive graph
+
+== Traditional Command Line ==
+dev -> ukb : Run 'ukb' command\n(terminal/CLI)
+ukb -> git : Analyze recent commits
+git -> ukb : Return commit data
+ukb -> logs : Process conversation logs
+logs -> ukb : Return semantic patterns
+ukb -> memory : Update shared-memory.json
+
+== Knowledge Search in VSCode ==
+dev -> vscode : "@km search patterns"
+vscode -> ext : Route search command
+ext -> http : Search API request
+http -> memory : Query knowledge base
+memory -> http : Search results
+http -> ext : Formatted results
+ext -> vscode : Show patterns with\ncode examples
+
+== Real-time Updates ==
+http -> ext : WebSocket notifications
+ext -> vscode : Status updates\nService notifications
+
+== Team Collaboration ==
+dev -> git : Push changes\n(includes shared-memory.json)
+git -> git : Share knowledge across team
+note right : All team members get\nupdated knowledge base\nVSCode extension provides\nconsistent access
+
+== Command Palette Integration ==
+dev -> vscode : Command Palette\n"KM: Update Knowledge Base"
+vscode -> ext : Direct command
+ext -> ext : Show input dialog
+ext -> http : Submit pattern
+http -> ukb : Execute update
+
+note over vscode, ext : VSCode Extension Bridge\nSeamless integration with chat\nReal-time feedback
+note over http : Fallback Services\nAPI layer for all operations\nWebSocket for real-time updates  
+note over memory : Authoritative Knowledge Store\nGit-tracked for team sharing\nAccessed by all interfaces
+
+@enduml

@@ -1,0 +1,96 @@
+@startuml vscode-extension-flow
+!theme amiga
+title VSCode Extension Knowledge Management Flow
+
+actor Developer as dev
+participant "VSCode UI" as ui
+participant "Copilot Chat" as chat
+participant "Extension Bridge" as ext
+participant "Fallback Client" as client
+participant "HTTP Server" as http
+participant "Service Manager" as svc
+participant "Knowledge Base" as kb
+participant "Visualizer" as viz
+
+== Extension Activation ==
+dev -> ui : Opens VSCode
+ui -> ext : Activates extension
+ext -> client : Initialize connection
+client -> http : Health check
+http -> client : Service status
+ext -> ui : Show "KM Ready" status
+
+== UKB Command Flow ==
+dev -> chat : "@km ukb Problem: X, Solution: Y"
+chat -> ext : Route command
+ext -> ext : Parse pattern data
+ext -> client : updateKnowledge(pattern)
+client -> http : POST /api/knowledge/update
+http -> svc : Process update
+svc -> kb : Write to shared-memory.json
+kb -> http : Update confirmation
+http -> client : Response data
+client -> ext : Pattern entity
+ext -> chat : Formatted response with buttons
+
+== VKB Command Flow ==
+dev -> chat : "@km vkb"
+chat -> ext : Route command
+ext -> client : launchViewer()
+client -> http : POST /api/viewer/launch
+http -> svc : Start visualizer
+svc -> viz : Launch on :8080
+viz -> http : Viewer URL
+http -> client : Service URL
+client -> ext : Launch confirmation
+ext -> chat : Show URL + statistics
+ext -> ui : Open browser (optional)
+
+== Search Flow ==
+dev -> chat : "@km search React patterns"
+chat -> ext : Route command
+ext -> ext : Extract search query
+ext -> client : search("React patterns")
+client -> http : GET /api/knowledge/search?q=...
+http -> svc : Query knowledge base
+svc -> kb : Search entities/relations
+kb -> svc : Results array
+svc -> http : Formatted results
+http -> client : Search results
+client -> ext : Pattern matches
+ext -> chat : Formatted search results
+
+== Auto-Analysis Flow ==
+dev -> chat : "@km ukb" (no pattern)
+chat -> ext : Route command
+ext -> client : analyzeSessionForInsights()
+client -> http : POST /api/knowledge/analyze-session
+http -> svc : Analyze recent commits/logs
+svc -> kb : Extract transferable patterns
+kb -> svc : Insight entities
+svc -> http : Analysis results
+http -> client : Insights array
+client -> ext : Structured insights
+ext -> chat : Formatted insights with significance
+
+== Real-time Updates ==
+http -> client : WebSocket message
+client -> ext : Handle service message
+alt knowledge_updated
+  ext -> ui : Show notification
+else service_status
+  ext -> ui : Update status bar
+end
+
+== Error Handling ==
+client -> http : Request fails
+http -> client : Error response
+client -> ext : Error details
+ext -> chat : Error message with troubleshooting
+
+note over ext : Extension manages chat participant\nregistration and command routing
+note over client : HTTP client handles API communication\nand WebSocket connections
+note over http : Fallback services provide API layer\nfor knowledge management operations
+note over kb : Shared memory serves as\nauthoritative knowledge source
+
+@enduml

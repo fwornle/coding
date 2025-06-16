@@ -30,9 +30,9 @@ This VSCode extension enables ukb/vkb commands within GitHub Copilot chat, allow
 ### In GitHub Copilot Chat:
 
 ```
-@km ukb Problem: slow rendering, Solution: use React.memo
-@km vkb
-@km search Redux patterns
+@KM ukb Problem: slow rendering, Solution: use React.memo
+@KM vkb
+@KM search Redux patterns
 ```
 
 ### Prerequisites
@@ -59,7 +59,7 @@ The extension will automatically connect to the running fallback services.
 
 ## Commands
 
-- `@km ukb <description>` - Update knowledge base with a new pattern
-- `@km vkb` - Launch the visual knowledge base viewer
-- `@km search <query>` - Search the knowledge base
-- `@km <question>` - Get relevant context from knowledge base
+- `@KM ukb <description>` - Update knowledge base with a new pattern
+- `@KM vkb` - Launch the visual knowledge base viewer
+- `@KM search <query>` - Search the knowledge base
+- `@KM <question>` - Get relevant context from knowledge base

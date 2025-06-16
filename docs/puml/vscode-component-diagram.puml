@@ -1,0 +1,111 @@
+@startuml vscode-component-diagram
+!theme amiga
+title VSCode Extension Components and Interactions
+
+package "VSCode Environment" {
+  component [GitHub Copilot] as copilot
+  component [Command Palette] as cmdpalette
+  component [Status Bar] as statusbar
+  component [Notification System] as notifications
+}
+
+package "Extension Components" {
+  component [Extension Main] as main
+  component [Extension Activation] as activation
+  component [Chat Participant Registration] as registration
+  component [Command Registration] as commands
+  component [Status Management] as status
+  
+  component [Chat Participant] as participant
+  component [Request Router] as router
+  component [UKB Handler] as ukbhandler
+  component [VKB Handler] as vkbhandler
+  component [Search Handler] as searchhandler
+  component [Pattern Parser] as parser
+  
+  component [Fallback Client] as client
+  component [HTTP Client] as httpclient
+  component [WebSocket Client] as wsclient
+  component [Connection Manager] as connmgr
+  component [Message Handler] as msghandler
+  
+  component [Service Manager] as svcmgr
+  component [Service Discovery] as discovery
+  component [Auto-Start Logic] as autostart
+  component [Health Monitoring] as health
+}
+
+package "External Services" {
+  component [HTTP Server :8765] as httpserver
+  component [Knowledge Base] as kb
+  component [Memory Visualizer :8080] as visualizer
+}
+
+' Extension Lifecycle
+main --> activation : Initialize
+activation --> registration : Register @km participant
+activation --> commands : Register palette commands
+activation --> discovery : Check service availability
+discovery --> autostart : Start if needed
+autostart --> connmgr : Establish connection
+
+' Component Relationships
+main --> participant : Contains
+main --> client : Contains
+main --> svcmgr : Contains
+participant --> router : Contains
+participant --> ukbhandler : Contains
+participant --> vkbhandler : Contains
+participant --> searchhandler : Contains
+participant --> parser : Contains
+client --> httpclient : Contains
+client --> wsclient : Contains
+client --> connmgr : Contains
+client --> msghandler : Contains
+
+' Chat Interactions
+copilot --> router : Chat requests
+router --> ukbhandler : UKB commands
+router --> vkbhandler : VKB commands
+router --> searchhandler : Search commands
+ukbhandler --> parser : Extract patterns
+vkbhandler --> httpclient : Launch requests
+searchhandler --> httpclient : Query requests
+
+' Service Communication
+httpclient --> httpserver : API requests
+wsclient --> httpserver : WebSocket connection
+httpserver --> kb : Knowledge operations
+httpserver --> visualizer : Viewer management
+
+' UI Feedback
+status --> statusbar : Show connection status
+msghandler --> notifications : Service messages
+participant --> copilot : Formatted responses
+
+' Command Palette Integration
+cmdpalette --> commands : Direct commands
+commands --> ukbhandler : UKB input dialog
+commands --> vkbhandler : Launch viewer
+
+' Real-time Updates
+httpserver --> wsclient : Status updates
+wsclient --> msghandler : Process messages
+msghandler --> status : Update connection
+msghandler --> notifications : User notifications
+
+interface "Chat Participant API" as chatapi
+interface "HTTP API" as httpapi
+interface "WebSocket API" as wsapi
+
+participant --> chatapi : Implement
+client --> httpapi : Use
+client --> wsapi : Use
+
+note top of main : Extension entry point\nManages lifecycle and registration
+note top of participant : Handles Copilot chat integration\nParses and routes commands
+note top of client : Communicates with fallback services\nManages HTTP and WebSocket connections
+note bottom of httpserver : Provides REST API\nManages knowledge operations
+note bottom of kb : Persistent knowledge storage\nshared-memory.json
+
+@enduml

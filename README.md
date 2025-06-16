@@ -55,7 +55,7 @@ This repository provides intelligent coding tools that work seamlessly with both
 
 ### Agent-Agnostic Features
 
-- **[Agent-Agnostic Implementation Guide](docs/README-AGENT-AGNOSTIC.md)** - Complete guide to the new architecture
+- **[Agent-Agnostic Implementation Guide](docs/agent-agnostic-implementation.md)** - Complete guide to the new architecture
 - **[Agent Detection & Switching](docs/agent-detection-architecture.md)** - How agent selection works
 - **[Fallback Services Architecture](docs/fallback-services-architecture.md)** - CoPilot fallback implementations
 - **[Graph Database Comparison](docs/graph-db-comparison.md)** - Why Graphology was chosen

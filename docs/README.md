@@ -7,18 +7,22 @@ This directory contains comprehensive documentation for the Coding Knowledge Man
 - **[team-knowledge-setup.md](team-knowledge-setup.md)** - Quick start guide for team collaboration
 - **[installation-guide.md](installation-guide.md)** - Detailed platform-specific installation instructions  
 - **[claude-mcp-setup.md](claude-mcp-setup.md)** - MCP server configuration guide
+- **[agent-agnostic-implementation.md](agent-agnostic-implementation.md)** - Agent-agnostic architecture for Claude Code and GitHub CoPilot
 
 ## System Documentation
 
 - **[documentation.md](documentation.md)** - Comprehensive system documentation
+- **[vscode-extension-bridge.md](vscode-extension-bridge.md)** - VSCode Extension integration for ukb/vkb commands in Copilot chat
 - **[mcp-memory-server-architecture.md](mcp-memory-server-architecture.md)** - MCP memory server architecture and cross-session knowledge access
 - **[automatic-conversation-logging.md](automatic-conversation-logging.md)** - How conversations are automatically logged
 - **[cross-project-knowledge-system.md](cross-project-knowledge-system.md)** - Knowledge sharing across projects
+- **[enhanced-knowledge-workflow.md](enhanced-knowledge-workflow.md)** - Enhanced workflow with VSCode integration and multiple interaction modes
 - **[portable-knowledge-references.md](portable-knowledge-references.md)** - Avoiding hardcoded paths for team compatibility
 
 ## UKB (Update Knowledge Base) Documentation
 
 - **[ukb-comprehensive-guide.md](ukb-comprehensive-guide.md)** - Complete UKB system documentation with architecture and features
+- **[enhanced-ukb-guide.md](enhanced-ukb-guide.md)** - Enhanced UKB with agent-powered semantic analysis and cross-session learning
 - **[ukb-use-cases.md](ukb-use-cases.md)** - Detailed use cases and workflow examples
 - **[ukb-complete-project-analysis.md](ukb-complete-project-analysis.md)** - Step-by-step guide for comprehensive project analysis
 - **[ukb-diagrams-reference.md](ukb-diagrams-reference.md)** - Visual documentation with architecture and workflow diagrams
@@ -31,8 +35,8 @@ This directory contains comprehensive documentation for the Coding Knowledge Man
 ## Visual Documentation
 
 - **[imag/](imag/)** - System architecture and workflow diagrams (PNG)
-- **[puml/](puml/)** - PlantUML source files for diagrams
-- **[diagrams/](diagrams/)** - Additional PlantUML diagrams
+- **[puml/](puml/)** - PlantUML source files for diagrams, including VSCode integration diagrams
+- **[diagrams/](diagrams/)** - Additional diagrams including Mermaid integration flows
 
 ## Organization
 
