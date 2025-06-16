@@ -4,6 +4,10 @@
   "description": "Enables ukb/vkb commands in GitHub Copilot chat",
   "version": "0.1.0",
   "publisher": "coding-tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/coding-tools.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
