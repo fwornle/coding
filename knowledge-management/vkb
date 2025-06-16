@@ -130,10 +130,17 @@ prepare_memory_data() {
     fi
     
     # Convert from our format to NDJSON format expected by visualizer
-    # Also deduplicate entities to prevent orphans
+    # Also deduplicate entities to prevent orphans and convert observations to simple strings
     {
-        # Deduplicate entities by name (keep the latest one)
-        jq -r '.entities | group_by(.name) | map(max_by(.created // "2000-01-01")) | .[] | @json' "$SHARED_MEMORY" 2>/dev/null || true
+        # Deduplicate entities by name (keep the latest one), add type field, and convert observations
+        jq -r '.entities | group_by(.name) | map(max_by(.created // "2000-01-01")) | .[] | 
+        (if .observations and (.observations | type == "array") and (.observations | length > 0) and (.observations[0] | type == "object") then
+          .observations = (.observations | map(if type == "object" then .content else . end))
+        else . end) |
+        (if .legacy_observations and (.legacy_observations | length > 0) then
+          .observations = .legacy_observations
+        else . end) |
+        . + {"type": "entity"} | @json' "$SHARED_MEMORY" 2>/dev/null || true
         jq -r '.relations[] | @json' "$SHARED_MEMORY" 2>/dev/null || true
     } > "$memory_dist"
     

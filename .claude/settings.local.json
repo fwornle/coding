@@ -68,7 +68,11 @@
       "Bash(coding)",
       "Bash(./bin/coding)",
       "Bash(./knowledge-management/vkb start:*)",
-      "Bash(do echo \"Converting $puml...\")"
+      "Bash(do echo \"Converting $puml...\")",
+      "Bash(vkb restart:*)",
+      "Bash(vkb stop:*)",
+      "Bash(vkb start:*)",
+      "Bash(git restore:*)"
     ],
     "deny": []
   }

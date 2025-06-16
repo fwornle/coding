@@ -188,10 +188,8 @@ function migrateKnowledgeBase() {
     process.exit(1);
   }
 
-  // Backup current file
-  const backupPath = KNOWLEDGE_BASE_PATH.replace('.json', `-backup-${Date.now()}.json`);
-  fs.writeFileSync(backupPath, JSON.stringify(kb, null, 2));
-  console.log(`📦 Backup created: ${backupPath}\n`);
+  // Skip backup creation - git provides version control
+  console.log(`📦 Using git for version control (no backup file created)\n`);
 
   // Migrate entities
   const migratedEntities = kb.entities.map(migrateEntity);

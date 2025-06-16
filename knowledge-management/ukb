@@ -1937,6 +1937,22 @@ analyze_session() {
         mkdir -p "$TMP_DIR"
     fi
     
+    # Get current project context first (before using project_name)
+    local project_name
+    # Use git remote to determine actual project name if available
+    if git remote -v 2>/dev/null | grep -q origin; then
+        # Extract project name from git remote URL
+        project_name=$(git remote get-url origin 2>/dev/null | sed -E 's/.*[:/]([^/]+)\/[^/]+\.git$/\1/' || basename "$PWD")
+        # Handle common cases
+        case "$project_name" in
+            "q284340"|"user"|".")
+                project_name=$(basename "$PWD")
+                ;;
+        esac
+    else
+        project_name=$(basename "$PWD")
+    fi
+    
     # Get git status and recent commits
     cd "$PWD" 2>/dev/null || cd "$HOME"
     
@@ -1976,22 +1992,6 @@ analyze_session() {
         if [[ "$current_head" != "unknown" ]]; then
             update_last_analyzed_commit "$project_name" "$current_head"
         fi
-    fi
-    
-    # Get current project context
-    local project_name
-    # Use git remote to determine actual project name if available
-    if git remote -v 2>/dev/null | grep -q origin; then
-        # Extract project name from git remote URL
-        project_name=$(git remote get-url origin 2>/dev/null | sed -E 's/.*[:/]([^/]+)\/[^/]+\.git$/\1/' || basename "$PWD")
-        # Handle common cases
-        case "$project_name" in
-            "q284340"|"user"|".")
-                project_name=$(basename "$PWD")
-                ;;
-        esac
-    else
-        project_name=$(basename "$PWD")
     fi
     
     # Determine main language
