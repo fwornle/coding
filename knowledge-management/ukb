@@ -295,6 +295,32 @@ parse_args() {
                     error_exit "Invalid agent session directory"
                 fi
                 ;;
+            --remove-entity)
+                # Remove entity from knowledge base
+                if [[ -n "$2" ]]; then
+                    remove_entity_from_kb "$2"
+                    exit 0
+                else
+                    error_exit "Must specify entity name to remove"
+                fi
+                ;;
+            --remove-entities)
+                # Remove multiple entities (comma-separated)
+                if [[ -n "$2" ]]; then
+                    IFS=',' read -ra ENTITIES <<< "$2"
+                    for entity in "${ENTITIES[@]}"; do
+                        remove_entity_from_kb "$entity"
+                    done
+                    exit 0
+                else
+                    error_exit "Must specify entity names to remove (comma-separated)"
+                fi
+                ;;
+            --list-entities)
+                # List all entities in knowledge base
+                list_entities_in_kb
+                exit 0
+                ;;
             --help|-h)
                 show_help
                 exit 0
@@ -335,6 +361,9 @@ show_help() {
     echo "  --force-reprocess Force reprocessing of all files (ignore incremental state)"
     echo "  --full-history    Analyze entire git history for comprehensive understanding"
     echo "  --history-depth N Analyze last N commits (use with --full-history for limit)"
+    echo "  --remove-entity E Remove specific entity from knowledge base"
+    echo "  --remove-entities E1,E2,E3 Remove multiple entities (comma-separated)"
+    echo "  --list-entities   List all entities in knowledge base"
     echo "  --help, -h        Show this help message"
     echo ""
     echo -e "${YELLOW}Features:${NC}"
@@ -2882,6 +2911,102 @@ analyze_session() {
 EOF
     
     echo "$session_file"
+}
+
+# List all entities in knowledge base
+list_entities_in_kb() {
+    local shared_memory="../coding/shared-memory.json"
+    
+    # Find shared-memory.json
+    for path in "$shared_memory" "shared-memory.json" "../shared-memory.json"; do
+        if [[ -f "$path" ]]; then
+            shared_memory="$path"
+            break
+        fi
+    done
+    
+    if [[ ! -f "$shared_memory" ]]; then
+        echo -e "${RED}❌ shared-memory.json not found${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}📋 Entities in Knowledge Base:${NC}"
+    echo -e "${CYAN}==============================${NC}"
+    
+    # List entities with their types and significance
+    jq -r '.entities[] | "\(.name) (\(.entityType)) [significance: \(.significance // 5)]"' "$shared_memory" | sort
+    
+    local total_entities
+    total_entities=$(jq '.entities | length' "$shared_memory")
+    echo ""
+    echo -e "${GREEN}Total entities: $total_entities${NC}"
+}
+
+# Remove entity from knowledge base
+remove_entity_from_kb() {
+    local entity_name="$1"
+    local shared_memory="../coding/shared-memory.json"
+    
+    # Find shared-memory.json
+    for path in "$shared_memory" "shared-memory.json" "../shared-memory.json"; do
+        if [[ -f "$path" ]]; then
+            shared_memory="$path"
+            break
+        fi
+    done
+    
+    if [[ ! -f "$shared_memory" ]]; then
+        echo -e "${RED}❌ shared-memory.json not found${NC}"
+        return 1
+    fi
+    
+    # Check if entity exists
+    if ! jq -e --arg name "$entity_name" '.entities[] | select(.name == $name)' "$shared_memory" >/dev/null; then
+        echo -e "${YELLOW}⚠️  Entity '$entity_name' not found in knowledge base${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}🗑️  Removing entity: $entity_name${NC}"
+    
+    # Create backup
+    cp "$shared_memory" "${shared_memory}.backup"
+    
+    # Remove entity and its relations
+    jq --arg name "$entity_name" --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+        # Remove the entity
+        .entities = (.entities | map(select(.name != $name))) |
+        # Remove relations involving this entity
+        .relations = (.relations | map(select(.from != $name and .to != $name))) |
+        # Update metadata
+        .metadata.last_updated = $timestamp |
+        .metadata.total_entities = (.entities | length) |
+        .metadata.total_relations = (.relations | length) |
+        .metadata.last_mode = "entity_removal"
+    ' "$shared_memory" > "${shared_memory}.tmp" && mv "${shared_memory}.tmp" "$shared_memory"
+    
+    echo -e "${GREEN}✅ Successfully removed entity: $entity_name${NC}"
+    
+    # Also remove markdown file if it exists
+    local insights_dir="../coding/knowledge-management/insights"
+    local md_file="${insights_dir}/${entity_name}.md"
+    
+    if [[ -f "$md_file" ]]; then
+        rm "$md_file"
+        echo -e "${GREEN}✅ Removed markdown file: $md_file${NC}"
+    fi
+    
+    # Sync to visualizer
+    local dist_memory="../coding/memory-visualizer/dist/memory.json"
+    if [[ -f "$dist_memory" ]]; then
+        cp "$shared_memory" "$dist_memory"
+        echo -e "${GREEN}✅ Synced to visualizer${NC}"
+    fi
+    
+    # Show updated counts
+    local total_entities total_relations
+    total_entities=$(jq '.entities | length' "$shared_memory")
+    total_relations=$(jq '.relations | length' "$shared_memory")
+    echo -e "${CYAN}📊 Updated counts: $total_entities entities, $total_relations relations${NC}"
 }
 
 # Main execution
