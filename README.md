@@ -42,7 +42,7 @@ This repository provides intelligent coding tools that work seamlessly with both
 | **Memory Graph** | MCP Memory Server | Graphology.js | ✅ Compatible |
 | **Browser Automation** | Browser MCP | Playwright | ✅ Compatible |
 | **Conversation Logging** | Logger MCP | Specstory/File | ✅ Compatible |
-| **Knowledge Management** | Git + MCP sync | Git + Graph DB | ✅ Compatible |
+| **Knowledge Management** | Git + MCP sync | Git + Graphology | ✅ Compatible |
 
 ## 📚 Documentation
 
@@ -101,7 +101,7 @@ vkb                 # Interactive visualization at localhost:8080
 - 🌐 **Interactive visualization** with agent-specific insights
 - 🔄 **Team sharing** via git-tracked knowledge base
 - 🎯 **Transferable patterns** work across different agents
-- 🔗 **Universal memory** - MCP for Claude, Graphology for CoPilot
+- 🔗 **Universal memory** - MCP for Claude, Graphology (with shared-memory.json sync) for CoPilot
 - 📝 **Smart logging** - Specstory extension or file-based fallback
 - 🔀 **Cross-project compatibility** - same tools, different agents
 

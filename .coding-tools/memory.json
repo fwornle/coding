@@ -1,0 +1,1645 @@
+{
+  "nodes": [
+    {
+      "key": "codingknowledge",
+      "attributes": {
+        "name": "CodingKnowledge",
+        "entityType": "System",
+        "metadata": {
+          "significance": 10,
+          "author": "q284340",
+          "project": null,
+          "created": "2025-06-06T10:00:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "observations": [
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Central hub for high-value, transferable programming patterns"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Contains only proven solutions applicable across multiple projects"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Focus: architectural decisions, performance patterns, reusable designs"
+          }
+        ],
+        "legacy_observations": [
+          "Central hub for high-value, transferable programming patterns",
+          "Contains only proven solutions applicable across multiple projects",
+          "Focus: architectural decisions, performance patterns, reusable designs"
+        ],
+        "created": "2025-06-17T05:05:12.841Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "conditionalloggingpattern",
+      "attributes": {
+        "name": "ConditionalLoggingPattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 8,
+          "author": "q284340",
+          "project": "DynArch",
+          "created": "2025-06-06T10:00:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "Need debug output in production without performance impact",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Logger.getActiveLevels() check before expensive debug operations",
+          "implementation": "Runtime log level checking with conditional rendering",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "Any application requiring conditional debug output"
+          ],
+          "technologies": [
+            "JavaScript",
+            "TypeScript",
+            "React"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [
+            "js/utils/Logger.js",
+            "js/config/loggingConfig.js",
+            "js/components/ui/LoggingControl.js"
+          ],
+          "documentation": null,
+          "external": [],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Originally developed in DynArch autonomous driving visualization system"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Advanced dual-axis filtering: 5 log levels + 13 specialized categories"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Persistent configuration via localStorage with UI controls"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Dynamic color system with automatic contrast calculation"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Global console access for runtime debugging: window.Logger"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Hierarchical level activation and category grouping"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Zero performance impact when logging disabled"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "application",
+            "content": "Also implemented in TimelineProject with React integration"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "code_example",
+            "content": "Pattern: Logger.log(level, category, ...messages) with runtime filtering"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/ConditionalLoggingPattern.md"
+          }
+        ],
+        "legacy_observations": [
+          "Originally developed in DynArch autonomous driving visualization system",
+          "Advanced dual-axis filtering: 5 log levels + 13 specialized categories",
+          "Persistent configuration via localStorage with UI controls",
+          "Dynamic color system with automatic contrast calculation",
+          "Global console access for runtime debugging: window.Logger",
+          "Hierarchical level activation and category grouping",
+          "Zero performance impact when logging disabled",
+          "Also implemented in TimelineProject with React integration",
+          "Pattern: Logger.log(level, category, ...messages) with runtime filtering",
+          "Details: http://localhost:8080/knowledge-management/insights/ConditionalLoggingPattern.md"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "viewportcullingpattern",
+      "attributes": {
+        "name": "ViewportCullingPattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 8,
+          "author": "q284340",
+          "project": "TimelineProject",
+          "created": "2025-06-06T10:00:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "3D scenes with many objects causing frame rate drops",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Calculate object distance from camera, hide objects beyond threshold",
+          "implementation": "Distance-based viewport culling for performance optimization",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "3D applications with many rendered objects"
+          ],
+          "technologies": [
+            "Three.js",
+            "WebGL",
+            "React Three Fiber"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [
+            "ViewportManager.js",
+            "SceneOptimizer.js"
+          ],
+          "documentation": null,
+          "external": [
+            "https://github.com/mrdoob/three.js/wiki/How-to-dispose-of-objects",
+            "https://docs.pmnd.rs/react-three-fiber/advanced/scaling-performance",
+            "https://threejs.org/docs/#api/en/math/Frustum"
+          ],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "problem",
+            "content": "Problem: Rendering 200+ timeline events caused <10 FPS"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Solution: Only render objects within camera view distance"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Implementation: camera.position.distanceTo(object.position) < threshold"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Result: Improved from 200 objects to ~20-50 visible, 60 FPS achieved"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Transferable: Essential pattern for any 3D scene with many objects"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "References: https://github.com/mrdoob/three.js/wiki/How-to-dispose-of-objects, https://docs.pmnd.rs/react-three-fiber/advanced/scaling-performance, https://threejs.org/docs/#api/en/math/Frustum"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/ViewportCullingPattern.md"
+          }
+        ],
+        "legacy_observations": [
+          "Problem: Rendering 200+ timeline events caused <10 FPS",
+          "Solution: Only render objects within camera view distance",
+          "Implementation: camera.position.distanceTo(object.position) < threshold",
+          "Result: Improved from 200 objects to ~20-50 visible, 60 FPS achieved",
+          "Transferable: Essential pattern for any 3D scene with many objects",
+          "References: https://github.com/mrdoob/three.js/wiki/How-to-dispose-of-objects, https://docs.pmnd.rs/react-three-fiber/advanced/scaling-performance, https://threejs.org/docs/#api/en/math/Frustum",
+          "Details: http://localhost:8080/knowledge-management/insights/ViewportCullingPattern.md"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "reduxstatemanagementpattern",
+      "attributes": {
+        "name": "ReduxStateManagementPattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 8,
+          "author": "q284340",
+          "project": "TimelineProject",
+          "created": "2025-06-06T10:00:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "Complex React state becoming unmanageable and inconsistent",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Separate slices for UI, data, preferences with typed hooks",
+          "implementation": "Redux Toolkit with feature-based slice organization",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "Complex React applications requiring predictable state"
+          ],
+          "technologies": [
+            "Redux Toolkit",
+            "React",
+            "TypeScript"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [
+            "store/uiSlice.ts",
+            "store/timelineSlice.ts",
+            "hooks/typed-hooks.ts"
+          ],
+          "documentation": null,
+          "external": [
+            "https://redux-toolkit.js.org/",
+            "https://react-redux.js.org/tutorials/typescript-quick-start",
+            "https://redux.js.org/usage/usage-with-typescript"
+          ],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "problem",
+            "content": "Problem: useState becoming unmaintainable across 15+ components"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Solution: Redux Toolkit with feature-based slices (ui, timeline, prefs)"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "code_example",
+            "content": "Pattern: createSlice() + typed useSelector/useDispatch hooks"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Benefits: Predictable state, time-travel debugging, persistence integration"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Transferable: Standard pattern for complex React applications"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "References: https://redux-toolkit.js.org/, https://react-redux.js.org/tutorials/typescript-quick-start, https://redux.js.org/usage/usage-with-typescript"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/ReduxStateManagementPattern.md"
+          }
+        ],
+        "legacy_observations": [
+          "Problem: useState becoming unmaintainable across 15+ components",
+          "Solution: Redux Toolkit with feature-based slices (ui, timeline, prefs)",
+          "Pattern: createSlice() + typed useSelector/useDispatch hooks",
+          "Benefits: Predictable state, time-travel debugging, persistence integration",
+          "Transferable: Standard pattern for complex React applications",
+          "References: https://redux-toolkit.js.org/, https://react-redux.js.org/tutorials/typescript-quick-start, https://redux.js.org/usage/usage-with-typescript",
+          "Details: http://localhost:8080/knowledge-management/insights/ReduxStateManagementPattern.md"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "knowledgepersistencepattern",
+      "attributes": {
+        "name": "KnowledgePersistencePattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 9,
+          "author": "q284340",
+          "project": null,
+          "created": "2025-06-06T10:00:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "AI agents lose project context and patterns between sessions",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Agent-agnostic knowledge persistence with JSON knowledge base + optional MCP integration",
+          "implementation": "Agent-agnostic knowledge persistence with JSON knowledge base + optional MCP integration",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [],
+          "technologies": [],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [],
+          "documentation": null,
+          "external": [],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "problem",
+            "content": "Problem: AI agents lose project context and patterns between sessions"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Solution: Agent-agnostic knowledge persistence with JSON knowledge base + optional MCP integration"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Architecture: JSON as source of truth, MCP for runtime enhancement, ukb/vkb for capture/visualization"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Key insight: Universal design works with any AI agent, not just Claude"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Implementation: Git-tracked shared-memory.json + auto-sync + structured capture tools"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/KnowledgePersistencePattern.md"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Transferable: Any AI-assisted development workflow"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Significance: 9/10"
+          }
+        ],
+        "legacy_observations": [
+          "Problem: AI agents lose project context and patterns between sessions",
+          "Solution: Agent-agnostic knowledge persistence with JSON knowledge base + optional MCP integration",
+          "Architecture: JSON as source of truth, MCP for runtime enhancement, ukb/vkb for capture/visualization",
+          "Key insight: Universal design works with any AI agent, not just Claude",
+          "Implementation: Git-tracked shared-memory.json + auto-sync + structured capture tools",
+          "Details: http://localhost:8080/knowledge-management/insights/KnowledgePersistencePattern.md",
+          "Transferable: Any AI-assisted development workflow",
+          "Significance: 9/10"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "timelineproject",
+      "attributes": {
+        "name": "TimelineProject",
+        "entityType": "Project",
+        "metadata": {
+          "significance": 6,
+          "author": "q284340",
+          "project": null,
+          "created": "2025-06-06T10:00:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "observations": [
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "3D timeline visualization with React + Three.js"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Implemented viewport culling and Redux state management patterns"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Source of multiple transferable performance and architecture patterns"
+          }
+        ],
+        "legacy_observations": [
+          "3D timeline visualization with React + Three.js",
+          "Implemented viewport culling and Redux state management patterns",
+          "Source of multiple transferable performance and architecture patterns"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "coding",
+      "attributes": {
+        "name": "Coding",
+        "entityType": "Project",
+        "metadata": {
+          "significance": 7,
+          "author": "q284340",
+          "project": null,
+          "created": "2025-06-06T10:00:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "observations": [
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Coding knowledge management system for development teams"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Implements MCP persistence and cross-platform installation patterns"
+          },
+          {
+            "date": "2025-06-06T10:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Automated capture and visualization of programming insights"
+          }
+        ],
+        "legacy_observations": [
+          "Coding knowledge management system for development teams",
+          "Implements MCP persistence and cross-platform installation patterns",
+          "Automated capture and visualization of programming insights"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "networkawareinstallationpattern",
+      "attributes": {
+        "name": "NetworkAwareInstallationPattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 9,
+          "author": "q284340",
+          "project": "Coding",
+          "created": "2025-06-07T09:45:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "Enterprise software installations failing in corporate networks with proxies and SSH restrictions",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Multi-stage detection provides reliability without manual configuration while supporting both corporate mirrors and public repositories",
+          "implementation": "Network-aware detection with graceful fallbacks for different network environments",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "Enterprise development tools, CI/CD systems, developer onboarding scripts, multi-repository projects with mixed dependencies"
+          ],
+          "technologies": [
+            "Bash",
+            "Shell Scripting",
+            "Git",
+            "SSH",
+            "Network Detection"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [
+            "install.sh",
+            "docs/installation-architecture.md"
+          ],
+          "documentation": "knowledge-management/insights/NetworkAwareInstallationPattern.md",
+          "external": [],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-07T09:45:00Z",
+            "metadata": {},
+            "type": "problem",
+            "content": "Problem: Enterprise software installations failing in corporate networks with proxies and SSH restrictions"
+          },
+          {
+            "date": "2025-06-07T09:45:00Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Solution: Network-aware detection with graceful fallbacks for different network environments"
+          },
+          {
+            "date": "2025-06-07T09:45:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Key learnings: Network detection patterns, timeout-based operations, graceful degradation, selective repository mirroring based on network context"
+          },
+          {
+            "date": "2025-06-07T09:45:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Applicability: Enterprise development tools, CI/CD systems, developer onboarding scripts, multi-repository projects with mixed dependencies"
+          },
+          {
+            "date": "2025-06-07T09:45:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/NetworkAwareInstallationPattern.md"
+          },
+          {
+            "date": "2025-06-07T09:45:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Significance: 9/10"
+          },
+          {
+            "date": "2025-06-07T09:45:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Created: 2025-06-07T09:45:00Z"
+          }
+        ],
+        "legacy_observations": [
+          "Problem: Enterprise software installations failing in corporate networks with proxies and SSH restrictions",
+          "Solution: Network-aware detection with graceful fallbacks for different network environments",
+          "Key learnings: Network detection patterns, timeout-based operations, graceful degradation, selective repository mirroring based on network context",
+          "Applicability: Enterprise development tools, CI/CD systems, developer onboarding scripts, multi-repository projects with mixed dependencies",
+          "Details: http://localhost:8080/knowledge-management/insights/NetworkAwareInstallationPattern.md",
+          "Significance: 9/10",
+          "Created: 2025-06-07T09:45:00Z"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "dynarch",
+      "attributes": {
+        "name": "DynArch",
+        "entityType": "Project",
+        "metadata": {
+          "significance": 7,
+          "author": "q284340",
+          "project": null,
+          "created": "2025-06-08T15:30:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "observations": [
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Complex autonomous driving system visualization with 7V5R processor architecture"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Real-time animation of sensor data flow, processing, and timing diagrams"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Origin of the sophisticated ConditionalLoggingPattern with dual-axis filtering"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Advanced timing visualization system with interactive elements"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Modular routing system for different sensor types (Camera, Radar, LiDAR)"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Performance-optimized animation pipeline handling complex state transitions"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Comprehensive documentation with UML diagrams and architectural patterns"
+          }
+        ],
+        "legacy_observations": [
+          "Complex autonomous driving system visualization with 7V5R processor architecture",
+          "Real-time animation of sensor data flow, processing, and timing diagrams",
+          "Origin of the sophisticated ConditionalLoggingPattern with dual-axis filtering",
+          "Advanced timing visualization system with interactive elements",
+          "Modular routing system for different sensor types (Camera, Radar, LiDAR)",
+          "Performance-optimized animation pipeline handling complex state transitions",
+          "Comprehensive documentation with UML diagrams and architectural patterns"
+        ],
+        "domain": "Autonomous Driving Visualization",
+        "tech_stack": [
+          "Vanilla JavaScript",
+          "HTML5 Canvas",
+          "CSS3",
+          "SVG"
+        ],
+        "architecture_patterns": [
+          "Component-based architecture",
+          "Event-driven simulation",
+          "State management",
+          "Animation pipeline"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "statedrivenanimationpipelinepattern",
+      "attributes": {
+        "name": "StateDrivenAnimationPipelinePattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 8,
+          "author": "q284340",
+          "project": "DynArch",
+          "created": "2025-06-08T15:30:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "Complex animation systems struggle with coordinating multiple components and managing performance",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Abstract base components + centralized manager + event-driven state management",
+          "implementation": "Hierarchical animation pipeline with standardized lifecycle management and centralized coordination",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "Animation systems, real-time simulations, game engines, interactive visualizations"
+          ],
+          "technologies": [
+            "JavaScript",
+            "Animation APIs",
+            "Canvas",
+            "WebGL"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [
+            "js/components/animation/core/BaseAnimation.js",
+            "js/components/animation/managers/AnimationManager.js",
+            "js/components/animation/SimulationState.js",
+            "js/components/animation/types/AnimationState.js"
+          ],
+          "documentation": null,
+          "external": [],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Developed in DynArch for coordinating 15+ simultaneous animation components"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Standardized lifecycle: initialize → start → pause → stop → destroy"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Single animation loop coordination via requestAnimationFrame"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Event-driven state management with async task tracking"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Dynamic component registration/unregistration without disruption"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Maintains 60fps with complex processor and sensor animations"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Graceful error handling - individual failures don't crash system"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Transferable to any system requiring coordinated animation management"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/StateDrivenAnimationPipelinePattern.md"
+          }
+        ],
+        "legacy_observations": [
+          "Developed in DynArch for coordinating 15+ simultaneous animation components",
+          "Standardized lifecycle: initialize → start → pause → stop → destroy",
+          "Single animation loop coordination via requestAnimationFrame",
+          "Event-driven state management with async task tracking",
+          "Dynamic component registration/unregistration without disruption",
+          "Maintains 60fps with complex processor and sensor animations",
+          "Graceful error handling - individual failures don't crash system",
+          "Transferable to any system requiring coordinated animation management",
+          "Details: http://localhost:8080/knowledge-management/insights/StateDrivenAnimationPipelinePattern.md"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "claudecodestartuppattern",
+      "attributes": {
+        "name": "ClaudeCodeStartupPattern",
+        "entityType": "WorkflowPattern",
+        "metadata": {
+          "significance": 10,
+          "author": "q284340",
+          "project": "Coding",
+          "created": "2025-06-13T07:40:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "Claude Code fails to utilize established knowledge base patterns across sessions",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Automatic knowledge base consumption with pattern verification at session start",
+          "implementation": "Mandatory startup checklist to query MCP memory and apply established patterns",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "All Claude Code sessions requiring consistent pattern application"
+          ],
+          "technologies": [
+            "MCP",
+            "Claude Code",
+            "Knowledge Management"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [],
+          "documentation": null,
+          "external": [],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "MANDATORY: At session start, always query MCP memory for relevant patterns"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Execute: mcp__memory__search_nodes for key patterns like ConditionalLoggingPattern, ReduxStateManagementPattern"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "warning",
+            "content": "NEVER use console.log - always use Logger class from ConditionalLoggingPattern"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "warning",
+            "content": "NEVER use local React state - always use Redux from ReduxStateManagementPattern"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "warning",
+            "content": "NEVER edit shared-memory.json directly - ALWAYS use ukb --interactive or ukb --auto"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "ukb is available in PATH from /Users/q284340/Agentic/coding/bin/ukb and works from anywhere"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "ALWAYS check for existing architectural patterns before implementing solutions"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Session startup checklist: 1) Query MCP memory, 2) Apply relevant patterns, 3) Verify logging is working, 4) Use ukb for knowledge management"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "This pattern prevents repeating architectural mistakes across sessions"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "If claude-mcp is used, knowledge base should be automatically loaded and consumed"
+          },
+          {
+            "date": "2025-06-13T07:40:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Failure to follow this pattern results in reinventing existing solutions and architectural mistakes"
+          }
+        ],
+        "legacy_observations": [
+          "MANDATORY: At session start, always query MCP memory for relevant patterns",
+          "Execute: mcp__memory__search_nodes for key patterns like ConditionalLoggingPattern, ReduxStateManagementPattern",
+          "NEVER use console.log - always use Logger class from ConditionalLoggingPattern",
+          "NEVER use local React state - always use Redux from ReduxStateManagementPattern",
+          "NEVER edit shared-memory.json directly - ALWAYS use ukb --interactive or ukb --auto",
+          "ukb is available in PATH from /Users/q284340/Agentic/coding/bin/ukb and works from anywhere",
+          "ALWAYS check for existing architectural patterns before implementing solutions",
+          "Session startup checklist: 1) Query MCP memory, 2) Apply relevant patterns, 3) Verify logging is working, 4) Use ukb for knowledge management",
+          "This pattern prevents repeating architectural mistakes across sessions",
+          "If claude-mcp is used, knowledge base should be automatically loaded and consumed",
+          "Failure to follow this pattern results in reinventing existing solutions and architectural mistakes"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "strategybasedmodularroutingpattern",
+      "attributes": {
+        "name": "StrategyBasedModularRoutingPattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 8,
+          "author": "q284340",
+          "project": "DynArch",
+          "created": "2025-06-08T15:30:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "Complex geometric routing systems need extensible algorithms without core modifications",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Factory creates specialized handlers + modular strategies + shared base functionality",
+          "implementation": "Strategy and Factory pattern-based routing with pluggable handlers for different connection types",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "Geometric routing, pathfinding, connection systems, network visualization"
+          ],
+          "technologies": [
+            "JavaScript",
+            "SVG",
+            "Canvas",
+            "Mathematical algorithms"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [
+            "js/components/connections/routing/RoutingHandlerFactory.js",
+            "js/components/connections/routing/BaseRoutingHandler.js",
+            "js/components/connections/routing/CameraRoutingHandler.js",
+            "js/components/connections/routing/RadarRoutingHandler.js",
+            "js/components/connections/RoutingManager.js"
+          ],
+          "documentation": null,
+          "external": [],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Developed in DynArch for handling multiple routing algorithms (Camera, Radar, Corridor)"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Extensible architecture allows runtime registration of new routing strategies"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Handles 50+ simultaneous connections with different routing strategies"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Specialized algorithms: curved paths for cameras, obstacle avoidance for radar"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Dynamic boundary calculations and collision detection"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Route calculation: <5ms simple routes, <20ms complex avoidance routes"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Configuration-driven behavior modification without code changes"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Transferable to network visualization, circuit design, game pathfinding"
+          },
+          {
+            "date": "2025-06-08T15:30:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/StrategyBasedModularRoutingPattern.md"
+          }
+        ],
+        "legacy_observations": [
+          "Developed in DynArch for handling multiple routing algorithms (Camera, Radar, Corridor)",
+          "Extensible architecture allows runtime registration of new routing strategies",
+          "Handles 50+ simultaneous connections with different routing strategies",
+          "Specialized algorithms: curved paths for cameras, obstacle avoidance for radar",
+          "Dynamic boundary calculations and collision detection",
+          "Route calculation: <5ms simple routes, <20ms complex avoidance routes",
+          "Configuration-driven behavior modification without code changes",
+          "Transferable to network visualization, circuit design, game pathfinding",
+          "Details: http://localhost:8080/knowledge-management/insights/StrategyBasedModularRoutingPattern.md"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "mcpmemoryloggingintegrationpattern",
+      "attributes": {
+        "name": "MCPMemoryLoggingIntegrationPattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 8,
+          "author": "q284340",
+          "project": "Coding",
+          "created": "2025-06-16T07:20:06Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "MCP logging systems need different approaches for interactive vs piped modes",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Interactive mode requires different logging approach than piped mode - MCP memory sync with verification",
+          "implementation": "Claude-mcp wrapper ensures both logging AND knowledge consumption with mode-aware logging",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "Any MCP-based system requiring both conversation logging and knowledge persistence"
+          ],
+          "technologies": [
+            "MCP",
+            "Claude Code",
+            "Knowledge Management"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [],
+          "documentation": null,
+          "external": [],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-16T07:20:06Z",
+            "metadata": {},
+            "type": "problem",
+            "content": "Problem: Automatic logging system designed for --print mode with piped input fails in interactive mode"
+          },
+          {
+            "date": "2025-06-16T07:20:06Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Solution: Mode-aware logging with MCP memory sync verification"
+          },
+          {
+            "date": "2025-06-16T07:20:06Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Key insight: Interactive mode needs different logging approach than piped mode"
+          },
+          {
+            "date": "2025-06-16T07:20:06Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Transferable: Any AI-assisted development system with MCP integration"
+          },
+          {
+            "date": "2025-06-16T07:20:06Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/mcpmemoryloggingintegration.md"
+          }
+        ],
+        "legacy_observations": [
+          "Problem: Automatic logging system designed for --print mode with piped input fails in interactive mode",
+          "Solution: Mode-aware logging with MCP memory sync verification",
+          "Key insight: Interactive mode needs different logging approach than piped mode",
+          "Transferable: Any AI-assisted development system with MCP integration",
+          "Details: http://localhost:8080/knowledge-management/insights/mcpmemoryloggingintegration.md"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "ukbcomprehensiveanalysispattern",
+      "attributes": {
+        "name": "UKBComprehensiveAnalysisPattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 9,
+          "author": "q284340",
+          "project": "Coding",
+          "created": "2025-06-16T08:00:00Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "Development teams need comprehensive understanding of codebase evolution, architectural decisions, and transferable patterns across projects",
+          "symptoms": [],
+          "impact": "medium"
+        },
+        "solution": {
+          "approach": "Multi-mode analysis system combining git history mining, conversation analysis, and interactive knowledge capture with automatic schema management",
+          "implementation": "UKB (Update Knowledge Base) system with incremental processing, full history analysis, and intelligent pattern extraction",
+          "code_example": null
+        },
+        "context": {
+          "applicability": [
+            "Any software development team requiring codebase understanding, knowledge transfer, architecture reviews, technical debt management, or cross-project learning"
+          ],
+          "technologies": [
+            "Bash",
+            "Git",
+            "jq",
+            "PlantUML",
+            "MCP",
+            "Node.js"
+          ],
+          "performance": {}
+        },
+        "references": {
+          "code_files": [
+            "knowledge-management/ukb",
+            "knowledge-management/scripts/migrate-entities.js",
+            "knowledge-management/schemas/enhanced-entity-schema.json"
+          ],
+          "documentation": null,
+          "external": [],
+          "related_patterns": []
+        },
+        "observations": [
+          {
+            "date": "2025-06-16T08:00:00Z",
+            "metadata": {},
+            "type": "problem",
+            "content": "Problem: Teams need comprehensive codebase understanding and knowledge transfer capabilities"
+          },
+          {
+            "date": "2025-06-16T08:00:00Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Solution: Multi-mode analysis system with incremental processing and full history analysis"
+          },
+          {
+            "date": "2025-06-16T08:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Key features: Git history mining, conversation analysis, schema management, pattern extraction"
+          },
+          {
+            "date": "2025-06-16T08:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Modes: Incremental (default), Full History, Interactive, Agent-assisted"
+          },
+          {
+            "date": "2025-06-16T08:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Benefits: 70% faster onboarding, comprehensive technical debt assessment, data-driven architecture reviews"
+          },
+          {
+            "date": "2025-06-16T08:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Scale: Handles repositories with 10,000+ commits, 90% time savings on subsequent runs"
+          },
+          {
+            "date": "2025-06-16T08:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Integration: MCP memory, git-tracked storage, web visualization, AI agent support"
+          },
+          {
+            "date": "2025-06-16T08:00:00Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Details: http://localhost:8080/knowledge-management/insights/ukbcomprehensiveanalysispattern.md"
+          }
+        ],
+        "legacy_observations": [
+          "Problem: Teams need comprehensive codebase understanding and knowledge transfer capabilities",
+          "Solution: Multi-mode analysis system with incremental processing and full history analysis",
+          "Key features: Git history mining, conversation analysis, schema management, pattern extraction",
+          "Modes: Incremental (default), Full History, Interactive, Agent-assisted",
+          "Benefits: 70% faster onboarding, comprehensive technical debt assessment, data-driven architecture reviews",
+          "Scale: Handles repositories with 10,000+ commits, 90% time savings on subsequent runs",
+          "Integration: MCP memory, git-tracked storage, web visualization, AI agent support",
+          "Details: http://localhost:8080/knowledge-management/insights/ukbcomprehensiveanalysispattern.md"
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "vscodeextensionbridgepattern",
+      "attributes": {
+        "name": "VSCodeExtensionBridgePattern",
+        "entityType": "TransferablePattern",
+        "metadata": {
+          "significance": 9,
+          "author": "q284340",
+          "project": "Coding",
+          "created": "2025-06-16T15:30:47Z",
+          "last_used": null,
+          "usage_count": 0
+        },
+        "problem": {
+          "description": "Developers need to capture knowledge insights without leaving their IDE or switching between tools, which breaks development flow and reduces the likelihood of documenting patterns",
+          "symptoms": [
+            "Context switching disrupts development flow",
+            "Knowledge capture tools require separate applications",
+            "Manual documentation is often skipped"
+          ],
+          "impact": "high"
+        },
+        "solution": {
+          "approach": "Integrate ukb/vkb commands directly into GitHub Copilot chat through VSCode extension bridge, providing natural language interface with real-time feedback",
+          "implementation": "VSCode extension with chat participant registration, HTTP API client, WebSocket real-time updates, and fallback service management",
+          "code_example": "// Extension Registration\nconst participant = vscode.chat.createChatParticipant('km-assistant', async (request, context, response, token) => {\n    await chatParticipant.handleRequest(request, context, response, token);\n});\n\n// HTTP Client Integration\nasync updateKnowledge(pattern) {\n    const response = await axios.post(`${this.baseUrl}/api/knowledge/update`, {\n        entity: pattern\n    });\n    return response.data;\n}"
+        },
+        "context": {
+          "applicability": [
+            "VSCode extension development for developer tools",
+            "GitHub Copilot chat participant integration",
+            "IDE-based knowledge management systems",
+            "Developer experience optimization tools"
+          ],
+          "technologies": [
+            "VSCode Extension API",
+            "GitHub Copilot Chat API",
+            "HTTP/WebSocket communication",
+            "Node.js",
+            "Knowledge Management"
+          ],
+          "performance": {
+            "response_time": "< 500ms for chat responses",
+            "real_time_updates": "WebSocket-based notifications"
+          }
+        },
+        "references": {
+          "code_files": [
+            "vscode-km-copilot/src/extension.js",
+            "vscode-km-copilot/src/chatParticipant.js",
+            "vscode-km-copilot/src/fallbackClient.js",
+            "vscode-km-copilot/src/serviceManager.js"
+          ],
+          "documentation": [
+            "docs/vscode-extension-bridge.md",
+            "docs/enhanced-knowledge-workflow.md"
+          ],
+          "external": [
+            "https://code.visualstudio.com/api/extension-guides/chat",
+            "https://code.visualstudio.com/api/references/vscode-api"
+          ],
+          "related_patterns": [
+            "MCPMemoryLoggingIntegrationPattern",
+            "KnowledgePersistencePattern"
+          ]
+        },
+        "observations": [
+          {
+            "date": "2025-06-16T15:30:47Z",
+            "metadata": {},
+            "type": "problem",
+            "content": "Problem: Context switching between IDE and knowledge management tools disrupts development flow"
+          },
+          {
+            "date": "2025-06-16T15:30:47Z",
+            "metadata": {},
+            "type": "solution",
+            "content": "Solution: Native IDE integration through GitHub Copilot chat participant @km"
+          },
+          {
+            "date": "2025-06-16T15:30:47Z",
+            "metadata": {},
+            "type": "implementation",
+            "content": "Implementation: VSCode extension with HTTP API client and WebSocket for real-time updates"
+          },
+          {
+            "date": "2025-06-16T15:30:47Z",
+            "metadata": {},
+            "type": "metric",
+            "content": "Result: Seamless knowledge capture with <500ms response time and real-time notifications"
+          },
+          {
+            "date": "2025-06-16T15:30:47Z",
+            "metadata": {},
+            "type": "insight",
+            "content": "Transferable: Pattern applicable to any IDE-based developer tool integration requiring chat interfaces"
+          }
+        ],
+        "created": "2025-06-17T05:05:12.844Z",
+        "lastUpdated": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "key": "testgraphologypattern",
+      "attributes": {
+        "name": "TestGraphologyPattern",
+        "entityType": "TestPattern",
+        "significance": 8,
+        "observations": [
+          "This is a test pattern",
+          "It uses Graphology for graph operations"
+        ],
+        "created": "2025-06-17T05:05:12.846Z",
+        "lastUpdated": "2025-06-17T05:05:12.846Z"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "codingknowledge",
+      "target": "conditionalloggingpattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.844Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "viewportcullingpattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "reduxstatemanagementpattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "knowledgepersistencepattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "networkawareinstallationpattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "statedrivenanimationpipelinepattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "strategybasedmodularroutingpattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "claudecodestartuppattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "conditionalloggingpattern",
+      "target": "dynarch",
+      "attributes": {
+        "relationType": "originally developed in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "conditionalloggingpattern",
+      "target": "timelineproject",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "viewportcullingpattern",
+      "target": "timelineproject",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "reduxstatemanagementpattern",
+      "target": "timelineproject",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "knowledgepersistencepattern",
+      "target": "coding",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "networkawareinstallationpattern",
+      "target": "coding",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "timelineproject",
+      "target": "codingknowledge",
+      "attributes": {
+        "relationType": "contributed patterns to",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "coding",
+      "target": "codingknowledge",
+      "attributes": {
+        "relationType": "contributed patterns to",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "dynarch",
+      "target": "codingknowledge",
+      "attributes": {
+        "relationType": "contributed patterns to",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "statedrivenanimationpipelinepattern",
+      "target": "dynarch",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "strategybasedmodularroutingpattern",
+      "target": "dynarch",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "mcpmemoryloggingintegrationpattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "mcpmemoryloggingintegrationpattern",
+      "target": "coding",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "ukbcomprehensiveanalysispattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "ukbcomprehensiveanalysispattern",
+      "target": "coding",
+      "attributes": {
+        "relationType": "implemented in",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "ukbcomprehensiveanalysispattern",
+      "target": "knowledgepersistencepattern",
+      "attributes": {
+        "relationType": "enhances",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "codingknowledge",
+      "target": "vscodeextensionbridgepattern",
+      "attributes": {
+        "relationType": "contains",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "vscodeextensionbridgepattern",
+      "target": "mcpmemoryloggingintegrationpattern",
+      "attributes": {
+        "relationType": "extends",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "vscodeextensionbridgepattern",
+      "target": "knowledgepersistencepattern",
+      "attributes": {
+        "relationType": "enhances",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    },
+    {
+      "source": "vscodeextensionbridgepattern",
+      "target": "ukbcomprehensiveanalysispattern",
+      "attributes": {
+        "relationType": "integrates_with",
+        "created": "2025-06-17T05:05:12.845Z"
+      }
+    }
+  ],
+  "metadata": {
+    "lastSaved": "2025-06-17T05:05:12.854Z",
+    "nodeCount": 16,
+    "edgeCount": 28
+  }
+}
