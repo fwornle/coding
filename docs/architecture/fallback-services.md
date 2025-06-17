@@ -132,7 +132,7 @@ graph TB
 
 ### Agent-Agnostic Architecture Overview
 
-![Agent-Agnostic Architecture](puml/Agent-Agnostic%20Architecture.png)
+![Agent-Agnostic Architecture](../puml/Agent-Agnostic%20Architecture.png)
 
 This diagram shows the complete flow from agent detection to service implementation, highlighting how:
 
@@ -142,7 +142,7 @@ This diagram shows the complete flow from agent detection to service implementat
 
 ### Graphology Memory Architecture
 
-![Graphology Memory Architecture](puml/Graphology%20Memory%20Architecture.png)
+![Graphology Memory Architecture](../puml/Graphology%20Memory%20Architecture.png)
 
 This detailed view shows the Graphology memory service architecture, including:
 
@@ -153,7 +153,7 @@ This detailed view shows the Graphology memory service architecture, including:
 
 ### Fallback Services Detailed Architecture
 
-![Fallback Services Detailed Architecture](puml/Fallback%20Services%20Detailed%20Architecture.png)
+![Fallback Services Detailed Architecture](../puml/Fallback%20Services%20Detailed%20Architecture.png)
 
 This comprehensive diagram illustrates the complete fallback services ecosystem:
 

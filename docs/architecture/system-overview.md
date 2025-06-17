@@ -34,7 +34,7 @@ The Knowledge Management (KM) system is designed to automatically capture, organ
 
 ## Architecture
 
-![System Architecture](imag/system-architecture.png)
+![System Architecture](../imag/system-architecture.png)
 
 The system consists of three main layers:
 
@@ -60,7 +60,7 @@ The system consists of three main layers:
 
 ## User Workflows
 
-![Knowledge Workflow](imag/knowledge-workflow.png)
+![Knowledge Workflow](../imag/knowledge-workflow.png)
 
 ### Daily Development Workflow
 
@@ -98,7 +98,7 @@ The system consists of three main layers:
 
 ## Knowledge Base Schema
 
-![Knowledge Schema](imag/knowledge-schema.png)
+![Knowledge Schema](../imag/knowledge-schema.png)
 
 ### Entity Types
 
@@ -276,7 +276,7 @@ Clicking any node shows:
 - Creation date
 - All relationships (inbound/outbound)
 
-![Knowledge Visualization Details](imag/viewer-details.png)
+![Knowledge Visualization Details](../imag/viewer-details.png)
 
 When a node contains references to detailed markdown documentation (e.g., transferable patterns), clicking the markdown link opens a full-screen viewer with:
 

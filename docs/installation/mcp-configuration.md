@@ -1,6 +1,6 @@
 # Claude MCP Configuration Setup Guide
 
-![Claude MCP Auto-Logging](imag/claude-mcp-autologging.png)
+![Claude MCP Auto-Logging](../imag/claude-mcp-autologging.png)
 
 This guide explains how to set up the MCP (Model Context Protocol) servers for the Coding Knowledge Management System. The screenshot above shows the complete startup sequence when you launch `claude-mcp`, demonstrating both the auto-sync of the knowledge base (12 entities, 19 relations) and the post-session logging initialization.
 

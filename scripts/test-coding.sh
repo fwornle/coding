@@ -579,6 +579,23 @@ else
     print_fixed ".specstory directory structure created"
 fi
 
+print_check "Documentation structure"
+DOCS_ISSUES=0
+for dir in "installation" "architecture" "ukb" "logging" "integrations" "reference"; do
+    if dir_exists "$CODING_ROOT/docs/$dir"; then
+        print_pass "docs/$dir directory found"
+    else
+        print_fail "docs/$dir directory missing"
+        DOCS_ISSUES=$((DOCS_ISSUES + 1))
+    fi
+done
+
+if [ $DOCS_ISSUES -eq 0 ]; then
+    print_pass "Documentation structure complete"
+else
+    print_fail "Documentation structure incomplete"
+fi
+
 # =============================================================================
 # PHASE 8: INTEGRATION TESTING
 # =============================================================================

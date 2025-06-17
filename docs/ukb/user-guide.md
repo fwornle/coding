@@ -317,7 +317,6 @@ cat ~/.ukb/debug.log
 
 ## Next Steps
 
-- **[Use Cases](use-cases.md)** - Detailed workflow examples
-- **[Diagrams Reference](diagrams.md)** - Visual documentation
+- **[Use Cases](ukb-use-cases.md)** - Detailed workflow examples
 - **[VSCode Integration](../integrations/vscode-extension.md)** - IDE integration
 - **[System Architecture](../architecture/system-overview.md)** - Technical details
