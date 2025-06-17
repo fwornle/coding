@@ -295,9 +295,19 @@ rm -rf memory-visualizer/
 
 ### Verify Complete Installation
 ```bash
-# Run complete verification suite
-./scripts/verify-installation.sh
+# Run comprehensive test & repair script
+./scripts/test-coding.sh
 
+# This script will:
+# ✓ Test all components and dependencies
+# ✓ Detect available AI agents (Claude/Copilot)  
+# ✓ Verify VSCode extension installation
+# ✓ Automatically repair any issues found
+# ✓ Provide detailed status report
+```
+
+### Quick Manual Verification
+```bash
 # Manual verification checklist:
 echo "✓ Commands available:" && ukb --version && vkb --version
 echo "✓ Knowledge base works:" && ukb "test" && echo "OK"

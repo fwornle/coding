@@ -130,6 +130,7 @@ vkb                    # View knowledge graph in browser
 
 # System management
 ./install.sh           # Install or update system
+./scripts/test-coding.sh # Comprehensive test & repair
 claude-mcp            # Start Claude with MCP integration
 coding --copilot      # Start fallback services for Copilot
 

@@ -8,6 +8,9 @@ This repository provides intelligent coding tools that work seamlessly with both
 # Install the system (detects and configures available agents)
 ./install.sh
 
+# Test installation and auto-repair any issues
+./scripts/test-coding.sh
+
 # Use best available agent (auto-detects)
 ./bin/coding
 
