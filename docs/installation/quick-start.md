@@ -107,6 +107,41 @@ cd ~/coding
 vkb  # View existing team knowledge
 ```
 
+## VSCode Extension Setup
+
+### Building and Installing the Extension
+```bash
+# Navigate to extension directory
+cd ~/coding/vscode-km-copilot
+
+# Install dependencies
+npm install
+
+# Build the extension
+npm run package
+
+# Install in VSCode
+code --install-extension km-copilot-bridge-*.vsix
+```
+
+### Using Command Palette Commands
+After installation, restart VSCode and:
+
+1. **Start fallback services first**:
+   ```bash
+   coding --copilot
+   ```
+
+2. **Use Command Palette** (Ctrl+Shift+P / Cmd+Shift+P):
+   - `View Knowledge Base` - Opens knowledge graph in browser
+   - `Update Knowledge Base` - Add new patterns interactively
+
+3. **Use in Copilot Chat**:
+   - Type `@KM vkb` to view knowledge base
+   - Type `@KM ukb Problem: X, Solution: Y` to add patterns
+
+**Note:** The extension requires fallback services running on port 8765. Always start with `coding --copilot` first.
+
 ## ✅ Installation Verification
 
 ### Step 1: Basic Command Test

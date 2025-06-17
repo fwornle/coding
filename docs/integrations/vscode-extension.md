@@ -390,9 +390,14 @@ Check logs in:
 3. **JIRA Integration**: Link patterns to development tickets
 4. **Documentation Generation**: Auto-generate docs from patterns
 
+## Troubleshooting
+
+For common issues and solutions, see **[VSCode Extension Troubleshooting Guide](vscode-extension-troubleshooting.md)**.
+
 ## Related Documentation
 
-- [UKB User Guide](../ukb/user-guide.md)
-- [Memory Systems](../architecture/memory-systems.md)
-- [Cross-Project Knowledge](../architecture/cross-project-knowledge.md)
-- [Quick Start Installation](../installation/quick-start.md)
+- [VSCode Extension Troubleshooting](vscode-extension-troubleshooting.md) - Common issues and solutions
+- [UKB User Guide](../ukb/user-guide.md) - Knowledge management workflows
+- [Memory Systems](../architecture/memory-systems.md) - MCP memory architecture
+- [Cross-Project Knowledge](../architecture/cross-project-knowledge.md) - Knowledge sharing
+- [Quick Start Installation](../installation/quick-start.md) - System installation
