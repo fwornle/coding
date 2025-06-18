@@ -127,28 +127,42 @@ echo
 # Port 8080 Check
 echo "7. Port 8080 Status:"
 PORT_IN_USE=false
+
+# Check for LISTENING servers on port 8080 (not outgoing connections)
 if command -v lsof >/dev/null 2>&1; then
-    if lsof -i :8080 >/dev/null 2>&1; then
+    # Look for LISTEN state specifically
+    if lsof -i :8080 -sTCP:LISTEN >/dev/null 2>&1; then
         PORT_IN_USE=true
-        echo "   ⚠️  Port 8080 is already in use:"
-        lsof -i :8080 | head -5
+        echo "   ⚠️  Port 8080 is already in use by a listening server:"
+        lsof -i :8080 -sTCP:LISTEN | head -5
     fi
 elif command -v ss >/dev/null 2>&1; then
-    if ss -tlnp 2>/dev/null | grep -q ":8080"; then
+    # ss -tln shows listening TCP ports
+    if ss -tln 2>/dev/null | grep -q ":8080 "; then
         PORT_IN_USE=true
-        echo "   ⚠️  Port 8080 is already in use:"
-        ss -tlnp | grep ":8080"
+        echo "   ⚠️  Port 8080 is already in use by a listening server:"
+        ss -tlnp 2>/dev/null | grep ":8080 "
     fi
 elif command -v netstat >/dev/null 2>&1; then
-    if netstat -tlnp 2>/dev/null | grep -q ":8080"; then
+    # netstat -tln shows listening TCP ports
+    if netstat -tln 2>/dev/null | grep -q ":8080 "; then
         PORT_IN_USE=true
-        echo "   ⚠️  Port 8080 is already in use:"
-        netstat -tlnp 2>/dev/null | grep ":8080"
+        echo "   ⚠️  Port 8080 is already in use by a listening server:"
+        netstat -tlnp 2>/dev/null | grep ":8080 "
     fi
 fi
 
 if [[ "$PORT_IN_USE" == "false" ]]; then
-    echo "   ✓ Port 8080 is available"
+    echo "   ✓ Port 8080 is available for listening"
+    
+    # Show any outgoing connections to port 8080 (informational only)
+    if command -v lsof >/dev/null 2>&1; then
+        local outgoing_count
+        outgoing_count=$(lsof -i :8080 2>/dev/null | grep -v LISTEN | wc -l)
+        if [[ $outgoing_count -gt 0 ]]; then
+            echo "   ℹ️  Note: Found $outgoing_count outgoing connection(s) to remote port 8080 (not a problem)"
+        fi
+    fi
 fi
 echo
 

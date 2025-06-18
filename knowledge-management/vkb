@@ -99,18 +99,18 @@ is_server_running() {
         rm -f "$PID_FILE"
     fi
     
-    # Also check if any process is using our port (could be orphaned server)
-    # Try lsof first, then fall back to netstat or ss
+    # Also check if any process is listening on our port (could be orphaned server)
+    # Try lsof first, then fall back to ss or netstat
     if command -v lsof >/dev/null 2>&1; then
-        if lsof -i ":$SERVER_PORT" >/dev/null 2>&1; then
+        if lsof -i ":$SERVER_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
             return 0
         fi
     elif command -v ss >/dev/null 2>&1; then
-        if ss -tlnp 2>/dev/null | grep -q ":$SERVER_PORT"; then
+        if ss -tln 2>/dev/null | grep -q ":$SERVER_PORT "; then
             return 0
         fi
     elif command -v netstat >/dev/null 2>&1; then
-        if netstat -tlnp 2>/dev/null | grep -q ":$SERVER_PORT"; then
+        if netstat -tln 2>/dev/null | grep -q ":$SERVER_PORT "; then
             return 0
         fi
     fi
@@ -135,16 +135,16 @@ stop_server() {
         rm -f "$PID_FILE"
     fi
     
-    # Kill any process using our port
+    # Kill any process listening on our port
     local port_pid=""
     if command -v lsof >/dev/null 2>&1; then
-        port_pid=$(lsof -i ":$SERVER_PORT" -t 2>/dev/null || true)
+        port_pid=$(lsof -i ":$SERVER_PORT" -sTCP:LISTEN -t 2>/dev/null || true)
     elif command -v ss >/dev/null 2>&1; then
-        # Extract PID from ss output (Linux)
-        port_pid=$(ss -tlnp 2>/dev/null | grep ":$SERVER_PORT" | grep -o 'pid=[0-9]*' | cut -d= -f2 || true)
+        # Extract PID from ss output (Linux) - only listening ports
+        port_pid=$(ss -tlnp 2>/dev/null | grep ":$SERVER_PORT " | grep -o 'pid=[0-9]*' | cut -d= -f2 || true)
     elif command -v netstat >/dev/null 2>&1; then
-        # Try to extract PID from netstat (may require root)
-        port_pid=$(netstat -tlnp 2>/dev/null | grep ":$SERVER_PORT" | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+        # Try to extract PID from netstat (may require root) - only listening ports
+        port_pid=$(netstat -tlnp 2>/dev/null | grep ":$SERVER_PORT " | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
     fi
     if [[ -n "$port_pid" ]]; then
         echo -e "${YELLOW}Killing process using port $SERVER_PORT (PID: $port_pid)...${NC}"
