@@ -151,17 +151,65 @@ class PostSessionLogger {
   detectCodingContent(content) {
     const lowerContent = content.toLowerCase();
     
-    const codingKeywords = [
-      'ukb', 'vkb', 'shared-memory.json', 'knowledge-base', 'knowledge base',
-      'mcp', 'claude-mcp', 'specstory', 'claude-logger', 'coding project',
-      'coding repo', 'coding repository', 'agentic/coding', 'install.sh',
-      'knowledge management', 'transferable pattern', 'shared knowledge',
-      'cross-project', '.activate', 'claude tools', 'memory-visualizer',
-      'start-auto-logger', 'automatic logging', 'conversation logging',
-      'CLAUDE.md', 'CODING_REPO', 'todowrite', 'todoread', 'post-session logging'
+    // Semantic patterns for coding infrastructure discussions
+    const codingPatterns = [
+      // Knowledge base management tools
+      /\b(ukb|vkb)\s+(command|tool|update|sync)/,
+      /shared-memory\.json\s+(update|edit|management)/,
+      /knowledge[\s-]?base\s+(management|tool|update|sync)/,
+      
+      // MCP and Claude tools development
+      /\bmcp\s+(server|client|tool|development|integration)/,
+      /claude[\s-]?mcp\s+(setup|configuration|development)/,
+      /claude\s+tools?\s+(development|setup|configuration)/,
+      
+      // Logging infrastructure (not just any .specstory mention)
+      /specstory\s+(logger|logging|mechanism|infrastructure)/,
+      /claude[\s-]?logger\s+(setup|configuration|development)/,
+      /post[\s-]?session[\s-]?logg(er|ing)/,
+      /automatic\s+logging\s+(setup|mechanism|infrastructure)/,
+      
+      // Coding repository specific
+      /coding\s+(project|repo|repository)\s+(setup|configuration|tools)/,
+      /agentic\/coding\s+(directory|folder|repository)/,
+      
+      // Infrastructure and tooling
+      /install\.sh\s+(script|setup|configuration)/,
+      /\.activate\s+(script|command|setup)/,
+      /memory[\s-]?visualizer\s+(tool|setup|development)/,
+      /start[\s-]?auto[\s-]?logger/,
+      
+      // Cross-project patterns and knowledge transfer
+      /transferable\s+pattern/,
+      /cross[\s-]?project\s+(knowledge|pattern|tool)/,
+      /shared\s+knowledge\s+(management|system)/
     ];
     
-    return codingKeywords.some(keyword => lowerContent.includes(keyword));
+    // Check semantic patterns first
+    const hasSemanticMatch = codingPatterns.some(pattern => pattern.test(lowerContent));
+    if (hasSemanticMatch) return true;
+    
+    // Fallback to specific unambiguous keywords
+    const unambiguousKeywords = [
+      'ukb', 'vkb', // These are always coding-related
+      'agentic/coding',
+      'coding_repo',
+      'todowrite', 'todoread' // These are Claude Code specific tools
+    ];
+    
+    // Context-aware detection: if discussing .specstory in context of timeline data, it's NOT coding-related
+    const timelineContext = [
+      /\.specstory\/history\s+(data|files?|directory)/,
+      /timeline.*\.specstory/,
+      /\.specstory.*timeline/,
+      /extract.*\.specstory.*data/,
+      /read.*\.specstory.*files?/
+    ];
+    
+    const isTimelineContext = timelineContext.some(pattern => pattern.test(lowerContent));
+    if (isTimelineContext) return false;
+    
+    return unambiguousKeywords.some(keyword => lowerContent.includes(keyword));
   }
 
   createLogFile(targetRepo, sessionData, content) {
