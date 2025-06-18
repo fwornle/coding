@@ -353,6 +353,15 @@ parse_args() {
                     error_exit "Must specify entity rename as: old_name,new_name"
                 fi
                 ;;
+            --add-entity)
+                # Add entity: name|type|observation1;observation2;...
+                if [[ -n "$2" ]]; then
+                    add_entity_to_kb "$2"
+                    exit 0
+                else
+                    error_exit "Must specify entity as: name|type|observation1;observation2;..."
+                fi
+                ;;
             --add-relations)
                 # Add multiple relations (space-separated)
                 shift
@@ -410,6 +419,7 @@ show_help() {
     echo "  --add-relations R1 R2... Add multiple relations (space-separated)"
     echo "  --list-relations  List all relations in knowledge base"
     echo "  --rename-entity O,N Rename entity (format: old_name,new_name)"
+    echo "  --add-entity N|T|O Add entity (format: name|type|observation1;observation2;...)"
     echo "  --help, -h        Show this help message"
     echo ""
     echo -e "${YELLOW}Features:${NC}"
@@ -3139,6 +3149,97 @@ rename_entity_in_kb() {
         mv "$old_md_file" "$new_md_file"
         echo -e "${GREEN}✅ Renamed markdown file: $old_name.md → $new_name.md${NC}"
     fi
+    
+    # Sync to visualizer
+    local dist_memory="../coding/memory-visualizer/dist/memory.json"
+    if [[ -f "$dist_memory" ]]; then
+        cp "$shared_memory" "$dist_memory"
+        echo -e "${GREEN}✅ Synced to visualizer${NC}"
+    fi
+    
+    # Show updated counts
+    local total_entities total_relations
+    total_entities=$(jq '.entities | length' "$shared_memory")
+    total_relations=$(jq '.relations | length' "$shared_memory")
+    echo -e "${CYAN}📊 Updated counts: $total_entities entities, $total_relations relations${NC}"
+}
+
+# Add entity to knowledge base
+add_entity_to_kb() {
+    local entity_spec="$1"
+    local shared_memory="../coding/shared-memory.json"
+    
+    # Find shared-memory.json
+    for path in "$shared_memory" "shared-memory.json" "../shared-memory.json"; do
+        if [[ -f "$path" ]]; then
+            shared_memory="$path"
+            break
+        fi
+    done
+    
+    if [[ ! -f "$shared_memory" ]]; then
+        echo -e "${RED}❌ shared-memory.json not found${NC}"
+        return 1
+    fi
+    
+    # Parse entity: name|type|observation1;observation2;...
+    IFS='|' read -ra ENTITY_PARTS <<< "$entity_spec"
+    if [[ ${#ENTITY_PARTS[@]} -lt 3 ]]; then
+        echo -e "${RED}❌ Invalid entity format. Use: name|type|observation1;observation2;...${NC}"
+        return 1
+    fi
+    
+    local entity_name="${ENTITY_PARTS[0]}"
+    local entity_type="${ENTITY_PARTS[1]}"
+    local observations_str="${ENTITY_PARTS[2]}"
+    
+    # Check if entity already exists
+    if jq -e --arg name "$entity_name" '.entities[] | select(.name == $name)' "$shared_memory" >/dev/null; then
+        echo -e "${YELLOW}⚠️  Entity '$entity_name' already exists in knowledge base${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}➕ Adding entity: $entity_name${NC}"
+    
+    # Create backup
+    cp "$shared_memory" "${shared_memory}.backup"
+    
+    # Convert observations to JSON array
+    IFS=';' read -ra OBS_ARRAY <<< "$observations_str"
+    local obs_json=""
+    for obs in "${OBS_ARRAY[@]}"; do
+        if [[ -n "$obs_json" ]]; then
+            obs_json="$obs_json,"
+        fi
+        obs_json="$obs_json\"$obs\""
+    done
+    obs_json="[$obs_json]"
+    
+    # Add entity
+    jq --arg name "$entity_name" \
+       --arg type "$entity_type" \
+       --argjson obs "$obs_json" \
+       --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+        # Add the entity
+        .entities += [{
+            "name": $name,
+            "entityType": $type,
+            "observations": $obs,
+            "significance": 5,
+            "problem": {},
+            "solution": {},
+            "metadata": {
+                "created_at": $timestamp,
+                "last_updated": $timestamp
+            }
+        }] |
+        # Update metadata
+        .metadata.last_updated = $timestamp |
+        .metadata.total_entities = (.entities | length) |
+        .metadata.last_mode = "entity_addition"
+    ' "$shared_memory" > "${shared_memory}.tmp" && mv "${shared_memory}.tmp" "$shared_memory"
+    
+    echo -e "${GREEN}✅ Successfully added entity: $entity_name${NC}"
     
     # Sync to visualizer
     local dist_memory="../coding/memory-visualizer/dist/memory.json"
