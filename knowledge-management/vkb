@@ -176,8 +176,24 @@ prepare_memory_data() {
     
     # Create symlink to knowledge-management directory for serving documentation
     local km_link="$VISUALIZER_DIR/dist/knowledge-management"
-    if [[ ! -L "$km_link" ]]; then
-        ln -sf "$CODING_REPO/knowledge-management" "$km_link" 2>/dev/null || true
+    if [[ -L "$km_link" ]]; then
+        # Remove existing symlink to recreate it (in case path changed)
+        rm -f "$km_link"
+    fi
+    
+    # Create fresh symlink
+    if ln -sf "$CODING_REPO/knowledge-management" "$km_link" 2>/dev/null; then
+        echo -e "${GREEN}✓ Knowledge management files linked for serving${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Could not create symlink to knowledge-management directory${NC}"
+        echo -e "${YELLOW}   Insight files may not be accessible${NC}"
+    fi
+    
+    # Verify the symlink points to the right place
+    if [[ -L "$km_link" ]] && [[ -d "$km_link/insights" ]]; then
+        local insight_count
+        insight_count=$(find "$km_link/insights" -name "*.md" 2>/dev/null | wc -l)
+        echo -e "${GREEN}✓ Found $insight_count insight files${NC}"
     fi
     
     # Convert from our format to NDJSON format expected by visualizer
@@ -215,17 +231,27 @@ start_server() {
     # Change to visualizer directory
     cd "$VISUALIZER_DIR"
     
+    # Choose server type based on availability
+    local server_cmd
+    if [[ -f "$VISUALIZER_DIR/cors-server.py" ]]; then
+        server_cmd="python3 $VISUALIZER_DIR/cors-server.py $SERVER_PORT dist"
+        echo -e "${GREEN}✓ Using CORS-enabled server${NC}"
+    else
+        server_cmd="python3 -m http.server $SERVER_PORT --directory dist"
+        echo -e "${YELLOW}⚠️  Using basic HTTP server (CORS issues may occur)${NC}"
+    fi
+    
     if [[ "$foreground_mode" == "true" ]]; then
         # Start HTTP server in foreground for debugging
         echo -e "${YELLOW}🔍 Running in foreground mode (press Ctrl+C to stop)${NC}"
         echo -e "${GREEN}🔗 URL: http://localhost:$SERVER_PORT${NC}"
         echo -e "${BLUE}📊 Server output:${NC}"
         echo "----------------------------------------"
-        exec python3 -m http.server "$SERVER_PORT" --directory dist
+        exec $server_cmd
     else
         # Start HTTP server in background
         {
-            python3 -m http.server "$SERVER_PORT" --directory dist 2>&1 | \
+            $server_cmd 2>&1 | \
             while IFS= read -r line; do
                 echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
             done

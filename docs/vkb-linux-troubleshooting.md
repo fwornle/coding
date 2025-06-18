@@ -141,6 +141,27 @@ sudo firewall-cmd --add-port=8080/tcp --permanent
 sudo firewall-cmd --reload
 ```
 
+### 8. CORS Issues with Insight Files
+
+If you can open the knowledge base but clicking on insight files gives 404 or CORS errors:
+
+```bash
+# Check if insight files are accessible
+ls memory-visualizer/dist/knowledge-management/insights/
+
+# Restart vkb to recreate symlinks
+vkb restart
+
+# Check server logs for CORS headers
+curl -I http://localhost:8080/knowledge-management/insights/ConditionalLoggingPattern.md
+```
+
+The VKB server now includes CORS support automatically. You should see headers like:
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+```
+
 ## Manual Server Start (For Debugging)
 
 If vkb still doesn't work, try starting the server manually:
