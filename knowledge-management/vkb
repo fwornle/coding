@@ -376,7 +376,9 @@ main() {
             if is_server_running; then
                 echo -e "${YELLOW}⚠️  Server already running in background${NC}"
                 echo -e "${YELLOW}Please stop it first with 'vkb stop'${NC}"
-                return 1
+                echo -e "${BLUE}Attempting to stop existing server...${NC}"
+                stop_server
+                sleep 2
             fi
             
             # Prepare data and start server in foreground
@@ -408,8 +410,36 @@ main() {
                 echo -e "${YELLOW}⚠️  No log file found${NC}"
             fi
             ;;
+        "port"|"check-port")
+            echo -e "${BLUE}🔍 Checking port $SERVER_PORT usage:${NC}"
+            echo
+            
+            # Check for listening servers
+            echo -e "${BLUE}Listening servers on port $SERVER_PORT:${NC}"
+            if command -v lsof >/dev/null 2>&1; then
+                lsof -i ":$SERVER_PORT" -sTCP:LISTEN 2>/dev/null || echo "None found"
+            elif command -v ss >/dev/null 2>&1; then
+                ss -tlnp 2>/dev/null | grep ":$SERVER_PORT " || echo "None found"
+            elif command -v netstat >/dev/null 2>&1; then
+                netstat -tlnp 2>/dev/null | grep ":$SERVER_PORT " || echo "None found"
+            else
+                echo "No port checking tools available"
+            fi
+            
+            echo
+            echo -e "${BLUE}All connections involving port $SERVER_PORT:${NC}"
+            if command -v lsof >/dev/null 2>&1; then
+                lsof -i ":$SERVER_PORT" 2>/dev/null || echo "None found"
+            elif command -v ss >/dev/null 2>&1; then
+                ss -anp 2>/dev/null | grep ":$SERVER_PORT" || echo "None found"
+            elif command -v netstat >/dev/null 2>&1; then
+                netstat -anp 2>/dev/null | grep ":$SERVER_PORT" || echo "None found"
+            else
+                echo "No port checking tools available"
+            fi
+            ;;
         "help"|"--help"|"-h"|*)
-            echo "Usage: $0 [start|fg|stop|restart|status|logs|help]"
+            echo "Usage: $0 [start|fg|stop|restart|status|logs|port|help]"
             echo "  start      - Start visualization server in background (default)"  
             echo "  fg         - Start visualization server in foreground (for debugging)"
             echo "  foreground - Same as 'fg'"
@@ -417,6 +447,7 @@ main() {
             echo "  restart    - Restart visualization server"
             echo "  status     - Show server status"
             echo "  logs       - Show recent server logs"
+            echo "  port       - Check what's using port 8080"
             echo "  help       - Show this help message"
             echo ""
             echo "Foreground mode is useful for debugging as it shows server output directly."
