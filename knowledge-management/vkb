@@ -16,11 +16,20 @@ find_repo_root() {
         current_dir="$(dirname "$current_dir")"
     done
     
-    # Fallback: check if we're in a subdirectory of the expected location
-    if [[ -f "/Users/q284340/Agentic/coding/shared-memory.json" ]]; then
-        echo "/Users/q284340/Agentic/coding"
-        return 0
-    fi
+    # Fallback: check common locations
+    local common_paths=(
+        "$HOME/Agentic/coding"
+        "$HOME/coding"
+        "$HOME/projects/coding"
+        "$HOME/dev/coding"
+    )
+    
+    for path in "${common_paths[@]}"; do
+        if [[ -f "$path/shared-memory.json" ]] && [[ -d "$path/knowledge-management" ]]; then
+            echo "$path"
+            return 0
+        fi
+    done
     
     # Last resort: use current directory if it has the right structure  
     if [[ -f "shared-memory.json" ]] && [[ -d "knowledge-management" ]]; then
@@ -28,22 +37,40 @@ find_repo_root() {
         return 0
     fi
     
-    echo "/Users/q284340/Agentic/coding"  # Default fallback
+    # Final fallback: return current directory or error
+    if [[ -d "knowledge-management" ]]; then
+        echo "$PWD"
+    else
+        echo "ERROR: Could not find repository root" >&2
+        return 1
+    fi
 }
 
 CODING_REPO="$(find_repo_root)"
+if [[ "$CODING_REPO" == "ERROR:"* ]]; then
+    error_exit "Could not find repository root. Please run from within the coding repository."
+fi
 SHARED_MEMORY="$CODING_REPO/shared-memory.json"
-VISUALIZER_DIR="/Users/q284340/Agentic/coding/memory-visualizer"
+VISUALIZER_DIR="$CODING_REPO/memory-visualizer"
 SERVER_PORT=8080
 PID_FILE="/tmp/vkb-server.pid"
 LOG_FILE="/tmp/vkb-server.log"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Colors for output (with terminal support check)
+if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+else
+    # No colors if not in a terminal or terminal doesn't support colors
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 # Error handling
 error_exit() {
@@ -59,7 +86,12 @@ is_server_running() {
         pid=$(cat "$PID_FILE")
         if kill -0 "$pid" 2>/dev/null; then
             # Check if it's actually our server
-            if lsof -i ":$SERVER_PORT" -t | grep -q "$pid"; then
+            if command -v lsof >/dev/null 2>&1; then
+                if lsof -i ":$SERVER_PORT" -t 2>/dev/null | grep -q "$pid"; then
+                    return 0
+                fi
+            else
+                # If lsof not available, just trust the PID file
                 return 0
             fi
         fi
@@ -68,8 +100,19 @@ is_server_running() {
     fi
     
     # Also check if any process is using our port (could be orphaned server)
-    if lsof -i ":$SERVER_PORT" >/dev/null 2>&1; then
-        return 0
+    # Try lsof first, then fall back to netstat or ss
+    if command -v lsof >/dev/null 2>&1; then
+        if lsof -i ":$SERVER_PORT" >/dev/null 2>&1; then
+            return 0
+        fi
+    elif command -v ss >/dev/null 2>&1; then
+        if ss -tlnp 2>/dev/null | grep -q ":$SERVER_PORT"; then
+            return 0
+        fi
+    elif command -v netstat >/dev/null 2>&1; then
+        if netstat -tlnp 2>/dev/null | grep -q ":$SERVER_PORT"; then
+            return 0
+        fi
     fi
     
     return 1
@@ -93,8 +136,16 @@ stop_server() {
     fi
     
     # Kill any process using our port
-    local port_pid
-    port_pid=$(lsof -i ":$SERVER_PORT" -t 2>/dev/null || true)
+    local port_pid=""
+    if command -v lsof >/dev/null 2>&1; then
+        port_pid=$(lsof -i ":$SERVER_PORT" -t 2>/dev/null || true)
+    elif command -v ss >/dev/null 2>&1; then
+        # Extract PID from ss output (Linux)
+        port_pid=$(ss -tlnp 2>/dev/null | grep ":$SERVER_PORT" | grep -o 'pid=[0-9]*' | cut -d= -f2 || true)
+    elif command -v netstat >/dev/null 2>&1; then
+        # Try to extract PID from netstat (may require root)
+        port_pid=$(netstat -tlnp 2>/dev/null | grep ":$SERVER_PORT" | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+    fi
     if [[ -n "$port_pid" ]]; then
         echo -e "${YELLOW}Killing process using port $SERVER_PORT (PID: $port_pid)...${NC}"
         kill "$port_pid" 2>/dev/null || true
@@ -154,6 +205,11 @@ prepare_memory_data() {
 # Start visualization server
 start_server() {
     echo -e "${BLUE}🚀 Starting visualization server...${NC}"
+    
+    # Check for Python 3
+    if ! command -v python3 >/dev/null 2>&1; then
+        error_exit "Python 3 is required but not found. Please install Python 3."
+    fi
     
     # Change to visualizer directory
     cd "$VISUALIZER_DIR"
@@ -229,9 +285,31 @@ show_status() {
     fi
 }
 
+# Check dependencies
+check_dependencies() {
+    local missing_deps=()
+    
+    if ! command -v jq >/dev/null 2>&1; then
+        missing_deps+=("jq")
+    fi
+    
+    if ! command -v python3 >/dev/null 2>&1; then
+        missing_deps+=("python3")
+    fi
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        error_exit "Missing required dependencies: ${missing_deps[*]}. Please install them first."
+    fi
+}
+
 # Main execution
 main() {
     local command="${1:-start}"
+    
+    # Check dependencies before running any command
+    if [[ "$command" != "help" ]] && [[ "$command" != "--help" ]] && [[ "$command" != "-h" ]]; then
+        check_dependencies
+    fi
     
     case "$command" in
         "start"|"")
@@ -279,14 +357,22 @@ main() {
                 echo -e "${YELLOW}⚠️  No log file found${NC}"
             fi
             ;;
-        *)
-            echo "Usage: $0 [start|stop|restart|status|logs]"
+        "help"|"--help"|"-h"|*)
+            echo "Usage: $0 [start|stop|restart|status|logs|help]"
             echo "  start   - Start visualization server (default)"
             echo "  stop    - Stop visualization server"
             echo "  restart - Restart visualization server"
             echo "  status  - Show server status"
             echo "  logs    - Show recent server logs"
-            exit 1
+            echo "  help    - Show this help message"
+            echo ""
+            echo "Requirements:"
+            echo "  - jq (JSON processor)"
+            echo "  - python3 (for HTTP server)"
+            echo "  - lsof/ss/netstat (for port checking, at least one required)"
+            if [[ "$command" != "help" ]] && [[ "$command" != "--help" ]] && [[ "$command" != "-h" ]]; then
+                exit 1
+            fi
             ;;
     esac
 }
