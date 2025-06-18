@@ -79,7 +79,9 @@
       "Bash(cat:*)",
       "Bash(bash:*)",
       "Bash(./scripts/test-coding.sh:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(vkb help:*)",
+      "mcp__memory__delete_entities"
     ],
     "deny": []
   }
