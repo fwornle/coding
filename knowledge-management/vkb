@@ -51,7 +51,7 @@ if [[ "$CODING_REPO" == "ERROR:"* ]]; then
     error_exit "Could not find repository root. Please run from within the coding repository."
 fi
 SHARED_MEMORY="$CODING_REPO/shared-memory.json"
-VISUALIZER_DIR="$CODING_REPO/memory-visualizer"
+VISUALIZER_DIR="/Users/q284340/Agentic/coding/memory-visualizer"
 SERVER_PORT=8080
 PID_FILE="/tmp/vkb-server.pid"
 LOG_FILE="/tmp/vkb-server.log"

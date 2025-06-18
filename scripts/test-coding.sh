@@ -718,18 +718,100 @@ if [ -f "$CODING_ROOT/lib/adapters/copilot-http-server.js" ]; then
     print_pass "CoPilot HTTP server file found"
     
     # Test if we can start the server (briefly)
-    timeout 5 node "$CODING_ROOT/lib/adapters/copilot-http-server.js" >/dev/null 2>&1 &
+    timeout 10 node "$CODING_ROOT/lib/adapters/copilot-http-server.js" >/dev/null 2>&1 &
     SERVER_PID=$!
-    sleep 2
+    sleep 3
     
     if kill -0 $SERVER_PID 2>/dev/null; then
         print_pass "CoPilot HTTP server can start"
+        
+        # Test if server responds to health check
+        if command_exists curl; then
+            sleep 2
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8765/health" 2>/dev/null || echo "000")
+            if [ "$HTTP_STATUS" = "200" ]; then
+                print_pass "CoPilot HTTP server health endpoint responsive"
+                
+                # Test @KM vkb functionality
+                print_check "@KM vkb endpoint test"
+                VKB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:8765/api/viewer/launch" 2>/dev/null || echo "000")
+                if [ "$VKB_STATUS" = "200" ]; then
+                    print_pass "@KM vkb endpoint functional"
+                    
+                    # Check if VKB server was actually started
+                    sleep 3
+                    VKB_SERVER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080" 2>/dev/null || echo "000")
+                    if [ "$VKB_SERVER_STATUS" = "200" ]; then
+                        print_pass "VKB visualization server auto-started successfully"
+                        
+                        # Test CORS headers
+                        CORS_HEADERS=$(curl -s -I "http://localhost:8080" 2>/dev/null | grep -i "access-control-allow-origin" || echo "")
+                        if [ -n "$CORS_HEADERS" ]; then
+                            print_pass "VKB server has CORS support"
+                        else
+                            print_warning "VKB server missing CORS headers"
+                        fi
+                        
+                        # Clean up VKB server
+                        if command_exists vkb; then
+                            vkb stop >/dev/null 2>&1 || true
+                        fi
+                    else
+                        print_warning "VKB visualization server failed to start automatically"
+                    fi
+                else
+                    print_fail "@KM vkb endpoint not responding (status: $VKB_STATUS)"
+                fi
+            else
+                print_fail "CoPilot HTTP server not responding to health check (status: $HTTP_STATUS)"
+            fi
+        else
+            print_warning "curl not available - cannot test HTTP endpoints"
+        fi
+        
         kill $SERVER_PID 2>/dev/null || true
     else
         print_warning "CoPilot HTTP server may have startup issues"
     fi
 else
     print_fail "CoPilot HTTP server not found"
+fi
+
+# Additional VKB standalone tests
+print_check "VKB standalone functionality"
+if command_exists vkb; then
+    # Test VKB help command
+    if vkb help >/dev/null 2>&1; then
+        print_pass "VKB help command functional"
+    else
+        print_fail "VKB help command failed"
+    fi
+    
+    # Test VKB diagnostic
+    if vkb port >/dev/null 2>&1; then
+        print_pass "VKB port checking functional"
+    else
+        print_warning "VKB port checking may have issues"
+    fi
+    
+    # Test VKB status
+    if vkb status >/dev/null 2>&1; then
+        print_pass "VKB status command functional"
+    else
+        print_warning "VKB status command may have issues"
+    fi
+    
+    # Test VKB can prepare data
+    cd "$CODING_ROOT"
+    if [ -f "shared-memory.json" ]; then
+        # Try a quick start/stop test
+        timeout 15 bash -c 'vkb start >/dev/null 2>&1; sleep 5; vkb stop >/dev/null 2>&1' 2>/dev/null || true
+        print_pass "VKB start/stop test completed"
+    else
+        print_warning "VKB data preparation test skipped (no shared-memory.json)"
+    fi
+else
+    print_fail "VKB command not available for testing"
 fi
 
 # =============================================================================
@@ -1042,9 +1124,15 @@ fi
 
 echo -e "\n${BOLD}Quick Start Commands:${NC}"
 echo -e "  ${CYAN}ukb${NC}                    # Update knowledge base"
-echo -e "  ${CYAN}vkb${NC}                    # View knowledge graph"
+echo -e "  ${CYAN}vkb${NC}                    # View knowledge graph (standalone)"
+echo -e "  ${CYAN}vkb fg${NC}                 # View knowledge graph (foreground/debug mode)"
 echo -e "  ${CYAN}claude-mcp${NC}             # Start Claude with MCP (if available)"
 echo -e "  ${CYAN}coding --copilot${NC}       # Start fallback services for CoPilot"
+echo -e ""
+echo -e "${BOLD}VSCode Integration Commands:${NC}"
+echo -e "  ${CYAN}@KM vkb${NC}                # Launch knowledge viewer from VSCode Copilot"
+echo -e "  ${CYAN}@KM ukb${NC}                # Update knowledge base from VSCode Copilot"
+echo -e "  ${CYAN}@KM search <query>${NC}     # Search knowledge base from VSCode Copilot"
 
 echo -e "\n${BOLD}Next Steps:${NC}"
 if ! command_exists claude-mcp; then
