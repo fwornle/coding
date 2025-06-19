@@ -1,0 +1,41 @@
+@startuml CodingWorkflowSequence
+\!theme plain
+
+participant Developer
+participant MCP as "MCP Memory"
+participant UKB as "UKB Tool"
+participant VKB as "VKB Server"
+participant Git as "Git Repository"
+participant KB as "Knowledge Base"
+
+== Session Start ==
+Developer -> MCP: Query existing patterns
+MCP -> Developer: Return relevant patterns
+Developer -> VKB: vkb start
+VKB -> KB: Load visualization
+VKB -> Developer: http://localhost:8080
+
+== Development Work ==
+Developer -> Developer: Code following patterns
+note right: Use Logger.log()\nUse Redux for state\nFollow architectural patterns
+
+== Knowledge Capture ==
+Developer -> Git: Commit changes
+Developer -> UKB: ukb --auto
+UKB -> Git: Analyze recent commits
+UKB -> KB: Extract insights
+UKB -> MCP: Update memory
+UKB -> VKB: Sync visualization
+
+== Interactive Insights ==
+Developer -> UKB: ukb --interactive
+UKB -> Developer: Guided questions
+Developer -> UKB: Detailed responses
+UKB -> KB: Store structured insights
+UKB -> VKB: Update visualization
+
+== Knowledge Sharing ==
+Developer -> Git: Push to remote
+note right: Knowledge base\ntravels with code
+@enduml
+EOF < /dev/null

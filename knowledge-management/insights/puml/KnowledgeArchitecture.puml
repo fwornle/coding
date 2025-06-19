@@ -1,0 +1,36 @@
+@startuml KnowledgeArchitecture
+\!theme plain
+
+package "Knowledge Layer" {
+  [shared-memory.json] as KB
+  [MCP Memory Server] as MCP
+  [VKB Visualization] as VKB
+}
+
+package "Capture Tools" {
+  [UKB Auto Mode] as Auto
+  [UKB Interactive] as Interactive
+  [UKB Agent Mode] as Agent
+}
+
+package "Development" {
+  [Git Repository] as Git
+  [Code Files] as Code
+  [Conversation Logs] as Logs
+}
+
+Git --> Auto : Commit analysis
+Logs --> Auto : Session insights
+Code --> Agent : Semantic analysis
+Interactive --> KB : Manual insights
+
+Auto --> KB : Patterns & insights
+Agent --> KB : Deep analysis
+Interactive --> KB : Structured knowledge
+
+KB <--> MCP : Runtime sync
+KB --> VKB : Visualization
+MCP --> "Development Session" : Pattern guidance
+
+@enduml
+EOF < /dev/null
