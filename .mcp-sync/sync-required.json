@@ -1,1 +1,8 @@
-{"entity_count": 20, "relation_count": 41, "last_sync": "2025-06-19T14:22:32Z", "reason": "Updated CodingWorkflow checklist formatting"}
+{
+  "sync_required": true,
+  "entity_count": 20,
+  "relation_count": 41,
+  "prepared_at": "2025-06-19T14:46:19.3NZ",
+  "shared_memory_path": "/Users/q284340/Agentic/coding/shared-memory.json",
+  "sync_script_path": "/Users/q284340/Agentic/coding/.mcp-sync/auto-sync.md"
+}

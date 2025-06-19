@@ -1,0 +1,248 @@
+#!/bin/bash
+# UKB (Update Knowledge Base) - Refactored wrapper using new Knowledge API
+# Version 4.0 - Agent-agnostic knowledge management
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODING_REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+NODE_CLI="$CODING_REPO/bin/ukb-cli.js"
+
+# Mode flags (for backwards compatibility)
+INTERACTIVE_MODE=false
+AGENT_MODE=false
+AUTO_MODE=true
+VERBOSE=false
+
+# Check if Node.js CLI exists
+check_node_cli() {
+    if [[ ! -f "$NODE_CLI" ]]; then
+        echo -e "${RED}Error: Node.js CLI not found at $NODE_CLI${NC}"
+        echo -e "${YELLOW}Please run the installation script first:${NC}"
+        echo -e "${CYAN}  cd $CODING_REPO && npm install${NC}"
+        exit 1
+    fi
+    
+    if [[ ! -x "$NODE_CLI" ]]; then
+        echo -e "${YELLOW}Making CLI executable...${NC}"
+        chmod +x "$NODE_CLI"
+    fi
+}
+
+# Display help
+show_help() {
+    echo -e "${PURPLE}UKB (Update Knowledge Base) v4.0 - Refactored Edition${NC}"
+    echo -e "${PURPLE}Agent-agnostic knowledge management system${NC}"
+    echo ""
+    echo -e "${CYAN}USAGE:${NC}"
+    echo "  ukb [OPTIONS] [COMMAND]"
+    echo ""
+    echo -e "${CYAN}COMMANDS:${NC}"
+    echo "  status                    Show knowledge base status"
+    echo "  entity list              List all entities"
+    echo "  entity add               Add new entity (interactive)"
+    echo "  entity search <query>    Search entities"
+    echo "  relation list            List all relations"
+    echo "  relation add             Add new relation (interactive)"
+    echo "  insight                  Process insight (interactive)"
+    echo "  interactive              Start interactive mode"
+    echo ""
+    echo -e "${CYAN}LEGACY OPTIONS (backwards compatibility):${NC}"
+    echo "  -i, --interactive        Start interactive mode"
+    echo "  -a, --agent              Agent-aware mode (semantic analysis)"
+    echo "  -v, --verbose            Verbose output"
+    echo "  -h, --help               Show this help message"
+    echo ""
+    echo -e "${CYAN}EXAMPLES:${NC}"
+    echo "  ukb                      Auto-capture from recent commits"
+    echo "  ukb status               Show knowledge base status"
+    echo "  ukb -i                   Interactive insight capture"
+    echo "  ukb entity list          List all entities"
+    echo "  ukb insight              Process insight interactively"
+    echo ""
+    echo -e "${CYAN}MIGRATION NOTES:${NC}"
+    echo "  • The new system uses Node.js for better cross-platform support"
+    echo "  • All existing data formats are supported"
+    echo "  • Legacy command-line options are preserved for compatibility"
+    echo "  • For advanced features, use: $NODE_CLI --help"
+}
+
+# Parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -i|--interactive)
+                INTERACTIVE_MODE=true
+                AUTO_MODE=false
+                shift
+                ;;
+            -a|--agent)
+                AGENT_MODE=true
+                AUTO_MODE=false
+                shift
+                ;;
+            -v|--verbose)
+                VERBOSE=true
+                shift
+                ;;
+            status)
+                exec "$NODE_CLI" status
+                ;;
+            entity)
+                shift
+                if [[ $# -gt 0 ]]; then
+                    exec "$NODE_CLI" entity "$@"
+                else
+                    exec "$NODE_CLI" entity list
+                fi
+                ;;
+            relation)
+                shift
+                if [[ $# -gt 0 ]]; then
+                    exec "$NODE_CLI" relation "$@"
+                else
+                    exec "$NODE_CLI" relation list
+                fi
+                ;;
+            insight)
+                exec "$NODE_CLI" insight --interactive
+                ;;
+            interactive)
+                exec "$NODE_CLI" interactive
+                ;;
+            import)
+                shift
+                if [[ $# -gt 0 ]]; then
+                    exec "$NODE_CLI" import "$@"
+                else
+                    echo -e "${RED}Error: import requires a file path${NC}"
+                    exit 1
+                fi
+                ;;
+            export)
+                shift
+                if [[ $# -gt 0 ]]; then
+                    exec "$NODE_CLI" export "$@"
+                else
+                    echo -e "${RED}Error: export requires a file path${NC}"
+                    exit 1
+                fi
+                ;;
+            *)
+                echo -e "${RED}Unknown option: $1${NC}"
+                echo "Use 'ukb --help' for usage information."
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Legacy auto-capture mode (for backwards compatibility)
+legacy_auto_capture() {
+    echo -e "${PURPLE}🧠 UKB v4.0 - Legacy Auto-Capture Mode${NC}"
+    echo -e "${YELLOW}Note: Consider using the new CLI interface: $NODE_CLI${NC}"
+    echo ""
+    
+    # Check for recent commits and analyze them
+    local recent_commits
+    recent_commits=$(git log --oneline -10 2>/dev/null || echo "")
+    
+    if [[ -z "$recent_commits" ]]; then
+        echo -e "${YELLOW}No git repository found or no recent commits.${NC}"
+        echo -e "${CYAN}Starting interactive mode instead...${NC}"
+        exec "$NODE_CLI" interactive
+        return
+    fi
+    
+    echo -e "${CYAN}Found recent commits:${NC}"
+    echo "$recent_commits"
+    echo ""
+    
+    # For now, redirect to interactive mode
+    # In the future, this could implement automatic commit analysis
+    echo -e "${CYAN}Auto-analysis not yet implemented in refactored version.${NC}"
+    echo -e "${CYAN}Starting interactive mode...${NC}"
+    echo ""
+    exec "$NODE_CLI" interactive
+}
+
+# Legacy interactive mode
+legacy_interactive() {
+    echo -e "${PURPLE}🧠 UKB v4.0 - Legacy Interactive Mode${NC}"
+    echo -e "${YELLOW}Redirecting to new interactive interface...${NC}"
+    echo ""
+    exec "$NODE_CLI" interactive
+}
+
+# Legacy agent mode
+legacy_agent() {
+    echo -e "${PURPLE}🧠 UKB v4.0 - Legacy Agent Mode${NC}"
+    echo -e "${YELLOW}Agent-aware analysis not yet implemented in refactored version.${NC}"
+    echo -e "${CYAN}Starting interactive mode instead...${NC}"
+    echo ""
+    exec "$NODE_CLI" interactive
+}
+
+# Main execution
+main() {
+    echo -e "${PURPLE}🧠 UKB (Update Knowledge Base) v4.0${NC}"
+    echo -e "${PURPLE}======================================${NC}"
+    
+    # Check prerequisites
+    check_node_cli
+    
+    # Handle no arguments (legacy auto mode)
+    if [[ $# -eq 0 ]]; then
+        legacy_auto_capture
+        return
+    fi
+    
+    # Parse arguments
+    parse_args "$@"
+    
+    # Handle legacy modes
+    if [[ "$INTERACTIVE_MODE" == true ]]; then
+        legacy_interactive
+    elif [[ "$AGENT_MODE" == true ]]; then
+        legacy_agent
+    else
+        legacy_auto_capture
+    fi
+}
+
+# Error handling
+error_exit() {
+    echo -e "${RED}Error: $1${NC}" >&2
+    exit 1
+}
+
+# Cleanup function
+cleanup() {
+    # Nothing to clean up in wrapper script
+    exit 0
+}
+
+# Trap cleanup on exit
+trap cleanup EXIT
+
+# Check for Node.js
+if ! command -v node >/dev/null 2>&1; then
+    error_exit "Node.js is required but not installed. Please install Node.js 18+ and try again."
+fi
+
+# Main execution with arguments
+main "$@"
