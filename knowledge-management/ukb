@@ -3804,6 +3804,9 @@ main() {
         .metadata.last_mode = $mode' \
        "$SHARED_MEMORY" > "$SHARED_MEMORY.tmp" && mv "$SHARED_MEMORY.tmp" "$SHARED_MEMORY"
     
+    # CRITICAL: Sync to visualizer after any changes to shared-memory.json
+    atomic_sync_to_visualizer "$SHARED_MEMORY"
+    
     # Show summary
     show_insight_summary
     
