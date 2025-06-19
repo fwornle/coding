@@ -82,7 +82,10 @@
       "Bash(timeout:*)",
       "Bash(vkb help:*)",
       "mcp__memory__delete_entities",
-      "Bash(# Check if the PNG files were properly generated\nfile *.png | grep -E \"(CodingWorkflowSequence|KnowledgeArchitecture)\"\n\n# Check file sizes - they should be reasonable\nls -lh CodingWorkflowSequence.png KnowledgeArchitecture.png)"
+      "Bash(# Check if the PNG files were properly generated\nfile *.png | grep -E \"(CodingWorkflowSequence|KnowledgeArchitecture)\"\n\n# Check file sizes - they should be reasonable\nls -lh CodingWorkflowSequence.png KnowledgeArchitecture.png)",
+      "Bash(do if ! grep -q \"Table of Contents\\|TOC\" \"$file\")",
+      "Bash(then echo \"MISSING TOC: $(basename \"$file\")\")",
+      "Bash(then echo \"STILL MISSING TOC: $(basename \"$file\")\")"
     ],
     "deny": []
   }

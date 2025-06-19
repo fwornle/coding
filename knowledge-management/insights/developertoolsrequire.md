@@ -1,5 +1,20 @@
 # DevelopertoolsrequirePattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Applicability](#applicability)
+- [Technologies](#technologies)
+- [Implementation Details](#implementation-details)
+  - [Problem Context](#problem-context)
+  - [Solution Strategy](#solution-strategy)
+  - [Key Implementation Points](#key-implementation-points)
+- [Key Files](#key-files)
+- [References](#references)
+- [Project Context](#project-context)
+- [Usage Guidelines](#usage-guidelines)
+- [Related Patterns](#related-patterns)
+
 ## Overview
 
 **Problem:** Developer tools require context switching between IDE and external applications, breaking development flow and reducing tool adoption
