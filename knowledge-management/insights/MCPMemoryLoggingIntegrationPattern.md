@@ -1,5 +1,18 @@
 # MCPMemoryLoggingIntegrationPattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Applicability](#applicability)
+- [Technologies](#technologies)
+- [Implementation Details](#implementation-details)
+  - [Problem Context](#problem-context)
+  - [Solution Strategy](#solution-strategy)
+  - [Key Implementation Points](#key-implementation-points)
+- [Project Context](#project-context)
+- [Usage Guidelines](#usage-guidelines)
+- [Related Patterns](#related-patterns)
+
 ## Overview
 
 **Problem:** MCP logging systems need different approaches for interactive vs piped modes

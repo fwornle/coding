@@ -6,6 +6,28 @@
 **Significance:** 8/10  
 **Origin Project:** DynArch (Autonomous Driving Visualization System)
 
+## Table of Contents
+
+- [Problem Statement](#problem-statement)
+- [Solution Overview](#solution-overview)
+- [Architecture Overview](#architecture-overview)
+- [Core Implementation](#core-implementation)
+  - [1. Abstract Base Animation Component](#1-abstract-base-animation-component)
+  - [2. Centralized Animation Manager](#2-centralized-animation-manager)
+  - [3. Event-Driven State Management](#3-event-driven-state-management)
+  - [4. Standardized State Definitions](#4-standardized-state-definitions)
+- [DynArch Implementation Examples](#dynarch-implementation-examples)
+  - [Sensor Animation Component](#sensor-animation-component)
+  - [Processor Animation Component](#processor-animation-component)
+- [Key Benefits](#key-benefits)
+  - [1. Scalable Performance](#1-scalable-performance)
+  - [2. Consistent State Management](#2-consistent-state-management)
+  - [3. Flexible Architecture](#3-flexible-architecture)
+  - [4. Production Reliability](#4-production-reliability)
+- [Transferable Applications](#transferable-applications)
+- [Performance Metrics](#performance-metrics)
+- [Related Patterns](#related-patterns)
+
 ## Problem Statement
 
 Complex animation systems often struggle with:

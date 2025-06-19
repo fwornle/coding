@@ -2,6 +2,31 @@
 
 *Extracted from Timeline Visualization Project - January 2025*
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Core Architecture: MVI with Redux Toolkit](#core-architecture-mvi-with-redux-toolkit)
+- [Key Patterns](#key-patterns)
+  - [Intent-Driven State Management](#1-intent-driven-state-management)
+  - [Automatic State Persistence Pattern](#2-automatic-state-persistence-pattern)
+  - [Typed Redux Hooks](#3-typed-redux-hooks)
+  - [Non-Serializable Object Handling](#4-non-serializable-object-handling)
+  - [State Coordination Pattern](#5-state-coordination-pattern)
+  - [Intelligent Caching Pattern](#6-intelligent-caching-pattern)
+  - [Migration Pattern for Evolving State](#7-migration-pattern-for-evolving-state)
+  - [Debug-Friendly Middleware](#8-debug-friendly-middleware)
+- [Best Practices](#best-practices)
+  - [State Structure](#1-state-structure)
+  - [Intent Design](#2-intent-design)
+  - [Persistence Strategy](#3-persistence-strategy)
+  - [Performance Optimization](#4-performance-optimization)
+  - [Error Handling](#5-error-handling)
+  - [Testing Strategy](#6-testing-strategy)
+- [Implementation Checklist](#implementation-checklist)
+- [Advantages of This Pattern](#advantages-of-this-pattern)
+- [When to Use This Pattern](#when-to-use-this-pattern)
+- [Conclusion](#conclusion)
+
 ## Overview
 
 This document captures a generalized Redux implementation pattern that combines Model-View-Intent (MVI) architecture with Redux Toolkit, automatic state persistence, and advanced state coordination patterns. This approach has proven effective for complex applications requiring real-time 3D visualization, state persistence, and sophisticated user interactions.

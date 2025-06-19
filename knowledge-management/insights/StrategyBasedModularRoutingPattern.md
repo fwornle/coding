@@ -6,6 +6,26 @@
 **Significance:** 8/10  
 **Origin Project:** DynArch (Autonomous Driving Visualization System)
 
+## Table of Contents
+
+- [Problem Statement](#problem-statement)
+- [Solution Overview](#solution-overview)
+- [Core Architecture](#core-architecture)
+- [Implementation Details](#implementation-details)
+  - [1. Routing Handler Factory](#1-routing-handler-factory)
+  - [2. Base Routing Handler](#2-base-routing-handler)
+  - [3. Specialized Routing Strategies](#3-specialized-routing-strategies)
+  - [4. Routing Manager Coordination](#4-routing-manager-coordination)
+- [Configuration Integration](#configuration-integration)
+- [Key Benefits](#key-benefits)
+  - [1. Extensible Architecture](#1-extensible-architecture)
+  - [2. Maintainable Complexity](#2-maintainable-complexity)
+  - [3. Performance Optimization](#3-performance-optimization)
+  - [4. Robust Error Handling](#4-robust-error-handling)
+- [DynArch Results](#dynarch-results)
+- [Transferable Applications](#transferable-applications)
+- [Related Patterns](#related-patterns)
+
 ## Problem Statement
 
 Complex geometric routing systems often face challenges with:

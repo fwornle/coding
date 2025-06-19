@@ -1,5 +1,45 @@
 # UKBComprehensiveAnalysisPattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Applicability](#applicability)
+- [Technologies](#technologies)
+- [Implementation Details](#implementation-details)
+  - [Core Architecture](#core-architecture)
+  - [Key Components](#key-components)
+  - [Processing Workflows](#processing-workflows)
+  - [Pattern Quality Assurance](#pattern-quality-assurance)
+- [Key Implementation Points](#key-implementation-points)
+  - [1. Incremental Efficiency](#1-incremental-efficiency)
+  - [2. Comprehensive Analysis Capabilities](#2-comprehensive-analysis-capabilities)
+  - [3. Schema Evolution Management](#3-schema-evolution-management)
+  - [4. Multi-Output Integration](#4-multi-output-integration)
+- [Performance Characteristics](#performance-characteristics)
+  - [Large Repository Handling](#large-repository-handling)
+  - [Processing Speed Estimates](#processing-speed-estimates)
+- [Use Cases and Outcomes](#use-cases-and-outcomes)
+  - [1. New Team Member Onboarding](#1-new-team-member-onboarding)
+  - [2. Technical Debt Assessment](#2-technical-debt-assessment)
+  - [3. Architecture Review Preparation](#3-architecture-review-preparation)
+  - [4. Cross-Project Pattern Standardization](#4-cross-project-pattern-standardization)
+- [Advanced Features](#advanced-features)
+  - [1. Custom Analysis Depth](#1-custom-analysis-depth)
+  - [2. Multi-Project Analysis](#2-multi-project-analysis)
+  - [3. Force Reprocessing](#3-force-reprocessing)
+- [Integration Points](#integration-points)
+  - [Version Control Integration](#version-control-integration)
+  - [AI Agent Integration](#ai-agent-integration)
+  - [Team Collaboration](#team-collaboration)
+- [Success Metrics](#success-metrics)
+  - [Knowledge Quality](#knowledge-quality)
+  - [Team Productivity](#team-productivity)
+  - [System Efficiency](#system-efficiency)
+- [Related Patterns](#related-patterns)
+- [Future Enhancements](#future-enhancements)
+  - [Planned Capabilities](#planned-capabilities)
+  - [Extensibility Points](#extensibility-points)
+
 ## Overview
 
 **Problem:** Development teams need comprehensive understanding of codebase evolution, architectural decisions, and transferable patterns across projects

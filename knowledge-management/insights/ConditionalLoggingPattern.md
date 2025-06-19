@@ -6,6 +6,32 @@
 **Significance:** 8/10  
 **Origin Project:** DynArch (Autonomous Driving Visualization System)
 
+## Table of Contents
+
+- [Problem Statement](#problem-statement)
+- [Solution Overview](#solution-overview)
+- [Original Implementation: DynArch System](#original-implementation-dynarch-system)
+  - [Advanced Dual-Axis Filtering Architecture](#advanced-dual-axis-filtering-architecture)
+  - [DynArch Logger Configuration](#dynarch-logger-configuration)
+  - [Dynamic Color System with Automatic Contrast](#dynamic-color-system-with-automatic-contrast)
+  - [Persistent Configuration System](#persistent-configuration-system)
+  - [Advanced UI Control System](#advanced-ui-control-system)
+  - [Evolution History in DynArch](#evolution-history-in-dynarch)
+- [Implementation Pattern](#implementation-pattern)
+  - [Core Logger Architecture](#core-logger-architecture)
+  - [Conditional Debug Rendering](#conditional-debug-rendering)
+  - [Smart Debug Mode Toggle](#smart-debug-mode-toggle)
+  - [Performance-Aware Logging](#performance-aware-logging)
+- [Architecture Diagram](#architecture-diagram)
+- [Key Benefits](#key-benefits)
+- [Implementation Examples](#implementation-examples)
+  - [Example 1: Conditional 3D Debug Overlays](#example-1-conditional-3d-debug-overlays)
+  - [Example 2: Expensive Debug Calculations](#example-2-expensive-debug-calculations)
+- [Transferable Applications](#transferable-applications)
+- [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
+- [Related Patterns](#related-patterns)
+- [Performance Impact](#performance-impact)
+
 ## Problem Statement
 
 Debug output and logging can cause significant performance degradation in production environments, especially when dealing with:

@@ -1,5 +1,21 @@
 # React Three Fiber Integration Pattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Implementation](#implementation)
+  - [Basic Setup](#basic-setup)
+  - [Component-Based 3D Objects](#component-based-3d-objects)
+  - [Custom Hooks for 3D Logic](#custom-hooks-for-3d-logic)
+  - [State Integration](#state-integration)
+- [Key Patterns](#key-patterns)
+- [Benefits](#benefits)
+- [Common Pitfalls](#common-pitfalls)
+- [Advanced Techniques](#advanced-techniques)
+- [References](#references)
+- [Related Patterns](#related-patterns)
+
 ## Overview
 
 **Problem:** Integrating Three.js with React requires imperative code that conflicts with React's declarative paradigm. Managing 3D object lifecycles, event handling, and state synchronization becomes complex.

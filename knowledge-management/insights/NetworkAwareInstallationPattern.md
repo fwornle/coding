@@ -1,5 +1,25 @@
 # Network-Aware Installation Patterns for Enterprise Environments
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Core Concepts](#core-concepts)
+  - [Network Environment Detection](#network-environment-detection)
+  - [Repository Strategy Patterns](#repository-strategy-patterns)
+  - [Shell Environment Management](#shell-environment-management)
+  - [SSH Key Management for Multiple GitHub Instances](#ssh-key-management-for-multiple-github-instances)
+  - [Protocol Fallback Strategy](#protocol-fallback-strategy)
+  - [Timeout-Based State Detection](#timeout-based-state-detection)
+  - [Graceful Degradation Strategy](#graceful-degradation-strategy)
+  - [Proxy Detection and Handling](#proxy-detection-and-handling)
+- [Implementation Guidelines](#implementation-guidelines)
+  - [Error Handling Best Practices](#error-handling-best-practices)
+  - [User Experience Patterns](#user-experience-patterns)
+  - [Testing Strategies](#testing-strategies)
+- [Real-World Applications](#real-world-applications)
+- [Key Takeaways](#key-takeaways)
+- [Related Documentation](#related-documentation)
+
 ## Overview
 
 This document captures transferable knowledge about implementing network-aware installation systems that intelligently adapt to different network environments (corporate networks vs. public internet). These patterns are essential for enterprise software that needs to work seamlessly across different network contexts while handling security restrictions, proxy configurations, and multiple repository sources.

@@ -1,5 +1,27 @@
 # UKB Command
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Complete Command Reference](#complete-command-reference)
+  - [Basic Modes](#basic-modes)
+  - [History Analysis](#history-analysis)
+  - [Entity Management](#entity-management)
+  - [Relationship Management](#relationship-management)
+  - [System Operations](#system-operations)
+- [Common Usage Patterns](#common-usage-patterns)
+  - [Daily Workflow](#daily-workflow)
+  - [Team Onboarding](#team-onboarding)
+  - [Adding New Pattern with Relations](#adding-new-pattern-with-relations)
+  - [Knowledge Base Cleanup](#knowledge-base-cleanup)
+- [Technical Details](#technical-details)
+  - [File Locations](#file-locations)
+  - [Integration Points](#integration-points)
+  - [Quality Filters](#quality-filters)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
+- [Related Tools](#related-tools)
+
 ## Overview
 
 **Type:** Development Tool  

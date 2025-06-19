@@ -1,5 +1,20 @@
 # Viewport Culling Optimization Pattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Visual Architecture](#visual-architecture)
+- [Implementation Details](#implementation-details)
+  - [Core Algorithm](#core-algorithm)
+  - [Performance Metrics](#performance-metrics)
+  - [Anti-Jump Algorithm Visualization](#anti-jump-algorithm-visualization)
+- [Debug Visualization](#debug-visualization)
+- [Benefits](#benefits)
+- [Configuration](#configuration)
+- [Related Patterns](#related-patterns)
+- [References](#references)
+- [Implementation Checklist](#implementation-checklist)
+
 ## Overview
 
 **Problem:** Rendering 800+ 3D timeline events causes severe performance degradation (15-20 fps) and visual "jumping" when events are removed from view. Users experience jarring transitions as the timeline scrolls.

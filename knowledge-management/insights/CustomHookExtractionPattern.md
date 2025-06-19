@@ -1,5 +1,35 @@
 # CustomHookExtractionPattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Real Implementation Analysis](#real-implementation-analysis)
+  - [Architecture Overview](#architecture-overview)
+- [Advanced Hook Patterns Demonstrated](#advanced-hook-patterns-demonstrated)
+  - [1. Performance-Optimized Animation Hook](#1-performance-optimized-animation-hook)
+  - [2. Multi-Source Data Coordination Hook](#2-multi-source-data-coordination-hook)
+  - [3. Viewport Filtering with Performance Optimization](#3-viewport-filtering-with-performance-optimization)
+  - [4. Context-Aware Logging Hook](#4-context-aware-logging-hook)
+- [TypeScript Integration Patterns](#typescript-integration-patterns)
+  - [Advanced Interface Design](#advanced-interface-design)
+- [Performance Optimization Techniques](#performance-optimization-techniques)
+  - [1. Ref-Based Optimization](#1-ref-based-optimization)
+  - [2. Strategic Memoization](#2-strategic-memoization)
+  - [3. Throttling and Debouncing](#3-throttling-and-debouncing)
+- [Redux Integration Patterns](#redux-integration-patterns)
+  - [Typed Store Hooks](#typed-store-hooks)
+- [Testing Strategies for Custom Hooks](#testing-strategies-for-custom-hooks)
+  - [1. Hook Testing Setup](#1-hook-testing-setup)
+  - [2. Service Mocking](#2-service-mocking)
+- [Industry Best Practices Integration](#industry-best-practices-integration)
+  - [1. Single Responsibility Principle](#1-single-responsibility-principle)
+  - [2. Composition Over Configuration](#2-composition-over-configuration)
+  - [3. Error Boundaries and Graceful Degradation](#3-error-boundaries-and-graceful-degradation)
+- [Key Benefits Demonstrated](#key-benefits-demonstrated)
+- [Implementation Checklist](#implementation-checklist)
+- [Related Patterns](#related-patterns)
+- [References](#references)
+
 ## Overview
 
 **Problem:** Duplicated stateful logic across multiple components leads to maintenance issues, poor reusability, and scattered state management concerns.

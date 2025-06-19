@@ -1,5 +1,20 @@
 # MVI Redux Architecture Pattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Timeline Project Implementation](#timeline-project-implementation)
+  - [Architecture Overview](#architecture-overview)
+  - [Key Implementation Details](#key-implementation-details)
+- [Benefits](#benefits)
+- [Applicability](#applicability)
+- [Related Patterns](#related-patterns)
+- [Pattern Consolidation](#pattern-consolidation)
+- [References](#references)
+- [Code Examples](#code-examples)
+- [Implementation Checklist](#implementation-checklist)
+- [Timeline Project Stats](#timeline-project-stats)
+
 ## Overview
 
 **Problem:** Complex React applications with 20+ components suffer from state management chaos, prop drilling, and unpredictable updates. Traditional MVC patterns break down when state needs to be shared across deeply nested component trees.

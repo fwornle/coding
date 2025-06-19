@@ -1,5 +1,24 @@
 # ModularComponentArchitecturePattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Real Implementation Analysis](#real-implementation-analysis)
+- [Domain-Driven Module Organization](#domain-driven-module-organization)
+- [Standardized Component Interfaces](#standardized-component-interfaces)
+- [State Management Modularization](#state-management-modularization)
+- [Service Layer Modularization](#service-layer-modularization)
+- [Container/Presentation Pattern Implementation](#containerpresentation-pattern-implementation)
+- [Global State Coordination Pattern](#global-state-coordination-pattern)
+- [Custom Hook Extraction Pattern](#custom-hook-extraction-pattern)
+- [Configuration Module Architecture](#configuration-module-architecture)
+- [Testing Strategy for Modular Architecture](#testing-strategy-for-modular-architecture)
+- [Key Benefits Demonstrated](#key-benefits-demonstrated)
+- [Implementation Checklist](#implementation-checklist)
+- [Related Patterns](#related-patterns)
+- [Pattern Consolidation](#pattern-consolidation)
+- [References](#references)
+
 ## Overview
 
 **Problem:** Component organization becomes chaotic in large React applications without clear modular boundaries, leading to tight coupling, difficult maintenance, and poor scalability.

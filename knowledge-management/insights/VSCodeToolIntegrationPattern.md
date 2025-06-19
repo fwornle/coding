@@ -1,5 +1,23 @@
 # VSCode Tool Integration Pattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Solution](#solution)
+  - [Core Integration Strategies](#core-integration-strategies)
+  - [Communication Architecture](#communication-architecture)
+- [Architecture Patterns](#architecture-patterns)
+- [User Experience Patterns](#user-experience-patterns)
+- [Testing and Quality Patterns](#testing-and-quality-patterns)
+- [Performance Optimization](#performance-optimization)
+- [Security Considerations](#security-considerations)
+- [Deployment and Distribution](#deployment-and-distribution)
+- [Applicability](#applicability)
+- [Benefits](#benefits)
+- [Implementation Checklist](#implementation-checklist)
+- [Related Patterns](#related-patterns)
+- [Future Enhancements](#future-enhancements)
+
 **Pattern Type:** TransferablePattern  
 **Significance:** 9/10  
 **Domain:** Developer Tools & IDE Integration  

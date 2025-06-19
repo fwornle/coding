@@ -5,6 +5,43 @@
 **Project:** Coding  
 **Created:** 2025-06-16T15:30:47Z
 
+## Table of Contents
+
+- [Problem](#problem)
+  - [Symptoms](#symptoms)
+  - [Impact](#impact)
+- [Solution](#solution)
+  - [Implementation Approach](#implementation-approach)
+  - [Code Example](#code-example)
+- [Architecture](#architecture)
+  - [Component Flow](#component-flow)
+  - [Component Relationships](#component-relationships)
+- [Key Features](#key-features)
+  - [Chat Participant Integration](#chat-participant-integration)
+  - [Command Support](#command-support)
+  - [Real-time Updates](#real-time-updates)
+- [Performance Metrics](#performance-metrics)
+- [Applicability](#applicability)
+- [Technologies](#technologies)
+- [Related Files](#related-files)
+  - [Implementation](#implementation)
+  - [Documentation](#documentation)
+  - [External References](#external-references)
+- [Related Patterns](#related-patterns)
+- [Usage Examples](#usage-examples)
+  - [Basic Pattern Capture](#basic-pattern-capture)
+  - [Knowledge Search](#knowledge-search)
+  - [Auto-Analysis](#auto-analysis)
+- [Benefits](#benefits)
+  - [Developer Experience](#developer-experience)
+  - [Knowledge Management](#knowledge-management)
+  - [Team Collaboration](#team-collaboration)
+- [Implementation Notes](#implementation-notes)
+  - [Extension Architecture](#extension-architecture)
+  - [Service Communication](#service-communication)
+  - [Error Handling](#error-handling)
+- [Future Enhancements](#future-enhancements)
+
 ## Problem
 
 Developers need to capture knowledge insights without leaving their IDE or switching between tools, which breaks development flow and reduces the likelihood of documenting patterns.

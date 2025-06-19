@@ -5,6 +5,32 @@
 **Technologies:** Three.js, WebGL, React Three Fiber, Canvas  
 **Significance:** 8/10  
 
+## Table of Contents
+
+- [Problem Statement](#problem-statement)
+- [Solution Overview](#solution-overview)
+- [Implementation Pattern](#implementation-pattern)
+  - [Core Viewport Filtering Hook](#core-viewport-filtering-hook)
+  - [Distance-Based Object Culling](#distance-based-object-culling)
+  - [Screen-Space Occlusion Culling](#screen-space-occlusion-culling)
+  - [Adaptive Level-of-Detail (LOD)](#adaptive-level-of-detail-lod)
+- [Architecture Diagram](#architecture-diagram)
+- [Performance Optimizations](#performance-optimizations)
+  - [1. Throttled Updates](#1-throttled-updates)
+  - [2. Spatial Indexing](#2-spatial-indexing)
+  - [3. Memory-Efficient Filtering](#3-memory-efficient-filtering)
+- [Integration with React Three Fiber](#integration-with-react-three-fiber)
+- [Key Performance Improvements](#key-performance-improvements)
+  - [Before Implementation](#before-implementation)
+  - [After Implementation](#after-implementation)
+  - [Measured Performance Gains](#measured-performance-gains)
+- [Transferable Applications](#transferable-applications)
+- [Advanced Optimizations](#advanced-optimizations)
+  - [1. Predictive Culling](#1-predictive-culling)
+  - [2. Hierarchical Culling](#2-hierarchical-culling)
+- [Related Patterns](#related-patterns)
+- [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
+
 ## Problem Statement
 
 3D scenes and large data visualizations suffer from severe performance degradation when rendering too many objects simultaneously:

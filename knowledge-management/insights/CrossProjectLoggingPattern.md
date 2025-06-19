@@ -1,5 +1,26 @@
 # Cross-Project Logging Pattern
 
+## Table of Contents
+
+- [Problem](#problem)
+- [Solution](#solution)
+- [Implementation Details](#implementation-details)
+  - [1. Post-Session Processing Architecture](#1-post-session-processing-architecture)
+  - [2. Session Data Analysis](#2-session-data-analysis)
+  - [3. Intelligent Content Detection](#3-intelligent-content-detection)
+  - [4. Repository Routing Decision](#4-repository-routing-decision)
+  - [3. Filename Convention](#3-filename-convention)
+  - [4. Filename Normalization](#4-filename-normalization)
+- [Benefits](#benefits)
+- [Usage](#usage)
+  - [Setup](#setup)
+  - [Verification](#verification)
+  - [Normalization](#normalization)
+- [Key Files](#key-files)
+- [Related Patterns](#related-patterns)
+- [Technologies](#technologies)
+- [Significance](#significance)
+
 ## Problem
 When working on the coding project (knowledge management tools) from other project contexts, conversation logs were saved only in the current project's `.specstory/history/` folder. This required manual cleanup and made it difficult to track cross-project knowledge management work, undermining the coding project's role as a central knowledge hub.
 

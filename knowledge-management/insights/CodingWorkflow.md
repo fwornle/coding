@@ -1,5 +1,45 @@
 # CodingWorkflow - Development Workflow Pattern
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Problem](#problem)
+- [Solution](#solution)
+- [Critical Rules](#critical-rules)
+  - [Never Use Direct Console Logging](#-never-use-direct-console-logging)
+  - [Never Edit shared-memory.json Directly](#-never-edit-shared-memoryjson-directly)
+  - [Always Check Existing Patterns](#-always-check-existing-patterns)
+- [UKB Command Reference](#ukb-command-reference)
+  - [Basic Operations](#basic-operations)
+  - [Entity Management](#entity-management)
+  - [Relation Management](#relation-management)
+  - [Git History Analysis](#git-history-analysis)
+- [VKB Command Reference](#vkb-command-reference)
+  - [Server Management](#server-management)
+  - [Diagnostics](#diagnostics)
+- [Development Workflow Sequence](#development-workflow-sequence)
+- [Knowledge Management Architecture](#knowledge-management-architecture)
+- [Use Case Examples](#use-case-examples)
+  - [Adding a New Pattern](#1-adding-a-new-pattern)
+  - [Deep Git Analysis](#2-deep-git-analysis)
+  - [Interactive Insight Capture](#3-interactive-insight-capture)
+  - [Visualization and Exploration](#4-visualization-and-exploration)
+- [Pattern Compliance Rules](#pattern-compliance-rules)
+  - [React State Management](#react-state-management)
+  - [Logging Implementation](#logging-implementation)
+- [Knowledge Synchronization](#knowledge-synchronization)
+  - [Automatic Sync Points](#automatic-sync-points)
+  - [Manual Sync Operations](#manual-sync-operations)
+- [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
+- [File Structure](#file-structure)
+- [Integration Points](#integration-points)
+  - [Claude Code Integration](#claude-code-integration)
+  - [Git Integration](#git-integration)
+  - [Team Collaboration](#team-collaboration)
+- [Benefits](#benefits)
+- [References](#references)
+
 ## Overview
 
 **Pattern Type:** WorkflowPattern  
