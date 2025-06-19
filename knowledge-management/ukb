@@ -1228,6 +1228,7 @@ complete_agent_analysis() {
     # Create MCP entities and relationships
     create_mcp_entities "$insights_file"
     create_project_relationships
+    validate_pattern_connections
     
     # Process MCP entities if any were created
     process_mcp_entities
@@ -2804,11 +2805,13 @@ create_project_relationships() {
             log "Linked AI-assisted insight to CodingKnowledge hub: $insight_name"
         fi
         
-        # For transferable patterns, link directly to CodingKnowledge hub
+        # For transferable patterns, link directly to CodingKnowledge hub AND project
         if [[ "$entity_type" == "TransferablePattern" ]]; then
             add_to_shared_memory_relation "CodingKnowledge" "contains" "$insight_name"
-            add_to_shared_memory_relation "$insight_name" "derived from" "$project"
-            log "Linked transferable pattern to CodingKnowledge hub: $insight_name"
+            # CRITICAL: All patterns must be connected to a project
+            # Use "implemented in" for the project where it's currently used
+            add_to_shared_memory_relation "$insight_name" "implemented in" "$project"
+            log "Linked transferable pattern to both CodingKnowledge hub and project: $insight_name"
         fi
     done <<< "$insights"
 }
@@ -2843,6 +2846,59 @@ add_to_shared_memory_relation() {
        .metadata.total_relations = (.relations | length) |
        .metadata.last_updated = $timestamp' \
        "$SHARED_MEMORY" > "$SHARED_MEMORY.tmp" && mv "$SHARED_MEMORY.tmp" "$SHARED_MEMORY"
+}
+
+# Validate and fix orphaned patterns
+validate_pattern_connections() {
+    log "Validating pattern connections..."
+    
+    local project
+    project=$(basename "$PWD")
+    
+    # Special handling for coding-related projects
+    if [[ "$project" == "coding" ]] || [[ "$project" == "knowledge-management" ]] || [[ "$PWD" == *"/coding"* ]]; then
+        project="Coding"
+    fi
+    
+    # Find all patterns that don't have project connections
+    local orphaned_patterns
+    orphaned_patterns=$(jq -r '.entities[] | select(.entityType | test("Pattern")) | .name' "$SHARED_MEMORY" 2>/dev/null || echo "")
+    
+    while IFS= read -r pattern_name; do
+        [[ -z "$pattern_name" ]] && continue
+        
+        # Check if pattern has any project connection
+        local has_connection
+        has_connection=$(jq -r --arg pattern "$pattern_name" \
+            '.relations[] | select(.from == $pattern and (.relationType == "implemented in" or .relationType == "originally developed in"))' \
+            "$SHARED_MEMORY" 2>/dev/null || echo "")
+        
+        if [[ -z "$has_connection" ]]; then
+            # Pattern has no project connection - fix it
+            log "Found orphaned pattern: $pattern_name - connecting to $project"
+            add_to_shared_memory_relation "$pattern_name" "implemented in" "$project"
+        fi
+    done <<< "$orphaned_patterns"
+    
+    # Also ensure WorkflowPattern entities (like CodingWorkflow) are connected
+    local workflow_patterns
+    workflow_patterns=$(jq -r '.entities[] | select(.entityType == "WorkflowPattern") | .name' "$SHARED_MEMORY" 2>/dev/null || echo "")
+    
+    while IFS= read -r workflow_name; do
+        [[ -z "$workflow_name" ]] && continue
+        
+        # Check if workflow has project connection
+        local has_connection
+        has_connection=$(jq -r --arg workflow "$workflow_name" \
+            '.relations[] | select(.from == $workflow and .relationType == "implemented in")' \
+            "$SHARED_MEMORY" 2>/dev/null || echo "")
+        
+        if [[ -z "$has_connection" ]]; then
+            # Workflow has no project connection - fix it
+            log "Found orphaned workflow: $workflow_name - connecting to $project"
+            add_to_shared_memory_relation "$workflow_name" "implemented in" "$project"
+        fi
+    done <<< "$workflow_patterns"
 }
 
 # Show insight summary
@@ -3260,6 +3316,16 @@ add_entity_to_kb() {
     total_entities=$(jq '.entities | length' "$shared_memory")
     total_relations=$(jq '.relations | length' "$shared_memory")
     echo -e "${CYAN}📊 Updated counts: $total_entities entities, $total_relations relations${NC}"
+    
+    # If it's a pattern, ensure it has project connection
+    if [[ "$entity_type" == *"Pattern"* ]] || [[ "$entity_type" == "WorkflowPattern" ]]; then
+        # Set SHARED_MEMORY for validation function
+        SHARED_MEMORY="$shared_memory"
+        validate_pattern_connections
+        # Update counts after validation
+        total_relations=$(jq '.relations | length' "$shared_memory")
+        echo -e "${CYAN}📊 Final counts: $total_entities entities, $total_relations relations${NC}"
+    fi
 }
 
 # List all relations in knowledge base
