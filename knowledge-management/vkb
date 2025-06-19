@@ -421,9 +421,9 @@ main() {
     local clear_cache=false
     
     # Check for cache clearing flag
-    if [[ "${2:-}" == "--with-cache-clear" ]] || [[ "$1" == "--with-cache-clear" ]]; then
+    if [[ "${2:-}" == "--with-cache-clear" ]] || [[ "${1:-}" == "--with-cache-clear" ]]; then
         clear_cache=true
-        if [[ "$1" == "--with-cache-clear" ]]; then
+        if [[ "${1:-}" == "--with-cache-clear" ]]; then
             command="start"
         fi
     fi
