@@ -122,6 +122,72 @@ needs_schema_migration() {
     [[ "$current_version" != "2.0.0" ]]
 }
 
+# Content validation to prevent marketing language
+validate_technical_content() {
+    local content="$1"
+    
+    # Define marketing phrases to filter out
+    local marketing_phrases=(
+        "% faster"
+        "% reduction"
+        "% savings"
+        "% improvement"
+        "% increase"
+        "% decrease"
+        "times faster"
+        "times better"
+        "comprehensive.*assessment"
+        "data-driven.*review"
+        "proven.*solution"
+        "industry-leading"
+        "cutting-edge"
+        "state-of-the-art"
+        "revolutionary"
+        "game-changing"
+        "breakthrough"
+        "award-winning"
+        "best-in-class"
+        "world-class"
+        "enterprise-grade"
+        "mission-critical"
+        "next-generation"
+        "seamless.*experience"
+        "robust.*framework"
+        "scalable.*architecture"
+        "flexible.*solution"
+    )
+    
+    # Check for marketing language
+    for phrase in "${marketing_phrases[@]}"; do
+        if echo "$content" | grep -qiE "$phrase"; then
+            log "❌ Filtered marketing content: $phrase"
+            return 1
+        fi
+    done
+    
+    # Check for suspicious number claims without context
+    if echo "$content" | grep -qE "[0-9]+% |[0-9]+x |[0-9]+ times"; then
+        log "❌ Filtered unsubstantiated metric claim in: $content"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Apply content validation to observations
+filter_marketing_content() {
+    local input="$1"
+    local filtered=""
+    
+    while IFS= read -r line; do
+        if validate_technical_content "$line"; then
+            filtered="$filtered$line\n"
+        fi
+    done <<< "$input"
+    
+    echo -e "$filtered"
+}
+
 # Configuration - Dynamic repo detection
 # Find the repository root by looking for characteristic files/directories
 find_repo_root() {
@@ -919,26 +985,41 @@ capture_interactive_insight() {
     echo -e "${YELLOW}1. What problem or challenge did you face?${NC}"
     echo -e "${BLUE}(Describe the core issue, not just symptoms)${NC}"
     read -r -p "> " problem_context
+    if ! validate_technical_content "$problem_context"; then
+        echo -e "${YELLOW}⚠️  Please avoid marketing language and focus on technical details${NC}"
+    fi
     
     # Solution Approach
     echo -e "\n${YELLOW}2. How did you solve it?${NC}"
     echo -e "${BLUE}(Include approaches tried, what worked/didn't)${NC}"
     read -r -p "> " solution_approach
+    if ! validate_technical_content "$solution_approach"; then
+        echo -e "${YELLOW}⚠️  Please avoid marketing language and focus on technical implementation${NC}"
+    fi
     
     # Design Rationale
     echo -e "\n${YELLOW}3. Why did you choose this solution?${NC}"
     echo -e "${BLUE}(Trade-offs, alternatives considered, constraints)${NC}"
     read -r -p "> " design_rationale
+    if ! validate_technical_content "$design_rationale"; then
+        echo -e "${YELLOW}⚠️  Please avoid marketing language and focus on technical reasoning${NC}"
+    fi
     
     # Key Learnings
     echo -e "\n${YELLOW}4. What did you learn?${NC}"
     echo -e "${BLUE}(Insights that will help in future projects)${NC}"
     read -r -p "> " key_learnings
+    if ! validate_technical_content "$key_learnings"; then
+        echo -e "${YELLOW}⚠️  Please avoid marketing language and focus on technical insights${NC}"
+    fi
     
     # Applicability
     echo -e "\n${YELLOW}5. Where else could this be applied?${NC}"
     echo -e "${BLUE}(What types of projects/situations would benefit)${NC}"
     read -r -p "> " applicability
+    if ! validate_technical_content "$applicability"; then
+        echo -e "${YELLOW}⚠️  Please avoid marketing language and focus on technical scenarios${NC}"
+    fi
     
     # Technologies
     echo -e "\n${YELLOW}6. Technologies involved (comma-separated):${NC}"
@@ -1018,10 +1099,27 @@ capture_interactive_insight() {
         significance=7
     fi
     
-    # Create meaningful pattern name
-    local base_name=$(echo "$problem_context" | sed 's/[^a-zA-Z0-9 ]//g' | awk '{print $1$2$3}' | sed 's/ //g')
-    local insight_name="${base_name}Pattern"
-    [[ ${#insight_name} -lt 5 ]] && insight_name="${category}Pattern_${project}"
+    # Create meaningful entity name - allow custom naming
+    local insight_name
+    if [[ -n "${UKB_CUSTOM_NAME:-}" ]]; then
+        insight_name="$UKB_CUSTOM_NAME"
+        unset UKB_CUSTOM_NAME  # Clear after use
+    else
+        # Auto-generate name based on first significant words, without forcing "Pattern" suffix
+        local base_name=$(echo "$problem_context" | sed 's/[^a-zA-Z0-9 ]//g' | awk '{print $1$2$3}' | sed 's/ //g')
+        
+        # Use category to determine appropriate suffix
+        case "$category" in
+            "8") insight_name="${base_name}";;  # Other - no suffix
+            "6") insight_name="${base_name}Security";;
+            "7") insight_name="${base_name}Testing";;
+            "2") insight_name="${base_name}Optimization";;
+            *) insight_name="${base_name}Pattern";;
+        esac
+        
+        # Fallback if name too short
+        [[ ${#insight_name} -lt 5 ]] && insight_name="${category}_${project}_$(date +%Y%m%d)"
+    fi
     
     local timestamp
     timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -1272,6 +1370,11 @@ complete_agent_analysis() {
     else
         project=$(basename "$PWD")
         main_language="unknown"
+    fi
+    
+    # Special handling for coding-related projects
+    if [[ "$project" == "coding" ]] || [[ "$project" == "knowledge-management" ]] || [[ "$PWD" == *"/coding"* ]]; then
+        project="Coding"
     fi
     
     # Process the insights
@@ -2585,6 +2688,9 @@ add_to_shared_memory_entity() {
     local observations="$3"
     local significance="${4:-5}"
     
+    # Apply content validation to filter out marketing language
+    observations=$(filter_marketing_content "$observations")
+    
     # Convert observations to JSON array for MCP
     local obs_array
     obs_array=$(echo "$observations" | jq -R -s 'split("\n") | map(select(length > 0))')
@@ -2820,6 +2926,11 @@ create_project_relationships() {
     
     local project
     project=$(basename "$PWD")
+    
+    # Special handling for coding-related projects
+    if [[ "$project" == "coding" ]] || [[ "$project" == "knowledge-management" ]] || [[ "$PWD" == *"/coding"* ]]; then
+        project="Coding"
+    fi
     
     # Ensure project entity exists with high significance (so it's never filtered out)
     if ! jq -e --arg proj "$project" '.entities[] | select(.name == $proj)' "$SHARED_MEMORY" >/dev/null; then
