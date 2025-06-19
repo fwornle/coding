@@ -348,6 +348,24 @@ parse_args() {
                     error_exit "Must specify entity names to remove (comma-separated)"
                 fi
                 ;;
+            --remove-observation)
+                # Remove observation from entity (format: entity_name|observation_content)
+                if [[ -n "$2" ]]; then
+                    remove_observation_from_entity "$2"
+                    exit 0
+                else
+                    error_exit "Must specify entity and observation as: entity_name|observation_content"
+                fi
+                ;;
+            --add-observation)
+                # Add observation to entity (format: entity_name|observation_content)
+                if [[ -n "$2" ]]; then
+                    add_observation_to_entity "$2"
+                    exit 0
+                else
+                    error_exit "Must specify entity and observation as: entity_name|observation_content"
+                fi
+                ;;
             --list-entities)
                 # List all entities in knowledge base
                 list_entities_in_kb
@@ -445,6 +463,8 @@ show_help() {
     echo "  --history-depth N Analyze last N commits (use with --full-history for limit)"
     echo "  --remove-entity E Remove specific entity from knowledge base"
     echo "  --remove-entities E1,E2,E3 Remove multiple entities (comma-separated)"
+    echo "  --remove-observation E|O Remove observation from entity (format: entity_name|observation_content)"
+    echo "  --add-observation E|O Add observation to entity (format: entity_name|observation_content)"
     echo "  --list-entities   List all entities in knowledge base"
     echo "  --add-relation R  Add relation (format: from,to,relationType)"
     echo "  --remove-relation R Remove relation (format: from,to,relationType)"
@@ -3154,6 +3174,152 @@ remove_entity_from_kb() {
     total_entities=$(jq '.entities | length' "$shared_memory")
     total_relations=$(jq '.relations | length' "$shared_memory")
     echo -e "${CYAN}📊 Updated counts: $total_entities entities, $total_relations relations${NC}"
+}
+
+# Remove observation from entity
+remove_observation_from_entity() {
+    local input="$1"
+    local shared_memory="../coding/shared-memory.json"
+    
+    # Parse input: entity_name|observation_content
+    if [[ "$input" != *"|"* ]]; then
+        echo -e "${RED}❌ Invalid format. Use: entity_name|observation_content${NC}"
+        return 1
+    fi
+    
+    local entity_name="${input%%|*}"
+    local observation_content="${input#*|}"
+    
+    # Find shared-memory.json
+    for path in "$shared_memory" "shared-memory.json" "../shared-memory.json"; do
+        if [[ -f "$path" ]]; then
+            shared_memory="$path"
+            break
+        fi
+    done
+    
+    if [[ ! -f "$shared_memory" ]]; then
+        echo -e "${RED}❌ shared-memory.json not found${NC}"
+        return 1
+    fi
+    
+    # Check if entity exists
+    if ! jq -e --arg name "$entity_name" '.entities[] | select(.name == $name)' "$shared_memory" >/dev/null; then
+        echo -e "${YELLOW}⚠️  Entity '$entity_name' not found in knowledge base${NC}"
+        return 1
+    fi
+    
+    # Check if observation exists in entity
+    local obs_exists
+    obs_exists=$(jq -r --arg name "$entity_name" --arg content "$observation_content" '
+        .entities[] | select(.name == $name) | 
+        .observations[] | 
+        select(
+            (type == "string" and . == $content) or 
+            (type == "object" and .content == $content)
+        ) | 
+        length > 0' "$shared_memory" 2>/dev/null || echo "false")
+    
+    if [[ "$obs_exists" != "true" ]]; then
+        echo -e "${YELLOW}⚠️  Observation not found in entity '$entity_name'${NC}"
+        echo -e "${BLUE}💡 Use partial matching by providing the beginning of the observation${NC}"
+        
+        # Show available observations for reference
+        echo -e "${CYAN}Available observations in '$entity_name':${NC}"
+        jq -r --arg name "$entity_name" '
+            .entities[] | select(.name == $name) | 
+            .observations[] | 
+            if type == "string" then . else .content end' "$shared_memory" | head -5 | sed 's/^/  • /'
+        
+        return 1
+    fi
+    
+    echo -e "${CYAN}🗑️  Removing observation from entity: $entity_name${NC}"
+    echo -e "${BLUE}Observation: ${observation_content:0:80}...${NC}"
+    
+    # Remove the observation
+    jq --arg name "$entity_name" --arg content "$observation_content" --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+        .entities = (.entities | map(
+            if .name == $name then
+                .observations = (.observations | map(select(
+                    (type == "string" and . != $content) and
+                    (type == "object" and .content != $content)
+                ))) |
+                .metadata.last_updated = $timestamp
+            else . end
+        )) |
+        .metadata.last_updated = $timestamp |
+        .metadata.last_mode = "observation_removal"
+    ' "$shared_memory" > "${shared_memory}.tmp" && mv "${shared_memory}.tmp" "$shared_memory"
+    
+    echo -e "${GREEN}✅ Successfully removed observation from entity: $entity_name${NC}"
+    
+    # Sync to visualizer
+    atomic_sync_to_visualizer "$shared_memory"
+    
+    # Show updated observation count for entity
+    local obs_count
+    obs_count=$(jq -r --arg name "$entity_name" '.entities[] | select(.name == $name) | .observations | length' "$shared_memory")
+    echo -e "${CYAN}📊 Entity '$entity_name' now has $obs_count observations${NC}"
+}
+
+# Add observation to entity
+add_observation_to_entity() {
+    local input="$1"
+    local shared_memory="../coding/shared-memory.json"
+    
+    # Parse input: entity_name|observation_content
+    if [[ "$input" != *"|"* ]]; then
+        echo -e "${RED}❌ Invalid format. Use: entity_name|observation_content${NC}"
+        return 1
+    fi
+    
+    local entity_name="${input%%|*}"
+    local observation_content="${input#*|}"
+    
+    # Find shared-memory.json
+    for path in "$shared_memory" "shared-memory.json" "../shared-memory.json"; do
+        if [[ -f "$path" ]]; then
+            shared_memory="$path"
+            break
+        fi
+    done
+    
+    if [[ ! -f "$shared_memory" ]]; then
+        echo -e "${RED}❌ shared-memory.json not found${NC}"
+        return 1
+    fi
+    
+    # Check if entity exists
+    if ! jq -e --arg name "$entity_name" '.entities[] | select(.name == $name)' "$shared_memory" >/dev/null; then
+        echo -e "${YELLOW}⚠️  Entity '$entity_name' not found in knowledge base${NC}"
+        return 1
+    fi
+    
+    echo -e "${CYAN}➕ Adding observation to entity: $entity_name${NC}"
+    echo -e "${BLUE}Observation: ${observation_content:0:80}...${NC}"
+    
+    # Add the observation
+    jq --arg name "$entity_name" --arg content "$observation_content" --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+        .entities = (.entities | map(
+            if .name == $name then
+                .observations += [$content] |
+                .metadata.last_updated = $timestamp
+            else . end
+        )) |
+        .metadata.last_updated = $timestamp |
+        .metadata.last_mode = "observation_addition"
+    ' "$shared_memory" > "${shared_memory}.tmp" && mv "${shared_memory}.tmp" "$shared_memory"
+    
+    echo -e "${GREEN}✅ Successfully added observation to entity: $entity_name${NC}"
+    
+    # Sync to visualizer
+    atomic_sync_to_visualizer "$shared_memory"
+    
+    # Show updated observation count for entity
+    local obs_count
+    obs_count=$(jq -r --arg name "$entity_name" '.entities[] | select(.name == $name) | .observations | length' "$shared_memory")
+    echo -e "${CYAN}📊 Entity '$entity_name' now has $obs_count observations${NC}"
 }
 
 # Rename entity in knowledge base
