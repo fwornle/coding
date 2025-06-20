@@ -52,9 +52,19 @@ console.log(`✅ MCP Memory loaded: ${graphState.nodes?.length || 0} entities, $
 
 ## Current Knowledge Base Summary
 
-**Entities to sync:** 6
-**Relations to sync:** 5
+**Entities to sync:** 20
+**Relations to sync:** 39
 
 **Key Patterns Available:**
+- ConditionalLoggingPattern (significance: 5)
+- ViewportCullingPattern (significance: 5)
+- ReduxStateManagementPattern (significance: 5)
+- KnowledgePersistencePattern (significance: 5)
+- NetworkAwareInstallationPattern (significance: 5)
+- StateDrivenAnimationPipelinePattern (significance: 5)
+- StrategyBasedModularRoutingPattern (significance: 5)
+- MCPMemoryLoggingIntegrationPattern (significance: 5)
+- VSCodeExtensionBridgePattern (significance: 5)
+- MVIReduxArchitecturePattern (significance: 5)
 
-**Sync prepared at:** Thu Jun 19 18:23:19 CEST 2025
+**Sync prepared at:** Fri Jun 20 07:59:48 CEST 2025

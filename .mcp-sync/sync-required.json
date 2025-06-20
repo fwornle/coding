@@ -1,8 +1,8 @@
 {
   "sync_required": true,
-  "entity_count": 6,
-  "relation_count": 5,
-  "prepared_at": "2025-06-19T16:23:19.3NZ",
+  "entity_count": 20,
+  "relation_count": 39,
+  "prepared_at": "2025-06-20T05:59:48.3NZ",
   "shared_memory_path": "/Users/q284340/Agentic/coding/shared-memory.json",
   "sync_script_path": "/Users/q284340/Agentic/coding/.mcp-sync/auto-sync.md"
 }

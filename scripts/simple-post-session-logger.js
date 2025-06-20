@@ -5,9 +5,14 @@
  * Creates a session tracking mechanism that can capture conversations
  */
 
-const fs = require('fs');
-const path = require('path');
-const ClaudeConversationExtractor = require('./claude-conversation-extractor.js');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import ClaudeConversationExtractor from './claude-conversation-extractor.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 class SimplePostSessionLogger {
   constructor(projectPath, codingRepo) {
@@ -141,6 +146,5 @@ async function main() {
   await logger.log();
 }
 
-if (require.main === module) {
-  main().catch(console.error);
-}
+// Execute if run directly
+main().catch(console.error);

@@ -5,9 +5,9 @@
  * Extracts conversation history from Claude Code's JSONL files
  */
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 class ClaudeConversationExtractor {
   constructor(projectPath) {
@@ -242,8 +242,9 @@ async function main() {
   }
 }
 
-if (require.main === module) {
+// Execute if run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(console.error);
 }
 
-module.exports = ClaudeConversationExtractor;
+export default ClaudeConversationExtractor;
