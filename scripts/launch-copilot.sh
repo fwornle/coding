@@ -35,6 +35,9 @@ colored_log "${CYAN}📋 Initializing fallback services...${NC}"
 # Use existing service manager script
 SERVICE_SCRIPT="$PROJECT_DIR/lib/start-fallback-services.js"
 
+# Ensure .coding-tools directory exists
+mkdir -p "$PROJECT_DIR/.coding-tools"
+
 # Start the services in background
 node "$SERVICE_SCRIPT" &
 FALLBACK_PID=$!
@@ -96,8 +99,11 @@ async function startHTTPServer() {
 startHTTPServer();
 EOF
   
-  # Run the HTTP server
-  exec node "$PROJECT_DIR/lib/start-http-server.js"
+  # Run the HTTP server and store PID
+  node "$PROJECT_DIR/lib/start-http-server.js" &
+  HTTP_PID=$!
+  echo $HTTP_PID > "$PROJECT_DIR/.coding-tools/http-server.pid"
+  wait $HTTP_PID
 fi
 
 # Check if CoPilot is available
