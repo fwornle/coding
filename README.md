@@ -57,14 +57,14 @@ The system supports team-based knowledge isolation while maintaining shared cros
 
 | Team | Focus | Technologies | Knowledge File |
 |------|-------|-------------|----------------|
-| **fw** | Frontend Web | React, TypeScript, CSS, HTML | `shared-memory-fw.json` |
+| **ui** | UI/Frontend | React, TypeScript, CSS, HTML | `shared-memory-ui.json` |
 | **resi** | Resilience | C++, Systems, Performance | `shared-memory-resi.json` |
 | **raas** | RaaS | Java, DevOps, Microservices | `shared-memory-raas.json` |
 | **coding** | Cross-team | Architecture, Patterns | `shared-memory-coding.json` |
 
 ```bash
 # Set your team during installation or manually
-export CODING_TEAM=fw
+export CODING_TEAM=ui
 
 # Team-specific knowledge management
 ukb --interactive    # Saves to your team's knowledge base

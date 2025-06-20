@@ -791,7 +791,7 @@ configure_team_setup() {
     echo ""
     
     info "The system supports team-specific knowledge bases for better organization:"
-    echo "  • fw     - Frontend Web development (React, TypeScript, etc.)"
+    echo "  • ui     - UI/Frontend development (React, TypeScript, etc.)"
     echo "  • resi   - Resilience engineering (C++, systems, performance)"
     echo "  • raas   - RaaS development (Java, DevOps, microservices)"
     echo "  • custom - Custom team name"
@@ -802,7 +802,7 @@ configure_team_setup() {
     while true; do
         echo -e "${CYAN}Select your team configuration:${NC}"
         echo "1) Individual developer (single knowledge base)"
-        echo "2) Frontend Web team (fw)"
+        echo "2) UI/Frontend team (ui)"
         echo "3) Resilience team (resi)"
         echo "4) RaaS team (raas)"
         echo "5) Custom team name"
@@ -816,8 +816,8 @@ configure_team_setup() {
                 break
                 ;;
             2)
-                export CODING_TEAM="fw"
-                info "Configured for Frontend Web team (CODING_TEAM=fw)"
+                export CODING_TEAM="ui"
+                info "Configured for UI/Frontend team (CODING_TEAM=ui)"
                 break
                 ;;
             3)
@@ -929,7 +929,7 @@ setup_unified_launcher() {
 setup_vscode_extension() {
     info "Setting up VSCode extension for knowledge management..."
     
-    local vscode_ext_dir="$CODING_REPO/vscode-km-copilot"
+    local vscode_ext_dir="$CODING_REPO/integrations/vscode-km-copilot"
     
     if [ ! -d "$vscode_ext_dir" ]; then
         warning "VSCode extension directory not found at $vscode_ext_dir - skipping VSCode extension setup"

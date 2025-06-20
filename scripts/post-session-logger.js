@@ -5,9 +5,9 @@
  * Captures conversation history after Claude exits and logs it appropriately
  */
 
-const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { spawn } from 'child_process';
 
 class PostSessionLogger {
   constructor(projectPath, codingRepo, sessionId) {
@@ -268,8 +268,8 @@ async function main() {
   await logger.captureConversation();
 }
 
-if (require.main === module) {
+if (import.meta.url === new URL(process.argv[1], 'file://').href) {
   main().catch(console.error);
 }
 
-module.exports = PostSessionLogger;
+export default PostSessionLogger;

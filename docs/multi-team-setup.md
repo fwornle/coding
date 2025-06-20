@@ -6,7 +6,7 @@ The coding tools system supports multi-team environments with isolated knowledge
 
 ### Team Structure
 
-- **fw** - Frontend Web development (React, TypeScript, web technologies)
+- **ui** - UI/Frontend development (React, TypeScript, web technologies)
 - **resi** - Resilience engineering (C++, systems programming, performance optimization)
 - **raas** - RaaS development (Java, DevOps, microservices, cloud infrastructure)
 - **custom** - Any custom team name you define
@@ -18,7 +18,7 @@ When using teams, the system creates separate knowledge files:
 
 ```
 shared-memory-coding.json    # Cross-team patterns (always loaded)
-shared-memory-fw.json        # Frontend Web team knowledge
+shared-memory-ui.json        # UI/Frontend team knowledge
 shared-memory-resi.json      # Resilience team knowledge  
 shared-memory-raas.json      # RaaS team knowledge
 shared-memory-custom.json    # Custom team knowledge
@@ -44,7 +44,7 @@ The installer will ask:
 
 Select your team configuration:
 1) Individual developer (single knowledge base)
-2) Frontend Web team (fw)
+2) UI/Frontend team (ui)
 3) Resilience team (resi)
 4) RaaS team (raas)
 5) Custom team name
@@ -58,7 +58,7 @@ You can set your team environment variable manually:
 
 ```bash
 # In your shell profile (.bashrc, .zshrc, etc.)
-export CODING_TEAM=fw
+export CODING_TEAM=ui
 
 # Or temporarily for a session
 CODING_TEAM=resi claude-mcp
@@ -85,7 +85,7 @@ ukb --interactive
 vkb
 
 # View specific team (if you have access)
-CODING_TEAM=fw vkb
+CODING_TEAM=ui vkb
 ```
 
 ### Cross-Team Patterns
@@ -104,7 +104,7 @@ Some patterns are automatically classified as cross-team and go to `shared-memor
 
 The system automatically categorizes entities based on:
 
-### Frontend Web (fw)
+### UI/Frontend (ui)
 - **Keywords**: react, vue, angular, javascript, typescript, css, html, web, frontend, ui, component, redux, state, browser
 - **Technologies**: React, Vue, Angular, JavaScript, TypeScript, CSS, HTML, Redux, Three.js
 - **Entity Types**: ReactPattern, ComponentPattern, WebPattern, UIPattern
@@ -189,7 +189,7 @@ Teams cannot see each other's specific knowledge by default. This prevents:
 
 ```bash
 # Team configuration
-CODING_TEAM=fw                    # Your team identifier
+CODING_TEAM=ui                    # Your team identifier
 
 # Paths (usually auto-configured)
 CODING_KNOWLEDGE_BASE=/path/to/shared-memory.json

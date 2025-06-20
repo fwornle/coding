@@ -15,8 +15,8 @@ const __dirname = path.dirname(__filename);
 
 // Team categorization rules based on technologies and patterns
 const TEAM_PATTERNS = {
-  fw: {
-    name: 'Frontend Web (FW)',
+  ui: {
+    name: 'UI/Frontend',
     keywords: ['react', 'vue', 'angular', 'javascript', 'typescript', 'css', 'html', 'web', 'frontend', 'ui', 'ux', 'component', 'hook', 'redux', 'state', 'browser'],
     technologies: ['React', 'Vue', 'Angular', 'JavaScript', 'TypeScript', 'CSS', 'HTML', 'Redux', 'Three.js'],
     entityTypes: ['ReactPattern', 'ComponentPattern', 'WebPattern', 'UIPattern']
@@ -96,7 +96,7 @@ async function main() {
 function categorizeEntities(entities) {
   const categorized = {
     coding: [],
-    fw: [],
+    ui: [],
     resi: [],
     raas: [],
     uncategorized: []
@@ -167,7 +167,7 @@ function categorizeEntities(entities) {
 function categorizeRelations(relations, categorizedEntities) {
   const categorized = {
     coding: [],
-    fw: [],
+    ui: [],
     resi: [],
     raas: [],
     uncategorized: []
@@ -214,9 +214,9 @@ async function createTeamFiles(projectRoot, categorizedEntities, categorizedRela
       description: 'Cross-team coding knowledge'
     },
     { 
-      team: 'fw', 
-      filename: 'shared-memory-fw.json',
-      description: 'Frontend Web team knowledge'
+      team: 'ui', 
+      filename: 'shared-memory-ui.json',
+      description: 'UI/Frontend team knowledge'
     },
     { 
       team: 'resi', 
