@@ -775,7 +775,7 @@ detect_agents() {
     fi
     
     if [ ${#agents_found[@]} -eq 0 ]; then
-        error "No supported coding agents found. Please install Claude Code or GitHub CoPilot."
+        error_exit "No supported coding agents found. Please install Claude Code or GitHub CoPilot."
         return 1
     fi
     
@@ -837,11 +837,11 @@ configure_team_setup() {
                     info "Configured for custom team: $custom_team (CODING_TEAM=$custom_team)"
                     break
                 else
-                    error "Invalid team name. Use only letters, numbers, hyphens, and underscores."
+                    error_exit "Invalid team name. Use only letters, numbers, hyphens, and underscores."
                 fi
                 ;;
             *)
-                error "Invalid choice. Please select 1-5."
+                error_exit "Invalid choice. Please select 1-5."
                 ;;
         esac
     done
@@ -866,7 +866,7 @@ install_node_dependencies() {
     info "Installing Node.js dependencies for agent-agnostic functionality..."
     
     if [ ! -f "$CODING_REPO/package.json" ]; then
-        error "package.json not found. This is required for agent-agnostic functionality."
+        error_exit "package.json not found. This is required for agent-agnostic functionality."
         return 1
     fi
     
@@ -875,7 +875,7 @@ install_node_dependencies() {
     if npm install; then
         success "✓ Node.js dependencies installed"
     else
-        error "Failed to install Node.js dependencies"
+        error_exit "Failed to install Node.js dependencies"
         return 1
     fi
     
@@ -920,7 +920,7 @@ setup_unified_launcher() {
             echo "export PATH=\"$bin_dir:\$PATH\"" >> "$SHELL_RC"
         fi
     else
-        error "coding script not found"
+        error_exit "coding script not found"
         return 1
     fi
 }
@@ -932,8 +932,9 @@ setup_vscode_extension() {
     local vscode_ext_dir="$CODING_REPO/vscode-km-copilot"
     
     if [ ! -d "$vscode_ext_dir" ]; then
-        error "VSCode extension directory not found at $vscode_ext_dir"
-        return 1
+        warning "VSCode extension directory not found at $vscode_ext_dir - skipping VSCode extension setup"
+        INSTALLATION_WARNINGS+=("VSCode extension directory not found - skipped VSCode extension setup")
+        return 0
     fi
     
     # Install extension dependencies
@@ -972,7 +973,7 @@ setup_vscode_extension() {
                 info "  4. Select: $vscode_ext_dir/$vsix_file"
             fi
         else
-            error "VSIX file not found after build"
+            error_exit "VSIX file not found after build"
             return 1
         fi
     else
