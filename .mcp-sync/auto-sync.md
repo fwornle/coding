@@ -52,8 +52,8 @@ console.log(`✅ MCP Memory loaded: ${graphState.nodes?.length || 0} entities, $
 
 ## Current Knowledge Base Summary
 
-**Entities to sync:** 25
-**Relations to sync:** 39
+**Entities to sync:** 21
+**Relations to sync:** 42
 
 **Key Patterns Available:**
 - ConditionalLoggingPattern (significance: 5)
@@ -67,4 +67,4 @@ console.log(`✅ MCP Memory loaded: ${graphState.nodes?.length || 0} entities, $
 - VSCodeExtensionBridgePattern (significance: 5)
 - MVIReduxArchitecturePattern (significance: 5)
 
-**Sync prepared at:** Fri Jun 20 08:51:05 CEST 2025
+**Sync prepared at:** Fri Jun 20 09:33:51 CEST 2025

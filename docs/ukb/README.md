@@ -104,7 +104,7 @@ ukb-cli interactive
 
 ## Architecture Highlights
 
-![System Architecture](../puml/ukb-cli-architecture.png)
+![System Architecture](images/ukb-cli-architecture.png)
 
 The system follows a layered architecture:
 - **CLI Layer**: User interface and command routing

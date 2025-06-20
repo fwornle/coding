@@ -5,6 +5,27 @@ skinparam roundcorner 20
 skinparam shadowing false
 title UkbCli - Modern Knowledge Management CLI Architecture
 
+skinparam component {
+  BackgroundColor #E8F5E8
+  FontSize 11
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F8F8F8
+  BorderColor #888888
+  FontSize 12
+  FontColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFACD
+  FontSize 9
+  FontColor #000000
+}
+skinparam arrow {
+  FontSize 9
+  FontColor #000000
+}
+
 package "UkbCli System" {
   
   package "CLI Layer" {

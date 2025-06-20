@@ -1,0 +1,91 @@
+@startuml vkb-cli-data-flow
+!theme plain
+title VKB-CLI Data Flow and Processing
+
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor #E8F5E8
+  FontSize 11
+  FontColor #000000
+}
+skinparam database {
+  BackgroundColor #FFF9E6
+  FontSize 11
+  FontColor #000000
+}
+skinparam queue {
+  BackgroundColor #E8F4FD
+  FontSize 11
+  FontColor #000000
+}
+skinparam cloud {
+  BackgroundColor #FFE8F4
+  FontSize 11
+  FontColor #000000
+}
+skinparam arrow {
+  FontSize 9
+  FontColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFACD
+  FontSize 9
+  FontColor #000000
+}
+
+database "shared-memory.json" as input
+queue "Data Processor" as processor
+component "VKB Server" as server
+cloud "HTTP Server\n(Python)" as http
+cloud "Memory Visualizer\n(React)" as viz
+database "NDJSON Output" as output
+component "Symlink Manager" as symlink
+database "knowledge-management/" as km
+
+' Input processing
+input --> processor : read JSON
+processor --> processor : validate format
+processor --> processor : detect entity types
+processor --> processor : convert to NDJSON
+
+' Data transformation
+processor --> output : write processed data
+processor --> symlink : create symlinks
+symlink --> km : link directory
+
+' Server operations  
+processor --> server : data ready
+server --> http : start Python server
+http --> viz : serve visualizer
+http --> output : serve NDJSON data
+http --> km : serve insight files
+
+' User interaction
+actor User
+User --> server : vkb commands
+server --> User : status/logs
+User --> viz : browser access
+viz --> User : interactive visualization
+
+note right of processor
+  • JSON → NDJSON conversion
+  • Enhanced observation support
+  • Entity deduplication
+  • Format validation
+end note
+
+note right of server
+  • Process lifecycle
+  • Health monitoring
+  • Error recovery
+  • Port management
+end note
+
+note bottom of viz
+  • Interactive knowledge graph
+  • Real-time updates
+  • Mobile-friendly
+  • Search and filtering
+end note
+
+@enduml

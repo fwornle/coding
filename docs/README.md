@@ -41,6 +41,17 @@ Modern Node.js-based knowledge capture and management system.
 - **[Use Cases](ukb/ukb-use-cases.md)** - Detailed workflow examples and scenarios
 - **[Migration Guide](ukb/user-guide.md#migration-guide)** - Transitioning from legacy bash UKB
 
+### 📊 Knowledge Visualization (VKB-CLI)
+
+Modern Node.js-based knowledge visualization server with cross-platform support.
+
+- **[VKB-CLI Overview](vkb/README.md)** - Complete VKB-CLI documentation and quick start
+- **[Technical Architecture](vkb/architecture.md)** - Server architecture and component design
+- **[API Reference](vkb/api-reference.md)** - CLI commands and programmatic JavaScript API
+- **[Use Cases](vkb/use-cases.md)** - Development workflows and integration patterns
+- **[Migration Guide](vkb/migration-guide.md)** - Transitioning from legacy bash VKB
+- **[Technical Deep Dive](../knowledge-management/insights/VkbCli.md)** - Comprehensive implementation details with diagrams
+
 ### 📝 Conversation Logging
 
 Automatic capture and organization of AI interactions.
@@ -95,6 +106,10 @@ Historical documents and planning materials.
 
 → [UKB User Guide](ukb/user-guide.md) → [Use Cases](ukb/ukb-use-cases.md)
 
+### "I want to set up knowledge visualization"
+
+→ [VKB-CLI Overview](vkb/README.md) → [VKB Use Cases](vkb/use-cases.md)
+
 ### "I need to troubleshoot network/installation issues"
 
 → [Network Setup](installation/network-setup.md) → [MCP Configuration](installation/mcp-configuration.md)
@@ -104,7 +119,7 @@ Historical documents and planning materials.
 ### Knowledge Management
 
 - **UKB-CLI (Modern Node.js CLI)**: Advanced knowledge capture with enhanced performance and features
-- **VKB (View Knowledge Base)**: Interactive visualization of knowledge graphs with real-time updates
+- **VKB-CLI (Modern Node.js Server)**: Cross-platform knowledge visualization server with programmatic API
 - **Shared Memory**: Git-tracked knowledge base for team collaboration with full backward compatibility
 - **Transferable Patterns**: Reusable solutions with structured problem-solution-rationale format
 
@@ -133,9 +148,13 @@ ukb search "pattern"   # Enhanced search with filtering
 ukb --add-entity "Name" --type TransferablePattern  # Add specific entities
 ukb --validate         # Comprehensive data integrity checks
 
-# Visualization
-vkb                    # Interactive knowledge graph at localhost:8080
-vkb restart            # Restart with fresh data
+# Knowledge Visualization (VKB-CLI)
+vkb                    # Start visualization server at localhost:8080
+vkb status             # Check server status and health
+vkb restart            # Restart server with fresh data
+vkb logs               # View server logs with formatting
+vkb-cli server health  # Advanced health monitoring
+vkb-cli data refresh   # Refresh data without restart
 
 # System management
 ./install.sh           # Install or update system
@@ -170,22 +189,36 @@ ukb --verify-references           # URL validation
 
 ## 🔄 Recent Updates
 
-### 🆕 2025 Major Update: UKB-CLI Implementation
+### 🆕 2025 Major Update: Modern CLI Implementation
+
+**UKB-CLI (Knowledge Capture):**
 
 - **Complete UKB Modernization**: Replaced 3000+ line bash script with modular Node.js CLI
 - **Performance Improvements**: 3x faster JSON processing, 50% memory reduction
 - **Enhanced Features**: Content validation, URL verification, custom entity naming, batch operations
 - **Stable API**: Programmatic interface for coding agent integration
 - **Full Backward Compatibility**: All existing commands work unchanged
-- **Comprehensive Documentation**: Technical architecture with PlantUML diagrams
+
+**VKB-CLI (Knowledge Visualization):**
+
+- **Complete VKB Refactoring**: Replaced 579-line bash script with modular Node.js server
+- **Cross-Platform Support**: Identical behavior on Windows, macOS, and Linux
+- **Programmatic API**: VKBServer class for development tool integration
+- **Enhanced Server Management**: Health monitoring, graceful shutdown, automatic recovery
+- **Improved Error Handling**: Clear error messages with actionable suggestions
+- **50% Faster Startup**: Optimized server initialization and resource management
 
 ### Documentation Improvements
 
-- **Updated UKB documentation** to reflect modern ukb-cli capabilities
-- **Added technical architecture documentation** with comprehensive diagrams
-- **Enhanced API reference** with programmatic integration examples
-- **Migration guide** for seamless transition from legacy bash implementation
+- **Updated UKB documentation** to reflect modern ukb-cli capabilities with comprehensive API reference
+- **New VKB documentation structure** matching UKB style with complete architecture documentation
+- **Added technical architecture documentation** for both UKB and VKB with comprehensive diagrams
+- **Enhanced API references** with programmatic integration examples for both tools
+- **Migration guides** for seamless transition from legacy bash implementations
 - **Consolidated installation guides** into focused quick-start and network setup
 - **Streamlined logging documentation** with unified automatic logging guide
 
-For detailed technical information, see **[UkbCli Architecture](../knowledge-management/insights/UkbCli.md)** with complete PlantUML diagrams and implementation details.
+For detailed technical information:
+
+- **UKB-CLI**: See [UkbCli Architecture](../knowledge-management/insights/UkbCli.md) with complete PlantUML diagrams
+- **VKB-CLI**: See [VkbCli Architecture](../knowledge-management/insights/VkbCli.md) with implementation details and use cases

@@ -3,12 +3,24 @@
 title UKB-CLI System Architecture
 
 skinparam componentStyle rectangle
+skinparam backgroundColor white
 skinparam component {
-  BackgroundColor<<api>> LightBlue
-  BackgroundColor<<core>> LightGreen
-  BackgroundColor<<storage>> LightYellow
-  BackgroundColor<<cli>> LightPink
-  BackgroundColor<<util>> LightGray
+  BackgroundColor<<api>> #E8F4FD
+  BackgroundColor<<core>> #E8F5E8
+  BackgroundColor<<storage>> #FFF9E6
+  BackgroundColor<<cli>> #FFE8F4
+  BackgroundColor<<util>> #F0F0F0
+  FontSize 12
+  FontColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFACD
+  FontSize 10
+  FontColor #000000
+}
+skinparam arrow {
+  FontSize 10
+  FontColor #000000
 }
 
 package "UKB-CLI System" {

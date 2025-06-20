@@ -1,0 +1,89 @@
+@startuml vkb-cli-integration
+!theme plain
+title VKB-CLI Integration with Legacy VKB
+
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor #E8F5E8
+  FontSize 12
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F8F8F8
+  BorderColor #888888
+  FontSize 14
+  FontColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFACD
+  FontSize 10
+  FontColor #000000
+}
+skinparam arrow {
+  FontSize 10
+  FontColor #000000
+}
+
+package "Legacy VKB (Bash)" {
+  [vkb script] as legacy
+  note right of legacy
+    579 lines
+    Mixed concerns
+    Platform-specific
+  end note
+}
+
+package "VKB-CLI (Node.js)" {
+  [vkb wrapper] as wrapper
+  [lib/vkb-server/] as server
+  [VKBServer API] as api
+  
+  note right of wrapper
+    133 lines
+    Backward compatible
+    Delegates to Node.js
+  end note
+  
+  note right of server
+    Modular design
+    Cross-platform
+    Programmatic API
+  end note
+}
+
+package "Shared Components" {
+  [shared-memory.json] as data
+  [memory-visualizer] as viz
+  [Python HTTP Server] as python
+}
+
+' Migration path
+legacy ..> wrapper : replaced by
+wrapper --> server : delegates to
+server --> api : exposes
+
+' Shared usage
+legacy --> data : reads
+server --> data : reads
+legacy --> viz : serves
+server --> viz : serves
+legacy --> python : spawns
+server --> python : spawns
+
+' Command compatibility
+actor User
+User --> legacy : vkb commands
+User --> wrapper : same commands
+wrapper --> server : enhanced features
+
+note bottom of User
+  All existing commands work unchanged:
+  • vkb start
+  • vkb stop  
+  • vkb status
+  • vkb logs
+  • vkb restart
+end note
+
+@enduml

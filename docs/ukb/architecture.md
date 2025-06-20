@@ -6,7 +6,7 @@ The UKB-CLI (Update Knowledge Base Command Line Interface) is a modern, agent-ag
 
 ## System Architecture
 
-![UKB-CLI Architecture](../puml/ukb-cli-architecture.png)
+![UKB-CLI Architecture](images/ukb-cli-architecture.png)
 
 ### Core Principles
 
@@ -95,7 +95,7 @@ The storage layer is abstracted through adapters:
 
 ## Class Diagrams
 
-![UKB-CLI Class Diagram](../puml/ukb-cli-class-diagram.png)
+![UKB-CLI Class Diagram](images/ukb-cli-class-diagram.png)
 
 ### Key Classes
 
@@ -110,7 +110,7 @@ The storage layer is abstracted through adapters:
 
 ## Data Flow Architecture
 
-![UKB-CLI Data Flow](../puml/ukb-cli-data-flow.png)
+![UKB-CLI Data Flow](images/ukb-cli-data-flow.png)
 
 ### Input Sources
 1. **CLI Commands**: Direct user input

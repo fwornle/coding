@@ -1,6 +1,29 @@
 @startuml vkb-cli-architecture
-!theme amiga
+!theme plain
 title VKB-CLI Architecture
+
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+skinparam component {
+  BackgroundColor #E8F5E8
+  FontSize 12
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F8F8F8
+  BorderColor #888888
+  FontSize 14
+  FontColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFACD
+  FontSize 10
+  FontColor #000000
+}
+skinparam arrow {
+  FontSize 10
+  FontColor #000000
+}
 
 package "Command Layer" {
   [vkb (bash wrapper)] as vkb

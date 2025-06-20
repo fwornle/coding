@@ -5,6 +5,30 @@ skinparam roundcorner 20
 skinparam shadowing false
 title UkbCli - Use Cases and Workflows
 
+skinparam usecase {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90E2
+  FontSize 10
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #FFE8F4
+  BorderColor #E24A90
+  FontSize 12
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F8F8F8
+  BorderColor #888888
+  FontSize 12
+  FontColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFACD
+  FontSize 9
+  FontColor #000000
+}
+
 left to right direction
 
 actor "Developer" as dev

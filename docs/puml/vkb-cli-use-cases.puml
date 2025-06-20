@@ -1,0 +1,119 @@
+@startuml vkb-cli-use-cases
+!theme plain
+title VKB-CLI - Use Cases and Workflows
+
+skinparam backgroundColor white
+skinparam usecase {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90E2
+  FontSize 10
+  FontColor #000000
+}
+skinparam actor {
+  BackgroundColor #FFE8F4
+  BorderColor #E24A90
+  FontSize 12
+  FontColor #000000
+}
+skinparam package {
+  BackgroundColor #F8F8F8
+  BorderColor #888888
+  FontSize 12
+  FontColor #000000
+}
+skinparam note {
+  BackgroundColor #FFFACD
+  FontSize 9
+  FontColor #000000
+}
+
+left to right direction
+
+actor "Developer" as dev
+actor "Team Lead" as lead  
+actor "CI/CD System" as ci
+actor "Development Tools" as tools
+
+package "Development Workflow" {
+  usecase "Daily Server Start" as start
+  usecase "Knowledge Exploration" as explore
+  usecase "Data Refresh" as refresh
+  usecase "Server Management" as manage
+  
+  note right of start
+    • Fast startup
+    • Auto browser open
+    • Background operation
+  end note
+}
+
+package "Team Collaboration" {
+  usecase "Knowledge Sharing" as share
+  usecase "Remote Debugging" as debug
+  usecase "Status Monitoring" as monitor
+  usecase "Log Analysis" as logs
+  
+  note right of share
+    • Network access
+    • Team sessions
+    • Real-time updates
+  end note
+}
+
+package "Automation Integration" {
+  usecase "Programmatic Control" as api
+  usecase "Health Checks" as health
+  usecase "Automated Testing" as test
+  usecase "CI/CD Validation" as validate
+  
+  note right of api
+    • VKBServer class
+    • Event handling
+    • Configuration
+  end note
+}
+
+package "Server Operations" {
+  usecase "Lifecycle Management" as lifecycle
+  usecase "Error Recovery" as recovery
+  usecase "Performance Monitoring" as perf
+  usecase "Cross-Platform Support" as platform
+  
+  note right of lifecycle
+    • Start/stop/restart
+    • Graceful shutdown
+    • Process cleanup
+  end note
+}
+
+' Developer workflows
+dev --> start
+dev --> explore
+dev --> refresh
+dev --> manage
+
+' Team lead workflows  
+lead --> share
+lead --> monitor
+lead --> logs
+lead --> debug
+
+' CI/CD workflows
+ci --> health
+ci --> test
+ci --> validate
+ci --> api
+
+' Development tools integration
+tools --> api
+tools --> lifecycle
+tools --> recovery
+tools --> platform
+
+' Cross-cutting concerns
+dev --> debug
+lead --> manage
+ci --> monitor
+tools --> health
+
+@enduml

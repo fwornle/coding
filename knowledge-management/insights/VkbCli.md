@@ -20,6 +20,8 @@ The VkbCli system follows a modular architecture with clear separation of concer
 
 ### Integration with Legacy VKB Script
 
+![VkbCli Integration](images/vkb-cli-integration.png)
+
 The VkbCli seamlessly integrates with the existing VKB bash script, providing:
 
 - **Backward Compatibility**: All existing VKB commands continue to work unchanged
@@ -74,6 +76,8 @@ The original VKB bash script had grown complex with mixed responsibilities and p
 - **Cross-Platform**: Works identically on macOS, Linux, and Windows
 
 ## Use Cases
+
+![VkbCli Use Cases](images/vkb-cli-use-cases.png)
 
 ### 1. Development Workflow Integration
 
@@ -152,21 +156,98 @@ console.log(`Running: ${status.running}, PID: ${status.pid}`);
 ### 4. Team Collaboration
 
 ```bash
-# Refresh data without server restart
-vkb data refresh
+# Start server with network access for team sharing
+vkb start --host 0.0.0.0
 
-# Check server health
-vkb status
+# Refresh data without server restart
+vkb-cli data refresh
+
+# Check server health for monitoring
+vkb-cli server health --json
 
 # Share server logs for debugging
-vkb logs > server-debug.log
+vkb logs --format json --since "1 hour ago" > team-debug.log
+
+# Generate team status report
+vkb status --verbose --json > team-status.json
 ```
+
+**Features:**
+- Network-accessible server for team collaboration
+- Real-time health monitoring and status reporting
+- Structured logging for debugging assistance
+- Comprehensive status information for team visibility
 
 **Ideal for:**
 - Team knowledge sharing sessions
 - Remote debugging assistance
 - Collaborative development
 - Documentation generation
+- Team onboarding and training
+
+### 5. CI/CD Integration
+
+```bash
+# Automated testing pipeline integration
+vkb-cli server start --port 8080 --timeout 30 --no-browser
+
+# Validate server health in CI
+vkb-cli server health --timeout 10 --json
+
+# Export knowledge data for testing
+vkb-cli data export --format json --output ci-knowledge.json
+
+# Graceful shutdown with timeout
+vkb-cli server stop --timeout 15
+```
+
+**Features:**
+- Headless server operation for CI environments
+- Health check endpoints for monitoring
+- Data export for validation and testing
+- Timeout controls for reliable automation
+
+**Ideal for:**
+- Continuous integration pipelines
+- Automated testing environments
+- Deployment validation
+- Knowledge base integrity checking
+
+### 6. Development Environment Integration
+
+```javascript
+// IDE integration example
+const { VKBServer } = require('vkb-server');
+
+const devEnvironment = new VKBServer({
+  port: 8080,
+  projectRoot: process.cwd(),
+  autoRestart: true,
+  healthCheckInterval: 30000
+});
+
+// Start server as part of development setup
+await devEnvironment.start({ openBrowser: false });
+
+// Monitor health during development
+devEnvironment.on('health-check', (result) => {
+  if (!result.healthy) {
+    console.warn('Knowledge server health issue:', result);
+  }
+});
+```
+
+**Features:**
+- Programmatic server control
+- Event-driven health monitoring
+- Automatic restart on failure
+- Integration with development tools
+
+**Ideal for:**
+- Development environment setup
+- IDE extension integration
+- Custom development tools
+- Automated workspace management
 
 ## Server Startup Sequence
 
@@ -192,7 +273,39 @@ The above sequence diagram shows the complete workflow for server startup, inclu
 3. **Health Monitoring**: Verifies server responsiveness
 4. **Browser Integration**: Automatic browser launching for user convenience
 
+## Detailed Workflow Sequence
+
+![VkbCli Server Startup Sequence](images/vkb-cli-sequence.png)
+
+The above sequence diagram shows the complete workflow for server startup and operation, including:
+
+### Startup Validation Pipeline
+1. **Environment Check**: Validates Node.js, Python 3, and required dependencies
+2. **Configuration Validation**: Ensures proper project structure and paths
+3. **Port Availability**: Checks port conflicts and resolves them automatically
+4. **Process Verification**: Detects existing server instances and handles cleanup
+
+### Data Preparation Workflow
+1. **Knowledge Base Loading**: Reads and parses shared-memory.json
+2. **Format Detection**: Handles both legacy and enhanced observation formats
+3. **Data Transformation**: Converts JSON to NDJSON format for visualizer
+4. **Asset Management**: Creates symlinks and prepares static files
+
+### Server Lifecycle Management
+1. **Process Spawning**: Starts HTTP server with proper configuration
+2. **Health Verification**: Performs initial health checks
+3. **Service Registration**: Registers server for lifecycle management
+4. **Browser Integration**: Optional automatic browser opening
+
+### Runtime Operations
+1. **Health Monitoring**: Continuous server responsiveness checks
+2. **Data Refresh**: Dynamic knowledge base reloading
+3. **Error Recovery**: Automatic restart and cleanup procedures
+4. **Graceful Shutdown**: Proper resource cleanup and termination
+
 ## Data Flow and Processing
+
+![VkbCli Data Flow](images/vkb-cli-data-flow.png)
 
 The VkbCli processing pipeline ensures reliable data serving through multiple stages:
 
