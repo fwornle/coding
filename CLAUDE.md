@@ -117,27 +117,28 @@ claude-mcp
 
 **When updating the knowledge base from conversation insights:**
 
-1. **For existing entities (recommended):** Use direct JSON updates via `jq` for simple observation additions
-2. **For new insights:** Use the piped input method with `ukb --interactive`
+1. **For simple entities:** Use direct command line or piped input with `ukb --interactive`
+2. **For complex insights:** Use the piped input method with `ukb --interactive` (9-line format)
 3. **For automated analysis:** Use the `claude-conversation-analyzer.js` script
 
-#### Method 1: Direct Entity Updates (Simple)
+#### Method 1: Direct Command Line (Simple Entities)
 ```bash
-# Add new observations to existing entities
-jq --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-   '.entities |= map(
-     if .name == "EntityName" then
-       .observations += ["New insight observation"] |
-       .metadata.last_updated = $timestamp
-     else . end
-   ) | .metadata.last_updated = $timestamp' \
-   shared-memory.json > shared-memory-updated.json && \
-   mv shared-memory-updated.json shared-memory.json
+# Direct command line approach
+ukb --add-entity --name "EntityName" --type "WorkflowPattern" --significance 5 --observation "Description"
 ```
 
-#### Method 2: Piped Input for Interactive UKB
+#### Method 2: Piped Input for Interactive UKB (Simple Entities)
 ```bash
-# Create input file with responses
+# Simple entity creation (2-4 lines)
+echo "EntityName
+WorkflowPattern
+5
+Optional observation" | ukb --interactive
+```
+
+#### Method 3: Piped Input for Complex Insights (9-line format)
+```bash
+# Create input file with responses (EXACTLY 9 lines required)
 cat > /tmp/ukb-input.txt << 'EOF'
 Problem description here
 Solution description here  
@@ -147,20 +148,43 @@ Applicability
 Technologies,comma,separated
 https://reference-urls.com
 code-file1.js,code-file2.js
-1
+8
 EOF
 
 # Pipe to UKB interactive mode
-cat /tmp/ukb-input.txt | ukb --interactive
+ukb --interactive < /tmp/ukb-input.txt
 ```
 
-#### Method 3: Automated Conversation Analysis
+#### Method 4: Automated Conversation Analysis
 ```bash
 # Use the conversation analyzer script
 node scripts/claude-conversation-analyzer.js
 ```
 
-**COMMON ISSUE**: If `ukb --interactive` hangs waiting for input, ALWAYS use the piped input method (Method 2) rather than trying to type responses manually.
+**🚨 CRITICAL SUCCESS PATTERNS**:
+- **READ ERROR MESSAGES**: When ukb --interactive fails, the error shows EXACTLY what format to use!
+- **For complex insights**: ALWAYS use Method 3 (9-line format) - this is the most reliable approach
+- **Never skip lines**: Each line must have content  
+- **Exact format**: Line 9 must be significance number only (1-10)
+- **Use piped input**: Much more reliable than typing manually
+- **Stop struggling**: The error message tells you the format - follow it exactly!
+
+**WORKING EXAMPLE** (copy this pattern):
+```bash
+cat > /tmp/insight.txt << 'EOF'
+VKB CLI Refactoring: Node.js server management
+Complete refactoring to modular Node.js architecture  
+Follows UKB pattern for better maintainability
+Modular architecture improves maintainability significantly  
+Pattern applies to other complex bash script refactoring
+Node.js,Commander.js,Architecture
+https://github.com/tj/commander.js/
+lib/vkb-server/index.js,lib/vkb-server/cli.js
+8
+EOF
+
+ukb --interactive < /tmp/insight.txt
+```
 
 ## 🔍 CRITICAL: Pattern Verification and Compliance
 

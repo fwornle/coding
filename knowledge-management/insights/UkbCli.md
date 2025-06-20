@@ -4,6 +4,29 @@
 
 **UkbCli** is a comprehensive Node.js-based command-line interface for knowledge management, created as a complete refactoring of the original monolithic bash UKB script. It provides a stable, cross-platform API for intelligent session insight capture and knowledge base management.
 
+## 🚨 CRITICAL: Quick Success Pattern
+
+**When ukb --interactive fails, READ THE ERROR MESSAGE!** It tells you exactly what format to use:
+
+```bash
+# For complex insights (most common) - EXACTLY 9 lines:
+cat > /tmp/insight.txt << 'EOF'
+Problem description
+Solution description  
+Rationale
+Key learnings
+Applicability
+Technologies,comma,separated
+https://reference-urls.com
+code-file1.js,code-file2.js
+8
+EOF
+
+ukb --interactive < /tmp/insight.txt
+```
+
+**Never struggle with this again** - the error message shows the required format!
+
 ## Architecture
 
 ### System Design
@@ -83,9 +106,29 @@ The original UKB bash script had grown to over 3000 lines with multiple concerns
 
 ### 1. Interactive Knowledge Capture
 
+#### Method A: Direct Interactive Mode
 ```bash
 # Enhanced interactive session with guided prompts
-ukb-cli --interactive
+ukb --interactive
+```
+
+#### Method B: Piped Input Mode (Recommended for Reliability)
+```bash
+# Create insight file with 9-line format
+cat > /tmp/insight.txt << 'EOF'
+Problem description (line 1)
+Solution description (line 2)
+Rationale for approach (line 3)
+Key learnings (line 4)
+Applicability (line 5)
+Technologies,comma,separated (line 6)
+https://reference-urls.com (line 7)
+code-file1.js,code-file2.js (line 8)
+8 (line 9 - significance 1-10)
+EOF
+
+# Add to knowledge base
+ukb --interactive < /tmp/insight.txt
 ```
 
 **Features:**
@@ -93,6 +136,11 @@ ukb-cli --interactive
 - Real-time content validation
 - URL verification and reference management
 - Category-based organization
+
+**Critical Success Pattern:**
+- **Always use 9-line format** for complex insights
+- **Never skip lines** - each line must have content
+- **Significance must be last line** as single number
 
 **Ideal for:**
 - Complex architectural decisions
@@ -300,6 +348,52 @@ ukb-cli --validate --detailed
 - **Memory Usage**: 50% reduction in memory footprint
 - **Git Analysis**: Incremental processing reduces redundant work
 - **Startup Time**: Sub-second startup vs. multi-second bash script initialization
+
+## Troubleshooting Interactive Mode
+
+### Common Issues and Solutions
+
+#### Issue: "Piped input requires at least 2 lines"
+**Cause:** Input file is empty or has only one line
+**Solution:** READ THE ERROR MESSAGE! It tells you the exact formats:
+- **Format 1 (Simple)**: 2-4 lines (EntityName, EntityType, Significance, Observation)  
+- **Format 2 (Complex)**: Exactly 9 lines (Problem, Solution, Rationale, Learnings, Applicability, Technologies, URLs, CodeFiles, Significance)
+
+**Critical**: The error message shows you exactly what ukb expects - don't ignore it!
+
+#### Issue: Interactive mode hangs or doesn't accept input  
+**Cause:** Direct interactive mode can have input handling issues
+**Solution:** Always use piped input method for reliability:
+```bash
+ukb --interactive < /tmp/insight.txt
+```
+
+#### Issue: Entity created with garbled name
+**Cause:** First line (problem description) used as entity name
+**Solution:** Keep first line concise and descriptive
+
+#### Issue: Missing fields in created entity
+**Cause:** Lines missing or in wrong order
+**Solution:** Follow exact 9-line format:
+1. Problem description
+2. Solution description  
+3. Rationale
+4. Key learnings
+5. Applicability
+6. Technologies (comma-separated)
+7. Reference URLs
+8. Code files (comma-separated)
+9. Significance (1-10)
+
+### Validation Checklist
+
+Before using ukb --interactive:
+- [ ] Input file has exactly 9 lines
+- [ ] No empty lines 
+- [ ] Significance is single number (1-10)
+- [ ] Technologies are comma-separated
+- [ ] URLs are valid
+- [ ] Code files exist in repository
 
 ## Best Practices
 

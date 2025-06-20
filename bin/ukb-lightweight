@@ -33,7 +33,35 @@ case "${1:-}" in
         node "$UKB_CLI" entity list "${@:2}"
         ;;
     "--add-entity")
-        node "$UKB_CLI" entity add --interactive "${@:2}"
+        # Check if parameters are provided for non-interactive mode
+        if [[ $# -gt 1 ]]; then
+            # Parameters provided, check if they include enough for non-interactive mode
+            args=("${@:2}")
+            has_name=false
+            has_type=false
+            has_significance=false
+            has_observation=false
+            
+            for ((i=0; i<${#args[@]}; i++)); do
+                case "${args[i]}" in
+                    "--name") has_name=true ;;
+                    "--type") has_type=true ;;
+                    "--significance") has_significance=true ;;
+                    "--observation") has_observation=true ;;
+                esac
+            done
+            
+            # If we have name and at least one other parameter, use non-interactive mode
+            if [[ "$has_name" == "true" && ("$has_type" == "true" || "$has_significance" == "true" || "$has_observation" == "true") ]]; then
+                node "$UKB_CLI" entity add "${@:2}"
+            else
+                # Not enough parameters, use interactive mode
+                node "$UKB_CLI" entity add --interactive "${@:2}"
+            fi
+        else
+            # No parameters, use interactive mode
+            node "$UKB_CLI" entity add --interactive
+        fi
         ;;
     "--remove-entity")
         if [[ $# -ge 2 ]]; then
