@@ -86,13 +86,56 @@ case "${1:-}" in
             exit 1
         fi
         ;;
+    "--add-observation")
+        if [[ $# -ge 3 ]]; then
+            node "$UKB_CLI" entity add-observation "$2" "$3" "${@:4}"
+        else
+            echo "Error: Entity name and observation required" >&2
+            echo "Usage: ukb --add-observation <entityName> <observation>" >&2
+            exit 1
+        fi
+        ;;
+    "--remove-observation")
+        if [[ $# -ge 3 ]]; then
+            node "$UKB_CLI" entity remove-observation "$2" "$3" "${@:4}"
+        else
+            echo "Error: Entity name and observation required" >&2
+            echo "Usage: ukb --remove-observation <entityName> <observation>" >&2
+            exit 1
+        fi
+        ;;
         
     # Relation management
     "--list-relations"|"--relations")
         node "$UKB_CLI" relation list "${@:2}"
         ;;
     "--add-relation")
-        node "$UKB_CLI" relation add --interactive "${@:2}"
+        # Check if we have parameters for non-interactive mode
+        if [[ $# -gt 1 ]]; then
+            args=("${@:2}")
+            has_from=false
+            has_to=false
+            has_type=false
+            
+            for ((i=0; i<${#args[@]}; i++)); do
+                case "${args[i]}" in
+                    "--from") has_from=true ;;
+                    "--to") has_to=true ;;
+                    "--type") has_type=true ;;
+                esac
+            done
+            
+            # If we have all required parameters, use non-interactive mode
+            if [[ "$has_from" == "true" && "$has_to" == "true" && "$has_type" == "true" ]]; then
+                node "$UKB_CLI" relation add "${@:2}"
+            else
+                # Not enough parameters, use interactive mode
+                node "$UKB_CLI" relation add --interactive "${@:2}"
+            fi
+        else
+            # No parameters, use interactive mode
+            node "$UKB_CLI" relation add --interactive
+        fi
         ;;
     "--remove-relation")
         node "$UKB_CLI" relation remove --interactive "${@:2}"
@@ -198,10 +241,12 @@ ENTITY MANAGEMENT:
     --remove-entity <name> Remove entity
     --search-entities <q>  Search entities
     --rename-entity <old> <new>  Rename entity
+    --add-observation <name> <obs>  Add observation to entity
+    --remove-observation <name> <obs>  Remove observation from entity
 
 RELATION MANAGEMENT:
     --list-relations       List all relations
-    --add-relation         Add relation (interactive)
+    --add-relation         Add relation (interactive or --from --to --type)
     --remove-relation      Remove relation (interactive)
 
 GIT ANALYSIS:
