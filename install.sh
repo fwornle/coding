@@ -692,7 +692,43 @@ CLAUDE_PROJECT_PATH=/path/to/coding/repo
 # Custom paths (optional)
 # CODING_REPO=/path/to/coding/repo
 # MEMORY_VISUALIZER_DIR=/path/to/memory-visualizer
+
+# Knowledge Base path - where shared-memory-*.json files are located
+# Default: same directory as the coding project
+# Can be set to a different path for centralized knowledge management
+CODING_KB_PATH=/path/to/coding/repo
 EOF
+    
+    # Create actual .env file if it doesn't exist
+    if [[ ! -f "$CODING_REPO/.env" ]]; then
+        info "Creating .env file with default settings..."
+        cat > "$CODING_REPO/.env" << EOF
+# Claude Knowledge Management System - Environment Variables
+
+# For browser-access MCP server (optional)
+ANTHROPIC_API_KEY=
+BROWSERBASE_API_KEY=
+BROWSERBASE_PROJECT_ID=
+LOCAL_CDP_URL=ws://localhost:9222
+
+# Project path - automatically set by installer
+CLAUDE_PROJECT_PATH=$CODING_REPO
+
+# Knowledge Base path - where shared-memory-*.json files are located
+# Default: same directory as the coding project
+CODING_KB_PATH=$CODING_REPO
+EOF
+        success ".env file created with project paths"
+    else
+        # Update existing .env file to add CODING_KB_PATH if missing
+        if ! grep -q "CODING_KB_PATH" "$CODING_REPO/.env"; then
+            info "Adding CODING_KB_PATH to existing .env file..."
+            echo "" >> "$CODING_REPO/.env"
+            echo "# Knowledge Base path - where shared-memory-*.json files are located" >> "$CODING_REPO/.env"
+            echo "# Default: same directory as the coding project" >> "$CODING_REPO/.env"
+            echo "CODING_KB_PATH=$CODING_REPO" >> "$CODING_REPO/.env"
+        fi
+    fi
     
     success "Example configuration files created"
 }

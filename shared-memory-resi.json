@@ -1,4 +1,6 @@
 {
+  "displayName": "ReSi",
+  "description": "Real-time streaming and resilience patterns from project Normalisa",
   "entities": [
     {
       "name": "CodingKnowledge",

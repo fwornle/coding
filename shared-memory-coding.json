@@ -1,4 +1,6 @@
 {
+  "displayName": "Coding",
+  "description": "Core coding knowledge management system for development teams",
   "entities": [
     {
       "name": "CodingKnowledge",

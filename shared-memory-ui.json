@@ -1,4 +1,6 @@
 {
+  "displayName": "UI",
+  "description": "User interface patterns and frontend development knowledge",
   "entities": [
     {
       "name": "CodingKnowledge",
