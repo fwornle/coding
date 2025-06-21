@@ -1,6 +1,23 @@
 {
   "entities": [
     {
+      "name": "CodingKnowledge",
+      "entityType": "System",
+      "observations": [
+        "Central hub for high-value, transferable programming patterns",
+        "Contains only proven solutions applicable across multiple projects",
+        "Focus: architectural decisions, performance patterns, reusable designs"
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-16T13:46:12.603Z",
+        "last_updated": "2025-06-18T15:33:31.309Z"
+      },
+      "id": "mc4flkg6hcc20676x5j"
+    },
+    {
       "name": "ViewportCullingPattern",
       "entityType": "TransferablePattern",
       "observations": [

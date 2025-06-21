@@ -1,99 +1,115 @@
 {
   "entities": [
     {
-      "name": "ViewportCullingOptimizationPattern",
-      "entityType": "TransferablePattern",
+      "name": "CodingKnowledge",
+      "entityType": "System",
       "observations": [
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "problem",
-          "content": "Rendering 800+ 3D timeline events causes performance degradation below 60fps and visual jumping"
-        },
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "solution",
-          "content": "Implement balanced marker-centric viewport culling with anti-jump algorithm"
-        },
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "implementation",
-          "content": "Protected zone around marker (maxEvents/4), proportional left-right removal, stride-based thinning"
-        },
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "performance",
-          "content": "75-90% reduction in rendered objects while maintaining smooth 60fps"
-        },
-        {
-          "date": "2025-06-17T16:26:18Z",
-          "metadata": {
-            "source": "semantic-codebase-analysis"
-          },
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/ViewportCullingPattern.md"
-        }
+        "Central hub for high-value, transferable programming patterns",
+        "Contains only proven solutions applicable across multiple projects",
+        "Focus: architectural decisions, performance patterns, reusable designs"
       ],
       "significance": 5,
       "problem": {},
       "solution": {},
       "metadata": {
-        "created_at": "2025-06-18T15:17:44.017Z",
-        "last_updated": "2025-06-19T11:25:29Z"
+        "created_at": "2025-06-16T13:46:12.603Z",
+        "last_updated": "2025-06-18T15:33:31.309Z"
       },
-      "quick_reference": {
-        "trigger": "Rendering 800+ 3D objects causing performance degradation below 60fps",
-        "action": "Implement balanced marker-centric viewport culling with anti-jump algorithm",
-        "avoid": "Naive culling causing visual jumping, rendering all objects regardless of visibility",
-        "check": "75-90% reduction in rendered objects while maintaining smooth 60fps"
-      },
-      "id": "mc4flkg6dvugvlx70vd"
+      "id": "mc4flkg6hcc20676x5j"
     },
     {
-      "id": "a7bbfb49-c5ce-428d-9676-9fd22885ac4d",
-      "name": "ReSiTestPattern",
-      "entityType": "TechnicalPattern",
+      "name": "Normalisa",
+      "entityType": "Project",
       "observations": [
-        "C++ memory optimization pattern for embedded systems"
+        "Real-time data normalization and validation system",
+        "Handles streaming data from multiple sources with different schemas",
+        "Implements advanced pattern matching and transformation pipelines"
       ],
-      "significance": "8",
-      "created": "2025-06-20T11:21:39.109Z",
-      "updated": "2025-06-20T11:21:39.109Z",
+      "significance": 5,
+      "problem": {},
+      "solution": {},
       "metadata": {
-        "created_by": "knowledge-api",
-        "version": "2.0.0"
-      }
+        "created_at": "2025-06-20T19:15:00.000Z",
+        "last_updated": "2025-06-20T19:15:00.000Z"
+      },
+      "id": "normalisa_project"
+    },
+    {
+      "name": "StreamProcessingPattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        "Handle high-volume streaming data with back-pressure and flow control",
+        "Implement windowing strategies for time-based aggregations",
+        "Use reactive streams for memory-efficient processing",
+        "Handles 10K+ events/second with <100ms latency",
+        "Essential for real-time analytics and data normalization systems"
+      ],
+      "significance": 8,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-20T19:15:00.000Z",
+        "last_updated": "2025-06-20T19:15:00.000Z"
+      },
+      "id": "stream_processing_pattern"
+    },
+    {
+      "name": "SchemaEvolutionPattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        "Handle schema changes in streaming data without service disruption",
+        "Implement backward/forward compatibility strategies",
+        "Use schema registry for centralized schema management",
+        "Graceful degradation when encountering unknown fields",
+        "Critical for long-running data processing systems"
+      ],
+      "significance": 7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-20T19:15:00.000Z",
+        "last_updated": "2025-06-20T19:15:00.000Z"
+      },
+      "id": "schema_evolution_pattern"
     }
   ],
-  "relations": [],
+  "relations": [
+    {
+      "from": "CodingKnowledge",
+      "to": "StreamProcessingPattern",
+      "relationType": "contains",
+      "id": "ck_contains_stream"
+    },
+    {
+      "from": "CodingKnowledge",
+      "to": "SchemaEvolutionPattern",
+      "relationType": "contains",
+      "id": "ck_contains_schema"
+    },
+    {
+      "from": "StreamProcessingPattern",
+      "to": "Normalisa",
+      "relationType": "implemented in",
+      "id": "stream_impl_normalisa"
+    },
+    {
+      "from": "SchemaEvolutionPattern",
+      "to": "Normalisa",
+      "relationType": "implemented in",
+      "id": "schema_impl_normalisa"
+    },
+    {
+      "from": "Normalisa",
+      "to": "CodingKnowledge",
+      "relationType": "contributed patterns to",
+      "id": "normalisa_contrib_ck"
+    }
+  ],
   "metadata": {
-    "version": "2.0.0",
-    "created": "2025-06-06T10:00:00Z",
-    "last_updated": "2025-06-20T11:21:39.109Z",
-    "contributors": [
-      "agent-q284340",
-      "q284340"
-    ],
-    "total_entities": 1,
-    "total_relations": 0,
-    "source": "curated_high_value_patterns",
-    "last_mode": "automatic",
-    "schema_version": "2.0.0",
-    "cleanup_performed": "2025-06-18T15:57:54.158Z",
-    "garbage_removal_performed": "2025-06-18T15:57:54.115Z",
-    "team": "resi",
-    "description": "Resilience team knowledge",
-    "created_from_migration": "2025-06-20T11:17:47.390Z"
+    "version": "1.0.0",
+    "created": "2025-06-20T19:15:00.000Z",
+    "contributors": ["Claude"],
+    "total_entities": 4,
+    "total_relations": 5
   }
 }
