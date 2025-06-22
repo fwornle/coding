@@ -1,9 +1,9 @@
 {
   "displayName": "ReSi",
-  "description": "Real-time streaming and resilience patterns from project Normalisa",
+  "description": "Reprocessing and Simulation Framework",
   "entities": [
     {
-      "name": "CodingKnowledge",
+      "name": "CollectiveKnowledge",
       "entityType": "System",
       "observations": [
         "Central hub for high-value, transferable programming patterns",
@@ -77,13 +77,13 @@
   ],
   "relations": [
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "StreamProcessingPattern",
       "relationType": "contains",
       "id": "ck_contains_stream"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "SchemaEvolutionPattern",
       "relationType": "contains",
       "id": "ck_contains_schema"
@@ -102,7 +102,7 @@
     },
     {
       "from": "Normalisa",
-      "to": "CodingKnowledge",
+      "to": "CollectiveKnowledge",
       "relationType": "contributed patterns to",
       "id": "normalisa_contrib_ck"
     }

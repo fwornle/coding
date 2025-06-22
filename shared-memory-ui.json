@@ -3,7 +3,7 @@
   "description": "User interface patterns and frontend development knowledge",
   "entities": [
     {
-      "name": "CodingKnowledge",
+      "name": "CollectiveKnowledge",
       "entityType": "System",
       "observations": [
         "Central hub for high-value, transferable programming patterns",
@@ -606,6 +606,54 @@
       "to": "Timeline",
       "relationType": "implemented in",
       "id": "mc4flkg6bkryix1mh6p"
+    },
+    {
+      "from": "ViewportCullingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_1"
+    },
+    {
+      "from": "ReduxStateManagementPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_2"
+    },
+    {
+      "from": "StateDrivenAnimationPipelinePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_3"
+    },
+    {
+      "from": "StrategyBasedModularRoutingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_4"
+    },
+    {
+      "from": "MVIReduxArchitecturePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_5"
+    },
+    {
+      "from": "ReactThreeFiberIntegrationPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_6"
+    },
+    {
+      "from": "ModularComponentArchitecturePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_7"
+    },
+    {
+      "from": "CustomHookExtractionPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_8"
     }
   ],
   "metadata": {

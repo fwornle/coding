@@ -3,7 +3,7 @@
   "description": "Core coding knowledge management system for development teams",
   "entities": [
     {
-      "name": "CodingKnowledge",
+      "name": "CollectiveKnowledge",
       "entityType": "System",
       "observations": [
         {
@@ -395,43 +395,43 @@
   ],
   "relations": [
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "ConditionalLoggingPattern",
       "relationType": "contains",
       "id": "mc4flkg6c78qfo0he0c"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "ViewportCullingPattern",
       "relationType": "contains",
       "id": "mc4flkg61veut5dayk8"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "ReduxStateManagementPattern",
       "relationType": "contains",
       "id": "mc4flkg6ak7udz49y5g"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "KnowledgePersistencePattern",
       "relationType": "contains",
       "id": "mc4flkg6swfrjor6gga"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "NetworkAwareInstallationPattern",
       "relationType": "contains",
       "id": "mc4flkg6ubsskteya6"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "StateDrivenAnimationPipelinePattern",
       "relationType": "contains",
       "id": "mc4flkg6z71o94387n"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "StrategyBasedModularRoutingPattern",
       "relationType": "contains",
       "id": "mc4flkg6dpa23m2es2"
@@ -462,24 +462,24 @@
     },
     {
       "from": "Timeline",
-      "to": "CodingKnowledge",
+      "to": "CollectiveKnowledge",
       "relationType": "contributed patterns to",
       "id": "mc4flkg6sub3eic7k6j"
     },
     {
       "from": "Coding",
-      "to": "CodingKnowledge",
+      "to": "CollectiveKnowledge",
       "relationType": "contributed patterns to",
       "id": "mc4flkg6i4qquuiciqc"
     },
     {
       "from": "DynArch",
-      "to": "CodingKnowledge",
+      "to": "CollectiveKnowledge",
       "relationType": "contributed patterns to",
       "id": "mc4flkg6azwmpkwyra4"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "MCPMemoryLoggingIntegrationPattern",
       "relationType": "contains",
       "id": "mc4flkg6twd8nga64c"
@@ -491,7 +491,7 @@
       "id": "mc4flkg6f3k123574ub"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "VSCodeExtensionBridgePattern",
       "relationType": "contains",
       "id": "mc4flkg6u4u27srmti"
@@ -509,31 +509,31 @@
       "id": "mc4flkg6xoq3j17tia"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "MVIReduxArchitecturePattern",
       "relationType": "contains",
       "id": "mc4flkg6svbtw1c86fl"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "ViewportCullingOptimizationPattern",
       "relationType": "contains",
       "id": "mc4flkg6r3kezofwmnk"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "ReactThreeFiberIntegrationPattern",
       "relationType": "contains",
       "id": "mc4flkg63ue03rtwfgy"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "CustomHookExtractionPattern",
       "relationType": "contains",
       "id": "mc4flkg65dfcj9gwv6f"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "ModularComponentArchitecturePattern",
       "relationType": "contains",
       "id": "mc4flkg6yuqj8r61trl"
@@ -559,7 +559,7 @@
       "id": "mc4flkg6pq78806nfb"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "CodingWorkflow",
       "relationType": "contains",
       "id": "mc4flkg6qua839tme4"
@@ -579,14 +579,14 @@
       "id": "mc4flkg65x15d7rews5"
     },
     {
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "UkbCli",
       "relationType": "contains",
       "id": "mc4flkg6ylr2gsxbnlh"
     },
     {
       "id": "4b81a6ec-8236-456a-9eba-b6a5b85a1d16",
-      "from": "CodingKnowledge",
+      "from": "CollectiveKnowledge",
       "to": "VkbCli",
       "relationType": "contains",
       "significance": 5,
