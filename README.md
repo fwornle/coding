@@ -50,6 +50,7 @@ For comprehensive documentation, installation guides, architecture details, and 
 - **[Installation Guide](docs/installation/quick-start.md)** - Get started in 30 seconds
 - **[Multi-Team Setup](docs/multi-team-setup.md)** - 🏢 Team-based knowledge isolation
 - **[UKB-CLI User Guide](docs/ukb/user-guide.md)** - Modern knowledge management workflows 
+- **[UKB Use Cases](docs/ukb/use-cases.md)** - 📋 Complete examples and workflows
 - **[UkbCli Technical Architecture](knowledge-management/insights/UkbCli.md)** - Complete technical documentation with diagrams
 - **[VSCode Integration](docs/integrations/vscode-extension.md)** - GitHub Copilot chat integration
 - **[System Architecture](docs/architecture/system-overview.md)** - How it all works
@@ -82,6 +83,47 @@ vkb                  # Visualize your team's knowledge
 - ✅ Migration tools for existing knowledge bases
 
 **→ [Complete Multi-Team Guide](docs/multi-team-setup.md)**
+
+## 📋 Main Use Cases
+
+### 1. **Domain-Specific Knowledge Management**
+Create specialized knowledge bases for different domains (RaaS, UI, DevOps) while maintaining cross-team patterns.
+
+```bash
+cd /path/to/raas-project
+ukb --list-entities  # Auto-creates shared-memory-raas.json
+```
+
+### 2. **Pattern Capture & Sharing**
+Capture reusable solutions and architectural patterns from daily development work.
+
+```bash
+# Capture a bug fix pattern
+ukb insight --interactive
+
+# Quick pattern capture
+echo "ReactHooksPattern\nTechnicalPattern\n8\nUse useCallback for stable references" | ukb --add-entity
+```
+
+### 3. **Cross-Project Learning**
+Apply proven patterns from one project to another through the centralized knowledge system.
+
+```bash
+# Search for applicable patterns
+ukb entity search "authentication"
+ukb relation list -r "implements"
+```
+
+### 4. **Team Onboarding**
+New team members discover domain-specific patterns and architectural decisions quickly.
+
+```bash
+# Export onboarding patterns
+ukb entity list -t "WorkflowPattern" > onboarding-guide.txt
+vkb  # Visualize knowledge graph
+```
+
+**→ [Complete Use Cases with Examples](docs/ukb/use-cases.md)**
 
 ## 🤖 Supported AI Agents
 

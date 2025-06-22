@@ -1,0 +1,111 @@
+@startuml domain-specific-kb-creation
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam handwritten false
+skinparam defaultFontName "Arial"
+
+title Domain-Specific Knowledge Base Creation Workflow
+
+actor "RaaS Developer" as Developer #LightBlue
+participant "Terminal" as Terminal #LightGray
+participant "ukb CLI" as UKB #LightGreen
+participant "ConfigManager" as Config #Yellow
+participant "FileStorageAdapter" as Storage #Orange
+participant "Knowledge API" as API #Pink
+database "CODING_KB_PATH" as KBPATH #LightCyan
+
+Developer -> Terminal: cd /path/to/raas-project
+activate Terminal
+
+Developer -> Terminal: ukb --list-entities
+Terminal -> UKB: Execute command
+activate UKB
+
+UKB -> Config: Load environment variables from coding/.env
+activate Config
+Config -> Config: Set CODING_KB_PATH=/Users/q284340/Agentic/coding
+Config --> UKB: Environment loaded
+deactivate Config
+
+UKB -> Config: _findProjectRoot()
+activate Config
+Config -> Config: Detect project root from "raas" directory
+Config --> UKB: Project root: /path/to/raas-project
+deactivate Config
+
+UKB -> Config: _resolveDefaultStoragePath()
+activate Config
+Config -> Config: projectName = path.basename(projectRoot) = "raas"
+Config -> Config: teamSpecificFile = CODING_KB_PATH + "shared-memory-raas.json"
+Config --> UKB: /Users/q284340/Agentic/coding/shared-memory-raas.json
+deactivate Config
+
+UKB -> Storage: new FileStorageAdapter(config)
+activate Storage
+Storage -> Storage: Set filePath = shared-memory-raas.json
+Storage --> UKB: Storage adapter created
+deactivate Storage
+
+UKB -> API: new KnowledgeAPI()
+activate API
+API -> Storage: initialize()
+activate Storage
+
+Storage -> KBPATH: Check if shared-memory-raas.json exists
+activate KBPATH
+KBPATH --> Storage: File not found
+deactivate KBPATH
+
+Storage --> API: Error: Knowledge base file not found
+deactivate Storage
+API --> UKB: InitError: File not found
+deactivate API
+
+UKB -> UKB: Detect file creation needed
+UKB -> Terminal: Prompt: "Knowledge base file not found. Create a new knowledge base file?"
+Terminal -> Developer: Display prompt
+Developer -> Terminal: "Yes"
+Terminal -> UKB: User confirmed creation
+
+UKB -> API: createNew()
+activate API
+API -> Storage: createNewFile()
+activate Storage
+
+Storage -> Storage: _ensureDirectoryExists()
+Storage -> Storage: _createEmptyFile()
+note right
+Creates file with:
+{
+  "entities": [],
+  "relations": [],
+  "metadata": {
+    "created": "2025-06-22T...",
+    "version": "2.0.0"
+  }
+}
+end note
+
+Storage -> KBPATH: Write shared-memory-raas.json
+activate KBPATH
+KBPATH --> Storage: File created successfully
+deactivate KBPATH
+
+Storage --> API: File created and initialized
+deactivate Storage
+API --> UKB: Knowledge base ready
+deactivate API
+
+UKB -> Terminal: "✅ Created new knowledge base: shared-memory-raas.json"
+UKB -> Terminal: Display empty entities list
+Terminal -> Developer: Show success message and empty list
+deactivate UKB
+deactivate Terminal
+
+note over Developer, KBPATH #LightYellow
+Domain-specific knowledge base is now ready for RaaS patterns.
+Future ukb commands in raas-project will automatically
+use shared-memory-raas.json for team-specific knowledge.
+end note
+
+@enduml

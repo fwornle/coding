@@ -368,9 +368,97 @@ $ echo "$(date +%Y-%m-%d),$(ukb status | grep Entities | awk '{print $2}')" \
     >> reports/kb-growth.csv
 ```
 
+## Domain-Specific Knowledge Management
+
+### Use Case 16: Creating Domain-Specific Knowledge Bases
+
+**Scenario**: Starting a new project in a specialized domain (e.g., Reprocessing as a Service - RaaS) and need to establish domain-specific knowledge while maintaining cross-project patterns.
+
+```bash
+# Step 1: Navigate to domain project directory
+$ cd /path/to/raas-project
+
+# Step 2: First ukb command automatically creates shared-memory-raas.json
+$ ukb --list-entities
+? Knowledge base file not found. Create a new knowledge base file? Yes
+✅ Created new knowledge base: /Users/q284340/Agentic/coding/shared-memory-raas.json
+
+# Step 3: Add first domain entity using piped input
+$ echo "StreamProcessingPipeline
+TechnicalPattern
+8
+Core pattern for real-time data reprocessing with event streaming architecture
+Handles high-throughput data streams with fault tolerance and exactly-once semantics
+Implemented using Apache Kafka + Apache Flink for stream processing
+Essential for any reprocessing service requiring real-time data transformation" | ukb --add-entity
+
+# Step 4: Add service architecture pattern
+$ echo "MicroserviceReprocessingArchitecture
+TechnicalPattern
+9
+Distributed architecture pattern for scalable reprocessing services
+Uses container orchestration with Kubernetes for service deployment
+Event-driven communication between reprocessing microservices
+Implements circuit breaker and retry patterns for resilience
+Auto-scaling based on queue depth and processing time metrics" | ukb --add-entity
+
+# Step 5: Create relationships between patterns
+$ ukb --add-relation
+? From entity: MicroserviceReprocessingArchitecture
+? To entity: StreamProcessingPipeline
+? Relation type: implements
+✅ Created relation: MicroserviceReprocessingArchitecture -[implements]-> StreamProcessingPipeline
+
+# Step 6: Verify domain knowledge base
+$ ukb --print
+```
+
+**Benefits:**
+- **Domain isolation**: RaaS patterns don't pollute other team knowledge bases
+- **Cross-project learning**: Architectural patterns can be shared via `shared-memory-coding.json`
+- **Team-specific expertise**: Domain experts can build specialized knowledge repositories
+- **Onboarding efficiency**: New RaaS team members get domain-specific guidance
+
+**File Structure Result:**
+```
+/Users/q284340/Agentic/coding/
+├── shared-memory-coding.json     # Cross-team patterns
+├── shared-memory-raas.json       # RaaS domain knowledge
+├── shared-memory-ui.json         # UI team knowledge
+└── shared-memory-resi.json       # Resilience team knowledge
+```
+
+**Workflow Sequence:**
+
+![Domain-Specific KB Creation](../images/domain-specific-kb-creation.png)
+
+The diagram shows the complete workflow from project detection to knowledge base creation, highlighting how the system automatically determines the domain-specific file name and creates it in the centralized `CODING_KB_PATH` location.
+
+### Use Case 17: Cross-Domain Pattern Discovery
+
+**Scenario**: Finding reusable patterns across different domain knowledge bases.
+
+```bash
+# Search across all team knowledge bases
+$ cd /Users/q284340/Agentic/coding
+$ grep -l "MicroserviceArchitecture" shared-memory-*.json
+
+shared-memory-raas.json
+shared-memory-resi.json
+
+# Extract domain-specific implementations
+$ ukb --print --team raas | jq '.entities[] | select(.name | contains("Microservice"))'
+$ ukb --print --team resi | jq '.entities[] | select(.name | contains("Microservice"))'
+
+# Create cross-domain pattern in shared knowledge
+$ cd /any/project
+$ ukb entity add -n "CrossDomainMicroservicePattern" -t "ArchitecturePattern" -s 10 \
+    -o "Microservice patterns applicable across RaaS and Resilience domains"
+```
+
 ## Advanced Use Cases
 
-### Use Case 16: Complex Pattern Networks
+### Use Case 18: Complex Pattern Networks
 
 **Scenario**: Model complex architectural patterns with multiple components.
 
