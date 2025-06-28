@@ -106,8 +106,15 @@ echo -e "${BLUE}📚 Cross-project knowledge ready${NC}"
 echo -e "${GREEN}🔧 Knowledge Management Tools Available:${NC}"
 echo -e "  • ${BLUE}ukb${NC} - Update Knowledge Base (captures insights)"
 echo -e "  • ${BLUE}vkb${NC} - View Knowledge Base (visualizes knowledge graph)"
+echo -e "  • ${BLUE}semantic-cli${NC} - Standalone semantic analysis system"
+echo -e "  • ${GREEN}🤖 AI-Powered Tools (via MCP):${NC}"
+echo -e "    - analyze_repository: Intelligent code analysis"
+echo -e "    - analyze_conversation: Extract insights from discussions"
+echo -e "    - search_web: Technical documentation search"
+echo -e "    - start_workflow: Complex multi-agent workflows"
+echo -e "    - sync_with_ukb: Integrate with knowledge base"
 echo -e "  • ${YELLOW}CRITICAL: NEVER edit shared-memory.json directly${NC}"
-echo -e "  • ${YELLOW}ALWAYS use: ukb --interactive or ukb --auto${NC}"
+echo -e "  • ${YELLOW}ALWAYS use: ukb --interactive or AI tools${NC}"
 echo
 
 # Set up post-session conversation logging

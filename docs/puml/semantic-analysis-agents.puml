@@ -1,0 +1,201 @@
+@startuml semantic-analysis-agents
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+title Semantic Analysis System - Agent Architecture
+
+package "Base Agent Framework" {
+  abstract class BaseAgent {
+    +id: string
+    +config: object
+    +logger: Logger
+    +mqttClient: MQTTClient
+    +rpcHandler: RPCHandler
+    --
+    +initialize(): Promise<void>
+    +onInitialize(): Promise<void>
+    +registerRequestHandler(topic, handler)
+    +subscribe(topic, handler)
+    +publish(topic, data)
+    +sendRequest(target, method, params)
+    +onStop(): Promise<void>
+  }
+}
+
+package "Semantic Analysis Agent" {
+  class SemanticAnalysisAgent extends BaseAgent {
+    -llmProvider: LLMProviderInterface
+    -fallbackProvider: LLMProviderInterface
+    -codeAnalyzer: CodeAnalyzer
+    -analysisCache: Map
+    --
+    +analyzeRepository(params): Promise<AnalysisResult>
+    +analyzeConversation(params): Promise<AnalysisResult>
+    +extractPatterns(content, patterns): Promise<Pattern[]>
+    +scoreSignificance(content, context): Promise<number>
+  }
+
+  interface LLMProviderInterface {
+    +analyze(prompt, content, options): Promise<any>
+    +extractPatterns(content, patterns): Promise<Pattern[]>
+    +scoreSignificance(content, context): Promise<number>
+    +validateConfig(): boolean
+  }
+
+  class ClaudeProvider implements LLMProviderInterface {
+    -client: Anthropic
+    -config: ClaudeConfig
+    --
+    +analyze(prompt, content, options): Promise<any>
+    +buildSystemPrompt(analysisType): string
+  }
+
+  class OpenAIProvider implements LLMProviderInterface {
+    -client: OpenAI
+    -config: OpenAIConfig
+    --
+    +analyze(prompt, content, options): Promise<any>
+    +buildSystemPrompt(analysisType): string
+  }
+
+  class CodeAnalyzer {
+    -llmProvider: LLMProviderInterface
+    -config: AnalysisConfig
+    --
+    +analyzeRecentCommits(repoPath, options): Promise<CommitAnalysis[]>
+    +analyzeCommit(repoPath, commit): Promise<CommitAnalysis>
+    +getCommitDiff(repoPath, commitHash): Promise<string>
+    +isRelevantFile(filePath): boolean
+  }
+}
+
+package "Web Search Agent" {
+  class WebSearchAgent extends BaseAgent {
+    -searchProvider: WebSearchProvider
+    -resultProcessor: ResultProcessor
+    -searchCache: Map
+    --
+    +handleWebSearchRequest(data): Promise<SearchResult>
+    +handleTechnicalDocsSearch(data): Promise<SearchResult>
+    +handleBestPracticesSearch(data): Promise<SearchResult>
+  }
+
+  class WebSearchProvider {
+    -config: SearchConfig
+    -searchFunction: Function
+    --
+    +search(query, options): Promise<SearchResult[]>
+    +searchDuckDuckGo(query, options): Promise<SearchResult[]>
+    +searchBing(query, options): Promise<SearchResult[]>
+    +searchGoogle(query, options): Promise<SearchResult[]>
+  }
+
+  class ResultProcessor {
+    -config: ProcessingConfig
+    --
+    +processResults(rawResults, context): Promise<SearchResult[]>
+    +removeDuplicates(results): SearchResult[]
+    +filterByQuality(results): SearchResult[]
+    +scoreRelevance(results, context): SearchResult[]
+  }
+}
+
+package "Knowledge Graph Agent" {
+  class KnowledgeGraphAgent extends BaseAgent {
+    -knowledgeAPI: KnowledgeAPI
+    -ukbIntegration: UkbIntegration
+    -entityProcessor: EntityProcessor
+    -operationQueue: Operation[]
+    --
+    +handleEntityCreateRequest(data): Promise<Entity>
+    +handleEntitySearchRequest(data): Promise<Entity[]>
+    +handleUkbSyncRequest(data): Promise<SyncResult>
+  }
+
+  class KnowledgeAPI {
+    -config: KnowledgeConfig
+    -knowledgeData: KnowledgeBase
+    --
+    +createEntity(entityData): Promise<Entity>
+    +searchEntities(query, filters): Promise<Entity[]>
+    +createRelation(relationData): Promise<Relation>
+    +exportGraph(format, filters): Promise<any>
+  }
+
+  class UkbIntegration {
+    -config: UkbConfig
+    --
+    +syncEntity(entity): Promise<SyncResult>
+    +exportToUkb(): Promise<SyncResult>
+    +importFromUkb(): Promise<SyncResult>
+    +convertEntityToUkbFormat(entity): UkbEntity
+  }
+
+  class EntityProcessor {
+    -config: ProcessingConfig
+    --
+    +processEntity(entityData): Promise<Entity>
+    +extractEntitiesFromCodeAnalysis(result): Promise<Entity[]>
+    +extractEntitiesFromConversation(result): Promise<Entity[]>
+    +extractInsights(analysisData, context): Promise<Insight[]>
+  }
+}
+
+package "Coordinator Agent" {
+  class CoordinatorAgent extends BaseAgent {
+    -workflowEngine: WorkflowEngine
+    -workflowBuilder: WorkflowBuilder
+    -taskScheduler: TaskScheduler
+    -activeWorkflows: Map
+    -agentCapabilities: Map
+    --
+    +handleWorkflowStartRequest(data): Promise<WorkflowExecution>
+    +handleTaskScheduleRequest(data): Promise<ScheduledTask>
+    +discoverAgentCapabilities(): Promise<void>
+  }
+
+  class WorkflowEngine {
+    -workflows: Map
+    -executions: Map
+    -running: boolean
+    --
+    +startWorkflow(workflowId, parameters): Promise<WorkflowExecution>
+    +executeNextStep(execution, eventData): Promise<void>
+    +stopWorkflow(executionId): Promise<void>
+  }
+
+  class WorkflowBuilder {
+    -templates: Map
+    --
+    +createWorkflow(definition): Promise<Workflow>
+    +createRepositoryAnalysisWorkflow(params): Promise<Workflow>
+    +createConversationAnalysisWorkflow(params): Promise<Workflow>
+    +createTechnologyResearchWorkflow(params): Promise<Workflow>
+  }
+
+  class TaskScheduler {
+    -scheduledTasks: Map
+    -runningTasks: Map
+    -running: boolean
+    --
+    +scheduleTask(taskDefinition, schedule): Promise<ScheduledTask>
+    +executeTask(task): Promise<void>
+    +checkScheduledTasks(): void
+  }
+}
+
+' Relationships
+SemanticAnalysisAgent --> LLMProviderInterface : uses
+SemanticAnalysisAgent --> CodeAnalyzer : uses
+WebSearchAgent --> WebSearchProvider : uses
+WebSearchAgent --> ResultProcessor : uses
+KnowledgeGraphAgent --> KnowledgeAPI : uses
+KnowledgeGraphAgent --> UkbIntegration : uses
+KnowledgeGraphAgent --> EntityProcessor : uses
+CoordinatorAgent --> WorkflowEngine : uses
+CoordinatorAgent --> WorkflowBuilder : uses
+CoordinatorAgent --> TaskScheduler : uses
+
+@enduml

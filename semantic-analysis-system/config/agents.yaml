@@ -1,0 +1,146 @@
+# Agent Configuration
+agents:
+  semantic-analysis:
+    enabled: true
+    llm:
+      primary: claude
+      fallback: openai
+      claude:
+        model: claude-3-opus-20240229
+        maxTokens: 4096
+        temperature: 0.3
+      openai:
+        model: gpt-4
+        maxTokens: 4096
+        temperature: 0.3
+    analysis:
+      significanceThreshold: 7
+      maxCommits: 50
+      patterns:
+        - architectural
+        - performance
+        - security
+        - refactoring
+    mqtt:
+      subscriptions:
+        - analysis/requested
+        - git/commit/new
+        - conversation/analyze
+    rpc:
+      methods:
+        - analyzeCode
+        - analyzeConversation
+        - extractPatterns
+        - scoreSignificance
+        
+  web-search:
+    enabled: true
+    providers:
+      - google
+      - duckduckgo
+    rateLimit:
+      requests: 10
+      window: 60000  # 1 minute
+    cache:
+      enabled: true
+      ttl: 3600  # 1 hour
+    mqtt:
+      subscriptions:
+        - search/requested
+        - reference/validate
+    rpc:
+      methods:
+        - search
+        - validateUrl
+        - extractContent
+        
+  knowledge-graph:
+    enabled: true
+    storage:
+      adapter: file
+      path: ${CODING_KB_PATH}/shared-memory.json
+    mcpSync:
+      enabled: true
+      endpoint: localhost:3001
+      syncInterval: 30000  # 30 seconds
+    mqtt:
+      subscriptions:
+        - entity/create
+        - relation/create
+        - knowledge/query
+    rpc:
+      methods:
+        - createEntity
+        - createRelation
+        - searchEntities
+        - getGraph
+        
+  coordinator:
+    enabled: true
+    workflows:
+      codeAnalysis:
+        timeout: 300000  # 5 minutes
+        steps:
+          - agent: semantic-analysis
+            method: analyzeCode
+          - agent: web-search
+            method: searchReferences
+            optional: true
+          - agent: knowledge-graph
+            method: updateKnowledge
+      conversationAnalysis:
+        timeout: 180000  # 3 minutes
+        steps:
+          - agent: semantic-analysis
+            method: analyzeConversation
+          - agent: knowledge-graph
+            method: extractInsights
+    mqtt:
+      subscriptions:
+        - workflow/start
+        - workflow/status
+    rpc:
+      methods:
+        - startWorkflow
+        - getWorkflowStatus
+        - cancelWorkflow
+
+# Infrastructure Configuration
+infrastructure:
+  mqtt:
+    broker:
+      type: embedded  # embedded or external
+      host: ${MQTT_BROKER_HOST}
+      port: ${MQTT_BROKER_PORT}
+      persistence: true
+      qos: 1
+    client:
+      reconnectPeriod: 5000
+      keepalive: 60
+      
+  jsonrpc:
+    server:
+      port: ${JSON_RPC_PORT}
+      host: 0.0.0.0
+    client:
+      timeout: 30000
+      retries: 3
+      
+  monitoring:
+    healthCheck:
+      interval: 30000
+      timeout: 5000
+    metrics:
+      enabled: true
+      port: 9090
+      
+# Logging Configuration
+logging:
+  level: ${LOG_LEVEL}
+  transports:
+    - console
+    - file
+  file:
+    filename: ${LOG_FILE}
+    maxSize: 10m
+    maxFiles: 5

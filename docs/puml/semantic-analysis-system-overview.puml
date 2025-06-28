@@ -1,0 +1,112 @@
+@startuml semantic-analysis-system-overview
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+title Semantic Analysis System - Overview
+
+package "Claude Code Integration" {
+  [Claude Code] as CC
+  [MCP Server] as MCP
+  [semantic-analysis tools] as tools
+}
+
+package "Communication Infrastructure" {
+  [MQTT Broker] as MQTT
+  [JSON-RPC Server] as RPC
+  [Event Bus] as EventBus
+}
+
+package "AI Agents" {
+  [Semantic Analysis Agent] as SA
+  [Web Search Agent] as WS
+  [Knowledge Graph Agent] as KG
+  [Coordinator Agent] as CA
+}
+
+package "LLM Providers" {
+  [Claude Provider] as ClaudeP
+  [OpenAI Provider] as OpenAIP
+}
+
+package "Knowledge Management" {
+  [shared-memory.json] as KB
+  [UKB CLI] as UKB
+  [VKB Viewer] as VKB
+}
+
+package "External Services" {
+  [DuckDuckGo] as DDG
+  [Bing API] as Bing
+  [Google API] as Google
+}
+
+' Claude Code connections
+CC --> MCP : "uses tools"
+MCP --> tools : "exposes"
+
+' Agent connections to infrastructure
+SA --> MQTT : "publishes/subscribes"
+WS --> MQTT : "publishes/subscribes"
+KG --> MQTT : "publishes/subscribes"
+CA --> MQTT : "publishes/subscribes"
+
+SA --> RPC : "request/response"
+WS --> RPC : "request/response"
+KG --> RPC : "request/response"
+CA --> RPC : "request/response"
+
+' Agent capabilities
+SA --> ClaudeP : "primary LLM"
+SA --> OpenAIP : "fallback LLM"
+WS --> DDG : "web search"
+WS --> Bing : "web search"
+WS --> Google : "web search"
+KG --> KB : "reads/writes"
+KG --> UKB : "syncs with"
+
+' Workflow coordination
+CA --> SA : "coordinates"
+CA --> WS : "coordinates"
+CA --> KG : "coordinates"
+
+' User interfaces
+UKB --> KB : "updates"
+VKB --> KB : "visualizes"
+
+' Tool integration
+tools --> SA : "analyze_repository"
+tools --> WS : "search_web"
+tools --> KG : "create_knowledge_entity"
+tools --> CA : "start_workflow"
+
+note right of SA
+  • Code repository analysis
+  • Conversation analysis
+  • Pattern detection
+  • Significance scoring
+end note
+
+note right of WS
+  • Technical documentation search
+  • Best practices discovery
+  • Result filtering & ranking
+  • Multiple search engines
+end note
+
+note right of KG
+  • Entity management
+  • UKB integration
+  • Automatic knowledge capture
+  • Relationship mapping
+end note
+
+note right of CA
+  • Workflow orchestration
+  • Task scheduling
+  • Agent coordination
+  • Failure recovery
+end note
+
+@enduml

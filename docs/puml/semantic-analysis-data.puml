@@ -1,0 +1,365 @@
+@startuml semantic-analysis-data
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+title Semantic Analysis System - Data Architecture
+
+package "Knowledge Graph Schema" {
+  class Entity {
+    +id: string
+    +name: string
+    +entityType: EntityType
+    +significance: number (1-10)
+    +observations: string[]
+    +metadata: EntityMetadata
+    --
+    +addObservation(observation): void
+    +updateSignificance(score): void
+    +toUkbFormat(): UkbEntity
+  }
+
+  class Relation {
+    +id: string
+    +from: string
+    +to: string
+    +relationType: RelationType
+    +metadata: RelationMetadata
+    --
+    +getStrength(): number
+    +isValid(): boolean
+    +reverse(): Relation
+  }
+
+  class EntityMetadata {
+    +created: Date
+    +updated: Date
+    +source: AnalysisType
+    +technologies: string[]
+    +references: string[]
+    +codeFiles: string[]
+    +author: string
+    --
+    +addTechnology(tech): void
+    +addReference(url): void
+    +addCodeFile(path): void
+  }
+
+  class RelationMetadata {
+    +created: Date
+    +strength: number (1-10)
+    +source: AnalysisType
+    +evidence: string[]
+    --
+    +addEvidence(evidence): void
+    +updateStrength(score): void
+  }
+
+  enum EntityType {
+    Pattern
+    Insight
+    Technology
+    Reference
+    ArchitecturalPattern
+    WorkflowPattern
+    TransferableKnowledge
+    CodeExample
+    BestPractice
+  }
+
+  enum RelationType {
+    uses
+    implements
+    extends
+    references
+    dependsOn
+    relatedTo
+    solves
+    appliesTo
+    conflicts
+  }
+
+  enum AnalysisType {
+    code
+    conversation
+    web-search
+    manual
+    workflow
+  }
+}
+
+package "Analysis Results Schema" {
+  class AnalysisResult {
+    +analysisType: AnalysisType
+    +timestamp: Date
+    +source: string
+    +significance: number (1-10)
+    +insights: Insight[]
+    +entities: Entity[]
+    +relations: Relation[]
+    +metadata: AnalysisMetadata
+    --
+    +addInsight(insight): void
+    +addEntity(entity): void
+    +addRelation(relation): void
+    +getHighSignificanceItems(): any[]
+  }
+
+  class Insight {
+    +type: InsightType
+    +title: string
+    +description: string
+    +significance: number (1-10)
+    +applicability: string
+    +technologies: string[]
+    +references: string[]
+    +codeExample: string
+    --
+    +toEntity(): Entity
+    +getApplicabilityScore(context): number
+  }
+
+  class AnalysisMetadata {
+    +requestId: string
+    +parameters: Map
+    +duration: number
+    +llmProvider: string
+    +agentId: string
+    +version: string
+    --
+    +getParameter(key): any
+    +setParameter(key, value): void
+  }
+
+  enum InsightType {
+    pattern
+    architectural
+    performance
+    security
+    maintainability
+    bestPractice
+    antiPattern
+    vulnerability
+  }
+}
+
+package "Search Results Schema" {
+  class SearchResult {
+    +query: string
+    +url: string
+    +title: string
+    +snippet: string
+    +relevanceScore: number (1-10)
+    +source: SearchProvider
+    +metadata: SearchMetadata
+    --
+    +isRelevant(threshold): boolean
+    +toReference(): Reference
+  }
+
+  class SearchMetadata {
+    +timestamp: Date
+    +searchProvider: string
+    +totalResults: number
+    +searchTime: number
+    +filters: Map
+    --
+    +wasFiltered(): boolean
+    +getFilterValue(key): any
+  }
+
+  class Reference {
+    +url: string
+    +title: string
+    +description: string
+    +type: ReferenceType
+    +tags: string[]
+    +verified: boolean
+    --
+    +verify(): Promise<boolean>
+    +addTag(tag): void
+  }
+
+  enum SearchProvider {
+    DuckDuckGo
+    Bing
+    Google
+    TechnicalDocs
+    GitHub
+  }
+
+  enum ReferenceType {
+    documentation
+    tutorial
+    blogPost
+    stackOverflow
+    github
+    officialDocs
+    bestPractices
+  }
+}
+
+package "UKB Integration Schema" {
+  class UkbEntity {
+    +name: string
+    +entityType: string
+    +significance: number
+    +problem: Problem
+    +solution: Solution
+    +observations: string[]
+    --
+    +fromEntity(entity): UkbEntity
+    +toEntity(): Entity
+  }
+
+  class Problem {
+    +description: string
+    +context: string
+    +technologies: string[]
+    --
+    +addContext(context): void
+  }
+
+  class Solution {
+    +approach: string
+    +rationale: string
+    +applicability: string
+    +codeExample: string
+    +references: string[]
+    --
+    +addReference(url): void
+    +setCodeExample(code): void
+  }
+
+  class SyncResult {
+    +direction: SyncDirection
+    +entitiesProcessed: number
+    +entitiesCreated: number
+    +entitiesUpdated: number
+    +errors: SyncError[]
+    +timestamp: Date
+    --
+    +hasErrors(): boolean
+    +getSuccessRate(): number
+  }
+
+  enum SyncDirection {
+    TO_UKB
+    FROM_UKB
+    BIDIRECTIONAL
+  }
+
+  class SyncError {
+    +entityId: string
+    +error: string
+    +severity: ErrorSeverity
+    --
+    +isCritical(): boolean
+  }
+
+  enum ErrorSeverity {
+    WARNING
+    ERROR
+    CRITICAL
+  }
+}
+
+package "Storage and Persistence" {
+  class KnowledgeBase {
+    +entities: Entity[]
+    +relations: Relation[]
+    +metadata: KnowledgeBaseMetadata
+    --
+    +addEntity(entity): void
+    +addRelation(relation): void
+    +searchEntities(query): Entity[]
+    +exportToUkb(): UkbEntity[]
+    +importFromUkb(entities): void
+  }
+
+  class KnowledgeBaseMetadata {
+    +version: string
+    +lastUpdated: Date
+    +totalEntities: number
+    +totalRelations: number
+    +sources: AnalysisType[]
+    --
+    +updateStats(): void
+    +getEntityCount(type): number
+  }
+
+  interface StorageProvider {
+    +save(data, path): Promise<void>
+    +load(path): Promise<any>
+    +exists(path): Promise<boolean>
+    +backup(path): Promise<string>
+  }
+
+  class FileSystemStorage implements StorageProvider {
+    +basePath: string
+    --
+    +save(data, path): Promise<void>
+    +load(path): Promise<any>
+    +exists(path): Promise<boolean>
+    +backup(path): Promise<string>
+  }
+}
+
+' Relationships
+Entity --> EntityMetadata : contains
+Relation --> RelationMetadata : contains
+Entity --> EntityType : has
+Relation --> RelationType : has
+
+AnalysisResult --> Insight : contains
+AnalysisResult --> Entity : contains
+AnalysisResult --> Relation : contains
+AnalysisResult --> AnalysisMetadata : contains
+AnalysisResult --> AnalysisType : has
+
+Insight --> InsightType : has
+Insight --> Entity : converts to
+
+SearchResult --> SearchMetadata : contains
+SearchResult --> Reference : converts to
+SearchResult --> SearchProvider : from
+Reference --> ReferenceType : has
+
+UkbEntity --> Problem : contains
+UkbEntity --> Solution : contains
+UkbEntity --> Entity : converts to/from
+
+KnowledgeBase --> Entity : stores
+KnowledgeBase --> Relation : stores
+KnowledgeBase --> KnowledgeBaseMetadata : contains
+KnowledgeBase --> StorageProvider : uses
+
+SyncResult --> SyncError : contains
+SyncResult --> SyncDirection : has
+
+note top of Entity
+  **Core Knowledge Entity**
+  - Represents any piece of knowledge
+  - Compatible with UKB format
+  - Rich metadata for context
+  - Significance scoring (1-10)
+end note
+
+note top of AnalysisResult
+  **Analysis Output Format**
+  - Standard result from all agents
+  - Contains extracted insights
+  - Ready for knowledge graph insertion
+  - Includes source attribution
+end note
+
+note top of UkbEntity
+  **UKB Compatibility Layer**
+  - Bidirectional conversion
+  - Preserves existing format
+  - Enables gradual migration
+  - Maintains backward compatibility
+end note
+
+@enduml

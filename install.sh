@@ -473,6 +473,26 @@ exec "$CODING_REPO/knowledge-management/vkb" "$@"
 EOF
     chmod +x "$bin_dir/vkb"
     
+    # Create semantic-cli wrapper (if semantic analysis system exists)
+    if [[ -d "$CODING_REPO/semantic-analysis-system" ]]; then
+        cat > "$bin_dir/semantic-cli" << 'EOF'
+#!/bin/bash
+# Semantic Analysis System CLI wrapper
+CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
+SEMANTIC_DIR="$CODING_REPO/semantic-analysis-system"
+
+if [[ ! -d "$SEMANTIC_DIR" ]]; then
+    echo "Error: Semantic analysis system not found at $SEMANTIC_DIR" >&2
+    exit 1
+fi
+
+cd "$SEMANTIC_DIR"
+node index.js "$@"
+EOF
+        chmod +x "$bin_dir/semantic-cli"
+        info "Created semantic-cli wrapper"
+    fi
+    
     # Note: Original scripts now use dynamic repo detection, no need to update paths
     
     success "Command wrappers created"
@@ -697,6 +717,21 @@ CLAUDE_PROJECT_PATH=/path/to/coding/repo
 # Default: same directory as the coding project
 # Can be set to a different path for centralized knowledge management
 CODING_KB_PATH=/path/to/coding/repo
+
+# Semantic Analysis System (optional)
+# LLM Provider Configuration
+# ANTHROPIC_API_KEY=your-anthropic-api-key
+# OPENAI_API_KEY=your-openai-api-key
+# DEFAULT_LLM_PROVIDER=claude
+
+# Communication Infrastructure
+# MQTT_BROKER_HOST=localhost
+# MQTT_BROKER_PORT=1883
+# JSON_RPC_PORT=8080
+# MCP_SERVER_PORT=3002
+
+# Logging
+# LOG_LEVEL=info
 EOF
     
     # Create actual .env file if it doesn't exist
@@ -773,6 +808,17 @@ verify_installation() {
         success "Claude-logger MCP server is built"
     else
         warning "Claude-logger MCP server not built"
+    fi
+    
+    # Check semantic analysis system
+    if [[ -d "$CODING_REPO/semantic-analysis-system" ]]; then
+        if [[ -f "$CODING_REPO/semantic-analysis-system/package.json" ]] && [[ -d "$CODING_REPO/semantic-analysis-system/node_modules" ]]; then
+            success "Semantic analysis system is installed"
+        else
+            warning "Semantic analysis system dependencies not properly installed"
+        fi
+    else
+        info "Semantic analysis system not found (optional component)"
     fi
     
     if [[ $errors -eq 0 ]]; then
@@ -938,6 +984,94 @@ install_node_dependencies() {
     fi
 }
 
+# Install semantic-analysis-system
+install_semantic_analysis_system() {
+    echo -e "\n${CYAN}🧠 Installing semantic-analysis-system...${NC}"
+    
+    local semantic_dir="$CODING_REPO/semantic-analysis-system"
+    
+    if [ -d "$semantic_dir" ]; then
+        info "Semantic analysis system directory exists, updating dependencies..."
+        cd "$semantic_dir"
+        
+        if npm install; then
+            success "✓ Semantic analysis system dependencies updated"
+        else
+            warning "Failed to update semantic analysis system dependencies"
+            INSTALLATION_WARNINGS+=("semantic-analysis-system dependencies failed")
+            return 1
+        fi
+    else
+        warning "Semantic analysis system directory not found at $semantic_dir"
+        info "This is expected if you haven't created the system yet."
+        return 0
+    fi
+    
+    # Create environment file if it doesn't exist
+    if [ ! -f "$semantic_dir/.env" ]; then
+        info "Creating .env file for semantic analysis system..."
+        cp "$semantic_dir/.env.example" "$semantic_dir/.env" 2>/dev/null || {
+            # Create basic .env if example doesn't exist
+            cat > "$semantic_dir/.env" << EOF
+# Semantic Analysis System Environment Variables
+
+# LLM Provider Configuration
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+OPENAI_API_KEY=${OPENAI_API_KEY:-}
+DEFAULT_LLM_PROVIDER=claude
+
+# Communication Infrastructure
+MQTT_BROKER_HOST=localhost
+MQTT_BROKER_PORT=1883
+JSON_RPC_PORT=8080
+
+# Knowledge Base Path
+CODING_KB_PATH=$CODING_REPO
+KNOWLEDGE_BASE_FILE=shared-memory.json
+
+# MCP Server Configuration
+MCP_SERVER_PORT=3002
+MCP_SERVER_NAME=semantic-analysis-tools
+
+# Logging
+LOG_LEVEL=info
+LOG_FILE=logs/semantic-analysis.log
+
+# Development
+NODE_ENV=development
+EOF
+        }
+        success "✓ Semantic analysis system environment configured"
+    else
+        info "Semantic analysis system .env file already exists"
+    fi
+    
+    # Create logs directory
+    mkdir -p "$semantic_dir/logs"
+    
+    # Test the system (basic validation)
+    info "Validating semantic analysis system configuration..."
+    cd "$semantic_dir"
+    
+    if node -e "
+        try {
+            require('./package.json');
+            console.log('✓ Package.json is valid');
+        } catch(e) {
+            console.error('✗ Package.json validation failed:', e.message);
+            process.exit(1);
+        }
+    " 2>/dev/null; then
+        success "✓ Semantic analysis system configuration validated"
+    else
+        warning "Semantic analysis system configuration validation failed"
+        INSTALLATION_WARNINGS+=("semantic-analysis-system validation failed")
+    fi
+    
+    cd "$CODING_REPO"
+    success "Semantic analysis system installation completed"
+}
+
 # Create unified launcher
 setup_unified_launcher() {
     info "Setting up unified launcher..."
@@ -1045,6 +1179,7 @@ main() {
     detect_agents
     configure_team_setup
     install_node_dependencies
+    install_semantic_analysis_system
     detect_network_and_set_repos
     test_proxy_connectivity
     install_memory_visualizer

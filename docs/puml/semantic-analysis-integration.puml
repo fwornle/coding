@@ -1,0 +1,266 @@
+@startuml semantic-analysis-integration
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+title Semantic Analysis System - Integration Architecture
+
+package "Claude Code Integration Layer" {
+  component [Claude Code] as CC
+  note right of CC
+    • Primary user interface
+    • Tool-based interaction
+    • Context-aware operations
+    • Session management
+  end note
+
+  component [MCP Server] as MCP
+  interface "Tool Interface" as ToolIface
+  note right of MCP
+    • Tool exposure layer
+    • Request routing
+    • Response aggregation
+    • Error handling
+  end note
+
+  component [Knowledge Sync Manager] as KnowledgeSync
+  note right of KnowledgeSync
+    • Auto-loads knowledge base
+    • Syncs with MCP memory
+    • Manages startup process
+    • Handles migrations
+  end note
+
+  component [Conversation Logger] as ConvLogger
+  note right of ConvLogger
+    • Post-session capture
+    • Content analysis
+    • Smart routing
+    • History management
+  end note
+}
+
+package "Traditional Tools Integration" {
+  component [UKB CLI] as UKB
+  interface "Command Interface" as UKBIface
+  note right of UKB
+    • Manual knowledge entry
+    • Interactive mode
+    • Batch processing
+    • Legacy compatibility
+  end note
+
+  component [VKB Viewer] as VKB
+  interface "Web Interface" as VKBIface
+  note right of VKB
+    • Knowledge visualization
+    • Graph exploration
+    • Entity details
+    • Relationship mapping
+  end note
+
+  component [shared-memory.json] as SharedMemory
+  note right of SharedMemory
+    • Central knowledge store
+    • Git-tracked persistence
+    • Cross-session continuity
+    • Team collaboration
+  end note
+}
+
+package "Semantic Analysis Agents" {
+  component [Semantic Analysis Agent] as SA
+  component [Web Search Agent] as WS
+  component [Knowledge Graph Agent] as KG
+  component [Coordinator Agent] as CA
+}
+
+package "External Integrations" {
+  component [Claude API] as ClaudeAPI
+  note right of ClaudeAPI
+    • Primary LLM provider
+    • Advanced reasoning
+    • Code analysis
+    • Pattern detection
+  end note
+
+  component [OpenAI API] as OpenAIAPI
+  note right of OpenAIAPI
+    • Fallback LLM provider
+    • Alternative analysis
+    • Cost optimization
+    • Provider diversity
+  end note
+
+  component [Search Engines] as SearchEngines
+  component [DuckDuckGo] as DDG
+  component [Bing API] as Bing
+  component [Google API] as Google
+  note right of SearchEngines
+    • Multi-source search
+    • Technical documentation
+    • Best practices
+    • Reference materials
+  end note
+
+  component [Project Files] as ProjectFiles
+  component [Git Repository] as GitRepo
+  component [Conversation Logs] as ConvLogs
+  component [.specstory/history] as SpecStory
+  note right of ProjectFiles
+    • Source code analysis
+    • Commit history
+    • Conversation capture
+    • Historical context
+  end note
+}
+
+' Claude Code Integration Flow
+CC --> MCP : tool calls
+MCP --> ToolIface
+ToolIface --> SA : analyze_repository
+ToolIface --> WS : search_web
+ToolIface --> KG : create_knowledge_entity
+ToolIface --> CA : start_workflow
+
+MCP --> KnowledgeSync : startup
+KnowledgeSync --> SharedMemory : load
+KnowledgeSync --> MCP : sync memory
+
+CC --> ConvLogger : session end
+ConvLogger --> SpecStory : save logs
+ConvLogger --> SA : analyze conversation
+
+' Traditional Tools Integration
+UKB --> UKBIface
+UKBIface --> SharedMemory : read/write
+VKB --> VKBIface
+VKBIface --> SharedMemory : read
+KG --> SharedMemory : sync
+
+' Agent External Connections
+SA --> ClaudeAPI : primary analysis
+SA --> OpenAIAPI : fallback analysis
+SA --> GitRepo : code analysis
+SA --> ConvLogs : conversation analysis
+
+WS --> DDG : web search
+WS --> Bing : api search
+WS --> Google : custom search
+
+KG --> SharedMemory : knowledge persistence
+CA --> SA : coordinate analysis
+CA --> WS : coordinate search
+CA --> KG : coordinate knowledge
+
+' Bidirectional Knowledge Flow
+SharedMemory <--> KG : sync entities
+KG <--> SA : analysis results
+KG <--> WS : search results
+KG <--> CA : workflow results
+
+package "Integration Patterns" {
+  rectangle "Startup Integration" as StartupPattern {
+    [claude-mcp command] --> [MCP Config Load]
+    [MCP Config Load] --> [Knowledge Sync]
+    [Knowledge Sync] --> [Agent Startup]
+    [Agent Startup] --> [Claude Code Ready]
+    
+    note bottom
+      **Startup Sequence:**
+      1. claude-mcp loads configuration
+      2. Knowledge base syncs to MCP memory
+      3. Agents start and register capabilities
+      4. Claude Code becomes available with AI tools
+    end note
+  }
+
+  rectangle "Knowledge Synchronization" as SyncPattern {
+    [AI Analysis] --> [Knowledge Graph Agent]
+    [Knowledge Graph Agent] --> [Entity Creation]
+    [Entity Creation] --> [shared-memory.json]
+    [shared-memory.json] --> [UKB/VKB Tools]
+    
+    note bottom
+      **Sync Pattern:**
+      - AI tools create entities automatically
+      - Changes persist to shared-memory.json
+      - Traditional tools see AI-generated knowledge
+      - Bidirectional compatibility maintained
+    end note
+  }
+
+  rectangle "Conversation Logging" as LogPattern {
+    [Claude Session] --> [Session End]
+    [Session End] --> [Post-Session Logger]
+    [Post-Session Logger] --> [Content Analysis]
+    [Content Analysis] --> [Smart Routing]
+    [Smart Routing] --> [.specstory/history]
+    
+    note bottom
+      **Logging Pattern:**
+      - Sessions automatically captured
+      - Content analyzed for project relevance
+      - Routed to appropriate history directory
+      - Available for future analysis
+    end note
+  }
+
+  rectangle "Workflow Orchestration" as WorkflowPattern {
+    [User Request] --> [MCP Tool Call]
+    [MCP Tool Call] --> [Coordinator Agent]
+    [Coordinator Agent] --> [Multi-Agent Workflow]
+    [Multi-Agent Workflow] --> [Result Aggregation]
+    [Result Aggregation] --> [Knowledge Update]
+    [Knowledge Update] --> [User Response]
+    
+    note bottom
+      **Workflow Pattern:**
+      - Complex tasks use orchestration
+      - Multiple agents work together
+      - Results automatically captured
+      - Knowledge base updated seamlessly
+    end note
+  }
+}
+
+package "Migration and Compatibility" {
+  rectangle "Backward Compatibility" as BackwardCompat {
+    [Existing UKB Data] --> [Format Validation]
+    [Format Validation] --> [AI Enhancement]
+    [AI Enhancement] --> [Enriched Entities]
+    [Enriched Entities] --> [Traditional Tools]
+    
+    note bottom
+      **Compatibility Strategy:**
+      - Existing data remains valid
+      - AI tools enhance but don't replace
+      - Traditional workflows continue working
+      - Gradual adoption possible
+    end note
+  }
+
+  rectangle "Data Migration" as DataMigration {
+    [Legacy Entities] --> [Structure Analysis]
+    [Structure Analysis] --> [Metadata Enhancement]
+    [Metadata Enhancement] --> [Relationship Discovery]
+    [Relationship Discovery] --> [Enhanced Knowledge]
+    
+    note bottom
+      **Migration Benefits:**
+      - Automatic relationship detection
+      - Enhanced metadata extraction
+      - Improved categorization
+      - Better searchability
+    end note
+  }
+}
+
+' Integration timing
+StartupPattern --> SyncPattern : "on startup"
+LogPattern --> SyncPattern : "periodic"
+WorkflowPattern --> SyncPattern : "on completion"
+BackwardCompat --> DataMigration : "optional"
+
+@enduml

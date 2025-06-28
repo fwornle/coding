@@ -1,0 +1,216 @@
+@startuml semantic-analysis-workflows
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+title Semantic Analysis System - Workflow Architecture
+
+package "Workflow Engine" {
+  class WorkflowBuilder {
+    -templates: Map
+    --
+    +createWorkflow(definition): Workflow
+    +createRepositoryAnalysisWorkflow(params): Workflow
+    +createConversationAnalysisWorkflow(params): Workflow
+    +createTechnologyResearchWorkflow(params): Workflow
+    +validateWorkflow(workflow): boolean
+  }
+
+  class WorkflowEngine {
+    -workflows: Map
+    -executions: Map
+    -running: boolean
+    --
+    +startWorkflow(workflowId, parameters): WorkflowExecution
+    +executeNextStep(execution, eventData): Promise<void>
+    +stopWorkflow(executionId): Promise<void>
+    +getWorkflowStatus(executionId): WorkflowStatus
+  }
+
+  class TaskScheduler {
+    -scheduledTasks: Map
+    -runningTasks: Map
+    -running: boolean
+    --
+    +scheduleTask(taskDefinition, schedule): ScheduledTask
+    +executeTask(task): Promise<void>
+    +checkScheduledTasks(): void
+    +getTaskStatus(taskId): TaskStatus
+  }
+}
+
+package "Workflow Types" {
+  class RepositoryAnalysisWorkflow {
+    +steps: Step[]
+    --
+    1. analyze-repository
+    2. extract-technologies
+    3. search-best-practices
+    4. create-knowledge-entities
+    5. sync-with-ukb
+  }
+
+  class ConversationAnalysisWorkflow {
+    +steps: Step[]
+    --
+    1. analyze-conversation
+    2. extract-insights
+    3. search-related-topics
+    4. create-knowledge-entities
+    5. update-relationships
+  }
+
+  class TechnologyResearchWorkflow {
+    +steps: Step[]
+    --
+    1. search-documentation
+    2. search-best-practices
+    3. search-comparisons
+    4. analyze-results
+    5. create-summary-entity
+  }
+
+  class CustomWorkflow {
+    +steps: Step[]
+    +parameters: Map
+    --
+    +addStep(step): void
+    +removeStep(index): void
+    +validate(): boolean
+  }
+}
+
+package "Step Types" {
+  abstract class WorkflowStep {
+    +id: string
+    +type: StepType
+    +agent: string
+    +parameters: Map
+    +dependencies: string[]
+    --
+    +execute(context): Promise<StepResult>
+    +validate(): boolean
+  }
+
+  class AgentStep extends WorkflowStep {
+    +agentId: string
+    +method: string
+    --
+    +execute(context): Promise<StepResult>
+  }
+
+  class TransformStep extends WorkflowStep {
+    +transformer: Function
+    --
+    +execute(context): Promise<StepResult>
+  }
+
+  class ConditionalStep extends WorkflowStep {
+    +condition: Function
+    +trueBranch: WorkflowStep[]
+    +falseBranch: WorkflowStep[]
+    --
+    +execute(context): Promise<StepResult>
+  }
+
+  class ParallelStep extends WorkflowStep {
+    +parallelSteps: WorkflowStep[]
+    --
+    +execute(context): Promise<StepResult>
+  }
+}
+
+package "Execution Management" {
+  class WorkflowExecution {
+    +id: string
+    +workflowId: string
+    +status: ExecutionStatus
+    +currentStep: number
+    +context: Map
+    +results: StepResult[]
+    +startTime: Date
+    +endTime: Date
+    --
+    +getCurrentStep(): WorkflowStep
+    +addResult(result): void
+    +getContext(key): any
+    +setContext(key, value): void
+  }
+
+  class StepResult {
+    +stepId: string
+    +status: StepStatus
+    +data: any
+    +error: Error
+    +duration: number
+    +timestamp: Date
+    --
+    +isSuccess(): boolean
+    +getError(): Error
+  }
+
+  enum ExecutionStatus {
+    PENDING
+    RUNNING
+    COMPLETED
+    FAILED
+    CANCELLED
+  }
+
+  enum StepStatus {
+    PENDING
+    RUNNING
+    COMPLETED
+    FAILED
+    SKIPPED
+  }
+}
+
+' Relationships
+WorkflowBuilder --> RepositoryAnalysisWorkflow : creates
+WorkflowBuilder --> ConversationAnalysisWorkflow : creates
+WorkflowBuilder --> TechnologyResearchWorkflow : creates
+WorkflowBuilder --> CustomWorkflow : creates
+
+WorkflowEngine --> WorkflowExecution : manages
+WorkflowExecution --> StepResult : contains
+WorkflowStep --> StepResult : produces
+
+TaskScheduler --> WorkflowEngine : triggers
+WorkflowEngine --> WorkflowStep : executes
+
+' Step inheritance
+AgentStep --|> WorkflowStep
+TransformStep --|> WorkflowStep
+ConditionalStep --|> WorkflowStep
+ParallelStep --|> WorkflowStep
+
+note top of RepositoryAnalysisWorkflow
+  **Repository Analysis Workflow:**
+  1. analyze-repository → Semantic Analysis Agent
+  2. extract-technologies → Transform step
+  3. search-best-practices → Web Search Agent
+  4. create-knowledge-entities → Knowledge Graph Agent
+  5. sync-with-ukb → Knowledge Graph Agent
+end note
+
+note top of ConversationAnalysisWorkflow
+  **Conversation Analysis Workflow:**
+  1. analyze-conversation → Semantic Analysis Agent
+  2. extract-insights → Transform step
+  3. search-related-topics → Web Search Agent
+  4. create-knowledge-entities → Knowledge Graph Agent
+  5. update-relationships → Knowledge Graph Agent
+end note
+
+note top of TechnologyResearchWorkflow
+  **Technology Research Workflow:**
+  1. search-documentation → Web Search Agent
+  2. search-best-practices → Web Search Agent
+  3. search-comparisons → Web Search Agent
+  4. analyze-results → Semantic Analysis Agent
+  5. create-summary-entity → Knowledge Graph Agent
+end note
+
+@enduml

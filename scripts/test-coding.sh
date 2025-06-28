@@ -1151,6 +1151,228 @@ else
 fi
 
 # =============================================================================
+# PHASE 11: SEMANTIC ANALYSIS SYSTEM
+# =============================================================================
+
+print_section "PHASE 11: Semantic Analysis System"
+
+print_test "Semantic analysis system installation"
+
+print_check "Semantic analysis system directory"
+if dir_exists "$CODING_ROOT/semantic-analysis-system"; then
+    print_pass "Semantic analysis system directory found"
+else
+    print_fail "Semantic analysis system directory not found"
+    print_repair "Creating semantic analysis system directory..."
+    mkdir -p "$CODING_ROOT/semantic-analysis-system"
+    print_fixed "Semantic analysis system directory created"
+fi
+
+print_check "Semantic analysis package.json"
+if file_exists "$CODING_ROOT/semantic-analysis-system/package.json"; then
+    print_pass "package.json found"
+else
+    print_fail "package.json not found"
+    print_repair "Running installation to create semantic analysis system..."
+    cd "$CODING_ROOT" && ./install.sh
+    print_fixed "Installation completed"
+fi
+
+print_check "Semantic analysis dependencies"
+cd "$CODING_ROOT/semantic-analysis-system"
+if [ -d "node_modules" ] && [ -f "package-lock.json" ]; then
+    print_pass "Node modules installed"
+else
+    print_fail "Dependencies not installed"
+    print_repair "Installing semantic analysis dependencies..."
+    if command_exists npm; then
+        npm install >/dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            print_fixed "Dependencies installed successfully"
+        else
+            print_fail "Failed to install dependencies"
+        fi
+    else
+        print_fail "npm not available for dependency installation"
+    fi
+fi
+
+print_check "Semantic analysis configuration"
+if file_exists "$CODING_ROOT/semantic-analysis-system/.env"; then
+    print_pass ".env file found"
+else
+    print_fail ".env file not found"
+    print_repair "Creating .env file from template..."
+    if file_exists "$CODING_ROOT/semantic-analysis-system/.env.example"; then
+        cp "$CODING_ROOT/semantic-analysis-system/.env.example" "$CODING_ROOT/semantic-analysis-system/.env"
+        print_fixed ".env file created from template"
+    else
+        print_fail ".env.example template not found"
+    fi
+fi
+
+print_test "Semantic analysis core components"
+
+print_check "Base agent framework"
+if file_exists "$CODING_ROOT/semantic-analysis-system/framework/base-agent.js"; then
+    print_pass "Base agent framework found"
+else
+    print_fail "Base agent framework not found"
+fi
+
+print_check "Communication infrastructure"
+MQTT_BROKER="$CODING_ROOT/semantic-analysis-system/infrastructure/mqtt/broker.js"
+RPC_SERVER="$CODING_ROOT/semantic-analysis-system/infrastructure/rpc/server.js"
+if file_exists "$MQTT_BROKER" && file_exists "$RPC_SERVER"; then
+    print_pass "Communication infrastructure found"
+else
+    print_fail "Communication infrastructure incomplete"
+fi
+
+print_check "Semantic analysis agent"
+if file_exists "$CODING_ROOT/semantic-analysis-system/agents/semantic-analysis/index.js"; then
+    print_pass "Semantic analysis agent found"
+else
+    print_fail "Semantic analysis agent not found"
+fi
+
+print_check "LLM providers"
+CLAUDE_PROVIDER="$CODING_ROOT/semantic-analysis-system/agents/semantic-analysis/providers/claude-provider.js"
+OPENAI_PROVIDER="$CODING_ROOT/semantic-analysis-system/agents/semantic-analysis/providers/openai-provider.js"
+if file_exists "$CLAUDE_PROVIDER" && file_exists "$OPENAI_PROVIDER"; then
+    print_pass "LLM providers found"
+else
+    print_fail "LLM providers incomplete"
+fi
+
+print_test "Semantic CLI wrapper"
+
+print_check "semantic-cli command availability"
+if command_exists semantic-cli; then
+    print_pass "semantic-cli command found"
+    SEMANTIC_CLI_LOCATION=$(which semantic-cli)
+    print_info "Location: $SEMANTIC_CLI_LOCATION"
+else
+    print_fail "semantic-cli command not found"
+    print_repair "Running installation to create semantic-cli wrapper..."
+    cd "$CODING_ROOT" && ./install.sh
+    print_fixed "Installation completed - semantic-cli should now be available"
+fi
+
+print_test "Environment variables for semantic analysis"
+
+print_check "CODING_TOOLS_PATH for semantic system"
+if [ -n "$CODING_TOOLS_PATH" ] && [ "$CODING_TOOLS_PATH" = "$CODING_ROOT" ]; then
+    print_pass "CODING_TOOLS_PATH correctly set for semantic system"
+else
+    print_fail "CODING_TOOLS_PATH not properly configured"
+    print_repair "Setting CODING_TOOLS_PATH..."
+    export CODING_TOOLS_PATH="$CODING_ROOT"
+    print_fixed "CODING_TOOLS_PATH set to $CODING_ROOT"
+fi
+
+print_check "LLM API keys configuration"
+LLM_CONFIGURED=false
+if [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$CLAUDE_API_KEY" ]; then
+    print_pass "Claude API key configured"
+    LLM_CONFIGURED=true
+elif [ -n "$OPENAI_API_KEY" ]; then
+    print_pass "OpenAI API key configured"
+    LLM_CONFIGURED=true
+else
+    print_warning "No LLM API keys found in environment"
+    print_info "Set ANTHROPIC_API_KEY or OPENAI_API_KEY for semantic analysis"
+fi
+
+print_test "Semantic analysis system functionality"
+
+cd "$CODING_ROOT/semantic-analysis-system"
+
+print_check "Node.js syntax validation"
+if command_exists node; then
+    # Test basic syntax of key files
+    SYNTAX_ERRORS=0
+    
+    for file in "framework/base-agent.js" "agents/semantic-analysis/index.js" "shared/logger.js"; do
+        if file_exists "$file"; then
+            if node -c "$file" 2>/dev/null; then
+                continue
+            else
+                SYNTAX_ERRORS=$((SYNTAX_ERRORS + 1))
+            fi
+        fi
+    done
+    
+    if [ $SYNTAX_ERRORS -eq 0 ]; then
+        print_pass "JavaScript syntax validation passed"
+    else
+        print_fail "JavaScript syntax errors found ($SYNTAX_ERRORS files)"
+    fi
+else
+    print_warning "Node.js not available for syntax validation"
+fi
+
+print_check "Configuration file validation"
+if file_exists "config/agents.yaml"; then
+    print_pass "Agent configuration file found"
+else
+    print_fail "Agent configuration file missing"
+fi
+
+if file_exists ".env"; then
+    # Check if .env has required structure
+    if grep -q "NODE_ENV=" ".env" && grep -q "LOG_LEVEL=" ".env"; then
+        print_pass "Environment configuration appears valid"
+    else
+        print_warning "Environment configuration may be incomplete"
+    fi
+else
+    print_fail "Environment configuration file missing"
+fi
+
+print_test "Integration with existing knowledge system"
+
+print_check "Shared memory access"
+if file_exists "$CODING_ROOT/shared-memory.json"; then
+    print_pass "Shared memory file accessible"
+else
+    print_fail "Shared memory file not found"
+    print_repair "Creating shared-memory.json..."
+    echo '{"entities":[],"relations":[],"metadata":{"version":"1.0.0"}}' > "$CODING_ROOT/shared-memory.json"
+    print_fixed "Shared memory file created"
+fi
+
+print_check "UKB integration paths"
+if [ -n "$CODING_TOOLS_PATH" ] && file_exists "$CODING_TOOLS_PATH/bin/ukb"; then
+    print_pass "UKB integration path verified"
+else
+    print_fail "UKB integration path not properly configured"
+fi
+
+# Final semantic analysis system assessment
+SEMANTIC_ERRORS=0
+if ! dir_exists "$CODING_ROOT/semantic-analysis-system"; then
+    SEMANTIC_ERRORS=$((SEMANTIC_ERRORS + 1))
+fi
+if ! file_exists "$CODING_ROOT/semantic-analysis-system/package.json"; then
+    SEMANTIC_ERRORS=$((SEMANTIC_ERRORS + 1))
+fi
+if ! file_exists "$CODING_ROOT/semantic-analysis-system/agents/semantic-analysis/index.js"; then
+    SEMANTIC_ERRORS=$((SEMANTIC_ERRORS + 1))
+fi
+
+if [ $SEMANTIC_ERRORS -eq 0 ]; then
+    if [ "$LLM_CONFIGURED" = true ]; then
+        print_pass "Semantic Analysis System fully operational"
+    else
+        print_warning "Semantic Analysis System ready (requires LLM API key configuration)"
+        print_info "Set ANTHROPIC_API_KEY or OPENAI_API_KEY to enable semantic analysis"
+    fi
+else
+    print_fail "Semantic Analysis System has configuration issues ($SEMANTIC_ERRORS critical errors)"
+fi
+
+# =============================================================================
 # SUMMARY REPORT
 # =============================================================================
 
@@ -1182,6 +1404,7 @@ echo -e "\n${BOLD}Quick Start Commands:${NC}"
 echo -e "  ${CYAN}ukb${NC}                    # Update knowledge base"
 echo -e "  ${CYAN}vkb${NC}                    # View knowledge graph (standalone)"
 echo -e "  ${CYAN}vkb fg${NC}                 # View knowledge graph (foreground/debug mode)"
+echo -e "  ${CYAN}semantic-cli${NC}           # Standalone semantic analysis system"
 echo -e "  ${CYAN}claude-mcp${NC}             # Start Claude with MCP (if available)"
 echo -e "  ${CYAN}coding --copilot${NC}       # Start fallback services for CoPilot"
 echo -e ""
@@ -1201,6 +1424,7 @@ fi
 
 echo -e "  • Run ${CYAN}ukb --interactive${NC} to add your first knowledge pattern"
 echo -e "  • Run ${CYAN}vkb${NC} to explore the knowledge graph visualization"
+echo -e "  • Configure ${CYAN}semantic-cli${NC} with LLM API keys for standalone semantic analysis"
 echo -e "  • See docs/README.md for comprehensive documentation"
 
 echo -e "\n${BOLD}Test completed at:${NC} $(date)"

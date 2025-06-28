@@ -1,0 +1,128 @@
+@startuml semantic-analysis-communication
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+title Semantic Analysis System - Communication Architecture
+
+package "Communication Infrastructure" {
+  component [MQTT Broker] as MQTT
+  port "Port 1883" as MQTTPort
+  note right of MQTT
+    • Async event-driven communication
+    • Topic-based pub/sub messaging
+    • Agent coordination & notifications
+    • Workflow status updates
+  end note
+
+  component [JSON-RPC Server] as RPC
+  port "Port 3001" as RPCPort
+  note right of RPC
+    • Sync request-response operations
+    • Direct agent method calls
+    • Immediate results required
+    • Status queries & health checks
+  end note
+
+  component [MCP Server] as MCP
+  port "Claude Code Interface" as MCPPort
+  note right of MCP
+    • Claude Code tool integration
+    • User-facing API layer
+    • Request routing to agents
+    • Response aggregation
+  end note
+}
+
+package "Agent Communication Patterns" {
+  
+  rectangle "Event-Driven (MQTT)" as EventDriven {
+    [analysis/code/requested] --> [Semantic Analysis Agent]
+    [analysis/code/completed] <-- [Semantic Analysis Agent]
+    
+    [search/web/requested] --> [Web Search Agent]
+    [search/web/completed] <-- [Web Search Agent]
+    
+    [knowledge/entity/create/requested] --> [Knowledge Graph Agent]
+    [knowledge/entity/created] <-- [Knowledge Graph Agent]
+    
+    [workflow/started] --> [Coordinator Agent]
+    [workflow/step/completed] <-- [Coordinator Agent]
+    [workflow/completed] <-- [Coordinator Agent]
+  }
+
+  rectangle "Request-Response (JSON-RPC)" as ReqResp {
+    [semantic-analysis.analyzeCode()] --> [Semantic Analysis Agent]
+    [Result] <-- [Semantic Analysis Agent]
+    
+    [web-search.search()] --> [Web Search Agent]
+    [SearchResults] <-- [Web Search Agent]
+    
+    [knowledge-graph.createEntity()] --> [Knowledge Graph Agent]
+    [Entity] <-- [Knowledge Graph Agent]
+    
+    [coordinator.startWorkflow()] --> [Coordinator Agent]
+    [WorkflowExecution] <-- [Coordinator Agent]
+  }
+}
+
+package "MCP Tool Integration" {
+  [Claude Code] --> MCP : tool calls
+  MCP --> EventDriven : events
+  MCP --> ReqResp : sync calls
+  EventDriven --> MCP : notifications
+  ReqResp --> MCP : responses
+  MCP --> [Claude Code] : results
+}
+
+' Communication flow connections
+MQTT --> EventDriven
+RPC --> ReqResp
+MCP --> MQTT : "route events"
+MCP --> RPC : "proxy calls"
+
+' Topic structure detail
+note left of EventDriven
+  **Topic Structure:**
+  ├── analysis/
+  │   ├── code/requested
+  │   ├── code/completed
+  │   ├── conversation/requested
+  │   └── conversation/completed
+  ├── search/
+  │   ├── web/requested
+  │   ├── web/completed
+  │   └── technical-docs/requested
+  ├── knowledge/
+  │   ├── entity/create/requested
+  │   ├── entity/created
+  │   └── relation/created
+  └── workflow/
+      ├── started
+      ├── step/completed
+      └── completed
+end note
+
+' RPC method detail
+note right of ReqResp
+  **RPC Methods:**
+  ├── semantic-analysis.*
+  │   ├── analyzeCode(params)
+  │   ├── analyzeConversation(params)
+  │   └── extractPatterns(params)
+  ├── web-search.*
+  │   ├── search(query, options)
+  │   ├── searchTechnicalDocs(params)
+  │   └── validateReferences(params)
+  ├── knowledge-graph.*
+  │   ├── createEntity(entity)
+  │   ├── searchEntities(query)
+  │   └── syncWithUkb(direction)
+  └── coordinator.*
+      ├── startWorkflow(type, params)
+      ├── getWorkflowStatus(id)
+      └── scheduleTask(task)
+end note
+
+@enduml
