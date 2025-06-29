@@ -1,0 +1,30 @@
+@startuml claude-code-knowledge-capture
+!include _standard-style.puml
+
+title Knowledge Capture via Claude Code - Sequence Diagram
+
+actor Developer as Dev
+participant "Claude Code" as CC
+participant "MCP Server" as MCP
+participant "Semantic Agents" as SA
+database "Knowledge Base" as KB
+
+Dev -> CC: Asks technical question
+CC -> MCP: mcp__memory__search_nodes("pattern")
+MCP -> SA: Query knowledge graph
+SA -> KB: Read from shared-memory.json
+KB --> SA: Return existing knowledge
+SA --> MCP: No matching pattern found
+MCP --> CC: Empty results
+
+Dev -> CC: Implements solution
+Dev -> CC: "Capture this pattern"
+CC -> MCP: analyze_repository()
+MCP -> SA: Analyze code changes
+SA -> SA: Extract patterns
+SA -> KB: Update shared-memory.json
+SA -> MCP: Return analysis
+MCP --> CC: Pattern captured
+CC --> Dev: Confirmation
+
+@enduml

@@ -1,8 +1,10 @@
 # VSCode CoPilot Integration with Semantic Analysis
 
+> **Note**: The CoPilot HTTP server (port 8765) and semantic bridge functionality described in this document are planned features. Currently, the semantic analysis system is fully functional via Claude Code's MCP integration. The CoPilot integration will provide an HTTP API alternative for VSCode users.
+
 ## Overview
 
-The `coding --copilot` command now automatically integrates with the semantic-analysis agent system, providing advanced AI-powered code analysis capabilities directly in VSCode through the CoPilot extension.
+The `coding --copilot` command will automatically integrate with the semantic-analysis agent system, providing advanced AI-powered code analysis capabilities directly in VSCode through the CoPilot extension.
 
 ## How It Works
 

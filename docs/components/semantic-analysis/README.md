@@ -2,6 +2,13 @@
 
 The Semantic Analysis System is an advanced AI-powered knowledge management enhancement that provides intelligent code analysis, web search, and automated knowledge extraction capabilities through a multi-agent architecture.
 
+## Use Cases
+
+See the [Use Cases Documentation](../../use-cases/) for detailed scenarios:
+- [Managing Collective Knowledge Base](../../use-cases/managing-knowledge-base.md) - How teams capture and access knowledge via Claude Code and CoPilot
+- [Code Pattern Analysis](../../use-cases/code-pattern-analysis.md) - Automatic detection of patterns and anti-patterns
+- [Conversation Insight Extraction](../../use-cases/conversation-insights.md) - Learning from team discussions
+
 ## Overview
 
 The system extends the traditional `ukb` (Update Knowledge Base) workflow with AI-powered agents that can:

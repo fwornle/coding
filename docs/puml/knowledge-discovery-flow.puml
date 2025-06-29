@@ -1,0 +1,44 @@
+@startuml knowledge-discovery-flow
+!include _standard-style.puml
+
+title Knowledge Discovery Flow - Semantic Analysis System
+
+start
+
+:Developer needs solution;
+
+if (Using Claude Code?) then (yes)
+  :Use MCP memory tools;
+  :mcp__memory__search_nodes();
+  if (Pattern found?) then (yes)
+    :Display results;
+    :Apply pattern;
+  else (no)
+    :Search web/docs;
+    :Implement solution;
+    :Capture new pattern;
+  endif
+else (no)
+  if (Using VSCode CoPilot?) then (yes)
+    :Use @KM search command;
+    :HTTP API /api/knowledge/search;
+    if (Pattern found?) then (yes)
+      :Display in chat;
+      :Apply pattern;
+    else (no)
+      :Manual search;
+      :Implement solution;
+      :@KM ukb to capture;
+    endif
+  else (no)
+    :Use ukb/vkb CLI directly;
+    :vkb to browse graph;
+    :Manual pattern search;
+  endif
+endif
+
+:Solution implemented;
+
+stop
+
+@enduml

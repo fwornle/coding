@@ -1,0 +1,29 @@
+@startuml fallback-knowledge-capture
+!include _standard-style.puml
+
+title Fallback Knowledge Capture (No Agents) - Sequence Diagram
+
+actor Developer as Dev
+participant "Coding CLI" as System
+participant "ukb-cli" as UKB
+database "Knowledge Base" as KB
+
+Dev -> System: coding --copilot
+System -> System: Check API keys
+System --> Dev: No API keys found
+
+Dev -> UKB: ukb --interactive
+UKB -> Dev: Enter problem description
+Dev -> UKB: "Handle async React errors"
+UKB -> Dev: Enter solution
+Dev -> UKB: "Use error boundaries"
+UKB -> Dev: [Additional prompts...]
+UKB -> KB: Write to shared-memory.json
+KB --> UKB: Updated
+UKB --> Dev: Knowledge captured
+
+Dev -> System: vkb
+System -> Dev: Opens web viewer
+Dev -> Dev: Browse knowledge graph
+
+@enduml

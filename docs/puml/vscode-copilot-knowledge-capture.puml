@@ -1,0 +1,35 @@
+@startuml vscode-copilot-knowledge-capture
+!include _standard-style.puml
+
+title Knowledge Capture via VSCode CoPilot - Sequence Diagram
+
+actor Developer as Dev
+participant "VSCode CoPilot" as VS
+participant "HTTP Server\n(Port 8765)" as HTTP
+participant "Semantic Bridge" as Bridge
+participant "Semantic Agents" as SA
+database "Knowledge Base" as KB
+
+Dev -> VS: @KM search "error handling"
+VS -> HTTP: GET /api/knowledge/search
+HTTP -> Bridge: Forward request
+Bridge -> SA: Search knowledge
+SA -> KB: Query patterns
+KB --> SA: Return results
+SA --> Bridge: Format response
+Bridge --> HTTP: JSON response
+HTTP --> VS: Display results
+VS --> Dev: Show in chat
+
+Dev -> VS: Implements new pattern
+Dev -> VS: @KM ukb "New error pattern"
+VS -> HTTP: POST /api/knowledge/update
+HTTP -> Bridge: Process update
+Bridge -> SA: Analyze and store
+SA -> KB: Update knowledge base
+SA --> Bridge: Confirmation
+Bridge --> HTTP: Success response
+HTTP --> VS: Updated
+VS --> Dev: Knowledge captured
+
+@enduml
