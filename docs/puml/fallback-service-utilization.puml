@@ -1,0 +1,68 @@
+@startuml fallback-service-utilization
+!include _standard-style.puml
+
+title Fallback Service Utilization - Sequence Diagram
+
+actor Developer as Dev
+participant "Claude Code" as CC
+participant "Fallback Manager" as FM
+participant "MCP Server" as MCP
+participant "Semantic Agents" as SA
+participant "UKB CLI" as CLI
+database "Cache" as Cache
+
+Dev -> CC: Request analysis
+CC -> FM: Check service availability
+
+activate FM
+    FM -> SA: Health check
+    SA --> FM: Service unavailable
+    FM -> MCP: Health check
+    MCP --> FM: Service available
+    FM -> FM: Route to MCP fallback
+deactivate FM
+
+FM -> CC: Use MCP-only mode
+CC -> MCP: Limited analysis request
+MCP -> Cache: Access cached models
+Cache -> MCP: Return cached data
+MCP -> CC: Basic analysis results
+CC -> Dev: Show limited results + fallback notice
+
+== Service Degradation ==
+
+Dev -> CC: Request advanced analysis
+CC -> FM: Check service availability
+
+activate FM
+    FM -> MCP: Health check
+    MCP --> FM: Service unavailable
+    FM -> CLI: Health check
+    CLI --> FM: Service available
+    FM -> FM: Route to CLI fallback
+deactivate FM
+
+FM -> CC: Use CLI-only mode
+CC -> CLI: Direct command execution
+CLI -> Cache: Access local knowledge
+Cache -> CLI: Return cached insights
+CLI -> CC: Manual operation results
+CC -> Dev: Show basic results + manual instructions
+
+note right of FM
+  Fallback Levels:
+  1. Full service (all agents)
+  2. MCP-only (limited analysis)
+  3. CLI-only (manual operations)
+  4. Offline cache (read-only)
+end note
+
+note right of Cache
+  Fallback Resources:
+  - Cached analysis models
+  - Historical patterns
+  - Local knowledge base
+  - Offline capabilities
+end note
+
+@enduml

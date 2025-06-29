@@ -1,0 +1,47 @@
+@startuml code-pattern-analysis
+!include _standard-style.puml
+
+title Code Pattern Analysis - Sequence Diagram
+
+actor Developer as Dev
+participant "Claude Code" as CC
+participant "MCP Server" as MCP
+participant "Semantic Agents" as SA
+participant "Pattern Engine" as PE
+database "Knowledge Base" as KB
+
+Dev -> CC: Request pattern analysis
+CC -> MCP: analyze_repository()
+MCP -> SA: Analyze codebase
+SA -> PE: Detect patterns
+
+activate PE
+    PE -> PE: Scan files for patterns
+    PE -> PE: Classify pattern types
+    PE -> PE: Assess pattern quality
+deactivate PE
+
+PE -> SA: Return detected patterns
+SA -> SA: Generate recommendations
+SA -> KB: Store pattern entities
+SA -> MCP: Return analysis results
+MCP -> CC: Pattern analysis complete
+CC -> Dev: Show patterns & recommendations
+
+note right of PE
+  Pattern Detection:
+  - Architectural patterns
+  - Design patterns
+  - Anti-patterns
+  - Performance patterns
+end note
+
+note right of KB
+  Stored Entities:
+  - Pattern name & type
+  - Code examples
+  - Quality assessment
+  - Usage recommendations
+end note
+
+@enduml

@@ -1,0 +1,53 @@
+@startuml conversation-insight-extraction
+!include _standard-style.puml
+
+title Conversation Insight Extraction - Sequence Diagram
+
+actor Developer as Dev
+participant "Claude Code" as CC
+participant "MCP Server" as MCP
+participant "Semantic Agents" as SA
+participant "Conversation Processor" as CP
+database "Knowledge Base" as KB
+
+Dev -> CC: Share conversation for analysis
+CC -> MCP: analyze_conversation()
+MCP -> SA: Process conversation content
+SA -> CP: Extract insights
+
+activate CP
+    CP -> CP: Parse conversation format
+    CP -> CP: Identify participants
+    CP -> CP: Detect technical topics
+    CP -> CP: Extract decisions
+    CP -> CP: Identify action items
+    CP -> CP: Generate insights
+deactivate CP
+
+CP -> SA: Return structured insights
+SA -> SA: Classify insight types
+SA -> SA: Assess significance
+SA -> KB: Store insights & entities
+SA -> MCP: Return processed insights
+MCP -> CC: Insights extraction complete
+CC -> Dev: Show insights & action items
+
+note right of CP
+  Conversation Processing:
+  - Technical solutions
+  - Best practices
+  - Lessons learned
+  - Decision tracking
+  - Action item extraction
+end note
+
+note right of KB
+  Captured Knowledge:
+  - Structured insights
+  - Participant mapping
+  - Decision records
+  - Action items
+  - Topic relationships
+end note
+
+@enduml

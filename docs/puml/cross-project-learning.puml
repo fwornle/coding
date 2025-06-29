@@ -1,0 +1,51 @@
+@startuml cross-project-learning
+!include _standard-style.puml
+
+title Cross-Project Learning - Sequence Diagram
+
+actor Developer as Dev
+participant "Claude Code" as CC
+participant "MCP Server" as MCP
+participant "Coordinator Agent" as CA
+participant "Knowledge Graph" as KG
+database "Project A KB" as KB_A
+database "Project B KB" as KB_B
+database "Unified KB" as KB_U
+
+Dev -> CC: Request cross-project patterns
+CC -> MCP: find_cross_project_patterns()
+MCP -> CA: Analyze multiple projects
+
+activate CA
+    CA -> KB_A: Extract patterns from Project A
+    CA -> KB_B: Extract patterns from Project B
+    CA -> CA: Compare and correlate patterns
+    CA -> CA: Identify similar solutions
+    CA -> CA: Generate recommendations
+deactivate CA
+
+CA -> KG: Create cross-project entities
+KG -> KB_U: Store unified patterns
+CA -> MCP: Return cross-project insights
+MCP -> CC: Cross-project analysis complete
+CC -> Dev: Show similar patterns & recommendations
+
+note right of CA
+  Cross-Project Analysis:
+  - Pattern similarity detection
+  - Solution reuse identification
+  - Best practice consolidation
+  - Risk pattern recognition
+  - Knowledge transfer suggestions
+end note
+
+note right of KB_U
+  Unified Knowledge:
+  - Cross-project patterns
+  - Consolidated solutions
+  - Success/failure metrics
+  - Reuse recommendations
+  - Learning trajectories
+end note
+
+@enduml
