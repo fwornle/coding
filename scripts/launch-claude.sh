@@ -24,6 +24,12 @@ if [ -d "$SEMANTIC_ANALYSIS_DIR" ]; then
     log "Starting semantic-analysis agent system..."
     
     # Check for API keys
+    # First source main project .env if available
+    if [ -f "$PROJECT_DIR/.env" ]; then
+      source "$PROJECT_DIR/.env"
+    fi
+    
+    # Then source semantic-analysis .env (allows override)
     if [ -f "$SEMANTIC_ANALYSIS_DIR/.env" ]; then
       source "$SEMANTIC_ANALYSIS_DIR/.env"
       
