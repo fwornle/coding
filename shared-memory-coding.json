@@ -28,7 +28,7 @@
       "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.603Z",
-        "last_updated": "2025-06-18T15:33:31.309Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
       },
       "id": "mc4flkg6hcc20676x5j"
     },
@@ -72,7 +72,7 @@
       "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-19T11:09:50Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
       },
       "quick_reference": {
         "trigger": "Need to update knowledge base or capture insights",
@@ -110,7 +110,7 @@
       "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-18T15:33:31.309Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
       },
       "id": "mc4flkg61tpzbi5rpfo"
     },
@@ -149,7 +149,7 @@
       "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-19T11:10:37Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
       },
       "quick_reference": {
         "trigger": "Installation failing in corporate networks with proxies/SSH restrictions",
@@ -194,7 +194,7 @@
       "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-19T11:23:43Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
       },
       "quick_reference": {
         "trigger": "AI system with MCP integration failing in interactive vs piped mode",
@@ -239,7 +239,7 @@
       "solution": {},
       "metadata": {
         "created_at": "2025-06-18T15:17:44.017Z",
-        "last_updated": "2025-06-19T11:24:14Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
       },
       "quick_reference": {
         "trigger": "Context switching between IDE and knowledge management tools disrupts development flow",
@@ -289,7 +289,7 @@
       "solution": {},
       "metadata": {
         "created_at": "2025-06-19T06:40:00Z",
-        "last_updated": "2025-06-19T11:11:34Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
       },
       "quick_reference": {
         "trigger": "Starting any coding session or implementing new features",
@@ -315,7 +315,7 @@
       "solution": {},
       "metadata": {
         "created_at": "2025-06-19T17:12:16Z",
-        "last_updated": "2025-06-19T17:12:16Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
       },
       "id": "mc4flkg609s7phn2mx2f"
     },
@@ -337,7 +337,37 @@
       "metadata": {
         "created_by": "knowledge-api",
         "version": "2.0.0",
-        "last_updated": "2025-06-20T07:24:30.512Z"
+        "last_updated": "2025-06-29T16:08:35.832Z"
+      },
+      "problem": {},
+      "solution": {}
+    },
+    {
+      "name": "TestPathFixed",
+      "entityType": "Test",
+      "observations": [
+        "Testing correct paths"
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-29T15:51:44.252Z",
+        "last_updated": "2025-06-29T16:08:35.832Z"
+      }
+    },
+    {
+      "name": "TestFixPreservation",
+      "entityType": "Test",
+      "observations": [
+        "Testing if quick_reference preservation works"
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-29T16:08:35.830Z",
+        "last_updated": "2025-06-29T16:08:35.832Z"
       }
     }
   ],
@@ -401,12 +431,6 @@
       "to": "KnowledgePersistencePattern",
       "relationType": "enhances",
       "id": "mc4flkg6xoq3j17tia"
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "ViewportCullingOptimizationPattern",
-      "relationType": "contains",
-      "id": "mc4flkg6r3kezofwmnk"
     },
     {
       "from": "VSCodeExtensionBridgePattern",
@@ -480,23 +504,12 @@
       "metadata": {
         "created_by": "knowledge-api"
       }
-    },
-    {
-      "id": "13ad4cad-9899-4f09-8f4c-1f509565b608",
-      "from": "ConditionalLoggingPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes to",
-      "significance": 5,
-      "created": "2025-06-29T07:12:32.374Z",
-      "metadata": {
-        "created_by": "knowledge-api"
-      }
     }
   ],
   "metadata": {
-    "last_updated": "2025-06-29T07:12:32.374Z",
-    "total_entities": 9,
-    "total_relations": 20,
+    "last_updated": "2025-06-29T16:08:35.832Z",
+    "total_entities": 11,
+    "total_relations": 19,
     "team": "ui"
   }
 }

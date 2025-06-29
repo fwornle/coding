@@ -8,7 +8,10 @@
       "mcp__semantic-analysis__get_mcp_server_status",
       "Bash(find:*)",
       "Bash(ls:*)",
-      "Bash(plantuml:*)"
+      "Bash(plantuml:*)",
+      "Bash(git -C .. diff ../shared-memory-coding.json)",
+      "Bash(git -C .. diff -- shared-memory-coding.json)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }
