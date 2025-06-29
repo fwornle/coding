@@ -34,7 +34,7 @@ MEMORY_VISUALIZER_DIR="$CODING_REPO/memory-visualizer"
 
 BROWSERBASE_REPO_SSH=""
 BROWSERBASE_REPO_HTTPS=""
-BROWSERBASE_DIR="$CODING_REPO/mcp-server-browserbase"
+BROWSERBASE_DIR="$CODING_REPO/integrations/mcp-server-browserbase"
 
 # Installation status tracking
 INSIDE_CN=false

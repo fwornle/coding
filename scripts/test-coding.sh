@@ -731,21 +731,22 @@ else
 fi
 
 print_check "Browser automation server"
-if dir_exists "$CODING_ROOT/mcp-server-browserbase"; then
+if dir_exists "$CODING_ROOT/integrations/mcp-server-browserbase"; then
     print_pass "Browserbase MCP server found"
     
     print_check "Browserbase dependencies"
-    if [ -d "$CODING_ROOT/mcp-server-browserbase/node_modules" ]; then
+    if [ -d "$CODING_ROOT/integrations/mcp-server-browserbase/browserbase/node_modules" ] && [ -d "$CODING_ROOT/integrations/mcp-server-browserbase/stagehand/node_modules" ]; then
         print_pass "Browserbase dependencies installed"
     else
         print_repair "Installing browserbase dependencies..."
-        cd "$CODING_ROOT/mcp-server-browserbase" && npm install
+        cd "$CODING_ROOT/integrations/mcp-server-browserbase/browserbase" && npm install
+        cd "$CODING_ROOT/integrations/mcp-server-browserbase/stagehand" && npm install
         print_fixed "Browserbase dependencies installed"
     fi
 else
     print_fail "Browserbase MCP server not found"
     print_repair "Cloning browserbase server..."
-    cd "$CODING_ROOT"
+    cd "$CODING_ROOT/integrations"
     git clone https://github.com/browserbase/mcp-server-browserbase
     cd mcp-server-browserbase && npm install
     print_fixed "Browserbase server installed"
