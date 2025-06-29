@@ -1,8 +1,8 @@
-# UkbCli - Modern Knowledge Management CLI
+# UKB-CLI - Hybrid Knowledge Management System
 
 ## Overview
 
-**UkbCli** is a comprehensive Node.js-based command-line interface for knowledge management, created as a complete refactoring of the original monolithic bash UKB script. It provides a stable, cross-platform API for intelligent session insight capture and knowledge base management.
+**UKB** is a hybrid knowledge management CLI that combines bash wrapper convenience with Node.js implementation power. The system provides backward compatibility through a lightweight bash script (~200 lines) that delegates to a comprehensive Node.js CLI implementation (`ukb-cli.js`). This architecture reduces complexity from the original 3,948-line monolithic script while maintaining full functionality.
 
 ## 🚨 CRITICAL: Quick Success Pattern
 
