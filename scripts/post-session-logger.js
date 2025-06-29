@@ -8,6 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
+import { AutoInsightTrigger } from './auto-insight-trigger.js';
 
 class PostSessionLogger {
   constructor(projectPath, codingRepo, sessionId) {
@@ -278,6 +279,19 @@ ${content}
 `;
 
     fs.writeFileSync(logPath, logContent);
+    
+    // Trigger auto insight analysis after successful logging
+    try {
+      await AutoInsightTrigger.onSessionCompleted({
+        sessionId: sessionData.sessionId,
+        logPath,
+        targetRepo,
+        isCodingRelated: targetRepo === this.codingRepo
+      });
+    } catch (error) {
+      console.log(`⚠️  Auto insight trigger failed: ${error.message}`);
+    }
+    
     return logPath;
   }
 }
