@@ -14,7 +14,7 @@ The system extends the traditional `ukb` (Update Knowledge Base) workflow with A
 
 ## Architecture
 
-![Semantic Analysis Architecture](../images/semantic-analysis-system-overview.png)
+![Semantic Analysis Architecture](../../images/semantic-analysis-system-overview.png)
 
 The system consists of four specialized agents that communicate through a hybrid protocol:
 

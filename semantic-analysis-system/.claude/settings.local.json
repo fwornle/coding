@@ -5,7 +5,9 @@
       "Bash(grep:*)",
       "mcp__semantic-analysis__get_system_status",
       "mcp__memory__read_graph",
-      "mcp__semantic-analysis__get_mcp_server_status"
+      "mcp__semantic-analysis__get_mcp_server_status",
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
