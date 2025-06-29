@@ -431,10 +431,11 @@ if command_exists claude-mcp; then
     print_info "Location: $CLAUDE_LOCATION"
     
     print_check "Claude Code configuration"
-    if [ -f "$HOME/.config/claude-desktop/claude_desktop_config.json" ]; then
-        print_pass "Claude desktop config found"
+    # Note: Claude Code doesn't require Claude Desktop config
+    if [ -f "$CODING_ROOT/claude-code-mcp-processed.json" ]; then
+        print_pass "Claude Code MCP config found"
     else
-        print_warning "Claude desktop config not found - MCP features may not work"
+        print_warning "Claude Code MCP config not found - run ./install.sh --update-mcp-config"
     fi
 else
     print_fail "claude-mcp command not found"
@@ -468,14 +469,14 @@ if command_exists code; then
         
         # Check if extension files exist
         print_check "VSCode KM Bridge extension files"
-        if [ -d "$CODING_ROOT/vscode-km-copilot" ]; then
+        if [ -d "$CODING_ROOT/integrations/vscode-km-copilot" ]; then
             print_pass "VSCode KM Bridge source directory found"
             
             # Check key extension files
             EXTENSION_FILES=("package.json" "src/extension.js" "src/chatParticipant.js" "src/fallbackClient.js")
             MISSING_FILES=0
             for file in "${EXTENSION_FILES[@]}"; do
-                if [ -f "$CODING_ROOT/vscode-km-copilot/$file" ]; then
+                if [ -f "$CODING_ROOT/integrations/vscode-km-copilot/$file" ]; then
                     print_pass "Found: $file"
                 else
                     print_fail "Missing: $file"
@@ -509,17 +510,17 @@ if command_exists code; then
         
         # Test 2: Validate extension configuration
         print_check "Extension configuration validation"
-        if [ -f "$CODING_ROOT/vscode-km-copilot/package.json" ]; then
+        if [ -f "$CODING_ROOT/integrations/vscode-km-copilot/package.json" ]; then
             # Check if chat participant is properly configured
-            if grep -q '"chatParticipants"' "$CODING_ROOT/vscode-km-copilot/package.json" && \
-               grep -q '"id": "km-assistant"' "$CODING_ROOT/vscode-km-copilot/package.json"; then
+            if grep -q '"chatParticipants"' "$CODING_ROOT/integrations/vscode-km-copilot/package.json" && \
+               grep -q '"id": "km-assistant"' "$CODING_ROOT/integrations/vscode-km-copilot/package.json"; then
                 print_pass "Chat participant configuration valid"
             else
                 print_fail "Chat participant not properly configured in package.json"
             fi
             
             # Check extension activation events
-            if grep -q '"onStartupFinished"' "$CODING_ROOT/vscode-km-copilot/package.json"; then
+            if grep -q '"onStartupFinished"' "$CODING_ROOT/integrations/vscode-km-copilot/package.json"; then
                 print_pass "Extension activation events configured"
             else
                 print_warning "Extension may not activate automatically"
@@ -533,8 +534,8 @@ if command_exists code; then
         EXTENSION_ERRORS=0
         
         # Check if extension.js has proper chat participant registration
-        if [ -f "$CODING_ROOT/vscode-km-copilot/src/extension.js" ]; then
-            if grep -q "vscode.chat.createChatParticipant" "$CODING_ROOT/vscode-km-copilot/src/extension.js"; then
+        if [ -f "$CODING_ROOT/integrations/vscode-km-copilot/src/extension.js" ]; then
+            if grep -q "vscode.chat.createChatParticipant" "$CODING_ROOT/integrations/vscode-km-copilot/src/extension.js"; then
                 print_pass "Chat participant registration code found"
             else
                 print_fail "Chat participant registration missing in extension.js"
@@ -542,9 +543,9 @@ if command_exists code; then
             fi
             
             # Check if proper icon path is used
-            if grep -q "km-icon.svg" "$CODING_ROOT/vscode-km-copilot/src/extension.js"; then
+            if grep -q "km-icon.svg" "$CODING_ROOT/integrations/vscode-km-copilot/src/extension.js"; then
                 print_pass "Extension icon path correctly configured"
-            elif grep -q "km-icon.png" "$CODING_ROOT/vscode-km-copilot/src/extension.js"; then
+            elif grep -q "km-icon.png" "$CODING_ROOT/integrations/vscode-km-copilot/src/extension.js"; then
                 print_warning "Extension using PNG icon - SVG recommended"
             else
                 print_warning "Extension icon path not found"
@@ -555,9 +556,9 @@ if command_exists code; then
         fi
         
         # Check if chatParticipant.js has proper request handling
-        if [ -f "$CODING_ROOT/vscode-km-copilot/src/chatParticipant.js" ]; then
-            if grep -q "handleRequest" "$CODING_ROOT/vscode-km-copilot/src/chatParticipant.js" && \
-               grep -q "vkb\|ukb" "$CODING_ROOT/vscode-km-copilot/src/chatParticipant.js"; then
+        if [ -f "$CODING_ROOT/integrations/vscode-km-copilot/src/chatParticipant.js" ]; then
+            if grep -q "handleRequest" "$CODING_ROOT/integrations/vscode-km-copilot/src/chatParticipant.js" && \
+               grep -q "vkb\|ukb" "$CODING_ROOT/integrations/vscode-km-copilot/src/chatParticipant.js"; then
                 print_pass "Chat participant request handling implemented"
             else
                 print_fail "Chat participant request handling incomplete"
@@ -570,8 +571,8 @@ if command_exists code; then
         
         # Test 4: Extension build validation
         print_check "Extension build validation"
-        if [ -f "$CODING_ROOT/vscode-km-copilot/package.json" ]; then
-            cd "$CODING_ROOT/vscode-km-copilot"
+        if [ -f "$CODING_ROOT/integrations/vscode-km-copilot/package.json" ]; then
+            cd "$CODING_ROOT/integrations/vscode-km-copilot"
             
             # Check if node_modules exists (dependencies installed)
             if [ -d "node_modules" ]; then
@@ -640,19 +641,19 @@ if command_exists code; then
         print_warning "KM Copilot Bridge extension not found"
         
         # Check if extension source exists for building
-        if [ -d "$CODING_ROOT/vscode-km-copilot" ]; then
+        if [ -d "$CODING_ROOT/integrations/vscode-km-copilot" ]; then
             print_repair "VSCode KM Bridge source found, checking for built extension..."
             
             # Look for any VSIX files
-            VSIX_FILES=$(find "$CODING_ROOT/vscode-km-copilot" -name "*.vsix" 2>/dev/null)
+            VSIX_FILES=$(find "$CODING_ROOT/integrations/vscode-km-copilot" -name "*.vsix" 2>/dev/null)
             if [ -n "$VSIX_FILES" ]; then
                 print_repair "Installing VSCode Knowledge Management Bridge..."
-                LATEST_VSIX=$(ls -t "$CODING_ROOT/vscode-km-copilot"/*.vsix | head -1)
+                LATEST_VSIX=$(ls -t "$CODING_ROOT/integrations/vscode-km-copilot"/*.vsix | head -1)
                 code --install-extension "$LATEST_VSIX"
                 print_fixed "VSCode KM Bridge extension installed from: $(basename "$LATEST_VSIX")"
             else
                 print_repair "Building VSCode KM Bridge extension..."
-                cd "$CODING_ROOT/vscode-km-copilot"
+                cd "$CODING_ROOT/integrations/vscode-km-copilot"
                 if [ -f "package.json" ] && command_exists npm; then
                     npm install >/dev/null 2>&1
                     npm run package >/dev/null 2>&1
@@ -1076,8 +1077,8 @@ if command_exists code && code --list-extensions | grep -q km-copilot; then
     fi
     
     # Check if VSCode extension has proper configuration
-    if [ -f "$CODING_ROOT/vscode-km-copilot/package.json" ]; then
-        if grep -q "contributes.*chatParticipants" "$CODING_ROOT/vscode-km-copilot/package.json" 2>/dev/null; then
+    if [ -f "$CODING_ROOT/integrations/vscode-km-copilot/package.json" ]; then
+        if grep -q "contributes.*chatParticipants" "$CODING_ROOT/integrations/vscode-km-copilot/package.json" 2>/dev/null; then
             print_pass "VSCode Extension Bridge properly configured for chat integration"
         else
             print_warning "VSCode Extension Bridge may be missing chat participant configuration"
