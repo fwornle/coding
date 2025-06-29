@@ -116,8 +116,10 @@ else
     echo -e "${YELLOW}[WARNING]${NC} .env file not found - some tests may show warnings"
 fi
 
-# Preserve original KNOWLEDGE_VIEW for restoration after testing
+# Reset KNOWLEDGE_VIEW to default for clean testing (prevent corruption)
 ORIGINAL_KNOWLEDGE_VIEW="$KNOWLEDGE_VIEW"
+# Always use default multi-team view for VKB to prevent memory.json corruption
+export KNOWLEDGE_VIEW="coding,ui"
 
 # Stop any running VKB viewer to prevent memory corruption during testing
 if command_exists vkb && vkb status >/dev/null 2>&1; then
@@ -1471,23 +1473,24 @@ echo -e "  • Run ${CYAN}vkb${NC} to explore the knowledge graph visualization"
 echo -e "  • Configure ${CYAN}semantic-cli${NC} with LLM API keys for standalone semantic analysis"
 echo -e "  • See docs/README.md for comprehensive documentation"
 
-# Restore original KNOWLEDGE_VIEW to prevent memory.json corruption
-if [[ -n "$ORIGINAL_KNOWLEDGE_VIEW" ]]; then
-    export KNOWLEDGE_VIEW="$ORIGINAL_KNOWLEDGE_VIEW"
-    echo -e "\n${BLUE}[INFO]${NC} Restored KNOWLEDGE_VIEW to: $KNOWLEDGE_VIEW"
-    
-    # Stop any running VKB viewer first to ensure clean state
-    if command_exists vkb && vkb status >/dev/null 2>&1; then
-        echo -e "${BLUE}[INFO]${NC} Stopping VKB viewer to apply corrected settings..."
-        vkb stop >/dev/null 2>&1 || true
-        sleep 2
-    fi
-    
-    # Start VKB with corrected settings and proper memory.json
-    if command_exists vkb; then
-        echo -e "${BLUE}[INFO]${NC} Starting VKB with corrected KNOWLEDGE_VIEW settings..."
-        vkb start >/dev/null 2>&1 || true
-    fi
+# Always ensure VKB restarts with clean, default settings (never preserve corruption)
+echo -e "\n${BLUE}[INFO]${NC} Ensuring VKB restarts with clean default settings..."
+
+# Stop any running VKB viewer first to ensure clean state
+if command_exists vkb && vkb status >/dev/null 2>&1; then
+    echo -e "${BLUE}[INFO]${NC} Stopping VKB viewer for clean restart..."
+    vkb stop >/dev/null 2>&1 || true
+    sleep 2
+fi
+
+# Force clean restart with default multi-team view (prevent memory.json corruption)
+export KNOWLEDGE_VIEW="coding,ui"
+echo -e "${BLUE}[INFO]${NC} Set KNOWLEDGE_VIEW to default: $KNOWLEDGE_VIEW"
+
+# Start VKB with clean settings and regenerated memory.json
+if command_exists vkb; then
+    echo -e "${BLUE}[INFO]${NC} Starting VKB with clean default settings..."
+    vkb start >/dev/null 2>&1 || true
 fi
 
 echo -e "\n${BOLD}Test completed at:${NC} $(date)"
