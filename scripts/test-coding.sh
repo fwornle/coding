@@ -106,6 +106,16 @@ dir_exists() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODING_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# Load environment variables from .env file if it exists
+if [[ -f "$CODING_ROOT/.env" ]]; then
+    echo -e "${BLUE}[INFO]${NC} Loading environment variables from .env file..."
+    set -a
+    source "$CODING_ROOT/.env"
+    set +a
+else
+    echo -e "${YELLOW}[WARNING]${NC} .env file not found - some tests may show warnings"
+fi
+
 print_header "CODING TOOLS COMPREHENSIVE TEST & REPAIR"
 
 echo -e "${BOLD}Test started at:${NC} $(date)"
