@@ -7,6 +7,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { SemanticAnalysisClient } from './clients/semantic-analysis-client.js';
 import { Logger } from '../shared/logger.js';
@@ -27,17 +28,52 @@ class SemanticAnalysisMCPServer {
     );
     
     this.client = null;
+    this.connectionStatus = {
+      server: 'starting',
+      client: 'disconnected',
+      mqttBroker: 'unknown',
+      rpcServer: 'unknown',
+      agentSystem: 'unknown',
+      lastError: null,
+      startTime: new Date().toISOString()
+    };
     this.setupServer();
   }
 
   async setupServer() {
     try {
+      this.connectionStatus.server = 'initializing';
+      
       // Check environment and provide detailed error messages
       await this.checkEnvironment();
       
       // Initialize semantic analysis client
+      this.connectionStatus.client = 'connecting';
       this.client = new SemanticAnalysisClient();
-      await this.client.connect();
+      
+      try {
+        await this.client.connect();
+        this.connectionStatus.client = 'connected';
+        this.connectionStatus.mqttBroker = 'connected';
+        this.connectionStatus.rpcServer = 'connected';
+        this.connectionStatus.agentSystem = 'running';
+      } catch (clientError) {
+        this.connectionStatus.client = 'failed';
+        this.connectionStatus.lastError = clientError.message;
+        
+        // Check specific connection failures
+        if (clientError.message?.includes('MQTT')) {
+          this.connectionStatus.mqttBroker = 'failed';
+        }
+        if (clientError.message?.includes('RPC')) {
+          this.connectionStatus.rpcServer = 'failed';
+        }
+        if (clientError.code === 'ECONNREFUSED') {
+          this.connectionStatus.agentSystem = 'not_running';
+        }
+        
+        throw clientError;
+      }
       
       // Register tools
       this.registerTools();
@@ -45,42 +81,113 @@ class SemanticAnalysisMCPServer {
       // Register error handlers
       this.server.onerror = (error) => {
         this.logger.error('MCP Server error:', error);
+        this.connectionStatus.lastError = error.message;
       };
       
+      this.connectionStatus.server = 'ready';
       this.logger.info('MCP Server setup completed');
       
     } catch (error) {
+      this.connectionStatus.server = 'failed';
+      this.connectionStatus.lastError = error.message;
       this.logger.error('Failed to setup MCP server:', error);
       
-      // Provide detailed error information
-      if (error.code === 'ECONNREFUSED') {
-        console.error('\n❌ MCP Server Failed: Agent system not running');
-        console.error('   The semantic-analysis agent system must be running first.');
-        console.error('   \n   To fix this:');
-        console.error('   1. Ensure API keys are configured in .env file');
-        console.error('   2. Start the agent system: npm run start:agents');
-        console.error('   3. Then start the MCP server: npm run start:mcp\n');
-      } else if (error.message?.includes('API')) {
-        console.error('\n❌ MCP Server Failed: API key configuration issue');
-        console.error(`   ${error.message}`);
-        console.error('   \n   Configure at least one API key in the .env file:');
-        console.error('   - ANTHROPIC_API_KEY=your-actual-key');
-        console.error('   - OPENAI_API_KEY=your-actual-key\n');
-      }
+      // Provide detailed, actionable error information
+      this.displayDetailedError(error);
       
       throw error;
     }
   }
   
-  async checkEnvironment() {
-    // Load environment variables
-    const envPath = new URL('../.env', import.meta.url).pathname;
+  displayDetailedError(error) {
+    console.error('\n' + '='.repeat(80));
+    console.error('🚨 SEMANTIC ANALYSIS MCP SERVER - CONNECTION FAILED');
+    console.error('='.repeat(80));
     
+    if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED')) {
+      console.error('\n❌ ISSUE: Agent system infrastructure not running');
+      console.error('\n📋 REQUIRED SERVICES:');
+      console.error('   • MQTT Broker (port 1883)');
+      console.error('   • RPC Server (port 3001 or 8080)');
+      console.error('   • Semantic Analysis Agents');
+      
+      console.error('\n🔧 TO FIX THIS:');
+      console.error('   1. Check if you have the required infrastructure setup');
+      console.error('   2. The start-agents.js script is missing - you may need to:');
+      console.error('      - Install and start an MQTT broker (like Mosquitto)');
+      console.error('      - Create the agent system infrastructure');
+      console.error('      - Or run this MCP server in standalone mode');
+      
+      console.error('\n💡 QUICK START OPTIONS:');
+      console.error('   Option A: Install MQTT broker');
+      console.error('   → brew install mosquitto && brew services start mosquitto');
+      console.error('   \n   Option B: Use embedded MQTT (recommended)');
+      console.error('   → We can modify the server to use embedded Aedes MQTT broker');
+      
+    } else if (error.message?.includes('API')) {
+      console.error('\n❌ ISSUE: API key configuration problem');
+      console.error(`\n📝 ERROR: ${error.message}`);
+      console.error('\n🔧 TO FIX THIS:');
+      console.error('   1. Create or update ./.env file with:');
+      console.error('      ANTHROPIC_API_KEY=your-actual-anthropic-key');
+      console.error('      OPENAI_API_KEY=your-actual-openai-key');
+      console.error('   2. Or set environment variables directly');
+      
+    } else {
+      console.error(`\n❌ ISSUE: ${error.message}`);
+      console.error('\n🔍 DEBUG INFO:');
+      console.error(`   Error Type: ${error.constructor.name}`);
+      console.error(`   Error Code: ${error.code || 'N/A'}`);
+      if (error.stack) {
+        console.error(`   Stack: ${error.stack.split('\n')[1]?.trim() || 'N/A'}`);
+      }
+    }
+    
+    console.error('\n📊 CONNECTION STATUS:');
+    Object.entries(this.connectionStatus).forEach(([key, value]) => {
+      const status = typeof value === 'string' ? value : JSON.stringify(value);
+      const icon = this.getStatusIcon(status);
+      console.error(`   ${icon} ${key}: ${status}`);
+    });
+    
+    console.error('\n' + '='.repeat(80) + '\n');
+  }
+  
+  getStatusIcon(status) {
+    switch (status) {
+      case 'connected':
+      case 'ready':
+      case 'running':
+        return '✅';
+      case 'connecting':
+      case 'initializing':
+      case 'starting':
+        return '🔄';
+      case 'failed':
+      case 'not_running':
+      case 'disconnected':
+        return '❌';
+      default:
+        return '❓';
+    }
+  }
+  
+  async checkEnvironment() {
+    // Load environment variables - load root .env first, then local .env for overrides
     try {
       const { config } = await import('dotenv');
-      config({ path: envPath });
+      
+      // Load root .env first (main API keys)
+      const rootEnvPath = new URL('../../.env', import.meta.url).pathname;
+      config({ path: rootEnvPath });
+      
+      // Load local .env second (for overrides and local config)
+      const localEnvPath = new URL('../.env', import.meta.url).pathname;
+      config({ path: localEnvPath, override: false }); // Don't override root values
+      
     } catch (error) {
       // dotenv might not be available, continue
+      this.logger.warn('Could not load .env files:', error.message);
     }
     
     // Check API keys
@@ -105,12 +212,14 @@ class SemanticAnalysisMCPServer {
   }
 
   registerTools() {
-    // Semantic Analysis Tools
-    this.server.setRequestHandler('tools/call', async (request) => {
-      const { name, arguments: args } = request.params;
-      
-      try {
-        switch (name) {
+    // Semantic Analysis Tools - MCP Tool Call Handler
+    this.server.setRequestHandler(
+      CallToolRequestSchema,
+      async (request) => {
+        const { name, arguments: args } = request.params;
+        
+        try {
+          switch (name) {
           case 'analyze_repository':
             return await this.analyzeRepository(args);
           case 'analyze_conversation':
@@ -133,6 +242,8 @@ class SemanticAnalysisMCPServer {
             return await this.syncWithUkb(args);
           case 'get_system_status':
             return await this.getSystemStatus(args);
+          case 'get_mcp_server_status':
+            return await this.getMCPServerStatus(args);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -150,7 +261,10 @@ class SemanticAnalysisMCPServer {
       }
     });
 
-    this.server.setRequestHandler('tools/list', async () => {
+    // MCP Tool List Handler
+    this.server.setRequestHandler(
+      ListToolsRequestSchema,
+      async () => {
       return {
         tools: [
           {
@@ -385,6 +499,20 @@ class SemanticAnalysisMCPServer {
               type: 'object',
               properties: {}
             }
+          },
+          {
+            name: 'get_mcp_server_status',
+            description: 'Get detailed MCP server connection and health status',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                includeDebugInfo: {
+                  type: 'boolean',
+                  description: 'Include detailed debug information',
+                  default: false
+                }
+              }
+            }
           }
         ]
       };
@@ -613,6 +741,27 @@ class SemanticAnalysisMCPServer {
 
   async getSystemStatus(args) {
     try {
+      // If client is not connected, return connection status instead
+      if (!this.client || !this.client.isConnected()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `# System Status - DISCONNECTED\n\n` +
+                    `**Overall Status:** disconnected\n` +
+                    `**Connection Issue:** Agent system not available\n\n` +
+                    `## MCP Server Status\n` +
+                    `${this.formatConnectionStatus()}\n\n` +
+                    `## Troubleshooting\n` +
+                    `- Ensure MQTT broker is running on port 1883\n` +
+                    `- Ensure RPC server is running on port 3001\n` +
+                    `- Check API keys in .env file\n` +
+                    `- Run: npm run start:agents (if available)`
+            }
+          ]
+        };
+      }
+      
       const result = await this.client.getSystemStatus();
       
       return {
@@ -632,8 +781,79 @@ class SemanticAnalysisMCPServer {
         ]
       };
     } catch (error) {
-      throw new Error(`System status retrieval failed: ${error.message}`);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `# System Status - ERROR\n\n` +
+                  `**Status:** error\n` +
+                  `**Error:** ${error.message}\n\n` +
+                  `## MCP Server Status\n` +
+                  `${this.formatConnectionStatus()}\n\n` +
+                  `## Last Known Issue\n` +
+                  `${this.connectionStatus.lastError || 'No specific error recorded'}`
+          }
+        ]
+      };
     }
+  }
+  
+  async getMCPServerStatus(args) {
+    const includeDebug = args?.includeDebugInfo || false;
+    
+    // Get client connection info if available
+    let clientInfo = { connected: false };
+    if (this.client) {
+      try {
+        clientInfo = this.client.getConnectionInfo();
+      } catch (error) {
+        clientInfo.error = error.message;
+      }
+    }
+    
+    const status = {
+      server: this.connectionStatus,
+      client: clientInfo,
+      tools: {
+        total: 12, // Number of tools we register
+        available: this.client && this.client.isConnected()
+      },
+      uptime: Math.floor(process.uptime()),
+      memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      timestamp: new Date().toISOString()
+    };
+    
+    let debugSection = '';
+    if (includeDebug) {
+      debugSection = `\n\n## Debug Information\n` +
+                    `**Process ID:** ${process.pid}\n` +
+                    `**Node Version:** ${process.version}\n` +
+                    `**Platform:** ${process.platform}\n` +
+                    `**Working Directory:** ${process.cwd()}\n` +
+                    `**Environment:** ${process.env.NODE_ENV || 'development'}\n` +
+                    `**Memory Usage:** ${JSON.stringify(process.memoryUsage(), null, 2)}`;
+    }
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `# MCP Server Status Report\n\n` +
+                `**Server Status:** ${this.getStatusIcon(status.server.server)} ${status.server.server}\n` +
+                `**Client Status:** ${this.getStatusIcon(status.server.client)} ${status.server.client}\n` +
+                `**Started:** ${status.server.startTime}\n` +
+                `**Uptime:** ${status.uptime} seconds\n` +
+                `**Memory:** ${status.memory} MB\n\n` +
+                `## Connection Details\n` +
+                `${this.formatConnectionStatus()}\n\n` +
+                `## Tool Availability\n` +
+                `**Total Tools:** ${status.tools.total}\n` +
+                `**Tools Available:** ${status.tools.available ? '✅ Yes' : '❌ No (client disconnected)'}\n` +
+                `${status.server.lastError ? `\n## Last Error\n${status.server.lastError}` : ''}` +
+                debugSection
+        }
+      ]
+    };
   }
 
   // Formatting Helper Methods
@@ -722,6 +942,17 @@ class SemanticAnalysisMCPServer {
     if (health.connections) metrics.push(`Connections: ${health.connections}`);
     
     return metrics.join(' | ') || 'System operational.';
+  }
+  
+  formatConnectionStatus() {
+    return Object.entries(this.connectionStatus)
+      .filter(([key]) => key !== 'startTime' && key !== 'lastError')
+      .map(([key, value]) => {
+        const displayName = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        const icon = this.getStatusIcon(value);
+        return `**${displayName}:** ${icon} ${value}`;
+      })
+      .join('\n');
   }
 
   async start() {
