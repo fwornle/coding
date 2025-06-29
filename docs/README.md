@@ -1,224 +1,159 @@
-# Documentation Index
+# Documentation Hub
 
-Welcome to the Coding Knowledge Management System documentation. This system provides intelligent knowledge capture, sharing, and visualization for development teams.
+Complete documentation for the Semantic Analysis & Knowledge Management System.
 
-## 🚀 Getting Started
+## 📖 Documentation Structure
 
-**New to the system?** Start here:
+### 🚀 Getting Started
 
-1. **[Quick Start Installation](installation/quick-start.md)** - Get up and running in 30 seconds
-2. **[UKB User Guide](ukb/user-guide.md)** - Learn knowledge management basics
-3. **[System Overview](architecture/system-overview.md)** - Understand how it all works
+#### [Quick Start Guide](installation/quick-start.md)
+Get the system running in 30 seconds. Covers installation, basic configuration, and first usage.
 
-## 📁 Documentation Structure
+#### [Network Setup](installation/network-setup.md)
+Corporate firewall configuration, proxy settings, and network troubleshooting.
 
-### 🔧 Installation & Setup
+#### [MCP Configuration](installation/mcp-configuration.md)
+Claude Code integration setup, MCP server configuration, and tool registration.
 
-Setting up the system on your machine or team.
+---
 
-- **[Quick Start](installation/quick-start.md)** - Basic installation for individuals and teams
-- **[Network Setup](installation/network-setup.md)** - Corporate networks, proxies, firewalls
-- **[MCP Configuration](installation/mcp-configuration.md)** - Claude Code integration setup
+### 🏗️ Architecture & Design
 
-### 🏗️ System Architecture
+#### [System Overview](architecture/system-overview.md)
+Complete architectural overview including multi-agent system, communication patterns, and data flow.
 
-Understanding how the system works internally.
+#### [Knowledge Flow](architecture/knowledge-flow.md)
+How knowledge moves through the system, from capture to visualization to AI assistance.
 
-- **[System Overview](architecture/system-overview.md)** - High-level architecture and components
-- **[Knowledge Flow](architecture/knowledge-flow.md)** - How information moves through the system
-- **[Memory Systems](architecture/memory-systems.md)** - MCP memory server and Graphology integration
-- **[Agent Detection](architecture/agent-detection.md)** - Multi-agent support and routing
-- **[Fallback Services](architecture/fallback-services.md)** - Non-Claude agent support
-- **[Agent-Agnostic Design](architecture/agent-agnostic.md)** - Cross-agent compatibility
-- **[Cross-Project Knowledge](architecture/cross-project-knowledge.md)** - Knowledge sharing across projects
+#### [Memory Systems](architecture/memory-systems.md)
+Storage architecture, synchronization mechanisms, and persistence strategies.
 
-### 📚 Knowledge Management (UKB-CLI)
+#### [Agent Detection](architecture/agent-detection.md)
+How the system detects and selects between Claude Code and GitHub CoPilot.
 
-Modern Node.js-based knowledge capture and management system.
+---
 
-- **[UKB-CLI User Guide](ukb/user-guide.md)** - Complete modern UKB-CLI documentation
-- **[Technical Architecture](../knowledge-management/insights/UkbCli.md)** - Comprehensive technical documentation with PlantUML diagrams
-- **[Use Cases](ukb/ukb-use-cases.md)** - Detailed workflow examples and scenarios
-- **[Migration Guide](ukb/user-guide.md#migration-guide)** - Transitioning from legacy bash UKB
+### 🧩 Component Documentation
 
-### 📊 Knowledge Visualization (VKB-CLI)
+#### UKB-CLI (Update Knowledge Base)
+- **[Overview](components/ukb/README.md)** - Command-line knowledge capture tool
+- **[Architecture](components/ukb/architecture.md)** - Internal design and Node.js implementation
+- **[Use Cases](components/ukb/use-cases.md)** - Common workflows and examples
+- **[API Reference](components/ukb/api-reference.md)** - Programmatic interface
 
-Modern Node.js-based knowledge visualization server with cross-platform support.
+#### VKB-CLI (View Knowledge Base)
+- **[Overview](components/vkb/README.md)** - Web-based knowledge visualization
+- **[Architecture](components/vkb/architecture.md)** - Server architecture and data flow
+- **[User Guide](components/vkb/user-guide.md)** - Web interface walkthrough
+- **[API Reference](components/vkb/api-reference.md)** - HTTP API endpoints
 
-- **[VKB-CLI Overview](vkb/README.md)** - Complete VKB-CLI documentation and quick start
-- **[Technical Architecture](vkb/architecture.md)** - Server architecture and component design
-- **[API Reference](vkb/api-reference.md)** - CLI commands and programmatic JavaScript API
-- **[Use Cases](vkb/use-cases.md)** - Development workflows and integration patterns
-- **[Migration Guide](vkb/migration-guide.md)** - Transitioning from legacy bash VKB
-- **[Technical Deep Dive](../knowledge-management/insights/VkbCli.md)** - Comprehensive implementation details with diagrams
+#### Semantic Analysis System
+- **[Overview](components/semantic-analysis/README.md)** - Multi-agent analysis system
+- **[Architecture](components/semantic-analysis/architecture.md)** - Agent communication and coordination
+- **[Agent Reference](components/semantic-analysis/agent-reference.md)** - Individual agent capabilities
+- **[MCP Server Setup](components/semantic-analysis/mcp-server-setup.md)** - Claude Code integration
+- **[Usage Examples](components/semantic-analysis/usage-examples.md)** - Common analysis workflows
 
-### 📝 Conversation Logging
+---
 
-Automatic capture and organization of AI interactions.
+### 🔌 Integrations
 
-- **[Automatic Logging](logging/automatic-logging.md)** - Post-session conversation capture
-- **[MCP Logger](logging/mcp-logger.md)** - Technical implementation details
-- **[Specstory Integration](logging/specstory-integration.md)** - VSCode extension integration
+#### [VSCode CoPilot Integration](integrations/vscode-copilot-integration.md)
+Complete guide to enhanced VSCode experience with semantic analysis integration.
 
-### 🔌 Tool Integrations
+#### [API Reference](integrations/api-reference.md)
+HTTP REST APIs, MCP tools, and WebSocket interfaces for external integrations.
 
-Connecting with IDEs and development tools.
+#### [Testing Guide](integrations/testing-guide.md)
+Integration testing strategies, test automation, and validation procedures.
 
-- **[VSCode Extension](integrations/vscode-extension.md)** - GitHub Copilot chat integration
-- **[API Reference](integrations/api-reference.md)** - Agent adapter APIs
+---
 
-### 📖 Reference Materials
+### 📋 Reference Materials
 
-Supporting documentation and troubleshooting.
+#### Command Reference
+- **[UKB Commands](reference/ukb-commands.md)** - All UKB-CLI options and examples
+- **[VKB Commands](reference/vkb-commands.md)** - All VKB-CLI options and examples
+- **[Coding Commands](reference/coding-commands.md)** - Agent launcher and system commands
 
-- **[Portable Paths](reference/portable-paths.md)** - Avoiding hardcoded file paths
-- **[Graph Databases](reference/graph-databases.md)** - Database comparison and selection
+#### Configuration
+- **[Environment Variables](reference/environment-variables.md)** - All configuration options
+- **[Configuration Files](reference/configuration-files.md)** - YAML and JSON configuration
+- **[API Keys Setup](reference/api-keys-setup.md)** - LLM provider configuration
 
-### 📂 Legacy Documentation
+#### Troubleshooting
+- **[Common Issues](reference/troubleshooting.md)** - FAQ and problem resolution
+- **[System Diagnostics](reference/system-diagnostics.md)** - Health checks and monitoring
+- **[Performance Tuning](reference/performance-tuning.md)** - Optimization guidelines
 
-Historical documents and planning materials.
+---
 
-- **[Legacy Files](legacy/)** - Superseded documentation and planning materials
+### 📊 Diagrams & Visualizations
 
-## 🎯 Quick Navigation by Use Case
+All architectural diagrams are available in two formats:
+- **Source**: [PlantUML files](puml/) - Editable diagram source code
+- **Images**: [PNG files](puml/) - Generated diagrams for documentation
 
-### "I want to start using this system"
+#### Key Diagrams
+- **[System Overview](puml/semantic-analysis-system-overview.png)** - Complete architecture
+- **[UKB-CLI Architecture](puml/ukb-cli-architecture.png)** - Knowledge capture system
+- **[Communication Patterns](puml/semantic-analysis-communication.png)** - Agent communication
+- **[Knowledge Schema](puml/knowledge-schema.png)** - Data structures and relationships
 
-→ [Quick Start Installation](installation/quick-start.md) → [UKB User Guide](ukb/user-guide.md)
+---
 
-### "I need to set this up for my team"
+### 📁 Archive & Legacy
 
-→ [Quick Start Installation](installation/quick-start.md) → [Network Setup](installation/network-setup.md)
+#### [Archive](archive/)
+Historical documentation, migration guides, and completed project summaries.
 
-### "I want to use this with Claude Code"
+#### [Legacy](legacy/)
+Superseded documentation maintained for reference and troubleshooting.
 
-→ [MCP Configuration](installation/mcp-configuration.md) → [System Overview](architecture/system-overview.md)
+---
 
-### "I want to integrate with VSCode/Copilot"
+## 🎯 Documentation Conventions
 
-→ [VSCode Extension](integrations/vscode-extension.md) → [Automatic Logging](logging/automatic-logging.md)
+### File Naming
+- Use kebab-case for all filenames: `semantic-analysis-system.md`
+- Use lowercase directories: `components/`, `integrations/`
+- No underscores in filenames: use hyphens instead
 
-### "I want to understand how it works internally"
+### Structure
+- Each component has its own directory with README.md as entry point
+- Related documents grouped logically in subdirectories
+- Cross-references use relative paths for portability
 
-→ [System Overview](architecture/system-overview.md) → [Knowledge Flow](architecture/knowledge-flow.md)
+### Diagrams
+- PlantUML source files in `puml/` directory
+- Generated PNG images co-located with source
+- Professional color scheme for consistency
+- Descriptive titles and legends
 
-### "I have questions about knowledge management workflows"
+### Navigation
+- Main README.md provides overview and quick navigation
+- This docs README.md provides comprehensive navigation
+- Each section README.md links to related documents
+- Breadcrumb navigation where helpful
 
-→ [UKB User Guide](ukb/user-guide.md) → [Use Cases](ukb/ukb-use-cases.md)
+---
 
-### "I want to set up knowledge visualization"
+## 🔍 Quick Navigation
 
-→ [VKB-CLI Overview](vkb/README.md) → [VKB Use Cases](vkb/use-cases.md)
+**Looking for something specific?**
 
-### "I need to troubleshoot network/installation issues"
+| I want to... | Go to... |
+|--------------|----------|
+| **Install the system** | [Quick Start Guide](installation/quick-start.md) |
+| **Understand the architecture** | [System Overview](architecture/system-overview.md) |
+| **Use UKB-CLI** | [UKB Documentation](components/ukb/) |
+| **Use VKB-CLI** | [VKB Documentation](components/vkb/) |
+| **Set up semantic analysis** | [Semantic Analysis Setup](components/semantic-analysis/mcp-server-setup.md) |
+| **Integrate with VSCode** | [VSCode Integration](integrations/vscode-copilot-integration.md) |
+| **Configure API keys** | [API Keys Setup](reference/api-keys-setup.md) |
+| **Troubleshoot issues** | [Troubleshooting Guide](reference/troubleshooting.md) |
+| **View system diagrams** | [Architecture Diagrams](puml/) |
 
-→ [Network Setup](installation/network-setup.md) → [MCP Configuration](installation/mcp-configuration.md)
+---
 
-## 🔍 Key Concepts
-
-### Knowledge Management
-
-- **UKB-CLI (Modern Node.js CLI)**: Advanced knowledge capture with enhanced performance and features
-- **VKB-CLI (Modern Node.js Server)**: Cross-platform knowledge visualization server with programmatic API
-- **Shared Memory**: Git-tracked knowledge base for team collaboration with full backward compatibility
-- **Transferable Patterns**: Reusable solutions with structured problem-solution-rationale format
-
-### Multi-Agent Support
-
-- **Claude Code**: Primary agent with MCP memory server integration
-- **Fallback Services**: Graphology-based services for other agents (Copilot, etc.)
-- **Agent Detection**: Automatic routing based on runtime environment
-- **Cross-Agent Sync**: Knowledge sharing between different AI tools
-
-### Conversation Logging
-
-- **Post-Session Capture**: Automatic logging after AI sessions complete
-- **Smart Routing**: Content-aware organization into project directories
-- **Cross-Project Detection**: Identifies knowledge management work regardless of location
-- **Specstory Integration**: VSCode extension for conversation management
-
-## 🛠️ Common Commands
-
-```bash
-# Modern Knowledge Management (UKB-CLI)
-ukb                    # Enhanced auto-analysis with git processing (3x faster)
-ukb --interactive      # Advanced interactive capture with validation
-ukb --list-entities    # Browse knowledge base entities
-ukb search "pattern"   # Enhanced search with filtering
-ukb --add-entity "Name" --type TransferablePattern  # Add specific entities
-ukb --validate         # Comprehensive data integrity checks
-
-# Knowledge Visualization (VKB-CLI)
-vkb                    # Start visualization server at localhost:8080
-vkb status             # Check server status and health
-vkb restart            # Restart server with fresh data
-vkb logs               # View server logs with formatting
-vkb-cli server health  # Advanced health monitoring
-vkb-cli data refresh   # Refresh data without restart
-
-# System management
-./install.sh           # Install or update system
-./scripts/test-coding.sh # Comprehensive test & repair
-claude-mcp            # Start Claude with MCP integration
-coding --copilot      # Start fallback services for Copilot
-
-# Advanced UKB-CLI Features
-ukb --analyze-git --depth 20     # Deep git history analysis
-ukb --export-json --format pretty # Export with formatting
-ukb --remove-entity "EntityName"  # Safe entity removal
-ukb --rename-entity "Old" "New"   # Entity renaming
-ukb --verify-references           # URL validation
-```
-
-## 📞 Support
-
-### Common Issues
-
-- **Installation problems**: See [Network Setup](installation/network-setup.md)
-- **MCP configuration**: See [MCP Configuration](installation/mcp-configuration.md)
-- **Knowledge management workflows**: See [UKB User Guide](ukb/user-guide.md)
-- **VSCode integration**: See [VSCode Extension](integrations/vscode-extension.md)
-- **Database corruption/bloat**: See [Knowledge Base Troubleshooting](troubleshooting-knowledge-base.md)
-
-### Getting Help
-
-1. Check the specific documentation section for your issue
-2. Enable debug mode: `DEBUG=1 <command>`
-3. Review log files in `.specstory/history/` and `~/.coding-tools/logs/`
-4. Search existing knowledge: `ukb search "your problem"`
-
-## 🔄 Recent Updates
-
-### 🆕 2025 Major Update: Modern CLI Implementation
-
-**UKB-CLI (Knowledge Capture):**
-
-- **Complete UKB Modernization**: Replaced 3000+ line bash script with modular Node.js CLI
-- **Performance Improvements**: 3x faster JSON processing, 50% memory reduction
-- **Enhanced Features**: Content validation, URL verification, custom entity naming, batch operations
-- **Stable API**: Programmatic interface for coding agent integration
-- **Full Backward Compatibility**: All existing commands work unchanged
-
-**VKB-CLI (Knowledge Visualization):**
-
-- **Complete VKB Refactoring**: Replaced 579-line bash script with modular Node.js server
-- **Cross-Platform Support**: Identical behavior on Windows, macOS, and Linux
-- **Programmatic API**: VKBServer class for development tool integration
-- **Enhanced Server Management**: Health monitoring, graceful shutdown, automatic recovery
-- **Improved Error Handling**: Clear error messages with actionable suggestions
-- **50% Faster Startup**: Optimized server initialization and resource management
-
-### Documentation Improvements
-
-- **Updated UKB documentation** to reflect modern ukb-cli capabilities with comprehensive API reference
-- **New VKB documentation structure** matching UKB style with complete architecture documentation
-- **Added technical architecture documentation** for both UKB and VKB with comprehensive diagrams
-- **Enhanced API references** with programmatic integration examples for both tools
-- **Migration guides** for seamless transition from legacy bash implementations
-- **Consolidated installation guides** into focused quick-start and network setup
-- **Streamlined logging documentation** with unified automatic logging guide
-
-For detailed technical information:
-
-- **UKB-CLI**: See [UkbCli Architecture](../knowledge-management/insights/UkbCli.md) with complete PlantUML diagrams
-- **VKB-CLI**: See [VkbCli Architecture](../knowledge-management/insights/VkbCli.md) with implementation details and use cases
+**💡 Tip**: Use your browser's search function (Ctrl/Cmd + F) to quickly find specific topics within any documentation page.

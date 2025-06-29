@@ -4,109 +4,116 @@ skinparam backgroundColor white
 skinparam defaultFontName Arial
 skinparam defaultFontSize 12
 
-title Semantic Analysis System - Overview
+title Semantic Analysis System - Complete Architecture Overview
 
-package "Claude Code Integration" {
-  [Claude Code] as CC
-  [MCP Server] as MCP
-  [semantic-analysis tools] as tools
+skinparam component {
+  BackgroundColor<<api>> #E8F4FD
+  BackgroundColor<<agent>> #E6F3FF
+  BackgroundColor<<infra>> #FFF2E6
+  BackgroundColor<<cli>> #FFE8F4
+  BackgroundColor<<storage>> #FFF9E6
+  BackgroundColor<<external>> #F5F5F5
+  FontSize 12
+  FontColor #000000
 }
 
-package "Communication Infrastructure" {
-  [MQTT Broker] as MQTT
-  [JSON-RPC Server] as RPC
-  [Event Bus] as EventBus
+package "User Interfaces" {
+  actor "Claude Code" as Claude <<external>>
+  actor "VSCode CoPilot" as VSCode <<external>>
+  actor "CLI User" as CLIUser <<external>>
 }
 
-package "AI Agents" {
-  [Semantic Analysis Agent] as SA
-  [Web Search Agent] as WS
-  [Knowledge Graph Agent] as KG
-  [Coordinator Agent] as CA
+package "MCP Integration Layer" {
+  component [MCP Server] as MCP <<api>>
+  component [Semantic Bridge] as Bridge <<api>>
+  component [CoPilot HTTP Server] as HTTP <<api>>
+  
+  note right of MCP
+    Port: Default MCP
+    • Tool integration for Claude
+    • Request routing to agents
+    • Response aggregation
+  end note
+  
+  note right of HTTP
+    Port: 8765
+    • REST API for VSCode
+    • WebSocket notifications
+    • Knowledge management
+  end note
 }
 
-package "LLM Providers" {
-  [Claude Provider] as ClaudeP
-  [OpenAI Provider] as OpenAIP
+package "Communication Infrastructure" <<infra>> {
+  component [MQTT Broker] as MQTT
+  component [JSON-RPC Server] as RPC
+  
+  note right of MQTT
+    Port: 1883
+    • Event-driven communication
+    • Async agent coordination
+    • Workflow notifications
+  end note
+  
+  note right of RPC
+    Port: 8080
+    • Sync request-response
+    • Direct method calls
+    • Status queries
+  end note
+}
+
+package "Agent System" {
+  component [Semantic Analysis] as SemanticAgent <<agent>>
+  component [Web Search] as WebAgent <<agent>>
+  component [Knowledge Graph] as KnowledgeAgent <<agent>>
+  component [Coordinator] as CoordinatorAgent <<agent>>
 }
 
 package "Knowledge Management" {
-  [shared-memory.json] as KB
-  [UKB CLI] as UKB
-  [VKB Viewer] as VKB
+  component [UKB-CLI] as UKB <<cli>>
+  component [VKB-CLI] as VKB <<cli>>
+  database "shared-memory.json" as SharedMemory <<storage>>
+  cloud "MCP Memory" as MCPMemory <<external>>
 }
 
-package "External Services" {
-  [DuckDuckGo] as DDG
-  [Bing API] as Bing
-  [Google API] as Google
+package "LLM Integration" {
+  cloud "Claude API" as ClaudeAPI <<external>>
+  cloud "OpenAI API" as OpenAIAPI <<external>>
 }
 
-' Claude Code connections
-CC --> MCP : "uses tools"
-MCP --> tools : "exposes"
+' User connections
+Claude -[#4A90E2]-> MCP : tool calls
+VSCode -[#4A90E2]-> HTTP : REST API
+VSCode -[#43A047,dashed]-> HTTP : WebSocket
+CLIUser -[#4A90E2]-> UKB : commands
+CLIUser -[#4A90E2]-> VKB : commands
 
-' Agent connections to infrastructure
-SA --> MQTT : "publishes/subscribes"
-WS --> MQTT : "publishes/subscribes"
-KG --> MQTT : "publishes/subscribes"
-CA --> MQTT : "publishes/subscribes"
+' MCP layer connections
+MCP -[#43A047,dashed]-> MQTT : events
+MCP -[#4A90E2]-> RPC : sync calls
+Bridge -[#43A047,dashed]-> MQTT : events
+Bridge -[#4A90E2]-> RPC : sync calls
+HTTP -[#FF9800]-> Bridge : semantic analysis
 
-SA --> RPC : "request/response"
-WS --> RPC : "request/response"
-KG --> RPC : "request/response"
-CA --> RPC : "request/response"
+' Agent connections
+MQTT -[#FF9800]-> SemanticAgent : event bus
+MQTT -[#FF9800]-> WebAgent : event bus
+MQTT -[#FF9800]-> KnowledgeAgent : event bus
+MQTT -[#FF9800]-> CoordinatorAgent : event bus
 
-' Agent capabilities
-SA --> ClaudeP : "primary LLM"
-SA --> OpenAIP : "fallback LLM"
-WS --> DDG : "web search"
-WS --> Bing : "web search"
-WS --> Google : "web search"
-KG --> KB : "reads/writes"
-KG --> UKB : "syncs with"
+RPC -[#4A90E2]-> SemanticAgent : RPC calls
+RPC -[#4A90E2]-> WebAgent : RPC calls
+RPC -[#4A90E2]-> KnowledgeAgent : RPC calls
+RPC -[#4A90E2]-> CoordinatorAgent : RPC calls
 
-' Workflow coordination
-CA --> SA : "coordinates"
-CA --> WS : "coordinates"
-CA --> KG : "coordinates"
+' Knowledge connections
+KnowledgeAgent -[#FF9800]-> SharedMemory : read/write
+UKB -[#FF9800]-> SharedMemory : update
+VKB -[#FF9800]-> SharedMemory : read
+MCPMemory -[#43A047,dashed]-> SharedMemory : sync
 
-' User interfaces
-UKB --> KB : "updates"
-VKB --> KB : "visualizes"
-
-' Tool integration
-tools --> SA : "analyze_repository"
-tools --> WS : "search_web"
-tools --> KG : "create_knowledge_entity"
-tools --> CA : "start_workflow"
-
-note right of SA
-  • Code repository analysis
-  • Conversation analysis
-  • Pattern detection
-  • Significance scoring
-end note
-
-note right of WS
-  • Technical documentation search
-  • Best practices discovery
-  • Result filtering & ranking
-  • Multiple search engines
-end note
-
-note right of KG
-  • Entity management
-  • UKB integration
-  • Automatic knowledge capture
-  • Relationship mapping
-end note
-
-note right of CA
-  • Workflow orchestration
-  • Task scheduling
-  • Agent coordination
-  • Failure recovery
-end note
+' LLM connections
+SemanticAgent -[#4A90E2]-> ClaudeAPI : analysis
+SemanticAgent -[#757575,dotted]-> OpenAIAPI : fallback
 
 @enduml

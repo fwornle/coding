@@ -1,6 +1,6 @@
-# Agent-Agnostic Coding Tools
+# Semantic Analysis & Knowledge Management System
 
-This repository provides intelligent coding tools that work seamlessly with both **Claude Code** (with MCP servers) and **GitHub CoPilot** (with fallback services), offering unified knowledge management and development productivity features regardless of your AI coding agent.
+A comprehensive AI-powered development toolkit that provides intelligent code analysis, knowledge management, and seamless integration with both **Claude Code** (with MCP servers) and **GitHub CoPilot** (with fallback services).
 
 ## 🚀 Quick Start
 
@@ -15,365 +15,174 @@ This repository provides intelligent coding tools that work seamlessly with both
 ./bin/coding
 
 # Force specific agent
-./bin/coding --claude     # Use Claude Code with MCP
-./bin/coding --copilot    # Use GitHub CoPilot with fallbacks
+./bin/coding --claude     # Use Claude Code with MCP + Semantic Analysis
+./bin/coding --copilot    # Use GitHub CoPilot with Semantic Analysis
 ```
 
-## Knowledge-Base Viewer
+## 🏗️ System Architecture
 
-![Knowledge Visualization](docs/images/viewer.png)
+![Semantic Analysis System Overview](docs/puml/semantic-analysis-system-overview.png)
 
-## Viewer Details Mode
+The system provides:
+- **Multi-Agent Semantic Analysis** - Code pattern recognition, conversation insights
+- **Knowledge Management** - UKB-CLI for capture, VKB-CLI for visualization
+- **Agent-Agnostic Interface** - Works with Claude Code or GitHub CoPilot
+- **MCP Integration** - Deep Claude Code integration via MCP tools
+- **VSCode Integration** - Enhanced CoPilot experience with semantic analysis
 
-![Knowledge Visualization Details](docs/images/viewer-details.png)
+## 🔧 Core Components
 
-## Viewer Implementation Details
+### Knowledge Management Tools
+- **[UKB-CLI](docs/components/ukb/)** - Update Knowledge Base (capture insights)
+- **[VKB-CLI](docs/components/vkb/)** - View Knowledge Base (web visualization)
 
-![Knowledge Visualization Implementation Details](docs/images/viewer-details-impl.png)
-
-## Viewer View Selection
-
-![Knowledge Visualization View Selection](docs/images/viewer-view-selection.png)
-
-## Agent-Agnostic Architecture
-
-![Agent-Agnostic Architecture](docs/images/agent-agnostic-architecture.png)
+### Semantic Analysis System
+- **[Multi-Agent System](docs/components/semantic-analysis/)** - Advanced AI-powered analysis
+- **[MCP Integration](docs/components/semantic-analysis/mcp-server-setup.md)** - Claude Code tools
+- **[VSCode Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced CoPilot
 
 ## 📚 Documentation
 
-For comprehensive documentation, installation guides, architecture details, and usage examples:
+### 🚀 Getting Started
+- **[Quick Start Guide](docs/installation/quick-start.md)** - Get running in 30 seconds
+- **[Network Setup](docs/installation/network-setup.md)** - Corporate firewall configuration
+- **[MCP Configuration](docs/installation/mcp-configuration.md)** - Claude Code setup
 
-**→ [Complete Documentation](docs/README.md)**
+### 🏗️ Architecture & Design
+- **[System Overview](docs/architecture/system-overview.md)** - Complete architecture guide
+- **[Knowledge Flow](docs/architecture/knowledge-flow.md)** - How knowledge moves through the system
+- **[Memory Systems](docs/architecture/memory-systems.md)** - Storage and synchronization
 
-### Quick Documentation Links
+### 🧩 Component Documentation
+- **[UKB-CLI Documentation](docs/components/ukb/)** - Knowledge capture system
+- **[VKB-CLI Documentation](docs/components/vkb/)** - Knowledge visualization
+- **[Semantic Analysis System](docs/components/semantic-analysis/)** - AI analysis agents
 
-- **[Installation Guide](docs/installation/quick-start.md)** - Get started in 30 seconds
-- **[Multi-Team Setup](docs/multi-team-setup.md)** - 🏢 Team-based knowledge isolation
-- **[UKB-CLI User Guide](docs/ukb/user-guide.md)** - Modern knowledge management workflows 
-- **[UKB Use Cases](docs/ukb/use-cases.md)** - 📋 Complete examples and workflows
-- **[UkbCli Technical Architecture](knowledge-management/insights/UkbCli.md)** - Complete technical documentation with diagrams
-- **[VSCode Integration](docs/integrations/vscode-extension.md)** - GitHub Copilot chat integration
-- **[System Architecture](docs/architecture/system-overview.md)** - How it all works
-- **[Troubleshooting](docs/installation/network-setup.md)** - Common issues and solutions
+### 🔌 Integrations
+- **[VSCode CoPilot Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced development experience
+- **[API Reference](docs/integrations/api-reference.md)** - HTTP and MCP APIs
+- **[Testing Guide](docs/integrations/testing-guide.md)** - Integration testing
 
-## 🏢 Multi-Team Knowledge Management
+### 📋 Reference
+- **[Command Reference](docs/reference/)** - All CLI commands and options
+- **[Configuration](docs/reference/)** - Environment variables and settings
+- **[Troubleshooting](docs/reference/)** - Common issues and solutions
 
-The system supports team-based knowledge isolation while maintaining shared cross-team patterns:
+## 🎯 Key Features
 
-| Team | Focus | Technologies | Knowledge File |
-|------|-------|-------------|----------------|
-| **ui** | UI/Frontend | React, TypeScript, CSS, HTML | `shared-memory-ui.json` |
-| **resi** | Resilience | C++, Systems, Performance | `shared-memory-resi.json` |
-| **raas** | RaaS | Java, DevOps, Microservices | `shared-memory-raas.json` |
-| **coding** | Cross-team | Architecture, Patterns | `shared-memory-coding.json` |
+### Agent-Agnostic Design
+- **Universal Interface**: Same commands work with Claude Code or GitHub CoPilot
+- **Auto-Detection**: Automatically uses the best available AI agent
+- **Fallback Services**: Graceful degradation when agents unavailable
 
+### Semantic Analysis
+- **Code Pattern Recognition**: Identifies architectural patterns and anti-patterns
+- **Conversation Insights**: Extracts knowledge from discussions and logs
+- **Cross-Project Learning**: Accumulates insights across multiple projects
+
+### Knowledge Management
+- **Persistent Storage**: Git-tracked knowledge base (`shared-memory.json`)
+- **Interactive Capture**: `ukb --interactive` for guided knowledge entry
+- **Visual Exploration**: `vkb` web interface for knowledge graph visualization
+- **MCP Synchronization**: Real-time sync with Claude Code memory
+
+### Developer Experience
+- **Zero Configuration**: Auto-starts required services when needed
+- **Rich Diagnostics**: `mcp-status` command for system health checking
+- **Hot Reloading**: Live updates during development
+- **Cross-Platform**: Works on macOS, Linux, and Windows
+
+## ⚡ Usage Examples
+
+### Capture Knowledge from Code Analysis
 ```bash
-# Set your team during installation or manually
-export CODING_TEAM=ui
+# Analyze recent commits and capture insights
+ukb --auto
 
-# Team-specific knowledge management
-ukb --interactive    # Saves to your team's knowledge base
-vkb                  # Visualize your team's knowledge
+# Interactive knowledge capture
+ukb --interactive
+
+# Analyze specific files
+ukb --files src/components/*.tsx
 ```
 
-**Key Features:**
-- ✅ Team knowledge isolation prevents pattern pollution
-- ✅ Shared cross-team patterns in `shared-memory-coding.json`
-- ✅ Automatic entity categorization by technology/keywords
-- ✅ Migration tools for existing knowledge bases
-
-**→ [Complete Multi-Team Guide](docs/multi-team-setup.md)**
-
-## 📋 Main Use Cases
-
-### 1. **Domain-Specific Knowledge Management**
-Create specialized knowledge bases for different domains (RaaS, UI, DevOps) while maintaining cross-team patterns.
-
+### Visualize Knowledge Graph
 ```bash
-cd /path/to/raas-project
-ukb --list-entities  # Auto-creates shared-memory-raas.json
+# Launch web interface
+vkb
+
+# Export for external tools
+vkb --export --format graphml
 ```
 
-### 2. **Pattern Capture & Sharing**
-Capture reusable solutions and architectural patterns from daily development work.
-
+### Semantic Analysis (with agents running)
 ```bash
-# Capture a bug fix pattern
-ukb insight --interactive
+# In Claude Code - use MCP tools:
+# analyze_repository, analyze_conversation, search_web
 
-# Quick pattern capture
-echo "ReactHooksPattern\nTechnicalPattern\n8\nUse useCallback for stable references" | ukb --add-entity
+# In VSCode CoPilot - use HTTP API:
+# POST /api/semantic/analyze-repository
+# POST /api/semantic/analyze-conversation
 ```
 
-### 3. **Cross-Project Learning**
-Apply proven patterns from one project to another through the centralized knowledge system.
+## 🔍 System Status
 
+Check system health and configuration:
 ```bash
-# Search for applicable patterns
-ukb entity search "authentication"
-ukb relation list -r "implements"
+# Check overall system status
+mcp-status
+
+# Test all components
+./scripts/test-coding.sh
+
+# View agent status
+./bin/coding --agent copilot --copilot-stop  # Stop CoPilot services
+./bin/coding --agent claude                   # Check Claude integration
 ```
 
-### 4. **Team Onboarding**
-New team members discover domain-specific patterns and architectural decisions quickly.
+## 🛠️ Development
 
+### API Keys Configuration
+Configure in `semantic-analysis-system/.env`:
 ```bash
-# Export onboarding patterns
-ukb entity list -t "WorkflowPattern" > onboarding-guide.txt
-vkb  # Visualize knowledge graph
+# Option 1: Anthropic only (recommended)
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+DEFAULT_LLM_PROVIDER=claude
+
+# Option 2: OpenAI only
+OPENAI_API_KEY=sk-your-key-here
+DEFAULT_LLM_PROVIDER=openai
+
+# Option 3: Both (fallback support)
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+OPENAI_API_KEY=sk-your-key-here
+DEFAULT_LLM_PROVIDER=claude
 ```
 
-**→ [Complete Use Cases with Examples](docs/ukb/use-cases.md)**
+### Service Architecture
+- **MQTT Broker**: Port 1883 (async agent communication)
+- **JSON-RPC Server**: Port 8080 (sync method calls)
+- **VKB Web Server**: Port 8080 (knowledge visualization)
+- **CoPilot HTTP Server**: Port 8765 (VSCode integration)
 
-## 🤖 Supported AI Agents
+## 📖 Historical Context
 
-| Agent | Capabilities | Implementation | Status |
-|-------|-------------|----------------|---------|
-| **Claude Code** | MCP Memory, Browser, Logging | Native MCP servers | ✅ Production |
-| **GitHub CoPilot** | Code completion, Chat + Full features | JavaScript fallbacks | ✅ Production |
+This system has evolved through several iterations:
+- **Phase 1**: Basic knowledge capture (bash scripts)
+- **Phase 2**: Node.js CLI tools (UKB-CLI, VKB-CLI)
+- **Phase 3**: MCP integration for Claude Code
+- **Phase 4**: Multi-agent semantic analysis system
+- **Phase 5**: Agent-agnostic interface with CoPilot support
 
-### Feature Parity Matrix
+See [Archive](docs/archive/) for migration histories and legacy documentation.
 
-| Feature | Claude Code | CoPilot | Implementation |
-|---------|-------------|---------|----------------|
-| **Memory Graph** | MCP Memory Server | Graphology.js | ✅ Compatible |
-| **Browser Automation** | Browser MCP | Playwright | ✅ Compatible |
-| **Conversation Logging** | Logger MCP | Specstory/File | ✅ Compatible |
-| **Knowledge Management** | Git + MCP sync | Git + Graphology | ✅ Compatible |
+## 🤝 Contributing
 
-## 📚 Documentation
-
-### Getting Started
-
-- **[Installation Guide](docs/installation-guide.md)** - Detailed installation instructions for all platforms
-- **[Claude MCP Setup](docs/claude-mcp-setup.md)** - Configure Claude Code with MCP servers
-- **[Team Knowledge Setup](docs/team-knowledge-setup.md)** - Quick start for team collaboration
-- **[Network Troubleshooting](docs/network-troubleshooting.md)** - Resolve proxy and enterprise network issues
-
-### Agent-Agnostic Features
-
-- **[Agent-Agnostic Implementation Guide](docs/agent-agnostic-implementation.md)** - Complete guide to the new architecture
-- **[Agent Detection & Switching](docs/agent-detection-architecture.md)** - How agent selection works
-- **[Fallback Services Architecture](docs/fallback-services-architecture.md)** - CoPilot fallback implementations
-- **[Graph Database Comparison](docs/graph-db-comparison.md)** - Why Graphology was chosen
-
-### System Architecture  
-- **[Complete Documentation](docs/documentation.md)** - Comprehensive system documentation
-- **[Knowledge Flow Architecture](docs/knowledge-flow-architecture.md)** - Information flow across agents and storage
-- **[Cross-Agent Memory Sync](docs/cross-agent-memory-sync.md)** - How knowledge persists between agents
-- **[Installation Architecture](docs/installation-architecture.md)** - Agent detection and setup strategy
-
-### Logging & Memory
-- **[Automatic Conversation Logging](docs/automatic-conversation-logging.md)** - Multi-agent logging strategies
-- **[Enhanced Cross-Project Logging](docs/enhanced-cross-project-logging.md)** - Project-aware logging with agent routing
-- **[Specstory Integration](docs/specstory-integration.md)** - VSCode extension integration for CoPilot
-- **[MCP Memory Server Architecture](docs/mcp-memory-server-architecture.md)** - Claude's memory system
-
-### Team Collaboration
-- **[Cross-Project Knowledge System](docs/cross-project-knowledge-system.md)** - Knowledge sharing across projects and agents
-- **[Portable Knowledge References](docs/portable-knowledge-references.md)** - Agent-agnostic path handling
-- **[Team Setup Guide](docs/team-knowledge-setup.md)** - Multi-agent team collaboration
-
-### Development  
-- **[Architecture Diagrams](docs/images/)** - System architecture and workflow diagrams
-- **[Insights Library](knowledge-management/insights/)** - Transferable patterns and solutions
-- **[API Reference](docs/api-reference.md)** - Agent adapter APIs
-
-## 🎯 Modern Knowledge Management System
-
-**🆕 2025 Update:** Completely redesigned knowledge management powered by **UKB-CLI** - a modern Node.js system that replaced the legacy 3000+ line bash script with enhanced performance, stability, and features.
-
-```bash
-# Enhanced knowledge management (now 3x faster)
-ukb                 # Intelligent auto-analysis with git processing
-ukb --interactive   # Advanced interactive capture with validation
-ukb --list-entities # Browse existing knowledge base
-ukb search "pattern" # Advanced search capabilities
-
-# Interactive visualization (unchanged interface)
-vkb                 # Knowledge graph visualization at localhost:8080
-```
-
-**Key Features:**
-
-- 🚀 **Modern Architecture** - Node.js CLI with modular design and comprehensive testing
-- 🔍 **Enhanced Analysis** - Intelligent git analysis, content validation, and URL verification  
-- 🎯 **Stable API** - Programmatic interface for coding agent integration
-- 🤖 **Agent-agnostic** - Works seamlessly with Claude, CoPilot, and other AI assistants
-- 🌐 **Interactive visualization** with real-time knowledge graph updates
-- 🔄 **Team collaboration** via git-tracked knowledge base with full backward compatibility
-- 📝 **Quality assurance** - Content filtering, technology validation, and structured insights
-- ⚡ **Performance** - 3x faster JSON processing, 50% reduced memory usage
-
-## 🏗️ Architecture Overview
-
-```mermaid
-graph TB
-    subgraph "Unified Interface"
-        CLI[./bin/coding CLI]
-        UKB[ukb tool]
-        VKB[vkb viewer]
-    end
-    
-    subgraph "Agent Detection"
-        AD[Agent Detector]
-        AR[Agent Registry]
-    end
-    
-    subgraph "Claude Code Path"
-        C[Claude Code]
-        MCP[MCP Servers]
-        MM[MCP Memory]
-        BM[Browser MCP]
-        LM[Logger MCP]
-    end
-    
-    subgraph "CoPilot Path"
-        CP[GitHub CoPilot]
-        GR[Graphology Memory]
-        PW[Playwright Browser]
-        SF[Specstory/File Logger]
-    end
-    
-    subgraph "Shared Storage"
-        SM[shared-memory.json]
-        SH[.specstory/history/]
-    end
-    
-    CLI --> AD
-    AD --> AR
-    AR --> C
-    AR --> CP
-    
-    C --> MCP
-    MCP --> MM
-    MCP --> BM
-    MCP --> LM
-    
-    CP --> GR
-    CP --> PW
-    CP --> SF
-    
-    MM <--> SM
-    GR <--> SM
-    LM --> SH
-    SF --> SH
-    
-    UKB --> AR
-    VKB --> SM
-```
-
-## 🛠️ Installation & Setup
-
-### Automatic Installation
-```bash
-# Detects available agents and installs appropriate components
-./install.sh
-
-# Manual agent detection
-node lib/agent-detector.js --best
-```
-
-### Manual Setup
-```bash
-# Install Node.js dependencies
-npm install
-
-# Install Playwright browsers (for CoPilot)
-npx playwright install chromium
-
-# Set up unified launcher
-ln -sf $(pwd)/./bin/coding ~/bin/./bin/coding
-```
-
-## 🔧 Configuration
-
-### Agent Selection
-```bash
-# Environment variable (persistent)
-export CODING_AGENT="copilot"
-
-# Command-line flags (per-command)
-./bin/coding --claude
-./bin/coding --copilot
-```
-
-### Agent-Specific Settings
-```json
-{
-  "agents": {
-    "claude": {
-      "mcpConfig": "claude-code-mcp-processed.json",
-      "features": ["mcp", "memory", "browser", "logging"]
-    },
-    "copilot": {
-      "memoryPath": ".coding-tools/memory.json", 
-      "specstoryIntegration": true,
-      "features": ["memory", "browser", "logging"]
-    }
-  }
-}
-```
-
-## 🧪 Testing
-
-```bash
-# Test agent detection
-node test-agent-detection.js
-
-# Test memory systems
-node test-memory-fallback.js
-
-# Test full integration
-npm test
-```
-
-## 🔄 Migration from Claude-Only
-
-Existing users can upgrade seamlessly:
-
-1. **Backup**: `cp shared-memory.json shared-memory.json.backup`
-2. **Install**: `./install.sh`  
-3. **Update**: Replace `claude-mcp` with `./bin/coding`
-
-All existing Claude functionality continues to work!
-
-## 🎨 Agent-Specific Features
-
-### Claude Code Users
-- ✅ **Full MCP integration** - all existing features
-- ✅ **Advanced memory** - persistent graph across sessions  
-- ✅ **Browser automation** - via MCP servers
-- ✅ **Auto-logging** - conversation capture
-- 🆕 **Agent flexibility** - can switch to CoPilot when needed
-
-### GitHub CoPilot Users  
-- 🆕 **Full feature parity** - memory, browser, logging
-- 🆕 **Specstory integration** - automatic VSCode extension detection
-- 🆕 **Pure JavaScript** - no native dependencies
-- 🆕 **Graph database** - Graphology for advanced memory operations
-- 🆕 **Team compatibility** - same knowledge format as Claude users
-
-## 🏆 Benefits
-
-### For Individuals
-- **Flexibility**: Switch agents based on availability or preference
-- **Consistency**: Same commands and workflows regardless of agent
-- **No lock-in**: Agent-agnostic knowledge and skills
-
-### For Teams
-- **Choice**: Team members can use different agents
-- **Collaboration**: Shared knowledge base works across agents  
-- **Migration**: Easy to adopt new agents as they become available
-
-## 🚀 Future Roadmap
-
-- Support for additional agents (Cursor, Replit, etc.)
-- Enhanced graph algorithms and visualizations
-- Real-time multi-agent collaboration
-- Plugin system for custom agent adapters
-- Advanced browser automation workflows
+1. Follow the existing code patterns
+2. Update relevant documentation
+3. Test with both Claude Code and CoPilot
+4. Use `ukb` to capture insights from your changes
 
 ---
 
-**Ready to get started?** Run `./install.sh` and use `./bin/coding` to begin with your preferred AI coding assistant!
+**🎯 The goal**: Make AI-assisted development more intelligent by learning from every interaction and accumulating knowledge across projects and team members.
