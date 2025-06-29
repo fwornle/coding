@@ -62,8 +62,9 @@ The system provides:
 - **[Use Cases Overview](docs/use-cases/)** - Complete workflow examples
 - **[Managing Knowledge Base](docs/use-cases/managing-knowledge-base.md)** - Team knowledge capture and access
 - **[Semantic Workflows](docs/use-cases/semantic-workflows.md)** - Orchestrated multi-step analysis processes
-- **[Code Pattern Analysis](docs/use-cases/code-pattern-analysis.md)** - Automatic pattern detection
+- **[Cross-Project Learning](docs/use-cases/cross-project-learning.md)** - Knowledge accumulation across projects
 - **[Conversation Insights](docs/use-cases/conversation-insights.md)** - Learning from team discussions
+- **[Fallback Services](docs/use-cases/fallback-services.md)** - Graceful degradation when agents unavailable
 
 ### 🔌 Integrations
 - **[VSCode CoPilot Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced development experience
