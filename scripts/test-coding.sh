@@ -116,6 +116,9 @@ else
     echo -e "${YELLOW}[WARNING]${NC} .env file not found - some tests may show warnings"
 fi
 
+# Preserve original KNOWLEDGE_VIEW for restoration after testing
+ORIGINAL_KNOWLEDGE_VIEW="$KNOWLEDGE_VIEW"
+
 print_header "CODING TOOLS COMPREHENSIVE TEST & REPAIR"
 
 echo -e "${BOLD}Test started at:${NC} $(date)"
@@ -1460,6 +1463,18 @@ echo -e "  • Run ${CYAN}ukb --interactive${NC} to add your first knowledge pat
 echo -e "  • Run ${CYAN}vkb${NC} to explore the knowledge graph visualization"
 echo -e "  • Configure ${CYAN}semantic-cli${NC} with LLM API keys for standalone semantic analysis"
 echo -e "  • See docs/README.md for comprehensive documentation"
+
+# Restore original KNOWLEDGE_VIEW to prevent memory.json corruption
+if [[ -n "$ORIGINAL_KNOWLEDGE_VIEW" ]]; then
+    export KNOWLEDGE_VIEW="$ORIGINAL_KNOWLEDGE_VIEW"
+    echo -e "\n${BLUE}[INFO]${NC} Restored KNOWLEDGE_VIEW to: $KNOWLEDGE_VIEW"
+    
+    # If VKB is running, restart it with original settings
+    if command_exists vkb && vkb status >/dev/null 2>&1; then
+        echo -e "${BLUE}[INFO]${NC} Restarting VKB with restored settings..."
+        vkb restart >/dev/null 2>&1 || true
+    fi
+fi
 
 echo -e "\n${BOLD}Test completed at:${NC} $(date)"
 

@@ -99,7 +99,8 @@
       "Bash(./cli.js entity add:*)",
       "Bash(./cli.js relation:*)",
       "Bash(./cli.js entity list)",
-      "Bash(./bin/ukb:*)"
+      "Bash(./bin/ukb:*)",
+      "Bash(scripts/test-coding.sh:*)"
     ],
     "deny": []
   }
