@@ -343,32 +343,592 @@
       "solution": {}
     },
     {
-      "name": "TestPathFixed",
-      "entityType": "Test",
+      "name": "ViewportCullingPattern",
+      "entityType": "TransferablePattern",
       "observations": [
-        "Testing correct paths"
+        {
+          "type": "rule",
+          "content": "Apply viewport culling when rendering 200+ 3D objects, use advanced techniques for 800+ objects",
+          "date": "2025-06-19T12:34:22Z"
+        },
+        {
+          "type": "basic_implementation",
+          "content": "camera.position.distanceTo(object.position) < threshold",
+          "date": "2025-06-19T12:34:22Z"
+        },
+        {
+          "type": "advanced_implementation",
+          "content": "Balanced marker-centric culling: protected zone around marker (maxEvents/4), proportional left-right removal, stride-based thinning",
+          "date": "2025-06-19T12:34:22Z"
+        },
+        {
+          "type": "performance",
+          "content": "Basic: 200 objects → ~20-50 visible, <10 FPS → 60 FPS. Advanced: 75-90% reduction in rendered objects",
+          "date": "2025-06-19T12:34:22Z"
+        },
+        {
+          "type": "anti_jump",
+          "content": "Advanced pattern prevents visual jumping with protected zones and gradual object removal",
+          "date": "2025-06-19T12:34:22Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Essential for any 3D scene with many objects - Three.js, React Three Fiber, timeline visualizations",
+          "date": "2025-06-19T12:34:22Z"
+        },
+        {
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/ViewportCullingPattern.md",
+          "date": "2025-06-19T12:34:22Z"
+        }
       ],
       "significance": 5,
       "problem": {},
       "solution": {},
       "metadata": {
-        "created_at": "2025-06-29T15:51:44.252Z",
-        "last_updated": "2025-06-29T16:08:35.832Z"
-      }
+        "created_at": "2025-06-16T13:46:12.604Z",
+        "last_updated": "2025-06-19T12:34:22Z"
+      },
+      "quick_reference": {
+        "trigger": "Rendering 200+ 3D objects causing performance issues (basic) or 800+ objects with visual jumping (advanced)",
+        "action": "Basic: camera.position.distanceTo(object.position) < threshold. Advanced: balanced marker-centric culling with anti-jump algorithm",
+        "avoid": "Rendering all objects regardless of visibility, naive culling without performance testing, visual jumping during culling",
+        "check": "Basic: 60 FPS with 200+ objects. Advanced: 75-90% reduction in rendered objects, smooth 60fps with 800+ objects"
+      },
+      "id": "mc4flkg6s51c4g4ep4"
     },
     {
-      "name": "TestFixPreservation",
-      "entityType": "Test",
+      "name": "ReduxStateManagementPattern",
+      "entityType": "TransferablePattern",
       "observations": [
-        "Testing if quick_reference preservation works"
+        {
+          "type": "rule",
+          "content": "NEVER useState for complex state - ALWAYS Redux slices with typed hooks",
+          "date": "2025-06-19T12:34:40Z"
+        },
+        {
+          "type": "basic_implementation",
+          "content": "const value = useSelector(state => state.feature.value); dispatch(action())",
+          "date": "2025-06-19T12:34:40Z"
+        },
+        {
+          "type": "architecture",
+          "content": "Feature-based slices: ui, timeline, preferences, repository, logging",
+          "date": "2025-06-19T12:34:40Z"
+        },
+        {
+          "type": "advanced_mvi",
+          "content": "For 20+ components: Model-View-Intent architecture with Redux store + 5 slices + 4 intent files for async operations",
+          "date": "2025-06-19T12:34:40Z"
+        },
+        {
+          "type": "benefits",
+          "content": "Predictable state, time-travel debugging, persistence integration. Advanced: zero prop drilling, full TypeScript coverage",
+          "date": "2025-06-19T12:34:40Z"
+        },
+        {
+          "type": "trigger_criteria",
+          "content": "Basic: 15+ components, cross-component state. Advanced: 20+ components with state management chaos",
+          "date": "2025-06-19T12:34:40Z"
+        },
+        {
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/ReduxStateManagementPattern.md",
+          "date": "2025-06-19T12:34:40Z"
+        }
       ],
       "significance": 5,
       "problem": {},
       "solution": {},
       "metadata": {
-        "created_at": "2025-06-29T16:08:35.830Z",
-        "last_updated": "2025-06-29T16:08:35.832Z"
-      }
+        "created_at": "2025-06-16T13:46:12.604Z",
+        "last_updated": "2025-06-19T12:34:40Z"
+      },
+      "quick_reference": {
+        "trigger": "React component with complex state (3+ properties, cross-component sharing, or 20+ components)",
+        "action": "Use Redux Toolkit with createSlice() and typed hooks. For large apps (20+ components): implement MVI architecture with intent layers",
+        "avoid": "useState for complex state, prop drilling, direct state mutation, mixed state management approaches",
+        "check": "Basic: minimal useState usage. Advanced: zero prop drilling, 100% TypeScript coverage, predictable state flow"
+      },
+      "id": "mc4flkg6qoq9ti6a83d"
+    },
+    {
+      "name": "Timeline",
+      "entityType": "Project",
+      "observations": [
+        {
+          "date": "2025-06-06T10:00:00Z",
+          "metadata": {},
+          "type": "insight",
+          "content": "3D timeline visualization with React + Three.js"
+        },
+        {
+          "date": "2025-06-06T10:00:00Z",
+          "metadata": {},
+          "type": "insight",
+          "content": "Implemented viewport culling and Redux state management patterns"
+        },
+        {
+          "date": "2025-06-06T10:00:00Z",
+          "metadata": {},
+          "type": "insight",
+          "content": "Source of multiple transferable performance and architecture patterns"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-16T13:46:12.604Z",
+        "last_updated": "2025-06-18T15:33:31.309Z"
+      },
+      "id": "mc4flkg66ngb7esal3v"
+    },
+    {
+      "name": "DynArch",
+      "entityType": "Project",
+      "observations": [
+        {
+          "date": "2025-06-08T15:30:00Z",
+          "metadata": {},
+          "type": "insight",
+          "content": "Complex autonomous driving system visualization with 7V5R processor architecture"
+        },
+        {
+          "date": "2025-06-08T15:30:00Z",
+          "metadata": {},
+          "type": "metric",
+          "content": "Real-time animation of sensor data flow, processing, and timing diagrams"
+        },
+        {
+          "date": "2025-06-08T15:30:00Z",
+          "metadata": {},
+          "type": "insight",
+          "content": "Origin of the sophisticated ConditionalLoggingPattern with dual-axis filtering"
+        },
+        {
+          "date": "2025-06-08T15:30:00Z",
+          "metadata": {},
+          "type": "insight",
+          "content": "Advanced timing visualization system with interactive elements"
+        },
+        {
+          "date": "2025-06-08T15:30:00Z",
+          "metadata": {},
+          "type": "insight",
+          "content": "Modular routing system for different sensor types (Camera, Radar, LiDAR)"
+        },
+        {
+          "date": "2025-06-08T15:30:00Z",
+          "metadata": {},
+          "type": "insight",
+          "content": "Performance-optimized animation pipeline handling complex state transitions"
+        },
+        {
+          "date": "2025-06-08T15:30:00Z",
+          "metadata": {},
+          "type": "metric",
+          "content": "Comprehensive documentation with UML diagrams and architectural patterns"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-16T13:46:12.604Z",
+        "last_updated": "2025-06-18T15:33:31.309Z"
+      },
+      "id": "mc4flkg6rgm4h3nz2k"
+    },
+    {
+      "name": "StateDrivenAnimationPipelinePattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        {
+          "type": "rule",
+          "content": "Use single coordinated animation loop for 15+ simultaneous components",
+          "date": "2025-06-19T11:22:19Z"
+        },
+        {
+          "type": "implementation",
+          "content": "Standardized lifecycle with requestAnimationFrame coordination and event-driven state management",
+          "date": "2025-06-19T11:22:19Z"
+        },
+        {
+          "type": "performance",
+          "content": "Maintains 60fps with complex processor and sensor animations",
+          "date": "2025-06-19T11:22:19Z"
+        },
+        {
+          "type": "features",
+          "content": "Dynamic registration/unregistration, graceful error handling, async task tracking",
+          "date": "2025-06-19T11:22:19Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Any system requiring coordinated animation management",
+          "date": "2025-06-19T11:22:19Z"
+        },
+        {
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/StateDrivenAnimationPipelinePattern.md",
+          "date": "2025-06-19T11:22:19Z"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-16T13:46:12.604Z",
+        "last_updated": "2025-06-19T11:22:19Z"
+      },
+      "quick_reference": {
+        "trigger": "Need to coordinate 15+ simultaneous animation components",
+        "action": "Implement standardized lifecycle: initialize → start → pause → stop → destroy with single requestAnimationFrame loop",
+        "avoid": "Multiple uncoordinated animation loops, missing error handling, lack of graceful cleanup",
+        "check": "Verify 60fps maintenance with complex animations and proper component registration/cleanup"
+      },
+      "id": "mc4flkg62no511cgwee"
+    },
+    {
+      "name": "StrategyBasedModularRoutingPattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        {
+          "type": "rule",
+          "content": "Use strategy pattern for multiple routing algorithms with runtime registration",
+          "date": "2025-06-19T11:23:27Z"
+        },
+        {
+          "type": "implementation",
+          "content": "Extensible architecture with specialized algorithms: curved paths, obstacle avoidance, boundary calculations",
+          "date": "2025-06-19T11:23:27Z"
+        },
+        {
+          "type": "performance",
+          "content": "Handles 50+ simultaneous connections, <5ms simple routes, <20ms complex routes",
+          "date": "2025-06-19T11:23:27Z"
+        },
+        {
+          "type": "features",
+          "content": "Dynamic boundary calculations, collision detection, configuration-driven behavior",
+          "date": "2025-06-19T11:23:27Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Network visualization, circuit design, game pathfinding",
+          "date": "2025-06-19T11:23:27Z"
+        },
+        {
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/StrategyBasedModularRoutingPattern.md",
+          "date": "2025-06-19T11:23:27Z"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-16T13:46:12.604Z",
+        "last_updated": "2025-06-19T11:23:27Z"
+      },
+      "quick_reference": {
+        "trigger": "Need multiple routing algorithms for different connection types (50+ connections)",
+        "action": "Implement strategy pattern with runtime registration and extensible architecture",
+        "avoid": "Hard-coded routing logic, single routing algorithm for all cases, performance bottlenecks",
+        "check": "Route calculation <5ms simple routes, <20ms complex avoidance routes"
+      },
+      "id": "mc4flkg6k7ue6mzj7zp"
+    },
+    {
+      "name": "MVIReduxArchitecturePattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "problem",
+          "content": "Complex React applications with 20+ components suffer from state management chaos, prop drilling, and unpredictable updates"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "solution",
+          "content": "Implement Model-View-Intent (MVI) architecture using Redux Toolkit with separate slices and intent layers"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "implementation",
+          "content": "Redux store with 5 slices (ui, timeline, preferences, repository, logging) and 4 intent files handling async operations"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "benefit",
+          "content": "Zero prop drilling, predictable state updates, time-travel debugging, and 100% TypeScript coverage"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/MVIReduxArchitecturePattern.md"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-18T15:17:44.017Z",
+        "last_updated": "2025-06-19T11:25:14Z"
+      },
+      "quick_reference": {
+        "trigger": "React app with 20+ components suffering from state management chaos",
+        "action": "Implement MVI architecture using Redux Toolkit with separate slices and intent layers",
+        "avoid": "Prop drilling, unpredictable state updates, mixed state management approaches",
+        "check": "Zero prop drilling, 100% TypeScript coverage, predictable state flow"
+      },
+      "id": "mc4flkg6bd8nq4vvt3b"
+    },
+    {
+      "name": "ReactThreeFiberIntegrationPattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "problem",
+          "content": "Need to integrate Three.js 3D graphics with React component lifecycle and state management"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "solution",
+          "content": "Use React Three Fiber for declarative 3D scene management with React patterns"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "implementation",
+          "content": "Canvas wrapper with hooks, refs for Three.js objects, and React event handling"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "benefit",
+          "content": "Seamless integration of 3D graphics with React's declarative paradigm"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/ReactThreeFiberIntegrationPattern.md"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-18T15:17:44.017Z",
+        "last_updated": "2025-06-19T11:25:29Z"
+      },
+      "quick_reference": {
+        "trigger": "Need to integrate Three.js 3D graphics with React component lifecycle",
+        "action": "Use React Three Fiber for declarative 3D scene management with React patterns",
+        "avoid": "Manual Three.js integration, bypassing React lifecycle, imperative 3D code",
+        "check": "Seamless integration of 3D graphics with React's declarative paradigm"
+      },
+      "id": "mc4flkg6oafz4fvgrfo"
+    },
+    {
+      "name": "ModularComponentArchitecturePattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "problem",
+          "content": "Component organization becomes chaotic in large React applications"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "solution",
+          "content": "Feature-based component organization with clear domain boundaries"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "implementation",
+          "content": "components/three/, components/layout/, components/ui/ structure"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "metric",
+          "content": "27 components organized in logical directories with zero circular dependencies"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/ModularComponentArchitecturePattern.md"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-18T15:17:44.017Z",
+        "last_updated": "2025-06-19T11:25:29Z"
+      },
+      "quick_reference": {
+        "trigger": "Component organization becoming chaotic in large React applications",
+        "action": "Implement feature-based component organization with clear domain boundaries",
+        "avoid": "Flat component structure, unclear boundaries, circular dependencies",
+        "check": "Zero circular dependencies, logical directory structure, clear domain separation"
+      },
+      "id": "mc4flkg62369u270rnvh"
+    },
+    {
+      "name": "CustomHookExtractionPattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "problem",
+          "content": "Duplicated stateful logic across multiple components"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "solution",
+          "content": "Extract common logic into reusable custom hooks"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "implementation",
+          "content": "useViewportFiltering, useTimelineAnimation, useCameraControl hooks"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "benefit",
+          "content": "DRY principle applied to React hooks with full TypeScript support"
+        },
+        {
+          "date": "2025-06-17T16:26:18Z",
+          "metadata": {
+            "source": "semantic-codebase-analysis"
+          },
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/CustomHookExtractionPattern.md"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-18T15:17:44.017Z",
+        "last_updated": "2025-06-19T11:25:29Z"
+      },
+      "quick_reference": {
+        "trigger": "Duplicated stateful logic across multiple React components",
+        "action": "Extract common logic into reusable custom hooks with TypeScript support",
+        "avoid": "Duplicated component logic, inline complex state management, non-reusable patterns",
+        "check": "DRY principle applied with full TypeScript support and reusable hooks"
+      },
+      "id": "mc4flkg6pp2n80apkv"
+    },
+    {
+      "name": "ConditionalLoggingPattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        {
+          "type": "rule",
+          "content": "NEVER console.log - ALWAYS Logger.log(level, category, message)",
+          "date": "2025-06-19T12:35:15Z"
+        },
+        {
+          "type": "implementation",
+          "content": "Dual-axis filtering system with level-based and category-based controls",
+          "date": "2025-06-19T12:35:15Z"
+        },
+        {
+          "type": "architecture",
+          "content": "Logger.log(level, category, message) with configurable output targets",
+          "date": "2025-06-19T12:35:15Z"
+        },
+        {
+          "type": "benefits",
+          "content": "Centralized logging control, runtime filtering, production-ready debugging",
+          "date": "2025-06-19T12:35:15Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Any application requiring sophisticated logging control and filtering",
+          "date": "2025-06-19T12:35:15Z"
+        },
+        {
+          "type": "link",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/ConditionalLoggingPattern.md",
+          "date": "2025-06-19T12:35:15Z"
+        }
+      ],
+      "significance": 5,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2025-06-16T13:46:12.604Z",
+        "last_updated": "2025-06-29T07:05:00Z"
+      },
+      "quick_reference": {
+        "trigger": "Need sophisticated logging control with dual-axis filtering (level + category)",
+        "action": "Implement Logger.log(level, category, message) with configurable filtering and output targets",
+        "avoid": "console.log usage, hardcoded logging levels, single-axis filtering",
+        "check": "Zero console.log usage, configurable logging levels, category-based filtering working"
+      },
+      "id": "6f129029-7857-45e7-8e55-a3a1431d291e"
     }
   ],
   "relations": [
@@ -504,12 +1064,133 @@
       "metadata": {
         "created_by": "knowledge-api"
       }
+    },
+    {
+      "from": "ViewportCullingPattern",
+      "to": "Timeline",
+      "relationType": "implemented in",
+      "id": "mc4flkg63ah3hnbik7m"
+    },
+    {
+      "from": "ReduxStateManagementPattern",
+      "to": "Timeline",
+      "relationType": "implemented in",
+      "id": "mc4flkg60ic8xyepcou"
+    },
+    {
+      "from": "StateDrivenAnimationPipelinePattern",
+      "to": "DynArch",
+      "relationType": "implemented in",
+      "id": "mc4flkg6p4fmc0tmq4i"
+    },
+    {
+      "from": "StrategyBasedModularRoutingPattern",
+      "to": "DynArch",
+      "relationType": "implemented in",
+      "id": "mc4flkg649da5smfe05"
+    },
+    {
+      "from": "CustomHookExtractionPattern",
+      "to": "Timeline",
+      "relationType": "implemented in",
+      "id": "mc4flkg63gw6k4c8p4y"
+    },
+    {
+      "from": "ModularComponentArchitecturePattern",
+      "to": "Timeline",
+      "relationType": "implemented in",
+      "id": "mc4flkg6ws5vgen3t2c"
+    },
+    {
+      "from": "MVIReduxArchitecturePattern",
+      "to": "Timeline",
+      "relationType": "implemented in",
+      "id": "mc4flkg67h3xbg1k5l"
+    },
+    {
+      "from": "ReactThreeFiberIntegrationPattern",
+      "to": "Timeline",
+      "relationType": "implemented in",
+      "id": "mc4flkg6bkryix1mh6p"
+    },
+    {
+      "from": "ViewportCullingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_1"
+    },
+    {
+      "from": "ReduxStateManagementPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_2"
+    },
+    {
+      "from": "StateDrivenAnimationPipelinePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_3"
+    },
+    {
+      "from": "StrategyBasedModularRoutingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_4"
+    },
+    {
+      "from": "MVIReduxArchitecturePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_5"
+    },
+    {
+      "from": "ReactThreeFiberIntegrationPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_6"
+    },
+    {
+      "from": "ModularComponentArchitecturePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_7"
+    },
+    {
+      "from": "CustomHookExtractionPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_8"
+    },
+    {
+      "id": "1d8f8153-1852-4bec-b5de-44fee34833db",
+      "from": "ConditionalLoggingPattern",
+      "to": "DynArch",
+      "relationType": "originally developed in",
+      "significance": 5,
+      "created": "2025-06-29T07:00:58.776Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "id": "d9203070-b408-4166-bd7a-f2a34873c7b9",
+      "from": "ConditionalLoggingPattern",
+      "to": "Timeline",
+      "relationType": "implemented in",
+      "significance": 5,
+      "created": "2025-06-29T07:05:32.797Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "from": "ConditionalLoggingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "id": "ui_pattern_to_collective_9"
     }
   ],
   "metadata": {
-    "last_updated": "2025-06-29T16:08:35.832Z",
-    "total_entities": 11,
-    "total_relations": 19,
-    "team": "ui"
+    "last_updated": "2025-06-29T18:19:01.494Z"
   }
 }
