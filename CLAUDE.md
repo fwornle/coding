@@ -2,74 +2,35 @@
 
 This file provides essential guidance to Claude Code when working in this repository.
 
-## 🚨 CRITICAL: AUTO-SYNC KNOWLEDGE BASE TO MCP MEMORY
+## 🚨 CRITICAL: MCP MEMORY KNOWLEDGE BASE ACCESS
 
-**IMPORTANT**: Every time you start a `claude-mcp` session, you MUST automatically load the knowledge base into MCP memory by executing the sync operations:
+**IMPORTANT**: The knowledge base is accessed through the MCP memory service, which provides an internal knowledge graph that automatically syncs with configured topic-specific files (shared-memory-*.json where * could be ui, resi, raas, coding, etc.).
 
-1. **Check for sync trigger**: Look for `.mcp-sync/sync-required.json`
-2. **If sync required**: Execute the following MCP operations automatically
-3. **Load entities**: Use `mcp__memory__create_entities` with data from shared-memory.json
-4. **Load relations**: Use `mcp__memory__create_relations` with relationship data
-5. **Verify sync**: Use `mcp__memory__read_graph` to confirm successful loading
-6. **Apply patterns**: Query and apply critical patterns immediately
+**KNOWLEDGE BASE ARCHITECTURE**:
+1. **MCP Memory Service**: Runtime knowledge graph storage and querying
+2. **Topic-Specific Files**: shared-memory-coding.json, shared-memory-ui.json, etc. (git-tracked)
+3. **Automatic Sync**: MCP memory automatically syncs with configured files
+4. **Cross-Session Persistence**: Knowledge persists across Claude sessions
 
-**AUTO-SYNC PROCEDURE**: 
+**HOW TO ACCESS KNOWLEDGE**:
 ```typescript
-// 1. Check if sync is required
-const syncPath = process.env.CODING_TOOLS_PATH + '/.mcp-sync/sync-required.json';
-if (fileExists(syncPath)) {
-  const syncInfo = JSON.parse(readFile(syncPath));
-  console.log(`🔄 Auto-syncing ${syncInfo.entity_count} entities, ${syncInfo.relation_count} relations`);
-  
-  // 2. Load high-priority entities first (enhanced structure support)
-  const sharedMemory = JSON.parse(readFile(process.env.CODING_KNOWLEDGE_BASE));
-  const highPriorityEntities = sharedMemory.entities
-    .filter(e => e.significance >= 8 || e.entityType === 'WorkflowPattern')
-    .map(entity => ({
-      name: entity.name,
-      entityType: entity.entityType,
-      observations: entity.observations || [
-        `Problem: ${entity.problem?.description || 'N/A'}`,
-        `Solution: ${entity.solution?.approach || 'N/A'}`,
-        `Significance: ${entity.significance}/10`
-      ]
-    }));
-  
-  await mcp__memory__create_entities({ entities: highPriorityEntities });
-  
-  // 3. Load remaining entities
-  const remainingEntities = sharedMemory.entities
-    .filter(e => (e.significance < 8 && e.entityType !== 'WorkflowPattern'))
-    .map(entity => ({
-      name: entity.name,
-      entityType: entity.entityType,
-      observations: entity.observations || [`${entity.entityType}: ${entity.name}`]
-    }));
-  
-  await mcp__memory__create_entities({ entities: remainingEntities });
-  
-  // 4. Load relations
-  await mcp__memory__create_relations({ relations: sharedMemory.relations });
-  
-  // 5. Verify and apply critical patterns
-  const graph = await mcp__memory__read_graph();
-  console.log(`✅ Knowledge base synced: ${graph.nodes?.length} entities, ${graph.edges?.length} relations`);
-  
-  // 6. Query and apply critical patterns
-  const criticalPatterns = ['ConditionalLoggingPattern', 'ReduxStateManagementPattern', 'ClaudeCodeStartupPattern'];
-  for (const pattern of criticalPatterns) {
-    const result = await mcp__memory__search_nodes(pattern);
-    if (result?.nodes?.length > 0) {
-      console.log(`✅ Pattern loaded: ${pattern}`);
-    }
-  }
-  
-  // 7. Remove sync trigger
-  unlinkFile(syncPath);
-}
+// Query existing patterns
+const patterns = await mcp__memory__search_nodes("ConditionalLoggingPattern");
+
+// Read full knowledge graph
+const graph = await mcp__memory__read_graph();
+
+// Create new knowledge entities
+await mcp__memory__create_entities({
+  entities: [{
+    name: "NewPattern",
+    entityType: "TransferablePattern",
+    observations: ["Pattern description..."]
+  }]
+});
 ```
 
-**WHY THIS MATTERS**: Without this sync, Claude sessions cannot access the accumulated knowledge from previous sessions, making the cross-session learning system ineffective.
+**WHY THIS MATTERS**: The MCP memory service provides immediate access to accumulated knowledge from previous sessions and automatically maintains sync with persistent storage files.
 
 ## 🔴 CRITICAL: AUTOMATIC CONVERSATION LOGGING
 
@@ -111,7 +72,7 @@ claude-mcp
 
 ## 🚨 CRITICAL: Knowledge Base Management Rule
 
-**IMPORTANT: The shared-memory.json knowledge base must ALWAYS be updated using the `ukb` command. Never edit this file directly. The ukb tool ensures proper formatting, validation, and synchronization with MCP memory.**
+**IMPORTANT: The knowledge base is managed through MCP memory service and topic-specific shared-memory-*.json files. ALWAYS use the `ukb` command to update knowledge. Never edit the shared-memory files directly. The ukb tool ensures proper formatting, validation, and synchronization with MCP memory.**
 
 ### 🔧 Knowledge Base Update Methods
 
@@ -276,8 +237,9 @@ source .activate
 
 ### Knowledge Flow
 1. **Project Insights** → Captured by `ukb`
-2. **MCP Memory** → Runtime knowledge graph storage
-3. **shared-memory.json** → Git-tracked persistent storage
+2. **MCP Memory Service** → Runtime knowledge graph storage and querying
+3. **Topic-Specific Files** → shared-memory-*.json files (git-tracked persistent storage)
+4. **Automatic Sync** → MCP memory ↔ persistent files bidirectional sync
 
 ### Auto-Logging  
 - ✅ **WORKING**: Post-session logging via `post-session-logger.js`
@@ -291,7 +253,8 @@ source .activate
 
 ## Important Files
 
-- `shared-memory.json` - Knowledge base (git-tracked)
+- `shared-memory-*.json` - Topic-specific knowledge bases (git-tracked)
+- **MCP Memory Service** - Runtime knowledge graph access
 - `.specstory/history/` - Conversation logs
 - `knowledge-management/` - Scripts and insights
 - `docs/` - Comprehensive documentation
