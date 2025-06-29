@@ -14,7 +14,8 @@
       "Bash(rg:*)",
       "mcp__memory__create_entities",
       "mcp__memory__create_relations",
-      "Bash(vkb restart:*)"
+      "Bash(vkb restart:*)",
+      "mcp__memory__search_nodes"
     ],
     "deny": []
   }

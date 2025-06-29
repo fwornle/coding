@@ -1,0 +1,12 @@
+@startuml commandpatternimplementation-integration
+!include ../../../docs/puml/_standard-style.puml
+
+title Command Pattern Implementation - Technology Integration
+
+component "JavaScript" as JavaScript\ncomponent "MCP" as MCP\ncomponent "Claude" as Claude
+
+JavaScript --> MCP : integrates\nMCP --> Claude : integrates
+
+note top : Technologies: JavaScript, MCP, Claude
+
+@enduml

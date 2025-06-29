@@ -1,0 +1,12 @@
+@startuml repositorypatternimplementation-integration
+!include ../../../docs/puml/_standard-style.puml
+
+title Repository Pattern Implementation - Technology Integration
+
+component "MCP" as MCP\ncomponent "Claude" as Claude
+
+MCP --> Claude : integrates
+
+note top : Technologies: MCP, Claude
+
+@enduml

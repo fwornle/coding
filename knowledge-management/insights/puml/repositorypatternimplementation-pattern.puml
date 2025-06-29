@@ -1,0 +1,22 @@
+@startuml repositorypatternimplementation-pattern
+!include ../../../docs/puml/_standard-style.puml
+
+title Repository Pattern Implementation - Design Patterns
+
+
+package "Repository" {
+  class Repository {
+    +implement()\n    +execute()\n    +configure()
+  }
+}
+
+package "Command" {
+  class Command {
+    +implement()\n    +execute()\n    +configure()
+  }
+}
+
+
+note top : Technologies: MCP, Claude
+
+@enduml
