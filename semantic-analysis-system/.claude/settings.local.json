@@ -11,7 +11,10 @@
       "Bash(plantuml:*)",
       "Bash(git -C .. diff ../shared-memory-coding.json)",
       "Bash(git -C .. diff -- shared-memory-coding.json)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "mcp__memory__create_entities",
+      "mcp__memory__create_relations",
+      "Bash(vkb restart:*)"
     ],
     "deny": []
   }
