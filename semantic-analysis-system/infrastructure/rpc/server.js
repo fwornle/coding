@@ -104,8 +104,8 @@ export class JSONRPCServer {
       });
       
       // Add introspection methods
-      rpcMethods['rpc.discover'] = this.createDiscoverMethod();
-      rpcMethods['rpc.describe'] = this.createDescribeMethod();
+      rpcMethods['discover'] = this.createDiscoverMethod();
+      rpcMethods['describe'] = this.createDescribeMethod();
       
       this.server = jayson.server(rpcMethods);
       

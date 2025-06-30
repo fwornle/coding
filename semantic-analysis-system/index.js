@@ -12,7 +12,7 @@ import { CoordinatorAgent } from './agents/coordinator/index.js';
 import { AgentRegistry } from './framework/agent-registry.js';
 import { AgentSupervisor } from './framework/lifecycle/supervisor.js';
 import { MQTTBroker } from './infrastructure/mqtt/broker.js';
-import { RPCServer } from './infrastructure/rpc/server.js';
+import { JSONRPCServer } from './infrastructure/rpc/server.js';
 import { Logger } from './shared/logger.js';
 import { ConfigManager } from './shared/config.js';
 import dotenv from 'dotenv';
@@ -37,7 +37,7 @@ class SemanticAnalysisSystem {
       this.logger.info('Starting Semantic Analysis System...');
       
       // Load configuration
-      const config = await this.configManager.loadConfig();
+      const config = this.configManager.config;
       
       // Start infrastructure
       await this.startInfrastructure(config);
@@ -67,11 +67,13 @@ class SemanticAnalysisSystem {
 
   async startInfrastructure(config) {
     // Start MQTT broker
-    this.mqttBroker = new MQTTBroker(config.mqtt);
+    const mqttConfig = this.configManager.getInfrastructureConfig('mqtt.broker') || {};
+    this.mqttBroker = new MQTTBroker(mqttConfig);
     await this.mqttBroker.start();
     
-    // Start RPC server
-    this.rpcServer = new RPCServer(config.rpc);
+    // Start RPC server  
+    const rpcConfig = this.configManager.getJSONRPCConfig();
+    this.rpcServer = new JSONRPCServer(rpcConfig);
     await this.rpcServer.start();
     
     this.logger.info('Infrastructure services started');
@@ -80,22 +82,33 @@ class SemanticAnalysisSystem {
   async startAgents(config) {
     const agentConfigs = {
       'semantic-analysis': {
-        ...config.agents?.semanticAnalysis,
-        llm: config.llm
+        ...this.configManager.getAgentConfig('semantic-analysis'),
+        llm: this.configManager.getLLMConfig('semantic-analysis')
       },
       'web-search': {
-        ...config.agents?.webSearch,
-        search: config.search
+        ...this.configManager.getAgentConfig('web-search'),
+        search: {
+          provider: 'google',
+          apiKey: process.env.GOOGLE_API_KEY,
+          searchEngineId: process.env.GOOGLE_CSE_ID
+        }
       },
       'knowledge-graph': {
-        ...config.agents?.knowledgeGraph,
-        knowledgeApi: config.knowledgeApi,
-        ukb: config.ukb
+        ...this.configManager.getAgentConfig('knowledge-graph'),
+        knowledgeApi: {
+          apiUrl: 'http://localhost:3001',
+          timeout: 10000
+        },
+        ukb: {
+          ukbPath: process.env.CODING_TOOLS_PATH + '/bin/ukb',
+          sharedMemoryPath: process.env.CODING_KB_PATH + '/shared-memory-coding.json',
+          autoSync: true
+        }
       },
       'coordinator': {
-        ...config.agents?.coordinator,
-        workflows: config.workflows,
-        scheduling: config.scheduling
+        ...this.configManager.getAgentConfig('coordinator'),
+        workflows: {},
+        scheduling: {}
       }
     };
 

@@ -30,7 +30,6 @@ export class MQTTBroker {
     try {
       // Create Aedes instance
       this.aedes = new Aedes({
-        persistence: this.config.persistence,
         concurrency: 100,
         heartbeatInterval: 60000,
         connectTimeout: 30000,
