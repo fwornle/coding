@@ -15,7 +15,8 @@
       "mcp__memory__create_entities",
       "mcp__memory__create_relations",
       "Bash(vkb restart:*)",
-      "mcp__memory__search_nodes"
+      "mcp__memory__search_nodes",
+      "Bash(jq:*)"
     ],
     "deny": []
   }
