@@ -396,6 +396,120 @@
         "insight_type": "problem-solution",
         "last_updated": "2025-06-30T06:24:59.924Z"
       }
+    },
+    {
+      "id": "0833aba6-ec23-4a3d-8e46-c8e8e5342413",
+      "name": "AntipatternidentificationlacksComprehens",
+      "entityType": "WorkflowPattern",
+      "observations": [
+        {
+          "type": "problem",
+          "content": "Anti-pattern identification lacks systematic detection and automated remediation workflows",
+          "date": "2025-06-30T06:27:44.427Z"
+        },
+        {
+          "type": "solution",
+          "content": "Comprehensive anti-pattern detection system with severity assessment and automated refactoring suggestions",
+          "date": "2025-06-30T06:27:44.427Z"
+        },
+        {
+          "type": "rationale",
+          "content": "Enables proactive code quality management through early anti-pattern detection and guided remediation",
+          "date": "2025-06-30T06:27:44.427Z"
+        },
+        {
+          "type": "learnings",
+          "content": "Multi-category analysis (maintainability, performance, security) provides comprehensive code quality assessment",
+          "date": "2025-06-30T06:27:44.427Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Any development team requiring systematic code quality improvement and technical debt management",
+          "date": "2025-06-30T06:27:44.427Z"
+        },
+        "Details: http://localhost:8080/knowledge-management/insights/AntiPatternDetectionSystem.md"
+      ],
+      "significance": 8,
+      "created": "2025-06-30T06:27:44.437Z",
+      "updated": "2025-06-30T08:06:59.749Z",
+      "metadata": {
+        "created_by": "piped-insight",
+        "version": "2.0.0",
+        "team": "coding",
+        "technologies": [
+          "Anti-Pattern-Detection",
+          "Quality-Assessment",
+          "Code-Analysis",
+          "Refactoring",
+          "Technical-Debt"
+        ],
+        "references": [
+          "https://refactoring.guru/refactoring/smells"
+        ],
+        "codeFiles": [
+          "docs/use-cases/code-pattern-analysis.md",
+          "lib/semantic-analysis/analyzers/anti-pattern-detector.js"
+        ],
+        "insight_type": "problem-solution",
+        "last_updated": "2025-06-30T08:06:59.749Z"
+      }
+    },
+    {
+      "id": "31ccdb16-aa00-44e4-a8c4-51d7f8f6143c",
+      "name": "ArchitecturaldocumentationbecomesAutomat",
+      "entityType": "WorkflowPattern",
+      "observations": [
+        {
+          "type": "problem",
+          "content": "Architectural documentation becomes outdated and disconnected from actual code patterns",
+          "date": "2025-06-30T06:28:15.425Z"
+        },
+        {
+          "type": "solution",
+          "content": "Automated architecture documentation generation from detected patterns with living documentation updates",
+          "date": "2025-06-30T06:28:15.425Z"
+        },
+        {
+          "type": "rationale",
+          "content": "Maintains synchronization between code evolution and architectural documentation through continuous analysis",
+          "date": "2025-06-30T06:28:15.425Z"
+        },
+        {
+          "type": "learnings",
+          "content": "Real-time documentation generation ensures architectural knowledge stays current with codebase changes",
+          "date": "2025-06-30T06:28:15.425Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Any development team requiring accurate and current architectural documentation and onboarding materials",
+          "date": "2025-06-30T06:28:15.425Z"
+        },
+        "Details: http://localhost:8080/knowledge-management/insights/ArchitecturalDocumentationGeneration.md"
+      ],
+      "significance": 7,
+      "created": "2025-06-30T06:28:15.436Z",
+      "updated": "2025-06-30T08:07:10.491Z",
+      "metadata": {
+        "created_by": "piped-insight",
+        "version": "2.0.0",
+        "team": "coding",
+        "technologies": [
+          "Architecture-Documentation",
+          "Pattern-Detection",
+          "Living-Documentation",
+          "Team-Onboarding",
+          "Knowledge-Management"
+        ],
+        "references": [
+          "https://c4model.com/"
+        ],
+        "codeFiles": [
+          "docs/use-cases/code-pattern-analysis.md",
+          "lib/semantic-analysis/generators/architecture-docs.js"
+        ],
+        "insight_type": "problem-solution",
+        "last_updated": "2025-06-30T08:07:10.491Z"
+      }
     }
   ],
   "relations": [
@@ -570,10 +684,54 @@
       "metadata": {
         "created_by": "knowledge-api"
       }
+    },
+    {
+      "id": "bb2f9871-1b58-4c0a-b109-b0c348689fe7",
+      "from": "CollectiveKnowledge",
+      "to": "AntipatternidentificationlacksComprehens",
+      "relationType": "contains",
+      "significance": 5,
+      "created": "2025-06-30T06:28:35.576Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "id": "f69ace7d-3f53-4180-a1b2-109cb4dc2887",
+      "from": "CollectiveKnowledge",
+      "to": "ArchitecturaldocumentationbecomesAutomat",
+      "relationType": "contains",
+      "significance": 5,
+      "created": "2025-06-30T06:28:52.243Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "id": "e238ea17-722e-43b3-a7f1-04364d24c765",
+      "from": "AntipatternidentificationlacksComprehens",
+      "to": "Coding",
+      "relationType": "implemented in",
+      "significance": 5,
+      "created": "2025-06-30T06:29:07.163Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "id": "809cace8-501f-4fac-be64-38c1fe7f223f",
+      "from": "ArchitecturaldocumentationbecomesAutomat",
+      "to": "Coding",
+      "relationType": "implemented in",
+      "significance": 5,
+      "created": "2025-06-30T06:29:19.755Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
     }
   ],
   "metadata": {
-    "last_updated": "2025-06-30T06:24:59.924Z",
+    "last_updated": "2025-06-30T08:07:10.491Z",
     "total_entities": 9,
     "total_relations": 20,
     "team": "ui"
