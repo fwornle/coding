@@ -62,11 +62,19 @@ package "Communication Infrastructure" <<infra>> {
   end note
 }
 
-package "Agent System" {
-  component [Semantic Analysis] as SemanticAgent <<agent>>
-  component [Web Search] as WebAgent <<agent>>
-  component [Knowledge Graph] as KnowledgeAgent <<agent>>
-  component [Coordinator] as CoordinatorAgent <<agent>>
+package "Enhanced Agent System ✨" {
+  package "Core Agents" {
+    component [Semantic Analysis] as SemanticAgent <<agent>>
+    component [Web Search] as WebAgent <<agent>>
+    component [Knowledge Graph ✨] as KnowledgeAgent <<agent>>
+    component [Coordinator] as CoordinatorAgent <<agent>>
+  }
+  
+  package "Infrastructure Agents ⭐ NEW" {
+    component [Synchronization ✨] as SyncAgent <<agent>>
+    component [Deduplication ✨] as DedupAgent <<agent>>
+    component [Documentation] as DocAgent <<agent>>
+  }
 }
 
 package "Knowledge Management" {
@@ -95,25 +103,36 @@ Bridge -[#43A047,dashed]-> MQTT : events
 Bridge -[#4A90E2]-> RPC : sync calls
 HTTP -[#FF9800]-> Bridge : semantic analysis
 
-' Agent connections
+' Enhanced agent connections
 MQTT -[#FF9800]-> SemanticAgent : event bus
 MQTT -[#FF9800]-> WebAgent : event bus
 MQTT -[#FF9800]-> KnowledgeAgent : event bus
 MQTT -[#FF9800]-> CoordinatorAgent : event bus
+MQTT -[#FF9800]-> SyncAgent : event bus ✨
+MQTT -[#FF9800]-> DedupAgent : event bus ✨
+MQTT -[#FF9800]-> DocAgent : event bus
 
 RPC -[#4A90E2]-> SemanticAgent : RPC calls
 RPC -[#4A90E2]-> WebAgent : RPC calls
 RPC -[#4A90E2]-> KnowledgeAgent : RPC calls
 RPC -[#4A90E2]-> CoordinatorAgent : RPC calls
+RPC -[#4A90E2]-> SyncAgent : RPC calls ✨
+RPC -[#4A90E2]-> DedupAgent : RPC calls ✨
+RPC -[#4A90E2]-> DocAgent : RPC calls
 
-' Knowledge connections
+' Enhanced knowledge connections
 KnowledgeAgent -[#FF9800]-> SharedMemory : read/write
+SyncAgent -[#FF9800]-> SharedMemory : bidirectional sync ✨
+DedupAgent -[#FF9800]-> SharedMemory : deduplication ✨
 UKB -[#FF9800]-> SharedMemory : update
 VKB -[#FF9800]-> SharedMemory : read
 MCPMemory -[#43A047,dashed]-> SharedMemory : sync
+SyncAgent -[#43A047,dashed]-> MCPMemory : graph DB sync ✨
 
-' LLM connections
+' Enhanced LLM connections
 SemanticAgent -[#4A90E2]-> ClaudeAPI : analysis
 SemanticAgent -[#757575,dotted]-> OpenAIAPI : fallback
+DedupAgent -[#4A90E2]-> OpenAIAPI : embeddings ✨
+DocAgent -[#4A90E2]-> ClaudeAPI : documentation ✨
 
 @enduml

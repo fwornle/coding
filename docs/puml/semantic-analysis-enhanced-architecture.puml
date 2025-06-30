@@ -1,118 +1,117 @@
-@startuml system-architecture
-!theme aws-orange
-!define RECTANGLE(x,y) rectangle x <<y>>
+@startuml semantic-analysis-enhanced-architecture
+!include _standard-style.puml
 
-title Semantic Analysis System - Enhanced Architecture
+title Enhanced Semantic Analysis System Architecture
 
 package "Client Layer" {
-  RECTANGLE(CLI, "CLI Interface")
-  RECTANGLE(MCP_CLIENT, "MCP Client")
-  RECTANGLE(HTTP_CLIENT, "HTTP Client")
-  RECTANGLE(WEB_UI, "Web Dashboard")
+  [CLI Interface] as CLI <<cli>>
+  [MCP Client] as MCP_CLIENT <<api>>
+  [HTTP Client] as HTTP_CLIENT <<api>>
+  [Web Dashboard] as WEB_UI <<util>>
 }
 
 package "API Layer" {
-  RECTANGLE(MCP_SERVER, "MCP Server")
-  RECTANGLE(REST_API, "REST API")
-  RECTANGLE(GRAPHQL_API, "GraphQL API")
+  [MCP Server] as MCP_SERVER <<api>>
+  [REST API] as REST_API <<api>>
+  [GraphQL API] as GRAPHQL_API <<api>>
 }
 
-package "Agent Layer" {
+package "Enhanced Agent Layer" {
   package "Core Agents" {
-    RECTANGLE(SEMANTIC_AGENT, "Semantic Analysis\nAgent")
-    RECTANGLE(KNOWLEDGE_AGENT, "Knowledge Graph\nAgent ✨")
-    RECTANGLE(COORDINATOR_AGENT, "Coordinator\nAgent")
+    [Semantic Analysis\nAgent] as SEMANTIC_AGENT <<agent>>
+    [Knowledge Graph\nAgent ✨] as KNOWLEDGE_AGENT <<agent>>
+    [Coordinator\nAgent] as COORDINATOR_AGENT <<agent>>
   }
   
   package "Infrastructure Agents ⭐ NEW" {
-    RECTANGLE(SYNC_AGENT, "Synchronization\nAgent ✨")
-    RECTANGLE(DEDUP_AGENT, "Deduplication\nAgent ✨")
-    RECTANGLE(DOC_AGENT, "Documentation\nAgent")
+    [Synchronization\nAgent ✨] as SYNC_AGENT <<agent>>
+    [Deduplication\nAgent ✨] as DEDUP_AGENT <<agent>>
+    [Documentation\nAgent] as DOC_AGENT <<agent>>
   }
   
   package "Utility Agents" {
-    RECTANGLE(SEARCH_AGENT, "Web Search\nAgent")
-    RECTANGLE(QA_AGENT, "Quality Assurance\nAgent")
+    [Web Search\nAgent] as SEARCH_AGENT <<agent>>
+    [Quality Assurance\nAgent] as QA_AGENT <<agent>>
   }
 }
 
 package "Communication Layer" {
-  RECTANGLE(MQTT_BROKER, "MQTT Broker\n(Event Bus)")
-  RECTANGLE(RPC_SERVER, "JSON-RPC Server\n(Commands)")
-  RECTANGLE(EVENT_BUS, "Event Processing")
+  [MQTT Broker\n(Event Bus)] as MQTT_BROKER <<infra>>
+  [JSON-RPC Server\n(Commands)] as RPC_SERVER <<infra>>
+  [Event Processing] as EVENT_BUS <<infra>>
 }
 
-package "Storage Layer" {
+package "Enhanced Storage Layer ✨" {
   package "Graph Databases" {
-    RECTANGLE(MCP_MEMORY, "MCP Memory\nService")
-    RECTANGLE(GRAPHOLOGY_DB, "Graphology\nDatabase")
+    database [MCP Memory\nService] as MCP_MEMORY <<storage>>
+    database [Graphology\nDatabase] as GRAPHOLOGY_DB <<storage>>
   }
   
   package "File Storage" {
-    RECTANGLE(JSON_CODING, "shared-memory-\ncoding.json")
-    RECTANGLE(JSON_UI, "shared-memory-\nui.json")
-    RECTANGLE(JSON_RESI, "shared-memory-\nresi.json")
+    database [shared-memory-\ncoding.json] as JSON_CODING <<storage>>
+    database [shared-memory-\nui.json] as JSON_UI <<storage>>
+    database [shared-memory-\nresi.json] as JSON_RESI <<storage>>
   }
   
-  package "Version Control" {
-    RECTANGLE(VERSION_STORAGE, "Version\nStorage")
-    RECTANGLE(BACKUP_STORAGE, "Backup\nStorage")
+  package "Version Control ⭐ NEW" {
+    database [Version\nStorage] as VERSION_STORAGE <<storage>>
+    database [Backup\nStorage] as BACKUP_STORAGE <<storage>>
   }
 }
 
 package "External Services" {
-  RECTANGLE(CLAUDE_API, "Claude API")
-  RECTANGLE(OPENAI_API, "OpenAI API")
-  RECTANGLE(GOOGLE_SEARCH, "Google Search")
-  RECTANGLE(UKB_SYSTEM, "UKB System")
+  cloud [Claude API] as CLAUDE_API <<external>>
+  cloud [OpenAI API] as OPENAI_API <<external>>
+  cloud [Google Search] as GOOGLE_SEARCH <<external>>
+  [UKB System] as UKB_SYSTEM <<external>>
 }
 
 ' Client connections
-CLI --> REST_API
-MCP_CLIENT --> MCP_SERVER
-HTTP_CLIENT --> REST_API
-WEB_UI --> GRAPHQL_API
+CLI SYNC_LINE REST_API
+MCP_CLIENT SYNC_LINE MCP_SERVER
+HTTP_CLIENT SYNC_LINE REST_API
+WEB_UI SYNC_LINE GRAPHQL_API
 
 ' API to Agent connections
-MCP_SERVER --> KNOWLEDGE_AGENT
-REST_API --> COORDINATOR_AGENT
-GRAPHQL_API --> COORDINATOR_AGENT
+MCP_SERVER SYNC_LINE KNOWLEDGE_AGENT
+REST_API SYNC_LINE COORDINATOR_AGENT
+GRAPHQL_API SYNC_LINE COORDINATOR_AGENT
 
 ' Agent interconnections
-COORDINATOR_AGENT --> EVENT_BUS
-SEMANTIC_AGENT --> EVENT_BUS
-KNOWLEDGE_AGENT --> EVENT_BUS
-SYNC_AGENT --> EVENT_BUS
-DEDUP_AGENT --> EVENT_BUS
-DOC_AGENT --> EVENT_BUS
-SEARCH_AGENT --> EVENT_BUS
-QA_AGENT --> EVENT_BUS
+COORDINATOR_AGENT ASYNC_LINE EVENT_BUS
+SEMANTIC_AGENT ASYNC_LINE EVENT_BUS
+KNOWLEDGE_AGENT ASYNC_LINE EVENT_BUS
+SYNC_AGENT ASYNC_LINE EVENT_BUS
+DEDUP_AGENT ASYNC_LINE EVENT_BUS
+DOC_AGENT ASYNC_LINE EVENT_BUS
+SEARCH_AGENT ASYNC_LINE EVENT_BUS
+QA_AGENT ASYNC_LINE EVENT_BUS
 
 ' Communication layer
-EVENT_BUS --> MQTT_BROKER
-EVENT_BUS --> RPC_SERVER
+EVENT_BUS CONTROL_LINE MQTT_BROKER
+EVENT_BUS CONTROL_LINE RPC_SERVER
 
-' Storage connections
-SYNC_AGENT --> MCP_MEMORY
-SYNC_AGENT --> GRAPHOLOGY_DB
-SYNC_AGENT --> JSON_CODING
-SYNC_AGENT --> JSON_UI
-SYNC_AGENT --> JSON_RESI
-SYNC_AGENT --> VERSION_STORAGE
+' Enhanced storage connections
+SYNC_AGENT DATA_LINE MCP_MEMORY
+SYNC_AGENT DATA_LINE GRAPHOLOGY_DB
+SYNC_AGENT DATA_LINE JSON_CODING
+SYNC_AGENT DATA_LINE JSON_UI
+SYNC_AGENT DATA_LINE JSON_RESI
+SYNC_AGENT DATA_LINE VERSION_STORAGE
 
-KNOWLEDGE_AGENT --> MCP_MEMORY
-DEDUP_AGENT --> MCP_MEMORY
+KNOWLEDGE_AGENT DATA_LINE MCP_MEMORY
+DEDUP_AGENT DATA_LINE MCP_MEMORY
 
 ' External service connections
-SEMANTIC_AGENT --> CLAUDE_API
-SEMANTIC_AGENT --> OPENAI_API
-DEDUP_AGENT --> OPENAI_API
-SEARCH_AGENT --> GOOGLE_SEARCH
-KNOWLEDGE_AGENT --> UKB_SYSTEM
+SEMANTIC_AGENT OPTIONAL_LINE CLAUDE_API
+SEMANTIC_AGENT OPTIONAL_LINE OPENAI_API
+DEDUP_AGENT OPTIONAL_LINE OPENAI_API
+SEARCH_AGENT OPTIONAL_LINE GOOGLE_SEARCH
+KNOWLEDGE_AGENT DATA_LINE UKB_SYSTEM
 
 ' Backup and versioning
-SYNC_AGENT --> BACKUP_STORAGE
-VERSION_STORAGE --> BACKUP_STORAGE
+SYNC_AGENT DATA_LINE BACKUP_STORAGE
+VERSION_STORAGE OPTIONAL_LINE BACKUP_STORAGE
 
 note right of SYNC_AGENT
   **✨ Enhanced Synchronization Agent**

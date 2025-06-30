@@ -47,12 +47,15 @@ How the system detects and selects between Claude Code and GitHub CoPilot.
 - **[User Guide](components/vkb/user-guide.md)** - Web interface walkthrough
 - **[API Reference](components/vkb/api-reference.md)** - HTTP API endpoints
 
-#### Semantic Analysis System
-- **[Overview](components/semantic-analysis/README.md)** - Multi-agent analysis system
-- **[Architecture](components/semantic-analysis/architecture.md)** - Agent communication and coordination
-- **[Agent Reference](components/semantic-analysis/agent-reference.md)** - Individual agent capabilities
+#### Semantic Analysis System ✨ (Enhanced)
+- **[Overview](components/semantic-analysis/README.md)** - Enhanced multi-agent analysis system with sync & deduplication
+- **[Enhanced Architecture](components/semantic-analysis/enhanced-architecture.md)** - Complete enhanced system architecture
+- **[Architecture](components/semantic-analysis/architecture.md)** - Original agent communication and coordination
+- **[Installation Guide](components/semantic-analysis/installation.md)** - Complete setup and configuration
+- **[Use Cases](components/semantic-analysis/use-cases.md)** - Comprehensive usage examples and workflows
+- **[API Reference](components/semantic-analysis/api-reference.md)** - Agent APIs and interfaces
 - **[MCP Server Setup](components/semantic-analysis/mcp-server-setup.md)** - Claude Code integration
-- **[Usage Examples](components/semantic-analysis/usage-examples.md)** - Common analysis workflows
+- **[Troubleshooting](components/semantic-analysis/troubleshooting.md)** - Common issues and solutions
 
 ---
 
@@ -95,9 +98,10 @@ All architectural diagrams are available in two formats:
 - **Images**: [PNG files](puml/) - Generated diagrams for documentation
 
 #### Key Diagrams
-- **[System Overview](puml/semantic-analysis-system-overview.png)** - Complete architecture
-- **[UKB-CLI Architecture](puml/ukb-cli-architecture.png)** - Knowledge capture system
-- **[Communication Patterns](puml/semantic-analysis-communication.png)** - Agent communication
+- **[System Overview](images/semantic-analysis-system-overview.png)** - Complete enhanced architecture
+- **[Enhanced Architecture](images/semantic-analysis-enhanced-architecture.png)** - New agents & infrastructure ✨
+- **[UKB-CLI Architecture](images/ukb-cli-architecture.png)** - Knowledge capture system
+- **[Communication Patterns](images/semantic-analysis-communication.png)** - Agent communication
 - **[Knowledge Schema](puml/knowledge-schema.png)** - Data structures and relationships
 
 ---
