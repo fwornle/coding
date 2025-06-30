@@ -453,6 +453,171 @@
         "insight_type": "problem-solution",
         "last_updated": "2025-06-30T12:01:40.841Z"
       }
+    },
+    {
+      "id": "e9da693f-9d88-4d15-837a-4e362b409af8",
+      "name": "MultiAgentSemanticAnalysisCompletemultia",
+      "entityType": "WorkflowPattern",
+      "observations": [
+        {
+          "type": "problem",
+          "content": "Multi-Agent Semantic Analysis Architecture Pattern",
+          "date": "2025-06-30T13:16:50.907Z"
+        },
+        {
+          "type": "solution",
+          "content": "Complete multi-agent system for automated semantic analysis and knowledge extraction",
+          "date": "2025-06-30T13:16:50.907Z"
+        },
+        {
+          "type": "rationale",
+          "content": "Hybrid MQTT/JSON-RPC communication enabling scalable agent coordination",
+          "date": "2025-06-30T13:16:50.907Z"
+        },
+        {
+          "type": "learnings",
+          "content": "Event-driven architecture with agent supervision and automatic restart capabilities",
+          "date": "2025-06-30T13:16:50.907Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Distributed knowledge capture, analysis, and integration system",
+          "date": "2025-06-30T13:16:50.907Z"
+        }
+      ],
+      "significance": 9,
+      "created": "2025-06-30T13:16:50.916Z",
+      "updated": "2025-06-30T13:16:50.916Z",
+      "metadata": {
+        "created_by": "piped-insight",
+        "version": "2.0.0",
+        "team": "coding",
+        "technologies": [
+          "Node.js",
+          "MQTT",
+          "JSON-RPC",
+          "Claude",
+          "MCP"
+        ],
+        "references": [
+          "https://github.com/eclipse/mosquitto"
+        ],
+        "codeFiles": [
+          "agents/semantic-analysis/index.js",
+          "framework/base-agent.js",
+          "mcp-server/index.js"
+        ],
+        "insight_type": "problem-solution"
+      }
+    },
+    {
+      "id": "5061c6f7-7dd4-4261-88f2-51d244c17dfb",
+      "name": "AgentInfrastructureAutomationAutomatedin",
+      "entityType": "WorkflowPattern",
+      "observations": [
+        {
+          "type": "problem",
+          "content": "Agent Infrastructure Automation Pattern",
+          "date": "2025-06-30T13:17:07.127Z"
+        },
+        {
+          "type": "solution",
+          "content": "Automated infrastructure startup with MQTT broker and RPC server orchestration",
+          "date": "2025-06-30T13:17:07.127Z"
+        },
+        {
+          "type": "rationale",
+          "content": "Systematic agent lifecycle management with health monitoring and auto-restart",
+          "date": "2025-06-30T13:17:07.127Z"
+        },
+        {
+          "type": "learnings",
+          "content": "Environment validation, service dependency checking, and graceful shutdown handling",
+          "date": "2025-06-30T13:17:07.127Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Essential for production multi-agent deployments requiring high availability",
+          "date": "2025-06-30T13:17:07.127Z"
+        }
+      ],
+      "significance": 8,
+      "created": "2025-06-30T13:17:07.138Z",
+      "updated": "2025-06-30T13:17:07.138Z",
+      "metadata": {
+        "created_by": "piped-insight",
+        "version": "2.0.0",
+        "team": "coding",
+        "technologies": [
+          "Node.js",
+          "MQTT",
+          "JSON-RPC",
+          "Supervisor"
+        ],
+        "references": [
+          "https://nodejs.org/api/process.html"
+        ],
+        "codeFiles": [
+          "infrastructure/mqtt/broker.js",
+          "framework/lifecycle/supervisor.js",
+          "scripts/start-agents.js"
+        ],
+        "insight_type": "problem-solution"
+      }
+    },
+    {
+      "id": "3bdc441c-a591-44e6-aad4-518e79858384",
+      "name": "KnowledgeGraphAgentAutomatedknowledgeent",
+      "entityType": "WorkflowPattern",
+      "observations": [
+        {
+          "type": "problem",
+          "content": "Knowledge Graph Agent Integration Pattern",
+          "date": "2025-06-30T13:17:23.826Z"
+        },
+        {
+          "type": "solution",
+          "content": "Automated knowledge entity creation and synchronization with UKB via agent system",
+          "date": "2025-06-30T13:17:23.826Z"
+        },
+        {
+          "type": "rationale",
+          "content": "Integration pattern enabling semantic analysis agents to directly update knowledge base",
+          "date": "2025-06-30T13:17:23.826Z"
+        },
+        {
+          "type": "learnings",
+          "content": "Bi-directional sync between agent-discovered patterns and persistent knowledge storage",
+          "date": "2025-06-30T13:17:23.826Z"
+        },
+        {
+          "type": "applicability",
+          "content": "Transforms manual knowledge capture into automated discovery and integration workflow",
+          "date": "2025-06-30T13:17:23.826Z"
+        }
+      ],
+      "significance": 8,
+      "created": "2025-06-30T13:17:23.837Z",
+      "updated": "2025-06-30T13:17:23.837Z",
+      "metadata": {
+        "created_by": "piped-insight",
+        "version": "2.0.0",
+        "team": "coding",
+        "technologies": [
+          "Node.js",
+          "UKB",
+          "MCP",
+          "SemanticAnalysis"
+        ],
+        "references": [
+          "https://github.com/anthropics/claude-code"
+        ],
+        "codeFiles": [
+          "agents/knowledge-graph/integrations/ukb-integration.js",
+          "agents/knowledge-graph/index.js"
+        ],
+        "insight_type": "problem-solution"
+      }
     }
   ],
   "relations": [
@@ -729,7 +894,7 @@
     }
   ],
   "metadata": {
-    "last_updated": "2025-06-30T13:08:06.134Z",
+    "last_updated": "2025-06-30T13:17:23.837Z",
     "total_entities": 9,
     "total_relations": 20,
     "team": "ui"
