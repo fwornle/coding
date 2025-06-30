@@ -24,6 +24,7 @@ A comprehensive AI-powered development toolkit that provides intelligent code an
 ![Semantic Analysis System Overview](docs/images/semantic-analysis-system-overview.png)
 
 The system provides:
+
 - **Multi-Agent Semantic Analysis** - Code pattern recognition, conversation insights
 - **Knowledge Management** - UKB-CLI for capture, VKB-CLI for visualization
 - **Agent-Agnostic Interface** - Works with Claude Code or GitHub CoPilot
@@ -33,10 +34,12 @@ The system provides:
 ## 🔧 Core Components
 
 ### Knowledge Management Tools
+
 - **[UKB-CLI](docs/ukb/)** - Update Knowledge Base (capture insights)
 - **[VKB-CLI](docs/vkb/)** - View Knowledge Base (web visualization)
 
 ### Semantic Analysis System
+
 - **[Multi-Agent System](docs/components/semantic-analysis/)** - Advanced AI-powered analysis
 - **[MCP Integration](docs/components/semantic-analysis/mcp-server-setup.md)** - Claude Code tools
 - **[VSCode Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced CoPilot
@@ -44,21 +47,25 @@ The system provides:
 ## 📚 Documentation
 
 ### 🚀 Getting Started
+
 - **[Quick Start Guide](docs/installation/quick-start.md)** - Get running in 30 seconds
 - **[Network Setup](docs/installation/network-setup.md)** - Corporate firewall configuration
 - **[MCP Configuration](docs/installation/mcp-configuration.md)** - Claude Code setup
 
 ### 🏗️ Architecture & Design
+
 - **[System Overview](docs/architecture/system-overview.md)** - Complete architecture guide
 - **[Knowledge Flow](docs/architecture/knowledge-flow.md)** - How knowledge moves through the system
 - **[Memory Systems](docs/architecture/memory-systems.md)** - Storage and synchronization
 
 ### 🧩 Component Documentation
+
 - **[UKB-CLI Documentation](docs/ukb/)** - Knowledge capture system
 - **[VKB-CLI Documentation](docs/vkb/)** - Knowledge visualization
 - **[Semantic Analysis System](docs/components/semantic-analysis/)** - AI analysis agents
 
 ### 🎯 Use Cases & Workflows
+
 - **[Use Cases Overview](docs/use-cases/)** - Complete workflow examples
 - **[Managing Knowledge Base](docs/use-cases/managing-knowledge-base.md)** - Team knowledge capture and access
 - **[Semantic Workflows](docs/use-cases/semantic-workflows.md)** - Orchestrated multi-step analysis processes
@@ -67,11 +74,13 @@ The system provides:
 - **[Fallback Services](docs/use-cases/fallback-services.md)** - Graceful degradation when agents unavailable
 
 ### 🔌 Integrations
+
 - **[VSCode CoPilot Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced development experience
 - **[API Reference](docs/integrations/api-reference.md)** - HTTP and MCP APIs
 - **[Testing Guide](docs/integrations/vscode-testing-guide.md)** - Integration testing
 
 ### 📋 Reference
+
 - **[Reference Documentation](docs/reference/)** - Complete reference materials
 - **[API Keys Setup](docs/reference/api-keys-setup.md)** - LLM provider configuration
 - **[Troubleshooting](docs/reference/troubleshooting-knowledge-base.md)** - Common issues and solutions
@@ -79,22 +88,26 @@ The system provides:
 ## 🎯 Key Features
 
 ### Agent-Agnostic Design
+
 - **Universal Interface**: Same commands work with Claude Code or GitHub CoPilot
 - **Auto-Detection**: Automatically uses the best available AI agent
 - **Fallback Services**: Graceful degradation when agents unavailable
 
 ### Semantic Analysis
+
 - **Code Pattern Recognition**: Identifies architectural patterns and anti-patterns
 - **Conversation Insights**: Extracts knowledge from discussions and logs
 - **Cross-Project Learning**: Accumulates insights across multiple projects
 
 ### Knowledge Management
+
 - **Persistent Storage**: Git-tracked knowledge base (`shared-memory.json`)
 - **Interactive Capture**: `ukb --interactive` for guided knowledge entry
 - **Visual Exploration**: `vkb` web interface for knowledge graph visualization
 - **MCP Synchronization**: Real-time sync with Claude Code memory
 
 ### Developer Experience
+
 - **Zero Configuration**: Auto-starts required services when needed
 - **Rich Diagnostics**: `mcp-status` command for system health checking
 - **Hot Reloading**: Live updates during development
@@ -105,6 +118,7 @@ The system provides:
 ### 1. Analyze Your Current Project
 
 **Using Claude Code:**
+
 ```bash
 # Start Claude with semantic analysis
 claude-mcp
@@ -118,6 +132,7 @@ analyze_repository {
 ```
 
 **Using VSCode CoPilot:**
+
 ```bash
 # Start CoPilot with knowledge management
 coding --copilot
@@ -129,6 +144,7 @@ coding --copilot
 ### 2. Capture Knowledge from Discussion
 
 **Claude Code:**
+
 ```
 create_knowledge_entity {
   "name": "ReactErrorBoundaryPattern",
@@ -142,6 +158,7 @@ create_knowledge_entity {
 ```
 
 **VSCode CoPilot:**
+
 ```
 @KM ukb "Use React error boundaries to catch component errors and show fallback UI for better user experience"
 ```
@@ -149,6 +166,7 @@ create_knowledge_entity {
 ### 3. Search Your Knowledge Base
 
 **Claude Code:**
+
 ```
 search_knowledge {
   "query": "React error handling",
@@ -157,11 +175,13 @@ search_knowledge {
 ```
 
 **VSCode CoPilot:**
+
 ```
 @KM search "React error handling"
 ```
 
 ### 4. Fallback Mode (No API Keys)
+
 ```bash
 # Direct knowledge management
 ukb --interactive  # Follow prompts to capture insights
@@ -169,6 +189,7 @@ vkb               # Open web visualization
 ```
 
 ### 5. Comprehensive Analysis Workflow
+
 ```bash
 # Claude Code
 start_workflow {
@@ -189,6 +210,7 @@ curl -X POST http://localhost:8765/api/semantic/analyze-repository \
 ## 🔍 System Status
 
 Check system health and configuration:
+
 ```bash
 # Check overall system status
 mcp-status
@@ -204,7 +226,9 @@ mcp-status
 ## 🛠️ Development
 
 ### API Keys Configuration
+
 Configure in `semantic-analysis-system/.env`:
+
 ```bash
 # Option 1: Anthropic only (recommended)
 ANTHROPIC_API_KEY=sk-ant-your-key-here
@@ -221,6 +245,7 @@ DEFAULT_LLM_PROVIDER=claude
 ```
 
 ### Service Architecture
+
 - **MQTT Broker**: Port 1883 (async agent communication)
 - **JSON-RPC Server**: Port 8080 (sync method calls)
 - **VKB Web Server**: Port 8080 (knowledge visualization)
@@ -229,6 +254,7 @@ DEFAULT_LLM_PROVIDER=claude
 ## 📖 Historical Context
 
 This system has evolved through several iterations:
+
 - **Phase 1**: Basic knowledge capture (bash scripts)
 - **Phase 2**: Node.js CLI tools (UKB-CLI, VKB-CLI)
 - **Phase 3**: MCP integration for Claude Code
