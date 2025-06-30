@@ -398,117 +398,117 @@
       }
     },
     {
-      "id": "0833aba6-ec23-4a3d-8e46-c8e8e5342413",
-      "name": "AntipatternidentificationlacksComprehens",
+      "id": "a8be361b-c3b8-4634-b8db-1fea75104f0c",
+      "name": "CommandPatternWorkflow",
       "entityType": "WorkflowPattern",
       "observations": [
         {
           "type": "problem",
-          "content": "Anti-pattern identification lacks systematic detection and automated remediation workflows",
-          "date": "2025-06-30T06:27:44.427Z"
+          "content": "Command-based interaction patterns in development workflows detected through semantic analysis",
+          "date": "2025-06-30T11:47:34.668Z"
         },
         {
           "type": "solution",
-          "content": "Comprehensive anti-pattern detection system with severity assessment and automated refactoring suggestions",
-          "date": "2025-06-30T06:27:44.427Z"
+          "content": "Systematic command-based problem resolution approaches in script automation and MCP configuration management",
+          "date": "2025-06-30T11:47:34.668Z"
         },
         {
           "type": "rationale",
-          "content": "Enables proactive code quality management through early anti-pattern detection and guided remediation",
-          "date": "2025-06-30T06:27:44.427Z"
+          "content": "Enables automated detection and documentation of command patterns in development conversations",
+          "date": "2025-06-30T11:47:34.668Z"
         },
         {
           "type": "learnings",
-          "content": "Multi-category analysis (maintainability, performance, security) provides comprehensive code quality assessment",
-          "date": "2025-06-30T06:27:44.427Z"
+          "content": "Multi-layer semantic analysis provides comprehensive workflow pattern identification and documentation",
+          "date": "2025-06-30T11:47:34.668Z"
         },
         {
           "type": "applicability",
-          "content": "Any development team requiring systematic code quality improvement and technical debt management",
-          "date": "2025-06-30T06:27:44.427Z"
+          "content": "Any development team requiring systematic command pattern detection and workflow automation",
+          "date": "2025-06-30T11:47:34.668Z"
         },
-        "Details: http://localhost:8080/knowledge-management/insights/AntiPatternDetectionSystem.md"
+        "Details: http://localhost:8080/knowledge-management/insights/CommandPatternWorkflow.md"
       ],
-      "significance": 8,
-      "created": "2025-06-30T06:27:44.437Z",
-      "updated": "2025-06-30T08:06:59.749Z",
+      "significance": 7,
+      "created": "2025-06-30T11:47:34.679Z",
+      "updated": "2025-06-30T12:01:30.279Z",
       "metadata": {
         "created_by": "piped-insight",
         "version": "2.0.0",
         "team": "coding",
         "technologies": [
-          "Anti-Pattern-Detection",
-          "Quality-Assessment",
-          "Code-Analysis",
-          "Refactoring",
-          "Technical-Debt"
+          "Semantic-Analysis",
+          "Command-Patterns",
+          "Workflow-Automation",
+          "Script-Configuration",
+          "MCP-Integration"
         ],
         "references": [
-          "https://refactoring.guru/refactoring/smells"
+          "http://localhost:8080/knowledge-management/insights/CommandPatternImplementation.md"
         ],
         "codeFiles": [
           "docs/use-cases/code-pattern-analysis.md",
-          "lib/semantic-analysis/analyzers/anti-pattern-detector.js"
+          "lib/semantic-analysis/analyzers/command-analyzer.js"
         ],
         "insight_type": "problem-solution",
-        "last_updated": "2025-06-30T08:06:59.749Z"
+        "last_updated": "2025-06-30T12:01:30.279Z"
       }
     },
     {
-      "id": "31ccdb16-aa00-44e4-a8c4-51d7f8f6143c",
-      "name": "ArchitecturaldocumentationbecomesAutomat",
+      "id": "e7f684ff-0131-476d-b4a4-5aa158fa70aa",
+      "name": "RepositoryPatternWorkflow",
       "entityType": "WorkflowPattern",
       "observations": [
         {
           "type": "problem",
-          "content": "Architectural documentation becomes outdated and disconnected from actual code patterns",
-          "date": "2025-06-30T06:28:15.425Z"
+          "content": "Repository-based knowledge management and data persistence patterns detected through semantic analysis",
+          "date": "2025-06-30T11:47:51.542Z"
         },
         {
           "type": "solution",
-          "content": "Automated architecture documentation generation from detected patterns with living documentation updates",
-          "date": "2025-06-30T06:28:15.425Z"
+          "content": "Systematic data persistence and retrieval patterns in MCP memory management and cross-session knowledge continuity",
+          "date": "2025-06-30T11:47:51.542Z"
         },
         {
           "type": "rationale",
-          "content": "Maintains synchronization between code evolution and architectural documentation through continuous analysis",
-          "date": "2025-06-30T06:28:15.425Z"
+          "content": "Enables automated detection and documentation of repository patterns in knowledge management workflows",
+          "date": "2025-06-30T11:47:51.542Z"
         },
         {
           "type": "learnings",
-          "content": "Real-time documentation generation ensures architectural knowledge stays current with codebase changes",
-          "date": "2025-06-30T06:28:15.425Z"
+          "content": "Comprehensive repository pattern analysis provides critical knowledge continuity across development sessions",
+          "date": "2025-06-30T11:47:51.542Z"
         },
         {
           "type": "applicability",
-          "content": "Any development team requiring accurate and current architectural documentation and onboarding materials",
-          "date": "2025-06-30T06:28:15.425Z"
+          "content": "Any development team requiring systematic knowledge persistence and cross-session data management",
+          "date": "2025-06-30T11:47:51.542Z"
         },
-        "Details: http://localhost:8080/knowledge-management/insights/ArchitecturalDocumentationGeneration.md"
+        "Details: http://localhost:8080/knowledge-management/insights/RepositoryPatternWorkflow.md"
       ],
-      "significance": 7,
-      "created": "2025-06-30T06:28:15.436Z",
-      "updated": "2025-06-30T08:07:10.491Z",
+      "significance": 8,
+      "created": "2025-06-30T11:47:51.553Z",
+      "updated": "2025-06-30T12:01:40.841Z",
       "metadata": {
         "created_by": "piped-insight",
         "version": "2.0.0",
         "team": "coding",
         "technologies": [
-          "Architecture-Documentation",
-          "Pattern-Detection",
-          "Living-Documentation",
-          "Team-Onboarding",
-          "Knowledge-Management"
+          "Semantic-Analysis",
+          "Repository-Patterns",
+          "Knowledge-Management",
+          "MCP-Memory",
+          "Data-Persistence"
         ],
         "references": [
-          "https://c4model.com/"
+          "http://localhost:8080/knowledge-management/insights/RepositoryPatternImplementation.md"
         ],
         "codeFiles": [
-          "docs/use-cases/code-pattern-analysis.md",
-          "lib/semantic-analysis/generators/architecture-docs.js"
+          "lib/knowledge-api/adapters/multi-file-storage.js",
+          "lib/mcp-memory/repository.js"
         ],
         "insight_type": "problem-solution",
-        "last_updated": "2025-06-30T08:07:10.491Z"
+        "last_updated": "2025-06-30T12:01:40.841Z"
       }
     }
   ],
@@ -728,10 +728,65 @@
       "metadata": {
         "created_by": "knowledge-api"
       }
+    },
+    {
+      "id": "819eda6b-3693-4502-bbc5-e597757d01d2",
+      "from": "Coding",
+      "to": "UkbCli",
+      "relationType": "uses",
+      "significance": 7,
+      "created": "2025-06-30T12:11:47.815Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "id": "b74ba2f0-d847-4672-a7ce-9291f118798e",
+      "from": "CommandPatternWorkflow",
+      "to": "CollectiveKnowledge",
+      "relationType": "part_of",
+      "significance": 8,
+      "created": "2025-06-30T12:14:31.986Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "id": "46f50d4f-586c-49cc-8afc-d7cde92347e9",
+      "from": "RepositoryPatternWorkflow",
+      "to": "CollectiveKnowledge",
+      "relationType": "part_of",
+      "significance": 8,
+      "created": "2025-06-30T12:14:44.690Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "id": "824eb96c-172c-44f3-9236-c3430c92edec",
+      "from": "Coding",
+      "to": "CommandPatternWorkflow",
+      "relationType": "uses",
+      "significance": 7,
+      "created": "2025-06-30T12:14:55.612Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
+    },
+    {
+      "id": "2ad8913a-3fe4-44d3-9347-9c409bf248e2",
+      "from": "Coding",
+      "to": "RepositoryPatternWorkflow",
+      "relationType": "uses",
+      "significance": 8,
+      "created": "2025-06-30T12:15:05.308Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
     }
   ],
   "metadata": {
-    "last_updated": "2025-06-30T08:07:10.491Z",
+    "last_updated": "2025-06-30T12:38:00.532Z",
     "total_entities": 9,
     "total_relations": 20,
     "team": "ui"

@@ -730,12 +730,23 @@
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
       "id": "ui_pattern_to_collective_9"
+    },
+    {
+      "id": "2072f700-81bd-4a7b-9690-125839737cad",
+      "from": "ConditionalLoggingPattern",
+      "to": "ReduxStateManagementPattern",
+      "relationType": "related_to",
+      "significance": 8,
+      "created": "2025-06-30T12:13:26.058Z",
+      "metadata": {
+        "created_by": "knowledge-api"
+      }
     }
   ],
   "metadata": {
     "version": "2.0.0",
     "created": "2025-06-06T10:00:00Z",
-    "last_updated": "2025-06-29T07:13:00.570Z",
+    "last_updated": "2025-06-30T12:13:26.058Z",
     "contributors": [
       "agent-q284340",
       "q284340"

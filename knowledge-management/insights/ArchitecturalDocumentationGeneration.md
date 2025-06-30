@@ -4,6 +4,72 @@
 
 **ArchitecturalDocumentationGeneration** is an automated system that generates and maintains up-to-date architectural documentation from detected code patterns, ensuring documentation stays synchronized with actual implementation.
 
+## Semantic Analysis Workflow Integration
+
+This pattern was automatically detected and documented by the Semantic Analysis System during the analysis of code pattern detection workflows. The system identified this as a critical component for maintaining living documentation that evolves with the codebase.
+
+### Automated Detection Process
+1. **Pattern Analysis**: The semantic analysis system identified documentation generation as a key outcome of pattern detection
+2. **Workflow Integration**: Recognized as part of the larger pattern analysis → documentation → knowledge base pipeline
+3. **Multi-Format Support**: Detected support for Markdown, PlantUML, Mermaid, and C4 model diagrams
+4. **Significance Scoring**: Rated at 7/10 for maintaining architectural knowledge currency
+5. **Automation Benefits**: Eliminates manual documentation drift through continuous generation
+
+### Integration with Semantic Analysis System
+```javascript
+// Automated documentation generation workflow
+const documentationWorkflow = {
+  trigger: 'pattern-detection-complete',
+  pipeline: [
+    'extract-architectural-elements',
+    'generate-documentation-templates',
+    'create-visual-diagrams',
+    'update-knowledge-base'
+  ],
+  outputs: {
+    markdown: 'knowledge-management/insights/',
+    diagrams: 'docs/architecture/diagrams/',
+    metrics: 'docs/architecture/metrics.json'
+  }
+};
+
+// Part of insight-orchestrator.js workflow
+const generateArchitecturalDocs = async (patterns) => {
+  const docs = await architectureDocGen.generate({
+    patterns,
+    formats: ['markdown', 'mermaid', 'plantuml'],
+    diagramsPerInsight: 3-4,
+    includeMetrics: true
+  });
+  
+  // Automatic knowledge base integration
+  await ukbIntegration.persistDocs(docs);
+};
+```
+
+### Semantic Analysis Architecture for Documentation
+```mermaid
+graph LR
+    A[Pattern Detection] --> B[Architecture Extractor]
+    B --> C[Documentation Generator]
+    C --> D[Template Engine]
+    C --> E[Diagram Generator]
+    C --> F[Metrics Calculator]
+    D --> G[Markdown Docs]
+    E --> H[Visual Diagrams]
+    F --> I[Quality Metrics]
+    G --> J[Knowledge Base]
+    H --> J
+    I --> J
+    J --> K[Team Portal]
+```
+
+### Workflow Execution Results
+- **Generated Artifacts**: CommandPatternImplementation.md, RepositoryPatternImplementation.md
+- **Visual Documentation**: 3-4 diagrams per insight (PlantUML/Mermaid → PNG conversion)
+- **Knowledge Integration**: Attempted ukb integration (blocked by formatting bug)
+- **Continuous Updates**: Post-session analysis triggers documentation regeneration
+
 ## Problem
 
 Architectural documentation becomes outdated and disconnected from actual code patterns. Development teams struggle with:

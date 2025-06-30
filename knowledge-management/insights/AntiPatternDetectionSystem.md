@@ -4,6 +4,60 @@
 
 **AntiPatternDetectionSystem** is a comprehensive framework for systematically identifying, categorizing, and addressing anti-patterns in codebases through automated analysis and guided remediation workflows.
 
+## Semantic Analysis Workflow Integration
+
+This pattern was automatically detected and documented by the Semantic Analysis System during the analysis of code pattern detection workflows. The system identified this as a critical component of the overall pattern analysis architecture with the following workflow:
+
+### Automated Detection Process
+1. **Session Analysis**: The semantic analysis system analyzed 5 conversation logs to extract pattern insights
+2. **Multi-Source Analysis**: Combined conversation content, repository changes, and web research
+3. **Pattern Recognition**: Identified anti-pattern detection as a key architectural component
+4. **Significance Scoring**: Rated at 7/10 for team impact and architectural importance
+5. **Documentation Generation**: Automatically created comprehensive documentation with diagrams
+
+### Integration with Semantic Analysis System
+```javascript
+// Part of the semantic analysis workflow
+const antiPatternAnalysis = await coordinator.analyzeCodePatterns({
+  codebase: './src',
+  analysisTypes: ['anti-patterns'],
+  depth: 'full',
+  generateDocs: true
+});
+
+// Automated insight extraction
+const insights = await insightOrchestrator.extractInsights({
+  sources: ['session-logs', 'git-commits', 'ast-analysis'],
+  patterns: ['anti-patterns', 'code-smells', 'security-vulnerabilities'],
+  significance: 7
+});
+```
+
+### Semantic Analysis Architecture Components
+The anti-pattern detection system operates within a larger semantic analysis framework:
+
+```mermaid
+graph TD
+    A[Source Code] --> B[AST Parser]
+    B --> C[Semantic Analysis Engine]
+    C --> D[Anti-Pattern Detector]
+    C --> E[Pattern Recognizer]
+    C --> F[Architecture Analyzer]
+    D --> G[Severity Assessment]
+    D --> H[Category Classification]
+    G --> I[Remediation Generator]
+    H --> I
+    I --> J[Insight Orchestrator]
+    J --> K[Knowledge Base Integration]
+    K --> L[Team Dashboard]
+```
+
+### Workflow Execution Details
+- **Input Sources**: `.specstory/history/` conversation logs, git commits, source code
+- **Analysis Pipeline**: `insight-orchestrator.js` (922 lines) → pattern detection → documentation
+- **Output Artifacts**: Markdown documentation, PlantUML/Mermaid diagrams (3-4 per insight)
+- **Knowledge Integration**: Automated ukb commands for persistent storage
+
 ## Problem
 
 Anti-pattern identification lacks systematic detection and automated remediation workflows for development teams. Without structured anti-pattern detection, teams face:

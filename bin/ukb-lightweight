@@ -246,7 +246,7 @@ ENTITY MANAGEMENT:
 
 RELATION MANAGEMENT:
     --list-relations       List all relations
-    --add-relation         Add relation (interactive or --from --to --type)
+    --add-relation         Add relation (interactive, --from --to --type, or piped input)
     --remove-relation      Remove relation (interactive)
 
 GIT ANALYSIS:
@@ -270,6 +270,9 @@ EXAMPLES:
     ukb --list-entities    # List all entities
     ukb --stats            # Show statistics
     ukb --interactive      # Start interactive mode
+    
+    # Add relation with piped input (4 lines: from, to, type, significance)
+    echo -e "EntityA\nEntityB\nuses\n7" | ukb --add-relation
 
 This lightweight script replaces the original 3,948-line bash script
 while providing 100% backward compatibility via ukb-cli delegation.

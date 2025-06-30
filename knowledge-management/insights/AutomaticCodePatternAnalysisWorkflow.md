@@ -4,6 +4,82 @@
 
 **AutomaticCodePatternAnalysisWorkflow** is a systematic approach to detecting, documenting, and enforcing architectural patterns across development teams using AST-based pattern recognition.
 
+## Semantic Analysis Workflow Integration
+
+This pattern was the primary pattern detected by the Semantic Analysis System during the automated workflow execution. It represents the core architecture of the semantic analysis system itself, demonstrating a self-referential pattern detection capability.
+
+### Automated Detection Process
+1. **Initial Trigger**: Post-session analysis of code pattern discussions
+2. **AST Analysis**: Deep code structure analysis using Babel parser
+3. **Pattern Recognition**: Identified multi-layer pattern detection architecture
+4. **Significance Scoring**: Rated at 8/10 as foundational infrastructure
+5. **Self-Documentation**: The system documented its own pattern detection capabilities
+
+### Integration with Semantic Analysis System
+```javascript
+// Core semantic analysis workflow implementation
+const semanticAnalysisWorkflow = {
+  name: 'code-pattern-analysis',
+  trigger: 'post-session-complete',
+  stages: [
+    {
+      name: 'session-analysis',
+      handler: 'insight-orchestrator.js',
+      inputs: ['.specstory/history/*.md'],
+      outputs: ['detected-patterns.json']
+    },
+    {
+      name: 'ast-analysis',
+      handler: 'code-analyzer.js', 
+      inputs: ['src/**/*.js'],
+      outputs: ['ast-patterns.json']
+    },
+    {
+      name: 'pattern-synthesis',
+      handler: 'pattern-matcher.js',
+      inputs: ['detected-patterns.json', 'ast-patterns.json'],
+      outputs: ['synthesized-patterns.json']
+    },
+    {
+      name: 'documentation-generation',
+      handler: 'doc-generator.js',
+      inputs: ['synthesized-patterns.json'],
+      outputs: ['insights/*.md', 'diagrams/*.png']
+    }
+  ]
+};
+```
+
+### Semantic Analysis Architecture
+```mermaid
+graph TD
+    A[Conversation Logs] --> B[Session Analyzer]
+    C[Source Code] --> D[AST Parser]
+    B --> E[Pattern Extractor]
+    D --> E
+    E --> F[Pattern Matcher]
+    F --> G[Significance Scorer]
+    G --> H[Insight Generator]
+    H --> I[Documentation Engine]
+    I --> J[Knowledge Base]
+    J --> K[UKB Integration]
+    K --> L[Persistent Storage]
+```
+
+### Workflow Execution Components
+- **insight-orchestrator.js** (922 lines): Main orchestration engine
+- **auto-insight-trigger.js** (362 lines): Automatic workflow triggering
+- **post-session-logger.js** (313 lines): Session completion handler
+- **test-insight-workflow.js** (460 lines): End-to-end testing framework
+- **diagram-generator.js**: Visual documentation generation
+
+### Pattern Detection Capabilities
+The workflow demonstrated detection of:
+1. **Architectural Patterns**: MVC, Repository, Factory patterns
+2. **Framework Patterns**: React hooks, Redux patterns
+3. **Anti-Patterns**: Code smells, circular dependencies
+4. **Custom Patterns**: Team-specific architectural decisions
+
 ## Problem
 
 Automatic code pattern analysis lacks systematic detection and documentation workflows for development teams. Without structured pattern recognition, teams struggle with:
