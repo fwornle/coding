@@ -1,6 +1,6 @@
 # Documentation Hub
 
-Complete documentation for the Semantic Analysis & Knowledge Management System.
+Complete documentation for the **Unified** Semantic Analysis & Knowledge Management System.
 
 ## 📖 Documentation Structure
 
@@ -19,14 +19,14 @@ Claude Code integration setup, MCP server configuration, and tool registration.
 
 ### 🏗️ Architecture & Design
 
-#### [System Overview](architecture/system-overview.md)
-Complete architectural overview including multi-agent system, communication patterns, and data flow.
+#### [Unified System Overview](architecture/unified-system-overview.md)
+Complete unified architecture: 7-agent system serving both Claude Code and CoPilot.
 
-#### [Knowledge Flow](architecture/knowledge-flow.md)
-How knowledge moves through the system, from capture to visualization to AI assistance.
+#### [Unified Knowledge Flow](architecture/unified-knowledge-flow.md)
+How knowledge flows through the unified agent system with SynchronizationAgent authority.
 
-#### [Memory Systems](architecture/memory-systems.md)
-Storage architecture, synchronization mechanisms, and persistence strategies.
+#### [Multi-Database Systems](architecture/unified-memory-systems.md)
+SynchronizationAgent ensuring consistency across MCP Memory, Graphology, and shared-memory.json.
 
 #### [Agent Detection](architecture/agent-detection.md)
 How the system detects and selects between Claude Code and GitHub CoPilot.
@@ -47,14 +47,14 @@ How the system detects and selects between Claude Code and GitHub CoPilot.
 - **[User Guide](components/vkb/user-guide.md)** - Web interface walkthrough
 - **[API Reference](components/vkb/api-reference.md)** - HTTP API endpoints
 
-#### Semantic Analysis System ✨ (Enhanced)
-- **[Overview](components/semantic-analysis/README.md)** - Enhanced multi-agent analysis system with sync & deduplication
-- **[Enhanced Architecture](components/semantic-analysis/enhanced-architecture.md)** - Complete enhanced system architecture
-- **[Architecture](components/semantic-analysis/architecture.md)** - Original agent communication and coordination
+#### Unified Semantic Analysis System 🤖 (7-Agent)
+- **[Overview](components/semantic-analysis/README.md)** - Unified 7-agent system serving both Claude Code and CoPilot
+- **[Unified Architecture](components/semantic-analysis/unified-architecture.md)** - Complete 7-agent system architecture
+- **[SynchronizationAgent](components/semantic-analysis/synchronization-agent.md)** - Single source of truth implementation
 - **[Installation Guide](components/semantic-analysis/installation.md)** - Complete setup and configuration
-- **[Use Cases](components/semantic-analysis/use-cases.md)** - Comprehensive usage examples and workflows
-- **[API Reference](components/semantic-analysis/api-reference.md)** - Agent APIs and interfaces
-- **[MCP Server Setup](components/semantic-analysis/mcp-server-setup.md)** - Claude Code integration
+- **[Use Cases](components/semantic-analysis/use-cases.md)** - Unified command examples and workflows
+- **[API Reference](components/semantic-analysis/api-reference.md)** - Agent APIs and unified interfaces
+- **[MCP Server Setup](components/semantic-analysis/mcp-server-setup.md)** - Claude Code unified tools
 - **[Troubleshooting](components/semantic-analysis/troubleshooting.md)** - Common issues and solutions
 
 ---
@@ -98,8 +98,8 @@ All architectural diagrams are available in two formats:
 - **Images**: [PNG files](puml/) - Generated diagrams for documentation
 
 #### Key Diagrams
-- **[System Overview](images/semantic-analysis-system-overview.png)** - Complete enhanced architecture
-- **[Enhanced Architecture](images/semantic-analysis-enhanced-architecture.png)** - New agents & infrastructure ✨
+- **[Unified Architecture](images/unified-semantic-architecture.png)** - Complete unified system with SynchronizationAgent
+- **[7-Agent System](images/unified-7-agent-system.png)** - Specialized agents serving both Claude and CoPilot
 - **[UKB-CLI Architecture](images/ukb-cli-architecture.png)** - Knowledge capture system
 - **[Communication Patterns](images/semantic-analysis-communication.png)** - Agent communication
 - **[Knowledge Schema](puml/knowledge-schema.png)** - Data structures and relationships
@@ -149,10 +149,10 @@ Superseded documentation maintained for reference and troubleshooting.
 | I want to... | Go to... |
 |--------------|----------|
 | **Install the system** | [Quick Start Guide](installation/quick-start.md) |
-| **Understand the architecture** | [System Overview](architecture/system-overview.md) |
+| **Understand the unified architecture** | [Unified System Overview](architecture/unified-system-overview.md) |
 | **Use UKB-CLI** | [UKB Documentation](components/ukb/) |
 | **Use VKB-CLI** | [VKB Documentation](components/vkb/) |
-| **Set up semantic analysis** | [Semantic Analysis Setup](components/semantic-analysis/mcp-server-setup.md) |
+| **Set up unified agent system** | [Semantic Analysis Setup](components/semantic-analysis/mcp-server-setup.md) |
 | **Integrate with VSCode** | [VSCode Integration](integrations/vscode-copilot-integration.md) |
 | **Configure API keys** | [API Keys Setup](reference/api-keys-setup.md) |
 | **Troubleshoot issues** | [Troubleshooting Guide](reference/troubleshooting.md) |

@@ -1,35 +1,36 @@
-# Semantic Analysis & Knowledge Management System
+# Unified Semantic Analysis & Knowledge Management System
 
-A comprehensive AI-powered development toolkit that provides intelligent code analysis, knowledge management, and seamless integration with both **Claude Code** (with MCP servers) and **GitHub CoPilot** (with fallback services).
+A comprehensive AI-powered development toolkit featuring **unified multi-agent semantic analysis** with seamless integration for both **Claude Code** (MCP tools) and **GitHub CoPilot** (enhanced VSCode integration). The system uses a **single agent infrastructure** and **unified SynchronizationAgent** to ensure consistent knowledge management across all AI coding assistants.
 
 ## 🚀 Quick Start
 
 ```bash
-# Install the system (detects and configures available agents)
+# Install the unified system
 ./install.sh
 
-# Test installation and auto-repair any issues
+# Test installation and verify agent system
 ./scripts/test-coding.sh
 
 # Use best available agent (auto-detects)
 ./bin/coding
 
-# Force specific agent
-./bin/coding --claude     # Use Claude Code with MCP + Semantic Analysis
-./bin/coding --copilot    # Use GitHub CoPilot with Semantic Analysis
+# Force specific agent (both use SAME agent system)
+./bin/coding --claude     # Claude Code with MCP + Unified Agent System
+./bin/coding --copilot    # GitHub CoPilot + Unified Agent System
 ```
 
-## 🏗️ System Architecture
+## 🏗️ Unified System Architecture
 
-![Semantic Analysis System Overview](docs/images/semantic-analysis-system-overview.png)
+![Unified Semantic Analysis System](docs/images/unified-semantic-architecture.png)
 
 The system provides:
 
-- **Multi-Agent Semantic Analysis** - Code pattern recognition, conversation insights
-- **Knowledge Management** - UKB-CLI for capture, VKB-CLI for visualization
-- **Agent-Agnostic Interface** - Works with Claude Code or GitHub CoPilot
-- **MCP Integration** - Deep Claude Code integration via MCP tools
-- **VSCode Integration** - Enhanced CoPilot experience with semantic analysis
+- **🤖 Unified Multi-Agent System** - 7 specialized agents for comprehensive analysis
+- **🔄 Single SynchronizationAgent** - Sole authority for data integrity across all systems
+- **📊 Universal Command Interface** - `determine_insights`, `update_knowledge_base`, `lessons_learned`
+- **🎯 Agent-Agnostic Design** - Same functionality in Claude Code (MCP) and CoPilot (VSCode)
+- **🔗 Multi-Database Sync** - MCP Memory ↔ Graphology ↔ shared-memory.json
+- **👁️ Transparent Progress** - Real-time agent activity logging and visualization
 
 ## 🔧 Core Components
 
@@ -38,11 +39,12 @@ The system provides:
 - **[UKB-CLI](docs/ukb/)** - Update Knowledge Base (capture insights)
 - **[VKB-CLI](docs/vkb/)** - View Knowledge Base (web visualization)
 
-### Semantic Analysis System
+### Unified Semantic Analysis System
 
-- **[Multi-Agent System](docs/components/semantic-analysis/)** - Advanced AI-powered analysis
-- **[MCP Integration](docs/components/semantic-analysis/mcp-server-setup.md)** - Claude Code tools
-- **[VSCode Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced CoPilot
+- **[7-Agent System Architecture](docs/components/semantic-analysis/unified-architecture.md)** - Complete agent ecosystem
+- **[MCP Integration](docs/components/semantic-analysis/mcp-server-setup.md)** - Claude Code unified tools
+- **[VSCode Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced CoPilot with same agents
+- **[SynchronizationAgent](docs/components/semantic-analysis/synchronization-agent.md)** - Single source of truth
 
 ## 📚 Documentation
 
@@ -54,9 +56,9 @@ The system provides:
 
 ### 🏗️ Architecture & Design
 
-- **[System Overview](docs/architecture/system-overview.md)** - Complete architecture guide
-- **[Knowledge Flow](docs/architecture/knowledge-flow.md)** - How knowledge moves through the system
-- **[Memory Systems](docs/architecture/memory-systems.md)** - Storage and synchronization
+- **[Unified Architecture](docs/architecture/unified-system-overview.md)** - Complete unified system guide
+- **[Knowledge Flow](docs/architecture/unified-knowledge-flow.md)** - How knowledge flows through unified agents
+- **[Multi-Database Sync](docs/architecture/unified-memory-systems.md)** - SynchronizationAgent and data consistency
 
 ### 🧩 Component Documentation
 
@@ -87,24 +89,28 @@ The system provides:
 
 ## 🎯 Key Features
 
-### Agent-Agnostic Design
+### Unified Agent System Design
 
-- **Universal Interface**: Same commands work with Claude Code or GitHub CoPilot
+- **Single Agent Infrastructure**: Both Claude and CoPilot use the SAME 7-agent system
+- **Unified Commands**: `determine_insights`, `update_knowledge_base`, `lessons_learned` work everywhere
+- **SynchronizationAgent Authority**: Single source of truth for data integrity
 - **Auto-Detection**: Automatically uses the best available AI agent
-- **Fallback Services**: Graceful degradation when agents unavailable
+- **Transparent Progress**: Real-time visibility into agent activities
 
-### Semantic Analysis
+### Unified Semantic Analysis
 
-- **Code Pattern Recognition**: Identifies architectural patterns and anti-patterns
-- **Conversation Insights**: Extracts knowledge from discussions and logs
-- **Cross-Project Learning**: Accumulates insights across multiple projects
+- **7 Specialized Agents**: Semantic Analysis, Knowledge Graph, Coordinator, Web Search, Synchronization, Deduplication, Documentation
+- **Code & Conversation Analysis**: Comprehensive pattern recognition from code and AI interactions
+- **Cross-Project Learning**: Unified knowledge accumulation across all projects and AI sessions
+- **Multi-Modal Insights**: Combines repository analysis, conversation logs, and web research
 
-### Knowledge Management
+### Unified Knowledge Management
 
-- **Persistent Storage**: Git-tracked knowledge base (`shared-memory.json`)
-- **Interactive Capture**: `ukb --interactive` for guided knowledge entry
-- **Visual Exploration**: `vkb` web interface for knowledge graph visualization
-- **MCP Synchronization**: Real-time sync with Claude Code memory
+- **Multi-Database Architecture**: MCP Memory + Graphology + shared-memory.json
+- **SynchronizationAgent**: Single authority ensuring consistency across all databases
+- **Universal Commands**: Same interface for Claude Code (MCP) and CoPilot (HTTP API)
+- **Interactive Capture**: `ukb --interactive` and unified agent commands
+- **Visual Exploration**: `vkb` web interface with real-time multi-database sync
 
 ### Developer Experience
 
@@ -113,57 +119,82 @@ The system provides:
 - **Hot Reloading**: Live updates during development
 - **Cross-Platform**: Works on macOS, Linux, and Windows
 
-## ⚡ Quick Start Examples
+## ⚡ Unified Command Examples
 
-### 1. Analyze Your Current Project
+### 1. Determine Insights (Both Agents Use Same System)
 
 **Using Claude Code:**
 
 ```bash
-# Start Claude with semantic analysis
+# Start Claude with unified agent system
 claude-mcp
 
-# Then in Claude chat:
-analyze_repository {
+# Use unified command interface:
+determine_insights {
   "repository": ".",
+  "conversationContext": "Current refactoring work",
   "depth": 10,
-  "significanceThreshold": 6
+  "significanceThreshold": 7
 }
 ```
 
 **Using VSCode CoPilot:**
 
 ```bash
-# Start CoPilot with knowledge management
+# Start CoPilot with same agent system
 coding --copilot
 
-# Then in CoPilot chat:
-@KM analyze repository "." --depth 10
+# Same agents, different interface:
+@KM determine insights "Current refactoring work" --depth 10
 ```
 
-### 2. Capture Knowledge from Discussion
+### 2. Update Knowledge Base (Unified SynchronizationAgent)
 
 **Claude Code:**
 
 ```
-create_knowledge_entity {
-  "name": "ReactErrorBoundaryPattern",
-  "entityType": "TechnicalPattern",
-  "significance": 8,
-  "observations": [
-    "Use error boundaries to catch React component errors",
-    "Implement fallback UI for better user experience"
-  ]
+update_knowledge_base {
+  "insights": [{
+    "name": "ReactErrorBoundaryPattern",
+    "problem": "React component errors crash entire app",
+    "solution": "Use error boundaries with fallback UI",
+    "significance": 8,
+    "entityType": "TechnicalPattern"
+  }],
+  "syncTargets": ["mcp", "graphology", "files"]
 }
 ```
 
 **VSCode CoPilot:**
 
 ```
-@KM ukb "Use React error boundaries to catch component errors and show fallback UI for better user experience"
+@KM update knowledge base "ReactErrorBoundaryPattern: Use error boundaries to prevent app crashes with fallback UI"
 ```
 
-### 3. Search Your Knowledge Base
+*Both commands use the same SynchronizationAgent to ensure data appears in MCP Memory, Graphology, AND shared-memory.json*
+
+### 3. Extract Lessons Learned (Unified Analysis)
+
+**Claude Code:**
+
+```
+lessons_learned {
+  "context": "Recent debugging session",
+  "repository": ".",
+  "focusAreas": ["patterns", "failures", "solutions"],
+  "includeConversationHistory": true
+}
+```
+
+**VSCode CoPilot:**
+
+```
+@KM lessons learned "Recent debugging session" --focus patterns,failures,solutions
+```
+
+*Both commands trigger the same 7-agent workflow for comprehensive learning extraction*
+
+### 4. Search Unified Knowledge Base
 
 **Claude Code:**
 
@@ -180,47 +211,69 @@ search_knowledge {
 @KM search "React error handling"
 ```
 
-### 4. Fallback Mode (No API Keys)
+*Both search across MCP Memory, Graphology, and shared-memory.json simultaneously*
 
-```bash
-# Direct knowledge management
-ukb --interactive  # Follow prompts to capture insights
-vkb               # Open web visualization
+### 5. System Status and Transparency
+
+**Check Agent System Status:**
+
 ```
-
-### 5. Comprehensive Analysis Workflow
-
-```bash
 # Claude Code
-start_workflow {
-  "workflowType": "repository-analysis",
-  "parameters": {
-    "repository": ".",
-    "depth": 20,
-    "includeWebSearch": true
-  }
-}
+get_system_status {}
 
-# VSCode CoPilot API
-curl -X POST http://localhost:8765/api/semantic/analyze-repository \
-  -H "Content-Type: application/json" \
-  -d '{"repository": ".", "depth": 20}'
+# CoPilot
+@KM system status
 ```
 
-## 🔍 System Status
+**Monitor Agent Activities:**
 
-Check system health and configuration:
+```
+# Claude Code
+get_workflow_status {"workflowId": "analysis-123"}
+
+# CoPilot  
+@KM workflow status analysis-123
+```
+
+*Real-time visibility into all 7 agents: Semantic Analysis → Knowledge Graph → Coordinator → Web Search → Synchronization → Deduplication → Documentation*
+
+### 6. Fallback Mode (No API Keys)
 
 ```bash
-# Check overall system status
-mcp-status
+# Direct knowledge management (same data used by agents)
+ukb --interactive  # Manual knowledge capture
+vkb               # Web visualization of unified knowledge base
+```
 
-# Test all components
+## 🔍 Unified System Status
+
+Check unified agent system health:
+
+```bash
+# Check unified system status
+get_system_status  # In Claude Code
+@KM system status  # In CoPilot
+
+# Test all components  
 ./scripts/test-coding.sh
 
-# View agent status
+# Check agent infrastructure
+mcp-status  # MCP server health
 ./bin/coding --agent copilot --copilot-stop  # Stop CoPilot services
 ./bin/coding --agent claude                   # Check Claude integration
+```
+
+### Real-Time Agent Monitoring
+
+```bash
+# Monitor agent activities
+tail -f semantic-analysis-system/logs/agents.log
+
+# Check SynchronizationAgent status
+curl http://localhost:8765/api/graph/status
+
+# Verify multi-database consistency
+vkb  # Opens unified knowledge visualization
 ```
 
 ## 🛠️ Development

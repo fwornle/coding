@@ -1,0 +1,156 @@
+@startuml unified-7-agent-system
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+title "Unified 7-Agent System Architecture"
+
+package "AI Coding Assistants" {
+  [Claude Code\n(MCP Integration)] as claude
+  [GitHub CoPilot\n(VSCode Extension)] as copilot
+}
+
+package "Unified Interface Layer" {
+  [MCP Server\n(determine_insights,\nupdate_knowledge_base,\nlessons_learned)] as mcp
+  [HTTP API Server\n(@KM commands,\nREST endpoints)] as http
+}
+
+package "7-Agent System Infrastructure" {
+  rectangle "Coordinator Agent" as coordinator {
+    [Workflow Management]
+    [Progress Tracking]
+    [Error Handling]
+    [Task Scheduling]
+  }
+  
+  rectangle "Semantic Analysis Agent" as semantic {
+    [Repository Analysis]
+    [Conversation Processing]
+    [Pattern Recognition]
+    [Significance Scoring]
+  }
+  
+  rectangle "Knowledge Graph Agent" as knowledge {
+    [Entity Extraction]
+    [Relationship Mapping]
+    [Graph Management]
+    [Schema Validation]
+  }
+  
+  rectangle "Web Search Agent" as web {
+    [Documentation Search]
+    [Technical Research]
+    [Context Enrichment]
+    [Reference Validation]
+  }
+  
+  rectangle "SynchronizationAgent\n(SINGLE SOURCE OF TRUTH)" as sync {
+    [Multi-DB Sync]
+    [Conflict Resolution]
+    [Data Validation]
+    [Atomic Operations]
+  }
+  
+  rectangle "Deduplication Agent" as dedup {
+    [Similarity Detection]
+    [Duplicate Prevention]
+    [Quality Filtering]
+    [Entity Merging]
+  }
+  
+  rectangle "Documentation Agent" as docs {
+    [Markdown Generation]
+    [Diagram Creation]
+    [Template Application]
+    [Cross-referencing]
+  }
+}
+
+package "Communication Infrastructure" {
+  [MQTT Broker\n(Async messaging)] as mqtt
+  [JSON-RPC Server\n(Sync method calls)] as rpc
+}
+
+package "Multi-Database Storage" {
+  database "MCP Memory\n(Claude sessions)" as mcpmem
+  database "Graphology\n(CoPilot integration)" as graphology
+  database "shared-memory.json\n(Git persistence)" as sharedmem
+}
+
+package "Monitoring & Visualization" {
+  [VKB Web Interface\n(Knowledge graph viewer)] as vkb
+  [System Health Monitor\n(Agent status & metrics)] as health
+  [Workflow Progress Viewer\n(Real-time activity)] as progress
+}
+
+' User connections
+claude --> mcp : "MCP Protocol"
+copilot --> http : "HTTP/WebSocket"
+
+' Interface to coordinator
+mcp --> coordinator : "Start workflows"
+http --> coordinator : "API requests"
+
+' Agent workflows (determine_insights)
+coordinator --> semantic : "1. Analyze repository"
+coordinator --> knowledge : "2. Extract entities"
+coordinator --> web : "3. Research context"
+coordinator --> dedup : "4. Check duplicates"
+coordinator --> docs : "5. Generate docs"
+coordinator --> sync : "6. Sync all DBs"
+
+' Agent communication
+semantic --> mqtt : "Async messages"
+knowledge --> mqtt
+web --> mqtt
+dedup --> mqtt
+docs --> mqtt
+
+coordinator --> rpc : "Sync method calls"
+sync --> rpc
+
+' SynchronizationAgent (critical path)
+sync --> mcpmem : "Ensure consistency"
+sync --> graphology : "Ensure consistency"
+sync --> sharedmem : "Ensure consistency"
+
+' Monitoring
+health --> coordinator : "Check status"
+health --> mqtt : "Monitor messages"
+progress --> coordinator : "Track workflows"
+vkb --> sharedmem : "Visualize unified data"
+
+note top of sync
+  **CRITICAL COMPONENT**
+  Single source of truth ensuring
+  data consistency across ALL
+  storage systems
+end note
+
+note bottom of coordinator
+  **UNIFIED WORKFLOWS**
+  Same agent system serves both
+  Claude Code and CoPilot with
+  identical analysis quality
+end note
+
+note right of mcp
+  MCP Tools:
+  • determine_insights
+  • update_knowledge_base
+  • lessons_learned
+  • search_knowledge
+  • get_system_status
+end note
+
+note right of http
+  @KM Commands:
+  • @KM determine insights
+  • @KM update knowledge base
+  • @KM lessons learned
+  • @KM search [query]
+  • @KM system status
+end note
+
+@enduml

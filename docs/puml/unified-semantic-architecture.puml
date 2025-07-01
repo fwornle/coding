@@ -1,0 +1,106 @@
+@startuml unified-semantic-architecture
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+title "Unified Semantic Analysis & Knowledge Management System"
+
+package "AI Coding Assistants" {
+  [Claude Code\n(MCP Tools)] as claude
+  [GitHub CoPilot\n(VSCode Extension)] as copilot
+}
+
+package "Unified Interface Layer" {
+  [MCP Server\nUnified Commands] as mcp
+  [HTTP API Server\nVSCode Integration] as http
+}
+
+package "Single Agent System Infrastructure" {
+  [Coordinator Agent\n(Orchestrates workflows)] as coordinator
+  [Semantic Analysis Agent\n(Code & conversation analysis)] as semantic
+  [Knowledge Graph Agent\n(Entity & relationship extraction)] as knowledge
+  [Web Search Agent\n(Documentation research)] as web
+  [SynchronizationAgent\n(SINGLE SOURCE OF TRUTH)] as sync
+  [Deduplication Agent\n(Prevents duplicate insights)] as dedup
+  [Documentation Agent\n(Creates structured docs)] as docs
+}
+
+package "Multi-Database Storage" {
+  database "MCP Memory\n(Claude Sessions)" as mcpmem
+  database "Graphology\n(CoPilot Integration)" as graphology
+  database "shared-memory.json\n(Git-tracked persistence)" as sharedmem
+}
+
+package "Communication Infrastructure" {
+  [MQTT Broker\n(Agent messaging)] as mqtt
+  [JSON-RPC Server\n(Synchronous calls)] as rpc
+}
+
+package "Visualization & Monitoring" {
+  [VKB Web Interface\n(Knowledge graph viewer)] as vkb
+  [Progress Logging\n(Agent activity monitor)] as logging
+  [System Status\n(Health monitoring)] as status
+}
+
+' User connections
+claude --> mcp : "MCP Protocol"
+copilot --> http : "HTTP/WebSocket"
+
+' Interface to agent system
+mcp --> coordinator : "Start workflows"
+http --> coordinator : "API requests"
+
+' Agent system internal communication
+coordinator --> semantic : "Analyze code/conversation"
+coordinator --> knowledge : "Extract entities"
+coordinator --> web : "Research topics"
+coordinator --> sync : "Ensure consistency"
+semantic --> dedup : "Check duplicates"
+knowledge --> docs : "Generate documentation"
+
+' SynchronizationAgent is the single authority
+sync --> mcpmem : "Sync to MCP"
+sync --> graphology : "Sync to Graphology"
+sync --> sharedmem : "Sync to files"
+
+' Agent communication infrastructure
+semantic --> mqtt : "Message bus"
+knowledge --> mqtt
+web --> mqtt
+coordinator --> rpc : "Sync calls"
+sync --> rpc
+
+' Visualization and monitoring
+vkb --> sharedmem : "Read unified data"
+vkb ..> graphology : "Live graph data"
+logging --> mqtt : "Monitor agent activity"
+status --> coordinator : "Health checks"
+
+note top of sync
+  **CRITICAL**: SynchronizationAgent is the 
+  SINGLE SOURCE OF TRUTH ensuring data 
+  consistency across ALL databases
+end note
+
+note bottom of coordinator
+  **UNIFIED**: Both Claude Code and CoPilot use
+  the SAME 7-agent system for all analysis,
+  ensuring consistent results regardless of AI assistant
+end note
+
+note right of mcp
+  MCP Tools:
+  • determine_insights
+  • update_knowledge_base  
+  • lessons_learned
+end note
+
+note right of http
+  VSCode Integration:
+  • @KM commands
+  • REST API endpoints
+  • WebSocket connections
+end note
+
+@enduml

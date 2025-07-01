@@ -1,6 +1,6 @@
-# Semantic Analysis System
+# Unified Semantic Analysis System
 
-🚀 **Enhanced Multi-Agent Semantic Analysis System** with advanced synchronization, deduplication, and knowledge management capabilities.
+🚀 **Unified 7-Agent Semantic Analysis System** serving both Claude Code and GitHub CoPilot with single infrastructure and SynchronizationAgent authority.
 
 ## Overview
 
