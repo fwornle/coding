@@ -11,7 +11,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { z } from 'zod';
 import { SemanticAnalysisClient } from './clients/semantic-analysis-client.js';
 import { Logger } from '../shared/logger.js';
-import { robustTools } from './tools/robust-tools.js';
+import { AutoRobustTools } from './tools/auto-robust-tools.js';
 
 class SemanticAnalysisMCPServer {
   constructor() {
@@ -28,13 +28,11 @@ class SemanticAnalysisMCPServer {
       }
     );
     
-    this.client = null;
+    this.autoRobustTools = new AutoRobustTools();
     this.connectionStatus = {
       server: 'starting',
-      client: 'disconnected',
-      mqttBroker: 'unknown',
-      rpcServer: 'unknown',
-      agentSystem: 'unknown',
+      systemReady: false,
+      lastHealthCheck: null,
       lastError: null,
       startTime: new Date().toISOString()
     };
@@ -45,38 +43,7 @@ class SemanticAnalysisMCPServer {
     try {
       this.connectionStatus.server = 'initializing';
       
-      // Check environment and provide detailed error messages
-      await this.checkEnvironment();
-      
-      // Initialize semantic analysis client
-      this.connectionStatus.client = 'connecting';
-      this.client = new SemanticAnalysisClient();
-      
-      try {
-        await this.client.connect();
-        this.connectionStatus.client = 'connected';
-        this.connectionStatus.mqttBroker = 'connected';
-        this.connectionStatus.rpcServer = 'connected';
-        this.connectionStatus.agentSystem = 'running';
-      } catch (clientError) {
-        this.connectionStatus.client = 'failed';
-        this.connectionStatus.lastError = clientError.message;
-        
-        // Check specific connection failures
-        if (clientError.message?.includes('MQTT')) {
-          this.connectionStatus.mqttBroker = 'failed';
-        }
-        if (clientError.message?.includes('RPC')) {
-          this.connectionStatus.rpcServer = 'failed';
-        }
-        if (clientError.code === 'ECONNREFUSED') {
-          this.connectionStatus.agentSystem = 'not_running';
-        }
-        
-        throw clientError;
-      }
-      
-      // Register tools
+      // Register tools (auto-robust tools handle system health internally)
       this.registerTools();
       
       // Register error handlers
@@ -86,16 +53,12 @@ class SemanticAnalysisMCPServer {
       };
       
       this.connectionStatus.server = 'ready';
-      this.logger.info('MCP Server setup completed');
+      this.logger.info('MCP Server with Auto-Robust Tools ready');
       
     } catch (error) {
       this.connectionStatus.server = 'failed';
       this.connectionStatus.lastError = error.message;
       this.logger.error('Failed to setup MCP server:', error);
-      
-      // Provide detailed, actionable error information
-      this.displayDetailedError(error);
-      
       throw error;
     }
   }
@@ -240,19 +203,21 @@ class SemanticAnalysisMCPServer {
           case 'sync_with_ukb':
             return await this.syncWithUkb(args);
           case 'get_system_status':
-            return await robustTools.get_system_status(args);
+            return await this.autoRobustTools.get_system_status(args);
           case 'get_mcp_server_status':
-            return await robustTools.get_mcp_server_status(args);
+            return await this.autoRobustTools.get_mcp_server_status(args);
           case 'determine_insights':
-            return await robustTools.determine_insights(args);
+            return await this.autoRobustTools.determine_insights(args);
           case 'update_knowledge_base':
-            return await robustTools.update_knowledge_base(args);
-          case 'lessons_learned':
-            return await robustTools.lessons_learned(args);
+            return await this.autoRobustTools.update_knowledge_base(args);
+          case 'extract_lessons_learned':
+            return await this.autoRobustTools.extract_lessons_learned(args);
           case 'analyze_repository':
-            return await robustTools.analyze_repository(args);
-          case 'search_knowledge':
-            return await robustTools.search_knowledge(args);
+            return await this.autoRobustTools.analyze_repository(args);
+          case 'search_technical_docs':
+            return await this.autoRobustTools.search_technical_docs(args);
+          case 'schedule_analysis_task':
+            return await this.autoRobustTools.schedule_analysis_task(args);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }

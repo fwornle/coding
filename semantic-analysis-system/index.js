@@ -9,6 +9,9 @@ import { SemanticAnalysisAgent } from './agents/semantic-analysis/index.js';
 import { WebSearchAgent } from './agents/web-search/index.js';
 import { KnowledgeGraphAgent } from './agents/knowledge-graph/index.js';
 import { CoordinatorAgent } from './agents/coordinator/index.js';
+import { SynchronizationAgent } from './agents/synchronization/index.js';
+import { DeduplicationAgent } from './agents/deduplication/index.js';
+import { DocumentationAgent } from './agents/documentation/index.js';
 import { AgentRegistry } from './framework/agent-registry.js';
 import { AgentSupervisor } from './framework/lifecycle/supervisor.js';
 import { MQTTBroker } from './infrastructure/mqtt/broker.js';
@@ -109,6 +112,15 @@ class SemanticAnalysisSystem {
         ...this.configManager.getAgentConfig('coordinator'),
         workflows: {},
         scheduling: {}
+      },
+      'synchronization': {
+        ...this.configManager.getAgentConfig('synchronization')
+      },
+      'deduplication': {
+        ...this.configManager.getAgentConfig('deduplication')
+      },
+      'documentation': {
+        ...this.configManager.getAgentConfig('documentation')
       }
     };
 
@@ -117,7 +129,10 @@ class SemanticAnalysisSystem {
       'semantic-analysis': SemanticAnalysisAgent,
       'web-search': WebSearchAgent,
       'knowledge-graph': KnowledgeGraphAgent,
-      'coordinator': CoordinatorAgent
+      'coordinator': CoordinatorAgent,
+      'synchronization': SynchronizationAgent,
+      'deduplication': DeduplicationAgent,
+      'documentation': DocumentationAgent
     };
 
     for (const [agentId, AgentClass] of Object.entries(agentClasses)) {
@@ -125,8 +140,8 @@ class SemanticAnalysisSystem {
         const agent = new AgentClass(agentConfigs[agentId]);
         
         // Register agent
-        this.agentRegistry.register(agent);
-        this.supervisor.addAgent(agent);
+        await this.agentRegistry.registerAgent(agent);
+        await this.supervisor.registerAgent(agent);
         this.agents.set(agentId, agent);
         
         // Initialize agent
@@ -202,7 +217,7 @@ class SemanticAnalysisSystem {
     try {
       // Stop agents
       if (this.supervisor) {
-        await this.supervisor.stopAll();
+        await this.supervisor.stop();
       }
 
       // Stop infrastructure

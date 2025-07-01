@@ -165,14 +165,14 @@ export class ConfigManager {
 
   getMQTTConfig() {
     return {
-      brokerUrl: `mqtt://${this.get('infrastructure.mqtt.broker.host', 'localhost')}:${this.get('infrastructure.mqtt.broker.port', 1883)}`,
+      brokerUrl: `mqtt://${this.get('infrastructure.mqtt.broker.host', 'localhost')}:${this.get('infrastructure.mqtt.broker.port', 1884)}`,
       ...this.get('infrastructure.mqtt.client', {})
     };
   }
 
   getJSONRPCConfig() {
     return this.get('infrastructure.jsonrpc.server', {
-      port: 8080,
+      port: 8082,  // Avoid conflicts: 8080=visualization, 8081=browser-access
       host: '0.0.0.0'
     });
   }

@@ -64,3 +64,6 @@ shared-memory.json
 
 # CoPilot fallback service runtime data
 .coding-tools/
+
+# Version tracking files (synchronization agent backups)
+.versions/

@@ -9,7 +9,7 @@ import { Logger } from '../../shared/logger.js';
 export class JSONRPCClient {
   constructor(config = {}) {
     this.config = {
-      endpoint: config.endpoint || 'http://localhost:8080',
+      endpoint: config.endpoint || 'http://localhost:8082',
       timeout: config.timeout || 30000,
       retries: config.retries || 3,
       retryDelay: config.retryDelay || 1000,

@@ -15,7 +15,7 @@ export class SemanticAnalysisClient extends EventEmitter {
     
     this.config = {
       mqttUrl: config.mqttUrl || 'mqtt://localhost:1883',
-      rpcUrl: config.rpcUrl || `http://localhost:${process.env.JSON_RPC_PORT || '8081'}`,
+      rpcUrl: config.rpcUrl || `http://localhost:${process.env.JSON_RPC_PORT || '8082'}`,
       timeout: config.timeout || 30000,
       retryAttempts: config.retryAttempts || 3,
       retryDelay: config.retryDelay || 5000,

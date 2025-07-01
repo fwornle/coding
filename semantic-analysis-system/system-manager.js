@@ -21,8 +21,8 @@ export class SystemManager {
   constructor() {
     this.logger = new Logger('system-manager');
     this.config = {
-      mqttPort: 1883,
-      rpcPort: 8081,
+      mqttPort: 1884,  // Avoid conflict with default MQTT 1883
+      rpcPort: 8082,   // Avoid conflict with browser-access 8081
       maxRetries: 3,
       healthCheckInterval: 30000,
       startupTimeout: 60000
@@ -331,7 +331,8 @@ export class SystemManager {
       AGENT_KNOWLEDGE_ENABLED: 'true',
       AGENT_COORDINATOR_ENABLED: 'true',
       AGENT_SYNCHRONIZATION_ENABLED: 'true',
-      AGENT_DEDUPLICATION_ENABLED: 'true'
+      AGENT_DEDUPLICATION_ENABLED: 'true',
+      AGENT_DOCUMENTATION_ENABLED: 'true'
     };
 
     return new Promise((resolve, reject) => {

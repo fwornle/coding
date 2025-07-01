@@ -13,7 +13,7 @@ export class EventBus extends EventEmitter {
     
     this.config = {
       namespace: config.namespace || 'semantic-analysis',
-      brokerUrl: config.brokerUrl || 'mqtt://localhost:1883',
+      brokerUrl: config.brokerUrl || 'mqtt://localhost:1884',
       ...config
     };
     
