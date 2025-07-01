@@ -32,7 +32,7 @@ graph TD
 
 ### Sequence Diagram
 
-![Cross-Project Learning Sequence](../../docs/puml/cross-project-learning.png)
+![Cross-Project Learning Sequence](../../docs/images/cross-project-learning.png)
 
 ### 2. Pattern Recognition Across Projects
 

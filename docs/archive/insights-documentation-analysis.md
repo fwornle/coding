@@ -50,7 +50,7 @@
 - shared-memory.json is the runtime instance (currently empty/minimal)
 
 ### **Architecture Documentation**
-- **docs/puml/semantic-analysis-system-overview.png** - Current implementation
+- **docs/images/semantic-analysis-system-overview.png** - Current implementation
 - **insights/puml/detailed-system-architecture-enhanced.puml** - Enhanced/aspirational view
 - Both are now appropriately positioned (no conflicts)
 

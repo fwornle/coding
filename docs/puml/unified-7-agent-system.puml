@@ -1,125 +1,122 @@
 @startuml unified-7-agent-system
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
 
 title "Unified 7-Agent System Architecture"
 
 package "AI Coding Assistants" {
-  [Claude Code\n(MCP Integration)] as claude
-  [GitHub CoPilot\n(VSCode Extension)] as copilot
+  [Claude Code\n(MCP Integration)] <<external>> as claude
+  [GitHub CoPilot\n(VSCode Extension)] <<external>> as copilot
 }
 
 package "Unified Interface Layer" {
-  [MCP Server\n(determine_insights,\nupdate_knowledge_base,\nlessons_learned)] as mcp
-  [HTTP API Server\n(@KM commands,\nREST endpoints)] as http
+  [MCP Server\n(determine_insights,\nupdate_knowledge_base,\nlessons_learned)] <<api>> as mcp
+  [HTTP API Server\n(@KM commands,\nREST endpoints)] <<api>> as http
 }
 
 package "7-Agent System Infrastructure" {
-  rectangle "Coordinator Agent" as coordinator {
-    [Workflow Management]
-    [Progress Tracking]
-    [Error Handling]
-    [Task Scheduling]
+  rectangle "Coordinator Agent" <<agent>> as coordinator {
+    [Workflow Management] <<core>>
+    [Progress Tracking] <<core>>
+    [Error Handling] <<core>>
+    [Task Scheduling] <<core>>
   }
   
-  rectangle "Semantic Analysis Agent" as semantic {
-    [Repository Analysis]
-    [Conversation Processing]
-    [Pattern Recognition]
-    [Significance Scoring]
+  rectangle "Semantic Analysis Agent" <<agent>> as semantic {
+    [Repository Analysis] <<core>>
+    [Conversation Processing] <<core>>
+    [Pattern Recognition] <<core>>
+    [Significance Scoring] <<core>>
   }
   
-  rectangle "Knowledge Graph Agent" as knowledge {
-    [Entity Extraction]
-    [Relationship Mapping]
-    [Graph Management]
-    [Schema Validation]
+  rectangle "Knowledge Graph Agent" <<agent>> as knowledge {
+    [Entity Extraction] <<core>>
+    [Relationship Mapping] <<core>>
+    [Graph Management] <<core>>
+    [Schema Validation] <<core>>
   }
   
-  rectangle "Web Search Agent" as web {
-    [Documentation Search]
-    [Technical Research]
-    [Context Enrichment]
-    [Reference Validation]
+  rectangle "Web Search Agent" <<agent>> as web {
+    [Documentation Search] <<util>>
+    [Technical Research] <<util>>
+    [Context Enrichment] <<util>>
+    [Reference Validation] <<util>>
   }
   
-  rectangle "SynchronizationAgent\n(SINGLE SOURCE OF TRUTH)" as sync {
-    [Multi-DB Sync]
-    [Conflict Resolution]
-    [Data Validation]
-    [Atomic Operations]
+  rectangle "SynchronizationAgent\n(SINGLE SOURCE OF TRUTH)" <<agent>> as sync {
+    [Multi-DB Sync] <<core>>
+    [Conflict Resolution] <<core>>
+    [Data Validation] <<core>>
+    [Atomic Operations] <<core>>
   }
   
-  rectangle "Deduplication Agent" as dedup {
-    [Similarity Detection]
-    [Duplicate Prevention]
-    [Quality Filtering]
-    [Entity Merging]
+  rectangle "Deduplication Agent" <<agent>> as dedup {
+    [Similarity Detection] <<util>>
+    [Duplicate Prevention] <<util>>
+    [Quality Filtering] <<util>>
+    [Entity Merging] <<util>>
   }
   
-  rectangle "Documentation Agent" as docs {
-    [Markdown Generation]
-    [Diagram Creation]
-    [Template Application]
-    [Cross-referencing]
+  rectangle "Documentation Agent" <<agent>> as docs {
+    [Markdown Generation] <<util>>
+    [Diagram Creation] <<util>>
+    [Template Application] <<util>>
+    [Cross-referencing] <<util>>
   }
 }
 
 package "Communication Infrastructure" {
-  [MQTT Broker\n(Async messaging)] as mqtt
-  [JSON-RPC Server\n(Sync method calls)] as rpc
+  [MQTT Broker\n(Async messaging)] <<infra>> as mqtt
+  [JSON-RPC Server\n(Sync method calls)] <<infra>> as rpc
 }
 
 package "Multi-Database Storage" {
-  database "MCP Memory\n(Claude sessions)" as mcpmem
-  database "Graphology\n(CoPilot integration)" as graphology
-  database "shared-memory.json\n(Git persistence)" as sharedmem
+  database "MCP Memory\n(Claude sessions)" <<storage>> as mcpmem
+  database "Graphology\n(CoPilot integration)" <<storage>> as graphology
+  database "shared-memory.json\n(Git persistence)" <<storage>> as sharedmem
 }
 
 package "Monitoring & Visualization" {
-  [VKB Web Interface\n(Knowledge graph viewer)] as vkb
-  [System Health Monitor\n(Agent status & metrics)] as health
-  [Workflow Progress Viewer\n(Real-time activity)] as progress
+  [VKB Web Interface\n(Knowledge graph viewer)] <<cli>> as vkb
+  [System Health Monitor\n(Agent status & metrics)] <<util>> as health
+  [Workflow Progress Viewer\n(Real-time activity)] <<util>> as progress
 }
 
 ' User connections
-claude --> mcp : "MCP Protocol"
-copilot --> http : "HTTP/WebSocket"
+claude SYNC_LINE mcp : "MCP Protocol"
+copilot SYNC_LINE http : "HTTP/WebSocket"
 
 ' Interface to coordinator
-mcp --> coordinator : "Start workflows"
-http --> coordinator : "API requests"
+mcp CONTROL_LINE coordinator : "Start workflows"
+http CONTROL_LINE coordinator : "API requests"
 
 ' Agent workflows (determine_insights)
-coordinator --> semantic : "1. Analyze repository"
-coordinator --> knowledge : "2. Extract entities"
-coordinator --> web : "3. Research context"
-coordinator --> dedup : "4. Check duplicates"
-coordinator --> docs : "5. Generate docs"
-coordinator --> sync : "6. Sync all DBs"
+coordinator CONTROL_LINE semantic : "1. Analyze repository"
+coordinator CONTROL_LINE knowledge : "2. Extract entities"
+coordinator CONTROL_LINE web : "3. Research context"
+coordinator CONTROL_LINE dedup : "4. Check duplicates"
+coordinator CONTROL_LINE docs : "5. Generate docs"
+coordinator CONTROL_LINE sync : "6. Sync all DBs"
 
 ' Agent communication
-semantic --> mqtt : "Async messages"
-knowledge --> mqtt
-web --> mqtt
-dedup --> mqtt
-docs --> mqtt
+semantic ASYNC_LINE mqtt : "Async messages"
+knowledge ASYNC_LINE mqtt
+web ASYNC_LINE mqtt
+dedup ASYNC_LINE mqtt
+docs ASYNC_LINE mqtt
 
-coordinator --> rpc : "Sync method calls"
-sync --> rpc
+coordinator SYNC_LINE rpc : "Sync method calls"
+sync SYNC_LINE rpc
 
 ' SynchronizationAgent (critical path)
-sync --> mcpmem : "Ensure consistency"
-sync --> graphology : "Ensure consistency"
-sync --> sharedmem : "Ensure consistency"
+sync DATA_LINE mcpmem : "Ensure consistency"
+sync DATA_LINE graphology : "Ensure consistency"
+sync DATA_LINE sharedmem : "Ensure consistency"
 
 ' Monitoring
-health --> coordinator : "Check status"
-health --> mqtt : "Monitor messages"
-progress --> coordinator : "Track workflows"
-vkb --> sharedmem : "Visualize unified data"
+health OPTIONAL_LINE coordinator : "Check status"
+health OPTIONAL_LINE mqtt : "Monitor messages"
+progress OPTIONAL_LINE coordinator : "Track workflows"
+vkb DATA_LINE sharedmem : "Visualize unified data"
 
 note top of sync
   **CRITICAL COMPONENT**

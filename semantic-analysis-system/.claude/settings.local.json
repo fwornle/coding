@@ -44,7 +44,8 @@
       "Bash(if [ -d \"$path\" ])",
       "Bash(if [ -f \"$pathREADME.md\" ])",
       "Bash(\"docs/images/semantic-analysis-system-overview.png\")",
-      "Bash(npm run start:agents:*)"
+      "Bash(npm run start:agents:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

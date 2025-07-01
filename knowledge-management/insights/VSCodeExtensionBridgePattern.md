@@ -81,15 +81,15 @@ async updateKnowledge(pattern) {
 
 ## Architecture
 
-![VSCode Extension Bridge Architecture](../../docs/puml/vscode-integrated-architecture.png)
+![VSCode Extension Bridge Architecture](../../docs/images/vscode-integrated-architecture.png)
 
 ### Component Flow
 
-![VSCode Extension Flow](../../docs/puml/vscode-extension-flow.png)
+![VSCode Extension Flow](../../docs/images/vscode-extension-flow.png)
 
 ### Component Relationships
 
-![VSCode Component Diagram](../../docs/puml/vscode-component-diagram.png)
+![VSCode Component Diagram](../../docs/images/vscode-component-diagram.png)
 
 ## Key Features
 

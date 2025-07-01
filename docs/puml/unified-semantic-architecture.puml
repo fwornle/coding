@@ -1,81 +1,78 @@
 @startuml unified-semantic-architecture
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
 
 title "Unified Semantic Analysis & Knowledge Management System"
 
 package "AI Coding Assistants" {
-  [Claude Code\n(MCP Tools)] as claude
-  [GitHub CoPilot\n(VSCode Extension)] as copilot
+  [Claude Code\n(MCP Tools)] <<external>> as claude
+  [GitHub CoPilot\n(VSCode Extension)] <<external>> as copilot
 }
 
 package "Unified Interface Layer" {
-  [MCP Server\nUnified Commands] as mcp
-  [HTTP API Server\nVSCode Integration] as http
+  [MCP Server\nUnified Commands] <<api>> as mcp
+  [HTTP API Server\nVSCode Integration] <<api>> as http
 }
 
 package "Single Agent System Infrastructure" {
-  [Coordinator Agent\n(Orchestrates workflows)] as coordinator
-  [Semantic Analysis Agent\n(Code & conversation analysis)] as semantic
-  [Knowledge Graph Agent\n(Entity & relationship extraction)] as knowledge
-  [Web Search Agent\n(Documentation research)] as web
-  [SynchronizationAgent\n(SINGLE SOURCE OF TRUTH)] as sync
-  [Deduplication Agent\n(Prevents duplicate insights)] as dedup
-  [Documentation Agent\n(Creates structured docs)] as docs
+  [Coordinator Agent\n(Orchestrates workflows)] <<agent>> as coordinator
+  [Semantic Analysis Agent\n(Code & conversation analysis)] <<agent>> as semantic
+  [Knowledge Graph Agent\n(Entity & relationship extraction)] <<agent>> as knowledge
+  [Web Search Agent\n(Documentation research)] <<agent>> as web
+  [SynchronizationAgent\n(SINGLE SOURCE OF TRUTH)] <<agent>> as sync
+  [Deduplication Agent\n(Prevents duplicate insights)] <<agent>> as dedup
+  [Documentation Agent\n(Creates structured docs)] <<agent>> as docs
 }
 
 package "Multi-Database Storage" {
-  database "MCP Memory\n(Claude Sessions)" as mcpmem
-  database "Graphology\n(CoPilot Integration)" as graphology
-  database "shared-memory.json\n(Git-tracked persistence)" as sharedmem
+  database "MCP Memory\n(Claude Sessions)" <<storage>> as mcpmem
+  database "Graphology\n(CoPilot Integration)" <<storage>> as graphology
+  database "shared-memory.json\n(Git-tracked persistence)" <<storage>> as sharedmem
 }
 
 package "Communication Infrastructure" {
-  [MQTT Broker\n(Agent messaging)] as mqtt
-  [JSON-RPC Server\n(Synchronous calls)] as rpc
+  [MQTT Broker\n(Agent messaging)] <<infra>> as mqtt
+  [JSON-RPC Server\n(Synchronous calls)] <<infra>> as rpc
 }
 
 package "Visualization & Monitoring" {
-  [VKB Web Interface\n(Knowledge graph viewer)] as vkb
-  [Progress Logging\n(Agent activity monitor)] as logging
-  [System Status\n(Health monitoring)] as status
+  [VKB Web Interface\n(Knowledge graph viewer)] <<cli>> as vkb
+  [Progress Logging\n(Agent activity monitor)] <<util>> as logging
+  [System Status\n(Health monitoring)] <<util>> as status
 }
 
 ' User connections
-claude --> mcp : "MCP Protocol"
-copilot --> http : "HTTP/WebSocket"
+claude SYNC_LINE mcp : "MCP Protocol"
+copilot SYNC_LINE http : "HTTP/WebSocket"
 
 ' Interface to agent system
-mcp --> coordinator : "Start workflows"
-http --> coordinator : "API requests"
+mcp CONTROL_LINE coordinator : "Start workflows"
+http CONTROL_LINE coordinator : "API requests"
 
 ' Agent system internal communication
-coordinator --> semantic : "Analyze code/conversation"
-coordinator --> knowledge : "Extract entities"
-coordinator --> web : "Research topics"
-coordinator --> sync : "Ensure consistency"
-semantic --> dedup : "Check duplicates"
-knowledge --> docs : "Generate documentation"
+coordinator CONTROL_LINE semantic : "Analyze code/conversation"
+coordinator CONTROL_LINE knowledge : "Extract entities"
+coordinator CONTROL_LINE web : "Research topics"
+coordinator CONTROL_LINE sync : "Ensure consistency"
+semantic DATA_LINE dedup : "Check duplicates"
+knowledge DATA_LINE docs : "Generate documentation"
 
 ' SynchronizationAgent is the single authority
-sync --> mcpmem : "Sync to MCP"
-sync --> graphology : "Sync to Graphology"
-sync --> sharedmem : "Sync to files"
+sync DATA_LINE mcpmem : "Sync to MCP"
+sync DATA_LINE graphology : "Sync to Graphology"
+sync DATA_LINE sharedmem : "Sync to files"
 
 ' Agent communication infrastructure
-semantic --> mqtt : "Message bus"
-knowledge --> mqtt
-web --> mqtt
-coordinator --> rpc : "Sync calls"
-sync --> rpc
+semantic ASYNC_LINE mqtt : "Message bus"
+knowledge ASYNC_LINE mqtt
+web ASYNC_LINE mqtt
+coordinator SYNC_LINE rpc : "Sync calls"
+sync SYNC_LINE rpc
 
 ' Visualization and monitoring
-vkb --> sharedmem : "Read unified data"
-vkb ..> graphology : "Live graph data"
-logging --> mqtt : "Monitor agent activity"
-status --> coordinator : "Health checks"
+vkb DATA_LINE sharedmem : "Read unified data"
+vkb OPTIONAL_LINE graphology : "Live graph data"
+logging OPTIONAL_LINE mqtt : "Monitor agent activity"
+status OPTIONAL_LINE coordinator : "Health checks"
 
 note top of sync
   **CRITICAL**: SynchronizationAgent is the 
