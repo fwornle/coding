@@ -90,6 +90,20 @@ claude-mcp
 - Conversation history is tracked at the project level
 - Scripts and tools expect to run from the root directory
 
+## 🚨 CRITICAL: Bash Command Timeout Configuration
+
+**DEFAULT TIMEOUT**: Bash commands have a default timeout of 2 minutes (120000ms) which is TOO LONG for most operations.
+
+**OPTIMIZATION REQUIRED**: 
+- Health checks should be immediate (5-10 seconds max)
+- System startup should complete within 30 seconds
+- Long-running services should be started in background with quick status checks
+
+**COMMON ISSUES**:
+- Health checks failing due to missing methods (e.g., `getAgentStatus` vs `getStats`)
+- Excessive timeout periods blocking user interaction
+- System appearing unresponsive during normal operations
+
 ## 🚨 CRITICAL: Knowledge Base Management Rule
 
 **IMPORTANT: The knowledge base is managed through MCP memory service and topic-specific shared-memory-*.json files. ALWAYS use the `ukb` command to update knowledge. Never edit the shared-memory files directly. The ukb tool ensures proper formatting, validation, and synchronization with MCP memory.**

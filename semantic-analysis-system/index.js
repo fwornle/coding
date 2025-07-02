@@ -161,12 +161,15 @@ class SemanticAnalysisSystem {
   }
 
   keepAlive() {
+    // Perform initial health check
+    this.performHealthCheck();
+    
     // Keep the process running and monitor system health
     setInterval(() => {
       if (this.running) {
         this.performHealthCheck();
       }
-    }, 30000); // Every 30 seconds
+    }, 15000); // Every 15 seconds
   }
 
   performHealthCheck() {
@@ -174,14 +177,14 @@ class SemanticAnalysisSystem {
       const status = {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
-        agents: this.supervisor?.getAgentStatus() || {},
+        agents: this.supervisor?.getStats() || {},
         infrastructure: {
           mqtt: this.mqttBroker?.isRunning() || false,
           rpc: this.rpcServer?.isRunning() || false
         }
       };
       
-      this.logger.debug('Health check:', JSON.stringify(status, null, 2));
+      this.logger.debug('System health check passed');
       
     } catch (error) {
       this.logger.error('Health check failed:', error);
