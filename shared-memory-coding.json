@@ -789,6 +789,109 @@
         ],
         "insight_type": "problem-solution"
       }
+    },
+    {
+      "id": "cf1c4662-6c8d-4d22-bdf5-1ec21dde553d",
+      "name": "SemanticAnalysisSystemAgentfixedportComp",
+      "entityType": "WorkflowPattern",
+      "observations": [
+        {
+          "type": "problem",
+          "content": "SemanticAnalysisSystem7Agent fixed port chaos & implemented 7-agent system",
+          "date": "2025-07-01T18:27:54.415Z"
+        },
+        {
+          "type": "solution",
+          "content": "Complete resolution of port conflicts with centralized management system",
+          "date": "2025-07-01T18:27:54.415Z"
+        },
+        {
+          "type": "rationale",
+          "content": "Fixed all hardcoded port fallbacks that caused MQTT connection failures",
+          "date": "2025-07-01T18:27:54.415Z"
+        },
+        {
+          "type": "learnings",
+          "content": "Successfully implemented full 7-agent semantic analysis system with proper infrastructure",
+          "date": "2025-07-01T18:27:54.415Z"
+        },
+        {
+          "type": "applicability",
+          "content": "The system now reliably starts all agents without port conflicts",
+          "date": "2025-07-01T18:27:54.415Z"
+        }
+      ],
+      "significance": 9,
+      "created": "2025-07-01T18:27:54.426Z",
+      "updated": "2025-07-01T18:27:54.426Z",
+      "metadata": {
+        "created_by": "piped-insight",
+        "version": "2.0.0",
+        "team": "coding",
+        "technologies": [
+          "SystemArchitecture",
+          "InfrastructurePattern",
+          "AgentCommunication"
+        ],
+        "references": [
+          "file:///Users/q284340/Agentic/coding/semantic-analysis-system/shared/port-manager.js"
+        ],
+        "codeFiles": [
+          "index.js",
+          "shared/config.js",
+          "infrastructure/mqtt/client.js"
+        ],
+        "insight_type": "problem-solution"
+      }
+    },
+    {
+      "id": "783197dc-905a-484b-b252-d12b05a74095",
+      "name": "CentralizedPortManagement",
+      "entityType": "TechnicalPattern",
+      "observations": [
+        "Comprehensive port management system with automatic conflict resolution, dynamic allocation, and service cleanup to eliminate port chaos permanently"
+      ],
+      "significance": 8,
+      "created": "2025-07-01T18:30:49.827Z",
+      "updated": "2025-07-01T18:30:49.827Z",
+      "metadata": {
+        "created_by": "ukb-cli",
+        "version": "2.0.0",
+        "team": "coding"
+      }
+    },
+    {
+      "id": "e47e037d-d2aa-4ae2-bc40-edca34872112",
+      "name": "TestPortManagementFix",
+      "entityType": "TechnicalPattern",
+      "observations": [
+        "Test entity to verify automatic relation creation and proper team parsing works correctly"
+      ],
+      "significance": 9,
+      "created": "2025-07-01T18:59:14.075Z",
+      "updated": "2025-07-01T18:59:14.075Z",
+      "metadata": {
+        "created_by": "ukb-cli",
+        "version": "2.0.0",
+        "team": "coding"
+      }
+    },
+    {
+      "id": "2422c4cf-1d9e-4a5f-862a-5758ecb44c2f",
+      "name": "CodingProject",
+      "entityType": "Project",
+      "observations": [
+        "Project node for coding team knowledge"
+      ],
+      "significance": 9,
+      "created": "2025-07-01T18:59:14.078Z",
+      "updated": "2025-07-01T18:59:14.078Z",
+      "metadata": {
+        "created_by": "knowledge-api",
+        "version": "2.0.0",
+        "auto_created": true,
+        "team": "coding"
+      }
     }
   ],
   "relations": [
@@ -1062,12 +1165,36 @@
       "metadata": {
         "created_by": "knowledge-api"
       }
+    },
+    {
+      "id": "dbe4ab95-1c06-4f4f-94ca-26a53b994b99",
+      "from": "CollectiveKnowledge",
+      "to": "TestPortManagementFix",
+      "relationType": "contains",
+      "significance": 8,
+      "created": "2025-07-01T18:59:14.076Z",
+      "metadata": {
+        "created_by": "knowledge-api",
+        "auto_created": true
+      }
+    },
+    {
+      "id": "55acfab9-9b13-4956-aaef-1e3c16b69e7f",
+      "from": "Coding",
+      "to": "TestPortManagementFix",
+      "relationType": "contains",
+      "significance": 7,
+      "created": "2025-07-01T18:59:14.080Z",
+      "metadata": {
+        "created_by": "knowledge-api",
+        "auto_created": true
+      }
     }
   ],
   "metadata": {
-    "last_updated": "2025-07-01T15:22:04.587Z",
+    "last_updated": "2025-07-01T18:59:14.080Z",
     "total_entities": 9,
     "total_relations": 20,
-    "team": "coding ui"
+    "team": "coding"
   }
 }
