@@ -84,6 +84,27 @@ semantic-analysis  # Works from anywhere after 'source .activate'
 - ✅ No need to navigate to specific folders
 - ✅ Global command available after environment activation
 
+**🔴 HOW TO START/STOP SEMANTIC ANALYSIS**:
+```bash
+# Start the semantic analysis system (all services)
+semantic-analysis
+
+# The system includes:
+# - MQTT broker (port 1883)
+# - JSON-RPC server (port 8080)
+# - MCP server (port 8081)
+# - All agent services
+
+# Stop the system
+# Press Ctrl+C in the terminal where it's running
+```
+
+**🚨 IMPORTANT**: There is NO `npm run status` script! Use the global `semantic-analysis` command to start the system. The script is located in `/Users/q284340/Agentic/coding/bin/semantic-analysis` and handles:
+- Port availability checking
+- Proper service startup sequence
+- Environment variable passing
+- Process management
+
 ## 🚨 CRITICAL: Working Directory and File Locations
 
 **WORKING DIRECTORY**: Claude Code should ALWAYS start in the top-level project directory (`/Users/q284340/Agentic/coding`), NOT in subdirectories like `semantic-analysis-system`.
