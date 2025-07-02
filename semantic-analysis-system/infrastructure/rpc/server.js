@@ -123,7 +123,38 @@ export class JSONRPCServer {
         }
         
         if (req.method === 'POST') {
-          this.server.middleware()(req, res);
+          // Collect request body
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk.toString();
+          });
+          
+          req.on('end', () => {
+            // Parse and handle the JSON-RPC request
+            try {
+              const request = JSON.parse(body);
+              this.server.call(request, (error, response) => {
+                if (error) {
+                  res.writeHead(500, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify(error));
+                } else {
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify(response));
+                }
+              });
+            } catch (e) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                jsonrpc: '2.0',
+                error: {
+                  code: -32700,
+                  message: 'Parse error',
+                  data: e.message
+                },
+                id: null
+              }));
+            }
+          });
         } else {
           res.writeHead(405, { 'Content-Type': 'text/plain' });
           res.end('Method not allowed');
