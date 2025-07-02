@@ -24,6 +24,10 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Handle different working directories
+const originalCwd = process.env.SEMANTIC_ANALYSIS_CWD || process.cwd();
+const systemPath = process.env.SEMANTIC_ANALYSIS_SYSTEM_PATH || process.cwd();
+
 class SemanticAnalysisSystem {
   constructor() {
     this.logger = new Logger('system');

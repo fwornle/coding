@@ -1,0 +1,85 @@
+#!/usr/bin/env node
+
+/**
+ * Global Semantic Analysis Launcher
+ * 
+ * This script allows running semantic analysis from any directory.
+ * It locates the semantic-analysis-system and executes it with proper context.
+ */
+
+import { spawn } from 'child_process';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
+import process from 'process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Find the semantic analysis system
+const POSSIBLE_LOCATIONS = [
+  // Relative to this bin directory
+  join(__dirname, '..', 'semantic-analysis-system'),
+  // In coding directory
+  join(__dirname, '..', '..', 'coding', 'semantic-analysis-system'),
+  // Global installation
+  join(process.env.HOME, '.agentic', 'semantic-analysis-system'),
+  // Environment variable override
+  process.env.SEMANTIC_ANALYSIS_PATH
+].filter(Boolean);
+
+function findSemanticAnalysisSystem() {
+  for (const location of POSSIBLE_LOCATIONS) {
+    const indexPath = join(location, 'index.js');
+    if (existsSync(indexPath)) {
+      return location;
+    }
+  }
+  
+  console.error('❌ Semantic Analysis System not found!');
+  console.error('Searched locations:');
+  POSSIBLE_LOCATIONS.forEach(loc => console.error(`  - ${loc}`));
+  console.error('\nPlease ensure the semantic-analysis-system is installed.');
+  process.exit(1);
+}
+
+function runSemanticAnalysis() {
+  const systemPath = findSemanticAnalysisSystem();
+  const indexPath = join(systemPath, 'index.js');
+  
+  console.log(`🚀 Starting Semantic Analysis System from: ${systemPath}`);
+  console.log(`📁 Current working directory: ${process.cwd()}`);
+  
+  // Spawn the process with proper environment
+  const child = spawn('node', [indexPath, ...process.argv.slice(2)], {
+    cwd: systemPath,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      SEMANTIC_ANALYSIS_CWD: process.cwd(), // Pass original working directory
+      SEMANTIC_ANALYSIS_SYSTEM_PATH: systemPath
+    }
+  });
+  
+  child.on('close', (code) => {
+    process.exit(code);
+  });
+  
+  child.on('error', (error) => {
+    console.error('❌ Failed to start semantic analysis:', error.message);
+    process.exit(1);
+  });
+}
+
+// Handle process signals
+process.on('SIGINT', () => {
+  console.log('\n🛑 Semantic Analysis interrupted');
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Semantic Analysis terminated');
+  process.exit(0);
+});
+
+runSemanticAnalysis();

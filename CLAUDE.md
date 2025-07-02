@@ -70,6 +70,20 @@ claude-mcp
 
 **NEVER** use `claude code` directly - it won't have MCP features!
 
+## 🚀 CRITICAL: Global Semantic Analysis
+
+**NEW**: Semantic analysis can now be run from ANY directory:
+```bash
+semantic-analysis  # Works from anywhere after 'source .activate'
+```
+
+**KEY FEATURES**:
+- ✅ Works from any directory (not just coding/semantic-analysis-system)
+- ✅ Automatically locates the semantic analysis system
+- ✅ Passes original working directory context
+- ✅ No need to navigate to specific folders
+- ✅ Global command available after environment activation
+
 ## 🚨 CRITICAL: Working Directory and File Locations
 
 **WORKING DIRECTORY**: Claude Code should ALWAYS start in the top-level project directory (`/Users/q284340/Agentic/coding`), NOT in subdirectories like `semantic-analysis-system`.
@@ -281,6 +295,9 @@ vkb           # Opens localhost:8080
 
 # Activate commands in current shell
 source .activate
+
+# Run semantic analysis from any directory
+semantic-analysis
 ```
 
 ## Architecture Overview
