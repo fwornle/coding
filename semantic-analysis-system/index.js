@@ -19,6 +19,8 @@ import { JSONRPCServer } from './infrastructure/rpc/server.js';
 import { Logger } from './shared/logger.js';
 import { ConfigManager } from './shared/config.js';
 import { portManager } from './shared/port-manager.js';
+import { RobustStartupManager } from './lib/startup/robust-startup.js';
+import { StartupValidator } from './scripts/startup-validator.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -38,39 +40,46 @@ class SemanticAnalysisSystem {
     this.supervisor = null;
     this.agents = new Map();
     this.running = false;
+    this.robustStartup = new RobustStartupManager();
   }
 
   async start() {
     try {
-      this.logger.info('Starting Semantic Analysis System...');
+      this.logger.info('🚀 Starting Semantic Analysis System with Robust Startup...');
       
-      // Initialize port manager first to resolve all port conflicts
-      await portManager.initialize();
+      // Phase 1: Pre-startup validation
+      const validator = new StartupValidator();
+      const validationPassed = await validator.validate();
       
-      // Load configuration
-      const config = this.configManager.config;
+      if (!validationPassed) {
+        throw new Error('Pre-startup validation failed. Please fix issues before continuing.');
+      }
       
-      // Start infrastructure
-      await this.startInfrastructure(config);
+      // Phase 2: Robust infrastructure startup
+      const startupSuccess = await this.robustStartup.startSystem();
       
-      // Initialize agent registry and supervisor
-      this.agentRegistry = new AgentRegistry();
-      this.supervisor = new AgentSupervisor(config.supervisor);
+      if (!startupSuccess) {
+        throw new Error('Infrastructure startup failed');
+      }
       
-      // Start agents
-      await this.startAgents(config);
+      // Phase 3: Start agents using validated infrastructure
+      await this.startAgentsWithValidatedInfrastructure();
       
-      // Setup shutdown handlers
+      // Get started services from robust startup
+      this.mqttBroker = this.robustStartup.startedServices.get('mqtt-broker');
+      this.rpcServer = this.robustStartup.startedServices.get('json-rpc');
+      
+      // Phase 4: Final setup
       this.setupShutdownHandlers();
-      
       this.running = true;
-      this.logger.info('Semantic Analysis System started successfully');
+      
+      this.logger.info('✅ Semantic Analysis System started successfully with all validations passed');
       
       // Keep the process running
       this.keepAlive();
       
     } catch (error) {
-      this.logger.error('Failed to start system:', error);
+      this.logger.error('❌ Failed to start system:', error);
       await this.shutdown();
       process.exit(1);
     }
@@ -88,6 +97,15 @@ class SemanticAnalysisSystem {
     await this.rpcServer.start();
     
     this.logger.info('Infrastructure services started');
+  }
+
+  async startAgentsWithValidatedInfrastructure() {
+    // Initialize agent registry and supervisor first
+    this.agentRegistry = new AgentRegistry();
+    this.supervisor = new AgentSupervisor(this.configManager.config.supervisor);
+    
+    // Now start agents using the original method
+    await this.startAgents(this.configManager.config);
   }
 
   async startAgents(config) {
