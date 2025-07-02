@@ -51,7 +51,9 @@
       "Bash(curl:*)",
       "mcp__semantic-analysis__determine_insights",
       "Bash(npm run status:*)",
-      "mcp__semantic-analysis__analyze_repository"
+      "mcp__semantic-analysis__analyze_repository",
+      "Bash(rm:*)",
+      "Bash(chmod:*)"
     ],
     "deny": []
   }
