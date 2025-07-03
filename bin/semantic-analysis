@@ -66,44 +66,54 @@ async function killStaleProcesses() {
 
 async function checkPortAvailability() {
   const requiredPorts = [1883, 8080, 8081, 9090];
-  const unavailablePorts = [];
+  
+  // Import our enhanced port manager
+  const { CentralPortManager } = await import('../lib/services/port-manager.js');
+  const portManager = new CentralPortManager();
+  
+  console.log('🔍 Checking port availability with service awareness...');
+  
+  const conflicts = [];
+  const ourServices = [];
+  const available = [];
   
   for (const port of requiredPorts) {
-    try {
-      const { createServer } = await import('net');
-      const server = createServer();
+    const knownService = portManager.isKnownService(port);
+    
+    if (knownService) {
+      console.log(`✅ Port ${port} is used by our registered service: ${knownService}`);
+      ourServices.push({ port, service: knownService });
+    } else {
+      const isAvailable = await portManager.isPortAvailable(port);
       
-      await new Promise((resolve, reject) => {
-        server.once('error', (err) => {
-          if (err.code === 'EADDRINUSE') {
-            reject(err);
-          } else {
-            reject(err);
-          }
-        });
-        
-        server.listen(port, () => {
-          server.close(() => resolve());
-        });
-      });
-    } catch (error) {
-      if (error.code === 'EADDRINUSE') {
-        unavailablePorts.push(port);
+      if (isAvailable) {
+        available.push(port);
+      } else {
+        const portUser = portManager.getPortUser(port);
+        if (portUser && portManager.isOurService(portUser)) {
+          console.log(`✅ Port ${port} is used by our own process: ${portUser.process} (PID: ${portUser.pid})`);
+          ourServices.push({ port, service: portUser.process });
+        } else {
+          conflicts.push({ port, user: portUser });
+        }
       }
     }
   }
   
-  if (unavailablePorts.length > 0) {
-    console.error('❌ Port conflicts detected after cleanup:');
-    unavailablePorts.forEach(port => {
-      console.error(`  - Port ${port} is still in use`);
+  if (conflicts.length > 0) {
+    console.error('❌ External port conflicts detected:');
+    conflicts.forEach(({ port, user }) => {
+      const userInfo = user ? `${user.process} (PID: ${user.pid})` : 'unknown process';
+      console.error(`  - Port ${port} is used by: ${userInfo}`);
     });
-    console.error('\n💡 This may be due to non-semantic-analysis processes.');
-    console.error('Please manually check what is using these ports.');
+    console.error('\n💡 These are NOT our services. Manual resolution required.');
     process.exit(1);
   }
   
-  console.log('✅ All required ports are available');
+  console.log('✅ Port check completed successfully');
+  console.log(`   Our services: ${ourServices.length}`);
+  console.log(`   Available ports: ${available.length}`);
+  console.log(`   External conflicts: ${conflicts.length}`);
 }
 
 async function runSemanticAnalysis() {
