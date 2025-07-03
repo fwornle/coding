@@ -103,7 +103,8 @@
       "Bash(scripts/test-coding.sh:*)",
       "mcp__semantic-analysis__get_system_status",
       "mcp__semantic-analysis__determine_insights",
-      "Bash(semantic-analysis)"
+      "Bash(semantic-analysis)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
   }

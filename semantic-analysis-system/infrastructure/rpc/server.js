@@ -20,6 +20,7 @@ export class JSONRPCServer {
     this.server = null;
     this.httpServer = null;
     this.middleware = [];
+    this.running = false;
   }
 
   /**
@@ -162,6 +163,7 @@ export class JSONRPCServer {
       });
       
       this.httpServer.listen(this.config.port, this.config.host, () => {
+        this.running = true;
         this.logger.info(`JSON-RPC server listening on ${this.config.host}:${this.config.port}`);
         resolve();
       });
@@ -178,6 +180,7 @@ export class JSONRPCServer {
    */
   async stop() {
     return new Promise((resolve) => {
+      this.running = false;
       if (this.httpServer) {
         this.httpServer.close(() => {
           this.logger.info('JSON-RPC server stopped');
@@ -244,6 +247,10 @@ export class JSONRPCServer {
       address: `${this.config.host}:${this.config.port}`,
       uptime: process.uptime()
     };
+  }
+
+  isRunning() {
+    return this.running && this.httpServer;
   }
 }
 

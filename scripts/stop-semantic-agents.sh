@@ -10,25 +10,34 @@ log() {
   echo "[Semantic-Analysis] $1"
 }
 
+# Check for new PID file first
+if [ -f "$SEMANTIC_ANALYSIS_DIR/.system.pid" ]; then
+  PID=$(cat "$SEMANTIC_ANALYSIS_DIR/.system.pid")
+  if kill -0 $PID 2>/dev/null; then
+    log "Stopping semantic-analysis system (PID: $PID)..."
+    kill $PID
+    rm "$SEMANTIC_ANALYSIS_DIR/.system.pid"
+    log "Semantic-analysis system stopped"
+  else
+    log "System not running (stale PID file)"
+    rm "$SEMANTIC_ANALYSIS_DIR/.system.pid"
+  fi
+fi
+
+# Also check for old PID file for backwards compatibility
 if [ -f "$SEMANTIC_ANALYSIS_DIR/.agent.pid" ]; then
   PID=$(cat "$SEMANTIC_ANALYSIS_DIR/.agent.pid")
   if kill -0 $PID 2>/dev/null; then
     log "Stopping agent system (PID: $PID)..."
     kill $PID
-    rm "$SEMANTIC_ANALYSIS_DIR/.agent.pid"
-    log "Agent system stopped"
-  else
-    log "Agent system not running (stale PID file)"
-    rm "$SEMANTIC_ANALYSIS_DIR/.agent.pid"
   fi
-else
-  # Try to find by process name
-  PIDS=$(pgrep -f "semantic-analysis-system/index.js")
-  if [ -n "$PIDS" ]; then
-    log "Stopping agent system processes..."
-    kill $PIDS
-    log "Agent system stopped"
-  else
-    log "Agent system not running"
-  fi
+  rm "$SEMANTIC_ANALYSIS_DIR/.agent.pid"
+fi
+
+# Clean up any remaining processes
+PIDS=$(pgrep -f "semantic-analysis-system" || true)
+if [ -n "$PIDS" ]; then
+  log "Cleaning up remaining semantic-analysis processes..."
+  pkill -f "semantic-analysis-system" || true
+  log "All semantic-analysis processes stopped"
 fi

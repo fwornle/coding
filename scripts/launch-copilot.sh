@@ -31,84 +31,46 @@ export CODING_TOOLS_GRAPH_DB="$HOME/.coding-tools/memory.graph"
 export GRAPHOLOGY_SERVICE_ENABLED=true
 export GRAPHOLOGY_SERVICE_PORT=8765
 
-# Auto-start semantic-analysis agent system if needed
-SEMANTIC_ANALYSIS_DIR="$PROJECT_DIR/semantic-analysis-system"
-if [ -d "$SEMANTIC_ANALYSIS_DIR" ]; then
-  # Check if agents are already running
-  if ! pgrep -f "semantic-analysis-system/index.js" > /dev/null; then
-    colored_log "${CYAN}🤖 Starting semantic-analysis agent system...${NC}"
-    
-    # Check for API keys
-    if [ -f "$SEMANTIC_ANALYSIS_DIR/.env" ]; then
-      source "$SEMANTIC_ANALYSIS_DIR/.env"
-      
-      # Check if at least one API key is configured
-      if [ "$ANTHROPIC_API_KEY" = "your-anthropic-api-key" ] && [ "$OPENAI_API_KEY" = "your-openai-api-key" ]; then
-        colored_log "${YELLOW}⚠️  Warning: No API keys configured for semantic-analysis system${NC}"
-        colored_log "${YELLOW}   Semantic analysis features will not be available${NC}"
-      else
-        # Start the agent system in background
-        cd "$SEMANTIC_ANALYSIS_DIR"
-        nohup npm run start:agents > "$SEMANTIC_ANALYSIS_DIR/logs/agents.log" 2>&1 &
-        AGENT_PID=$!
-        colored_log "${GREEN}✓ Agent system started with PID: $AGENT_PID${NC}"
-        
-        # Wait a moment for agents to initialize
-        sleep 3
-        
-        # Store PID for cleanup
-        echo $AGENT_PID > "$SEMANTIC_ANALYSIS_DIR/.agent.pid"
-        cd "$PROJECT_DIR"
-      fi
-    else
-      colored_log "${YELLOW}⚠️  No .env file found for semantic-analysis system${NC}"
-    fi
-  else
-    colored_log "${GREEN}✓ Agent system already running${NC}"
-  fi
+# Load environment configuration
+if [ -f "$PROJECT_DIR/.env" ]; then
+  set -a
+  source "$PROJECT_DIR/.env"
+  set +a
+fi
+
+if [ -f "$PROJECT_DIR/.env.ports" ]; then
+  set -a
+  source "$PROJECT_DIR/.env.ports"
+  set +a
+fi
+
+# Start all services using new lifecycle management
+log "Starting coding services for CoPilot..."
+
+# Check if Node.js is available
+if ! command -v node &> /dev/null; then
+  log "Error: Node.js is required but not found in PATH"
+  exit 1
+fi
+
+# Start services using the new lifecycle manager
+if ! node "$PROJECT_DIR/lib/services/start-services.js" --agent copilot --verbose; then
+  log "Error: Failed to start services"
+  exit 1
 fi
 
 # Display colorful startup banner
 echo ""
 colored_log "${BLUE}🚀 Starting GitHub CoPilot with Knowledge Management Integration${NC}"
-colored_log "${CYAN}📋 Initializing fallback services...${NC}"
+colored_log "${CYAN}📋 All services started successfully${NC}"
 
-# Use existing service manager script
-SERVICE_SCRIPT="$PROJECT_DIR/lib/start-fallback-services.js"
-
-# Ensure .coding-tools directory exists
-mkdir -p "$PROJECT_DIR/.coding-tools"
-
-# Start the services in background
-node "$SERVICE_SCRIPT" &
-FALLBACK_PID=$!
-
-# Store PID for cleanup
-echo $FALLBACK_PID > "$PROJECT_DIR/.coding-tools/fallback-services.pid"
-
-# Ensure cleanup on exit
+# Setup cleanup handler
 cleanup() {
-  colored_log "${CYAN}🧹 Cleaning up fallback services...${NC}"
-  if [ -n "$FALLBACK_PID" ]; then
-    kill $FALLBACK_PID 2>/dev/null || true
-  fi
-  rm -f "$PROJECT_DIR/.coding-tools/fallback-services.pid"
-  
-  # Also stop semantic-analysis agents if we started them
-  if [ -f "$SEMANTIC_ANALYSIS_DIR/.agent.pid" ]; then
-    AGENT_PID=$(cat "$SEMANTIC_ANALYSIS_DIR/.agent.pid")
-    if kill -0 $AGENT_PID 2>/dev/null; then
-      colored_log "${CYAN}🧹 Stopping semantic-analysis agents...${NC}"
-      kill $AGENT_PID 2>/dev/null || true
-      rm -f "$SEMANTIC_ANALYSIS_DIR/.agent.pid"
-    fi
-  fi
+  colored_log "${CYAN}🧹 Stopping all services...${NC}"
+  node "$PROJECT_DIR/lib/services/stop-services.js" --agent copilot --verbose
 }
 
 trap cleanup EXIT INT TERM
-
-# Give services time to start
-sleep 2
 
 # Check if running in service-only mode
 if [[ "$1" == "--service-only" ]]; then

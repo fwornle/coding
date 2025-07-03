@@ -24,6 +24,7 @@ export class MQTTBroker {
     this.tcpServer = null;
     this.wsServer = null;
     this.clients = new Map();
+    this.running = false;
   }
 
   async start() {
@@ -44,9 +45,11 @@ export class MQTTBroker {
       // Start WebSocket server
       await this.startWsServer();
 
+      this.running = true;
       this.logger.info(`MQTT broker started on port ${this.config.port} (TCP) and ${this.config.wsPort} (WS)`);
     } catch (error) {
       this.logger.error('Failed to start MQTT broker:', error);
+      this.running = false;
       throw error;
     }
   }
@@ -170,5 +173,42 @@ export class MQTTBroker {
         }
       });
     });
+  }
+
+  async stop() {
+    try {
+      this.running = false;
+      
+      if (this.tcpServer) {
+        await new Promise((resolve) => {
+          this.tcpServer.close(resolve);
+        });
+        this.tcpServer = null;
+      }
+      
+      if (this.wsServer) {
+        await new Promise((resolve) => {
+          this.wsServer.close(resolve);
+        });
+        this.wsServer = null;
+      }
+      
+      if (this.aedes) {
+        await new Promise((resolve) => {
+          this.aedes.close(resolve);
+        });
+        this.aedes = null;
+      }
+      
+      this.clients.clear();
+      this.logger.info('MQTT broker stopped');
+    } catch (error) {
+      this.logger.error('Failed to stop MQTT broker:', error);
+      throw error;
+    }
+  }
+
+  isRunning() {
+    return this.running && this.tcpServer && this.aedes;
   }
 }

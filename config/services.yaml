@@ -1,0 +1,116 @@
+# Service Configuration for Coding Project
+# Defines all services, their dependencies, ports, and health checks
+
+services:
+  # Knowledge Visualization Server (start first as basic test)
+  vkb-server:
+    displayName: "Knowledge Visualization Server"
+    type: "http"
+    preferredPort: 8080
+    command: "node lib/vkb-server/cli.js server start --foreground"
+    workingDirectory: "."
+    env:
+      inherit: true
+    healthCheck:
+      type: "http"
+      endpoint: "/"
+      timeout: 5000
+    critical: false
+    agentTypes: ["claude", "copilot"]
+
+  # System Health Monitor
+  system-health-monitor:
+    displayName: "System Health Monitor"
+    type: "monitoring"
+    preferredPort: 9090
+    command: "node lib/services/health-monitor-standalone.js"
+    workingDirectory: "."
+    env:
+      inherit: true
+    healthCheck:
+      type: "http"
+      endpoint: "/health"
+      timeout: 5000
+    critical: false
+    agentTypes: ["claude", "copilot"]
+
+
+  # CoPilot Integration Services (disabled for testing)
+  # copilot-http-server:
+  #   displayName: "CoPilot HTTP API"
+  #   type: "http"
+  #   preferredPort: 8765
+  #   command: "node lib/adapters/copilot-http-server.js"
+  #   workingDirectory: "."
+  #   env:
+  #     inherit: true
+  #   healthCheck:
+  #     type: "http"
+  #     endpoint: "/health"
+  #     timeout: 5000
+  #   critical: false
+  #   agentTypes: ["copilot"]
+
+  # Browser Access MCP Server (disabled for testing)
+  # browser-access-mcp:
+  #   displayName: "Browser Access MCP Server"
+  #   type: "mcp"
+  #   transport: "stdio"
+  #   command: "node integrations/browser-access/dist/index.js"
+  #   workingDirectory: "."
+  #   env:
+  #     inherit: true
+  #   healthCheck:
+  #     type: "process"
+  #     timeout: 5000
+  #   critical: false
+  #   agentTypes: ["claude"]
+
+  # Claude Logger MCP Server (disabled for testing)
+  # claude-logger-mcp:
+  #   displayName: "Claude Logger MCP Server"
+  #   type: "mcp"
+  #   transport: "stdio"
+  #   command: "node integrations/claude-logger/dist/index.js"
+  #   workingDirectory: "."
+  #   env:
+  #     inherit: true
+  #   healthCheck:
+  #     type: "process"
+  #     timeout: 5000
+  #   critical: false
+  #   agentTypes: ["claude"]
+
+  # Memory Visualizer (disabled for testing)
+  # memory-visualizer:
+  #   displayName: "Memory Visualizer"
+  #   type: "http"
+  #   preferredPort: 8081
+  #   command: "npm run dev"
+  #   workingDirectory: "memory-visualizer"
+  #   env:
+  #     inherit: true
+  #     PORT: "${MEMORY_VISUALIZER_PORT:-8080}"
+  #   healthCheck:
+  #     type: "http"
+  #     endpoint: "/"
+  #     timeout: 10000
+  #   critical: false
+  #   agentTypes: ["claude", "copilot"]
+
+# Global configuration
+global:
+  # Maximum time to wait for all services to start (in milliseconds)
+  startupTimeout: 60000
+  
+  # Maximum time to wait for graceful shutdown (in milliseconds)
+  shutdownTimeout: 30000
+  
+  # Health check interval for running services (in milliseconds)
+  healthCheckInterval: 30000
+  
+  # Retry attempts for failed services
+  maxRetries: 3
+  
+  # Time between retry attempts (in milliseconds)
+  retryDelay: 5000

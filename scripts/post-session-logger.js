@@ -7,7 +7,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
 import { AutoInsightTrigger } from './auto-insight-trigger.js';
 
 class PostSessionLogger {
@@ -20,6 +19,9 @@ class PostSessionLogger {
 
   async captureConversation() {
     console.log('📋 Post-session logging started...');
+    
+    // First, stop semantic-analysis system
+    this.stopSemanticAnalysisSystem();
     
     try {
       // Check if session needs logging
@@ -293,6 +295,54 @@ ${content}
     }
     
     return logPath;
+  }
+
+  stopSemanticAnalysisSystem() {
+    console.log('🛑 Stopping all coding services...');
+    try {
+      // Use the new service lifecycle manager to stop all services
+      const { spawnSync } = require('child_process');
+      const stopScript = path.join(this.codingRepo, 'lib', 'services', 'stop-services.js');
+      
+      if (fs.existsSync(stopScript)) {
+        const result = spawnSync('node', [stopScript, '--agent', 'claude', '--verbose'], { 
+          stdio: 'inherit',
+          cwd: this.codingRepo,
+          encoding: 'utf8'
+        });
+        
+        if (result.error) {
+          throw result.error;
+        }
+        
+        console.log('✅ All coding services stopped successfully');
+      } else {
+        console.warn('⚠️  Service stop script not found, attempting legacy cleanup...');
+        
+        // Fallback to legacy stop script
+        const legacyScript = path.join(this.codingRepo, 'scripts', 'stop-semantic-agents.sh');
+        if (fs.existsSync(legacyScript)) {
+          spawnSync('/bin/bash', [legacyScript], { 
+            stdio: 'inherit',
+            cwd: this.codingRepo 
+          });
+        }
+      }
+    } catch (error) {
+      console.error('⚠️  Failed to stop services:', error.message);
+      console.log('🔄 Attempting emergency cleanup...');
+      
+      // Emergency cleanup - kill all semantic-analysis processes
+      try {
+        const { spawnSync } = require('child_process');
+        spawnSync('pkill', ['-f', 'semantic-analysis'], { stdio: 'pipe' });
+        spawnSync('pkill', ['-f', 'vkb-server'], { stdio: 'pipe' });
+        spawnSync('pkill', ['-f', 'copilot-http-server'], { stdio: 'pipe' });
+        console.log('✅ Emergency cleanup completed');
+      } catch (cleanupError) {
+        console.error('⚠️  Emergency cleanup failed:', cleanupError.message);
+      }
+    }
   }
 }
 

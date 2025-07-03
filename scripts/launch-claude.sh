@@ -16,46 +16,32 @@ if [ -f "$PROJECT_DIR/.mcp-sync/sync-required.json" ]; then
   log "MCP memory sync required, will be handled by Claude on startup"
 fi
 
-# Auto-start semantic-analysis agent system if needed
-SEMANTIC_ANALYSIS_DIR="$PROJECT_DIR/semantic-analysis-system"
-if [ -d "$SEMANTIC_ANALYSIS_DIR" ]; then
-  # Check if agents are already running (check for either index.js or system-health-manager)
-  if ! pgrep -f "semantic-analysis-system/(index.js|system-health-manager.js)" > /dev/null; then
-    log "Starting semantic-analysis agent system..."
-    
-    # Check for API keys
-    # First source main project .env if available
-    if [ -f "$PROJECT_DIR/.env" ]; then
-      source "$PROJECT_DIR/.env"
-    fi
-    
-    # Then source semantic-analysis .env (allows override)
-    if [ -f "$SEMANTIC_ANALYSIS_DIR/.env" ]; then
-      source "$SEMANTIC_ANALYSIS_DIR/.env"
-      
-      # Check if at least one API key is configured
-      if [ "$ANTHROPIC_API_KEY" = "your-anthropic-api-key" ] && [ "$OPENAI_API_KEY" = "your-openai-api-key" ]; then
-        log "Warning: No API keys configured for semantic-analysis system"
-        log "Please set ANTHROPIC_API_KEY and/or OPENAI_API_KEY in $SEMANTIC_ANALYSIS_DIR/.env"
-      else
-        # Start the full 7-agent system using system-health-manager
-        cd "$SEMANTIC_ANALYSIS_DIR"
-        nohup node system-health-manager.js start > "$SEMANTIC_ANALYSIS_DIR/logs/agents.log" 2>&1 &
-        AGENT_PID=$!
-        log "Full 7-agent system starting with PID: $AGENT_PID"
-        
-        # Wait a moment for agents to initialize
-        sleep 3
-        
-        # Store PID for cleanup
-        echo $AGENT_PID > "$SEMANTIC_ANALYSIS_DIR/.agent.pid"
-      fi
-    else
-      log "Warning: No .env file found for semantic-analysis system"
-    fi
-  else
-    log "Agent system already running"
-  fi
+# Load environment configuration
+if [ -f "$PROJECT_DIR/.env" ]; then
+  set -a
+  source "$PROJECT_DIR/.env"
+  set +a
+fi
+
+if [ -f "$PROJECT_DIR/.env.ports" ]; then
+  set -a
+  source "$PROJECT_DIR/.env.ports"
+  set +a
+fi
+
+# Start all services using new lifecycle management
+log "Starting coding services for Claude..."
+
+# Check if Node.js is available
+if ! command -v node &> /dev/null; then
+  log "Error: Node.js is required but not found in PATH"
+  exit 1
+fi
+
+# Start services using the new lifecycle manager
+if ! node "$PROJECT_DIR/lib/services/start-services.js" --agent claude --verbose; then
+  log "Error: Failed to start services"
+  exit 1
 fi
 
 # Find MCP config

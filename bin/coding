@@ -70,7 +70,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --copilot-stop)
-      exec "$SCRIPT_DIR/../scripts/stop-copilot-services.sh"
+      exec node "$SCRIPT_DIR/../lib/services/stop-services.js" --agent copilot --verbose
       ;;
     --claude)
       FORCE_AGENT="claude"

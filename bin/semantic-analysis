@@ -43,6 +43,27 @@ function findSemanticAnalysisSystem() {
   process.exit(1);
 }
 
+async function killStaleProcesses() {
+  console.log('🔍 Checking for stale semantic-analysis processes...');
+  
+  try {
+    const { execSync } = await import('child_process');
+    
+    // Kill any existing semantic-analysis processes
+    try {
+      execSync('pkill -f "semantic-analysis-system" || true', { stdio: 'pipe' });
+      console.log('✅ Cleaned up stale processes');
+    } catch (e) {
+      // pkill returns non-zero if no processes found, which is fine
+    }
+    
+    // Give processes time to exit
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  } catch (error) {
+    console.error('⚠️  Failed to clean up processes:', error.message);
+  }
+}
+
 async function checkPortAvailability() {
   const requiredPorts = [1883, 8080, 8081, 9090];
   const unavailablePorts = [];
@@ -73,17 +94,12 @@ async function checkPortAvailability() {
   }
   
   if (unavailablePorts.length > 0) {
-    console.error('❌ Port conflicts detected:');
+    console.error('❌ Port conflicts detected after cleanup:');
     unavailablePorts.forEach(port => {
-      console.error(`  - Port ${port} is already in use`);
+      console.error(`  - Port ${port} is still in use`);
     });
-    console.error('\n💡 Resolution steps:');
-    console.error('  1. Stop conflicting services:');
-    unavailablePorts.forEach(port => {
-      console.error(`     lsof -ti :${port} | xargs kill -9`);
-    });
-    console.error('  2. Or restart your system to clear port conflicts');
-    console.error('  3. Then try running semantic-analysis again');
+    console.error('\n💡 This may be due to non-semantic-analysis processes.');
+    console.error('Please manually check what is using these ports.');
     process.exit(1);
   }
   
@@ -91,7 +107,10 @@ async function checkPortAvailability() {
 }
 
 async function runSemanticAnalysis() {
-  // Check port availability first
+  // Kill stale processes first
+  await killStaleProcesses();
+  
+  // Then check port availability
   await checkPortAvailability();
   
   const systemPath = findSemanticAnalysisSystem();
