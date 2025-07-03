@@ -70,40 +70,48 @@ claude-mcp
 
 **NEVER** use `claude code` directly - it won't have MCP features!
 
-## 🚀 CRITICAL: Global Semantic Analysis
+## 🚀 CRITICAL: Semantic Analysis System
 
-**NEW**: Semantic analysis can now be run from ANY directory:
+**🔴 AUTOMATIC STARTUP**: The semantic analysis system is **AUTOMATICALLY STARTED** when you run `claude-mcp`! DO NOT manually start it with the `semantic-analysis` command unless it's not running.
+
+**🚨 BEFORE USING SEMANTIC ANALYSIS**:
+1. **CHECK IF IT'S RUNNING**: Use `ps aux | grep "index-robust" | grep -v grep` or check `.services-running.json`
+2. **DO NOT START IF RUNNING**: Starting it again causes port conflicts and 2-minute timeouts!
+3. **USE MCP TOOLS DIRECTLY**: Just call `mcp__semantic-analysis__*` tools - they'll work if the system is running
+
+**✅ CORRECT WORKFLOW**:
 ```bash
+# 1. Start Claude Code (this starts ALL services including semantic analysis)
+claude-mcp
+
+# 2. In Claude, just use the MCP tools directly:
+mcp__semantic-analysis__determine_insights(...)
+# NO NEED to run 'semantic-analysis' command!
+```
+
+**❌ WRONG WORKFLOW**:
+```bash
+# DON'T DO THIS - causes timeouts and port conflicts!
+claude-mcp
+# Then in Claude: semantic-analysis  # NO! Already running!
+```
+
+**MANUAL START (ONLY if not running)**:
+```bash
+# First check if it's running
+ps aux | grep "index-robust" | grep -v grep
+
+# Only start if NOT running
 semantic-analysis  # Works from anywhere after 'source .activate'
 ```
 
-**KEY FEATURES**:
-- ✅ Works from any directory (not just coding/semantic-analysis-system)
-- ✅ Automatically locates the semantic analysis system
-- ✅ Passes original working directory context
-- ✅ No need to navigate to specific folders
-- ✅ Global command available after environment activation
+**SYSTEM COMPONENTS**:
+- MQTT broker (port 1883)
+- JSON-RPC server (port 8081)  
+- MCP server (port 8082)
+- All agent services
 
-**🔴 HOW TO START/STOP SEMANTIC ANALYSIS**:
-```bash
-# Start the semantic analysis system (all services)
-semantic-analysis
-
-# The system includes:
-# - MQTT broker (port 1883)
-# - JSON-RPC server (port 8080)
-# - MCP server (port 8081)
-# - All agent services
-
-# Stop the system
-# Press Ctrl+C in the terminal where it's running
-```
-
-**🚨 IMPORTANT**: There is NO `npm run status` script! Use the global `semantic-analysis` command to start the system. The script is located in `/Users/q284340/Agentic/coding/bin/semantic-analysis` and handles:
-- Port availability checking
-- Proper service startup sequence
-- Environment variable passing
-- Process management
+**🔧 CONFIGURATION**: The system is configured in `config/services.yaml` and managed by the lifecycle manager.
 
 ## 🚨 CRITICAL: Working Directory and File Locations
 
@@ -129,15 +137,27 @@ semantic-analysis
 
 **DEFAULT TIMEOUT**: Bash commands have a default timeout of 2 minutes (120000ms) which is TOO LONG for most operations.
 
-**OPTIMIZATION REQUIRED**: 
-- Health checks should be immediate (5-10 seconds max)
-- System startup should complete within 30 seconds
-- Long-running services should be started in background with quick status checks
+**ALWAYS SPECIFY SHORTER TIMEOUTS**:
+```javascript
+// ✅ GOOD - Quick operations with appropriate timeouts
+Bash({ command: "ps aux | grep node", timeout: 5000 })  // 5 seconds
+Bash({ command: "curl localhost:8080", timeout: 3000 }) // 3 seconds
+
+// ❌ BAD - Using default 2-minute timeout
+Bash({ command: "semantic-analysis" })  // Will timeout after 2 minutes!
+```
+
+**TIMEOUT GUIDELINES**:
+- Process checks: 1-5 seconds
+- HTTP health checks: 2-5 seconds
+- Service status: 3-5 seconds
+- Quick commands: 5-10 seconds max
+- Only use default timeout for intentionally long operations
 
 **COMMON ISSUES**:
-- Health checks failing due to missing methods (e.g., `getAgentStatus` vs `getStats`)
-- Excessive timeout periods blocking user interaction
-- System appearing unresponsive during normal operations
+- Starting already-running services (causes 2-minute timeout)
+- Health checks failing due to missing methods
+- Not checking if services are already running before starting them
 
 ## 🚨 CRITICAL: Knowledge Base Management Rule
 
