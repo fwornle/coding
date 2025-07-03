@@ -1,8 +1,7 @@
 {
-  "timestamp": "2025-07-03T16:51:38.330Z",
+  "timestamp": "2025-07-03T18:32:56.215Z",
   "services": [
     "vkb-server",
-    "system-health-monitor",
     "semantic-analysis"
   ],
   "agent": "claude"

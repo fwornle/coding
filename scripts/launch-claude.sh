@@ -39,7 +39,7 @@ if ! command -v node &> /dev/null; then
 fi
 
 # Start services using the new lifecycle manager
-if ! node "$PROJECT_DIR/lib/services/start-services.js" --agent claude --verbose; then
+if ! node "$PROJECT_DIR/lib/services/start-services.js" --agent claude; then
   log "Error: Failed to start services"
   exit 1
 fi

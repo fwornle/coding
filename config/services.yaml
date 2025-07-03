@@ -18,21 +18,21 @@ services:
     critical: false
     agentTypes: ["claude", "copilot"]
 
-  # System Health Monitor
-  system-health-monitor:
-    displayName: "System Health Monitor"
-    type: "monitoring"
-    preferredPort: 9090
-    command: "node lib/services/health-monitor-standalone.js"
-    workingDirectory: "."
-    env:
-      inherit: true
-    healthCheck:
-      type: "http"
-      endpoint: "/health"
-      timeout: 2000
-    critical: false
-    agentTypes: ["claude", "copilot"]
+  # System Health Monitor (disabled - caused intrusive background monitoring)
+  # system-health-monitor:
+  #   displayName: "System Health Monitor"
+  #   type: "monitoring"
+  #   preferredPort: 9090
+  #   command: "node lib/services/health-monitor-standalone.js"
+  #   workingDirectory: "."
+  #   env:
+  #     inherit: true
+  #   healthCheck:
+  #     type: "http"
+  #     endpoint: "/health"
+  #     timeout: 2000
+  #   critical: false
+  #   agentTypes: ["claude", "copilot"]
 
   # Semantic Analysis System
   semantic-analysis:
@@ -126,8 +126,8 @@ global:
   # Maximum time to wait for graceful shutdown (in milliseconds)
   shutdownTimeout: 30000
   
-  # Health check interval for running services (in milliseconds)
-  healthCheckInterval: 30000
+  # Health check interval for running services (in milliseconds) - very long to minimize interference
+  healthCheckInterval: 3600000
   
   # Retry attempts for failed services
   maxRetries: 3

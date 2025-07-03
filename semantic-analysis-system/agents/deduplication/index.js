@@ -42,8 +42,8 @@ export class DeduplicationAgent extends BaseAgent {
     // Initialize embedding model
     await this.embeddingGenerator.initialize();
     
-    // Start periodic deduplication
-    this.startPeriodicDeduplication();
+    // Start periodic deduplication (disabled to prevent background interference)
+    // this.startPeriodicDeduplication();
     
     this.logger.info('Deduplication Agent initialized successfully');
   }
