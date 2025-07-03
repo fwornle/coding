@@ -892,6 +892,38 @@
         "auto_created": true,
         "team": "coding"
       }
+    },
+    {
+      "id": "54c52df6-fef7-4daa-9633-1aad77db2207",
+      "name": "GlobalSemanticAnalysisLauncher",
+      "entityType": "SystemArchitecturePattern",
+      "observations": [
+        "Created global semantic analysis launcher script that works from any directory, eliminating dependency on specific folder structure"
+      ],
+      "significance": "8",
+      "created": "2025-07-02T05:51:13.573Z",
+      "updated": "2025-07-02T05:51:13.573Z",
+      "metadata": {
+        "created_by": "ukb-cli",
+        "version": "2.0.0",
+        "team": "coding"
+      }
+    },
+    {
+      "id": "be994e91-56ed-406a-bfd0-077dd1cd14cf",
+      "name": "RobustSemanticAnalysisSystem",
+      "entityType": "SystemArchitecturePattern",
+      "observations": [
+        "Successfully implemented comprehensive fallback logging and workflow persistence system that tracks plan deviations, handles agent failures, and provides detailed recovery capabilities with cross-session resumption"
+      ],
+      "significance": "9",
+      "created": "2025-07-02T06:21:20.797Z",
+      "updated": "2025-07-02T06:21:20.797Z",
+      "metadata": {
+        "created_by": "ukb-cli",
+        "version": "2.0.0",
+        "team": "coding"
+      }
     }
   ],
   "relations": [
@@ -1189,10 +1221,58 @@
         "created_by": "knowledge-api",
         "auto_created": true
       }
+    },
+    {
+      "id": "941447e0-316a-4e63-a0ea-9f6325d51c3c",
+      "from": "CollectiveKnowledge",
+      "to": "GlobalSemanticAnalysisLauncher",
+      "relationType": "contains",
+      "significance": 8,
+      "created": "2025-07-02T05:51:13.575Z",
+      "metadata": {
+        "created_by": "knowledge-api",
+        "auto_created": true
+      }
+    },
+    {
+      "id": "83201e29-2160-4b04-be29-4438975143d1",
+      "from": "Coding",
+      "to": "GlobalSemanticAnalysisLauncher",
+      "relationType": "contains",
+      "significance": 7,
+      "created": "2025-07-02T05:51:13.583Z",
+      "metadata": {
+        "created_by": "knowledge-api",
+        "auto_created": true
+      }
+    },
+    {
+      "id": "81969a65-c79f-4e03-8987-2622bf1079be",
+      "from": "CollectiveKnowledge",
+      "to": "RobustSemanticAnalysisSystem",
+      "relationType": "contains",
+      "significance": 8,
+      "created": "2025-07-02T06:21:20.799Z",
+      "metadata": {
+        "created_by": "knowledge-api",
+        "auto_created": true
+      }
+    },
+    {
+      "id": "b9dfb022-1f59-4424-af6e-52bb0fa9f840",
+      "from": "Coding",
+      "to": "RobustSemanticAnalysisSystem",
+      "relationType": "contains",
+      "significance": 7,
+      "created": "2025-07-02T06:21:20.804Z",
+      "metadata": {
+        "created_by": "knowledge-api",
+        "auto_created": true
+      }
     }
   ],
   "metadata": {
-    "last_updated": "2025-07-01T18:59:14.080Z",
+    "last_updated": "2025-07-02T06:21:20.804Z",
     "total_entities": 9,
     "total_relations": 20,
     "team": "coding"

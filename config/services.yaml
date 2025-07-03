@@ -14,7 +14,7 @@ services:
     healthCheck:
       type: "http"
       endpoint: "/"
-      timeout: 5000
+      timeout: 2000
     critical: false
     agentTypes: ["claude", "copilot"]
 
@@ -30,7 +30,7 @@ services:
     healthCheck:
       type: "http"
       endpoint: "/health"
-      timeout: 5000
+      timeout: 2000
     critical: false
     agentTypes: ["claude", "copilot"]
 
