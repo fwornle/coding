@@ -81,26 +81,55 @@ if [[ -x "$SYNC_SCRIPT" ]]; then
     "$SYNC_SCRIPT" > /dev/null 2>&1
 fi
 
+# Validate MCP services are ready before starting Claude
+VALIDATION_SCRIPT="$CODING_REPO_DIR/scripts/validate-mcp-startup.sh"
+if [[ -x "$VALIDATION_SCRIPT" ]]; then
+    echo -e "${YELLOW}🔍 Validating MCP services...${NC}"
+    if ! "$VALIDATION_SCRIPT"; then
+        echo -e "${RED}❌ MCP services validation failed${NC}"
+        echo -e "${YELLOW}💡 Try running: ./start-services.sh${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✅ MCP services validated successfully${NC}"
+fi
+
 # Set up post-session conversation logging
 POST_SESSION_LOGGER="$CODING_REPO_DIR/scripts/simple-post-session-logger.js"
 if [[ -f "$POST_SESSION_LOGGER" ]]; then
     
     # Set up trap to trigger post-session logging on exit
     cleanup() {
-        # Clean up MCP processes first to prevent accumulation
-        pkill -f "mcp-server-memory" 2>/dev/null || true
-        pkill -f "browser-access/dist/index.js" 2>/dev/null || true  
-        pkill -f "semantic-analysis-system/mcp-server" 2>/dev/null || true
+        echo -e "${BLUE}🔄 Gracefully shutting down MCP services...${NC}"
         
-        # Give processes a moment to terminate gracefully
-        sleep 1
+        # Store PIDs of MCP processes before cleanup
+        local mcp_pids=$(ps aux | grep -E "(mcp-server-memory|browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}')
         
-        # Force kill any remaining stubborn processes
-        pkill -9 -f "mcp-server-memory" 2>/dev/null || true
-        pkill -9 -f "browser-access/dist/index.js" 2>/dev/null || true
-        pkill -9 -f "semantic-analysis-system/mcp-server" 2>/dev/null || true
+        # Only kill processes if they exist and are still running
+        if [[ -n "$mcp_pids" ]]; then
+            echo -e "${YELLOW}📋 Found MCP processes: $mcp_pids${NC}"
+            
+            # Send SIGTERM first for graceful shutdown
+            echo "$mcp_pids" | xargs -r kill -TERM 2>/dev/null || true
+            
+            # Wait for graceful shutdown
+            sleep 2
+            
+            # Check if processes are still running
+            local remaining_pids=$(ps aux | grep -E "(mcp-server-memory|browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}')
+            
+            if [[ -n "$remaining_pids" ]]; then
+                echo -e "${YELLOW}⚠️  Some processes need force termination: $remaining_pids${NC}"
+                echo "$remaining_pids" | xargs -r kill -KILL 2>/dev/null || true
+                sleep 1
+            fi
+        fi
         
-        node "$POST_SESSION_LOGGER" "$(pwd)" "$CODING_REPO_DIR" > /dev/null 2>&1
+        echo -e "${GREEN}✅ MCP services shutdown complete${NC}"
+        
+        # Run post-session logging
+        if [[ -f "$POST_SESSION_LOGGER" ]]; then
+            node "$POST_SESSION_LOGGER" "$(pwd)" "$CODING_REPO_DIR" > /dev/null 2>&1
+        fi
     }
     trap cleanup EXIT
     

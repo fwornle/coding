@@ -104,7 +104,8 @@
       "mcp__semantic-analysis__get_system_status",
       "mcp__semantic-analysis__determine_insights",
       "Bash(semantic-analysis)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "mcp__semantic-analysis__analyze_repository"
     ],
     "deny": []
   }

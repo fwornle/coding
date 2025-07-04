@@ -70,48 +70,35 @@ claude-mcp
 
 **NEVER** use `claude code` directly - it won't have MCP features!
 
-## 🚀 CRITICAL: Semantic Analysis System
+## 🚀 CRITICAL: Simplified Startup System
 
-**🔴 AUTOMATIC STARTUP**: The semantic analysis system is **AUTOMATICALLY STARTED** when you run `claude-mcp`! DO NOT manually start it with the `semantic-analysis` command unless it's not running.
+**🔴 AUTOMATIC STARTUP**: The coding services are **AUTOMATICALLY STARTED** when you run `coding` or `claude-mcp`! The system now uses a simple, reliable startup script.
 
-**🚨 BEFORE USING SEMANTIC ANALYSIS**:
-1. **CHECK IF IT'S RUNNING**: Use `ps aux | grep "index-robust" | grep -v grep` or check `.services-running.json`
-2. **DO NOT START IF RUNNING**: Starting it again causes port conflicts and 2-minute timeouts!
-3. **USE MCP TOOLS DIRECTLY**: Just call `mcp__semantic-analysis__*` tools - they'll work if the system is running
+**🚨 STARTUP PROCESS**:
+1. **Simple Command**: Just run `coding` or `coding --claude`
+2. **Automatic Service Start**: The system starts all required services automatically
+3. **No Manual Intervention**: No need to check ports or start services manually
 
 **✅ CORRECT WORKFLOW**:
 ```bash
-# 1. Start Claude Code (this starts ALL services including semantic analysis)
-claude-mcp
+# 1. Start coding session (this starts ALL services)
+coding
+# or
+coding --claude
+# or  
+coding --copilot
 
-# 2. In Claude, just use the MCP tools directly:
+# 2. In Claude, use MCP tools directly:
 mcp__semantic-analysis__determine_insights(...)
-# NO NEED to run 'semantic-analysis' command!
-```
-
-**❌ WRONG WORKFLOW**:
-```bash
-# DON'T DO THIS - causes timeouts and port conflicts!
-claude-mcp
-# Then in Claude: semantic-analysis  # NO! Already running!
-```
-
-**MANUAL START (ONLY if not running)**:
-```bash
-# First check if it's running
-ps aux | grep "index-robust" | grep -v grep
-
-# Only start if NOT running
-semantic-analysis  # Works from anywhere after 'source .activate'
 ```
 
 **SYSTEM COMPONENTS**:
-- MQTT broker (port 1883)
-- JSON-RPC server (port 8081)  
-- MCP server (port 8082)
-- All agent services
+- VKB Server (port 8080) - Knowledge visualization
+- MQTT broker (port 1883) - Message broker
+- JSON-RPC server (port 8081) - Remote procedure calls
+- MCP server (port 8082) - Model Context Protocol
 
-**🔧 CONFIGURATION**: The system is configured in `config/services.yaml` and managed by the lifecycle manager.
+**🔧 SIMPLE ARCHITECTURE**: The system uses `start-services.sh` for reliable service startup with automatic port conflict resolution.
 
 ## 🚨 CRITICAL: Working Directory and File Locations
 

@@ -1278,20 +1278,72 @@ class SemanticAnalysisMCPServer {
   }
 
   async start() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    this.logger.info('MCP Server started on stdio transport');
+    try {
+      this.logger.info('🚀 Starting MCP Server...');
+      this.logger.info(`Process ID: ${process.pid}`);
+      this.logger.info(`Node.js version: ${process.version}`);
+      this.logger.info(`Working directory: ${process.cwd()}`);
+      
+      const transport = new StdioServerTransport();
+      this.logger.info('📡 Connecting to stdio transport...');
+      
+      await this.server.connect(transport);
+      this.connectionStatus.server = 'connected';
+      this.connectionStatus.systemReady = true;
+      this.connectionStatus.lastHealthCheck = new Date().toISOString();
+      
+      this.logger.info('✅ MCP Server started successfully on stdio transport');
+      this.logger.info(`📊 Server status: ${JSON.stringify(this.connectionStatus, null, 2)}`);
+      
+      // Set up periodic health checks
+      setInterval(() => {
+        this.connectionStatus.lastHealthCheck = new Date().toISOString();
+        this.logger.debug('💗 Health check ping');
+      }, 30000); // Every 30 seconds
+      
+    } catch (error) {
+      this.connectionStatus.server = 'failed';
+      this.connectionStatus.lastError = error.message;
+      this.logger.error('❌ Failed to start MCP server:', error);
+      throw error;
+    }
   }
 }
 
-// Start the server
+// Start the server with retry logic
 async function main() {
-  try {
-    const server = new SemanticAnalysisMCPServer();
-    await server.start();
-  } catch (error) {
-    console.error('Failed to start MCP server:', error);
-    process.exit(1);
+  const maxRetries = 3;
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    try {
+      attempt++;
+      console.log(`🚀 MCP Server startup attempt ${attempt}/${maxRetries}`);
+      
+      const server = new SemanticAnalysisMCPServer();
+      await server.start();
+      
+      console.log('✅ MCP Server started successfully');
+      return; // Success, exit the retry loop
+      
+    } catch (error) {
+      console.error(`❌ Startup attempt ${attempt} failed:`, error.message);
+      
+      if (attempt >= maxRetries) {
+        console.error('🚨 Max retries reached. MCP server startup failed.');
+        console.error('💡 Common fixes:');
+        console.error('   1. Check if MQTT broker is running: brew services start mosquitto');
+        console.error('   2. Check if ports 1883, 8081 are available');
+        console.error('   3. Check if API keys are configured in .env');
+        console.error('   4. Check if all dependencies are installed: npm install');
+        process.exit(1);
+      }
+      
+      // Wait before retry (exponential backoff)
+      const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+      console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
   }
 }
 

@@ -29,7 +29,7 @@ if [ -f "$PROJECT_DIR/.env.ports" ]; then
   set +a
 fi
 
-# Start all services using new lifecycle management
+# Start all services using simple startup script
 log "Starting coding services for Claude..."
 
 # Check if Node.js is available
@@ -38,8 +38,8 @@ if ! command -v node &> /dev/null; then
   exit 1
 fi
 
-# Start services using the new lifecycle manager
-if ! node "$PROJECT_DIR/lib/services/start-services.js" --agent claude; then
+# Start services using the simple startup script
+if ! "$PROJECT_DIR/start-services.sh"; then
   log "Error: Failed to start services"
   exit 1
 fi
