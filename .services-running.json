@@ -1,8 +1,12 @@
 {
-  "timestamp": "2025-07-03T18:45:02.325Z",
-  "services": [
-    "vkb-server",
-    "semantic-analysis"
-  ],
+  "timestamp": "2025-07-04T04:56:56.3NZ",
+  "services": ["vkb-server"],
+  "ports": {
+    "vkb-server": 8080
+  },
+  "pids": {
+    "vkb-server": 49810
+  },
+  "services_running": 1,
   "agent": "claude"
 }

@@ -14,18 +14,6 @@
         "LOCAL_CDP_URL": "{{LOCAL_CDP_URL}}",
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}"
       }
-    },
-    "semantic-analysis": {
-      "command": "node",
-      "args": ["{{CODING_TOOLS_PATH}}/semantic-analysis-system/mcp-server/index.js"],
-      "env": {
-        "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}",
-        "OPENAI_API_KEY": "{{OPENAI_API_KEY}}",
-        "CODING_TOOLS_PATH": "{{CODING_TOOLS_PATH}}",
-        "CODING_KB_PATH": "{{CODING_TOOLS_PATH}}/shared-memory.json",
-        "NODE_ENV": "production",
-        "LOG_LEVEL": "info"
-      }
     }
   }
 }
