@@ -124,7 +124,8 @@
       "mcp__semantic-analysis__update_knowledge_graph",
       "mcp__semantic-analysis__sync_knowledge_sources",
       "mcp__semantic-analysis__detect_duplicates",
-      "mcp__semantic-analysis__backup_knowledge"
+      "mcp__semantic-analysis__backup_knowledge",
+      "mcp__semantic-analysis__generate_documentation"
     ],
     "deny": []
   }
