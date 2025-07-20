@@ -10,6 +10,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
+import LightweightEmbeddingClassifier from './lightweight-embedding-classifier.js';
+import SimplifiedSessionLogger from './simplified-session-logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,6 +20,7 @@ class SimplePostSessionLogger {
   constructor(projectPath, codingRepo) {
     this.projectPath = projectPath;
     this.codingRepo = codingRepo;
+    this.classifier = new LightweightEmbeddingClassifier();
     // Use local time for timestamp
     const now = new Date();
     const date = now.getFullYear() + '-' + 
@@ -33,12 +36,23 @@ class SimplePostSessionLogger {
   async log() {
     console.log('🔄 Post-session logging started...');
     
+    // Check if we should use multi-topic splitting
+    const useMultiTopic = process.env.MULTI_TOPIC_LOGGING === 'true' || 
+                         process.argv.includes('--multi-topic');
+    
+    if (useMultiTopic) {
+      console.log('🔀 Using simplified session logging...');
+      const simplifiedLogger = new SimplifiedSessionLogger(this.projectPath, this.codingRepo);
+      return await simplifiedLogger.log();
+    }
+    
     try {
       // Try to extract actual conversation first
       const extractor = new ClaudeConversationExtractor(this.projectPath);
       const extractedConversation = await extractor.extractRecentConversation(30);
       
-      const targetRepo = this.codingRepo; // Default to coding repo for now
+      // Determine target repository based on content
+      const targetRepo = await this.determineTargetRepository(extractedConversation);
       const logDir = path.join(targetRepo, '.specstory', 'history');
       
       // Ensure directory exists
@@ -46,7 +60,9 @@ class SimplePostSessionLogger {
         fs.mkdirSync(logDir, { recursive: true });
       }
 
-      const logFile = path.join(logDir, `${this.timestamp}_post-logged-coding-session.md`);
+      // Use appropriate filename based on target repo
+      const projectName = path.basename(targetRepo);
+      const logFile = path.join(logDir, `${this.timestamp}_post-logged-${projectName}-session.md`);
       
       // Create session log with extracted conversation or fallback content
       const logContent = extractedConversation || this.createLogContent();
@@ -61,11 +77,91 @@ class SimplePostSessionLogger {
       }
       
       // Update session tracking
-      this.updateSessionTracking(logFile);
+      this.updateSessionTracking(logFile, targetRepo);
       
     } catch (error) {
       console.error('❌ Post-session logging failed:', error.message);
     }
+  }
+
+  async determineTargetRepository(conversationContent) {
+    // If no conversation content, fall back to coding repo
+    if (!conversationContent) {
+      console.log('⚠️  No conversation content for semantic analysis, defaulting to coding repo');
+      return this.codingRepo;
+    }
+
+    // ALWAYS perform semantic analysis first - don't assume based on directory
+    console.log('🔍 Performing semantic analysis to determine appropriate project...');
+    try {
+      const classification = await this.classifier.classifyContent(conversationContent);
+      
+      if (classification === 'coding') {
+        console.log('📁 Content classified as coding infrastructure - logging to coding repo');
+        return this.codingRepo;
+      } else {
+        console.log('📁 Content classified as project-specific - using semantic analysis result');
+        // If we're in a project directory, use it; otherwise check if there's a clear project reference
+        if (this.projectPath !== this.codingRepo) {
+          return this.projectPath;
+        }
+        
+        // Try to extract project name from conversation
+        const projectPath = this.extractProjectPath(conversationContent);
+        if (projectPath && fs.existsSync(projectPath)) {
+          console.log(`📁 Detected project directory from content: ${projectPath}`);
+          return projectPath;
+        }
+        
+        // Default to current directory if it has .specstory
+        if (fs.existsSync(path.join(this.projectPath, '.specstory'))) {
+          return this.projectPath;
+        }
+        
+        // Last resort: coding repo
+        return this.codingRepo;
+      }
+    } catch (error) {
+      console.error('❌ Semantic analysis failed:', error.message);
+      console.log('⚠️  Falling back to coding repo');
+      return this.codingRepo;
+    }
+  }
+
+  extractProjectPath(content) {
+    // Look for common project path patterns in the conversation
+    const pathPattern = /\/Users\/\w+\/Agentic\/(\w+)/g;
+    const matches = content.match(pathPattern);
+    
+    if (matches && matches.length > 0) {
+      // Count occurrences of each project
+      const projectCounts = {};
+      matches.forEach(match => {
+        const projectName = match.split('/').pop();
+        if (projectName !== 'coding') {
+          projectCounts[projectName] = (projectCounts[projectName] || 0) + 1;
+        }
+      });
+      
+      // Find the most mentioned project
+      let maxCount = 0;
+      let mostMentionedProject = null;
+      for (const [project, count] of Object.entries(projectCounts)) {
+        if (count > maxCount) {
+          maxCount = count;
+          mostMentionedProject = project;
+        }
+      }
+      
+      if (mostMentionedProject) {
+        const projectPath = path.join('/Users/q284340/Agentic', mostMentionedProject);
+        if (fs.existsSync(projectPath)) {
+          return projectPath;
+        }
+      }
+    }
+    
+    return null;
   }
 
   createLogContent() {
@@ -121,13 +217,14 @@ To capture full **User:**/***Assistant:** exchanges with timestamps:
 `;
   }
 
-  updateSessionTracking(logFile) {
+  updateSessionTracking(logFile, targetRepo) {
     const sessionFile = path.join(this.codingRepo, '.mcp-sync', 'current-session.json');
     const sessionData = {
       sessionId: this.sessionId,
       startTime: new Date().toISOString(),
       projectPath: this.projectPath,
       codingRepo: this.codingRepo,
+      targetRepo: targetRepo || this.codingRepo,
       needsLogging: false,
       loggedAt: new Date().toISOString(),
       logFile: logFile

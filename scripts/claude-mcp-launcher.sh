@@ -126,9 +126,10 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
         
         echo -e "${GREEN}✅ MCP services shutdown complete${NC}"
         
-        # Run post-session logging
+        # Run post-session logging with multi-topic splitting
         if [[ -f "$POST_SESSION_LOGGER" ]]; then
-            node "$POST_SESSION_LOGGER" "$(pwd)" "$CODING_REPO_DIR" > /dev/null 2>&1
+            echo ""  # Add spacing before post-session messages
+            MULTI_TOPIC_LOGGING=true node "$POST_SESSION_LOGGER" "$(pwd)" "$CODING_REPO_DIR"
         fi
     }
     trap cleanup EXIT

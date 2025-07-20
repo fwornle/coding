@@ -28,24 +28,31 @@ class LLMContentClassifier {
   }
 
   async classifyContent(content) {
-    // Extract a sample of the content for classification (first 2000 chars)
-    const contentSample = content.substring(0, 2000);
+    // Extract a sample of the content for classification (first 1000 chars for speed)
+    const contentSample = content.substring(0, 1000);
     
-    const classificationPrompt = `Analyze this conversation excerpt and determine if it's primarily about the "coding" project's INFRASTRUCTURE (knowledge management tools like ukb/vkb, MCP development, logging systems, semantic analysis systems) or about developing a specific application project.
+    const classificationPrompt = `Analyze this conversation excerpt and determine if it's primarily about the "coding" project's INFRASTRUCTURE or about developing a specific application project.
 
 CODING INFRASTRUCTURE includes:
-- ukb, vkb commands and knowledge management
-- MCP servers, semantic analysis systems  
-- Logging infrastructure, post-session logging
+- ukb, vkb commands and knowledge management tools
+- MCP servers, semantic analysis systems, claude-mcp
+- Session logging, post-session logging, conversation capture
 - Knowledge base management, shared-memory files
-- The /Agentic/coding repository tools
+- /Agentic/coding repository tools and scripts
+- Development workflows, logging systems, insight capture
+- Cross-project patterns, architectural patterns
+- MCP integration, browser automation tools
+- Session management, conversation analysis
+- Auto-insight triggers, pattern detection systems
+- Knowledge graph management and synchronization
 
 PROJECT-SPECIFIC includes:
-- React/Vue/Angular applications
-- Timeline, UI components, web apps
-- Database schemas, API development
-- Kotlin, Compose Multiplatform apps
-- ANY specific business application
+- React/Vue/Angular applications and components
+- Timeline visualization, UI components, web apps
+- Database schemas, API development for specific apps
+- Kotlin, Compose Multiplatform application development
+- Business logic, authentication, domain-specific features
+- Application deployment, specific project configuration
 
 Conversation excerpt:
 ${contentSample}
@@ -116,8 +123,8 @@ Respond with ONLY one word: "coding" if this is about coding infrastructure/know
             content: prompt
           }
         ],
-        temperature: 0.1,
-        max_tokens: 10
+        temperature: 0,
+        max_tokens: 5
       });
 
       const options = {
@@ -212,13 +219,23 @@ Respond with ONLY one word: "coding" if this is about coding infrastructure/know
   fallbackClassification(content) {
     const lowerContent = content.toLowerCase();
     
-    // VERY SPECIFIC coding infrastructure keywords - must be precise
+    // Comprehensive coding infrastructure keywords based on repository analysis
     const codingKeywords = [
-      'ukb command', 'vkb command', 'ukb --', 'vkb --',
-      'mcp__memory__', 'mcp server', 'semantic-analysis system',
-      'post-session-logger', 'claude-mcp command',
-      'shared-memory-coding.json', 'knowledge-management/',
-      'coding repo', '/agentic/coding', 'ukb.js', 'vkb.js'
+      // Core tools
+      'ukb command', 'vkb command', 'ukb --', 'vkb --', 'ukb.js', 'vkb.js',
+      // MCP infrastructure
+      'mcp__memory__', 'mcp server', 'semantic-analysis system', 'claude-mcp',
+      // Session & logging systems
+      'post-session-logger', 'session logging', 'conversation capture', 'session management',
+      'multi-topic session', 'session-review', 'logging-system', 'gracefully shutting down mcp',
+      // Knowledge management
+      'shared-memory-coding.json', 'shared-memory.json', 'knowledge-management/',
+      'knowledge base', 'knowledge graph', 'insight capture', 'pattern detection',
+      // Repository & infrastructure
+      'coding repo', '/agentic/coding', 'coding infrastructure', 'development workflows',
+      // Service management
+      'mcp services', 'semantic analysis mcp server', 'vkb server', 'stdio transport',
+      'services startup', 'service status', 'cleanup existing processes'
     ];
     
     // Count occurrences
@@ -226,9 +243,8 @@ Respond with ONLY one word: "coding" if this is about coding infrastructure/know
       return count + (lowerContent.split(keyword).length - 1);
     }, 0);
     
-    // Require MULTIPLE specific infrastructure keywords to classify as coding
-    // This prevents false positives from general programming discussions
-    return keywordCount >= 3 ? 'coding' : 'project';
+    // Lower threshold since we have comprehensive keywords now
+    return keywordCount >= 2 ? 'coding' : 'project';
   }
 }
 
