@@ -1,12 +1,12 @@
 {
-  "timestamp": "2025-07-20T15:28:49.3NZ",
+  "timestamp": "2025-07-20T16:55:59.3NZ",
   "services": ["vkb-server", "semantic-analysis"],
   "ports": {
     "vkb-server": 8080,
     "semantic-analysis": 8001
   },
   "pids": {
-    "vkb-server": 86935,
+    "vkb-server": 35850,
     "semantic-analysis": stdio
   },
   "services_running": 2,

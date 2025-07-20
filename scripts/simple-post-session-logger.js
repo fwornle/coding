@@ -10,7 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
-import LightweightEmbeddingClassifier from './lightweight-embedding-classifier.js';
+// Removed: using adaptive classifier via SimplifiedSessionLogger
 import SimplifiedSessionLogger from './simplified-session-logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,7 +20,7 @@ class SimplePostSessionLogger {
   constructor(projectPath, codingRepo) {
     this.projectPath = projectPath;
     this.codingRepo = codingRepo;
-    this.classifier = new LightweightEmbeddingClassifier();
+    // Classifier is now handled by SimplifiedSessionLogger
     // Use local time for timestamp
     const now = new Date();
     const date = now.getFullYear() + '-' + 

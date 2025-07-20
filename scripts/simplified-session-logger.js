@@ -11,7 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
-import LightweightEmbeddingClassifier from './lightweight-embedding-classifier.js';
+import { AdaptiveEmbeddingClassifier } from './adaptive-embedding-classifier.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,7 +20,10 @@ class SimplifiedSessionLogger {
   constructor(projectPath, codingRepo) {
     this.projectPath = projectPath;
     this.codingRepo = codingRepo;
-    this.classifier = new LightweightEmbeddingClassifier();
+    this.classifier = new AdaptiveEmbeddingClassifier(
+      '/Users/q284340/Agentic/coding',
+      [this.projectPath] // Include current project path for learning
+    );
     
     // Generate single timestamp for both files
     const now = new Date();
@@ -47,9 +50,10 @@ class SimplifiedSessionLogger {
       }
       
       // Classify content to determine file creation strategy
-      const classification = await this.classifier.classifyContent(extractedConversation);
+      const classificationResult = await this.classifier.classifyContent(extractedConversation);
+      console.log(`🔍 Classification result:`, JSON.stringify(classificationResult, null, 2));
       
-      if (classification === 'coding') {
+      if (classificationResult.classification === 'coding') {
         // Pure coding content - create only coding file
         if (this.projectPath !== this.codingRepo) {
           const codingFile = await this.createCodingFile(extractedConversation);
