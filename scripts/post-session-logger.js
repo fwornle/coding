@@ -8,6 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import { AutoInsightTrigger } from './auto-insight-trigger.js';
+import LLMContentClassifier from './llm-content-classifier.js';
 
 class PostSessionLogger {
   constructor(projectPath, codingRepo, sessionId) {
@@ -53,10 +54,18 @@ class PostSessionLogger {
       }
 
       // Analyze content to determine target repository
-      const shouldGoToCoding = this.detectCodingContent(conversationContent);
-      const targetRepo = shouldGoToCoding ? this.codingRepo : this.projectPath;
+      const shouldGoToCoding = await this.detectCodingContent(conversationContent);
+      
+      // Check if session data contains projectPath that might be more accurate
+      const actualProjectPath = sessionData.projectPath || this.projectPath;
+      
+      // Default behavior: logs go to the current project
+      // Only route to coding repo if content is explicitly coding-related
+      const targetRepo = shouldGoToCoding ? this.codingRepo : actualProjectPath;
       
       console.log(`🎯 Routing to: ${targetRepo === this.codingRepo ? 'CODING repo' : 'current project'}`);
+      console.log(`📁 Project path: ${actualProjectPath}`);
+      console.log(`🔍 Content analysis: ${shouldGoToCoding ? 'coding-related' : 'project-specific'}`);
 
       // Create log file
       const logFile = await this.createLogFile(targetRepo, sessionData, conversationContent);
@@ -126,7 +135,7 @@ class PostSessionLogger {
     let exchangeCount = 0;
 
     if (conversationData.messages && conversationData.messages.length > 0) {
-      conversationData.messages.forEach((message, index) => {
+      conversationData.messages.forEach((message) => {
         if (message.role === 'user') {
           exchangeCount++;
           content += `## Exchange ${exchangeCount}\n\n**User:**\n${message.content}\n\n`;
@@ -151,92 +160,34 @@ class PostSessionLogger {
     return content || null;
   }
 
-  detectCodingContent(content) {
-    const lowerContent = content.toLowerCase();
-    
-    // First, check for explicit project-specific indicators that should NOT go to coding
-    const projectSpecificIndicators = [
-      // Timeline project specific
-      /timeline.*shared-memory\.json/,
-      /shared-memory\.json.*timeline/,
-      /vite.*proxy.*port.*calendar/,
-      /calendar.*data.*api/,
-      /timeline.*project.*issue/,
+  async detectCodingContent(content) {
+    try {
+      // Use LLM-based semantic analysis
+      const classifier = new LLMContentClassifier();
+      const classification = await classifier.classifyContent(content);
       
-      // Document structure fixes (non-coding specific)
-      /docs\/documentation\.md.*structure/,
-      /fix.*document.*structure.*coherent/,
-      /table\s+of\s+contents.*ordinal\s+numbers/,
+      console.log(`🤖 LLM Classification: ${classification}`);
       
-      // General project-specific patterns
-      /\.specstory\/history\s+(data|files?|directory)(?!.*coding)/,
-      /extract.*\.specstory.*data(?!.*coding)/,
-      /read.*\.specstory.*files?(?!.*coding)/
-    ];
-    
-    // If it matches project-specific patterns, it's NOT coding-related
-    if (projectSpecificIndicators.some(pattern => pattern.test(lowerContent))) {
-      return false;
+      return classification === 'coding';
+    } catch (error) {
+      console.warn('⚠️  LLM classification failed, using fallback detection:', error.message);
+      
+      // Fallback to basic pattern detection
+      const lowerContent = content.toLowerCase();
+      
+      // Very specific coding infrastructure keywords
+      const codingKeywords = [
+        'ukb', 'vkb',
+        'mcp server', 'mcp__memory',
+        'semantic-analysis system',
+        'post-session-logger',
+        'claude-mcp',
+        'shared-memory-coding.json',
+        '/agentic/coding'
+      ];
+      
+      return codingKeywords.some(keyword => lowerContent.includes(keyword));
     }
-    
-    // Semantic patterns for coding infrastructure discussions
-    const codingPatterns = [
-      // Knowledge base management tools
-      /\b(ukb|vkb)\s+(command|tool|update|sync)/,
-      /shared-memory\.json\s+(update|edit|management)/,
-      /knowledge[\s-]?base\s+(management|tool|update|sync)/,
-      
-      // MCP and Claude tools development
-      /\bmcp\s+(server|client|tool|development|integration)/,
-      /claude[\s-]?mcp\s+(setup|configuration|development)/,
-      /claude\s+tools?\s+(development|setup|configuration)/,
-      /mcp\s+memory\s+(server|sync|management)/,
-      
-      // Logging infrastructure (not just any .specstory mention)
-      /specstory\s+(logger|logging|mechanism|infrastructure)/,
-      /claude[\s-]?logger\s+(setup|configuration|development)/,
-      /post[\s-]?session[\s-]?logg(er|ing)/,
-      /automatic\s+logging\s+(setup|mechanism|infrastructure)/,
-      /conversation\s+logging\s+(mechanism|fix|issue)/,
-      
-      // Coding repository specific
-      /coding\s+(project|repo|repository)\s+(setup|configuration|tools)/,
-      /agentic\/coding\s+(directory|folder|repository)/,
-      /coding\s+mechanism.*fix/,
-      /fix.*coding\s+mechanism/,
-      
-      // Infrastructure and tooling
-      /install\.sh\s+(script|setup|configuration)/,
-      /\.activate\s+(script|command|setup)/,
-      /memory[\s-]?visualizer\s+(tool|setup|development)/,
-      /start[\s-]?auto[\s-]?logger/,
-      
-      // Cross-project patterns and knowledge transfer
-      /transferable\s+pattern/,
-      /cross[\s-]?project\s+(knowledge|pattern|tool)/,
-      /shared\s+knowledge\s+(management|system)/,
-      
-      // Claude.md and coding instructions
-      /claude\.md\s+(instructions|update|fix)/,
-      /coding\s+instructions/
-    ];
-    
-    // Check semantic patterns
-    const hasSemanticMatch = codingPatterns.some(pattern => pattern.test(lowerContent));
-    if (hasSemanticMatch) return true;
-    
-    // Specific unambiguous keywords that always indicate coding-related content
-    const unambiguousKeywords = [
-      'ukb', 'vkb', // These are always coding-related
-      'agentic/coding',
-      'coding_repo',
-      'todowrite', 'todoread', // These are Claude Code specific tools
-      'mcp__memory__', // MCP memory operations
-      'claude-mcp', // Claude MCP command
-      'shared-memory-coding.json' // Coding-specific knowledge base
-    ];
-    
-    return unambiguousKeywords.some(keyword => lowerContent.includes(keyword));
   }
 
   async createLogFile(targetRepo, sessionData, content) {
@@ -277,7 +228,7 @@ ${content}
 **Post-Session Logging Summary:**
 - Logged at: ${now.toISOString()}
 - Content routed to: ${targetRepo === this.codingRepo ? 'Coding repository' : 'Current project'}
-- Automatic classification: ${this.detectCodingContent(content) ? 'Coding-related' : 'Project-specific'}
+- Automatic classification: ${targetRepo === this.codingRepo ? 'Coding-related' : 'Project-specific'}
 `;
 
     fs.writeFileSync(logPath, logContent);
