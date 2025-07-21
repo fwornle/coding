@@ -1,0 +1,125 @@
+{
+  "project": "coding",
+  "description": "Unified Semantic Analysis & Knowledge Management System",
+  "classification_version": "2.0",
+  "keywords": {
+    "primary": [
+      "ukb", "vkb", "ckb", "update_knowledge_base", "view_knowledge_base",
+      "determine_insights", "lessons_learned", "search_knowledge",
+      "knowledge management", "knowledge base", "knowledge graph",
+      "semantic analysis", "semantic-analysis", "SynchronizationAgent",
+      "MCP", "mcp memory", "mcp__memory", "claude-mcp", "mcp-status",
+      "post-session-logger", "session-logger", "session logger",
+      "conversation-analyzer", "conversation-extractor", "claude-conversation-analyzer",
+      "adaptive-classifier", "embedding-classifier", "classification",
+      "shared-memory.json", "shared-memory-", "graphology",
+      "coding infrastructure", "coding agent", "coding startup",
+      "multi-topic-session-logger", "simplified-session-logger",
+      "session classification", "misclassified sessions", "move session logs",
+      "fast classification", "keyword matching", "classification system",
+      "misclassified", "session misclassified", "session logs", "move all",
+      "timeline dependent entries", "log files in coding", "last two sessions",
+      "session classification work", "classification strategy", "fast classifier"
+    ],
+    "secondary": [
+      "multi-agent", "7-agent", "agent system", "unified agent", "agent-agnostic",
+      "DeduplicationAgent", "DocumentationAgent", "CoordinatorAgent",
+      "WebSearchAgent", "KnowledgeGraphAgent", "SemanticAnalysisAgent",
+      "JSON-RPC", "MQTT", "mqtt broker", "json-rpc server",
+      "copilot integration", "vscode integration", "@KM",
+      "insight orchestrator", "insight-orchestrator",
+      "workflow status", "get_system_status", "get_workflow_status",
+      "entity extraction", "pattern recognition", "cross-project learning",
+      "fallback services", "api keys", "LLM provider",
+      "knowledge flow", "memory systems", "data consistency",
+      "agent detection", "agent registry", "universal launcher",
+      "browser automation", "stagehand", "MCP server",
+      "event sourcing", "workflow orchestration", "multi-interface",
+      "topic-specific files", "bidirectional sync", "runtime storage",
+      "cross-session persistence", "installation system", "service orchestration",
+      "port conflict", "process cleanup", "network detection",
+      "repository mirroring", "platform detection", "VSIX package",
+      "chat participant", "fallback client", "HTTP API",
+      "comprehensive logging", "intelligent routing", "content classification",
+      "embedding analysis", "conversation splitting", "cross-project preservation",
+      "classification via embeddings", "shutdown phase", "coding agent",
+      "fast shut-down phase", "semantically detecting", "session logger",
+      "coding detection", "topics covered", "analysis of topics",
+      "keyword dictionary matching", "dictionary-based classification"
+    ],
+    "file_patterns": [
+      "ukb", "vkb", "ckb", 
+      "simplified-session-logger", "post-session-logger", "multi-topic-session-logger",
+      "adaptive-classifier", "embedding-classifier", "fast-keyword-classifier",
+      "insight-orchestrator", "conversation-analyzer", "claude-conversation-analyzer",
+      "sync-shared-knowledge", "migrate-to-multi-team",
+      "semantic-analysis", "knowledge-management", "start-services",
+      "agent-adapter", "agent-detector", "agent-registry",
+      "mcp-server-semantic-analysis", "browser-access", "vscode-km-copilot",
+      "ukb-cli.js", "vkb-cli.js", "install.sh",
+      "post-session-logger.js", "conversation-extractor.js",
+      "coding-keywords.json", "session-index.json"
+    ],
+    "path_patterns": [
+      "/coding/", "/Agentic/coding/",
+      "knowledge-management/", "semantic-analysis-system/",
+      "scripts/", "bin/coding", "bin/ukb", "bin/vkb", "integrations/",
+      ".specstory/history/", "mcp-server-", "browser-access/",
+      "vscode-km-copilot/", "fallbacks/", "lib/knowledge-api/",
+      "memory-visualizer/", "docs/", "insights/"
+    ],
+    "mcp_patterns": [
+      "mcp__memory", "mcp__semantic-analysis", "mcp__browser-access",
+      "create_entities", "search_nodes", "read_graph", "update_entities",
+      "determine_insights", "lessons_learned", "get_system_status",
+      "get_workflow_status", "search_knowledge", "update_knowledge_base"
+    ],
+    "system_concepts": [
+      "unified architecture", "multi-agent system", "knowledge graph",
+      "semantic analysis agents", "synchronization agent", "coordination agent",
+      "web search agent", "documentation agent", "deduplication agent",
+      "MCP integration", "VSCode integration", "GitHub Copilot",
+      "agent-agnostic design", "multi-database sync", "transparent progress",
+      "universal commands", "service health", "system status",
+      "workflow monitoring", "real-time logging", "cross-platform support",
+      "zero configuration", "hot reloading", "rich diagnostics"
+    ],
+    "technical_terms": [
+      "JSON-RPC server", "MQTT broker", "stdio transport", "HTTP fallback",
+      "event sourcing", "workflow orchestration", "process management",
+      "port management", "service discovery", "health checks",
+      "API key fallback", "LLM provider", "embedding models",
+      "vector similarity", "semantic search", "graph traversal",
+      "node relationships", "entity types", "significance scoring",
+      "conversation parsing", "exchange detection", "content routing",
+      "timestamp extraction", "session splitting", "log classification"
+    ]
+  },
+  "exclusion_patterns": [
+    "timeline visualization", "3D timeline", "Three.js timeline", "Three.js",
+    "Kotlin Compose", "KMP migration", "composeApp", "Kotlin Multiplatform",
+    "TimelineEvent", "TimelineVisualization", "Timeline3DView",
+    "WebGL", "canvas rendering", "3D scene", "camera controls",
+    "timeline markers", "commit visualization", "git history visualization",
+    "Redux timeline", "timeline state", "timeline data",
+    "Compose Multiplatform", "jsMain", "commonMain", "androidMain", "iosMain"
+  ],
+  "classification_rules": {
+    "minimum_score": 4,
+    "primary_weight": 3,
+    "secondary_weight": 1,
+    "file_pattern_weight": 2,
+    "path_pattern_weight": 2,
+    "mcp_pattern_weight": 3,
+    "system_concept_weight": 2,
+    "technical_term_weight": 1,
+    "exclusion_penalty": -5,
+    "processing_timeout_ms": 10
+  },
+  "analysis_focus": [
+    "session classification", "log organization", "content routing",
+    "agent system development", "knowledge management workflows",
+    "MCP server implementation", "integration development",
+    "tool creation", "script automation", "system architecture"
+  ]
+}

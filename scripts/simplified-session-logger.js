@@ -11,7 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
-import { AdaptiveEmbeddingClassifier } from './adaptive-embedding-classifier.cjs';
+import FastKeywordClassifier from './fast-keyword-classifier.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,10 +20,8 @@ class SimplifiedSessionLogger {
   constructor(projectPath, codingRepo) {
     this.projectPath = projectPath;
     this.codingRepo = codingRepo;
-    this.classifier = new AdaptiveEmbeddingClassifier(
-      '/Users/q284340/Agentic/coding',
-      [this.projectPath] // Include current project path for learning
-    );
+    // Use fast keyword classifier for 2-3 second classification
+    this.classifier = new FastKeywordClassifier();
     
     // Generate single timestamp for both files
     const now = new Date();
@@ -50,7 +48,8 @@ class SimplifiedSessionLogger {
       }
       
       // Classify content to determine file creation strategy
-      const classificationResult = await this.classifier.classifyContent(extractedConversation);
+      // Fast keyword-based classification (2-3 seconds max)
+      const classificationResult = this.classifier.classifyContent(extractedConversation, this.projectPath);
       console.log(`🔍 Classification result:`, JSON.stringify(classificationResult, null, 2));
       
       if (classificationResult.classification === 'coding') {
