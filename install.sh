@@ -707,7 +707,65 @@ setup_mcp_config() {
     cp "$temp_file" "$CODING_REPO/claude-code-mcp-processed.json"
     info "Processed configuration saved to: claude-code-mcp-processed.json"
     
-    # Copy to user's Claude configuration directory
+    # Setup USER-LEVEL cross-project configuration
+    setup_user_level_mcp_config "$temp_file"
+    
+    # Setup project-level configuration (legacy support)
+    setup_project_level_mcp_config "$temp_file"
+    
+    # Clean up
+    rm -f "$temp_file"
+    
+    success "MCP configuration setup completed"
+}
+
+# Setup user-level MCP configuration for cross-project use
+setup_user_level_mcp_config() {
+    local temp_file="$1"
+    
+    echo -e "\n${CYAN}📋 Setting up user-level MCP configuration (cross-project)...${NC}"
+    
+    # Read existing user configuration if it exists
+    local user_config="$HOME/.claude.json"
+    local user_config_backup=""
+    
+    if [[ -f "$user_config" ]]; then
+        # Create backup
+        user_config_backup="$user_config.backup.$(date +%Y%m%d_%H%M%S)"
+        cp "$user_config" "$user_config_backup"
+        info "Backed up existing configuration to: $user_config_backup"
+        
+        # Merge with existing configuration
+        local merged_config=$(mktemp)
+        
+        # Use jq to merge configurations, giving priority to new MCP servers
+        if command -v jq >/dev/null 2>&1; then
+            jq -s '.[0] * .[1]' "$user_config" "$temp_file" > "$merged_config"
+            cp "$merged_config" "$user_config"
+            rm -f "$merged_config"
+            success "Merged MCP configuration with existing user config"
+        else
+            # Fallback: overwrite mcpServers section only
+            warning "jq not found, using simple merge (may overwrite existing MCP servers)"
+            cp "$temp_file" "$user_config"
+        fi
+    else
+        # No existing config, just copy
+        cp "$temp_file" "$user_config"
+        success "Created new user-level configuration"
+    fi
+    
+    info "User-level MCP configuration: $user_config"
+    echo -e "${GREEN}✅ This configuration will work in ALL your projects${NC}"
+}
+
+# Setup project-level MCP configuration (legacy support)
+setup_project_level_mcp_config() {
+    local temp_file="$1"
+    
+    echo -e "\n${CYAN}📁 Setting up project-level MCP configuration...${NC}"
+    
+    # Copy to user's Claude configuration directory (legacy app-specific config)
     local claude_config_dir=""
     case "$PLATFORM" in
         macos)
@@ -726,16 +784,10 @@ setup_mcp_config() {
     
     if [[ -n "$claude_config_dir" ]] && [[ -d "$claude_config_dir" ]]; then
         cp "$temp_file" "$claude_config_dir/claude-code-mcp.json"
-        success "MCP configuration installed to Claude app at: $claude_config_dir/claude-code-mcp.json"
+        info "Also installed to Claude app directory: $claude_config_dir/claude-code-mcp.json"
     else
-        warning "Claude configuration directory not found at: $claude_config_dir"
-        warning "Please manually copy claude-code-mcp-processed.json to your Claude configuration directory."
+        info "Claude app directory not found (this is normal for CLI-only usage)"
     fi
-    
-    # Clean up
-    rm -f "$temp_file"
-    
-    success "MCP configuration setup completed"
 }
 
 # Initialize shared memory

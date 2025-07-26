@@ -1,0 +1,30 @@
+{
+  "name": "@coding/mcp-server-semantic-analysis",
+  "version": "1.0.0",
+  "description": "MCP server for semantic analysis and knowledge management",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "mcp-server-semantic-analysis": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc && shx chmod +x dist/*.js",
+    "watch": "tsc --watch",
+    "dev": "npm run build && node dist/index.js",
+    "test": "npm run build && node dist/test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.3",
+    "@anthropic-ai/sdk": "^0.57.0",
+    "openai": "^4.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "shx": "^0.3.4", 
+    "typescript": "^5.8.3"
+  }
+}

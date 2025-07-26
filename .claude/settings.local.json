@@ -129,7 +129,8 @@
       "Bash(sal:*)",
       "mcp__semantic-analysis__analyze_code",
       "mcp__semantic-analysis__test_connection",
-      "Bash(./start-services.sh:*)"
+      "Bash(./start-services.sh:*)",
+      "Bash(journalctl:*)"
     ],
     "deny": []
   }
