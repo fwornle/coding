@@ -43,22 +43,28 @@ package "MCP Integration Layer" {
   end note
 }
 
-package "Communication Infrastructure" <<infra>> {
-  component [MQTT Broker] as MQTT
-  component [JSON-RPC Server] as RPC
+package "External Services" <<external>> {
+  cloud [Custom LLM] as Custom
+  cloud [Anthropic Claude] as Anthropic
+  cloud [OpenAI GPT] as OpenAI
+  cloud [Web Search APIs] as WebAPIs
   
-  note right of MQTT
-    Port: 1883
-    • Event-driven communication
-    • Async agent coordination
-    • Workflow notifications
+  note right of Custom
+    • Primary LLM provider
+    • Custom endpoints
+    • Flexible configuration
   end note
   
-  note right of RPC
-    Port: 8080
-    • Sync request-response
-    • Direct method calls
-    • Status queries
+  note right of Anthropic
+    • Secondary LLM provider
+    • Content analysis
+    • Insight generation
+  end note
+  
+  note right of OpenAI
+    • Fallback LLM provider
+    • Provider redundancy
+    • Cost optimization
   end note
 }
 
@@ -84,10 +90,6 @@ package "Knowledge Management" {
   cloud "MCP Memory" as MCPMemory <<external>>
 }
 
-package "LLM Integration" {
-  cloud "Claude API" as ClaudeAPI <<external>>
-  cloud "OpenAI API" as OpenAIAPI <<external>>
-}
 
 ' User connections
 Claude -[#4A90E2]-> MCP : tool calls
@@ -96,29 +98,18 @@ VSCode -[#43A047,dashed]-> HTTP : WebSocket
 CLIUser -[#4A90E2]-> UKB : commands
 CLIUser -[#4A90E2]-> VKB : commands
 
-' MCP layer connections
-MCP -[#43A047,dashed]-> MQTT : events
-MCP -[#4A90E2]-> RPC : sync calls
-Bridge -[#43A047,dashed]-> MQTT : events
-Bridge -[#4A90E2]-> RPC : sync calls
-HTTP -[#FF9800]-> Bridge : semantic analysis
+' MCP layer connections (Node.js direct calls)
+MCP -[#4A90E2]-> CoordinatorAgent : workflow execution
+HTTP -[#FF9800]-> CoordinatorAgent : API requests
+Bridge -[#43A047,dashed]-> CoordinatorAgent : semantic analysis
 
-' Enhanced agent connections
-MQTT -[#FF9800]-> SemanticAgent : event bus
-MQTT -[#FF9800]-> WebAgent : event bus
-MQTT -[#FF9800]-> KnowledgeAgent : event bus
-MQTT -[#FF9800]-> CoordinatorAgent : event bus
-MQTT -[#FF9800]-> SyncAgent : event bus ✨
-MQTT -[#FF9800]-> DedupAgent : event bus ✨
-MQTT -[#FF9800]-> DocAgent : event bus
-
-RPC -[#4A90E2]-> SemanticAgent : RPC calls
-RPC -[#4A90E2]-> WebAgent : RPC calls
-RPC -[#4A90E2]-> KnowledgeAgent : RPC calls
-RPC -[#4A90E2]-> CoordinatorAgent : RPC calls
-RPC -[#4A90E2]-> SyncAgent : RPC calls ✨
-RPC -[#4A90E2]-> DedupAgent : RPC calls ✨
-RPC -[#4A90E2]-> DocAgent : RPC calls
+' Enhanced agent connections (Node.js direct calls)
+CoordinatorAgent -[#FF9800]-> SemanticAgent : orchestrates
+CoordinatorAgent -[#FF9800]-> WebAgent : coordinates
+CoordinatorAgent -[#FF9800]-> KnowledgeAgent : manages
+CoordinatorAgent -[#FF9800]-> SyncAgent : ensures consistency ✨
+CoordinatorAgent -[#FF9800]-> DedupAgent : prevents duplicates ✨
+CoordinatorAgent -[#FF9800]-> DocAgent : generates docs
 
 ' Enhanced knowledge connections
 KnowledgeAgent -[#FF9800]-> SharedMemory : read/write
@@ -130,9 +121,11 @@ MCPMemory -[#43A047,dashed]-> SharedMemory : sync
 SyncAgent -[#43A047,dashed]-> MCPMemory : graph DB sync ✨
 
 ' Enhanced LLM connections
-SemanticAgent -[#4A90E2]-> ClaudeAPI : analysis
-SemanticAgent -[#757575,dotted]-> OpenAIAPI : fallback
-DedupAgent -[#4A90E2]-> OpenAIAPI : embeddings ✨
-DocAgent -[#4A90E2]-> ClaudeAPI : documentation ✨
+SemanticAgent -[#4A90E2]-> Custom : primary analysis
+SemanticAgent -[#FF9800]-> Anthropic : secondary analysis
+SemanticAgent -[#757575,dotted]-> OpenAI : fallback
+DedupAgent -[#4A90E2]-> OpenAI : embeddings ✨
+DocAgent -[#4A90E2]-> Custom : documentation ✨
+WebAgent -[#43A047,dashed]-> WebAPIs : search
 
 @enduml

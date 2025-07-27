@@ -20,7 +20,7 @@ Claude Code integration setup, MCP server configuration, and tool registration.
 ### 🏗️ Architecture & Design
 
 #### [Unified System Overview](architecture/unified-system-overview.md)
-Complete unified architecture: 7-agent system serving both Claude Code and CoPilot.
+Complete unified architecture: 8-agent system serving both Claude Code and CoPilot.
 
 #### [Unified Knowledge Flow](architecture/unified-knowledge-flow.md)
 How knowledge flows through the unified agent system with SynchronizationAgent authority.
@@ -48,8 +48,8 @@ How the system detects and selects between Claude Code and GitHub CoPilot.
 - **[API Reference](components/vkb/api-reference.md)** - HTTP API endpoints
 
 #### Unified Semantic Analysis System 🤖 (7-Agent)
-- **[Overview](components/semantic-analysis/README.md)** - Unified 7-agent system serving both Claude Code and CoPilot
-- **[Unified Architecture](components/semantic-analysis/unified-architecture.md)** - Complete 7-agent system architecture
+- **[Overview](components/semantic-analysis/README.md)** - Unified 8-agent system serving both Claude Code and CoPilot
+- **[Unified Architecture](components/semantic-analysis/unified-architecture.md)** - Complete 8-agent system architecture
 - **[SynchronizationAgent](components/semantic-analysis/synchronization-agent.md)** - Single source of truth implementation
 - **[Installation Guide](components/semantic-analysis/installation.md)** - Complete setup and configuration
 - **[Use Cases](components/semantic-analysis/use-cases.md)** - Unified command examples and workflows
@@ -99,7 +99,7 @@ All architectural diagrams are available in two formats:
 
 #### Key Diagrams
 - **[Unified Architecture](images/unified-semantic-architecture.png)** - Complete unified system with SynchronizationAgent
-- **[7-Agent System](images/unified-7-agent-system.png)** - Specialized agents serving both Claude and CoPilot
+- **[8-Agent System](images/unified-8-agent-system.png)** - Specialized agents serving both Claude and CoPilot
 - **[UKB-CLI Architecture](images/ukb-cli-architecture.png)** - Knowledge capture system
 - **[Communication Patterns](images/semantic-analysis-communication.png)** - Agent communication
 - **[Knowledge Schema](puml/knowledge-schema.png)** - Data structures and relationships

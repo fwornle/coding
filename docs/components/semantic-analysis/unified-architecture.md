@@ -1,8 +1,8 @@
-# Unified 7-Agent System Architecture
+# Unified 8-Agent System Architecture
 
 ## Overview
 
-The unified semantic analysis system consists of **7 specialized agents** that work together to provide comprehensive code analysis, knowledge extraction, and intelligent insights. This same agent system serves both Claude Code (via MCP tools) and GitHub CoPilot (via VSCode integration), ensuring consistent analysis quality regardless of the AI coding assistant being used.
+The unified semantic analysis system consists of **8 specialized agents** that work together to provide comprehensive code analysis, knowledge extraction, and intelligent insights. This same agent system serves both Claude Code (via MCP tools) and GitHub CoPilot (via VSCode integration), ensuring consistent analysis quality regardless of the AI coding assistant being used.
 
 ## Agent System Philosophy
 
@@ -24,9 +24,9 @@ The unified semantic analysis system consists of **7 specialized agents** that w
 - Automatic recovery and retry mechanisms
 - Health monitoring and diagnostics
 
-## 7-Agent Architecture
+## 8-Agent Architecture
 
-![7-Agent System Architecture](../../images/unified-7-agent-system.png)
+![8-Agent System Architecture](../../images/unified-8-agent-system.png)
 
 ### 1. Coordinator Agent
 **Role**: Workflow orchestration and management
@@ -512,7 +512,7 @@ get_system_status
 
 ### Integration Testing
 ```typescript
-describe('7-Agent System Integration', () => {
+describe('8-Agent System Integration', () => {
   it('should complete full workflow', async () => {
     const workflow = await coordinator.startWorkflow('repository-analysis', {
       repository: './test-repo',

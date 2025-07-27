@@ -27,12 +27,14 @@ The Semantic Analysis System is a comprehensive distributed agent framework desi
 ## Quick Start
 
 ```bash
-# Start the enhanced agent system
-npm run start:agents
+# Start Claude Code with integrated MCP server
+claude-mcp
 
-# Start MCP server (for Claude Code integration)
-npm run start:mcp
+# The semantic analysis server starts automatically
+# Access all 12 tools and 7 agents through Claude Code
 ```
+
+> **📋 Standalone Server**: The semantic analysis system is now available as a [standalone Node.js MCP server](../../../integrations/mcp-server-semantic-analysis/) with comprehensive documentation.
 
 ## Enhanced Architecture
 
@@ -222,7 +224,13 @@ The semantic analysis system **complements** rather than **replaces** the tradit
 
 ## Related Documentation
 
-### Semantic Analysis System
+### 🚀 Standalone MCP Server
+- **[MCP Server Documentation](../../../integrations/mcp-server-semantic-analysis/README.md)** - Complete standalone server documentation
+- **[Installation Guide](../../../integrations/mcp-server-semantic-analysis/docs/installation/README.md)** - Detailed setup and configuration
+- **[Architecture Details](../../../integrations/mcp-server-semantic-analysis/docs/architecture/README.md)** - Technical architecture and design patterns
+- **[API Reference](../../../integrations/mcp-server-semantic-analysis/docs/api/README.md)** - Complete tool and agent API documentation
+
+### Legacy Semantic Analysis System
 - [Enhanced Architecture](./enhanced-architecture.md) - Complete enhanced system architecture
 - [Architecture Details](./architecture.md) - Original technical architecture
 - [API Reference](./api-reference.md) - Complete API documentation

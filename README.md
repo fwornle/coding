@@ -25,7 +25,7 @@ A comprehensive AI-powered development toolkit featuring **unified multi-agent s
 
 The system provides:
 
-- **🤖 Unified Multi-Agent System** - 7 specialized agents for comprehensive analysis
+- **🤖 Unified Multi-Agent System** - 8 specialized agents for comprehensive analysis
 - **🔄 Single SynchronizationAgent** - Sole authority for data integrity across all systems
 - **📊 Universal Command Interface** - `determine_insights`, `update_knowledge_base`, `lessons_learned`
 - **🎯 Agent-Agnostic Design** - Same functionality in Claude Code (MCP) and CoPilot (VSCode)
@@ -41,7 +41,8 @@ The system provides:
 
 ### Unified Semantic Analysis System
 
-- **[7-Agent System Architecture](docs/components/semantic-analysis/unified-architecture.md)** - Complete agent ecosystem
+- **[MCP Server Documentation](integrations/mcp-server-semantic-analysis/README.md)** - Standalone Node.js MCP server (12 tools, 8 agents)
+- **[8-Agent System Architecture](docs/components/semantic-analysis/unified-architecture.md)** - Complete agent ecosystem
 - **[MCP Integration](docs/components/semantic-analysis/mcp-server-setup.md)** - Claude Code unified tools
 - **[VSCode Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced CoPilot with same agents
 - **[SynchronizationAgent](docs/components/semantic-analysis/synchronization-agent.md)** - Single source of truth
@@ -65,6 +66,10 @@ The system provides:
 - **[UKB-CLI Documentation](docs/ukb/)** - Knowledge capture system
 - **[VKB-CLI Documentation](docs/vkb/)** - Knowledge visualization
 - **[Semantic Analysis System](docs/components/semantic-analysis/)** - AI analysis agents
+- **[MCP Server](integrations/mcp-server-semantic-analysis/)** - Standalone Node.js semantic analysis server
+  - **[Installation Guide](integrations/mcp-server-semantic-analysis/docs/installation/README.md)** - Complete setup and configuration
+  - **[Architecture Details](integrations/mcp-server-semantic-analysis/docs/architecture/README.md)** - Technical architecture and design patterns
+  - **[API Reference](integrations/mcp-server-semantic-analysis/docs/api/README.md)** - Complete tool and agent API documentation
 
 ### 🎯 Use Cases & Workflows
 
@@ -91,7 +96,7 @@ The system provides:
 
 ### Unified Agent System Design
 
-- **Single Agent Infrastructure**: Both Claude and CoPilot use the SAME 7-agent system
+- **Single Agent Infrastructure**: Both Claude and CoPilot use the SAME 8-agent system
 - **Unified Commands**: `determine_insights`, `update_knowledge_base`, `lessons_learned` work everywhere
 - **SynchronizationAgent Authority**: Single source of truth for data integrity
 - **Auto-Detection**: Automatically uses the best available AI agent
@@ -99,7 +104,7 @@ The system provides:
 
 ### Unified Semantic Analysis
 
-- **7 Specialized Agents**: Semantic Analysis, Knowledge Graph, Coordinator, Web Search, Synchronization, Deduplication, Documentation
+- **8 Specialized Agents**: Coordinator, Semantic Analysis, Repository Analyzer, Knowledge Graph, Web Search, Synchronization, Deduplication, Documentation
 - **Code & Conversation Analysis**: Comprehensive pattern recognition from code and AI interactions
 - **Cross-Project Learning**: Unified knowledge accumulation across all projects and AI sessions
 - **Multi-Modal Insights**: Combines repository analysis, conversation logs, and web research
@@ -192,7 +197,7 @@ lessons_learned {
 @KM lessons learned "Recent debugging session" --focus patterns,failures,solutions
 ```
 
-*Both commands trigger the same 7-agent workflow for comprehensive learning extraction*
+*Both commands trigger the same 8-agent workflow for comprehensive learning extraction*
 
 ### 4. Search Unified Knowledge Base
 
@@ -235,7 +240,7 @@ get_workflow_status {"workflowId": "analysis-123"}
 @KM workflow status analysis-123
 ```
 
-*Real-time visibility into all 7 agents: Semantic Analysis → Knowledge Graph → Coordinator → Web Search → Synchronization → Deduplication → Documentation*
+*Real-time visibility into all 8 agents: Coordinator → Semantic Analysis → Repository Analyzer → Knowledge Graph → Web Search → Synchronization → Deduplication → Documentation*
 
 ### 6. Fallback Mode (No API Keys)
 
@@ -299,10 +304,10 @@ DEFAULT_LLM_PROVIDER=claude
 
 ### Service Architecture
 
-- **MQTT Broker**: Port 1883 (async agent communication)
-- **JSON-RPC Server**: Port 8080 (sync method calls)
+- **MCP Server**: Node.js process (Claude Code semantic analysis)
 - **VKB Web Server**: Port 8080 (knowledge visualization)
 - **CoPilot HTTP Server**: Port 8765 (VSCode integration)
+- **Knowledge Databases**: MCP Memory, Graphology, shared-memory.json
 
 ## 📖 Historical Context
 

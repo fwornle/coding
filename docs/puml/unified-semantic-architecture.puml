@@ -13,9 +13,10 @@ package "Unified Interface Layer" {
   [HTTP API Server\nVSCode Integration] <<api>> as http
 }
 
-package "Single Agent System Infrastructure" {
+package "Single Agent System Infrastructure (8 Agents)" {
   [Coordinator Agent\n(Orchestrates workflows)] <<agent>> as coordinator
   [Semantic Analysis Agent\n(Code & conversation analysis)] <<agent>> as semantic
+  [Repository Analyzer\n(Repository structure analysis)] <<agent>> as repo
   [Knowledge Graph Agent\n(Entity & relationship extraction)] <<agent>> as knowledge
   [Web Search Agent\n(Documentation research)] <<agent>> as web
   [SynchronizationAgent\n(SINGLE SOURCE OF TRUTH)] <<agent>> as sync
@@ -29,9 +30,11 @@ package "Multi-Database Storage" {
   database "shared-memory.json\n(Git-tracked persistence)" <<storage>> as sharedmem
 }
 
-package "Communication Infrastructure" {
-  [MQTT Broker\n(Agent messaging)] <<infra>> as mqtt
-  [JSON-RPC Server\n(Synchronous calls)] <<infra>> as rpc
+package "External Services" {
+  cloud "Custom LLM\n(Primary Provider)" <<external>> as custom
+  cloud "Anthropic Claude\n(Secondary Provider)" <<external>> as anthropic
+  cloud "OpenAI GPT\n(Fallback Provider)" <<external>> as openai
+  cloud "Web Search APIs\n(DuckDuckGo)" <<external>> as websearch
 }
 
 package "Visualization & Monitoring" {
@@ -41,38 +44,39 @@ package "Visualization & Monitoring" {
 }
 
 ' User connections
-claude SYNC_LINE mcp : "MCP Protocol"
-copilot SYNC_LINE http : "HTTP/WebSocket"
+claude --> mcp : "MCP Protocol"
+copilot --> http : "HTTP/WebSocket"
 
 ' Interface to agent system
-mcp CONTROL_LINE coordinator : "Start workflows"
-http CONTROL_LINE coordinator : "API requests"
+mcp --> coordinator : "Start workflows"
+http --> coordinator : "API requests"
 
-' Agent system internal communication
-coordinator CONTROL_LINE semantic : "Analyze code/conversation"
-coordinator CONTROL_LINE knowledge : "Extract entities"
-coordinator CONTROL_LINE web : "Research topics"
-coordinator CONTROL_LINE sync : "Ensure consistency"
-semantic DATA_LINE dedup : "Check duplicates"
-knowledge DATA_LINE docs : "Generate documentation"
+' Agent system internal communication (Node.js direct calls)
+coordinator --> semantic : "Analyze code/conversation"
+coordinator --> repo : "Scan repository"
+coordinator --> knowledge : "Extract entities"
+coordinator --> web : "Research topics"
+coordinator --> sync : "Ensure consistency"
+semantic --> dedup : "Check duplicates"
+repo --> knowledge : "Structure analysis"
+knowledge --> docs : "Generate documentation"
 
 ' SynchronizationAgent is the single authority
-sync DATA_LINE mcpmem : "Sync to MCP"
-sync DATA_LINE graphology : "Sync to Graphology"
-sync DATA_LINE sharedmem : "Sync to files"
+sync --> mcpmem : "Sync to MCP"
+sync --> graphology : "Sync to Graphology"
+sync --> sharedmem : "Sync to files"
 
-' Agent communication infrastructure
-semantic ASYNC_LINE mqtt : "Message bus"
-knowledge ASYNC_LINE mqtt
-web ASYNC_LINE mqtt
-coordinator SYNC_LINE rpc : "Sync calls"
-sync SYNC_LINE rpc
+' External service connections
+semantic ..> custom : "Primary LLM"
+semantic ..> anthropic : "Secondary LLM"
+semantic .> openai : "Fallback LLM"
+web ..> websearch : "Documentation Search"
 
 ' Visualization and monitoring
-vkb DATA_LINE sharedmem : "Read unified data"
-vkb OPTIONAL_LINE graphology : "Live graph data"
-logging OPTIONAL_LINE mqtt : "Monitor agent activity"
-status OPTIONAL_LINE coordinator : "Health checks"
+vkb --> sharedmem : "Read unified data"
+vkb ..> graphology : "Live graph data"
+logging ..> coordinator : "Monitor agent activity"
+status ..> coordinator : "Health checks"
 
 note top of sync
   **CRITICAL**: SynchronizationAgent is the 
@@ -82,15 +86,19 @@ end note
 
 note bottom of coordinator
   **UNIFIED**: Both Claude Code and CoPilot use
-  the SAME 7-agent system for all analysis,
+  the SAME 8-agent system for all analysis,
   ensuring consistent results regardless of AI assistant
 end note
 
 note right of mcp
-  MCP Tools:
+  12 MCP Tools:
   • determine_insights
-  • update_knowledge_base  
-  • lessons_learned
+  • analyze_code/repository
+  • extract_patterns
+  • create_ukb_entity
+  • execute_workflow
+  • generate_documentation
+  • + 6 more tools
 end note
 
 note right of http
@@ -98,6 +106,22 @@ note right of http
   • @KM commands
   • REST API endpoints
   • WebSocket connections
+end note
+
+note right of custom
+  **3-Tier Provider Chain**:
+  • Custom LLM (Primary)
+  • Anthropic Claude (Secondary)
+  • OpenAI GPT (Fallback)
+  • Graceful degradation
+end note
+
+note right of anthropic
+  **Node.js Architecture**:
+  • Direct TypeScript calls
+  • No MQTT/JSON-RPC overhead
+  • Stable connections
+  • Provider fallback chain
 end note
 
 @enduml
