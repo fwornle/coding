@@ -421,14 +421,14 @@ install_browserbase() {
     fi
     
     # Only proceed with build if we have the repository
-    if [[ -d "$BROWSERBASE_DIR/stagehand" ]]; then
-        info "Installing stagehand dependencies..."
-        cd "$BROWSERBASE_DIR/stagehand"
-        npm install || warning "Failed to install stagehand dependencies"
-        npm run build || warning "Failed to build stagehand"
-        success "Stagehand (browserbase) installed successfully"
+    if [[ -d "$BROWSERBASE_DIR" ]]; then
+        info "Installing browserbase dependencies (includes stagehand)..."
+        cd "$BROWSERBASE_DIR"
+        npm install || warning "Failed to install browserbase dependencies"
+        npm run build || warning "Failed to build browserbase"
+        success "Browserbase with Stagehand installed successfully"
     else
-        warning "Browserbase repository not available - skipping stagehand build"
+        warning "Browserbase repository not available - skipping build"
     fi
     
     cd "$CODING_REPO"
@@ -675,6 +675,8 @@ setup_mcp_config() {
     sed -i.bak "s|{{ANTHROPIC_API_KEY}}|${ANTHROPIC_API_KEY:-}|g" "$temp_file"
     sed -i.bak "s|{{OPENAI_API_KEY}}|${OPENAI_API_KEY:-}|g" "$temp_file"
     sed -i.bak "s|{{OPENAI_BASE_URL}}|${OPENAI_BASE_URL:-}|g" "$temp_file"
+    sed -i.bak "s|{{KNOWLEDGE_BASE_PATH}}|${KNOWLEDGE_BASE_PATH:-$CODING_REPO/knowledge-management/insights}|g" "$temp_file"
+    sed -i.bak "s|{{CODING_DOCS_PATH}}|${CODING_DOCS_PATH:-$CODING_REPO/docs}|g" "$temp_file"
     
     # Save the processed version locally
     cp "$temp_file" "$CODING_REPO/claude-code-mcp-processed.json"

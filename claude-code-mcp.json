@@ -20,6 +20,8 @@
       "args": ["{{CODING_TOOLS_PATH}}/integrations/mcp-server-semantic-analysis/dist/index.js"],
       "env": {
         "CODING_TOOLS_PATH": "{{CODING_TOOLS_PATH}}",
+        "KNOWLEDGE_BASE_PATH": "{{KNOWLEDGE_BASE_PATH}}",
+        "CODING_DOCS_PATH": "{{CODING_DOCS_PATH}}",
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}",
         "OPENAI_API_KEY": "{{OPENAI_API_KEY}}"
       }

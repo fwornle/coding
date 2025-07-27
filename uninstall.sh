@@ -114,6 +114,38 @@ rm -f "$CODING_REPO/install.log" 2>/dev/null || true
 rm -f /tmp/ukb-*.log 2>/dev/null || true
 rm -f /tmp/vkb-server.* 2>/dev/null || true
 
+# Remove MCP configuration files
+echo -e "\n${BLUE}🔧 Removing MCP configuration files...${NC}"
+rm -f "$CODING_REPO/claude-code-mcp-processed.json" 2>/dev/null || true
+
+# Remove user-level MCP configuration (optional - ask user)
+echo ""
+read -p "Remove user-level MCP configuration? This affects all projects using Claude Code. (y/N) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    USER_MCP_CONFIG="$HOME/.config/claude-code-mcp.json"
+    if [[ -f "$USER_MCP_CONFIG" ]]; then
+        rm -f "$USER_MCP_CONFIG"
+        echo "  Removed user-level MCP configuration"
+    fi
+    
+    # Remove from Claude app directory
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        CLAUDE_CONFIG_DIR="$HOME/Library/Application Support/Claude"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        CLAUDE_CONFIG_DIR="$HOME/.config/Claude"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+        CLAUDE_CONFIG_DIR="${APPDATA:-$HOME/AppData/Roaming}/Claude"
+    fi
+    
+    if [[ -n "$CLAUDE_CONFIG_DIR" ]] && [[ -f "$CLAUDE_CONFIG_DIR/claude-code-mcp.json" ]]; then
+        rm -f "$CLAUDE_CONFIG_DIR/claude-code-mcp.json"
+        echo "  Removed Claude app MCP configuration"
+    fi
+else
+    echo "  Keeping user-level MCP configuration"
+fi
+
 echo -e "\n${GREEN}✅ Uninstall completed!${NC}"
 echo -e "${GREEN}📊 Your knowledge data has been preserved:${NC}"
 echo "   $CODING_REPO/shared-memory.json (if exists)"

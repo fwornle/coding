@@ -280,6 +280,20 @@ else
     print_fixed "CODING_REPO set to $CODING_ROOT"
 fi
 
+print_check "KNOWLEDGE_BASE_PATH variable"
+if [ -n "$KNOWLEDGE_BASE_PATH" ]; then
+    print_pass "KNOWLEDGE_BASE_PATH set to: $KNOWLEDGE_BASE_PATH"
+else
+    print_info "KNOWLEDGE_BASE_PATH not set (will use default: $CODING_ROOT/knowledge-management/insights)"
+fi
+
+print_check "CODING_DOCS_PATH variable"
+if [ -n "$CODING_DOCS_PATH" ]; then
+    print_pass "CODING_DOCS_PATH set to: $CODING_DOCS_PATH"
+else
+    print_info "CODING_DOCS_PATH not set (will use default: $CODING_ROOT/docs)"
+fi
+
 # Check PATH
 print_check "PATH includes coding tools"
 if echo "$PATH" | grep -q "$CODING_ROOT"; then
@@ -700,7 +714,7 @@ print_test "MCP configuration"
 
 print_check "MCP configuration files"
 MCP_CONFIG_TEMPLATE="$CODING_ROOT/claude-code-mcp.json"
-MCP_CONFIG_PROCESSED="$CODING_ROOT/scripts/claude-code-mcp-processed.json"
+MCP_CONFIG_PROCESSED="$CODING_ROOT/claude-code-mcp-processed.json"
 
 if file_exists "$MCP_CONFIG_TEMPLATE"; then
     print_pass "MCP config template found"
@@ -710,6 +724,24 @@ fi
 
 if file_exists "$MCP_CONFIG_PROCESSED"; then
     print_pass "MCP processed config found"
+    
+    # Check if the processed config includes the new environment variables
+    print_check "MCP config environment variables"
+    if grep -q "KNOWLEDGE_BASE_PATH" "$MCP_CONFIG_PROCESSED" 2>/dev/null; then
+        print_pass "MCP config includes KNOWLEDGE_BASE_PATH"
+    else
+        print_warning "MCP config missing KNOWLEDGE_BASE_PATH - regenerating..."
+        cd "$CODING_ROOT" && ./install.sh --update-mcp-config
+        print_fixed "MCP configuration updated"
+    fi
+    
+    if grep -q "CODING_DOCS_PATH" "$MCP_CONFIG_PROCESSED" 2>/dev/null; then
+        print_pass "MCP config includes CODING_DOCS_PATH"
+    else
+        print_warning "MCP config missing CODING_DOCS_PATH - regenerating..."
+        cd "$CODING_ROOT" && ./install.sh --update-mcp-config
+        print_fixed "MCP configuration updated"
+    fi
 else
     print_fail "MCP processed config not found"
     print_repair "Generating MCP configuration..."
@@ -773,10 +805,29 @@ if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
         
         print_check "Semantic analysis server test"
         cd "$CODING_ROOT/integrations/mcp-server-semantic-analysis"
+        
+        # Set environment variables for test
+        export KNOWLEDGE_BASE_PATH="${KNOWLEDGE_BASE_PATH:-$CODING_ROOT/knowledge-management/insights}"
+        export CODING_DOCS_PATH="${CODING_DOCS_PATH:-$CODING_ROOT/docs}"
+        export CODING_TOOLS_PATH="$CODING_ROOT"
+        
         if timeout 10 node dist/index.js --test >/dev/null 2>&1; then
             print_pass "Semantic analysis server test successful"
         else
             print_warning "Semantic analysis server test failed (may need API keys)"
+        fi
+        
+        print_check "Environment variables for MCP server"
+        if [ -d "$KNOWLEDGE_BASE_PATH" ] || mkdir -p "$KNOWLEDGE_BASE_PATH" 2>/dev/null; then
+            print_pass "Knowledge base path accessible: $KNOWLEDGE_BASE_PATH"
+        else
+            print_warning "Knowledge base path not accessible: $KNOWLEDGE_BASE_PATH"
+        fi
+        
+        if [ -d "$CODING_DOCS_PATH" ]; then
+            print_pass "Docs path accessible: $CODING_DOCS_PATH"
+        else
+            print_warning "Docs path not found: $CODING_DOCS_PATH"
         fi
     else
         print_repair "Building semantic analysis server..."
