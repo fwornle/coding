@@ -811,7 +811,9 @@ if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
         export CODING_DOCS_PATH="${CODING_DOCS_PATH:-$CODING_ROOT/docs}"
         export CODING_TOOLS_PATH="$CODING_ROOT"
         
-        if timeout 10 node dist/index.js --test >/dev/null 2>&1; then
+        # Test that the server starts and produces expected output
+        SERVER_OUTPUT=$(timeout 3 node dist/index.js 2>&1 | head -n 3)
+        if echo "$SERVER_OUTPUT" | grep -q "Semantic Analysis MCP server is ready"; then
             print_pass "Semantic analysis server test successful"
         else
             print_warning "Semantic analysis server test failed (may need API keys)"
@@ -1056,7 +1058,7 @@ else
 fi
 
 print_check "Documentation diagrams and images"
-KEY_IMAGES=("images/system-architecture.png" "puml/vscode-component-diagram.png" "puml/vscode-extension-flow.png" "images/claude-mcp-autologging.png")
+KEY_IMAGES=("images/system-architecture.png" "images/vscode-component-diagram.png" "images/vscode-extension-flow.png" "images/claude-mcp-autologging.png")
 MISSING_IMAGES=0
 for img in "${KEY_IMAGES[@]}"; do
     if file_exists "$CODING_ROOT/docs/$img"; then
