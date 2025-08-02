@@ -3,7 +3,7 @@
 
 title Repository Pattern Implementation - Technology Integration
 
-component "MCP" as MCP\ncomponent "Claude" as Claude
+component "MCP" as MCP
 
 MCP --> Claude : integrates
 
