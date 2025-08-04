@@ -1,0 +1,62 @@
+@startuml
+
+' Styling
+skinparam componentStyle uml2
+skinparam packageStyle rectangle
+skinparam backgroundColor white
+skinparam roundCorner 10
+
+' Custom styles
+skinparam component {
+  BackgroundColor LightSteelBlue
+  BorderColor DarkSlateGray
+  FontColor DarkSlateGray
+  FontSize 14
+}
+
+skinparam package {
+  BackgroundColor WhiteSmoke
+  BorderColor DarkSlateGray
+  FontColor DarkSlateGray
+}
+
+skinparam note {
+  BackgroundColor LightYellow
+  BorderColor DarkKhaki
+  FontSize 12
+}
+
+' Main diagram
+package "Implementation Patterns" {
+  component [ConfigurationPattern] <<important>> as config
+  note right of config
+    Significance: 9/10
+    Occurrences: 17
+    Trend: Stable
+    Language: JavaScript
+  end note
+}
+
+' Key Components
+component "Configuration Files" as files
+component "Test Scripts" as tests
+component "Integration Services" as services
+component "Logging Infrastructure" as logging
+
+' Relationships
+config --> files : manages
+config --> tests : configures
+config --> services : controls
+config --> logging : configures
+
+' Summary metrics
+note as Summary
+**Pattern Analysis Summary**
+----
+Total Patterns: 1
+Categories: Implementation
+Avg Significance: 9
+Top Pattern: ConfigurationChangesPattern
+end note
+
+@enduml

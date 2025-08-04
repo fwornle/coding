@@ -1,0 +1,78 @@
+@startuml
+
+skinparam packageStyle rectangle
+skinparam class {
+  BackgroundColor #F8F9FA
+  BorderColor #4A4A4A
+  ArrowColor #2C3E50
+}
+
+package "Configuration Pattern Implementation" {
+  class ConfigurationPattern {
+    + name: String
+    + category: String
+    + significance: Integer
+    + occurrences: Integer
+    + trend: String
+    + validateConfig()
+    + applyChanges()
+  }
+
+  class ConfigurationManager {
+    + loadConfig()
+    + saveConfig()
+    + updateSettings()
+  }
+
+  package "Integration Components" {
+    class BrowserAccess {
+      + testBrowserAccess()
+      + validateAccess()
+    }
+
+    class ClaudeIntegration {
+      + initializeSession()
+      + handleCodeSession()
+    }
+  }
+
+  package "Testing Infrastructure" {
+    class TestFramework {
+      + runTests()
+      + validateResults()
+    }
+
+    class ClassifierTests {
+      + testEdgeCases()
+      + testFiltering()
+    }
+  }
+
+  package "Logging System" {
+    class SessionLogger {
+      + logSession()
+      + processLogs()
+    }
+
+    class MultiTopicLogger {
+      + segmentTopics()
+      + consolidateLogs()
+    }
+  }
+}
+
+ConfigurationPattern --> ConfigurationManager
+ConfigurationManager --> BrowserAccess
+ConfigurationManager --> ClaudeIntegration
+ConfigurationPattern --> TestFramework
+TestFramework --> ClassifierTests
+ConfigurationPattern --> SessionLogger
+SessionLogger --> MultiTopicLogger
+
+note right of ConfigurationPattern
+  Significance: 9/10
+  Occurrences: 17
+  Trend: Stable
+end note
+
+@enduml

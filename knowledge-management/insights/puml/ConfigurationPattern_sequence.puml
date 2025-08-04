@@ -1,0 +1,52 @@
+@startuml
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam sequence {
+    ArrowColor #2962FF
+    ActorBorderColor #2962FF
+    LifeLineBorderColor #2962FF
+    ParticipantBorderColor #2962FF
+    ParticipantBackgroundColor #E3F2FD
+}
+
+participant "Configuration\nManager" as CM
+participant "Script\nExecutor" as SE
+participant "Integration\nServices" as IS
+participant "Logger" as LOG
+participant "File System" as FS
+
+CM -> SE: Initialize configuration
+activate CM
+SE -> IS: Load integration settings
+activate IS
+IS --> SE: Settings loaded
+deactivate IS
+
+SE -> FS: Read config files
+activate FS
+note right: .json, .local.json files
+FS --> SE: Configuration data
+deactivate FS
+
+SE -> LOG: Log configuration changes
+activate LOG
+LOG --> SE: Changes recorded
+deactivate LOG
+
+SE --> CM: Configuration ready
+deactivate CM
+
+CM -> IS: Apply configuration
+activate CM
+activate IS
+IS --> CM: Configuration applied
+deactivate IS
+
+CM -> LOG: Record final state
+activate LOG
+LOG --> CM: State recorded
+deactivate LOG
+deactivate CM
+
+@enduml

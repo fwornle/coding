@@ -1,0 +1,78 @@
+@startuml
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam backgroundColor white
+skinparam class {
+    BackgroundColor lightblue
+    BorderColor navy
+    ArrowColor navy
+}
+
+package "Documentation Updates System" {
+    class DocumentationUpdatesPattern {
+        + name: String
+        + category: String
+        + significance: Integer
+        + occurrences: Integer
+        + trend: String
+        + updateDocumentation()
+        + trackChanges()
+        + validateUpdates()
+    }
+
+    class DocumentationAgent {
+        + processUpdates()
+        + synchronizeChanges()
+        + validateContent()
+    }
+
+    class ContentClassifier {
+        + classifyContent()
+        + filterUpdates()
+        + generateEmbeddings()
+    }
+
+    class SessionLogger {
+        + logSession()
+        + postProcessLogs()
+        + segmentTopics()
+    }
+}
+
+package "Integration Components" {
+    class MCPServer {
+        + handleRequests()
+        + coordinateAgents()
+        + manageSync()
+    }
+
+    class RepositoryAnalyzer {
+        + analyzeChanges()
+        + detectPatterns()
+        + generateReports()
+    }
+}
+
+DocumentationUpdatesPattern --> DocumentationAgent
+DocumentationAgent --> ContentClassifier
+DocumentationAgent --> SessionLogger
+MCPServer --> DocumentationAgent
+RepositoryAnalyzer --> DocumentationUpdatesPattern
+
+note right of DocumentationUpdatesPattern
+  Pattern Details:
+  - 13 occurrences
+  - Implementation category
+  - Significance: 7
+  - Trend: Stable
+end note
+
+note bottom of SessionLogger
+  Handles:
+  - Multi-topic sessions
+  - Post-session logging
+  - Session history
+end note
+
+@enduml

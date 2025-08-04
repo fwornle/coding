@@ -1,0 +1,51 @@
+@startuml
+
+skinparam {
+  ActorBackgroundColor #E8F8F5
+  ActorBorderColor #16A085
+  UseCaseBackgroundColor #D4EFDF
+  UseCaseBorderColor #27AE60
+  ArrowColor #2E86C1
+  PackageBackgroundColor transparent
+  PackageBorderColor #95A5A6
+}
+
+title Configuration Pattern Analysis
+
+package "Configuration Management" {
+  actor "Developer" as dev
+  actor "System" as sys
+
+  usecase "Modify Configuration Files" as UC1
+  usecase "Process JSON Configs" as UC2
+  usecase "Handle Settings" as UC3
+  usecase "Manage Service Config" as UC4
+  usecase "Execute Test Scripts" as UC5
+  usecase "Update Integration Settings" as UC6
+}
+
+dev --> UC1
+dev --> UC3
+dev --> UC5
+
+sys --> UC2
+sys --> UC4
+sys --> UC6
+
+UC1 ..> UC2 : <<includes>>
+UC3 ..> UC4 : <<includes>>
+UC5 ..> UC6 : <<includes>>
+
+note right of UC1
+  Handles configuration changes
+  across 17 identified occurrences
+end note
+
+note bottom of UC4
+  Primary configuration components:
+  - Service settings
+  - Integration configs
+  - Test parameters
+end note
+
+@enduml

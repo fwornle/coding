@@ -135,7 +135,9 @@
       "Bash(git commit:*)",
       "Bash(git -C /Users/q284340/Agentic/tmp/mcp-server-semantic-analysis log --oneline -5)",
       "Bash(npm audit:*)",
-      "Bash(ps:*)"
+      "Bash(ps:*)",
+      "WebFetch(domain:codelabs.developers.google.com)",
+      "WebFetch(domain:medium.com)"
     ],
     "deny": []
   }

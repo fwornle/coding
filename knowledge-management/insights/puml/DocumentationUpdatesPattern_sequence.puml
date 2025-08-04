@@ -1,0 +1,55 @@
+@startuml
+
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam sequence {
+  ArrowColor #2C3E50
+  LifeLineColor #3498DB
+  ParticipantBorderColor #2C3E50
+  ParticipantBackgroundColor #ECF0F1
+}
+
+title Documentation Updates Pattern Analysis
+
+participant "Documentation\nManager" as DM
+participant "Repository\nAnalyzer" as RA
+participant "Semantic\nAnalyzer" as SA
+participant "Knowledge\nManager" as KM
+
+activate DM
+DM -> RA: Scan documentation files
+activate RA
+
+RA -> SA: Analyze content changes
+activate SA
+SA --> RA: Pattern detection results
+deactivate SA
+
+RA -> KM: Update knowledge base
+activate KM
+KM --> RA: Knowledge base updated
+deactivate KM
+
+RA --> DM: Documentation analysis complete
+deactivate RA
+
+note right of DM
+  Pattern Statistics:
+  - 13 Occurrences
+  - Stable trend
+  - Significance: 7/10
+end note
+
+DM -> DM: Update documentation\nmetadata
+
+note over DM, KM
+  Implementation Components:
+  - Test scripts
+  - Session logs
+  - Integration files
+  - Configuration files
+end note
+
+deactivate DM
+
+@enduml

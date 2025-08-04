@@ -1,0 +1,61 @@
+@startuml
+
+skinparam usecase {
+  BackgroundColor LightBlue
+  BorderColor DarkBlue
+  ArrowColor Navy
+}
+
+skinparam actorStyle awesome
+
+left to right direction
+
+actor "Developer" as dev
+actor "Documentation System" as docsys
+
+rectangle "Documentation Updates Pattern" {
+  usecase "Update Documentation Files" as UC1
+  usecase "Manage Session Logs" as UC2
+  usecase "Process Integration Files" as UC3
+  usecase "Handle Test Documentation" as UC4
+  usecase "Maintain Configuration Docs" as UC5
+}
+
+dev --> UC1
+dev --> UC2
+dev --> UC3
+dev --> UC4
+dev --> UC5
+
+UC1 <-- docsys
+UC2 <-- docsys
+UC3 <-- docsys
+UC4 <-- docsys
+UC5 <-- docsys
+
+note right of UC1
+  Primary documentation updates
+  across multiple components
+end note
+
+note bottom of UC2
+  Session logging and history
+  management in .specstory
+end note
+
+note right of UC3
+  Integration documentation
+  for MCP and services
+end note
+
+note left of UC4
+  Test documentation and
+  script documentation
+end note
+
+note top of UC5
+  Configuration and setup
+  documentation maintenance
+end note
+
+@enduml
