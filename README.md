@@ -25,7 +25,7 @@ A comprehensive AI-powered development toolkit featuring **unified multi-agent s
 
 The system provides:
 
-- **🤖 Unified Multi-Agent System** - 10 specialized agents for comprehensive analysis
+- **🤖 Unified Multi-Agent System** - 11 specialized agents for comprehensive analysis
 - **🔄 Single SynchronizationAgent** - Sole authority for data integrity across all systems
 - **📊 Universal Command Interface** - `determine_insights`, `update_knowledge_base`, `lessons_learned`
 - **🎯 Agent-Agnostic Design** - Same functionality in Claude Code (MCP) and CoPilot (VSCode)
@@ -41,8 +41,8 @@ The system provides:
 
 ### Unified Semantic Analysis System
 
-- **[MCP Server Documentation](integrations/mcp-server-semantic-analysis/README.md)** - Standalone Node.js MCP server (12 tools, 10 agents)
-- **[10-Agent System Architecture](docs/components/semantic-analysis/unified-architecture.md)** - Complete agent ecosystem
+- **[MCP Server Documentation](integrations/mcp-server-semantic-analysis/README.md)** - Standalone Node.js MCP server (12 tools, 11 agents)
+- **[11-Agent System Architecture](docs/components/semantic-analysis/unified-architecture.md)** - Complete agent ecosystem
 - **[MCP Integration](docs/components/semantic-analysis/mcp-server-setup.md)** - Claude Code unified tools
 - **[VSCode Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced CoPilot with same agents
 - **[SynchronizationAgent](docs/components/semantic-analysis/synchronization-agent.md)** - Single source of truth
@@ -96,7 +96,7 @@ The system provides:
 
 ### Unified Agent System Design
 
-- **Single Agent Infrastructure**: Both Claude and CoPilot use the SAME 10-agent system
+- **Single Agent Infrastructure**: Both Claude and CoPilot use the SAME 11-agent system
 - **Unified Commands**: `determine_insights`, `update_knowledge_base`, `lessons_learned` work everywhere
 - **SynchronizationAgent Authority**: Single source of truth for data integrity
 - **Auto-Detection**: Automatically uses the best available AI agent
@@ -104,7 +104,7 @@ The system provides:
 
 ### Unified Semantic Analysis
 
-- **10 Specialized Agents**: Core analysis agents (Git History, Vibe History, Semantic Analysis, Web Search, Insight Generation, Observation Generation, Quality Assurance, Persistence) + infrastructure agents (Synchronization, Deduplication)
+- **11 Specialized Agents**: Core analysis agents (Git History, Vibe History, Semantic Analysis, Web Search, Insight Generation, Observation Generation, Quality Assurance, Persistence) + infrastructure agents (Synchronization, Deduplication) + orchestration agent (Coordinator)
 - **Code & Conversation Analysis**: Comprehensive pattern recognition from code and AI interactions
 - **Cross-Project Learning**: Unified knowledge accumulation across all projects and AI sessions
 - **Multi-Modal Insights**: Combines repository analysis, conversation logs, and web research
@@ -197,7 +197,7 @@ lessons_learned {
 @KM lessons learned "Recent debugging session" --focus patterns,failures,solutions
 ```
 
-*Both commands trigger the same 10-agent workflow for comprehensive learning extraction*
+*Both commands trigger the same 11-agent workflow for comprehensive learning extraction*
 
 ### 4. Search Unified Knowledge Base
 
@@ -240,7 +240,7 @@ get_workflow_status {"workflowId": "analysis-123"}
 @KM workflow status analysis-123
 ```
 
-*Real-time visibility into all 10 agents: Git History → Vibe History → Semantic Analysis → Web Search → Insight Generation → Observation Generation → Quality Assurance → Persistence → Synchronization → Deduplication*
+*Real-time visibility into all 11 agents: Coordinator → Git History → Vibe History → Semantic Analysis → Web Search → Insight Generation → Observation Generation → Quality Assurance → Persistence → Synchronization → Deduplication*
 
 ### 6. Fallback Mode (No API Keys)
 

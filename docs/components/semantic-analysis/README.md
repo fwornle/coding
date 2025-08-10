@@ -1,6 +1,6 @@
 # Unified Semantic Analysis System
 
-🚀 **Unified 10-Agent Semantic Analysis System** serving both Claude Code and GitHub CoPilot with single infrastructure and intelligent coordination.
+🚀 **Unified 11-Agent Semantic Analysis System** serving both Claude Code and GitHub CoPilot with single infrastructure and intelligent coordination.
 
 ## Overview
 
@@ -31,7 +31,7 @@ The Semantic Analysis System is a comprehensive distributed agent framework desi
 claude-mcp
 
 # The semantic analysis server starts automatically
-# Access all 12 tools and 10 agents through Claude Code
+# Access all 12 tools and 11 agents through Claude Code
 ```
 
 > **📋 Standalone Server**: The semantic analysis system is now available as a [standalone Node.js MCP server](../../../integrations/mcp-server-semantic-analysis/) with comprehensive documentation.
@@ -40,7 +40,8 @@ claude-mcp
 
 ```mermaid
 graph TB
-    subgraph "10-Agent Analysis System"
+    subgraph "11-Agent Analysis System"
+        CO[Coordinator Agent]
         GH[Git History Agent]
         VH[Vibe History Agent]  
         SA[Semantic Analysis Agent]
@@ -56,7 +57,6 @@ graph TB
     subgraph "MCP Infrastructure"
         MCP[MCP Protocol Handler]
         TOOLS[12 MCP Tools]
-        COORD[Coordinator Agent]
     end
     
     subgraph "Knowledge Storage"
@@ -66,17 +66,17 @@ graph TB
         INSIGHTS[Insight Files]
     end
     
-    MCP --> COORD
-    COORD --> GH
-    COORD --> VH
-    COORD --> SA
-    COORD --> WS
-    COORD --> IG
-    COORD --> OG
-    COORD --> QA
-    COORD --> PA
-    COORD --> SY
-    COORD --> DD
+    MCP --> CO
+    CO --> GH
+    CO --> VH
+    CO --> SA
+    CO --> WS
+    CO --> IG
+    CO --> OG
+    CO --> QA
+    CO --> PA
+    CO --> SY
+    CO --> DD
     
     SY <--> JSON
     SY <--> MEMORY  
@@ -105,37 +105,42 @@ graph TB
 ### Integration Guides
 - **[MCP Server Setup](mcp-server-setup.md)** - Claude Code integration
 
-## 🤖 10-Agent Analysis System
+## 🤖 11-Agent Analysis System
+
+### 1 Orchestration Agent (Workflow Management)
+
+#### 1. Coordinator Agent
+Orchestrates all workflow execution, manages task scheduling, coordinates agent interactions, and handles error recovery with rollback capabilities.
 
 ### 8 Core Analysis Agents (Sequential Workflow)
 
-#### 1. Git History Agent
+#### 2. Git History Agent
 Analyzes Git commit history from checkpoint, extracts meaningful changes and patterns from repository evolution.
 
-#### 2. Vibe History Agent  
+#### 3. Vibe History Agent  
 Processes conversation history from `.specstory/history` files, extracting context and insights from previous sessions.
 
-#### 3. Semantic Analysis Agent
+#### 4. Semantic Analysis Agent
 Performs deep code analysis, correlating Git changes with conversation context to identify patterns and architectural insights.
 
-#### 4. Web Search Agent
+#### 5. Web Search Agent
 Conducts context-aware web searches to validate references, discover documentation, and research external patterns.
 
-#### 5. Insight Generation Agent
+#### 6. Insight Generation Agent
 Generates comprehensive insights and creates PlantUML diagrams based on analysis results with LLM support.
 
-#### 6. Observation Generation Agent
+#### 7. Observation Generation Agent
 Creates structured, UKB-compatible observations from insights, ensuring proper knowledge base integration.
 
-#### 7. Quality Assurance Agent
+#### 8. Quality Assurance Agent
 Validates all outputs with auto-correction capabilities, ensuring accuracy and completeness of analysis results.
 
-#### 8. Persistence Agent
+#### 9. Persistence Agent
 Handles knowledge base persistence, creates checkpoints, and manages the storage of validated insights.
 
 ### 2 Infrastructure Agents (Supporting Services)
 
-#### 9. Synchronization Agent
+#### 10. Synchronization Agent
 **Purpose**: Ensures bidirectional sync between graph databases and JSON files
 
 **Key Features**:
@@ -144,7 +149,7 @@ Handles knowledge base persistence, creates checkpoints, and manages the storage
 - ✅ **Version management**: Rollback capabilities with history
 - ✅ **Data integrity**: Checksum validation and consistency checks
 
-#### 10. Deduplication Agent
+#### 11. Deduplication Agent
 **Purpose**: Detects and merges semantically similar entities
 
 **Key Features**:
