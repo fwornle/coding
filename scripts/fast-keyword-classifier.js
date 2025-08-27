@@ -134,6 +134,101 @@ class FastKeywordClassifier {
     return topicBlocks;
   }
 
+  extractFileModifications(content) {
+    // Extract file paths from tool calls (Edit, Write, Read with modifications)
+    const fileModifications = [];
+    const lines = content.split('\n');
+    
+    let inToolCall = false;
+    let toolCallType = '';
+    let currentFilePath = '';
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Detect tool call invocations that modify files
+      if (line.includes('<invoke name="Edit">') || 
+          line.includes('<invoke name="Write">') ||
+          line.includes('<invoke name="MultiEdit">') ||
+          line.includes('<invoke name="NotebookEdit">')) {
+        inToolCall = true;
+        toolCallType = line.match(/name="([^"]+)"/)?.[1] || 'unknown';
+      }
+      
+      // Extract file_path parameter
+      if (inToolCall && line.includes('<parameter name="file_path">')) {
+        const pathMatch = line.match(/<parameter name="file_path">([^<]+)</);
+        if (pathMatch) {
+          currentFilePath = pathMatch[1];
+        }
+      }
+      
+      // End of tool call - record the modification
+      if (inToolCall && line.includes('</invoke>')) {
+        if (currentFilePath) {
+          fileModifications.push({
+            type: toolCallType,
+            path: currentFilePath
+          });
+        }
+        inToolCall = false;
+        toolCallType = '';
+        currentFilePath = '';
+      }
+    }
+    
+    return fileModifications;
+  }
+
+  analyzeFileModifications(fileModifications) {
+    // Analyze file modifications to determine project vs coding classification
+    const analysis = {
+      totalModifications: fileModifications.length,
+      codingRepoModifications: 0,
+      projectRepoModifications: 0,
+      codingPaths: [],
+      projectPaths: [],
+      dominantRepository: 'unknown'
+    };
+    
+    if (fileModifications.length === 0) {
+      return analysis;
+    }
+    
+    for (const modification of fileModifications) {
+      const path = modification.path;
+      
+      // Check if path is in coding repository
+      if (path.includes('/coding/') || 
+          path.includes('semantic-analysis') ||
+          path.includes('knowledge-management') ||
+          path.includes('mcp-server') ||
+          path.includes('/scripts/') ||
+          path.includes('/bin/') ||
+          path.match(/ukb|vkb|ckb/i)) {
+        analysis.codingRepoModifications++;
+        analysis.codingPaths.push(path);
+      } else {
+        analysis.projectRepoModifications++;
+        analysis.projectPaths.push(path);
+      }
+    }
+    
+    // Determine dominant repository based on where most changes are made
+    if (analysis.codingRepoModifications > analysis.projectRepoModifications) {
+      analysis.dominantRepository = 'coding';
+    } else if (analysis.projectRepoModifications > analysis.codingRepoModifications) {
+      analysis.dominantRepository = 'project';
+    } else if (analysis.codingRepoModifications > 0) {
+      // If equal but some coding changes, lean towards coding
+      analysis.dominantRepository = 'coding';
+    } else {
+      analysis.dominantRepository = 'project';
+    }
+    
+    return analysis;
+  }
+
   extractUserRequests(content) {
     // Extract only actual user requests (not tool results) - kept for compatibility
     const userRequests = [];
@@ -237,6 +332,10 @@ class FastKeywordClassifier {
     const topicBlocks = useTopicBlocks ? this.extractTopicBlocks(content) : [];
     const userRequests = this.extractUserRequests(content);
     
+    // 🚨 NEW: Extract file modifications from tool calls - this is the key fix!
+    const fileModifications = this.extractFileModifications(content);
+    const fileModificationAnalysis = this.analyzeFileModifications(fileModifications);
+    
     // Analyze individual topic blocks if requested
     const blockAnalysis = [];
     if (showBlockDetails && topicBlocks.length > 0) {
@@ -260,6 +359,59 @@ class FastKeywordClassifier {
     // Also analyze the file path
     const fullText = `${textToAnalyze} ${filePath}`;
     
+    // 🚨 PRIORITY: File modifications override keyword analysis!
+    // If we have clear file modifications, use that as the primary classification signal
+    if (fileModificationAnalysis.totalModifications > 0) {
+      if (fileModificationAnalysis.dominantRepository === 'coding') {
+        console.log(`🎯 FILE-BASED CLASSIFICATION: Detected ${fileModificationAnalysis.codingRepoModifications} coding repo changes vs ${fileModificationAnalysis.projectRepoModifications} project changes -> CODING`);
+        // Strong positive score for coding classification
+        let fileBasedScore = fileModificationAnalysis.codingRepoModifications * 10; // Very high weight
+        
+        const result = {
+          classification: 'coding',
+          confidence: Math.min(100, fileBasedScore * 5),
+          score: fileBasedScore,
+          totalMatches: 0, // File-based classification doesn't use keyword matches
+          matches: { fileBased: true },
+          fileModificationAnalysis,
+          topicBlocksAnalyzed: topicBlocks.length,
+          userRequestsAnalyzed: userRequests.length,
+          processingTimeMs: Date.now() - startTime,
+          reasoning: `File-based classification: ${fileModificationAnalysis.codingRepoModifications} coding repo modifications vs ${fileModificationAnalysis.projectRepoModifications} project modifications -> coding`
+        };
+        
+        if (showBlockDetails && blockAnalysis.length > 0) {
+          result.blockAnalysis = blockAnalysis;
+        }
+        
+        return result;
+      } else if (fileModificationAnalysis.dominantRepository === 'project') {
+        console.log(`🎯 FILE-BASED CLASSIFICATION: Detected ${fileModificationAnalysis.projectRepoModifications} project changes vs ${fileModificationAnalysis.codingRepoModifications} coding changes -> PROJECT`);
+        
+        const result = {
+          classification: 'project',
+          confidence: Math.min(100, fileModificationAnalysis.projectRepoModifications * 50),
+          score: 0, // Project classification gets 0 score (not coding)
+          totalMatches: 0,
+          matches: { fileBased: true },
+          fileModificationAnalysis,
+          topicBlocksAnalyzed: topicBlocks.length,
+          userRequestsAnalyzed: userRequests.length,
+          processingTimeMs: Date.now() - startTime,
+          reasoning: `File-based classification: ${fileModificationAnalysis.projectRepoModifications} project modifications vs ${fileModificationAnalysis.codingRepoModifications} coding modifications -> project`
+        };
+        
+        if (showBlockDetails && blockAnalysis.length > 0) {
+          result.blockAnalysis = blockAnalysis;
+        }
+        
+        return result;
+      }
+    }
+    
+    // Fallback to keyword-based classification if no clear file modifications
+    console.log('📝 KEYWORD-BASED CLASSIFICATION: No clear file modifications detected, using keyword analysis');
+    
     // Score calculation
     let score = 0;
     const matches = {
@@ -270,7 +422,8 @@ class FastKeywordClassifier {
       mcpPatterns: [],
       systemConcepts: [],
       technicalTerms: [],
-      exclusions: []
+      exclusions: [],
+      fileModificationAnalysis // Include file analysis in matches
     };
     
     // Check primary keywords (weight: 3)
@@ -344,20 +497,21 @@ class FastKeywordClassifier {
                         matches.technicalTerms.length;
     
     const minScore = this.keywords.classification_rules.minimum_score || 4;
-    const classification = (score >= minScore) ? 'coding' : 'project';
+    const keywordClassification = (score >= minScore) ? 'coding' : 'project';
     
     const processingTime = Date.now() - startTime;
     
     const result = {
-      classification,
+      classification: keywordClassification,
       confidence: Math.min(100, Math.max(0, score * 10)), // Simple confidence score
       score,
       totalMatches,
       matches,
+      fileModificationAnalysis, // Always include file analysis
       topicBlocksAnalyzed: topicBlocks.length,
       userRequestsAnalyzed: userRequests.length,
       processingTimeMs: processingTime,
-      reasoning: this.generateReasoning(matches, score, classification)
+      reasoning: this.generateReasoning(matches, score, keywordClassification, fileModificationAnalysis)
     };
     
     if (showBlockDetails && blockAnalysis.length > 0) {
@@ -367,31 +521,36 @@ class FastKeywordClassifier {
     return result;
   }
 
-  generateReasoning(matches, score, classification) {
+  generateReasoning(matches, score, classification, fileModificationAnalysis = null) {
     const reasons = [];
     
-    if (matches.primary.length > 0) {
+    // Include file modification analysis if available
+    if (fileModificationAnalysis && fileModificationAnalysis.totalModifications > 0) {
+      reasons.push(`File modifications: ${fileModificationAnalysis.codingRepoModifications} coding, ${fileModificationAnalysis.projectRepoModifications} project`);
+    }
+    
+    if (matches.primary && matches.primary.length > 0) {
       reasons.push(`Found ${matches.primary.length} primary coding keywords`);
     }
-    if (matches.secondary.length > 0) {
+    if (matches.secondary && matches.secondary.length > 0) {
       reasons.push(`Found ${matches.secondary.length} secondary indicators`);
     }
-    if (matches.mcpPatterns.length > 0) {
+    if (matches.mcpPatterns && matches.mcpPatterns.length > 0) {
       reasons.push(`Found ${matches.mcpPatterns.length} MCP-related patterns`);
     }
-    if (matches.systemConcepts.length > 0) {
+    if (matches.systemConcepts && matches.systemConcepts.length > 0) {
       reasons.push(`Found ${matches.systemConcepts.length} system concept matches`);
     }
-    if (matches.technicalTerms.length > 0) {
+    if (matches.technicalTerms && matches.technicalTerms.length > 0) {
       reasons.push(`Found ${matches.technicalTerms.length} technical terms`);
     }
-    if (matches.filePatterns.length > 0) {
+    if (matches.filePatterns && matches.filePatterns.length > 0) {
       reasons.push(`File name matches coding patterns`);
     }
-    if (matches.pathPatterns.length > 0) {
+    if (matches.pathPatterns && matches.pathPatterns.length > 0) {
       reasons.push(`Path indicates coding project`);
     }
-    if (matches.exclusions.length > 0) {
+    if (matches.exclusions && matches.exclusions.length > 0) {
       reasons.push(`Found ${matches.exclusions.length} exclusion patterns (non-coding content)`);
     }
     

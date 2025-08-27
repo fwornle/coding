@@ -37,15 +37,19 @@ done
 echo "🧹 Cleaning up existing semantic analysis processes..."
 pkill -f "semantic_analysis_server.py" 2>/dev/null || true
 
+# Get the script directory and coding project directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODING_DIR="$SCRIPT_DIR"
+
 # Start VKB Server
 echo "🟢 Starting VKB Server (port 8080)..."
-cd /Users/q284340/Agentic/coding
+cd "$CODING_DIR"
 nohup node lib/vkb-server/cli.js server start --foreground > vkb-server.log 2>&1 &
 VKB_PID=$!
 
 # Start Semantic Analysis MCP Server
 echo "🟢 Starting Semantic Analysis MCP Server (Standard MCP)..."
-cd /Users/q284340/Agentic/coding/integrations/mcp-server-semantic-analysis
+cd "$CODING_DIR/integrations/mcp-server-semantic-analysis"
 # Note: Standard MCP server uses stdio transport, not HTTP
 # It will be started by Claude Code when needed
 echo "ℹ️  Semantic Analysis MCP Server configured for stdio transport"
@@ -67,13 +71,13 @@ else
 fi
 
 # Check if semantic analysis server is configured (stdio transport)
-if [ -f "/Users/q284340/Agentic/coding/integrations/mcp-server-semantic-analysis/dist/index.js" ]; then
+if [ -f "$CODING_DIR/integrations/mcp-server-semantic-analysis/dist/index.js" ]; then
     echo "✅ Semantic Analysis MCP Server configured (stdio transport)"
     services_running=$((services_running + 1))
     
     # Show Node.js executable verification for the MCP server
     echo "📦 MCP Server Node.js Verification:"
-    cd /Users/q284340/Agentic/coding/integrations/mcp-server-semantic-analysis
+    cd "$CODING_DIR/integrations/mcp-server-semantic-analysis"
     node -e "
 const path = require('path');
 const fs = require('fs');
@@ -84,7 +88,7 @@ console.log('   ANTHROPIC_API_KEY:', process.env.ANTHROPIC_API_KEY ? '✅ Set' :
 console.log('   OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Not set');
 console.log('   KNOWLEDGE_BASE_PATH:', process.env.KNOWLEDGE_BASE_PATH || 'Not set');
 "
-    cd /Users/q284340/Agentic/coding
+    cd "$CODING_DIR"
 else
     echo "❌ Semantic Analysis MCP Server NOT configured"
 fi
