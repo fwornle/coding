@@ -25,6 +25,13 @@
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}",
         "OPENAI_API_KEY": "{{OPENAI_API_KEY}}"
       }
+    },
+    "archon": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:8051/mcp"
+      ]
     }
   }
 }

@@ -137,7 +137,8 @@
       "Bash(npm audit:*)",
       "Bash(ps:*)",
       "WebFetch(domain:codelabs.developers.google.com)",
-      "WebFetch(domain:medium.com)"
+      "WebFetch(domain:medium.com)",
+      "Read(/Users/q284340/Documents/**)"
     ],
     "deny": []
   }
