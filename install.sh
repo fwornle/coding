@@ -514,30 +514,14 @@ install_mcp_servers() {
         warning "integrations/claude-logger-mcp directory not found, skipping..."
     fi
     
-    # Install constraint-monitor (real-time constraint violation detection)
-    if [[ -d "$CODING_REPO/integrations/constraint-monitor" ]]; then
-        info "Installing constraint-monitor system..."
-        cd "$CODING_REPO/integrations/constraint-monitor"
-        
-        # Try npm install with timeout and fallback
-        info "Installing constraint-monitor dependencies (with 60s timeout)..."
-        if timeout 60s npm install 2>/dev/null; then
-            success "Constraint monitor dependencies installed"
-            # Try setup with shorter timeout
-            if timeout 30s npm run setup 2>/dev/null; then
-                success "Constraint monitor system installed"
-            else
-                warning "Constraint monitor database setup failed or timed out - system will work without it"
-            fi
-        else
-            warning "Constraint monitor dependency installation timed out - system will work without it"
-            INSTALLATION_WARNINGS+=("Constraint monitor system skipped due to DuckDB compilation timeout")
-        fi
-        
-        # Return to main directory
-        cd "$CODING_REPO"
+    # Install constraint-monitor (now standalone MCP server)
+    info "Setting up MCP Constraint Monitor..."
+    if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]] || [[ -d "$CODING_REPO/integrations/mcp-server-constraint-monitor" ]]; then
+        success "MCP Constraint Monitor already installed"
     else
-        warning "integrations/constraint-monitor directory not found, skipping..."
+        info "MCP Constraint Monitor will be installed automatically when services start"
+        info "Repository: https://github.com/fwornle/mcp-server-constraint-monitor"
+        info "This provides real-time constraint monitoring for any Claude Code project"
     fi
 }
 
@@ -697,9 +681,11 @@ setup_mcp_config() {
     
     # Replace environment variables - use the actual CODING_REPO path
     sed -i.bak "s|{{CODING_TOOLS_PATH}}|$CODING_REPO|g" "$temp_file"
+    sed -i.bak "s|{{PARENT_DIR}}|$(dirname "$CODING_REPO")|g" "$temp_file"
     sed -i.bak "s|{{LOCAL_CDP_URL}}|${LOCAL_CDP_URL:-ws://localhost:9222}|g" "$temp_file"
     sed -i.bak "s|{{ANTHROPIC_API_KEY}}|${ANTHROPIC_API_KEY:-}|g" "$temp_file"
     sed -i.bak "s|{{OPENAI_API_KEY}}|${OPENAI_API_KEY:-}|g" "$temp_file"
+    sed -i.bak "s|{{GROQ_API_KEY}}|${GROQ_API_KEY:-}|g" "$temp_file"
     sed -i.bak "s|{{OPENAI_BASE_URL}}|${OPENAI_BASE_URL:-}|g" "$temp_file"
     sed -i.bak "s|{{KNOWLEDGE_BASE_PATH}}|${KNOWLEDGE_BASE_PATH:-$CODING_REPO/knowledge-management/insights}|g" "$temp_file"
     sed -i.bak "s|{{CODING_DOCS_PATH}}|${CODING_DOCS_PATH:-$CODING_REPO/docs}|g" "$temp_file"
@@ -971,8 +957,8 @@ verify_installation() {
         warning "Claude-logger MCP server not built"
     fi
     
-    if [[ -d "$CODING_REPO/integrations/constraint-monitor" && -f "$CODING_REPO/integrations/constraint-monitor/package.json" ]]; then
-        success "Constraint monitor system installed"
+    if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]] || [[ -d "$CODING_REPO/integrations/mcp-server-constraint-monitor" ]]; then
+        success "MCP Constraint Monitor (standalone) configured"
     else
         warning "Constraint monitor system not installed"
     fi

@@ -49,11 +49,11 @@ The system provides:
 
 ### Real-time Constraint Monitoring
 
-- **[Real-time Constraint Monitoring](docs/features/real-time-constraint-monitoring.md)** - Live constraint violation detection and intervention
-- **[Constraint Monitor Integration](integrations/constraint-monitor/)** - Ultra-fast semantic constraint checking (<10ms total latency)
-- **[Status Line Integration](integrations/constraint-monitor/src/status/)** - Real-time constraint compliance display
-- **[MCP Tools](integrations/constraint-monitor/src/mcp/)** - Constraint monitoring tools for Claude Code
-- **[Universal Agent Support](integrations/constraint-monitor/src/capture/)** - Works with Claude Code, Cursor, Copilot, Aider
+- **[MCP Constraint Monitor](https://github.com/fwornle/mcp-server-constraint-monitor)** - 🛡️ **Standalone MCP server** for universal constraint monitoring
+- **[Real-time Constraint Monitoring](docs/features/real-time-constraint-monitoring.md)** - Live constraint violation detection and intervention  
+- **[Status Line Integration](https://github.com/fwornle/mcp-server-constraint-monitor/blob/main/docs/status-line-integration.md)** - Real-time constraint compliance display
+- **[Quick Setup](https://github.com/fwornle/mcp-server-constraint-monitor#quick-start)** - Add to any Claude Code project in 30 seconds
+- **Universal Compatibility** - Works with Claude Code, Cursor, Copilot, Aider and any coding project
 
 ## 📚 Documentation
 

@@ -58,7 +58,7 @@ class CombinedStatusLine {
       }
 
       // Get detailed constraint status
-      const constraintScript = join(rootDir, 'integrations/constraint-monitor/src/status/constraint-status-line.js');
+      const constraintScript = join(rootDir, 'integrations/mcp-constraint-monitor/src/status/constraint-status-line.js');
       const result = execSync(`node "${constraintScript}"`, { 
         timeout: 3000, 
         encoding: 'utf8' 

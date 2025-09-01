@@ -79,11 +79,7 @@ shared-memory.json
 vkb-server.log
 semantic-analysis.log
 
-# Constraint Monitor files
-integrations/constraint-monitor/data/
-integrations/constraint-monitor/logs/
-integrations/constraint-monitor/config/
-integrations/constraint-monitor/.initialized
+# MCP Constraint Monitor now standalone - no local ignore patterns needed
 
 # Browser access logs
 integrations/browser-access/logs/

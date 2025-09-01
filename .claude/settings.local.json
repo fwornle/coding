@@ -149,7 +149,12 @@
       "Bash(npm --version)",
       "Bash(make:*)",
       "Bash(npm config:*)",
-      "Bash(mcp__semantic-analysis__test_connection:*)"
+      "Bash(mcp__semantic-analysis__test_connection:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Read(/Users/q284340/Agentic/mcp-constraint-monitor/**)"
     ],
     "deny": []
   },

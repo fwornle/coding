@@ -46,15 +46,47 @@ pkill -f "semantic_analysis_server.py" 2>/dev/null || true
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODING_DIR="$SCRIPT_DIR"
 
-# Check and start Constraint Monitor databases
+# Check and setup Constraint Monitor
 CONSTRAINT_MONITOR_STATUS="❌ NOT RUNNING"
 CONSTRAINT_MONITOR_WARNING=""
+
+# Check if mcp-constraint-monitor exists in integrations, if not clone it
+if [ ! -d "$CODING_DIR/integrations/mcp-constraint-monitor" ]; then
+    echo "📦 Installing MCP Constraint Monitor..."
+    cd "$CODING_DIR/integrations"
+    
+    # Check if we have local development version to copy
+    if [ -d "$CODING_DIR/mcp-constraint-monitor" ]; then
+        echo "   📁 Copying local development version..."
+        cp -r "$CODING_DIR/mcp-constraint-monitor" "./mcp-constraint-monitor"
+        cd mcp-constraint-monitor
+        echo "   📦 Installing dependencies..."
+        npm install --production 2>/dev/null || echo "   ⚠️ npm install failed, continuing..."
+        echo "   ✅ Local MCP Constraint Monitor installed"
+    else
+        echo "   🌐 Cloning from repository..."
+        if git clone https://github.com/fwornle/mcp-server-constraint-monitor.git mcp-constraint-monitor 2>/dev/null; then
+            cd mcp-constraint-monitor
+            echo "   📦 Installing dependencies..."
+            npm install --production 2>/dev/null || echo "   ⚠️ npm install failed, continuing..."
+            echo "   ✅ MCP Constraint Monitor installed from GitHub"
+        else
+            echo "   ⚠️ Failed to clone repository"
+            echo "   💡 Ensure internet connection and GitHub access"
+            echo "   💡 Manual install: git clone https://github.com/fwornle/mcp-server-constraint-monitor.git mcp-constraint-monitor"
+        fi
+    fi
+    cd "$CODING_DIR"
+fi
+
 if check_docker; then
     echo "🐳 Docker is running. Starting Constraint Monitor databases..."
     
-    # Check if constraint-monitor directory exists
-    if [ -d "$CODING_DIR/integrations/constraint-monitor" ]; then
-        cd "$CODING_DIR/integrations/constraint-monitor"
+    # Use constraint monitor in integrations directory
+    CONSTRAINT_DIR="$CODING_DIR/integrations/mcp-constraint-monitor"
+    
+    if [ -d "$CONSTRAINT_DIR" ]; then
+        cd "$CONSTRAINT_DIR"
         
         # Start databases with docker-compose
         echo "   Starting Docker containers (this may take a while on first run)..."
@@ -89,14 +121,14 @@ if check_docker; then
             fi
         else
             echo "⚠️ Failed to start Constraint Monitor databases"
-            CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
+            CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"  
             CONSTRAINT_MONITOR_WARNING="Docker containers failed to start"
         fi
         cd "$CODING_DIR"
     else
-        echo "⚠️ Constraint Monitor not installed in integrations/"
+        echo "⚠️ MCP Constraint Monitor not found"
         CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
-        CONSTRAINT_MONITOR_WARNING="Constraint Monitor not found"
+        CONSTRAINT_MONITOR_WARNING="MCP Constraint Monitor not installed"
     fi
 else
     echo ""

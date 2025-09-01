@@ -42,7 +42,7 @@
     },
     "constraint-monitor": {
       "command": "node",
-      "args": ["{{CODING_TOOLS_PATH}}/integrations/constraint-monitor/src/mcp/constraint-monitor-server.js"],
+      "args": ["{{PARENT_DIR}}/mcp-constraint-monitor/server.js"],
       "env": {
         "GROQ_API_KEY": "{{GROQ_API_KEY}}",
         "ANTHROPIC_API_KEY": "{{ANTHROPIC_API_KEY}}",

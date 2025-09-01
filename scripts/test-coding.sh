@@ -841,35 +841,36 @@ else
     print_info "Should be located at integrations/mcp-server-semantic-analysis"
 fi
 
-print_check "Constraint monitor system"
-if dir_exists "$CODING_ROOT/integrations/constraint-monitor"; then
-    print_pass "Constraint monitor system found"
+print_check "MCP Constraint Monitor (standalone)"
+CONSTRAINT_MONITOR_DIR="$CODING_ROOT/integrations/mcp-constraint-monitor"
+if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
+    print_pass "MCP Constraint Monitor found (standalone)"
     
-    print_check "Constraint monitor dependencies"
-    if [ -d "$CODING_ROOT/integrations/constraint-monitor/node_modules" ]; then
-        print_pass "Constraint monitor dependencies installed"
+    print_check "MCP Constraint Monitor dependencies"
+    if [ -d "$CONSTRAINT_MONITOR_DIR/node_modules" ]; then
+        print_pass "MCP Constraint Monitor dependencies installed"
     else
-        print_repair "Installing constraint monitor dependencies..."
-        cd "$CODING_ROOT/integrations/constraint-monitor" && npm install
-        print_fixed "Constraint monitor dependencies installed"
+        print_repair "Installing MCP Constraint Monitor dependencies..."
+        cd "$CONSTRAINT_MONITOR_DIR" && npm install
+        print_fixed "MCP Constraint Monitor dependencies installed"
     fi
     
-    print_check "Constraint monitor configuration"
-    if [ -f "$CODING_ROOT/integrations/constraint-monitor/config/constraints.yaml" ]; then
-        print_pass "Constraint monitor configuration found"
+    print_check "MCP Constraint Monitor configuration"
+    if [ -f "$CONSTRAINT_MONITOR_DIR/config/default-constraints.yaml" ]; then
+        print_pass "MCP Constraint Monitor configuration found"
     else
-        print_repair "Setting up constraint monitor configuration..."
-        cd "$CODING_ROOT/integrations/constraint-monitor" && npm run setup
-        print_fixed "Constraint monitor configuration created"
+        print_repair "Setting up MCP Constraint Monitor configuration..."
+        cd "$CONSTRAINT_MONITOR_DIR" && npm run setup
+        print_fixed "MCP Constraint Monitor configuration created"
     fi
     
-    print_check "Constraint monitor database setup"
-    if [ -d "$CODING_ROOT/integrations/constraint-monitor/data" ]; then
-        print_pass "Constraint monitor data directory exists"
+    print_check "MCP Constraint Monitor data directory"
+    if [ -d "$CONSTRAINT_MONITOR_DIR/data" ]; then
+        print_pass "MCP Constraint Monitor data directory exists"
     else
-        print_repair "Creating constraint monitor data directory..."
-        mkdir -p "$CODING_ROOT/integrations/constraint-monitor/data"
-        print_fixed "Constraint monitor data directory created"
+        print_repair "Creating MCP Constraint Monitor data directory..."
+        mkdir -p "$CONSTRAINT_MONITOR_DIR/data"
+        print_fixed "MCP Constraint Monitor data directory created"
     fi
     
     print_check "Constraint monitor environment variables"
@@ -884,20 +885,21 @@ if dir_exists "$CODING_ROOT/integrations/constraint-monitor"; then
         if docker ps -q -f name=constraint-monitor-qdrant >/dev/null 2>&1; then
             print_pass "Qdrant database running"
         else
-            print_warning "Qdrant database not running - start with: cd integrations/constraint-monitor && docker-compose up -d"
+            print_warning "Qdrant database not running - start with: cd integrations/mcp-constraint-monitor && docker-compose up -d"
         fi
         
         if docker ps -q -f name=constraint-monitor-redis >/dev/null 2>&1; then
             print_pass "Redis cache running"
         else
-            print_warning "Redis cache not running - start with: cd integrations/constraint-monitor && docker-compose up -d"
+            print_warning "Redis cache not running - start with: cd integrations/mcp-constraint-monitor && docker-compose up -d"
         fi
     else
         print_warning "Docker not available - constraint monitor requires Docker for Qdrant and Redis"
     fi
 else
-    print_fail "Constraint monitor system not found"
-    print_info "Should be located at integrations/constraint-monitor"
+    print_fail "MCP Constraint Monitor not found"
+    print_info "Should be located at integrations/mcp-constraint-monitor"
+    print_info "Install with: git clone https://github.com/fwornle/mcp-server-constraint-monitor.git integrations/mcp-constraint-monitor"
 fi
 
 # =============================================================================
