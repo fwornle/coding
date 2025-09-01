@@ -143,8 +143,18 @@
       "Read(/Users/q284340/.npm/_logs/**)",
       "mcp__constraint-monitor__get_constraint_status",
       "mcp__constraint-monitor__get_violation_history",
-      "Bash(docker:*)"
+      "Bash(docker:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm --version)",
+      "Bash(make:*)",
+      "Bash(npm config:*)",
+      "Bash(mcp__semantic-analysis__test_connection:*)"
     ],
     "deny": []
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node ./scripts/combined-status-line.js"
   }
 }

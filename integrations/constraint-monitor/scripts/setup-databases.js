@@ -7,10 +7,18 @@
  */
 
 import { QdrantDatabase } from '../src/database/qdrant-client.js';
-import { DuckDBAnalytics } from '../src/database/duckdb-client.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+
+// Conditional import for DuckDB to avoid startup failures
+let DuckDBAnalytics;
+try {
+  const duckModule = await import('../src/database/duckdb-client.js');
+  DuckDBAnalytics = duckModule.DuckDBAnalytics;
+} catch (error) {
+  console.log('⚠️  DuckDB module unavailable:', error.message);
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, '../data');
@@ -47,6 +55,12 @@ async function setupQdrant() {
 async function setupDuckDB() {
   console.log('\n🦆 Setting up DuckDB analytics database...');
   
+  if (!DuckDBAnalytics) {
+    console.log('  ⚠️  DuckDB setup skipped (module unavailable)');
+    console.log('  💡 Run: npm install duckdb && npm rebuild duckdb');
+    return;
+  }
+  
   try {
     const duckdb = new DuckDBAnalytics({
       path: join(dataDir, 'constraint-analytics.db')
@@ -56,8 +70,9 @@ async function setupDuckDB() {
     console.log('  ✅ DuckDB schema initialized');
     await duckdb.close();
   } catch (error) {
-    console.error(`  ❌ DuckDB setup failed: ${error.message}`);
-    throw error;
+    console.log(`  ⚠️  DuckDB setup skipped (runtime error): ${error.message}`);
+    console.log('  💡 Run: npm rebuild duckdb');
+    // Don't throw error - make it optional
   }
 }
 
@@ -137,9 +152,15 @@ async function setupEnvironment() {
   const requiredVars = ['GROQ_API_KEY'];
   const warnings = [];
   
+  // Debug: Show what we found
+  console.log('  🔍 Checking API keys...');
   for (const varName of requiredVars) {
-    if (!process.env[varName]) {
+    const value = process.env[varName];
+    if (!value) {
       warnings.push(`${varName} not set`);
+      console.log(`      - ${varName}: ❌ Not found`);
+    } else {
+      console.log(`      - ${varName}: ✅ Found (${value.substring(0, 10)}...)`);
     }
   }
   
@@ -148,7 +169,7 @@ async function setupEnvironment() {
     warnings.forEach(w => console.log(`      - ${w}`));
     console.log('  💡 Add missing API keys to your .env file');
   } else {
-    console.log('  ✅ Environment variables configured');
+    console.log('  ✅ All environment variables configured');
   }
 }
 

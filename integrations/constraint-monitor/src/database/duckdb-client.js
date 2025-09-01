@@ -1,4 +1,4 @@
-import Database from 'duckdb';
+import Database from 'better-sqlite3';
 import { logger } from '../utils/logger.js';
 
 export class DuckDBAnalytics {
@@ -18,25 +18,26 @@ export class DuckDBAnalytics {
 
   async initialize() {
     try {
-      this.db = new Database(this.config.dbPath);
-      this.connection = this.db.connect();
+      // Initialize SQLite database (more reliable than DuckDB)
+      this.db = new Database(this.config.path || this.config.dbPath || ':memory:');
       
       // Set performance optimizations
-      await this.exec(`PRAGMA memory_limit='${this.config.memory}'`);
-      await this.exec(`PRAGMA threads=${this.config.threads}`);
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('synchronous = NORMAL');
+      this.db.pragma('cache_size = 10000');
+      this.db.pragma('temp_store = memory');
       
-      if (this.config.enableOptimizer) {
-        await this.exec('PRAGMA enable_optimizer=true');
-        await this.exec('PRAGMA enable_profiling=false'); // Disable for production
+      if (this.config.enableOptimizer !== false) {
+        this.db.pragma('optimize');
       }
 
       await this.createTables();
       await this.createIndexes();
       
       this.initialized = true;
-      logger.info('DuckDB analytics database initialized successfully');
+      logger.info('SQLite analytics database initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize DuckDB database:', error);
+      logger.error('Failed to initialize SQLite database:', error);
       throw error;
     }
   }
@@ -284,30 +285,32 @@ export class DuckDBAnalytics {
 
   // Helper methods for database operations
   async exec(query, params = []) {
-    return new Promise((resolve, reject) => {
-      this.connection.exec(query, ...params, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    try {
+      return this.db.exec(query);
+    } catch (error) {
+      logger.error('SQLite exec error:', error);
+      throw error;
+    }
   }
 
   async all(query, params = []) {
-    return new Promise((resolve, reject) => {
-      this.connection.all(query, ...params, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
-    });
+    try {
+      const stmt = this.db.prepare(query);
+      return stmt.all(...params);
+    } catch (error) {
+      logger.error('SQLite all error:', error);
+      throw error;
+    }
   }
 
   async get(query, params = []) {
-    return new Promise((resolve, reject) => {
-      this.connection.get(query, ...params, (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
+    try {
+      const stmt = this.db.prepare(query);
+      return stmt.get(...params);
+    } catch (error) {
+      logger.error('SQLite get error:', error);
+      throw error;
+    }
   }
 
   async cleanup(retentionDays = 30) {
@@ -332,13 +335,10 @@ export class DuckDBAnalytics {
   }
 
   async close() {
-    if (this.connection) {
-      this.connection.close();
-    }
     if (this.db) {
       this.db.close();
     }
     this.initialized = false;
-    logger.info('DuckDB analytics database closed');
+    logger.info('SQLite database closed');
   }
 }
