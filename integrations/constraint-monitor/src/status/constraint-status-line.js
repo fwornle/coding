@@ -179,7 +179,7 @@ class ConstraintStatusLine {
     if (this.config.showCompliance) {
       const complianceIcon = this.config.icons.shield;
       const score = typeof data.compliance === 'number' ? data.compliance.toFixed(1) : '?';
-      parts.push(`${complianceIcon}${score}`);
+      parts.push(`${complianceIcon} ${score}`);  // Added space for better rendering
     }
 
     // Active violations

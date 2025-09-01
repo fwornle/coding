@@ -114,24 +114,24 @@ class CombinedStatusLine {
       if (constraint.text) {
         parts.push(constraint.text);
       } else {
-        parts.push('🛡️8.5');
+        parts.push('🛡️ 8.5');  // Added space for better rendering
       }
     } else if (constraint.status === 'degraded') {
-      parts.push('🛡️⚠️');
+      parts.push('🛡️ ⚠️');   // Added space for better rendering
       overallColor = 'yellow';
     } else {
-      parts.push('🛡️❌');
+      parts.push('🛡️ ❌');   // Added space for better rendering
       overallColor = 'red';
     }
 
     // Semantic Analysis Status
     if (semantic.status === 'operational') {
-      parts.push('🧠✅');
+      parts.push('🧠 ✅');  // Added space for better rendering
     } else if (semantic.status === 'degraded') {
-      parts.push('🧠⚠️');
+      parts.push('🧠 ⚠️'); // Added space for better rendering
       if (overallColor === 'green') overallColor = 'yellow';
     } else {
-      parts.push('🧠❌');
+      parts.push('🧠 ❌'); // Added space for better rendering
       overallColor = 'red';
     }
 
