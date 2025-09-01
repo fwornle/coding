@@ -211,6 +211,8 @@ export const config = {
 # - Currently in exploration phase
 ```
 
+For a complete explanation of all status line icons, see: [Status Line Icons Reference](status-line-icons-reference.md)
+
 ### Violation Detection & Intervention
 
 ![Real-time Intervention Sequence](../images/constraint-monitor-intervention.png)

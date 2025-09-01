@@ -155,6 +155,7 @@ Superseded documentation maintained for reference and troubleshooting.
 | **Set up unified agent system** | [Semantic Analysis Setup](components/semantic-analysis/mcp-server-setup.md) |
 | **Integrate with VSCode** | [VSCode Integration](integrations/vscode-copilot-integration.md) |
 | **Configure API keys** | [API Keys Setup](reference/api-keys-setup.md) |
+| **Understand status line icons** | [Status Line Icons Reference](features/status-line-icons-reference.md) |
 | **Troubleshoot issues** | [Troubleshooting Guide](reference/troubleshooting.md) |
 | **View system diagrams** | [Architecture Diagrams](puml/) |
 
