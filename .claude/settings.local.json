@@ -140,7 +140,10 @@
       "WebFetch(domain:medium.com)",
       "Read(/Users/q284340/Documents/**)",
       "Read(/Users/q284340/.npm/_logs/**)",
-      "Read(/Users/q284340/.npm/_logs/**)"
+      "Read(/Users/q284340/.npm/_logs/**)",
+      "mcp__constraint-monitor__get_constraint_status",
+      "mcp__constraint-monitor__get_violation_history",
+      "Bash(docker:*)"
     ],
     "deny": []
   }

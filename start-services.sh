@@ -24,6 +24,11 @@ kill_port() {
     fi
 }
 
+# Function to check if Docker is running
+check_docker() {
+    docker info >/dev/null 2>&1
+}
+
 # Kill any existing processes on our ports
 echo "🧹 Cleaning up existing processes..."
 # Kill VKB server port and FastMCP server port
@@ -40,6 +45,92 @@ pkill -f "semantic_analysis_server.py" 2>/dev/null || true
 # Get the script directory and coding project directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODING_DIR="$SCRIPT_DIR"
+
+# Check and start Constraint Monitor databases
+CONSTRAINT_MONITOR_STATUS="❌ NOT RUNNING"
+CONSTRAINT_MONITOR_WARNING=""
+if check_docker; then
+    echo "🐳 Docker is running. Starting Constraint Monitor databases..."
+    
+    # Check if constraint-monitor directory exists
+    if [ -d "$CODING_DIR/integrations/constraint-monitor" ]; then
+        cd "$CODING_DIR/integrations/constraint-monitor"
+        
+        # Start databases with docker-compose
+        echo "   Starting Docker containers (this may take a while on first run)..."
+        
+        # Check if images need to be pulled
+        images_exist=$(docker images -q qdrant/qdrant:v1.7.0 redis:7-alpine 2>/dev/null | wc -l)
+        
+        if [ "$images_exist" -lt 2 ]; then
+            echo "   📦 First-time setup: Downloading Docker images..."
+            echo "   This may take a few minutes. Please wait..."
+            timeout 300 docker-compose pull 2>&1 | grep -E "(Pulling|Downloading|Pull complete)" || true
+        fi
+        
+        # Now start the containers
+        if timeout 30 docker-compose up -d >/dev/null 2>&1; then
+            echo "✅ Constraint Monitor databases started (Qdrant on 6333, Redis on 6379)"
+            CONSTRAINT_MONITOR_STATUS="✅ FULLY OPERATIONAL"
+            
+            # Wait for databases to be ready
+            echo "⏳ Waiting for databases to be ready..."
+            sleep 3
+            
+            # Initialize databases if needed
+            if [ -f "scripts/setup-databases.js" ] && [ ! -f ".initialized" ]; then
+                echo "🔧 Initializing Constraint Monitor databases..."
+                if npm run setup 2>/dev/null; then
+                    touch .initialized
+                    echo "✅ Databases initialized"
+                else
+                    echo "⚠️ Database initialization failed, but continuing..."
+                fi
+            fi
+        else
+            echo "⚠️ Failed to start Constraint Monitor databases"
+            CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
+            CONSTRAINT_MONITOR_WARNING="Docker containers failed to start"
+        fi
+        cd "$CODING_DIR"
+    else
+        echo "⚠️ Constraint Monitor not installed in integrations/"
+        CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
+        CONSTRAINT_MONITOR_WARNING="Constraint Monitor not found"
+    fi
+else
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════════"
+    echo "⚠️  DOCKER NOT RUNNING - CONSTRAINT MONITOR IN DEGRADED MODE"
+    echo "═══════════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "The Live Guardrails system requires Docker for full functionality:"
+    echo ""
+    echo "❌ DISABLED FEATURES (Degraded Mode):"
+    echo "   • No semantic analysis (Groq inference engine)"
+    echo "   • No pattern learning from violations"
+    echo "   • No cross-session knowledge persistence"
+    echo "   • No predictive risk assessment"
+    echo "   • No vector similarity search for constraints"
+    echo "   • No analytical queries for trend detection"
+    echo ""
+    echo "✅ STILL WORKING (Basic Mode):"
+    echo "   • Basic pattern matching (regex-based)"
+    echo "   • Simple constraint violation detection"
+    echo "   • MCP server connectivity"
+    echo "   • Basic warning messages"
+    echo ""
+    echo "🔧 TO ENABLE FULL FUNCTIONALITY:"
+    echo "   1. Start Docker Desktop"
+    echo "   2. Wait for Docker to fully start"
+    echo "   3. Run: coding --restart"
+    echo "   4. Or manually: cd integrations/constraint-monitor && docker-compose up -d"
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════════"
+    echo ""
+    CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
+    CONSTRAINT_MONITOR_WARNING="Docker not running - no learning/persistence"
+fi
 
 # Start VKB Server
 echo "🟢 Starting VKB Server (port 8080)..."
@@ -97,27 +188,44 @@ fi
 cat > .services-running.json << EOF
 {
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")",
-  "services": ["vkb-server", "semantic-analysis"],
+  "services": ["vkb-server", "semantic-analysis", "constraint-monitor"],
   "ports": {
     "vkb-server": 8080,
-    "semantic-analysis": 8001
+    "semantic-analysis": 8001,
+    "qdrant": 6333,
+    "redis": 6379
   },
   "pids": {
     "vkb-server": $VKB_PID,
-    "semantic-analysis": $SEMANTIC_PID
+    "semantic-analysis": "$SEMANTIC_PID"
+  },
+  "constraint_monitor": {
+    "status": "$CONSTRAINT_MONITOR_STATUS",
+    "warning": "$CONSTRAINT_MONITOR_WARNING"
   },
   "services_running": $services_running,
   "agent": "claude"
 }
 EOF
 
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════"
+echo "📊 SERVICES STATUS SUMMARY"
+echo "═══════════════════════════════════════════════════════════════════════"
+echo ""
 if [ $services_running -ge 2 ]; then
-    echo "✅ Services started successfully! ($services_running/2 running)"
-    echo "📊 Services status: .services-running.json"
-    echo "📝 Logs: vkb-server.log, semantic-analysis.log"
+    echo "✅ Core services started successfully! ($services_running/2 running)"
 else
-    echo "⚠️  Some services not running. Check logs for issues."
-    echo "📝 Logs: vkb-server.log, semantic-analysis.log"
+    echo "⚠️  Some core services not running. Check logs for issues."
 fi
-
+echo ""
+echo "🛡️ CONSTRAINT MONITOR: $CONSTRAINT_MONITOR_STATUS"
+if [ -n "$CONSTRAINT_MONITOR_WARNING" ]; then
+    echo "   ⚠️ $CONSTRAINT_MONITOR_WARNING"
+fi
+echo ""
+echo "📊 Full status: .services-running.json"
+echo "📝 Logs: vkb-server.log, semantic-analysis.log"
+echo "═══════════════════════════════════════════════════════════════════════"
+echo ""
 echo "🎉 Startup complete!"

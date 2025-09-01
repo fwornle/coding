@@ -1,13 +1,19 @@
 {
-  "timestamp": "2025-09-01T16:30:26.3NZ",
-  "services": ["vkb-server", "semantic-analysis"],
+  "timestamp": "2025-09-01T21:45:10.3NZ",
+  "services": ["vkb-server", "semantic-analysis", "constraint-monitor"],
   "ports": {
     "vkb-server": 8080,
-    "semantic-analysis": 8001
+    "semantic-analysis": 8001,
+    "qdrant": 6333,
+    "redis": 6379
   },
   "pids": {
-    "vkb-server": 61452,
-    "semantic-analysis": stdio
+    "vkb-server": 18384,
+    "semantic-analysis": "stdio"
+  },
+  "constraint_monitor": {
+    "status": "✅ FULLY OPERATIONAL",
+    "warning": ""
   },
   "services_running": 2,
   "agent": "claude"
