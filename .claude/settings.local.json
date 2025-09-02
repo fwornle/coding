@@ -158,12 +158,13 @@
       "Bash(./scripts/status-line.js)",
       "Bash(./scripts/combined-status-line.js:*)",
       "Read(/Users/q284340/**)",
-      "Bash(open http://localhost:3001/dashboard)"
+      "Bash(open http://localhost:3001/dashboard)",
+      "Bash(./bin/log-session:*)"
     ],
     "deny": []
   },
   "statusLine": {
-    "type": "command", 
+    "type": "command",
     "command": "node ./scripts/combined-status-line.js"
   }
 }

@@ -89,8 +89,8 @@ integrations/browser-access/logs/
 *.sqlite
 *.sqlite3
 
-# Session and conversation logs
-.specstory/history/
+# Session and conversation logs (commented out to track sessions)
+# .specstory/history/
 
 # Package lock files (optional - some prefer to track these)
 package-lock.json

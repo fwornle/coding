@@ -129,13 +129,23 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
         # Run post-session logging with multi-topic splitting
         if [[ -f "$POST_SESSION_LOGGER" ]]; then
             echo ""  # Add spacing before post-session messages
-            MULTI_TOPIC_LOGGING=true node "$POST_SESSION_LOGGER" "$(pwd)" "$CODING_REPO_DIR"
+            echo -e "${BLUE}📝 Running post-session logger...${NC}"
+            MULTI_TOPIC_LOGGING=true node "$POST_SESSION_LOGGER" "$(pwd)" "$CODING_REPO_DIR" || echo -e "${YELLOW}⚠️  Post-session logging encountered an issue${NC}"
         fi
     }
-    trap cleanup EXIT
+    # Register trap for multiple signals to ensure it runs
+    trap cleanup EXIT INT TERM HUP
     
     # Launch Claude normally (without exec to preserve trap)
-    NODE_NO_WARNINGS=1 claude --mcp-config "$MCP_CONFIG" "$@"
+    # Store the command in a variable for better handling
+    CLAUDE_CMD="claude --mcp-config $MCP_CONFIG"
+    
+    # Run Claude and capture its exit code
+    NODE_NO_WARNINGS=1 $CLAUDE_CMD "$@"
+    CLAUDE_EXIT_CODE=$?
+    
+    # Exit with Claude's exit code (this will trigger the trap)
+    exit $CLAUDE_EXIT_CODE
 else
     # Launch Claude without logging
     NODE_NO_WARNINGS=1 exec claude --mcp-config "$MCP_CONFIG" "$@"
