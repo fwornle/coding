@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import SemanticToolInterpreter from './semantic-tool-interpreter.js';
 import ExchangeClassifier from './exchange-classifier.js';
+import { getViolationCaptureService } from './violation-capture-service.js';
 
 class HybridSessionLogger {
   constructor(options = {}) {
@@ -79,7 +80,10 @@ class HybridSessionLogger {
       // 1. Create semantic summary of the tool interaction
       const toolSummary = await this.interpreter.summarize(toolCall, result, conversationContext);
       
-      // 2. Create exchange object
+      // 2. Check for constraint violations and capture them
+      await this.checkAndCaptureViolations(toolCall, result, conversationContext);
+      
+      // 3. Create exchange object
       const exchange = {
         id: this.currentSession.exchanges.length + 1,
         timestamp: new Date().toISOString(),
@@ -92,7 +96,7 @@ class HybridSessionLogger {
         context: conversationContext
       };
       
-      // 3. Classify the exchange
+      // 4. Classify the exchange
       const classification = await this.classifier.classifyExchange(exchange, conversationContext);
       exchange.classification = classification;
       
@@ -108,6 +112,76 @@ class HybridSessionLogger {
       console.error('Tool interaction logging error:', error);
       return this.createErrorExchange(toolCall, error);
     }
+  }
+
+  /**
+   * Check for constraint violations and capture them for dashboard display
+   */
+  async checkAndCaptureViolations(toolCall, result, conversationContext = {}) {
+    try {
+      // Check if this is a constraint monitor tool call with violations
+      if (toolCall.name === 'mcp__constraint-monitor__check_constraints' && 
+          result && result.violations && result.violations.length > 0) {
+        
+        const violationService = getViolationCaptureService();
+        await violationService.captureViolation(toolCall, result.violations, {
+          sessionContext: 'live_logging',
+          workingDirectory: conversationContext.workingDirectory || process.cwd(),
+          ...conversationContext
+        });
+      }
+      
+      // Check if result contains violations in other formats
+      else if (result && typeof result === 'object') {
+        const possibleViolations = this.extractViolationsFromResult(result);
+        if (possibleViolations.length > 0) {
+          const violationService = getViolationCaptureService();
+          await violationService.captureViolation(toolCall, possibleViolations, {
+            sessionContext: 'live_logging_extracted',
+            workingDirectory: conversationContext.workingDirectory || process.cwd(),
+            ...conversationContext
+          });
+        }
+      }
+    } catch (error) {
+      console.debug('Violation capture error:', error.message);
+      // Don't fail the entire logging process for violation capture issues
+    }
+  }
+
+  /**
+   * Extract violations from various result formats
+   */
+  extractViolationsFromResult(result) {
+    const violations = [];
+    
+    // Check for violations array
+    if (result.violations && Array.isArray(result.violations)) {
+      violations.push(...result.violations);
+    }
+    
+    // Check for error/warning patterns that could be violations
+    if (result.error && typeof result.error === 'string') {
+      const errorPatterns = [
+        { pattern: /console\.log/i, constraint_id: 'no-console-log', message: 'Use Logger.log() instead of console.log', severity: 'warning' },
+        { pattern: /eval\s*\(/i, constraint_id: 'no-eval-usage', message: 'eval() usage detected - security risk', severity: 'critical' },
+        { pattern: /var\s+/i, constraint_id: 'no-var-declarations', message: "Use 'let' or 'const' instead of 'var'", severity: 'warning' }
+      ];
+      
+      for (const { pattern, constraint_id, message, severity } of errorPatterns) {
+        if (pattern.test(result.error)) {
+          violations.push({
+            constraint_id,
+            message,
+            severity,
+            pattern: pattern.source,
+            detected_at: new Date().toISOString()
+          });
+        }
+      }
+    }
+    
+    return violations;
   }
 
   updateSessionClassification(classification) {

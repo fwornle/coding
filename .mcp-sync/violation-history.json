@@ -1,0 +1,32 @@
+{
+  "violations": [
+    {
+      "id": "1756823849047-tktivyps",
+      "timestamp": "2025-09-02T14:37:29.047Z",
+      "sessionId": "session-1756823849046-c7he19",
+      "constraint_id": "no-console-log",
+      "message": "Use Logger.log() instead of console.log",
+      "severity": "warning",
+      "tool": "mcp__constraint-monitor__check_constraints",
+      "context": "coding"
+    }
+  ],
+  "sessions": {
+    "session-1756823849046-c7he19": {
+      "startTime": "2025-09-02T14:37:29.047Z",
+      "repository": "coding",
+      "violationCount": 1,
+      "lastViolation": "2025-09-02T14:37:29.047Z"
+    }
+  },
+  "statistics": {
+    "total": 1,
+    "last24Hours": 1,
+    "severityBreakdown": {
+      "warning": 1
+    },
+    "mostCommonViolation": "no-console-log",
+    "averagePerSession": "1.0",
+    "lastUpdated": "2025-09-02T14:37:29.047Z"
+  }
+}

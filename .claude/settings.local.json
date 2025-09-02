@@ -160,7 +160,9 @@
       "Read(/Users/q284340/**)",
       "Bash(open http://localhost:3001/dashboard)",
       "Bash(./bin/log-session:*)",
-      "Bash(./scripts/generate-plantuml-pngs.sh:*)"
+      "Bash(./scripts/generate-plantuml-pngs.sh:*)",
+      "mcp__constraint-monitor__check_constraints",
+      "mcp__constraint-monitor__update_constraints"
     ],
     "deny": []
   },

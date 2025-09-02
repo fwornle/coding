@@ -288,12 +288,31 @@ class SemanticToolInterpreter {
 
   // Generic fallback
   genericSummary(tool, params, result) {
+    // Better parameter summary
+    const paramSummary = Object.keys(params).length > 0 ? 
+      Object.keys(params).slice(0, 3).join(', ') : 'executed';
+    
+    // Better result display
+    let resultDisplay;
+    if (typeof result === 'string') {
+      resultDisplay = result.length > 100 ? result.slice(0, 100) + '...' : result;
+    } else if (typeof result === 'object' && result !== null) {
+      try {
+        const resultStr = JSON.stringify(result, null, 2);
+        resultDisplay = resultStr.length > 200 ? 
+          resultStr.slice(0, 200) + '...' : resultStr;
+      } catch (error) {
+        resultDisplay = `[Object with ${Object.keys(result).length} properties]`;
+      }
+    } else {
+      resultDisplay = String(result);
+    }
+    
     return {
       type: 'unknown',
       icon: '🔧',
-      summary: `${tool}: ${Object.keys(params).join(', ')}`,
-      details: typeof result === 'string' && result.length > 100 ? 
-        result.slice(0, 100) + '...' : result
+      summary: `${tool}: ${paramSummary}`,
+      details: resultDisplay
     };
   }
 }
