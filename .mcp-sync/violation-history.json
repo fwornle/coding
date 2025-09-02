@@ -9,6 +9,16 @@
       "severity": "warning",
       "tool": "mcp__constraint-monitor__check_constraints",
       "context": "coding"
+    },
+    {
+      "id": "1756824282475-2r58zqvc",
+      "timestamp": "2025-09-02T14:44:42.475Z",
+      "sessionId": "session-1756824282473-7r1a29",
+      "constraint_id": "plantuml-standard-styling",
+      "message": "PlantUML files must include the standard styling file",
+      "severity": "error",
+      "tool": "mcp__constraint-monitor__check_constraints",
+      "context": "coding"
     }
   ],
   "sessions": {
@@ -17,16 +27,23 @@
       "repository": "coding",
       "violationCount": 1,
       "lastViolation": "2025-09-02T14:37:29.047Z"
+    },
+    "session-1756824282473-7r1a29": {
+      "startTime": "2025-09-02T14:44:42.475Z",
+      "repository": "coding",
+      "violationCount": 1,
+      "lastViolation": "2025-09-02T14:44:42.475Z"
     }
   },
   "statistics": {
-    "total": 1,
-    "last24Hours": 1,
+    "total": 2,
+    "last24Hours": 2,
     "severityBreakdown": {
-      "warning": 1
+      "warning": 1,
+      "error": 1
     },
     "mostCommonViolation": "no-console-log",
     "averagePerSession": "1.0",
-    "lastUpdated": "2025-09-02T14:37:29.047Z"
+    "lastUpdated": "2025-09-02T14:44:42.487Z"
   }
 }

@@ -11,8 +11,10 @@ import { join } from 'path';
 
 class ViolationCaptureService {
   constructor() {
-    this.violationsPath = join(process.cwd(), '.mcp-sync/session-violations.jsonl');
-    this.persistencePath = join(process.cwd(), '.mcp-sync/violation-history.json');
+    // Use fixed coding directory path to ensure consistency across different working directories
+    const codingDir = '/Users/q284340/Agentic/coding';
+    this.violationsPath = join(codingDir, '.mcp-sync/session-violations.jsonl');
+    this.persistencePath = join(codingDir, '.mcp-sync/violation-history.json');
     this.sessionId = this.generateSessionId();
     
     this.ensureDirectories();
@@ -23,7 +25,8 @@ class ViolationCaptureService {
   }
 
   ensureDirectories() {
-    const syncDir = join(process.cwd(), '.mcp-sync');
+    const codingDir = '/Users/q284340/Agentic/coding';
+    const syncDir = join(codingDir, '.mcp-sync');
     if (!existsSync(syncDir)) {
       mkdirSync(syncDir, { recursive: true });
     }

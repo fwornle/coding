@@ -8,7 +8,7 @@ const path = require('path');
 function captureToolInteraction(toolCall, result, context = {}) {
   const interaction = {
     timestamp: new Date().toISOString(),
-    sessionId: 'live-1756824145587-k0cdbd',
+    sessionId: 'live-1756825227689-41iw6d',
     toolCall: toolCall,
     result: result,
     context: context
