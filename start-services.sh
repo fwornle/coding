@@ -91,38 +91,99 @@ if check_docker; then
         # Start databases with docker-compose
         echo "   Starting Docker containers (this may take a while on first run)..."
         
-        # Check if images need to be pulled
-        images_exist=$(docker images -q qdrant/qdrant:v1.7.0 redis:7-alpine 2>/dev/null | wc -l)
-        
-        if [ "$images_exist" -lt 2 ]; then
-            echo "   📦 First-time setup: Downloading Docker images..."
-            echo "   This may take a few minutes. Please wait..."
-            timeout 300 docker-compose pull 2>&1 | grep -E "(Pulling|Downloading|Pull complete)" || true
-        fi
-        
-        # Now start the containers
-        if timeout 30 docker-compose up -d >/dev/null 2>&1; then
-            echo "✅ Constraint Monitor databases started (Qdrant on 6333, Redis on 6379)"
-            CONSTRAINT_MONITOR_STATUS="✅ FULLY OPERATIONAL"
+        # Check if docker-compose.yml exists
+        if [ -f "docker-compose.yml" ]; then
+            echo "   📋 Found docker-compose.yml, using docker-compose..."
             
-            # Wait for databases to be ready
-            echo "⏳ Waiting for databases to be ready..."
-            sleep 3
-            
-            # Initialize databases if needed
-            if [ -f "scripts/setup-databases.js" ] && [ ! -f ".initialized" ]; then
-                echo "🔧 Initializing Constraint Monitor databases..."
-                if npm run setup 2>/dev/null; then
-                    touch .initialized
-                    echo "✅ Databases initialized"
+            # Check if containers are already running
+            if docker-compose ps | grep -E "(qdrant|redis)" | grep -q "Up"; then
+                echo "✅ Constraint Monitor databases already running (docker-compose)"
+                CONSTRAINT_MONITOR_STATUS="✅ FULLY OPERATIONAL"
+            else
+                echo "   🚀 Starting containers with docker-compose..."
+                
+                # Pull images if needed (with timeout)
+                echo "   📦 Pulling latest images..."
+                timeout 120 docker-compose pull || echo "   ⚠️ Image pull timeout, using existing images"
+                
+                # Start containers with docker-compose
+                if timeout 60 docker-compose up -d; then
+                    echo "   ⏳ Waiting for containers to be ready..."
+                    sleep 5
+                    
+                    # Wait for health checks
+                    for i in {1..12}; do
+                        if docker-compose ps | grep -E "(qdrant|redis)" | grep -q "Up.*healthy"; then
+                            echo "✅ Constraint Monitor databases started successfully"
+                            CONSTRAINT_MONITOR_STATUS="✅ FULLY OPERATIONAL"
+                            break
+                        elif [ $i -eq 12 ]; then
+                            echo "⚠️ Containers started but health checks not passing"
+                            CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
+                            CONSTRAINT_MONITOR_WARNING="Health checks failing"
+                        else
+                            echo "   ⏳ Waiting for health checks... ($i/12)"
+                            sleep 5
+                        fi
+                    done
+                    
+                    # Initialize databases if needed
+                    if [ "$CONSTRAINT_MONITOR_STATUS" = "✅ FULLY OPERATIONAL" ] && [ -f "scripts/setup-databases.js" ] && [ ! -f ".initialized" ]; then
+                        echo "🔧 Initializing Constraint Monitor databases..."
+                        if npm run setup 2>/dev/null; then
+                            touch .initialized
+                            echo "✅ Databases initialized"
+                        else
+                            echo "⚠️ Database initialization failed, but continuing..."
+                        fi
+                    fi
                 else
-                    echo "⚠️ Database initialization failed, but continuing..."
+                    echo "⚠️ Failed to start containers with docker-compose"
+                    CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
+                    CONSTRAINT_MONITOR_WARNING="Docker compose startup failed"
                 fi
             fi
         else
-            echo "⚠️ Failed to start Constraint Monitor databases"
-            CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"  
-            CONSTRAINT_MONITOR_WARNING="Docker containers failed to start"
+            echo "   ⚠️ No docker-compose.yml found, trying manual container startup..."
+            
+            # Fallback to manual container startup (existing logic)
+            qdrant_running=$(docker ps --filter "name=constraint-monitor-qdrant" --format "table {{.Names}}" | grep -c constraint-monitor-qdrant || echo "0")
+            redis_running=$(docker ps --filter "name=constraint-monitor-redis" --format "table {{.Names}}" | grep -c constraint-monitor-redis || echo "0")
+            
+            if [ "$qdrant_running" -gt 0 ] && [ "$redis_running" -gt 0 ]; then
+                echo "✅ Constraint Monitor databases already running (manual containers)"
+                CONSTRAINT_MONITOR_STATUS="✅ FULLY OPERATIONAL"
+            else
+                echo "   🚀 Starting containers manually..."
+                
+                # Start Qdrant container
+                if ! docker ps | grep -q constraint-monitor-qdrant; then
+                    docker run -d --name constraint-monitor-qdrant \
+                        -p 6333:6333 -p 6334:6334 \
+                        qdrant/qdrant:v1.7.0 || echo "   ⚠️ Failed to start Qdrant container"
+                fi
+                
+                # Start Redis container
+                if ! docker ps | grep -q constraint-monitor-redis; then
+                    docker run -d --name constraint-monitor-redis \
+                        -p 6379:6379 \
+                        redis:7-alpine || echo "   ⚠️ Failed to start Redis container"
+                fi
+                
+                # Check if containers started successfully
+                sleep 3
+                qdrant_check=$(docker ps --filter "name=constraint-monitor-qdrant" --format "table {{.Names}}" | grep -c constraint-monitor-qdrant || echo "0")
+                redis_check=$(docker ps --filter "name=constraint-monitor-redis" --format "table {{.Names}}" | grep -c constraint-monitor-redis || echo "0")
+                
+                if [ "$qdrant_check" -gt 0 ] && [ "$redis_check" -gt 0 ]; then
+                    echo "✅ Constraint Monitor databases started manually"
+                    CONSTRAINT_MONITOR_STATUS="✅ FULLY OPERATIONAL"
+                else
+                    echo "⚠️ Failed to start some containers manually"
+                    CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
+                    CONSTRAINT_MONITOR_WARNING="Manual container startup failed"
+                fi
+            fi
         fi
         cd "$CODING_DIR"
     else
