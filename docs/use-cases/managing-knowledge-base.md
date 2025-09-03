@@ -15,25 +15,25 @@ This use case demonstrates how development teams use the semantic analysis syste
 
 ### Scenario 1: Knowledge Capture via Claude Code
 
-![Claude Code Knowledge Capture](../puml/claude-code-knowledge-capture.png)
+![Claude Code Knowledge Capture](../images/claude-code-knowledge-capture.png)
 
 ### Scenario 2: Knowledge Capture via VSCode CoPilot
 
-![VSCode CoPilot Knowledge Capture](../puml/vscode-copilot-knowledge-capture.png)
+![VSCode CoPilot Knowledge Capture](../images/vscode-copilot-knowledge-capture.png)
 
 ### Scenario 3: Fallback When Agents Unavailable
 
-![Fallback Knowledge Capture](../puml/fallback-knowledge-capture.png)
+![Fallback Knowledge Capture](../images/fallback-knowledge-capture.png)
 
 ## Process Flow
 
 ### 1. Knowledge Discovery Flow
 
-![Knowledge Discovery Flow](../puml/knowledge-discovery-flow.png)
+![Knowledge Discovery Flow](../images/knowledge-discovery-flow.png)
 
 ### 2. Knowledge Capture Flow
 
-![Knowledge Capture Flow](../puml/knowledge-capture-flow.png)
+![Knowledge Capture Flow](../images/knowledge-capture-flow.png)
 
 ## Key Features
 

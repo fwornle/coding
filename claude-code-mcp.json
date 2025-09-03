@@ -1,4 +1,7 @@
 {
+  "statusLine": {
+    "toolInteractionHook": "{{CODING_TOOLS_PATH}}/.mcp-sync/tool-interaction-hook.js"
+  },
   "mcpServers": {
     "memory": {
       "command": "npx",

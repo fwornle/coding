@@ -32,11 +32,11 @@ await mcp__memory__create_entities({
 
 **WHY THIS MATTERS**: The MCP memory service provides immediate access to accumulated knowledge from previous sessions and automatically maintains sync with persistent storage files.
 
-## 🔴 CRITICAL: AUTOMATIC CONVERSATION LOGGING
+## 🔴 CRITICAL: CONVERSATION LOGGING ARCHITECTURE
 
-**STATUS**: ✅ **WORKING** - Post-session conversation logging is now fully functional.
+**STATUS**: ✅ **HYBRID WORKING** - Both post-session and real-time logging are now functional.
 
-**HOW IT WORKS**: 
+### **Post-Session Logging (Traditional)**
 - `claude-mcp` automatically starts conversation logging via `post-session-logger.js`
 - **Post-session capture**: After each Claude session ends, the logger processes the session data
 - **Session analysis**: The logger analyzes conversation content and extracts meaningful exchanges
@@ -44,22 +44,39 @@ await mcp__memory__create_entities({
 - **Coding-related content** (ukb, vkb, knowledge management, MCP, etc.) always goes to `coding/.specstory/history/`
 - **Other content** goes to the current project's `.specstory/history/`
 
+### **Real-Time Logging (New)**
+- **Simple Real-time Logger**: `scripts/simple-realtime-logger.js` provides immediate session capture
+- **Live session files**: Creates `*_live-session.md` files in `.specstory/history/` during active sessions
+- **Enhanced format**: Captures tool interactions with parameters, results, and timestamps
+- **Real-time updates**: Appends to session log as interactions occur
+- **Session summaries**: Automatic duration tracking and interaction counts
+
+### **Architecture Comparison**
+
+| Feature | Post-Session | Real-Time |
+|---------|-------------|-----------|
+| **Timing** | After session ends | During session |
+| **Format** | Traditional exchanges | Enhanced tool interactions |
+| **File naming** | `YYYY-MM-DD_HH-MM-SS_*-session.md` | `YYYY-MM-DD_HH-MM-SS_*_live-session.md` |
+| **Content depth** | Full conversations | Tool-focused with context |
+| **Status** | ✅ Working | ✅ Working |
+
+### **Complex Live Logging System Status**
+- **live-logging-coordinator.js**: ⚠️ **ISSUES** - File interference in `.mcp-sync/` directory
+- **hybrid-session-logger.js**: ✅ Components work individually 
+- **tool-interaction-hook.js**: ❌ **BLOCKED** - Constant rewrites prevent module loading
+- **Root cause**: IDE or background process continuously modifies files in `.mcp-sync/`
+- **Workaround**: Use `simple-realtime-logger.js` outside problematic directory
+
 **TECHNICAL IMPLEMENTATION**:
 ```bash
-# Post-session logging triggered after Claude session ends
+# Post-session logging (automatic)
 node /path/to/post-session-logger.js
+
+# Real-time logging (manual/programmatic)
+import { captureInteraction } from './scripts/simple-realtime-logger.js';
+captureInteraction(toolName, parameters, result, context);
 ```
-
-**KEY FEATURES**:
-- Post-session conversation capture and processing
-- No manual intervention required
-- Content-aware logging (coding vs. project-specific)  
-- Cross-project knowledge management preservation
-- Intelligent exchange detection and formatting
-- Automatic conversation classification and routing
-- Session completion logging with timestamped files
-
-**ARCHITECTURE**: Post-session logging processes completed Claude sessions to extract and save conversations, ensuring all valuable interactions are preserved for future reference.
 
 ## 🚨 CRITICAL: Session Continuity Check
 
@@ -177,6 +194,49 @@ Bash({ command: "semantic-analysis" })  // Will timeout after 2 minutes!
 - Starting already-running services (causes 2-minute timeout)
 - Health checks failing due to missing methods
 - Not checking if services are already running before starting them
+
+## ⚠️ CRITICAL: .mcp-sync Directory File Interference Issue
+
+**IDENTIFIED PROBLEM**: Files in the `.mcp-sync/` directory are subject to continuous modification by IDE or background processes, causing module loading failures.
+
+**SYMPTOMS**:
+- **Module loading failures**: `require()` returns empty objects `{}`
+- **Function unavailable**: Functions exist in files but `typeof function === 'undefined'`
+- **Constant file rewrites**: Files like `tool-interaction-hook.js` get modified continuously
+- **System reminders**: Constant "file was modified" notifications
+
+**ROOT CAUSE**: 
+- Claude IDE or background processes monitor/modify files in `.mcp-sync/`
+- File changes occur even when content appears identical
+- Node.js module cache conflicts with continuous file modifications
+- `writeFileSync()` operations don't complete before next modification
+
+**AFFECTED FILES**:
+- `.mcp-sync/tool-interaction-hook.js` - Primary affected file
+- `.mcp-sync/tool-interaction-buffer.jsonl` - Secondary effects
+- Any dynamically generated files in this directory
+
+**DEBUGGING EVIDENCE**:
+```bash
+# Files work outside .mcp-sync but fail inside
+node -e "const {test} = require('/tmp/test.js'); console.log(test());"  # ✅ Works
+node -e "const {test} = require('./.mcp-sync/test.js'); console.log(test());"  # ❌ Fails
+
+# System reminders show continuous modification
+# "file was modified, either by the user or by a linter"
+```
+
+**WORKAROUNDS**:
+1. **Avoid .mcp-sync for importable modules**: Place working JS files outside this directory
+2. **Use alternative logging approaches**: Implement logging in `scripts/` directory instead
+3. **Buffer-only approach**: Use `.mcp-sync/` only for data files, not executable modules
+4. **Manual testing in /tmp**: Test module logic outside problematic directory first
+
+**IMPLICATIONS FOR ARCHITECTURE**:
+- Complex live logging coordinator cannot work reliably in `.mcp-sync/`
+- Simple real-time logger (`scripts/simple-realtime-logger.js`) works as alternative
+- File-based hook interfaces are not viable in this directory
+- Direct logging approaches more reliable than hook-based systems
 
 ## 🚨 CRITICAL: Knowledge Base Management Rule
 
@@ -368,10 +428,33 @@ semantic-analysis
 3. **Topic-Specific Files** → shared-memory-*.json files (git-tracked persistent storage)
 4. **Automatic Sync** → MCP memory ↔ persistent files bidirectional sync
 
-### Auto-Logging  
-- ✅ **WORKING**: Post-session logging via `post-session-logger.js`
-- Smart content routing to appropriate projects
-- Post-session conversation capture and processing
+### Logging Architecture (Hybrid System)
+
+#### **Working Systems**
+- ✅ **Post-session logging**: `post-session-logger.js` - Traditional full conversation capture after sessions
+- ✅ **Simple real-time logging**: `scripts/simple-realtime-logger.js` - Tool interaction capture during sessions  
+- ✅ **Smart content routing**: Content intelligently routed to appropriate project directories
+
+#### **Complex System Status** 
+- ⚠️ **Live logging coordinator**: `scripts/live-logging-coordinator.js` - Has initialization capability but blocked by file interference
+- ⚠️ **Hybrid session logger**: `scripts/hybrid-session-logger.js` - Components work individually, integration blocked
+- ❌ **Tool interaction hook**: `.mcp-sync/tool-interaction-hook.js` - Continuously rewritten, module loading fails
+
+#### **File Structure**
+```
+.specstory/history/
+├── YYYY-MM-DD_HH-MM-SS_*-session.md        # Post-session logs (traditional)
+├── YYYY-MM-DD_HH-MM-SS_*_live-session.md   # Real-time logs (new)
+└── [archived sessions...]
+```
+
+#### **Data Flow**
+1. **During Session**: 
+   - Simple real-time logger captures tool interactions → `*_live-session.md`
+   - Complex coordinator attempts but fails due to `.mcp-sync/` interference
+2. **After Session**: 
+   - Post-session logger processes full conversation → `*-session.md`
+   - Enhanced post-session logger attempts hybrid processing
 
 ### MCP Configuration
 - Template: `claude-code-mcp.json` (with placeholders)
@@ -399,7 +482,52 @@ This system is designed for team use:
 2. **Run `ukb` regularly to capture insights**
 3. **Check `.specstory/history/` for past conversations**
 4. **The MCP memory persists across sessions when started correctly**
-5. **Post-session logging is now working** - conversations are automatically saved after sessions complete
+5. **Hybrid logging system is working**: 
+   - Post-session logs: Traditional conversation capture after sessions end
+   - Real-time logs: Tool interaction capture during active sessions (when enabled)
+6. **Avoid `.mcp-sync/` for importable modules** - Use alternative approaches due to file interference
+
+## Real-Time Logger Usage
+
+### **Enable Real-Time Logging**
+```javascript
+// In any script or tool implementation
+import { captureInteraction, getRealtimeLogger } from './scripts/simple-realtime-logger.js';
+
+// Capture individual tool interactions
+captureInteraction('ToolName', parameters, result, context);
+
+// Get logger instance for advanced usage
+const logger = getRealtimeLogger();
+logger.captureToolInteraction('CustomTool', params, results, { source: 'manual' });
+```
+
+### **Test Real-Time Logger**
+```bash
+# Run test to verify functionality
+node scripts/simple-realtime-logger.js
+
+# Check generated log
+ls -la .specstory/history/*live-session.md
+```
+
+### **Integration Examples**
+```javascript
+// In a custom script
+import { captureInteraction } from './scripts/simple-realtime-logger.js';
+
+async function myCustomTool(input) {
+  const result = await processInput(input);
+  
+  // Capture this interaction
+  captureInteraction('MyCustomTool', { input }, result, { 
+    source: 'custom-script',
+    timestamp: Date.now()
+  });
+  
+  return result;
+}
+```
 
 ## 🚨 Semantic Analysis Workflow Rule
 

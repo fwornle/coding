@@ -1,0 +1,26 @@
+@startuml live-logging-system
+
+title Live Session Logging System
+
+actor User
+participant "Claude Code" as Claude
+participant "Live Logging Coordinator" as Coordinator
+participant "Hook System" as Hooks
+participant "Session Logger" as Logger
+database "Session Files" as Files
+
+User -> Claude: Tool Interaction
+Claude -> Hooks: captureToolInteraction()
+Hooks -> Coordinator: Buffer Interaction
+Coordinator -> Logger: Process & Analyze
+Logger -> Files: Write Live Session
+Files -> User: Real-time Documentation
+
+note right of Logger
+  • Semantic tool analysis
+  • Enhanced formatting
+  • Classification & routing
+  • Cross-session continuity
+end note
+
+@enduml

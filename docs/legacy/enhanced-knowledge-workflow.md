@@ -6,7 +6,7 @@ The knowledge management system now supports multiple interaction modes, includi
 
 ## Workflow Diagram
 
-![Enhanced Knowledge Workflow](puml/knowledge-workflow-enhanced.png)
+![Enhanced Knowledge Workflow](../images/knowledge-workflow-enhanced.png)
 
 ## Workflow Modes
 

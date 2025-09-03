@@ -225,6 +225,13 @@ else
     CONSTRAINT_MONITOR_WARNING="Docker not running - no learning/persistence"
 fi
 
+# Start Live Logging Coordinator
+echo "🟢 Starting Live Logging Coordinator..."
+cd "$CODING_DIR"
+nohup node scripts/start-live-logging.js > live-logging.log 2>&1 &
+LIVE_LOGGING_PID=$!
+echo "   PID: $LIVE_LOGGING_PID"
+
 # Start VKB Server
 echo "🟢 Starting VKB Server (port 8080)..."
 cd "$CODING_DIR"
@@ -246,6 +253,14 @@ sleep 5
 # Verify services are running
 echo "🔍 Verifying services..."
 services_running=0
+
+# Check Live Logging Coordinator
+if ps -p $LIVE_LOGGING_PID > /dev/null 2>&1; then
+    echo "✅ Live Logging Coordinator running (PID: $LIVE_LOGGING_PID)"
+    services_running=$((services_running + 1))
+else
+    echo "❌ Live Logging Coordinator NOT running"
+fi
 
 if check_port 8080; then
     echo "✅ VKB Server running on port 8080"
@@ -281,7 +296,7 @@ fi
 cat > .services-running.json << EOF
 {
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")",
-  "services": ["vkb-server", "semantic-analysis", "constraint-monitor"],
+  "services": ["live-logging", "vkb-server", "semantic-analysis", "constraint-monitor"],
   "ports": {
     "vkb-server": 8080,
     "semantic-analysis": 8001,
@@ -289,6 +304,7 @@ cat > .services-running.json << EOF
     "redis": 6379
   },
   "pids": {
+    "live-logging": $LIVE_LOGGING_PID,
     "vkb-server": $VKB_PID,
     "semantic-analysis": "$SEMANTIC_PID"
   },
@@ -306,10 +322,10 @@ echo "════════════════════════�
 echo "📊 SERVICES STATUS SUMMARY"
 echo "═══════════════════════════════════════════════════════════════════════"
 echo ""
-if [ $services_running -ge 2 ]; then
-    echo "✅ Core services started successfully! ($services_running/2 running)"
+if [ $services_running -ge 3 ]; then
+    echo "✅ Core services started successfully! ($services_running/3 running)"
 else
-    echo "⚠️  Some core services not running. Check logs for issues."
+    echo "⚠️  Some core services not running ($services_running/3). Check logs for issues."
 fi
 echo ""
 echo "🛡️ CONSTRAINT MONITOR: $CONSTRAINT_MONITOR_STATUS"
@@ -318,7 +334,7 @@ if [ -n "$CONSTRAINT_MONITOR_WARNING" ]; then
 fi
 echo ""
 echo "📊 Full status: .services-running.json"
-echo "📝 Logs: vkb-server.log, semantic-analysis.log"
+echo "📝 Logs: live-logging.log, vkb-server.log, semantic-analysis.log"
 echo "═══════════════════════════════════════════════════════════════════════"
 echo ""
 echo "🎉 Startup complete!"

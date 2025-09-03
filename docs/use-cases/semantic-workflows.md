@@ -19,7 +19,7 @@ Workflows are **predefined sequences of semantic analysis operations** that can:
 
 **Purpose**: Comprehensive analysis of a codebase including patterns, architecture, and best practices.
 
-![Repository Analysis Workflow](../puml/workflow-repository-analysis.png)
+![Repository Analysis Workflow](../images/workflow-repository-analysis.png)
 
 **What it does**:
 1. Analyzes git history and commit patterns
@@ -32,7 +32,7 @@ Workflows are **predefined sequences of semantic analysis operations** that can:
 
 **Purpose**: Extract structured insights from team discussions, code reviews, and documentation.
 
-![Conversation Analysis Workflow](../puml/workflow-conversation-analysis.png)
+![Conversation Analysis Workflow](../images/workflow-conversation-analysis.png)
 
 **What it does**:
 1. Processes conversation transcripts or logs
@@ -45,7 +45,7 @@ Workflows are **predefined sequences of semantic analysis operations** that can:
 
 **Purpose**: Comprehensive research on specific technologies, frameworks, or approaches.
 
-![Technology Research Workflow](../puml/workflow-technology-research.png)
+![Technology Research Workflow](../images/workflow-technology-research.png)
 
 **What it does**:
 1. Searches multiple documentation sources

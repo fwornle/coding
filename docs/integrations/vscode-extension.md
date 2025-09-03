@@ -8,13 +8,13 @@ The VSCode Extension Bridge (`vscode-km-copilot`) seamlessly integrates knowledg
 
 ### System Architecture
 
-![VSCode Integrated Architecture](../puml/vscode-integrated-architecture.png)
+![VSCode Integrated Architecture](../images/vscode-integrated-architecture.png)
 
 The VSCode Extension Bridge integrates seamlessly with the existing knowledge management system, providing a unified interface through GitHub Copilot's chat functionality. The architecture features a Memory Service Layer with Graphology in-memory graph processing and automatic synchronization with shared-memory.json.
 
 ### Component Architecture
 
-![VSCode Component Diagram](../puml/vscode-component-diagram.png)
+![VSCode Component Diagram](../images/vscode-component-diagram.png)
 
 The extension consists of several key components:
 - **Extension Main**: Entry point and lifecycle management
@@ -25,7 +25,7 @@ The extension consists of several key components:
 
 ### Integration Flow
 
-![VSCode Extension Flow](../puml/vscode-extension-flow.png)
+![VSCode Extension Flow](../images/vscode-extension-flow.png)
 
 The extension follows a comprehensive flow for handling commands:
 

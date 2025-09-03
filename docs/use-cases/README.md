@@ -41,6 +41,6 @@ How the system gracefully degrades when semantic agents are unavailable, using d
 
 ## Architecture Diagrams
 
-- [System Overview](../puml/semantic-analysis-system-overview.png)
+- [System Overview](../images/semantic-analysis-system-overview.png)
 - [Knowledge Flow Diagram](../architecture/knowledge-flow.md)
 - [Integration Architecture](../architecture/integration-architecture.md)

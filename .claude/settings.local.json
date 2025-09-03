@@ -162,12 +162,16 @@
       "Bash(./bin/log-session:*)",
       "Bash(./scripts/generate-plantuml-pngs.sh:*)",
       "mcp__constraint-monitor__check_constraints",
-      "mcp__constraint-monitor__update_constraints"
+      "mcp__constraint-monitor__update_constraints",
+      "Read(/Users/q284340/.claude/**)",
+      "Bash(git log:*)",
+      "mcp__mcp-git-ingest__git_directory_structure",
+      "mcp__mcp-git-ingest__git_read_important_files"
     ],
     "deny": []
   },
   "statusLine": {
     "type": "command",
-    "command": "node ./scripts/combined-status-line.js"
+    "command": "node ./scripts/live-logging-status.js"
   }
 }

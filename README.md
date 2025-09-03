@@ -55,13 +55,15 @@ The system provides:
 - **[Quick Setup](https://github.com/fwornle/mcp-server-constraint-monitor#quick-start)** - Add to any Claude Code project in 30 seconds
 - **Universal Compatibility** - Works with Claude Code, Cursor, Copilot, Aider and any coding project
 
-### Enhanced Live Session Logging
+### Live Logging System
 
-- **[Enhanced Live Logging System](docs/logging/enhanced-live-logging.md)** - 📝 **Real-time intelligent conversation capture**
-- **[Architecture Overview](docs/logging/enhanced-live-logging.md#architecture)** - Component design and information flow
-- **[Semantic Tool Interpretation](docs/logging/enhanced-live-logging.md#semantic-tool-interpretation)** - Transform `[Tool: X]` into meaningful summaries  
-- **[Intelligent Classification](docs/logging/enhanced-live-logging.md#classification-logic-details)** - Real-time exchange routing with confidence scoring
-- **[Hybrid Logging Strategy](docs/logging/enhanced-live-logging.md#hybrid-classification)** - Automatic separation of coding vs project work
+- **[Live Logging System](docs/logging/live-logging-system.md)** - 📝 **Real-time transcript-based session monitoring**
+- **[Architecture Overview](docs/logging/live-logging-system.md#architecture-overview)** - Clean transcript-based design with AI analysis
+- **Current Status**: ✅ **Fully Operational** - Production-ready transcript monitoring with Groq AI insights
+- **Status Line Integration**: Real-time session info displayed in Claude Code status bar
+- **AI Analysis**: Groq-powered tool interaction insights and progress assessment  
+- **Performance**: < 10ms status updates, background AI processing
+- **Dependencies**: Node.js 18+, groq-sdk, Claude Code with statusLine support
 
 ## 📚 Documentation
 

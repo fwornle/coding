@@ -6,7 +6,7 @@ This document provides visual documentation of the UKB (Update Knowledge Base) s
 
 ### System Architecture Overview
 
-![UKB Architecture](puml/ukb-architecture.png)
+![UKB Architecture](../images/ukb-architecture.png)
 
 **Source**: [ukb-architecture.puml](puml/ukb-architecture.puml)
 
@@ -39,7 +39,7 @@ This diagram shows the complete UKB system architecture, including:
 
 ### Complete Processing Workflow
 
-![UKB Workflow](puml/ukb-workflow.png)
+![UKB Workflow](../images/ukb-workflow.png)
 
 **Source**: [ukb-workflow.puml](puml/ukb-workflow.puml)
 
@@ -56,7 +56,7 @@ This sequence diagram illustrates the complete UKB processing workflow:
 
 ### Full History Analysis Deep Dive
 
-![UKB Full History Analysis](puml/ukb-full-history-analysis.png)
+![UKB Full History Analysis](../images/ukb-full-history-analysis.png)
 
 **Source**: [ukb-full-history-analysis.puml](puml/ukb-full-history-analysis.puml)
 
@@ -83,7 +83,7 @@ This diagram shows the comprehensive full history analysis process:
 
 ### Incremental Processing System
 
-![UKB Incremental Processing](puml/ukb-incremental-processing.png)
+![UKB Incremental Processing](../images/ukb-incremental-processing.png)
 
 **Source**: [ukb-incremental-processing.puml](puml/ukb-incremental-processing.puml)
 
