@@ -450,7 +450,7 @@ class TranscriptMonitor {
     const sessionFile = await this.getRoutedSessionFile(exchange, toolCall);
     
     // Generate exchange entry
-    const exchangeTime = new Date(exchange.timestamp).toISOString();
+    const exchangeTime = this.formatTimestamp(exchange.timestamp);
     const toolSuccess = result && !result.is_error;
     const analysisInsight = analysis?.insight || 'No analysis available';
     
@@ -516,7 +516,7 @@ ${result?.content ? `**Output:** \`\`\`\n${typeof result.content === 'string' ? 
       // Create session header if file doesn't exist
       if (!fs.existsSync(this.currentSessionFile)) {
         const sessionHeader = `# WORK SESSION (${currentTranche})\n\n` +
-          `**Generated:** ${now.toISOString()}\n` +
+          `**Generated:** ${this.formatTimestamp(now.getTime())}\n` +
           `**Work Period:** ${currentTranche}\n` +
           `**Focus:** Live session logging\n` +
           `**Duration:** ~60 minutes\n\n` +
@@ -660,7 +660,7 @@ Format as markdown sections. Keep under 400 words.`;
       const previousSession = this.findPreviousSessionFiles(date, currentTranche, basePath);
       
       let trajectoryContent = `# Trajectory Analysis: ${currentTranche}\n\n` +
-        `**Generated:** ${now.toISOString()}\n` +
+        `**Generated:** ${this.formatTimestamp(now.getTime())}\n` +
         `**Session:** ${currentTranche}\n` +
         `**Focus:** Session trajectory and behavioral patterns\n` +
         `**Duration:** ~60 minutes\n\n` +
@@ -730,6 +730,17 @@ Format as markdown sections. Keep under 400 words.`;
     }
 
     return { lsl: null, trajectory: null };
+  }
+
+  /**
+   * Format timestamp with both UTC and local time for clarity
+   */
+  formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    const utcTime = date.toISOString();
+    const localTime = date.toLocaleString('sv-SE'); // ISO-like format in local time
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return `${utcTime} (${localTime} ${timezone})`;
   }
 
   /**
