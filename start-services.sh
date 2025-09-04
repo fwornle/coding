@@ -200,7 +200,7 @@ else
     echo "The Live Guardrails system requires Docker for full functionality:"
     echo ""
     echo "❌ DISABLED FEATURES (Degraded Mode):"
-    echo "   • No semantic analysis (Groq inference engine)"
+    echo "   • No semantic analysis (Grok inference engine)"
     echo "   • No pattern learning from violations"
     echo "   • No cross-session knowledge persistence"
     echo "   • No predictive risk assessment"

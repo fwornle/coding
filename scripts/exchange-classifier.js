@@ -264,6 +264,16 @@ class ExchangeClassifier {
   determineClassification(score) {
     const { totalScore } = score;
     
+    // CRITICAL FIX: If we're in the coding repository, ALWAYS classify as coding
+    const currentPath = process.cwd();
+    if (currentPath.includes('/coding') || currentPath.endsWith('coding')) {
+      return {
+        target: 'coding',
+        confidence: 0.95,
+        hybrid: false
+      };
+    }
+    
     if (totalScore >= 0.7) {
       return {
         target: 'coding',

@@ -7,13 +7,13 @@
 
 import fs from 'fs';
 import path from 'path';
-import { GroqAnalyzer } from './GroqAnalyzer.js';
+import { GrokAnalyzer } from './GroqAnalyzer.js';
 import { SessionDatabase } from './SessionDatabase.js';
 
 export class TranscriptAnalyzer {
   constructor(config = {}) {
     this.config = {
-      groqApiKey: config.groqApiKey || process.env.GROQ_API_KEY,
+      grokApiKey: config.grokApiKey || process.env.GROK_API_KEY,
       dbPath: config.dbPath || path.join(process.cwd(), '.live-logging', 'sessions.db'),
       batchSize: config.batchSize || 5,
       staleLockTime: config.staleLockTime || 30000,
@@ -21,7 +21,7 @@ export class TranscriptAnalyzer {
       ...config
     };
 
-    this.groq = new GroqAnalyzer(this.config.groqApiKey);
+    this.grok = new GrokAnalyzer(this.config.grokApiKey);
     this.db = new SessionDatabase(this.config.dbPath);
     this.isProcessing = false;
     this.lastCheckTime = 0;
@@ -270,7 +270,7 @@ export class TranscriptAnalyzer {
   }
 
   /**
-   * Perform detailed analysis with Groq
+   * Perform detailed analysis with Grok
    */
   async performDetailedAnalysis(transcriptPath, sessionId) {
     try {
@@ -289,9 +289,9 @@ export class TranscriptAnalyzer {
 
       this.debug(`Processing ${unprocessed.length} interactions`);
 
-      // Analyze with Groq
+      // Analyze with Grok
       for (const interaction of unprocessed) {
-        const analysis = await this.groq.analyzeToolInteraction(
+        const analysis = await this.grok.analyzeToolInteraction(
           interaction,
           this.getContext(messages, interaction.uuid)
         );

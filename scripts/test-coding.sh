@@ -874,10 +874,10 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     fi
     
     print_check "Constraint monitor environment variables"
-    if [ -n "${GROQ_API_KEY:-}" ]; then
-        print_pass "GROQ_API_KEY configured"
+    if [ -n "${GROK_API_KEY:-}" ]; then
+        print_pass "GROK_API_KEY configured"
     else
-        print_warning "GROQ_API_KEY not set - constraint monitor will use limited functionality"
+        print_warning "GROK_API_KEY not set - constraint monitor will use limited functionality"
     fi
     
     print_check "Docker services for constraint monitor"

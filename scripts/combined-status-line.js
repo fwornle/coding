@@ -32,7 +32,7 @@ class CombinedStatusLine {
       const constraintStatus = await this.getConstraintStatus();
       const semanticStatus = await this.getSemanticStatus();
       
-      const status = this.buildCombinedStatus(constraintStatus, semanticStatus);
+      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus);
       
       // Capture this status generation as a tool interaction for live logging
       await this.captureStatusGeneration(status);
@@ -129,7 +129,68 @@ class CombinedStatusLine {
     }
   }
 
-  buildCombinedStatus(constraint, semantic) {
+  async getAPIUsageEstimate() {
+    try {
+      // Check XAI/Grok API usage (since we have XAI key, not Groq)
+      let apiUsage = { percentage: 'unknown', tokensUsed: 0 };
+      
+      // Try to get actual usage if possible
+      try {
+        const response = await fetch('https://api.x.ai/v1/usage', {
+          headers: { 'Authorization': `Bearer ${process.env.GROK_API_KEY}` },
+          timeout: 2000
+        }).catch(() => null);
+        
+        if (response?.ok) {
+          const data = await response.json();
+          apiUsage = {
+            percentage: data.usage_percentage || 'unknown',
+            tokensUsed: data.tokens_used || 0,
+            limit: data.token_limit || 10000
+          };
+        }
+      } catch (error) {
+        // Fall back to session-based estimation
+      }
+      
+      // If we can't get real usage, estimate from session activity
+      if (apiUsage.percentage === 'unknown') {
+        const today = new Date().toISOString().split('T')[0];
+        const historyDir = join(rootDir, '.specstory/history');
+        
+        if (existsSync(historyDir)) {
+          const files = require('fs').readdirSync(historyDir);
+          const todayFiles = files.filter(f => f.includes(today) && f.endsWith('.md'));
+          
+          // More accurate estimation based on file content
+          let totalContent = 0;
+          todayFiles.slice(-5).forEach(file => {
+            try {
+              const content = require('fs').readFileSync(join(historyDir, file), 'utf8');
+              totalContent += content.length;
+            } catch (e) {}
+          });
+          
+          // Rough token estimation: ~4 chars per token
+          const estimatedTokens = Math.floor(totalContent / 4);
+          const dailyLimit = 5000; // Conservative estimate for free tier
+          const percentage = Math.min(100, (estimatedTokens / dailyLimit) * 100);
+          
+          apiUsage = {
+            percentage: Math.round(percentage),
+            tokensUsed: estimatedTokens,
+            limit: dailyLimit
+          };
+        }
+      }
+      
+      return apiUsage;
+    } catch (error) {
+      return { percentage: 'unknown', tokensUsed: 0 };
+    }
+  }
+
+  async buildCombinedStatus(constraint, semantic) {
     const parts = [];
     let overallColor = 'green';
 
@@ -157,9 +218,27 @@ class CombinedStatusLine {
       overallColor = 'red';
     }
 
-    // Semantic Analysis Status
+    // Semantic Analysis Status with API monitoring
     if (semantic.status === 'operational') {
-      parts.push('🧠 ✅');
+      // Add API credit monitoring
+      const apiUsage = await this.getAPIUsageEstimate();
+      
+      if (apiUsage.percentage !== 'unknown') {
+        const usage = typeof apiUsage.percentage === 'number' ? apiUsage.percentage : 0;
+        if (usage > 90) {
+          parts.push(`🧠 ❌${usage}%`); // Critical - very high usage
+          overallColor = 'red';
+        } else if (usage > 80) {
+          parts.push(`🧠 ⚠️${usage}%`); // Warning - high usage
+          if (overallColor === 'green') overallColor = 'yellow';
+        } else if (usage > 50) {
+          parts.push(`🧠 ✅${usage}%`); // Show percentage when significant
+        } else {
+          parts.push('🧠 ✅'); // Low usage - clean display
+        }
+      } else {
+        parts.push('🧠 ✅'); // Unknown usage - assume OK
+      }
     } else if (semantic.status === 'degraded') {
       parts.push('🧠 ⚠️');
       if (overallColor === 'green') overallColor = 'yellow';

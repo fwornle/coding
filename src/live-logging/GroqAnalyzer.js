@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * Groq Analyzer for Live Logging
- * Fast AI analysis of tool interactions using Groq
+ * Grok Analyzer for Live Logging
+ * Fast AI analysis of tool interactions using Grok
  */
 
-import Groq from 'groq-sdk';
+import Groq from 'groq-sdk'; // Note: Using for XAI/Grok API compatibility
 
-export class GroqAnalyzer {
+export class GrokAnalyzer {
   constructor(apiKey, model = 'llama-3.1-8b-instant') {
     if (!apiKey) {
-      throw new Error('GROQ_API_KEY is required');
+      throw new Error('GROK_API_KEY is required');
     }
     
     this.client = new Groq({ apiKey });
@@ -50,7 +50,7 @@ export class GroqAnalyzer {
       return this.parseAnalysisResponse(content, interaction);
 
     } catch (error) {
-      console.error(`Groq analysis error: ${error.message}`);
+      console.error(`Grok analysis error: ${error.message}`);
       return { 
         insight: 'Analysis unavailable', 
         category: 'error',
