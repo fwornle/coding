@@ -387,7 +387,7 @@ class TranscriptMonitor {
    * Log exchange to session file
    */
   async logExchange(exchange, toolCall, result, analysis) {
-    const sessionFile = this.getCurrentSessionFile();
+    const sessionFile = await this.getCurrentSessionFile();
     
     // Generate exchange entry
     const exchangeTime = new Date(exchange.timestamp).toISOString();
@@ -423,7 +423,7 @@ ${result?.content ? `**Output:** \`\`\`\n${typeof result.content === 'string' ? 
   /**
    * Get current session file path (create new session if needed)
    */
-  getCurrentSessionFile() {
+  async getCurrentSessionFile() {
     const now = new Date();
     
     // Calculate current time tranche
@@ -472,10 +472,130 @@ ${result?.content ? `**Output:** \`\`\`\n${typeof result.content === 'string' ? 
         
         fs.writeFileSync(this.currentSessionFile, sessionHeader);
         console.log(`📝 Started new 60-minute session: ${path.basename(this.currentSessionFile)}`);
+        
+        // Create corresponding trajectory file
+        await this.createTrajectoryFile(currentTranche, now);
       }
     }
     
     return this.currentSessionFile;
+  }
+
+  /**
+   * Create trajectory file with semantic analysis from previous session
+   */
+  async createTrajectoryFile(currentTranche, now) {
+    try {
+      const date = now.toISOString().split('T')[0];
+      const trajectoryFileName = `${date}_${currentTranche}-trajectory.md`;
+      const trajectoryFilePath = path.join(this.config.projectPath, '.specstory', 'history', trajectoryFileName);
+      
+      if (fs.existsSync(trajectoryFilePath)) {
+        return; // Trajectory file already exists
+      }
+
+      // Find previous session files for semantic analysis
+      const previousSession = this.findPreviousSessionFiles(date, currentTranche);
+      
+      let trajectoryContent = `# Trajectory Analysis: ${currentTranche}\n\n` +
+        `**Generated:** ${now.toISOString()}\n` +
+        `**Session:** ${currentTranche}\n` +
+        `**Focus:** Session trajectory and behavioral patterns\n` +
+        `**Duration:** ~60 minutes\n\n` +
+        `---\n\n## Session Trajectory\n\n`;
+
+      // If we have semantic analyzer and previous session, analyze for trajectory
+      if (this.semanticAnalyzer && previousSession.lsl && previousSession.trajectory) {
+        try {
+          const analysisResult = await this.performSemanticAnalysis(previousSession);
+          trajectoryContent += `## Analysis Summary\n\n${analysisResult}\n\n`;
+        } catch (error) {
+          console.log(`⚠️ Semantic analysis failed: ${error.message}`);
+          trajectoryContent += `## Analysis Summary\n\nTrajectory initialized. Semantic analysis will be performed as session progresses.\n\n`;
+        }
+      } else {
+        trajectoryContent += `## Analysis Summary\n\nTrajectory initialized. Semantic analysis will be performed as session progresses.\n\n`;
+      }
+
+      trajectoryContent += `## Key Patterns\n\n- Session started at ${now.toISOString()}\n\n` +
+        `## Learning Insights\n\n*To be populated as session progresses*\n\n` +
+        `---\n\n`;
+
+      fs.writeFileSync(trajectoryFilePath, trajectoryContent);
+      console.log(`🎯 Created trajectory file: ${path.basename(trajectoryFilePath)}`);
+      
+    } catch (error) {
+      console.error('❌ Failed to create trajectory file:', error.message);
+    }
+  }
+
+  /**
+   * Find previous session files for semantic analysis
+   */
+  findPreviousSessionFiles(currentDate, currentTranche) {
+    const historyDir = path.join(this.config.projectPath, '.specstory', 'history');
+    
+    if (!fs.existsSync(historyDir)) {
+      return { lsl: null, trajectory: null };
+    }
+
+    const files = fs.readdirSync(historyDir)
+      .filter(file => file.includes(currentDate) && file.includes('-session.md'))
+      .sort()
+      .reverse();
+
+    // Find the most recent session file before current tranche
+    for (const file of files) {
+      const match = file.match(/(\d{4})-(\d{4})-session\.md$/);
+      if (match && match[1] < currentTranche.split('-')[0]) {
+        const baseFileName = file.replace('-session.md', '');
+        const lslPath = path.join(historyDir, file);
+        const trajectoryPath = path.join(historyDir, `${baseFileName}-trajectory.md`);
+        
+        return {
+          lsl: fs.existsSync(lslPath) ? lslPath : null,
+          trajectory: fs.existsSync(trajectoryPath) ? trajectoryPath : null
+        };
+      }
+    }
+
+    return { lsl: null, trajectory: null };
+  }
+
+  /**
+   * Perform semantic analysis using previous session data
+   */
+  async performSemanticAnalysis(previousSession) {
+    if (!this.semanticAnalyzer) {
+      throw new Error('Semantic analyzer not available');
+    }
+
+    let analysisPrompt = 'Analyze the previous session trajectory and patterns:\n\n';
+    
+    if (previousSession.trajectory) {
+      const trajectoryContent = fs.readFileSync(previousSession.trajectory, 'utf8');
+      analysisPrompt += `Previous Trajectory:\n${trajectoryContent}\n\n`;
+    }
+    
+    if (previousSession.lsl) {
+      const lslContent = fs.readFileSync(previousSession.lsl, 'utf8');
+      // Take first 2000 chars to avoid token limits
+      analysisPrompt += `Previous Session Log:\n${lslContent.substring(0, 2000)}...\n\n`;
+    }
+
+    analysisPrompt += 'Based on this data, provide a brief trajectory analysis for the new session focusing on:\n' +
+      '1. Continuation patterns from previous session\n' +
+      '2. Expected focus areas\n' +
+      '3. Learning trajectory insights\n' +
+      'Keep response under 200 words.';
+
+    const result = await this.semanticAnalyzer.analyzeExchange({
+      toolCall: { name: 'trajectory-analysis' },
+      result: 'session-transition',
+      userPrompt: analysisPrompt
+    });
+
+    return result.summary || 'Trajectory analysis completed.';
   }
 
   /**

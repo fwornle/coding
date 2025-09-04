@@ -177,7 +177,8 @@
       "Bash(do echo \"Fixing $file\")",
       "Bash(do if [ \"$file\" != \"_standard-style.puml\" ])",
       "Bash(then sed -i '' 's/!theme plain/!include _standard-style.puml/' \"$file\")",
-      "Bash(/Users/q284340/Agentic/coding/scripts/generate-all-pngs-correctly.sh:*)"
+      "Bash(/Users/q284340/Agentic/coding/scripts/generate-all-pngs-correctly.sh:*)",
+      "Read(/Users/q284340/.claude/**)"
     ],
     "deny": []
   },

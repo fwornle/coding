@@ -537,6 +537,7 @@ create_command_wrappers() {
 #!/bin/bash
 # Universal ukb wrapper
 CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
+export CODING_REPO
 exec "$CODING_REPO/knowledge-management/ukb" "$@"
 EOF
     chmod +x "$bin_dir/ukb"
@@ -546,6 +547,7 @@ EOF
 #!/bin/bash
 # Universal vkb wrapper
 CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
+export CODING_REPO
 exec "$CODING_REPO/knowledge-management/vkb" "$@"
 EOF
     chmod +x "$bin_dir/vkb"

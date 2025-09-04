@@ -36,7 +36,8 @@ async function processToolInteraction() {
     }
     
     // Import and call the hook function
-    const { captureToolInteraction } = await import('../.mcp-sync/tool-interaction-hook.js');
+    const codingRepo = process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    const { captureToolInteraction } = await import(`${codingRepo}/.mcp-sync/tool-interaction-hook.js`);
     
     await captureToolInteraction(
       interactionData.toolCall || { name: interactionData.tool, args: interactionData.args },

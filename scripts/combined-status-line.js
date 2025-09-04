@@ -13,7 +13,7 @@ import { execSync } from 'child_process';
 // Removed live-logging-coordinator import to prevent console output
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = join(__dirname, '..');
+const rootDir = process.env.CODING_REPO || join(__dirname, '..');
 
 // Load configuration
 let config = {};
