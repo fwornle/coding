@@ -1,4 +1,5 @@
 @startuml live-logging-system
+!include _standard-style.puml
 
 title Live Session Logging System
 

@@ -1,5 +1,6 @@
 @startuml ukb-cli-data-flow
-!theme plain
+!include _standard-style.puml
+
 title UKB-CLI Data Flow Architecture
 
 skinparam activityShape rectangle

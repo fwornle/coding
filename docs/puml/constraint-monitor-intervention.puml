@@ -1,8 +1,6 @@
 @startuml constraint-monitor-intervention
-!theme plain
-skinparam backgroundColor #FAFAFA
-skinparam shadowing false
-skinparam roundCorner 10
+!include _standard-style.puml
+
 
 title Real-time Constraint Intervention Sequence
 

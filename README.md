@@ -65,6 +65,20 @@ The system provides:
 - **Performance**: < 10ms status updates, background AI processing
 - **Dependencies**: Node.js 18+, groq-sdk, Claude Code with statusLine support
 
+### Live Session Logging & Trajectory Analysis
+
+- **[Complete LSL Documentation](docs/live-session-logging-system.md)** - 🔄 **Comprehensive live session logging and trajectory analysis system**
+- **[System Architecture](docs/images/lsl-architecture.png)** - Visual overview of LSL components and data flow
+- **[Session Management](docs/images/session-transitions.png)** - Automatic 60-minute time tranche transitions with color-coded warnings
+- **[Status Line System](docs/images/status-display.png)** - Real-time session status with 🟠 orange warnings and 🔴 red indicators
+- **[Trajectory Analysis](docs/images/trajectory-flow.png)** - AI-powered learning accumulation and pattern recognition
+- **Key Features**: 
+  - **Automatic Session Transitions**: 60-minute time tranches (0630-0730, 0730-0830, etc.)
+  - **Real-time Status Warnings**: Orange indicator 5 minutes before session end
+  - **AI-Powered Analysis**: XAI/Grok semantic analysis with OpenAI fallback
+  - **Learning Accumulation**: Cross-session pattern recognition and knowledge building
+  - **Production Ready**: ✅ **Fully Operational** with comprehensive error handling
+
 ## 📚 Documentation
 
 ### 🚀 Getting Started

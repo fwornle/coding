@@ -1,9 +1,9 @@
 @startuml vkb-cli-architecture
-!theme plain
+!include _standard-style.puml
+
 title VKB-CLI Architecture
 
 skinparam componentStyle rectangle
-skinparam backgroundColor white
 skinparam component {
   BackgroundColor #E8F5E8
   FontSize 12

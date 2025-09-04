@@ -1,8 +1,5 @@
 @startuml semantic-analysis-data-compact
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
 
 title Data Architecture - Core Schemas
 

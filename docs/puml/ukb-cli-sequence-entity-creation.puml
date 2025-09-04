@@ -1,5 +1,6 @@
 @startuml ukb-cli-sequence-entity-creation
-!theme plain
+!include _standard-style.puml
+
 title Entity Creation Sequence Diagram
 
 actor User

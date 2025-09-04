@@ -1,4 +1,6 @@
 @startuml Knowledge Management Architecture
+!include _standard-style.puml
+
 !define RECTANGLE class
 
 skinparam rectangle {

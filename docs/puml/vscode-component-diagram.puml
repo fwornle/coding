@@ -1,8 +1,6 @@
 @startuml vscode-component-diagram
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
+
 title VSCode Extension Components and Interactions
 
 package "VSCode Environment" {

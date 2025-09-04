@@ -1,8 +1,5 @@
 @startuml semantic-analysis-data
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
 
 title Semantic Analysis System - Data Architecture
 

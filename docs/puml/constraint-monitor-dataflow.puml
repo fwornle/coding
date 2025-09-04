@@ -1,8 +1,6 @@
 @startuml constraint-monitor-dataflow
-!theme plain
-skinparam backgroundColor #FAFAFA
-skinparam shadowing false
-skinparam roundCorner 10
+!include _standard-style.puml
+
 
 title Constraint Monitoring Data Flow
 

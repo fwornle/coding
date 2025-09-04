@@ -1,8 +1,6 @@
 @startuml knowledge-workflow-enhanced
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
+
 title Enhanced Knowledge Management Workflow with VSCode Integration
 
 actor Developer as dev

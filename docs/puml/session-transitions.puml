@@ -1,0 +1,49 @@
+@startuml
+!include _standard-style.puml
+
+title LSL Session Transition & Time Management System
+
+!define TIME_COLOR #FEF7E0
+!define NORMAL_COLOR #E8F5E8
+!define WARNING_COLOR #FFF3E0
+!define ALERT_COLOR #FFEBEE
+
+state "Session Management" as mgmt {
+  state "Calculate Current Tranche" as calc <<TIME_COLOR>>
+  state "Normal Operation\n(>5 min remaining)" as normal <<NORMAL_COLOR>>
+  state "Warning Period\n(≤5 min remaining)" as warning <<WARNING_COLOR>>
+  state "Session Ended\n(past boundary)" as ended <<ALERT_COLOR>>
+  state "Create New Session" as create <<NORMAL_COLOR>>
+}
+
+[*] --> calc : System Start\nor Tool Interaction
+
+calc --> calc : **Tranche Calculation**\n• Current time: HH:MM\n• Total minutes: H*60+M\n• Tranche start: floor((total+30)/60)*60-30\n• Tranche end: start + 60\n• Format: HHMM-HHMM
+
+calc --> normal : Current session matches\ncurrent tranche
+calc --> warning : Current session matches\nbut <5 min remaining  
+calc --> ended : Current session doesn't\nmatch current tranche
+calc --> create : No current session file
+
+normal --> calc : Every tool interaction\n(5-second polling)
+
+warning --> calc : Every tool interaction\n(5-second polling)
+warning : **Status Display**\n📋🟠1230-1330-session(3min)
+
+ended --> create : Automatic transition
+ended : **Status Display**\n📋🔴1230-1330-session(ended)
+
+create --> normal : New session file created
+create : **Actions**\n• Generate filename: YYYY-MM-DD_HHMM-HHMM-session.md\n• Create session header\n• Update currentSessionFile\n• Log transition event
+
+normal : **Status Display**\n📋1330-1430-session
+
+note top of calc : **Time Tranche Examples**\n0630-0730, 0730-0830, 0830-0930\n0930-1030, 1030-1130, 1130-1230\n1230-1330, 1330-1430, 1430-1530
+
+note right of warning : **Warning Triggers**\n• 5 minutes before session end\n• Shows countdown: (3min), (2min), (1min)\n• Orange indicator: 🟠\n• Updates every interaction
+
+note right of ended : **Transition Triggers**\n• Session time boundary passed\n• Different tranche detected\n• Date change (new day)\n• Red indicator: 🔴
+
+note bottom of create : **File Creation**\n• Session: YYYY-MM-DD_HHMM-HHMM-session.md\n• Header with metadata\n• Real-time tool logging\n• Semantic analysis integration
+
+@enduml

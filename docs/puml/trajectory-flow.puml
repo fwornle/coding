@@ -1,0 +1,62 @@
+@startuml
+!include _standard-style.puml
+
+title Trajectory Analysis Flow & Learning Accumulation
+
+!define SESSION_COLOR #E8F5E8
+!define ANALYSIS_COLOR #F3E5F5  
+!define LEARNING_COLOR #FFF3E0
+!define OUTPUT_COLOR #E3F2FD
+
+actor "Claude User" as user
+participant "Session Activity" as activity <<SESSION_COLOR>>
+participant "Transcript Monitor" as monitor <<SESSION_COLOR>>
+participant "Semantic Analyzer" as analyzer <<ANALYSIS_COLOR>>
+participant "Trajectory Generator" as generator <<LEARNING_COLOR>>
+participant "Learning Accumulator" as accumulator <<LEARNING_COLOR>>
+participant "Output Files" as output <<OUTPUT_COLOR>>
+
+== Session Execution ==
+user -> activity : Performs coding tasks
+activity -> monitor : Tool interactions captured
+monitor -> analyzer : Real-time analysis
+analyzer -> monitor : Insights & patterns
+monitor -> output : Live session logging
+
+== Session Boundary (Every 60 Minutes) ==
+monitor -> monitor : Detect time tranche change
+monitor -> output : Finalize current session
+monitor -> output : Create new session file
+monitor -> generator : Trigger trajectory analysis
+
+== Trajectory Analysis Process ==
+generator -> output : Read completed session
+generator -> analyzer : Analyze session content
+analyzer -> generator : Extract key patterns
+generator -> accumulator : Apply learning framework
+
+== Learning Framework Application ==
+accumulator -> accumulator : **Executive Summary**\nHigh-level achievements
+accumulator -> accumulator : **Session Analysis**\n• Focus identification\n• Key accomplishments\n• Technical patterns
+accumulator -> accumulator : **Pattern Recognition**\n• Successful approaches\n• Emerging guardrails\n• Quality insights
+accumulator -> accumulator : **Active Learning**\n• Future session insights\n• Pattern evolution\n• Accumulated knowledge
+
+== Output Generation ==
+accumulator -> output : Generate trajectory file
+output -> output : **Structured Learning**\n• Session metrics\n• Pattern evolution\n• Quality assessment
+
+== Continuous Learning Loop ==
+note over accumulator : **Accumulated Learning**\nEach trajectory builds on\nprevious sessions, creating\na learning progression
+
+output -> user : **Deliverables**\n• Session logs with real-time insights\n• Trajectory files with patterns\n• Accumulated learning knowledge
+
+== Key Features ==
+note right of monitor : **Real-time Capture**\n• 5-second polling\n• Tool interaction logging\n• Semantic analysis integration\n• Secret redaction
+
+note right of analyzer : **AI-Powered Insights**\n• XAI/Grok primary analysis\n• OpenAI fallback\n• Pattern recognition\n• Productivity assessment
+
+note right of generator : **Learning Structure**\n• Session-by-session analysis\n• Pattern evolution tracking\n• Guardrail development\n• Quality metrics
+
+note right of accumulator : **Knowledge Building**\n• Cross-session learning\n• Approach refinement\n• Best practice emergence\n• Systematic improvement
+
+@enduml

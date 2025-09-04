@@ -1,8 +1,8 @@
 @startuml vkb-cli-use-cases
-!theme plain
+!include _standard-style.puml
+
 title VKB-CLI - Use Cases and Workflows
 
-skinparam backgroundColor white
 skinparam usecase {
   BackgroundColor #E8F4FD
   BorderColor #4A90E2

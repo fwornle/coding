@@ -1,8 +1,6 @@
 @startuml ukb-architecture
-!theme plain
-skinparam backgroundColor #FFFFFF
-skinparam defaultFontName Arial
-skinparam defaultFontSize 10
+!include _standard-style.puml
+
 
 title UKB (Update Knowledge Base) Architecture
 

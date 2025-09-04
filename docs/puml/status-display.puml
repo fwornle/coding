@@ -1,0 +1,21 @@
+@startuml
+!include _standard-style.puml
+
+title Status Line Display System
+
+rectangle "Status Line Generation" {
+  [Constraint Monitor] --> [Status Builder] : Compliance: 8.5
+  [Semantic Analysis] --> [Status Builder] : Status: ✅
+  [Session Detection] --> [Time Calculator] : 1330-1430-session.md
+  [Time Calculator] --> [Color Logic] : 7 minutes remaining
+  [Color Logic] --> [Status Builder] : Display format
+  [Status Builder] --> [Final Output] : Complete status line
+}
+
+note right of [Time Calculator] : **Calculation Logic**\n• Parse "1330-1430" → end at 14:30\n• Current time: 13:23\n• Remaining: 7 minutes\n• Threshold: 5 minutes
+
+note right of [Color Logic] : **Display Rules**\n**Normal (>5 min):** 📋1330-1430-session\n**Warning (≤5 min):** 📋🟠1330-1430-session(3min)\n**Ended (≤0 min):** 📋🔴1330-1430-session(ended)
+
+note bottom of [Final Output] : **Example Output**\n🛡️ 8.5 🔍EX 🧠 ✅ 📋1330-1430-session
+
+@enduml

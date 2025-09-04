@@ -1,8 +1,5 @@
-@startuml semantic-analysis-communication-compact
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+@startuml
+!include _standard-style.puml
 
 title Communication Patterns in Semantic Analysis System
 
@@ -24,7 +21,6 @@ package "Client Interfaces" {
   component [External APIs] as apis
 }
 
-' Communication patterns
 mqtt --> sa : async events
 mqtt --> ws : async events
 mqtt --> kg : async events
@@ -41,21 +37,5 @@ mcp --> rpc : request proxy
 
 claude --> mcp : tool calls
 apis --> rpc : direct API calls
-
-note right of mqtt
-  **MQTT Topics:**
-  • analysis/code/requested
-  • search/web/completed
-  • knowledge/entity/created
-  • workflow/step/completed
-end note
-
-note right of rpc
-  **RPC Methods:**
-  • semantic-analysis.analyzeCode()
-  • web-search.search()
-  • knowledge-graph.createEntity()
-  • coordinator.startWorkflow()
-end note
 
 @enduml

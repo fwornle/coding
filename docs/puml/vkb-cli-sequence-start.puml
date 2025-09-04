@@ -1,8 +1,6 @@
 @startuml vkb-cli-sequence-start
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
+
 title VKB Server Startup Sequence
 
 actor User

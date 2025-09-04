@@ -1,0 +1,28 @@
+@startuml
+!include _standard-style.puml
+
+title Status Line System & Color Coding
+
+package "Status Line Components" {
+  [Constraint Monitor] as constraint
+  [Semantic Analysis] as semantic
+  [Session File Detection] as session
+  [Time Calculation] as timing
+  [Color Logic] as colors
+}
+
+package "Display States" {
+  [Normal Display] as normal
+  [Warning Display] as warning  
+  [Ended Display] as ended
+}
+
+constraint --> session : Compliance score
+semantic --> session : Analysis status
+session --> timing : Current session file
+timing --> colors : Minutes remaining
+colors --> normal : >5 minutes
+colors --> warning : ≤5 minutes
+colors --> ended : ≤0 minutes
+
+@enduml

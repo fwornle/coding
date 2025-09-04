@@ -1,8 +1,5 @@
 @startuml semantic-analysis-agents
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
 
 title Semantic Analysis System - Agent Architecture
 

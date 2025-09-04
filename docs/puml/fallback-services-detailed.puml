@@ -1,10 +1,6 @@
 @startuml Fallback Services Detailed Architecture
-!theme plain
-skinparam backgroundColor #FEFEFE
-skinparam BoxPadding 15
-skinparam BoxBorderColor #666
-skinparam BoxBackgroundColor #FFF
-skinparam BoxFontColor #333
+!include _standard-style.puml
+
 
 title Fallback Services Detailed Architecture
 

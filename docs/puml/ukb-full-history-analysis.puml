@@ -1,6 +1,6 @@
 @startuml ukb-full-history-analysis
-!theme plain
-skinparam backgroundColor #FFFFFF
+!include _standard-style.puml
+
 
 title UKB Full History Analysis - Comprehensive Codebase Understanding
 

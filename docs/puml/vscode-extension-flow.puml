@@ -1,8 +1,6 @@
 @startuml vscode-extension-flow
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
+
 title VSCode Extension Knowledge Management Flow
 
 actor Developer as dev

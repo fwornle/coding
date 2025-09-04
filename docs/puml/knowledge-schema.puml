@@ -1,8 +1,6 @@
 @startuml knowledge-schema
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
+
 title Knowledge Base Schema
 
 class "Shared Memory" {

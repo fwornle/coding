@@ -1,8 +1,5 @@
 @startuml semantic-analysis-deployment-distributed
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
 
 title Semantic Analysis System - Distributed Deployment
 
@@ -16,13 +13,13 @@ node "Control Node" as control {
 node "Agent Node 1" as node1 {
   component [Semantic Analysis] as sa
   component [Web Search] as ws
-  component [RPC Server
+  component [RPC Server] as rpc1
 }
 
 node "Agent Node 2" as node2 {
   component [Knowledge Graph] as kg
   component [Coordinator] as ca
-  component [RPC Server
+  component [RPC Server] as rpc2
 }
 
 cloud "External Services" as ext {

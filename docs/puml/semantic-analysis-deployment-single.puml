@@ -1,8 +1,5 @@
 @startuml semantic-analysis-deployment-single
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
 
 title Semantic Analysis System - Single Machine Deployment
 
@@ -11,14 +8,14 @@ node "Host Machine" as host {
   component [MCP Server] as mcp
   
   package "Infrastructure" {
-    component [MQTT Broker
-    component [JSON-RPC Server
+    component [MQTT Broker] as mqtt
+    component [JSON-RPC Server] as rpc
   }
   
   package "Agents" {
-    component [Semantic
-    component [Web
-    component [Knowledge
+    component [Semantic Agent] as sa
+    component [Web Agent] as ws
+    component [Knowledge Agent] as kg
     component [Coordinator] as ca
   }
   

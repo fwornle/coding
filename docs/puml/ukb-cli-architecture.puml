@@ -1,9 +1,9 @@
 @startuml ukb-cli-architecture
-!theme plain
+!include _standard-style.puml
+
 title UKB-CLI System Architecture
 
 skinparam componentStyle rectangle
-skinparam backgroundColor white
 skinparam component {
   BackgroundColor<<api>> #E8F4FD
   BackgroundColor<<core>> #E8F5E8

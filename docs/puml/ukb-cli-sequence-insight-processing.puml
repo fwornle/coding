@@ -1,5 +1,6 @@
 @startuml ukb-cli-sequence-insight-processing
-!theme plain
+!include _standard-style.puml
+
 title Insight Processing Sequence Diagram
 
 actor User

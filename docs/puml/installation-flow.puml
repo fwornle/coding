@@ -1,9 +1,6 @@
 @startuml installation-flow
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 11
-skinparam arrow {
+!include _standard-style.puml
+
     Color black
     FontColor black
 }

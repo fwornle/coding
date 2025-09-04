@@ -1,4 +1,6 @@
 @startuml Knowledge Flow Architecture
+!include _standard-style.puml
+
 !define RECTANGLE class
 
 title Knowledge Flow: Project → MCP Memory → Git Storage

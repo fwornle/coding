@@ -1,6 +1,6 @@
 @startuml ukb-incremental-processing
-!theme plain
-skinparam backgroundColor #FFFFFF
+!include _standard-style.puml
+
 
 title UKB Incremental Processing System
 

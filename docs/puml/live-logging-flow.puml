@@ -1,6 +1,5 @@
 @startuml live-logging-flow
 !include _standard-style.puml
-skinparam direction top to bottom layout
 title Live Logging Data Flow (Final Design)
 
 participant "Claude Code" as Claude

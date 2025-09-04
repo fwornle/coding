@@ -1,8 +1,8 @@
 @startuml vkb-cli-data-flow
-!theme plain
+!include _standard-style.puml
+
 title VKB-CLI Data Flow and Processing
 
-skinparam backgroundColor white
 skinparam component {
   BackgroundColor #E8F5E8
   FontSize 11

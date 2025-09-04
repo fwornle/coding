@@ -173,7 +173,11 @@
       "Read(/Users/q284340/.claude/projects/-Users-q284340-Agentic-coding/**)",
       "Read(/Users/q284340/.claude/projects/-Users-q284340-Agentic-coding/**)",
       "Bash(TRANSCRIPT_DEBUG=true node scripts/transcript-monitor.js --test)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(do echo \"Fixing $file\")",
+      "Bash(do if [ \"$file\" != \"_standard-style.puml\" ])",
+      "Bash(then sed -i '' 's/!theme plain/!include _standard-style.puml/' \"$file\")",
+      "Bash(/Users/q284340/Agentic/coding/scripts/generate-all-pngs-correctly.sh:*)"
     ],
     "deny": []
   },

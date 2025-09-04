@@ -1,5 +1,6 @@
 @startuml ukb-cli-class-diagram
-!theme plain
+!include _standard-style.puml
+
 title UKB-CLI Class Diagram
 
 skinparam classAttributeIconSize 0

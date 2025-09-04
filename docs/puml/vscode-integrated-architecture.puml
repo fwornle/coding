@@ -1,8 +1,6 @@
 @startuml vscode-integrated-architecture
-!theme plain
-skinparam backgroundColor white
-skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+!include _standard-style.puml
+
 title Knowledge Management System Architecture with VSCode Integration
 
 package "Developer Environment" {

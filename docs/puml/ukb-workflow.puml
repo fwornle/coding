@@ -1,7 +1,6 @@
 @startuml ukb-workflow
-!theme plain
-skinparam backgroundColor #FFFFFF
-skinparam defaultFontName Arial
+!include _standard-style.puml
+
 
 title UKB Processing Workflow
 
