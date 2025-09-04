@@ -441,7 +441,8 @@ ${result?.content ? `**Output:** \`\`\`\n${typeof result.content === 'string' ? 
     
     // Check if we need a new session (no current session or different tranche)
     const needNewSession = !this.currentSessionFile || 
-                           !this.currentSessionFile.includes(currentTranche);
+                           !this.currentSessionFile.includes(currentTranche) ||
+                           !this.currentSessionFile.includes(now.toISOString().split('T')[0]); // Also check date
     
     if (needNewSession) {
       
