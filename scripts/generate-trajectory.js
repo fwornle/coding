@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Simple trajectory generator for session files
- * Creates trajectory analysis based on session content
+ * Enhanced trajectory generator for session files
+ * Creates trajectory analysis with proper predecessor detection across date boundaries
  */
 
 import fs from 'fs';
@@ -11,6 +11,76 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Find the most recent previous trajectory file regardless of date
+ */
+function findPreviousTrajectory(currentSession) {
+  const historyDir = path.join('.specstory/history');
+  const trajectoryDir = path.join('.specstory/trajectory');
+  
+  // Parse current session info
+  const match = currentSession.match(/(\d{4}-\d{2}-\d{2})_(\d{4})-(\d{4})/);
+  if (!match) return null;
+  
+  const [, currentDate, currentStart] = match;
+  const currentTimestamp = new Date(`${currentDate}T${currentStart.slice(0,2)}:${currentStart.slice(2)}:00`).getTime();
+  
+  // Find all trajectory files
+  const trajectoryFiles = [];
+  
+  [historyDir, trajectoryDir].forEach(dir => {
+    if (fs.existsSync(dir)) {
+      const files = fs.readdirSync(dir)
+        .filter(f => f.endsWith('-trajectory.md') && !f.includes(currentSession.replace('-session.md', '')));
+      
+      files.forEach(file => {
+        const fileMatch = file.match(/(\d{4}-\d{2}-\d{2})_(\d{4})-(\d{4})/);
+        if (fileMatch) {
+          const [, date, start, end] = fileMatch;
+          const timestamp = new Date(`${date}T${start.slice(0,2)}:${start.slice(2)}:00`).getTime();
+          
+          if (timestamp < currentTimestamp) {
+            trajectoryFiles.push({
+              file,
+              path: path.join(dir, file),
+              timestamp,
+              date,
+              timeRange: `${start}-${end}`
+            });
+          }
+        }
+      });
+    }
+  });
+  
+  // Sort by timestamp and get the most recent
+  trajectoryFiles.sort((a, b) => b.timestamp - a.timestamp);
+  return trajectoryFiles.length > 0 ? trajectoryFiles[0] : null;
+}
+
+/**
+ * Get cumulative session number across all dates
+ */
+function getCumulativeSessionNumber() {
+  const historyDir = path.join('.specstory/history');
+  const trajectoryDir = path.join('.specstory/trajectory');
+  
+  const allFiles = new Set();
+  
+  [historyDir, trajectoryDir].forEach(dir => {
+    if (fs.existsSync(dir)) {
+      const files = fs.readdirSync(dir)
+        .filter(f => f.match(/\d{4}-\d{2}-\d{2}_\d{4}-\d{4}-(session|trajectory)\.md/));
+      files.forEach(f => {
+        const base = f.replace(/-trajectory\.md/, '').replace(/-session\.md/, '');
+        allFiles.add(base);
+      });
+    }
+  });
+  
+  return allFiles.size + 1;
+}
 
 function generateTrajectory(sessionFile) {
   try {
@@ -27,12 +97,17 @@ function generateTrajectory(sessionFile) {
     const [, date, startTime, endTime] = match;
     const timeRange = `${startTime}-${endTime}`;
     
+    // Find previous trajectory
+    const previousTrajectory = findPreviousTrajectory(sessionFile);
+    const sessionNumber = getCumulativeSessionNumber();
+    
     // Analyze content for key themes
     let focusArea = 'System development and debugging';
-    if (sessionContent.includes('live-logging') || sessionContent.includes('transcript')) {
-      focusArea = 'Live logging system implementation and debugging';
-    }
-    if (sessionContent.includes('trajectory') || sessionContent.includes('semantic')) {
+    if (sessionContent.includes('PNG') || sessionContent.includes('image')) {
+      focusArea = 'Image analysis and attribution review';
+    } else if (sessionContent.includes('routing') || sessionContent.includes('transcript')) {
+      focusArea = 'Live logging system and content routing';
+    } else if (sessionContent.includes('trajectory') || sessionContent.includes('semantic')) {
       focusArea = 'Trajectory analysis and semantic processing';
     }
     
@@ -40,12 +115,23 @@ function generateTrajectory(sessionFile) {
     const toolMatches = sessionContent.match(/### \w+ - \d{4}-\d{2}-\d{2}T/g) || [];
     const toolCount = toolMatches.length;
     
+    // Build executive summary with predecessor info
+    let executiveSummary = `Session ${sessionNumber} at ${timeRange} focused on ${focusArea.toLowerCase()}. `;
+    if (previousTrajectory) {
+      const prevTimestamp = previousTrajectory.timestamp;
+      const timeDiff = new Date(`${date}T${startTime.slice(0,2)}:${startTime.slice(2)}:00`).getTime() - prevTimestamp;
+      const hoursDiff = Math.round(timeDiff / (1000 * 60 * 60));
+      executiveSummary += `This session continues from the previous trajectory (${previousTrajectory.date} ${previousTrajectory.timeRange}), after a ${hoursDiff}-hour gap. Building on accumulated learning from ${sessionNumber - 1} previous sessions.`;
+    } else {
+      executiveSummary += `This appears to be the first tracked session or continues after an extended break.`;
+    }
+    
     // Generate trajectory content
     const trajectory = `# Trajectory Analysis: ${timeRange}
 
 **Generated:** ${new Date().toISOString()}  
-**Session:** ${getSessionNumber(date, startTime)} (${timeRange})  
-**Time Range:** ${timeRange}  
+**Session:** ${sessionNumber} (${timeRange})  
+**Date:** ${date}  
 **Focus:** ${focusArea}  
 **Learning Mode:** Accumulated  
 
@@ -53,7 +139,7 @@ function generateTrajectory(sessionFile) {
 
 ## Executive Summary
 
-Session ${getSessionNumber(date, startTime)} focused on ${focusArea.toLowerCase()}. This builds on previous sessions for accumulated learning and trajectory analysis.
+${executiveSummary}
 
 ---
 
@@ -101,18 +187,22 @@ ${focusArea}
 - Maintain consistency between status line display and active session files
 
 ### Pattern Evolution
-Building on ${getSessionNumber(date, startTime) - 1} previous sessions, this session advanced the trajectory by focusing on ${focusArea.toLowerCase()}.
+${previousTrajectory ? 
+  `Building on ${sessionNumber - 1} previous sessions, this session advanced the trajectory by focusing on ${focusArea.toLowerCase()}.` :
+  `Initializing trajectory tracking with focus on ${focusArea.toLowerCase()}.`}
 
 ---
 
 ## Session Metrics
 
-- **Session Number:** ${getSessionNumber(date, startTime)}
+- **Session Number:** ${sessionNumber}
 - **Time Range:** ${timeRange}
+- **Date:** ${date}
 - **Focus Area:** ${focusArea}
 - **Tool Interactions:** ${toolCount}
-- **Learning Context:** Accumulated from ${getSessionNumber(date, startTime) - 1} previous sessions
-- **Quality Status:** ✅ Properly formatted with live transcript monitoring
+- **Previous Session:** ${previousTrajectory ? `${previousTrajectory.date} ${previousTrajectory.timeRange}` : 'None detected'}
+- **Learning Context:** ${previousTrajectory ? `Accumulated from ${sessionNumber - 1} previous sessions` : 'Fresh trajectory'}
+- **Quality Status:** ✅ Enhanced with cross-date predecessor detection
 
 ---
 

@@ -190,11 +190,22 @@ start_transcript_monitoring() {
   fi
 }
 
-# Only start transcript monitoring if we have a .specstory directory or can create one
+# Start transcript monitoring for target project
 if [ -d "$TARGET_PROJECT_DIR/.specstory" ] || mkdir -p "$TARGET_PROJECT_DIR/.specstory/history" 2>/dev/null; then
   start_transcript_monitoring "$TARGET_PROJECT_DIR" "$CODING_REPO"
 else
   log "Warning: Could not create .specstory directory for transcript monitoring"
+fi
+
+# ALWAYS start transcript monitoring for coding repo when working in a different project
+# This enables cross-project routing (when nano-degree operations affect coding files)
+if [ "$TARGET_PROJECT_DIR" != "$CODING_REPO" ]; then
+  log "Starting additional transcript monitoring for coding repo (cross-project routing)"
+  if [ -d "$CODING_REPO/.specstory" ] || mkdir -p "$CODING_REPO/.specstory/history" 2>/dev/null; then
+    start_transcript_monitoring "$CODING_REPO" "$CODING_REPO"
+  else
+    log "Warning: Could not create .specstory directory in coding repo"
+  fi
 fi
 
 # Show session summary for continuity
