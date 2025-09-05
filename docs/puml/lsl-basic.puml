@@ -1,0 +1,9 @@
+@startuml
+title Live Session Logging System
+
+Claude -> Monitor : Real-time transcripts
+Monitor -> LSLFiles : Generate session files
+Monitor -> StatusLine : Update display
+Monitor -> Trajectory : Create analysis
+
+@enduml

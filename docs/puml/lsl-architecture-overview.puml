@@ -1,0 +1,38 @@
+@startuml
+!theme plain
+title Live Session Logging (LSL) Architecture Overview
+
+participant "Claude Code\nSession" as Claude
+participant "Enhanced\nTranscript Monitor" as Monitor
+participant "Status Line\nDisplay" as Status
+participant "Semantic\nAnalyzer" as Analyzer
+database ".specstory/\nHistory Files" as Files
+database "Trajectory\nFiles" as Trajectory
+
+Claude -> Monitor : Transcript files\n(real-time)
+activate Monitor
+
+Monitor -> Monitor : Detect project\n(robust detection)
+Monitor -> Monitor : Parse exchanges\n(timezone-aware)
+Monitor -> Files : Generate LSL files\n(60-min tranches)
+
+Monitor -> Status : Update redirect status
+Monitor -> Analyzer : Send content for analysis
+activate Analyzer
+
+Analyzer -> Trajectory : Generate semantic\ntrajectory
+deactivate Analyzer
+
+Status -> Status : Display current session\n(with time warnings)
+
+note over Status
+🛡️ 8.5 🔍EX 🧠 ✅ 🔀→coding 📋1530-1630-session
+end note
+
+note over Files
+Cross-project routing:
+- nano-degree → coding (coding content)
+- Direct logging (project-specific content)
+end note
+
+@enduml

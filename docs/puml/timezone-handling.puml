@@ -1,0 +1,53 @@
+@startuml
+!theme plain
+title Timezone & Time Window Handling
+
+rectangle "Timezone Configuration" {
+  component "Central .env Config" as EnvConfig
+  component "Timezone Utilities" as Utils
+}
+
+rectangle "Time Sources" {
+  database "Claude Transcript\n(UTC timestamps)" as Transcript
+  component "Local System\nTime (CEST)" as LocalTime
+}
+
+rectangle "Time Window Logic" {
+  component "Window Calculator" as Calculator
+  note as WindowNote
+  60-minute tranches with 30-min offset:
+  - 06:30-07:30 CEST
+  - 07:30-08:30 CEST  
+  - 08:30-09:30 CEST
+  - 09:30-10:30 CEST
+  - etc.
+  end note
+}
+
+rectangle "Output Files" {
+  file "LSL Session Files" as LSLFiles
+  file "Trajectory Files" as TrajFiles
+  component "Status Line Display" as StatusDisplay
+}
+
+EnvConfig -> Utils : TIMEZONE=Europe/Berlin
+Transcript -> Utils : UTC: 2025-09-05T10:33:13Z
+LocalTime -> Calculator : Current CEST time
+
+Utils -> Calculator : Convert UTC → CEST
+Calculator -> WindowNote : Determine tranche
+Calculator -> LSLFiles : Filename: 1230-1330-session.md
+Calculator -> StatusDisplay : Display: 📋1230-1330-session
+
+Utils -> LSLFiles : Format: "12:33 CEST (10:33:13 UTC)"
+Utils -> TrajFiles : Timezone-aware timestamps
+
+note over Utils
+Centralized timezone handling:
+- parseTimestamp(utc) to local  
+- formatTimestamp() to display
+- getTimeWindow() to tranche
+- getTimezone() from .env
+end note
+
+@enduml

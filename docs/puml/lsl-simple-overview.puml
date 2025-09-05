@@ -1,0 +1,25 @@
+@startuml
+!theme plain
+title Live Session Logging Overview
+
+actor User
+participant "Claude Code" as Claude
+component "Transcript\nMonitor" as Monitor  
+database "LSL Files" as Files
+component "Status Line" as Status
+
+User -> Claude : Development session
+Claude -> Monitor : Real-time transcript
+Monitor -> Files : Generate session files
+Monitor -> Status : Update display
+
+note over Files
+Cross-project routing:
+nano-degree -> coding
+end note
+
+note over Status  
+Display: 🛡️ 8.5 🔍EX 🧠 ✅ 📋1530-1630
+end note
+
+@enduml

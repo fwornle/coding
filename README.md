@@ -55,29 +55,26 @@ The system provides:
 - **[Quick Setup](https://github.com/fwornle/mcp-server-constraint-monitor#quick-start)** - Add to any Claude Code project in 30 seconds
 - **Universal Compatibility** - Works with Claude Code, Cursor, Copilot, Aider and any coding project
 
-### Live Logging System
+### Live Session Logging (LSL) System v2.0
 
-- **[Live Logging System](docs/logging/live-logging-system.md)** - 📝 **Real-time transcript-based session monitoring**
-- **[Architecture Overview](docs/logging/live-logging-system.md#architecture-overview)** - Clean transcript-based design with AI analysis
-- **Current Status**: ✅ **Fully Operational** - Production-ready transcript monitoring with Groq AI insights
-- **Status Line Integration**: Real-time session info displayed in Claude Code status bar
-- **AI Analysis**: Groq-powered tool interaction insights and progress assessment  
-- **Performance**: < 10ms status updates, background AI processing
-- **Dependencies**: Node.js 18+, groq-sdk, Claude Code with statusLine support
-
-### Live Session Logging & Trajectory Analysis
-
-- **[Complete LSL Documentation](docs/live-session-logging-system.md)** - 🔄 **Comprehensive live session logging and trajectory analysis system**
-- **[System Architecture](docs/images/lsl-architecture.png)** - Visual overview of LSL components and data flow
-- **[Session Management](docs/images/session-transitions.png)** - Automatic 60-minute time tranche transitions with color-coded warnings
-- **[Status Line System](docs/images/status-display.png)** - Real-time session status with 🟠 orange warnings and 🔴 red indicators
-- **[Trajectory Analysis](docs/images/trajectory-flow.png)** - AI-powered learning accumulation and pattern recognition
-- **Key Features**: 
-  - **Automatic Session Transitions**: 60-minute time tranches (0630-0730, 0730-0830, etc.)
-  - **Real-time Status Warnings**: Orange indicator 5 minutes before session end
-  - **AI-Powered Analysis**: XAI/Grok semantic analysis with OpenAI fallback
-  - **Learning Accumulation**: Cross-session pattern recognition and knowledge building
-  - **Production Ready**: ✅ **Fully Operational** with comprehensive error handling
+- **[Complete LSL Documentation](docs/live-session-logging-system.md)** - 🔄 **Comprehensive live session logging with cross-project routing**
+- **[System Architecture](docs/images/lsl-basic.png)** - Enhanced transcript monitoring and intelligent content classification
+- **Key Features**:
+  - **Cross-Project Content Routing**: Routes coding content from nano-degree sessions to coding project LSL files
+  - **Robust Project Detection**: Multi-tier detection using environment variables, .specstory directories, and current working directory
+  - **Timezone-Aware Processing**: Centralized timezone handling via .env configuration (TIMEZONE=Europe/Berlin)
+  - **Enhanced Status Line**: Real-time session monitoring with `🔀→coding` redirect indicators and timing warnings
+  - **Semantic Trajectory Analysis**: AI-powered trajectory generation using Grok/XAI with progressive learning
+- **Status Line Integration**: 
+  ```
+  🛡️ 8.5 🔍EX 🧠 ✅ 🔀→coding 📋1530-1630-session
+  ```
+  - **🛡️ 8.5** - Constraint compliance score
+  - **🔍EX** - Experimentation mode active  
+  - **🧠 ✅** - Semantic analysis operational
+  - **🔀→coding** - Content being redirected to coding project
+  - **📋1530-1630-session** - Current session with timing warnings (🟠 orange ≤5min, 🔴 red ended)
+- **Production Status**: ✅ **Fully Operational** - Robust cross-project routing with comprehensive error handling
 
 ## 📚 Documentation
 

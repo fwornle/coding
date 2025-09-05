@@ -1,0 +1,62 @@
+@startuml
+!theme plain
+title Status Line Display States
+
+rectangle "Status Line Components" {
+  rectangle "Constraint\nMonitoring" as Constraint {
+    label "🛡️ 8.5" as Shield
+  }
+  
+  rectangle "Experimentation\nMode" as Experiment {
+    label "🔍EX" as Search
+  }
+  
+  rectangle "Semantic\nAnalysis" as Semantic {
+    label "🧠 ✅" as Brain
+  }
+  
+  rectangle "Content\nRedirection" as Redirect {
+    label "🔀→coding" as Arrow
+  }
+  
+  rectangle "Session\nStatus" as Session {
+    rectangle "Normal State" {
+      label "📋1530-1630-session" as Normal
+    }
+    rectangle "Warning State" {
+      label "📋🟠1530-1630(5min)" as Warning
+    }
+    rectangle "Ended State" {  
+      label "📋🔴1530-1630(ended)" as Ended
+    }
+  }
+}
+
+rectangle "Data Sources" {
+  component "Combined Status Line\nScript" as StatusScript
+  database ".services-running.json" as Services
+  database ".redirect-status" as RedirectFile
+  database ".specstory/history" as History
+}
+
+StatusScript -> Services : Check service health
+StatusScript -> RedirectFile : Check routing status
+StatusScript -> History : Find current session
+StatusScript -> Session : Calculate time remaining
+
+note over StatusScript
+Status line updates every 5 seconds
+Project detection via:
+- CODING_TARGET_PROJECT
+- Current working directory  
+- Coding repo directory
+end note
+
+note over Session
+Timing Logic:
+- Over 5 min: Normal display
+- Under 5 min: Orange warning  
+- Past end: Red ended
+end note
+
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+!theme plain
+title Cross-Project Content Routing
+
+rectangle "nano-degree" as nano {
+  file "session.md" as nano_session
+  file ".redirect-status" as redirect
+}
+
+rectangle "coding" as coding { 
+  file "from-nano-degree.md" as coding_session
+  file "trajectory.md" as trajectory
+}
+
+component "Monitor" as monitor
+component "Classifier" as classifier
+
+monitor -> classifier : Analyze content
+classifier -> nano_session : nano-degree content
+classifier -> coding_session : coding content  
+classifier -> redirect : Update status
+monitor -> trajectory : Generate analysis
+
+@enduml
