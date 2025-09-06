@@ -360,7 +360,8 @@ class EnhancedTranscriptMonitor {
   async updateComprehensiveTrajectory(targetProject) {
     try {
       const { spawn } = await import('child_process');
-      const updateScript = path.join(__dirname, 'update-comprehensive-trajectory.js');
+      const scriptDir = path.dirname(import.meta.url.replace('file://', ''));
+      const updateScript = path.join(scriptDir, 'update-comprehensive-trajectory-v2.js');
       
       const child = spawn('node', [updateScript], {
         cwd: targetProject,
