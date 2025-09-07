@@ -55,26 +55,31 @@ The system provides:
 - **[Quick Setup](https://github.com/fwornle/mcp-server-constraint-monitor#quick-start)** - Add to any Claude Code project in 30 seconds
 - **Universal Compatibility** - Works with Claude Code, Cursor, Copilot, Aider and any coding project
 
-### Live Session Logging (LSL) System v2.0
+### Live Session Logging (LSL) System v3.0
 
-- **[Complete LSL Documentation](docs/live-session-logging-system.md)** - 🔄 **Comprehensive live session logging with cross-project routing**
-- **[System Architecture](docs/images/lsl-basic.png)** - Enhanced transcript monitoring and intelligent content classification
+- **[Complete LSL Documentation](docs/live-session-logging-system.md)** - 🔄 **Comprehensive live session logging with conversation-based redirect detection**
+- **[Trajectory Generation System](docs/trajectory-generation-system.md)** - 📊 **Integrated repository analysis and trajectory reporting**
+- **System Architecture**: 
+  - ![LSL Architecture](docs/images/lsl-v3-architecture.png) - Conversation-based analysis with working directory tracking
+  - ![Status Line Integration](docs/images/status-line-hook-timing.png) - Hook-driven real-time updates
+  - ![Data Flow](docs/images/conversation-based-redirect-dataflow.png) - Context-aware redirect detection
 - **Key Features**:
-  - **Cross-Project Content Routing**: Routes coding content from nano-degree sessions to coding project LSL files
-  - **Robust Project Detection**: Multi-tier detection using environment variables, .specstory directories, and current working directory
-  - **Timezone-Aware Processing**: Centralized timezone handling via .env configuration (TIMEZONE=Europe/Berlin)
-  - **Enhanced Status Line**: Real-time session monitoring with `🔀→coding` redirect indicators and timing warnings
-  - **Semantic Trajectory Analysis**: AI-powered trajectory generation using Grok/XAI with progressive learning
+  - **Conversation-Based Detection**: Analyzes complete conversation context instead of individual files
+  - **Working Directory Tracking**: Context-aware path resolution using transcript metadata
+  - **Hook-Driven Updates**: Uses Claude Code's PostToolUse hooks for real-time status line updates
+  - **Dynamic Redirect Management**: 3-minute timeout for redirect indicators with automatic cleanup
+  - **Simplified Routing Logic**: Always reads from current project, routes based on content analysis
+  - **MCP-Powered Trajectory Analysis**: Deep repository analysis using semantic analysis services
 - **Status Line Integration**: 
   ```
-  🛡️ 8.5 🔍EX 🧠 ✅ 🔀→coding 📋1530-1630-session
+  🛡️ 8.5 🔍EX 🧠 ✅ →coding 📋1530-1630-session
   ```
   - **🛡️ 8.5** - Constraint compliance score
   - **🔍EX** - Experimentation mode active  
   - **🧠 ✅** - Semantic analysis operational
-  - **🔀→coding** - Content being redirected to coding project
-  - **📋1530-1630-session** - Current session with timing warnings (🟠 orange ≤5min, 🔴 red ended)
-- **Production Status**: ✅ **Fully Operational** - Robust cross-project routing with comprehensive error handling
+  - **→coding** - Dynamic coding activity indicator (3-min timeout)
+  - **📋1530-1630-session** - Current session with timing warnings
+- **Production Status**: ✅ **Fully Operational** - Hook-integrated with conversation-based redirect detection
 
 ## 📚 Documentation
 
