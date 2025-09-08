@@ -32,14 +32,74 @@ function getTargetProject() {
   };
 }
 
+// Function to redact API keys and secrets from text
+function redactSecrets(text) {
+  if (!text) return text;
+  
+  // List of API key patterns to redact
+  const apiKeyPatterns = [
+    // Environment variable format: KEY=value
+    /\b(ANTHROPIC_API_KEY|OPENAI_API_KEY|GROK_API_KEY|XAI_API_KEY|GROQ_API_KEY|GEMINI_API_KEY|CLAUDE_API_KEY|GPT_API_KEY|DEEPMIND_API_KEY|COHERE_API_KEY|HUGGINGFACE_API_KEY|HF_API_KEY|REPLICATE_API_KEY|TOGETHER_API_KEY|PERPLEXITY_API_KEY|AI21_API_KEY|GOOGLE_API_KEY|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AZURE_API_KEY|GCP_API_KEY|GITHUB_TOKEN|GITLAB_TOKEN|BITBUCKET_TOKEN|NPM_TOKEN|PYPI_TOKEN|DOCKER_TOKEN|SLACK_TOKEN|DISCORD_TOKEN|TELEGRAM_TOKEN|STRIPE_API_KEY|SENDGRID_API_KEY|MAILGUN_API_KEY|TWILIO_AUTH_TOKEN|FIREBASE_API_KEY|SUPABASE_API_KEY|MONGODB_URI|POSTGRES_PASSWORD|MYSQL_PASSWORD|REDIS_PASSWORD|DATABASE_URL|CONNECTION_STRING|JWT_SECRET|SESSION_SECRET|ENCRYPTION_KEY|PRIVATE_KEY|SECRET_KEY|CLIENT_SECRET|API_SECRET|WEBHOOK_SECRET)\s*=\s*["']?([^"'\s\n]+)["']?/gi,
+    
+    // sk- prefix (common for various API keys)
+    /\bsk-[a-zA-Z0-9]{20,}/gi,
+    
+    // Common API key formats
+    /\b[a-zA-Z0-9]{32,}[-_][a-zA-Z0-9]{8,}/gi,
+    
+    // Bearer tokens
+    /Bearer\s+[a-zA-Z0-9\-._~+\/]{20,}/gi,
+    
+    // JWT tokens (three base64 parts separated by dots)
+    /\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/gi,
+    
+    // MongoDB connection strings
+    /mongodb(\+srv)?:\/\/[^:]+:[^@]+@[^\s]+/gi,
+    
+    // PostgreSQL/MySQL connection strings
+    /postgres(ql)?:\/\/[^:]+:[^@]+@[^\s]+/gi,
+    /mysql:\/\/[^:]+:[^@]+@[^\s]+/gi,
+    
+    // Generic URL with credentials
+    /https?:\/\/[^:]+:[^@]+@[^\s]+/gi
+  ];
+  
+  let redactedText = text;
+  
+  // Apply each pattern
+  apiKeyPatterns.forEach(pattern => {
+    if (pattern.source.includes('=')) {
+      // For environment variable patterns, preserve the key name
+      redactedText = redactedText.replace(pattern, (match, keyName) => {
+        return `${keyName}=<SECRET_REDACTED>`;
+      });
+    } else if (pattern.source.includes('mongodb') || pattern.source.includes('postgres') || pattern.source.includes('mysql')) {
+      // For connection strings, preserve the protocol
+      redactedText = redactedText.replace(pattern, (match) => {
+        const protocol = match.split(':')[0];
+        return `${protocol}://<CONNECTION_STRING_REDACTED>`;
+      });
+    } else if (pattern.source.includes('Bearer')) {
+      // For Bearer tokens
+      redactedText = redactedText.replace(pattern, 'Bearer <TOKEN_REDACTED>');
+    } else {
+      // For other patterns, replace with generic redaction
+      redactedText = redactedText.replace(pattern, '<SECRET_REDACTED>');
+    }
+  });
+  
+  return redactedText;
+}
+
 function extractTextContent(content) {
-  if (typeof content === 'string') return content;
+  if (typeof content === 'string') return redactSecrets(content);
   if (Array.isArray(content)) {
-    return content
+    const text = content
       .filter(item => item && item.type === 'text')
       .map(item => item.text)
       .filter(text => text && text.trim())
       .join('\n');
+    return redactSecrets(text);
   }
   return '';
 }
@@ -48,7 +108,7 @@ function extractUserMessage(entry) {
   // Handle different user message structures
   if (entry.message?.content) {
     if (typeof entry.message.content === 'string') {
-      return entry.message.content;
+      return redactSecrets(entry.message.content);
     }
     return extractTextContent(entry.message.content);
   }
@@ -114,7 +174,9 @@ function extractToolCalls(content) {
                            tool.input?.file_path || 
                            tool.input?.pattern ||
                            'Tool executed';
-        return `**${tool.name}**: ${description}`;
+        // Redact secrets from tool descriptions
+        const redactedDescription = redactSecrets(description);
+        return `**${tool.name}**: ${redactedDescription}`;
       })
       .join('\n');
   }
@@ -224,12 +286,14 @@ async function generateLSL() {
             // This is a tool result
             const toolResult = nextEntry.message.content[0].content;
             if (toolResult && typeof toolResult === 'string') {
+              // Redact secrets from tool results
+              const redactedResult = redactSecrets(toolResult);
               // For /sl commands, also abbreviate tool results like Claude responses
-              if (isSlashCommandResponse(userText, toolResult)) {
-                toolResults.push(truncateSlashCommandResponse(toolResult));
+              if (isSlashCommandResponse(userText, redactedResult)) {
+                toolResults.push(truncateSlashCommandResponse(redactedResult));
               } else {
                 // Capture full tool result for non-/sl commands
-                toolResults.push(toolResult);
+                toolResults.push(redactedResult);
               }
             }
           }
