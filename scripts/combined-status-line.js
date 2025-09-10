@@ -301,7 +301,7 @@ class CombinedStatusLine {
       }
 
       // Get API key from configured environment variables
-      const apiKeyVars = this.config.api_key_env_vars || ['GROQ_API_KEY', 'GROK_API_KEY', 'XAI_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'];
+      const apiKeyVars = this.config.api_key_env_vars || ['XAI_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'];
       let apiKey = null;
       let provider = null;
 

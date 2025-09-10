@@ -687,7 +687,7 @@ setup_mcp_config() {
     sed -i.bak "s|{{LOCAL_CDP_URL}}|${LOCAL_CDP_URL:-ws://localhost:9222}|g" "$temp_file"
     sed -i.bak "s|{{ANTHROPIC_API_KEY}}|${ANTHROPIC_API_KEY:-}|g" "$temp_file"
     sed -i.bak "s|{{OPENAI_API_KEY}}|${OPENAI_API_KEY:-}|g" "$temp_file"
-    sed -i.bak "s|{{GROK_API_KEY}}|${GROK_API_KEY:-}|g" "$temp_file"
+    sed -i.bak "s|{{XAI_API_KEY}}|${XAI_API_KEY:-}|g" "$temp_file"
     sed -i.bak "s|{{OPENAI_BASE_URL}}|${OPENAI_BASE_URL:-}|g" "$temp_file"
     sed -i.bak "s|{{KNOWLEDGE_BASE_PATH}}|${KNOWLEDGE_BASE_PATH:-$CODING_REPO/knowledge-management/insights}|g" "$temp_file"
     sed -i.bak "s|{{CODING_DOCS_PATH}}|${CODING_DOCS_PATH:-$CODING_REPO/docs}|g" "$temp_file"
@@ -848,7 +848,7 @@ CODING_TOOLS_PATH=/path/to/coding/repo
 # No specific environment variables required
 
 # For constraint-monitor system
-GROK_API_KEY=your-groq-api-key
+XAI_API_KEY=your-xai-api-key
 OPENAI_API_KEY=your-openai-api-key
 
 # Custom paths (optional)

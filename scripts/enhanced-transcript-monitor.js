@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { parseTimestamp, formatTimestamp, getTimeWindow, getTimezone } from './timezone-utils.js';
+import { SemanticAnalyzer } from '../src/live-logging/SemanticAnalyzer.js';
 
 // Function to redact API keys and secrets from text
 function redactSecrets(text) {
@@ -17,7 +18,7 @@ function redactSecrets(text) {
   // List of API key patterns to redact
   const apiKeyPatterns = [
     // Environment variable format: KEY=value
-    /\b(ANTHROPIC_API_KEY|OPENAI_API_KEY|GROK_API_KEY|XAI_API_KEY|GROQ_API_KEY|GEMINI_API_KEY|CLAUDE_API_KEY|GPT_API_KEY|DEEPMIND_API_KEY|COHERE_API_KEY|HUGGINGFACE_API_KEY|HF_API_KEY|REPLICATE_API_KEY|TOGETHER_API_KEY|PERPLEXITY_API_KEY|AI21_API_KEY|GOOGLE_API_KEY|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AZURE_API_KEY|GCP_API_KEY|GITHUB_TOKEN|GITLAB_TOKEN|BITBUCKET_TOKEN|NPM_TOKEN|PYPI_TOKEN|DOCKER_TOKEN|SLACK_TOKEN|DISCORD_TOKEN|TELEGRAM_TOKEN|STRIPE_API_KEY|SENDGRID_API_KEY|MAILGUN_API_KEY|TWILIO_AUTH_TOKEN|FIREBASE_API_KEY|SUPABASE_API_KEY|MONGODB_URI|POSTGRES_PASSWORD|MYSQL_PASSWORD|REDIS_PASSWORD|DATABASE_URL|CONNECTION_STRING|JWT_SECRET|SESSION_SECRET|ENCRYPTION_KEY|PRIVATE_KEY|SECRET_KEY|CLIENT_SECRET|API_SECRET|WEBHOOK_SECRET)\s*=\s*["']?([^"'\s\n]+)["']?/gi,
+    /\b(ANTHROPIC_API_KEY|OPENAI_API_KEY|GROK_API_KEY|XAI_API_KEY|GEMINI_API_KEY|CLAUDE_API_KEY|GPT_API_KEY|DEEPMIND_API_KEY|COHERE_API_KEY|HUGGINGFACE_API_KEY|HF_API_KEY|REPLICATE_API_KEY|TOGETHER_API_KEY|PERPLEXITY_API_KEY|AI21_API_KEY|GOOGLE_API_KEY|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AZURE_API_KEY|GCP_API_KEY|GITHUB_TOKEN|GITLAB_TOKEN|BITBUCKET_TOKEN|NPM_TOKEN|PYPI_TOKEN|DOCKER_TOKEN|SLACK_TOKEN|DISCORD_TOKEN|TELEGRAM_TOKEN|STRIPE_API_KEY|SENDGRID_API_KEY|MAILGUN_API_KEY|TWILIO_AUTH_TOKEN|FIREBASE_API_KEY|SUPABASE_API_KEY|MONGODB_URI|POSTGRES_PASSWORD|MYSQL_PASSWORD|REDIS_PASSWORD|DATABASE_URL|CONNECTION_STRING|JWT_SECRET|SESSION_SECRET|ENCRYPTION_KEY|PRIVATE_KEY|SECRET_KEY|CLIENT_SECRET|API_SECRET|WEBHOOK_SECRET)\s*=\s*["']?([^"'\s\n]+)["']?/gi,
     
     // JSON format: "apiKey": "sk-..." or "API_KEY": "sk-..." or "xai-..."
     /"(apiKey|API_KEY|ANTHROPIC_API_KEY|OPENAI_API_KEY|XAI_API_KEY|GROK_API_KEY|api_key|anthropicApiKey|openaiApiKey|xaiApiKey|grokApiKey)":\s*"(sk-[a-zA-Z0-9-_]{20,}|xai-[a-zA-Z0-9-_]{20,}|[a-zA-Z0-9-_]{32,})"/gi,
@@ -120,6 +121,21 @@ class EnhancedTranscriptMonitor {
     this.currentUserPromptSet = [];
     this.lastUserPromptTime = null;
     this.sessionFiles = new Map(); // Track multiple session files
+    
+    // Initialize semantic analyzer for content classification
+    this.semanticAnalyzer = null;
+    try {
+      const apiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY || process.env.OPENAI_API_KEY;
+      if (apiKey) {
+        this.semanticAnalyzer = new SemanticAnalyzer(apiKey);
+        this.debug('Semantic analyzer initialized for content classification');
+      } else {
+        this.debug('No API key found - semantic analysis disabled');
+      }
+    } catch (error) {
+      console.error('Failed to initialize semantic analyzer:', error.message);
+      this.semanticAnalyzer = null;
+    }
   }
 
   /**
@@ -361,7 +377,7 @@ class EnhancedTranscriptMonitor {
    * (2a) If running in coding -> write to coding LSL
    * (2b) If running outside coding -> check redirect status
    */
-  determineTargetProject(exchange) {
+  async determineTargetProject(exchange) {
     const codingPath = process.env.CODING_TOOLS_PATH || '/Users/q284340/Agentic/coding';
     
     // Check if we're running from coding directory
@@ -370,7 +386,7 @@ class EnhancedTranscriptMonitor {
     }
     
     // Running from outside coding - check redirect status
-    if (this.isCodingRelated(exchange)) {
+    if (await this.isCodingRelated(exchange)) {
       return codingPath; // Redirect to coding
     }
     
@@ -387,56 +403,35 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
-   * Check if content involves coding project
+   * Check if content involves coding project using semantic analysis
    */
-  isCodingRelated(exchange) {
+  async isCodingRelated(exchange) {
     const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
     
     console.log(`\n🔍 ENHANCED CODING DETECTION:`);
     console.log(`  Coding path: ${codingPath}`);
     console.log(`  Tools: ${exchange.toolCalls?.map(t => t.name).join(', ') || 'none'}`);
     
-    // 1. Check tool calls for file operations in coding directory
+    // 1. FIRST: Check tool calls for DIRECT file operations in coding directory
+    // This is fast and definitive - if tools touch coding files, it's clearly coding
     for (const toolCall of exchange.toolCalls || []) {
       const toolData = JSON.stringify(toolCall).toLowerCase();
       
+      // Direct path references to coding directory
       if (toolData.includes(codingPath.toLowerCase()) || toolData.includes('/coding/') || toolData.includes('coding/')) {
-        console.log(`✅ CODING DETECTED (TOOL): ${toolCall.name} touches coding directory`);
+        console.log(`✅ CODING DETECTED (DIRECT): ${toolCall.name} touches coding directory`);
         this.debug(`Coding detected: ${toolCall.name} operates on coding directory`);
         return true;
       }
-    }
-    
-    // 2. Check user message and Claude response for coding-related keywords
-    const combinedContent = (exchange.userMessage + ' ' + exchange.claudeResponse).toLowerCase();
-    
-    const codingIndicators = [
-      'enhanced-transcript-monitor',
-      'transcript-monitor',
-      'trajectory system debugging',
-      'trajectory script',
-      'update-comprehensive-trajectory',
-      'coding/scripts/',
-      'coding/bin/',
-      // Removed overly broad keywords that cause false positives
-      // 'coding project', // Too generic
-      // 'lsl system', // Part of normal operation
-      // 'live session logging', // Part of normal operation  
-      // 'redirect indicator', // Part of normal operation
-      // 'status line', // Could be any project
-      'coding tools',
-      'coding_tools_path',
-      'trajectory update',
-      'semantic analysis',
-      'cross-project',
-      'content routing'
-    ];
-    
-    for (const indicator of codingIndicators) {
-      if (combinedContent.includes(indicator)) {
-        console.log(`✅ CODING DETECTED (CONTENT): Found "${indicator}" in exchange`);
-        this.debug(`Coding detected: Content contains "${indicator}"`);
-        return true;
+      
+      // LSL generation script patterns
+      if (toolCall.name === 'Bash' && toolData.includes('generate-proper-lsl-from-transcripts.js')) {
+        if (toolData.includes('CODING_TARGET_PROJECT="/Users/q284340/Agentic/coding"') || 
+            toolData.includes('--project=coding')) {
+          console.log(`✅ CODING DETECTED (LSL): LSL generation script targeting coding project`);
+          this.debug(`Coding detected: LSL script targets coding project`);
+          return true;
+        }
       }
     }
     
@@ -444,15 +439,68 @@ class EnhancedTranscriptMonitor {
     for (const toolResult of exchange.toolResults || []) {
       const resultData = JSON.stringify(toolResult).toLowerCase();
       
+      // Direct coding directory references
       if (resultData.includes(codingPath.toLowerCase()) || resultData.includes('/coding/')) {
-        console.log(`✅ CODING DETECTED: Tool result references coding directory`);
+        console.log(`✅ CODING DETECTED (RESULT): Tool result references coding directory`);
         this.debug(`Coding detected: Tool result references coding directory`);
         return true;
       }
     }
     
-    console.log(`❌ NON-CODING: No file operations in coding directory detected`);
-    this.debug(`Non-coding: No file operations in coding directory detected`);
+    // 2. SECOND: Use semantic analysis for content classification
+    if (this.semanticAnalyzer) {
+      try {
+        console.log(`🧠 SEMANTIC ANALYSIS: Analyzing conversation content...`);
+        const classification = await this.semanticAnalyzer.classifyConversationContent(exchange);
+        
+        console.log(`🧠 SEMANTIC RESULT: ${classification.classification} (${classification.confidence} confidence)`);
+        console.log(`🧠 REASON: ${classification.reason}`);
+        
+        const isCoding = classification.classification === 'CODING_INFRASTRUCTURE';
+        if (isCoding) {
+          console.log(`✅ CODING DETECTED (SEMANTIC): ${classification.reason}`);
+          this.debug(`Coding detected via semantic analysis: ${classification.reason}`);
+        } else {
+          console.log(`📄 NON-CODING CONTENT (SEMANTIC): ${classification.reason}`);
+          this.debug(`Non-coding content detected via semantic analysis: ${classification.reason}`);
+        }
+        
+        return isCoding;
+        
+      } catch (error) {
+        console.log(`⚠️ SEMANTIC ANALYSIS FAILED: ${error.message}`);
+        this.debug(`Semantic analysis failed: ${error.message}`);
+        // Fall through to keyword fallback
+      }
+    }
+    
+    // 3. FALLBACK: Simple keyword detection (only if semantic analysis unavailable)
+    console.log(`🔤 FALLBACK: Using keyword detection...`);
+    const combinedContent = (exchange.userMessage + ' ' + exchange.claudeResponse).toLowerCase();
+    
+    const codingIndicators = [
+      'enhanced-transcript-monitor',
+      'transcript-monitor', 
+      'lsl system',
+      'live session logging',
+      'trajectory',
+      'semantic analysis',
+      'coding tools',
+      'generate-proper-lsl',
+      'redaction',
+      'script debugging'
+    ];
+    
+    for (const indicator of codingIndicators) {
+      if (combinedContent.includes(indicator)) {
+        console.log(`✅ CODING DETECTED (FALLBACK): Found "${indicator}" in exchange`);
+        this.debug(`Coding detected via fallback: Content contains "${indicator}"`);
+        return true;
+      }
+    }
+    
+    console.log(`📄 NON-CODING: Classified as non-coding content`);
+    this.debug('Non-coding: Classified as non-coding content');
     return false;
   }
   
@@ -720,20 +768,20 @@ class EnhancedTranscriptMonitor {
           
           // Complete previous user prompt set if exists
           if (this.currentUserPromptSet.length > 0) {
-            const targetProject = this.determineTargetProject(this.currentUserPromptSet[0]);
+            const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
             await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, this.lastTranche || currentTranche);
             this.currentUserPromptSet = [];
           }
           
           // Create new session files for new time boundary - EXCLUSIVE routing
-          const targetProject = this.determineTargetProject(exchange);
+          const targetProject = await this.determineTargetProject(exchange);
           await this.createOrAppendToSessionFile(targetProject, currentTranche, exchange);
           this.lastTranche = currentTranche;
           
         } else {
           // Same session - complete current user prompt set  
           if (this.currentUserPromptSet.length > 0) {
-            const targetProject = this.determineTargetProject(this.currentUserPromptSet[0]);
+            const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
             await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, currentTranche);
             
             // Note: Redirect detection now handled by conversation-based analysis in status line
@@ -820,7 +868,7 @@ class EnhancedTranscriptMonitor {
       // Complete any pending user prompt set
       if (this.currentUserPromptSet.length > 0) {
         const currentTranche = this.getCurrentTimetranche();
-        const targetProject = this.determineTargetProject(this.currentUserPromptSet[0]);
+        const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
         
         await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, currentTranche);
       }

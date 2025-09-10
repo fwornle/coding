@@ -86,8 +86,6 @@
     "display_timezone": "Europe/Berlin"
   },
   "api_key_env_vars": [
-    "GROQ_API_KEY",
-    "GROK_API_KEY", 
     "XAI_API_KEY",
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY"
