@@ -10,6 +10,7 @@ import path from 'path';
 import os from 'os';
 import { parseTimestamp, formatTimestamp, getTimeWindow, getTimezone } from './timezone-utils.js';
 import { SemanticAnalyzer } from '../src/live-logging/SemanticAnalyzer.js';
+import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
 
 // Function to redact API keys and secrets from text
 function redactSecrets(text) {
@@ -122,19 +123,106 @@ class EnhancedTranscriptMonitor {
     this.lastUserPromptTime = null;
     this.sessionFiles = new Map(); // Track multiple session files
     
-    // Initialize semantic analyzer for content classification
+    // Initialize reliable coding classifier for local classification
+    this.reliableCodingClassifier = null;
+    this.reliableCodingClassifierReady = false;
+    this.initializeReliableCodingClassifier().catch(err => {
+      console.error('Reliable coding classifier initialization failed:', err.message);
+    });
+    
+    // Initialize semantic analyzer for content classification (fallback)
     this.semanticAnalyzer = null;
     try {
       const apiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY || process.env.OPENAI_API_KEY;
       if (apiKey) {
         this.semanticAnalyzer = new SemanticAnalyzer(apiKey);
-        this.debug('Semantic analyzer initialized for content classification');
+        this.debug('Semantic analyzer initialized for content classification (fallback)');
       } else {
         this.debug('No API key found - semantic analysis disabled');
       }
     } catch (error) {
       console.error('Failed to initialize semantic analyzer:', error.message);
       this.semanticAnalyzer = null;
+    }
+  }
+
+  /**
+   * Get session duration from config file in milliseconds
+   */
+  getSessionDurationMs() {
+    try {
+      const codingRepo = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO;
+      if (!codingRepo) {
+        return 3600000; // Default: 1 hour
+      }
+      
+      const configPath = path.join(codingRepo, 'config', 'live-logging-config.json');
+      if (!fs.existsSync(configPath)) {
+        return 3600000; // Default: 1 hour
+      }
+      
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      return config.live_logging?.session_duration || 3600000; // Default: 1 hour
+    } catch (error) {
+      return 3600000; // Default: 1 hour
+    }
+  }
+
+  /**
+   * Initialize reliable coding classifier
+   */
+  async initializeReliableCodingClassifier() {
+    try {
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+      
+      this.reliableCodingClassifier = new ReliableCodingClassifier({
+        projectPath: this.config.projectPath,
+        codingRepo: codingPath,
+        apiKey: process.env.XAI_API_KEY || process.env.OPENAI_API_KEY,
+        debug: this.debug
+      });
+      
+      await this.reliableCodingClassifier.initialize();
+      
+      this.reliableCodingClassifierReady = true;
+      this.debug(`Reliable coding classifier initialized with three-layer architecture`);
+    } catch (error) {
+      console.error('Failed to initialize reliable coding classifier:', error.message);
+      this.reliableCodingClassifier = null;
+      this.reliableCodingClassifierReady = false;
+    }
+  }
+
+  /**
+   * Get all transcript files for historical reprocessing
+   */
+  getAllTranscriptFiles() {
+    const baseDir = path.join(os.homedir(), '.claude', 'projects');
+    const projectName = this.getProjectDirName();
+    const projectDir = path.join(baseDir, projectName);
+    
+    if (!fs.existsSync(projectDir)) {
+      this.debug(`Project directory not found: ${projectDir}`);
+      return [];
+    }
+
+    this.debug(`Looking for all transcripts in: ${projectDir}`);
+
+    try {
+      const files = fs.readdirSync(projectDir)
+        .filter(file => file.endsWith('.jsonl'))
+        .map(file => {
+          const filePath = path.join(projectDir, file);
+          const stats = fs.statSync(filePath);
+          return { path: filePath, mtime: stats.mtime, size: stats.size };
+        })
+        .sort((a, b) => a.mtime - b.mtime); // Sort oldest first for chronological processing
+
+      this.debug(`Found ${files.length} transcript files for processing`);
+      return files.map(f => f.path);
+    } catch (error) {
+      this.debug(`Error reading transcript directory: ${error.message}`);
+      return [];
     }
   }
 
@@ -447,10 +535,58 @@ class EnhancedTranscriptMonitor {
       }
     }
     
-    // 2. SECOND: Use semantic analysis for content classification
+    // 2. SECOND: Use reliable coding classifier for local classification (priority)
+    if (this.reliableCodingClassifier && this.reliableCodingClassifierReady) {
+      try {
+        console.log(`⚡ RELIABLE CLASSIFIER: Analyzing with three-layer architecture...`);
+        const startTime = Date.now();
+        
+        // Build exchange object with file operations
+        const fileOps = [];
+        if (exchange.toolCalls) {
+          for (const tool of exchange.toolCalls) {
+            if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool.name) && tool.input?.file_path) {
+              fileOps.push(tool.input.file_path);
+            }
+          }
+        }
+        
+        const embeddingExchange = {
+          ...exchange,
+          fileOperations: fileOps
+        };
+        
+        const result = await this.reliableCodingClassifier.classify(embeddingExchange);
+        
+        console.log(`⚡ RELIABLE RESULT: ${result.classification} (confidence: ${result.confidence}, time: ${result.processingTimeMs}ms)`);
+        console.log(`⚡ LAYER: ${result.layer || 'unknown'} | REASONING: ${result.reason}`);
+        
+        const isCoding = result.classification === 'CODING_INFRASTRUCTURE';
+        if (isCoding) {
+          console.log(`✅ CODING DETECTED (${result.layer?.toUpperCase()}): ${result.reason}`);
+          this.debug(`Coding detected via ${result.layer} layer in ${result.processingTimeMs}ms`);
+        } else {
+          console.log(`📄 NON-CODING CONTENT (${result.layer?.toUpperCase()}): ${result.reason}`);
+          this.debug(`Non-coding content via ${result.layer} layer in ${result.processingTimeMs}ms`);
+        }
+        
+        // Show performance stats occasionally
+        if (Math.random() < 0.1) { // 10% of the time
+          const stats = this.reliableCodingClassifier.getStats();
+          console.log(`⚡ STATS: Avg classification time: ${stats.avgClassificationTime?.toFixed(1)}ms, Classifications: ${stats.totalClassifications}`);
+        }
+        
+        return isCoding;
+      } catch (error) {
+        console.error('Reliable coding classification failed:', error.message);
+        // Fall through to semantic analyzer
+      }
+    }
+    
+    // 3. THIRD: Fall back to semantic analysis if reliable coding classifier unavailable
     if (this.semanticAnalyzer) {
       try {
-        console.log(`🧠 SEMANTIC ANALYSIS: Analyzing conversation content...`);
+        console.log(`🧠 SEMANTIC ANALYSIS (FALLBACK): Analyzing conversation content...`);
         const classification = await this.semanticAnalyzer.classifyConversationContent(exchange);
         
         console.log(`🧠 SEMANTIC RESULT: ${classification.classification} (${classification.confidence} confidence)`);
@@ -474,7 +610,7 @@ class EnhancedTranscriptMonitor {
       }
     }
     
-    // 3. FALLBACK: Simple keyword detection (only if semantic analysis unavailable)
+    // 4. FINAL FALLBACK: Simple keyword detection (only if all classifiers unavailable)
     console.log(`🔤 FALLBACK: Using keyword detection...`);
     const combinedContent = (exchange.userMessage + ' ' + exchange.claudeResponse).toLowerCase();
     
@@ -507,12 +643,12 @@ class EnhancedTranscriptMonitor {
 
 
   /**
-   * Get current time tranche (XX:30 - (XX+1):30)
+   * Get time tranche for given timestamp (XX:30 - (XX+1):30)
    */
-  getCurrentTimetranche() {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
+  getCurrentTimetranche(timestamp = null) {
+    const targetTime = timestamp ? new Date(timestamp) : new Date();
+    const hours = targetTime.getHours();
+    const minutes = targetTime.getMinutes();
     const totalMinutes = hours * 60 + minutes;
     const trancheStart = Math.floor((totalMinutes + 30) / 60) * 60 - 30;
     const trancheEnd = trancheStart + 60;
@@ -526,7 +662,7 @@ class EnhancedTranscriptMonitor {
       timeString: `${formatTime(startHour, startMin)}-${formatTime(endHour, endMin)}`,
       startTime: trancheStart,
       endTime: trancheEnd,
-      date: now.toISOString().split('T')[0]
+      date: targetTime.toISOString().split('T')[0]
     };
   }
 
@@ -758,7 +894,7 @@ class EnhancedTranscriptMonitor {
     this.debug(`Processing ${exchanges.length} exchanges`);
 
     for (const exchange of exchanges) {
-      const currentTranche = this.getCurrentTimetranche();
+      const currentTranche = this.getCurrentTimetranche(exchange.timestamp);
       
       if (exchange.isUserPrompt) {
         // New user prompt detected
@@ -834,7 +970,8 @@ class EnhancedTranscriptMonitor {
     console.log(`📁 Project: ${this.config.projectPath}`);
     console.log(`📊 Transcript: ${path.basename(this.transcriptPath)}`);
     console.log(`🔍 Check interval: ${this.config.checkInterval}ms`);
-    console.log(`⏰ Session boundaries: Every 30 minutes`);
+    const sessionDurationMins = Math.round(this.getSessionDurationMs() / 60000);
+    console.log(`⏰ Session boundaries: Every ${sessionDurationMins} minutes`);
 
     // Create initial health file
     this.updateHealthFile();

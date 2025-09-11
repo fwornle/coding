@@ -58,11 +58,14 @@ export class TranscriptAnalyzer {
         return null;
       }
 
-      // Return the most recent file that's been modified in the last 30 minutes
+      // Return the most recent file that's been modified in the configured session duration
       const mostRecent = files[0];
       const timeDiff = Date.now() - mostRecent.mtime.getTime();
       
-      if (timeDiff < 1800000) { // 30 minutes
+      // Load session duration from config (defaults to 1 hour)
+      const sessionDuration = this.getSessionDurationMs();
+      
+      if (timeDiff < sessionDuration) {
         return mostRecent.path;
       }
 
@@ -70,6 +73,30 @@ export class TranscriptAnalyzer {
     } catch (error) {
       this.debug(`Error finding transcript: ${error.message}`);
       return null;
+    }
+  }
+
+  /**
+   * Get session duration from config file in milliseconds
+   */
+  getSessionDurationMs() {
+    try {
+      // Find the coding repository root
+      const codingRepo = process.env.CODING_REPO || process.env.CODING_TOOLS_PATH;
+      if (!codingRepo) {
+        return 3600000; // Default: 1 hour
+      }
+      
+      const configPath = path.join(codingRepo, 'config', 'live-logging-config.json');
+      if (!fs.existsSync(configPath)) {
+        return 3600000; // Default: 1 hour
+      }
+      
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      return config.live_logging?.session_duration || 3600000; // Default: 1 hour
+    } catch (error) {
+      this.debug(`Error loading session duration from config: ${error.message}`);
+      return 3600000; // Default: 1 hour
     }
   }
 

@@ -24,8 +24,11 @@ class ClaudeConversationExtractor {
   async findRecentConversation(withinMinutes = 30) {
     const projectDir = path.join(this.claudeProjectsDir, this.projectKey);
     
-    // console.log(`🔍 Looking for project directory: ${projectDir}`);
-    // console.log(`📁 Available projects:`, fs.existsSync(this.claudeProjectsDir) ? fs.readdirSync(this.claudeProjectsDir) : 'Directory not found');
+    // Quick timeout check - don't hang
+    if (!fs.existsSync(this.claudeProjectsDir)) {
+      console.log(`⚠️  Claude projects directory not found: ${this.claudeProjectsDir}`);
+      return null;
+    }
     
     if (!fs.existsSync(projectDir)) {
       console.log(`⚠️  Claude project directory not found: ${projectDir}`);
@@ -133,12 +136,14 @@ class ClaudeConversationExtractor {
         if (part.type === 'text') {
           return part.text;
         } else if (part.type === 'tool_use') {
-          return `[Tool: ${part.name}]`;
+          const input = part.input ? `\nInput: ${JSON.stringify(part.input, null, 2)}` : '';
+          return `[Tool: ${part.name}]${input}`;
         } else if (part.type === 'tool_result') {
-          return `[Tool Result]`;
+          const result = part.content || part.text || part.result || JSON.stringify(part, null, 2);
+          return `[Tool Result]\n${result}`;
         }
         return '';
-      }).join('');
+      }).join('\n\n');
     }
     
     return message.content || '';
@@ -174,17 +179,17 @@ class ClaudeConversationExtractor {
         
         exchangeNumber++;
         content += `## Exchange ${exchangeNumber}\n\n`;
-        content += `**User:** *(${timestamp})*\n${message.content}\n\n`;
+        content += `**User:** *(${timestamp})*\n${this.extractMessageContent(message)}\n\n`;
         currentExchange = { user: true };
         
       } else if (message.type === 'assistant') {
         if (currentExchange && currentExchange.user) {
           // Complete the exchange
-          content += `**Assistant:** *(${timestamp})*\n${message.content}\n\n---\n\n`;
+          content += `**Assistant:** *(${timestamp})*\n${this.extractMessageContent(message)}\n\n---\n\n`;
           currentExchange = null;
         } else {
           // Orphaned assistant message
-          content += `**Assistant:** *(${timestamp})*\n${message.content}\n\n---\n\n`;
+          content += `**Assistant:** *(${timestamp})*\n${this.extractMessageContent(message)}\n\n---\n\n`;
         }
       }
     }
@@ -207,6 +212,24 @@ class ClaudeConversationExtractor {
   async extractRecentConversation(withinMinutes = 30) {
     console.log('🔍 Searching for recent Claude Code conversation...');
     
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Conversation extraction timed out')), 10000); // 10 second timeout
+    });
+    
+    try {
+      const extractionPromise = this._doExtractRecentConversation(withinMinutes);
+      return await Promise.race([extractionPromise, timeoutPromise]);
+    } catch (error) {
+      if (error.message.includes('timed out')) {
+        console.log('⚠️  Conversation extraction timed out, skipping');
+        return null;
+      }
+      throw error;
+    }
+  }
+  
+  async _doExtractRecentConversation(withinMinutes) {
     const recentFile = await this.findRecentConversation(withinMinutes);
     if (!recentFile) {
       return null;

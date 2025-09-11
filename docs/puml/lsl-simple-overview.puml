@@ -1,26 +1,43 @@
-@startuml
+@startuml lsl-simple-overview
 !include _standard-style.puml
-!theme plain
-title Live Session Logging Overview
+
+title Live Session Logging (LSL) v4.0 - Overview
 
 actor User
-participant "Claude Code" as Claude
-participant "Transcript\nMonitor" as Monitor  
-participant "LSL Files" as Files
-participant "Status Line" as Status
+participant "Claude Code" as Claude <<cli>>
+participant "Transcript\nMonitor" as Monitor <<core>>
+participant "ReliableCoding\nClassifier" as Classifier <<agent>>
+participant "Session\nRouter" as Router <<core>>
+participant "LSL Files" as Files <<storage>>
+participant "Status Line" as Status <<api>>
 
 User -> Claude : Development session
 Claude -> Monitor : Real-time transcript
-Monitor -> Files : Generate session files
-Monitor -> Status : Update display
 
-note over Files
-Cross-project routing:
-nano-degree -> coding
+Monitor -> Classifier : Classify content
+note right of Classifier
+  **3-Layer Classification:**
+  1. Path Analysis
+  2. Semantic Analysis  
+  3. Keyword Matching
 end note
 
+Classifier --> Monitor : Classification result
+
+Monitor -> Router : Route based on classification
+
+alt CODING_INFRASTRUCTURE
+  Router -> Files : Save to coding/.specstory/
+  Router -> Status : Show →coding indicator
+else NOT_CODING_INFRASTRUCTURE
+  Router -> Files : Save to project/.specstory/
+  Router -> Status : Update normal status
+end
+
 note over Status  
-Display: 🛡️ 8.5 🔍EX 🧠 ✅ 📋1530-1630
+  Live Display Examples:
+  Normal: 🛡️ 8.5 🔍EX 🧠 ✅ 📋1530-1630
+  Coding: 🛡️ 8.5 🔍EX 🧠 ✅ →coding 📋1530-1630
 end note
 
 @enduml

@@ -14,7 +14,6 @@
       "adaptive-classifier", "embedding-classifier", "classification",
       "shared-memory.json", "shared-memory-", "graphology",
       "coding infrastructure", "coding agent", "coding startup",
-      "multi-topic-session-logger", "simplified-session-logger",
       "session classification", "misclassified sessions", "move session logs",
       "fast classification", "keyword matching", "classification system",
       "misclassified", "session misclassified", "session logs", "move all",
@@ -49,7 +48,7 @@
     ],
     "file_patterns": [
       "ukb", "vkb", "ckb", 
-      "simplified-session-logger", "post-session-logger", "multi-topic-session-logger",
+      "post-session-logger", "enhanced-transcript-monitor",
       "adaptive-classifier", "embedding-classifier", "fast-keyword-classifier",
       "insight-orchestrator", "conversation-analyzer", "claude-conversation-analyzer",
       "sync-shared-knowledge", "migrate-to-multi-team",

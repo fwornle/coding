@@ -11,7 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
-import FastKeywordClassifier from './fast-keyword-classifier.js';
+import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,18 +20,16 @@ class SimplifiedSessionLogger {
   constructor(projectPath, codingRepo) {
     this.projectPath = projectPath;
     this.codingRepo = codingRepo;
-    // Use fast keyword classifier for 2-3 second classification
-    this.classifier = new FastKeywordClassifier();
+    // Use reliable coding classifier for 2-3 second classification
+    this.classifier = new ReliableCodingClassifier({
+      projectPath: projectPath,
+      codingRepo: codingRepo
+    });
     
-    // Generate single timestamp for both files
+    // Generate proper time window timestamp (60-minute windows starting at :30)
     const now = new Date();
-    const date = now.getFullYear() + '-' + 
-                String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(now.getDate()).padStart(2, '0');
-    const time = String(now.getHours()).padStart(2, '0') + '-' + 
-                String(now.getMinutes()).padStart(2, '0') + '-' + 
-                String(now.getSeconds()).padStart(2, '0');
-    this.timestamp = `${date}_${time}`;
+    const timeWindow = this.calculateTimeWindow(now.getTime());
+    this.timestamp = `${timeWindow.dateString}_${timeWindow.windowString}`;
   }
 
   async log() {
@@ -47,12 +45,17 @@ class SimplifiedSessionLogger {
         return;
       }
       
+      // Initialize classifier if not already done
+      if (!this.classifier.pathAnalyzer) {
+        await this.classifier.initialize();
+      }
+      
       // Classify content to determine file creation strategy
-      // Fast keyword-based classification (2-3 seconds max)
-      const classificationResult = this.classifier.classifyContent(extractedConversation, this.projectPath);
+      // Reliable classification (2-3 seconds max)
+      const classificationResult = await this.classifier.classify(extractedConversation, { projectPath: this.projectPath });
       console.log(`🔍 Classification result:`, JSON.stringify(classificationResult, null, 2));
       
-      if (classificationResult.classification === 'coding') {
+      if (classificationResult.classification === 'CODING_INFRASTRUCTURE') {
         // Pure coding content - create only coding file
         if (this.projectPath !== this.codingRepo) {
           const codingFile = await this.createCodingFile(extractedConversation);
@@ -79,8 +82,7 @@ class SimplifiedSessionLogger {
     const logDir = path.join(this.projectPath, '.specstory', 'history');
     this.ensureDirectoryExists(logDir);
     
-    const projectName = path.basename(this.projectPath);
-    const filename = `${this.timestamp}_${projectName}-session.md`;
+    const filename = `${this.timestamp}-session.md`;
     const filepath = path.join(logDir, filename);
     
     const content = this.createSessionContent(conversation, 'local', hasCodingContent);
@@ -93,7 +95,11 @@ class SimplifiedSessionLogger {
     const logDir = path.join(this.codingRepo, '.specstory', 'history');
     this.ensureDirectoryExists(logDir);
     
-    const filename = `${this.timestamp}_coding-session.md`;
+    // Add source project suffix if redirected
+    const sourceProject = path.basename(this.projectPath);
+    const isRedirected = this.projectPath !== this.codingRepo;
+    const suffix = isRedirected ? `-session-from-${sourceProject}` : '-session';
+    const filename = `${this.timestamp}${suffix}.md`;
     const filepath = path.join(logDir, filename);
     
     const content = this.createSessionContent(conversation, 'coding', false);
@@ -145,6 +151,76 @@ ${conversation}
 `;
   }
 
+  /**
+   * Calculate 60-minute time window for timestamp (matches ExchangeRouter logic)
+   * @param {number} timestamp - Unix timestamp
+   * @returns {Object} Time window information
+   */
+  calculateTimeWindow(timestamp) {
+    const date = new Date(timestamp);
+    
+    // Calculate time window (60-minute windows starting at :30)
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const totalMinutes = hours * 60 + minutes;
+    const trancheStart = Math.floor((totalMinutes + 30) / 60) * 60 - 30;
+    const trancheEnd = trancheStart + 60;
+    
+    // Handle day boundaries
+    let windowStart = new Date(date);
+    let windowEnd = new Date(date);
+    
+    if (trancheStart < 0) {
+      // Window crosses midnight backwards
+      windowStart.setDate(windowStart.getDate() - 1);
+      windowStart.setHours(23, 30, 0, 0);
+      windowEnd.setHours(0, 30, 0, 0);
+    } else if (trancheEnd >= 24 * 60) {
+      // Window crosses midnight forwards  
+      windowStart.setHours(23, 30, 0, 0);
+      windowEnd.setDate(windowEnd.getDate() + 1);
+      windowEnd.setHours(0, 30, 0, 0);
+    } else {
+      // Normal window within same day
+      windowStart.setHours(Math.floor(trancheStart / 60), trancheStart % 60, 0, 0);
+      windowEnd.setHours(Math.floor(trancheEnd / 60), trancheEnd % 60, 0, 0);
+    }
+    
+    // Format strings for file naming
+    const dateString = this.formatDateString(windowStart);
+    const windowString = this.formatWindowString(windowStart, windowEnd);
+    
+    return {
+      start: windowStart,
+      end: windowEnd,
+      dateString,
+      windowString
+    };
+  }
+
+  /**
+   * Format date string for file names (YYYY-MM-DD format)
+   * @param {Date} date - Date to format
+   * @returns {string} Formatted date string
+   */
+  formatDateString(date) {
+    return date.toISOString().split('T')[0];
+  }
+
+  /**
+   * Format window string for file names (HHMM-HHMM format)
+   * @param {Date} start - Window start time
+   * @param {Date} end - Window end time
+   * @returns {string} Formatted window string
+   */
+  formatWindowString(start, end) {
+    const formatTime = (date) => {
+      return date.toTimeString().substring(0, 5).replace(':', '');
+    };
+    
+    return `${formatTime(start)}-${formatTime(end)}`;
+  }
+
   ensureDirectoryExists(dir) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -163,7 +239,12 @@ async function main() {
 
 // Execute if run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error);
+  main()
+    .then(() => process.exit(0))
+    .catch(error => {
+      console.error(error);
+      process.exit(1);
+    });
 }
 
 export default SimplifiedSessionLogger;

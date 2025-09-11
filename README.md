@@ -55,21 +55,24 @@ The system provides:
 - **[Quick Setup](https://github.com/fwornle/mcp-server-constraint-monitor#quick-start)** - Add to any Claude Code project in 30 seconds
 - **Universal Compatibility** - Works with Claude Code, Cursor, Copilot, Aider and any coding project
 
-### Live Session Logging (LSL) System v3.0
+### Live Session Logging (LSL) System v4.0
 
+- **[📚 LSL v4.0 System Documentation](docs/LSL-SYSTEM-DOCUMENTATION.md)** - 🚀 **Complete guide to the ReliableCodingClassifier and three-layer decision architecture**
 - **[Complete LSL Documentation](docs/live-session-logging-system.md)** - 🔄 **Comprehensive live session logging with conversation-based redirect detection**
 - **[Trajectory Generation System](docs/trajectory-generation-system.md)** - 📊 **Integrated repository analysis and trajectory reporting**
 - **System Architecture**: 
-  - ![LSL Architecture](docs/images/lsl-v3-architecture.png) - Conversation-based analysis with working directory tracking
+  - ![LSL v4 Architecture](docs/images/lsl-v4-architecture.png) - Three-layer classification with ReliableCodingClassifier
+  - ![Classifier Decision Tree](docs/images/lsl-classifier-decision-tree.png) - Decision flow and confidence scoring
+  - ![Live vs Batch Mode](docs/images/lsl-live-vs-batch-sequence.png) - Dual-mode operation for performance
   - ![Status Line Integration](docs/images/status-line-hook-timing.png) - Hook-driven real-time updates
-  - ![Data Flow](docs/images/conversation-based-redirect-dataflow.png) - Context-aware redirect detection
-- **Key Features**:
-  - **Conversation-Based Detection**: Analyzes complete conversation context instead of individual files
-  - **Working Directory Tracking**: Context-aware path resolution using transcript metadata
-  - **Hook-Driven Updates**: Uses Claude Code's PostToolUse hooks for real-time status line updates
-  - **Dynamic Redirect Management**: 3-minute timeout for redirect indicators with automatic cleanup
-  - **Simplified Routing Logic**: Always reads from current project, routes based on content analysis
-  - **MCP-Powered Trajectory Analysis**: Deep repository analysis using semantic analysis services
+- **Key Features (v4.0)**:
+  - **Three-Layer Classification**: PathAnalyzer (100% accuracy) → SemanticAnalyzer (95%) → KeywordMatcher (fallback)
+  - **ReliableCodingClassifier**: <2s classification with 95%+ accuracy, replacing FastEmbeddingClassifier
+  - **Dual-Mode Operation**: Live monitoring during sessions, batch processing post-session
+  - **Fast Semantic Analysis**: LLM-powered understanding with cached embeddings and 2s timeout
+  - **Operational Logging**: Complete decision tree tracking for debugging and optimization
+  - **Hook-Driven Updates**: Real-time status line integration with `→coding` indicator
+  - **Smart Session Routing**: Automatic routing to appropriate `.specstory/history/` directories
 - **Status Line Integration**: 
   ```
   🛡️ 8.5 🔍EX 🧠 ✅ →coding 📋1530-1630-session

@@ -95,28 +95,37 @@ fi
 
 # Set up post-session conversation logging
 POST_SESSION_LOGGER="$CODING_REPO_DIR/scripts/post-session-logger.js"
-FALLBACK_LOGGER="$CODING_REPO_DIR/scripts/simple-post-session-logger.js"
+FALLBACK_LOGGER="$CODING_REPO_DIR/scripts/post-session-logger.js"
 if [[ -f "$POST_SESSION_LOGGER" ]]; then
     
     # Set up trap to trigger post-session logging on exit
     cleanup() {
+        # Prevent multiple cleanup runs
+        if [[ "$CLEANUP_RUNNING" == "true" ]]; then
+            return 0
+        fi
+        export CLEANUP_RUNNING=true
+        
         echo -e "${BLUE}🔄 Gracefully shutting down MCP services...${NC}"
         
         # Store PIDs of MCP processes before cleanup
-        local mcp_pids=$(ps aux | grep -E "(mcp-server-memory|browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}')
+        echo -e "${YELLOW}🔍 Locating MCP processes...${NC}"
+        local mcp_pids=$(ps aux | grep -E "(mcp-server-memory|browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}' || true)
         
         # Only kill processes if they exist and are still running
         if [[ -n "$mcp_pids" ]]; then
             echo -e "${YELLOW}📋 Found MCP processes: $mcp_pids${NC}"
             
             # Send SIGTERM first for graceful shutdown
+            echo -e "${YELLOW}⏳ Sending graceful shutdown signal...${NC}"
             echo "$mcp_pids" | xargs -r kill -TERM 2>/dev/null || true
             
             # Wait for graceful shutdown
+            echo -e "${YELLOW}⌛ Waiting for graceful shutdown (2s)...${NC}"
             sleep 2
             
             # Check if processes are still running
-            local remaining_pids=$(ps aux | grep -E "(mcp-server-memory|browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}')
+            local remaining_pids=$(ps aux | grep -E "(mcp-server-memory|browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}' || true)
             
             if [[ -n "$remaining_pids" ]]; then
                 echo -e "${YELLOW}⚠️  Some processes need force termination: $remaining_pids${NC}"
@@ -127,14 +136,53 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
         
         echo -e "${GREEN}✅ MCP services shutdown complete${NC}"
         
-        # Run enhanced post-session logging with fallback
-        if [[ -f "$POST_SESSION_LOGGER" ]]; then
+        # Check if live session logging already handled this session
+        if [[ -f "$FALLBACK_LOGGER" ]]; then
             echo ""  # Add spacing before post-session messages
-            echo -e "${BLUE}📝 Running post-session logger...${NC}"
-            if ! MULTI_TOPIC_LOGGING=true node "$POST_SESSION_LOGGER" "$(pwd)" "$CODING_REPO_DIR" 2>/dev/null; then
-                echo -e "${YELLOW}⚠️  Post-session logger failed, falling back to simple logger${NC}"
-                if [[ -f "$FALLBACK_LOGGER" ]]; then
-                    MULTI_TOPIC_LOGGING=true node "$FALLBACK_LOGGER" "$(pwd)" "$CODING_REPO_DIR" || echo -e "${RED}❌ Both loggers failed${NC}"
+            echo -e "${BLUE}📝 Checking session status...${NC}"
+            
+            # Check if LSL created recent session files (within last 10 minutes)
+            local current_time=$(date +%s)
+            local session_found=false
+            
+            # Check both project locations for recent LSL files
+            for project_dir in "$(pwd)" "$CODING_REPO_DIR"; do
+                if [[ -d "$project_dir/.specstory/history" ]]; then
+                    # Look for recent session files (modified within last 10 minutes)
+                    local recent_files=$(find "$project_dir/.specstory/history" -name "*session*.md" -newermt '10 minutes ago' 2>/dev/null)
+                    if [[ -n "$recent_files" ]]; then
+                        echo -e "${GREEN}✅ Live session logging already handled this session${NC}"
+                        session_found=true
+                        break
+                    fi
+                fi
+            done
+            
+            if [[ "$session_found" == "true" ]]; then
+                echo -e "${GREEN}📄 Session logging complete - skipping fallback${NC}"
+            else
+                echo -e "${YELLOW}⚠️  No recent LSL files found - running fallback logger${NC}"
+                echo -e "${YELLOW}⏳ Analyzing Claude Code conversation history (this may take 5-10 seconds)...${NC}"
+                
+                # Capture logger output to extract the actual file path
+                local logger_output=$(timeout 15s node "$FALLBACK_LOGGER" "$(pwd)" "$CODING_REPO_DIR" 2>&1)
+                local logger_exit_code=$?
+                
+                # Display the logger output (which includes progress messages)
+                echo "$logger_output"
+                
+                # Check if logger completed successfully
+                if [[ $logger_exit_code -eq 0 ]]; then
+                    # Extract and display the actual log file path from logger output
+                    local log_path=$(echo "$logger_output" | grep "✅ Session logged to:" | sed 's/.*✅ Session logged to: //')
+                    if [[ -n "$log_path" ]]; then
+                        echo -e "${GREEN}✅ Session logging complete${NC}"
+                    else
+                        # Fallback message if path extraction fails
+                        echo -e "${GREEN}✅ Session logged with timestamp: $(date '+%Y-%m-%d_%H%M')${NC}"
+                    fi
+                else
+                    echo -e "${YELLOW}⚠️  Post-session logger timed out or failed${NC}"
                 fi
             fi
         fi
@@ -143,11 +191,8 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
     trap cleanup EXIT INT TERM HUP
     
     # Launch Claude normally (without exec to preserve trap)
-    # Store the command in a variable for better handling
-    CLAUDE_CMD="claude --mcp-config $MCP_CONFIG"
-    
-    # Run Claude and capture its exit code
-    NODE_NO_WARNINGS=1 $CLAUDE_CMD "$@"
+    # Run Claude directly with proper argument handling
+    NODE_NO_WARNINGS=1 claude --mcp-config "$MCP_CONFIG" "$@"
     CLAUDE_EXIT_CODE=$?
     
     # Exit with Claude's exit code (this will trigger the trap)

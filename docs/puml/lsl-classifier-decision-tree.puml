@@ -1,0 +1,120 @@
+@startuml lsl-classifier-decision-tree
+!include _standard-style.puml
+
+title ReliableCodingClassifier - Decision Tree Flow
+
+start
+
+:Receive Exchange/Content;
+note right
+  Input from transcript monitor
+  or session logger
+end note
+
+:Initialize Classification Context;
+#E8F5E8:projectPath = current project
+codingRepo = /Agentic/coding
+startTime = Date.now();
+
+partition "Layer 1: PathAnalyzer" #E8F4FD {
+  :Analyze File Paths;
+  if (Contains coding repo paths?) then (yes)
+    #90EE90:Classification: CODING_INFRASTRUCTURE;
+    :Confidence: 100%;
+    :Processing Time: <10ms;
+    stop
+  elseif (Contains project-specific paths?) then (yes)
+    #FFB6C1:Classification: NOT_CODING_INFRASTRUCTURE;
+    :Confidence: 95%;
+    :Processing Time: <10ms;
+    stop
+  else (no paths or ambiguous)
+    :Continue to Layer 2;
+  endif
+}
+
+partition "Layer 2: SemanticAnalyzer" #E6F3FF {
+  :Check API Key Availability;
+  if (ANTHROPIC_API_KEY exists?) then (yes)
+    :Call Semantic Analysis API;
+    note right
+      Fast LLM analysis with:
+      • Cached embeddings
+      • Contextual understanding
+      • 2-second timeout
+    end note
+    
+    if (API Response received?) then (yes)
+      if (Confidence > 0.8?) then (yes)
+        if (isCodingInfrastructure?) then (yes)
+          #90EE90:Classification: CODING_INFRASTRUCTURE;
+        else (no)
+          #FFB6C1:Classification: NOT_CODING_INFRASTRUCTURE;
+        endif
+        :Processing Time: ~1s;
+        stop
+      else (low confidence)
+        :Continue to Layer 3;
+      endif
+    else (timeout/error)
+      :Log API failure;
+      :Continue to Layer 3;
+    endif
+  else (no API key)
+    :Continue to Layer 3;
+  endif
+}
+
+partition "Layer 3: KeywordMatcher" #F0F0F0 {
+  :Load Keyword Patterns;
+  note left
+    Keywords from:
+    • coding-keywords.json
+    • Project-specific terms
+    • Infrastructure patterns
+  end note
+  
+  :Calculate Keyword Scores;
+  #FFF9E6:codingScore = matchCodingKeywords()
+  projectScore = matchProjectKeywords()
+  infraScore = matchInfraPatterns();
+  
+  if (codingScore > threshold?) then (yes)
+    #90EE90:Classification: CODING_INFRASTRUCTURE;
+    :Confidence: 0.6-0.7;
+  elseif (projectScore > threshold?) then (yes)
+    #FFB6C1:Classification: NOT_CODING_INFRASTRUCTURE;
+    :Confidence: 0.5-0.6;
+  else (no clear match)
+    #D3D3D3:Classification: NOT_CODING_INFRASTRUCTURE;
+    :Confidence: 0.3 (default);
+    note right
+      Default to project logging
+      when uncertain
+    end note
+  endif
+  :Processing Time: <5ms;
+}
+
+:Log Decision Path;
+note left
+  Operational Logger tracks:
+  • Layer used for decision
+  • Processing time per layer
+  • Confidence scores
+  • Classification reason
+end note
+
+:Return Classification Result;
+#E8F4FD:**Result Structure:**
+{
+  classification: "CODING_INFRASTRUCTURE" | "NOT_CODING_INFRASTRUCTURE",
+  confidence: 0.0 - 1.0,
+  processingTimeMs: number,
+  decisionPath: [...layers],
+  reason: string
+};
+
+stop
+
+@enduml

@@ -429,10 +429,10 @@ Format: CLASSIFICATION: [CODING_INFRASTRUCTURE|NOT_CODING_INFRASTRUCTURE] | CONF
     // Strong coding infrastructure indicators
     const codingKeywords = [
       'enhanced-transcript-monitor', 'transcript-monitor', 'lsl system', 'live session logging',
-      'trajectory', 'semantic analysis', 'coding tools', 'generate-proper-lsl', 'redaction',
-      'script debugging', 'tool development', 'infrastructure', 'build system', 'ci/cd',
-      'development environment', 'testing framework', 'code analysis', 'deployment',
-      'repository management', 'version control'
+      'lsl', 'trajectory file', 'statusline', 'trajectory', 'semantic analysis', 'coding tools', 
+      'generate-proper-lsl', 'redaction', 'tool development', 
+      'ci/cd', 'repository management', 'mcp__semantic_analysis',
+      'mcp__semantic-analysis', 'mcp integration', 'semantic analyzer'
     ];
     
     const codingScore = codingKeywords.filter(keyword => combinedContent.includes(keyword)).length;

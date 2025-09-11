@@ -180,7 +180,17 @@
       "Bash(/Users/q284340/Agentic/coding/scripts/generate-all-pngs-correctly.sh:*)",
       "Read(/Users/q284340/.claude/**)",
       "Read(/Users/q284340/.claude/projects/-Users-q284340-Agentic-coding/**)",
-      "Read(/Users/q284340/.claude/**)"
+      "Read(/Users/q284340/.claude/**)",
+      "mcp__spec-workflow__spec-workflow-guide",
+      "mcp__spec-workflow__get-steering-context",
+      "mcp__spec-workflow__get-template-context",
+      "mcp__spec-workflow__create-spec-doc",
+      "mcp__spec-workflow__request-approval",
+      "mcp__spec-workflow__get-approval-status",
+      "mcp__spec-workflow__delete-approval",
+      "mcp__spec-workflow__manage-tasks",
+      "mcp__spec-workflow__spec-status",
+      "Bash(npm test:*)"
     ],
     "deny": []
   },

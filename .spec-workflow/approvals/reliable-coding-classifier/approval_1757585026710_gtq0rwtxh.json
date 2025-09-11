@@ -1,0 +1,21 @@
+{
+  "id": "approval_1757585026710_gtq0rwtxh",
+  "title": "Design: Reliable Coding Classifier",
+  "filePath": ".spec-workflow/specs/reliable-coding-classifier/design.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-11T10:03:46.710Z",
+  "category": "spec",
+  "categoryName": "reliable-coding-classifier",
+  "response": "Feedback Summary (1 comments):\n\nGeneral Comments:\n1. The integration of this fast classification system is with the transcript monitor - this should be made clear (check existing codebase for details)\nIt also integrates with the script which is used to run batch-mode LSL generation\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"The integration of this fast classification system is with the transcript monitor - this should be made clear (check existing codebase for details)\\nIt also integrates with the script which is used to run batch-mode LSL generation\",\n      \"timestamp\": \"2025-09-11T10:10:10.854Z\",\n      \"id\": \"comment_1757585410854_0d2m452pq\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nGeneral Comments:\\n1. The integration of this fast classification system is with the transcript monitor - this should be made clear (check existing codebase for details)\\nIt also integrates with the script which is used to run batch-mode LSL generation\\n\\n\",\n  \"timestamp\": \"2025-09-11T10:10:15.586Z\"\n}",
+  "respondedAt": "2025-09-11T10:10:15.595Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "The integration of this fast classification system is with the transcript monitor - this should be made clear (check existing codebase for details)\nIt also integrates with the script which is used to run batch-mode LSL generation",
+      "timestamp": "2025-09-11T10:10:10.854Z",
+      "id": "comment_1757585410854_0d2m452pq"
+    }
+  ]
+}

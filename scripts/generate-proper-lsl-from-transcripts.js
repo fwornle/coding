@@ -9,6 +9,8 @@
 import fs from 'fs';
 import path from 'path';
 import { parseTimestamp, formatTimestamp } from './timezone-utils.js';
+// Use the enhanced transcript monitor for consistent classification logic
+import EnhancedTranscriptMonitor from './enhanced-transcript-monitor.js';
 
 // Get the target project from environment or command line
 function getTargetProject() {
@@ -169,27 +171,25 @@ function truncateSlashCommandResponse(responseText) {
   return responseText.substring(0, 500) + '\n\n...\n\n*[Response truncated - /sl command output abbreviated for readability]*\n';
 }
 
-// Check if exchange involves operations on coding directory files
-function touchesCodingDirectory(fullExchange) {
-  // Only look for actual file operations in the coding directory
-  const codingPath = '/Users/q284340/Agentic/coding/';
-  const exchange = fullExchange.toLowerCase();
-  
-  // Check if any tool calls touch coding directory files
-  // Look for Read, Edit, Write, MultiEdit operations on coding paths
-  if (exchange.includes(codingPath.toLowerCase())) {
-    return true;
+// Use enhanced transcript monitor for consistent classification
+async function isCodingInfrastructureExchange(exchangeText, monitor) {
+  try {
+    // Create exchange object in the format expected by the monitor
+    const exchange = {
+      timestamp: new Date().toISOString(),
+      content: exchangeText,
+      tools: [] // We'll extract tools if needed
+    };
+    
+    // Use the monitor's enhanced coding detection logic
+    const isCoding = await monitor.isCodingRelated(exchange);
+    return isCoding;
+  } catch (error) {
+    console.warn(`Classification error: ${error.message}, falling back to path detection`);
+    // Fallback to simple path detection if classification fails
+    const codingPath = '/Users/q284340/Agentic/coding/';
+    return exchangeText.toLowerCase().includes(codingPath.toLowerCase());
   }
-  
-  // Also check for relative paths that clearly indicate coding directory
-  if (exchange.includes('coding/scripts/') || 
-      exchange.includes('coding/docs/') ||
-      exchange.includes('coding/bin/') ||
-      exchange.includes('coding/.specstory/')) {
-    return true;
-  }
-  
-  return false;
 }
 
 function extractToolCalls(content) {
@@ -215,6 +215,23 @@ function extractToolCalls(content) {
 async function generateLSL() {
   const targetProject = getTargetProject();
   console.log(`\n🔄 Generating LSL files for: ${targetProject.path}`);
+
+  // Initialize enhanced transcript monitor for consistent classification logic
+  console.log('🧠 Initializing enhanced classification system...');
+  const monitor = new EnhancedTranscriptMonitor({ projectPath: targetProject.path });
+  
+  // Wait for reliable coding classifier to be ready
+  let retries = 0;
+  while (!monitor.reliableCodingClassifierReady && retries < 30) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    retries++;
+  }
+  
+  if (monitor.reliableCodingClassifierReady) {
+    console.log('✅ Reliable coding classifier ready with three-layer architecture');
+  } else {
+    console.log('⚠️ Using fallback classification (semantic analysis + keywords)');
+  }
 
   // Find all transcript files automatically - use imports since this is ES module
   
@@ -248,6 +265,9 @@ async function generateLSL() {
   console.log(`Found ${transcriptPaths.length} transcript files to process`);
 
   const sessions = new Map();
+  const startTime = Date.now();
+  let filesProcessed = 0;
+  let totalExchanges = 0;
 
   for (const transcriptPath of transcriptPaths) {
     if (!fs.existsSync(transcriptPath)) continue;
@@ -339,10 +359,10 @@ async function generateLSL() {
           fullExchange += '\n\nTool Results:\n' + toolResults.join('\n');
         }
         
-        // Simple logic: 
-        // - If we're generating for coding project AND exchange touches coding files → include
-        // - If we're generating for any other project AND exchange doesn't touch coding files → include
-        const touchesCoding = touchesCodingDirectory(fullExchange);
+        // Enhanced logic using the same classification as live monitoring
+        // - If we're generating for coding project AND exchange is coding infrastructure → include
+        // - If we're generating for any other project AND exchange is NOT coding infrastructure → include
+        const touchesCoding = await isCodingInfrastructureExchange(fullExchange, monitor);
         const shouldInclude = (targetProject.name === 'coding') ? touchesCoding : !touchesCoding;
         
         if (shouldInclude) {
@@ -381,6 +401,13 @@ async function generateLSL() {
     }
     
     console.log(`Extracted ${exchangeCount} exchanges from ${path.basename(transcriptPath)}`);
+    
+    // Update progress tracking
+    filesProcessed++;
+    totalExchanges += exchangeCount;
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const progress = ((filesProcessed / transcriptPaths.length) * 100).toFixed(1);
+    console.log(`📊 Progress: ${filesProcessed}/${transcriptPaths.length} files (${progress}%) | ${totalExchanges} exchanges | ${elapsed}s elapsed`);
   }
 
   // Generate LSL files for each session
@@ -470,6 +497,31 @@ ${exchange.toolResults.join('\n')}
 
     fs.writeFileSync(filepath, content);
     console.log(`Created: ${filename} with ${exchanges.length} exchanges`);
+  }
+  
+  // Final batch processing summary
+  const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  const avgTimePerFile = filesProcessed > 0 ? (totalElapsed / filesProcessed).toFixed(2) : 0;
+  const avgTimePerExchange = totalExchanges > 0 ? ((totalElapsed * 1000) / totalExchanges).toFixed(1) : 0;
+  
+  console.log(`\n📊 BATCH PROCESSING SUMMARY:`);
+  console.log(`   Files processed: ${filesProcessed}`);
+  console.log(`   Total exchanges: ${totalExchanges}`);
+  console.log(`   Session files generated: ${sessions.size}`);
+  console.log(`   Total processing time: ${totalElapsed}s`);
+  console.log(`   Average time per file: ${avgTimePerFile}s`);
+  console.log(`   Average time per exchange: ${avgTimePerExchange}ms`);
+  
+  if (monitor.reliableCodingClassifierReady) {
+    const stats = monitor.reliableCodingClassifier?.getStats();
+    if (stats) {
+      console.log(`\n🔬 CLASSIFICATION PERFORMANCE:`);
+      console.log(`   Total classifications: ${stats.totalClassifications || 0}`);
+      console.log(`   Average classification time: ${stats.avgClassificationTime?.toFixed(1) || 0}ms`);
+      console.log(`   Path analysis hits: ${stats.pathAnalysisHits || 0}`);
+      console.log(`   Semantic analysis hits: ${stats.semanticAnalysisHits || 0}`);
+      console.log(`   Keyword analysis hits: ${stats.keywordAnalysisHits || 0}`);
+    }
   }
   
   console.log(`\n✅ LSL file generation complete for ${targetProject.name}!`);

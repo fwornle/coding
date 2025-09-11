@@ -7,6 +7,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { AutoInsightTrigger } from './auto-insight-trigger.js';
 import LLMContentClassifier from './llm-content-classifier.js';
 
@@ -18,11 +19,25 @@ class PostSessionLogger {
     this.sessionFile = path.join(codingRepo, '.mcp-sync', 'current-session.json');
   }
 
+  getSessionDurationMs() {
+    try {
+      const configPath = path.join(this.codingRepo, 'config', 'live-logging-config.json');
+      if (!fs.existsSync(configPath)) {
+        return 3600000; // Default: 1 hour
+      }
+      
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      return config.live_logging?.session_duration || 3600000; // Default: 1 hour
+    } catch (error) {
+      return 3600000; // Default: 1 hour
+    }
+  }
+
   async captureConversation() {
     console.log('📋 Post-session logging started...');
     
     // First, stop semantic-analysis system
-    this.stopSemanticAnalysisSystem();
+    await this.stopSemanticAnalysisSystem();
     
     try {
       // Check if session needs logging
@@ -40,7 +55,7 @@ class PostSessionLogger {
       console.log(`🔍 Capturing conversation for session: ${sessionData.sessionId}`);
 
       // Check if live session logs exist and are plausible
-      const liveSessionCheck = await this.checkLiveSessionPlausibility(sessionData.sessionId);
+      const liveSessionCheck = await this.checkLiveSessionPlausibility();
       
       if (liveSessionCheck.exists && liveSessionCheck.plausible) {
         console.log('✅ Live session complete and plausible - skipping post-session logging');
@@ -106,7 +121,7 @@ class PostSessionLogger {
   async extractConversationFromHistory() {
     try {
       // Check for Claude Code's session history in ~/.claude/conversations
-      const homeDir = require('os').homedir();
+      const homeDir = os.homedir();
       const claudeHistoryDir = path.join(homeDir, '.claude', 'conversations');
       
       if (fs.existsSync(claudeHistoryDir)) {
@@ -125,8 +140,9 @@ class PostSessionLogger {
           const recentConversation = conversationFiles[0];
           const timeDiff = Date.now() - recentConversation.mtime.getTime();
           
-          // If it was modified within the last 30 minutes, it's likely our session
-          if (timeDiff < 1800000) {
+          // If it was modified within the configured session duration, it's likely our session
+          const sessionDuration = this.getSessionDurationMs();
+          if (timeDiff < sessionDuration) {
             const conversationData = JSON.parse(fs.readFileSync(recentConversation.path, 'utf8'));
             return this.formatConversationFromClaudeHistory(conversationData);
           }
@@ -182,39 +198,74 @@ class PostSessionLogger {
 
   /**
    * Check if live session logs exist and are plausible for the given session
+   * Checks both local project and coding repo locations
    */
-  async checkLiveSessionPlausibility(sessionId) {
+  async checkLiveSessionPlausibility() {
     try {
-      const historyDir = path.join(this.projectPath, '.specstory', 'history');
-      if (!fs.existsSync(historyDir)) {
-        return { exists: false, plausible: false, filePath: null };
-      }
+      // Check both possible locations for LSL files
+      const locations = [
+        {
+          name: 'local project',
+          path: path.join(this.projectPath, '.specstory', 'history'),
+          filePattern: (today) => (file) => {
+            return (file.includes(today) && 
+                    (file.includes('live-transcript') || 
+                     file.includes('live-session') ||
+                     file.includes('project-session') ||
+                     file.includes('coding-session'))) &&
+                   file.endsWith('.md');
+          }
+        },
+        {
+          name: 'coding repo',
+          path: path.join(this.codingRepo, '.specstory', 'history'), 
+          filePattern: (today) => (file) => {
+            return (file.includes(today) && 
+                    (file.includes('live-transcript') || 
+                     file.includes('live-session') ||
+                     file.includes('project-session') ||
+                     file.includes('coding-session') ||
+                     file.includes('from-' + path.basename(this.projectPath)))) &&
+                   file.endsWith('.md');
+          }
+        }
+      ];
 
-      // Look for live session files from today's session
       const today = new Date().toISOString().split('T')[0];
-      const files = fs.readdirSync(historyDir);
-      
-      // Find files that could be from this session
-      const sessionFiles = files.filter(file => {
-        return (file.includes(today) && 
-                (file.includes('live-transcript') || 
-                 file.includes('live-session') ||
-                 file.includes('project-session') ||
-                 file.includes('coding-session'))) &&
-               file.endsWith('.md');
-      });
+      let allSessionFiles = [];
 
-      if (sessionFiles.length === 0) {
+      // Collect files from both locations
+      for (const location of locations) {
+        if (!fs.existsSync(location.path)) {
+          console.log(`📁 ${location.name} history dir doesn't exist: ${location.path}`);
+          continue;
+        }
+
+        const files = fs.readdirSync(location.path);
+        const locationFiles = files
+          .filter(location.filePattern(today))
+          .map(file => ({
+            file,
+            path: path.join(location.path, file),
+            location: location.name,
+            stats: fs.statSync(path.join(location.path, file))
+          }));
+
+        allSessionFiles.push(...locationFiles);
+        console.log(`📁 ${location.name}: found ${locationFiles.length} session files`);
+      }
+
+      if (allSessionFiles.length === 0) {
+        console.log('📁 No LSL files found in either location - triggering fallback');
         return { exists: false, plausible: false, filePath: null };
       }
 
-      // Check the most recent session file for plausibility
-      const mostRecent = sessionFiles
-        .map(file => {
-          const filePath = path.join(historyDir, file);
-          const stats = fs.statSync(filePath);
-          return { file, path: filePath, mtime: stats.mtime };
-        })
+      // Find the most recent session file across all locations
+      const mostRecent = allSessionFiles
+        .map(fileInfo => ({
+          ...fileInfo,
+          mtime: fileInfo.stats.mtime
+        }))
         .sort((a, b) => b.mtime - a.mtime)[0];
 
       const content = fs.readFileSync(mostRecent.path, 'utf8');
@@ -231,7 +282,7 @@ class PostSessionLogger {
       const plausibilityScore = Object.values(plausibilityResults).filter(Boolean).length;
       const isPlausible = plausibilityScore >= 3; // At least 3 out of 5 checks pass
 
-      console.log(`🔍 Live session check: ${mostRecent.file}`);
+      console.log(`🔍 Live session check: ${mostRecent.file} (${mostRecent.location})`);
       console.log(`📊 Plausibility: ${plausibilityScore}/5 - ${isPlausible ? 'PLAUSIBLE' : 'INCOMPLETE'}`);
       
       if (process.env.DEBUG_SESSION) {
@@ -242,6 +293,7 @@ class PostSessionLogger {
         exists: true,
         plausible: isPlausible,
         filePath: mostRecent.file,
+        location: mostRecent.location,
         score: plausibilityScore,
         details: plausibilityResults
       };
@@ -361,11 +413,11 @@ ${isRerouted ? '- ⚠️  This session was RE-ROUTED from its original project d
     return logPath;
   }
 
-  stopSemanticAnalysisSystem() {
+  async stopSemanticAnalysisSystem() {
     console.log('🛑 Stopping all coding services...');
     try {
       // Use the new service lifecycle manager to stop all services
-      const { spawnSync } = require('child_process');
+      const { spawnSync } = await import('child_process');
       const stopScript = path.join(this.codingRepo, 'lib', 'services', 'stop-services.js');
       
       if (fs.existsSync(stopScript)) {
@@ -398,7 +450,7 @@ ${isRerouted ? '- ⚠️  This session was RE-ROUTED from its original project d
       
       // Emergency cleanup - kill all semantic-analysis processes
       try {
-        const { spawnSync } = require('child_process');
+        const { spawnSync } = await import('child_process');
         spawnSync('pkill', ['-f', 'semantic-analysis'], { stdio: 'pipe' });
         spawnSync('pkill', ['-f', 'vkb-server'], { stdio: 'pipe' });
         spawnSync('pkill', ['-f', 'copilot-http-server'], { stdio: 'pipe' });

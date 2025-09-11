@@ -1,0 +1,107 @@
+@startuml lsl-live-vs-batch-sequence
+!include _standard-style.puml
+
+title LSL System - Live Mode vs Batch Mode Operation
+
+actor "Claude Code" as Claude
+participant "Transcript Monitor" as Monitor <<core>>
+participant "ReliableCodingClassifier" as Classifier <<agent>>
+participant "Live Logging\nCoordinator" as LiveCoord <<infra>>
+participant "Session Logger" as Logger <<core>>
+participant "Status Line" as Status <<api>>
+database "History Storage" as Storage <<storage>>
+
+== Live Mode (Real-time during session) ==
+
+Claude -> Monitor : Tool interaction
+activate Monitor #E8F5E8
+
+Monitor -> Monitor : Detect conversation change
+Monitor -> Classifier : Classify exchange\n(async, non-blocking)
+activate Classifier #E8F4FD
+
+par Parallel Processing
+  Classifier -> Classifier : Layer 1: PathAnalyzer\n(<10ms)
+  note right: Immediate path-based\nclassification
+  
+  Classifier -> Classifier : Layer 2: SemanticAnalyzer\n(~1s, if needed)
+  note right: LLM semantic analysis\nwith 2s timeout
+  
+  Classifier -> Classifier : Layer 3: KeywordMatcher\n(<5ms, fallback)
+else Status Updates
+  Monitor -> LiveCoord : Buffer interaction
+  activate LiveCoord #FFF9E6
+  LiveCoord -> Status : Update →coding indicator
+  Status -> Claude : Display status
+  deactivate LiveCoord
+end
+
+Classifier --> Monitor : Classification result
+deactivate Classifier
+
+Monitor -> Monitor : Determine routing
+alt CODING_INFRASTRUCTURE detected
+  Monitor -> Status : Show →coding
+  Monitor -> LiveCoord : Route to coding repo
+else NOT_CODING_INFRASTRUCTURE
+  Monitor -> LiveCoord : Route to project
+end
+
+LiveCoord -> LiveCoord : Buffer for batch write
+note over LiveCoord : Accumulates changes\nfor 5-second intervals
+
+deactivate Monitor
+
+== Batch Mode (Post-session processing) ==
+
+Claude -> Claude : Session ends/exit
+Claude -> Logger : Trigger post-session logging
+activate Logger #E8F5E8
+
+Logger -> Logger : Find recent transcripts
+Logger -> Classifier : Classify entire session
+activate Classifier #E8F4FD
+
+Classifier -> Classifier : Analyze complete conversation
+note right: Full context analysis\nwith all three layers
+
+Classifier --> Logger : Final classification
+deactivate Classifier
+
+Logger -> Logger : Generate session document
+
+alt CODING_INFRASTRUCTURE
+  Logger -> Storage : Save to coding/.specstory/history/
+  note right: Coding infrastructure\nsession archived
+else NOT_CODING_INFRASTRUCTURE  
+  Logger -> Storage : Save to project/.specstory/history/
+  note right: Project work\nsession archived
+else MIXED_CONTENT
+  Logger -> Storage : Save to both locations
+  note right: Dual logging for\nmixed sessions
+end
+
+Logger --> Claude : Session logged successfully
+deactivate Logger
+
+== Key Differences ==
+
+note over Monitor, Classifier
+  **Live Mode:**
+  • Real-time classification
+  • Minimal latency priority
+  • Status line updates
+  • Buffered writes
+  • Early exit on confidence
+end note
+
+note over Logger, Storage
+  **Batch Mode:**
+  • Complete session analysis
+  • Full context available
+  • Comprehensive classification
+  • Single write operation
+  • Post-processing flexibility
+end note
+
+@enduml

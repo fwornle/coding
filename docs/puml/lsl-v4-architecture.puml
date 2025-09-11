@@ -1,0 +1,110 @@
+@startuml lsl-v4-architecture
+!include _standard-style.puml
+
+title LSL System v4.0 - Multi-Layer Classification Architecture
+
+package "Claude Code Session" {
+  [User Interactions] as User <<external>>
+  [Tool Calls & Responses] as Tools <<external>>
+  [Real-time Transcript] as Transcript <<external>>
+}
+
+package "Live Session Logging (LSL) v4.0" <<core>> {
+  
+  package "Enhanced Transcript Monitor" {
+    [Transcript Analyzer] as TranscriptAnalyzer <<core>>
+    [Session Transition Detector] as TransitionDetector <<core>>
+    [Working Directory Tracker] as WorkingDir <<core>>
+  }
+  
+  package "ReliableCodingClassifier" #E8F5E8 {
+    component "Three-Layer Decision Engine" as DecisionEngine <<agent>> {
+      [Layer 1: PathAnalyzer] as PathAnalyzer <<core>>
+      [Layer 2: SemanticAnalyzer] as SemanticAnalyzer <<agent>>
+      [Layer 3: KeywordMatcher] as KeywordMatcher <<util>>
+    }
+    [Operational Logger] as OpLogger <<util>>
+    [Classifier Orchestrator] as Orchestrator <<core>>
+  }
+  
+  package "Session Management" {
+    [Session Router] as Router <<core>>
+    [SimplifiedSessionLogger] as SimpleLogger <<core>>
+    [Live Logging Coordinator] as Coordinator <<infra>>
+  }
+  
+  package "Storage & Output" {
+    database "Project History\n(.specstory/history/)" as ProjectHistory <<storage>>
+    database "Coding History\n(coding/.specstory/)" as CodingHistory <<storage>>
+    [Status Line Integrator] as StatusLine <<api>>
+  }
+}
+
+package "MCP Integration" <<infra>> {
+  [Semantic Analysis Server] as SemanticMCP <<api>>
+  [Constraint Monitor] as ConstraintMCP <<api>>
+}
+
+' Main flow connections
+User --> Transcript : generates
+Tools --> Transcript : enriches
+Transcript --> TranscriptAnalyzer : monitors
+
+TranscriptAnalyzer --> TransitionDetector
+TransitionDetector --> WorkingDir
+TranscriptAnalyzer --> Orchestrator
+
+' Classification flow
+Orchestrator --> PathAnalyzer : "1. File ops check\n(<10ms)"
+PathAnalyzer --> OpLogger : logs decision
+
+Orchestrator --> SemanticAnalyzer : "2. Semantic analysis\n(if needed)"
+SemanticAnalyzer --> SemanticMCP : API call
+SemanticAnalyzer --> OpLogger : logs decision
+
+Orchestrator --> KeywordMatcher : "3. Fallback\n(<5ms)"
+KeywordMatcher --> OpLogger : logs decision
+
+' Routing decision
+Orchestrator --> Router : classification result
+Router --> SimpleLogger : route session
+
+' Storage routing
+SimpleLogger ..> ProjectHistory : "NOT_CODING_\nINFRASTRUCTURE"
+SimpleLogger ..> CodingHistory : "CODING_\nINFRASTRUCTURE"
+
+' Live updates
+Router --> Coordinator : live updates
+Coordinator --> StatusLine : "→coding indicator"
+StatusLine --> ConstraintMCP : hook integration
+
+' Feedback loop
+OpLogger --> Orchestrator : performance metrics
+
+note right of DecisionEngine
+  **v4.0 Innovation: Three-Layer Architecture**
+  • Layer 1: Path-based (100% accuracy, <10ms)
+  • Layer 2: LLM semantic (95% accuracy, ~1s)  
+  • Layer 3: Keyword fallback (<5ms)
+  
+  Early exit on high confidence
+  Operational logging for debugging
+end note
+
+note bottom of SemanticMCP
+  **Fast Semantic Analysis**
+  • Cached embeddings
+  • Batched API calls
+  • <2s response time
+  • Fallback on timeout
+end note
+
+note left of Router
+  **Smart Routing Logic**
+  • CODING_INFRASTRUCTURE → coding repo
+  • NOT_CODING_INFRASTRUCTURE → project
+  • Dual logging for mixed content
+  • Session transition handling
+end note
+
+@enduml

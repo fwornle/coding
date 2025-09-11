@@ -95,7 +95,7 @@ docker --version
 node --version  # >= 18
 
 # API Keys
-export GROQ_API_KEY="your-groq-key"
+export XAI_API_KEY="your-grok-key"
 export ANTHROPIC_API_KEY="your-claude-key"  # fallback
 ```
 

@@ -237,7 +237,7 @@ sleep 2
 
 # Start the transcript monitor (this handles session transitions)
 echo "📋 Starting Transcript Monitor with session transitions..."
-nohup node scripts/transcript-monitor.js > transcript-monitor.log 2>&1 &
+nohup node scripts/enhanced-transcript-monitor.js > transcript-monitor.log 2>&1 &
 TRANSCRIPT_PID=$!
 echo "   Transcript Monitor PID: $TRANSCRIPT_PID"
 

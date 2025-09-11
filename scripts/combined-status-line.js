@@ -813,15 +813,23 @@ class CombinedStatusLine {
       overallColor = 'red';
     }
 
-    // Add redirect indicator if active
+    // Add redirect indicator if active (compact)
     if (redirectStatus && redirectStatus.active) {
-      parts.push(`→${redirectStatus.target}`);
+      // Shorten common target names for compactness
+      const target = redirectStatus.target
+        .replace('coding', 'cod')
+        .replace('nano-degree', 'nano');
+      parts.push(`→${target}`);
     }
 
-    // Add live log target filename inline at the end (compact format)
+    // Add live log target filename inline at the end (readable format)
     if (liveLogTarget && liveLogTarget !== '----') {
-      // Compact the session display to avoid wrapping
-      const compactTarget = liveLogTarget.replace('-session', '').replace('🔴', '🔴').replace('🟠', '🟠');
+      // Keep the full time window but remove redundant text
+      let compactTarget = liveLogTarget
+        .replace('-session', '')
+        .replace('(ended)', '')
+        .trim();
+      
       parts.push(`📋${compactTarget}`);
     }
     

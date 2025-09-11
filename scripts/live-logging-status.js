@@ -9,6 +9,29 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 
+/**
+ * Get session duration from config file in milliseconds
+ */
+function getSessionDurationMs() {
+  try {
+    // Find the coding repository root
+    const codingRepo = process.env.CODING_REPO || process.env.CODING_TOOLS_PATH;
+    if (!codingRepo) {
+      return 3600000; // Default: 1 hour
+    }
+    
+    const configPath = path.join(codingRepo, 'config', 'live-logging-config.json');
+    if (!fs.existsSync(configPath)) {
+      return 3600000; // Default: 1 hour
+    }
+    
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    return config.live_logging?.session_duration || 3600000; // Default: 1 hour
+  } catch (error) {
+    return 3600000; // Default: 1 hour
+  }
+}
+
 class SimpleStatusAnalyzer {
   /**
    * Find the most recent Claude Code transcript
@@ -40,11 +63,14 @@ class SimpleStatusAnalyzer {
         return null;
       }
 
-      // Return the most recent file modified in the last 30 minutes
+      // Return the most recent file modified in the configured session duration
       const mostRecent = files[0];
       const timeDiff = Date.now() - mostRecent.mtime.getTime();
       
-      if (timeDiff < 1800000) { // 30 minutes
+      // Load session duration from config (defaults to 1 hour)
+      const sessionDuration = getSessionDurationMs();
+      
+      if (timeDiff < sessionDuration) {
         return mostRecent;
       }
 

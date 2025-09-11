@@ -55,7 +55,7 @@
     },
     "spec-workflow": {
       "command": "npx",
-      "args": ["-y", "@pimzino/spec-workflow-mcp@latest", "{{CODING_TOOLS_PATH}}", "--AutoStartDashboard"]
+      "args": ["-y", "@pimzino/spec-workflow-mcp@latest", "{{CODING_TOOLS_PATH}}"]
     }
   }
 }
