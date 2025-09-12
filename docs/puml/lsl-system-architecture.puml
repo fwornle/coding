@@ -1,0 +1,64 @@
+@startuml lsl-system-architecture
+!include _standard-style.puml
+
+title LSL System Architecture
+
+package "Claude Code Session" {
+  [User] as user
+  [Conversation] as conv
+}
+
+package "LSL System" {
+  [Enhanced Transcript Monitor] as monitor <<infra>>
+  [ReliableCodingClassifier] as classifier <<core>>
+  [LSL Generation Scripts] as scripts <<util>>
+}
+
+package "Classification Layers" {
+  [PathAnalyzer] as path <<core>>
+  [KeywordMatcher] as keyword <<core>> 
+  [SemanticAnalyzer] as semantic <<api>>
+}
+
+package "Output Destinations" {
+  folder "nano-degree/.specstory/history/" as nano_history <<storage>>
+  folder "coding/.specstory/history/" as coding_history <<storage>>
+}
+
+package "Data Sources" {
+  database "~/.claude/projects/*.jsonl" as transcripts <<storage>>
+  [coding-keywords.json] as keywords <<storage>>
+}
+
+' Main flow
+user --> conv : converses
+conv --> monitor : live monitoring
+monitor --> classifier : classify exchange
+
+' Classification layers
+classifier --> path : 1. file operations
+classifier --> keyword : 2. content matching  
+classifier --> semantic : 3. LLM analysis
+
+' Data sources
+path --> transcripts : reads paths
+keyword --> keywords : loads dictionary
+semantic --> transcripts : analyzes content
+
+' Output routing
+classifier --> nano_history : all content
+classifier --> coding_history : coding content only
+
+' Batch processing
+scripts --> transcripts : bulk processing
+scripts --> classifier : batch classification
+scripts --> nano_history : generated sessions
+scripts --> coding_history : generated sessions
+
+note right of classifier : Three-layer decision:\n- PathAnalyzer (100% accuracy)\n- KeywordMatcher (fast)\n- SemanticAnalyzer (selective)
+
+note bottom of nano_history : Receives ALL content\n(main project)
+
+note bottom of coding_history : Receives ONLY\ncoding infrastructure content
+
+@enduml

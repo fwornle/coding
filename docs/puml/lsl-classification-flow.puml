@@ -1,0 +1,63 @@
+@startuml lsl-classification-flow
+!include _standard-style.puml
+
+title LSL Classification Decision Tree
+
+start
+
+:Exchange received from\nClaud Code conversation;
+
+partition "Layer 1: PathAnalyzer" {
+  :Extract file operations\nfrom exchange;
+  if (File paths contain\ncoding repo references?) then (yes)
+    :Classification: CODING_INFRASTRUCTURE\nConfidence: 0.95\nReason: File operation detected;
+    stop
+  else (no)
+    :Continue to next layer;
+  endif
+}
+
+partition "Layer 2: KeywordMatcher" {
+  :Load coding-keywords.json\ndictionary;
+  :Scan content for\nprimary & secondary keywords;
+  if (Keywords match\ncoding patterns?) then (yes)
+    if (Confidence > threshold?) then (yes)
+      :Classification: CODING_INFRASTRUCTURE\nConfidence: 0.70-0.90\nReason: Keyword match;
+      stop
+    else (low confidence)
+      :Continue to semantic analysis;
+    endif
+  else (no match)
+    :Continue to next layer;
+  endif
+}
+
+partition "Layer 3: SemanticAnalyzer" {
+  if (Semantic analysis enabled?) then (yes)
+    :Send content to LLM\nfor semantic understanding;
+    if (LLM identifies\ncoding infrastructure?) then (yes)
+      :Classification: CODING_INFRASTRUCTURE\nConfidence: 0.60-0.95\nReason: Semantic analysis;
+      stop
+    else (no)
+      :Classification: NOT_CODING_INFRASTRUCTURE\nConfidence: 0.80\nReason: No coding patterns found;
+      stop
+    endif
+  else (disabled/fast-path)
+    :Classification: NOT_CODING_INFRASTRUCTURE\nConfidence: 0.10\nReason: Default fallback;
+    stop
+  endif
+}
+
+note right
+  **Layer Priority:**
+  1. PathAnalyzer (highest accuracy)
+  2. KeywordMatcher (fastest) 
+  3. SemanticAnalyzer (most comprehensive)
+  
+  **Performance Targets:**
+  - PathAnalyzer: <1ms
+  - KeywordMatcher: <2ms
+  - SemanticAnalyzer: <2000ms
+end note
+
+@enduml

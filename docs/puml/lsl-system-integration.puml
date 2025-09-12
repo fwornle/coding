@@ -1,0 +1,62 @@
+@startuml lsl-system-integration
+!include _standard-style.puml
+
+title LSL System Integration with Claude Code
+
+actor "Developer" as dev
+participant "Claude Code" as claude
+participant "Status Line" as status
+participant "LSL Monitor" as monitor
+participant "Classifier" as classifier
+participant "Session Files" as files
+
+== Real-time Session Monitoring ==
+
+dev -> claude : starts conversation
+activate claude
+
+claude -> monitor : session begins
+activate monitor
+
+loop for each exchange
+  claude -> monitor : new exchange
+  monitor -> classifier : classify content
+  activate classifier
+  
+  classifier -> classifier : PathAnalyzer\n→ KeywordMatcher\n→ SemanticAnalyzer
+  classifier --> monitor : classification result
+  deactivate classifier
+  
+  monitor -> files : append to session file
+  monitor -> status : update coding indicator
+  status --> dev : visual feedback
+end
+
+== Batch Processing Mode ==
+
+dev -> claude : request LSL regeneration
+claude -> monitor : start batch mode
+monitor -> classifier : fast-path enabled\n(skip semantic analysis)
+
+loop for each transcript file
+  monitor -> classifier : classify exchanges
+  classifier --> monitor : results (keyword + path only)
+  monitor -> files : generate session files
+end
+
+monitor --> claude : completion report
+claude --> dev : "✅ LSL Generation Complete!\n📊 Files: 120, Exchanges: 2,130\n⚡ Time: 5.2s"
+
+== Status Line Updates ==
+
+note over status
+**Status Line Indicators:**
+📋1530-1630 - Current session
+🟠1530-1630(5min) - Window closing
+→coding - Coding activity detected
+🛡️8.5 - Constraint compliance
+🔍EX - Experimentation mode
+🧠✅ - Semantic analysis ready
+end note
+
+@enduml
