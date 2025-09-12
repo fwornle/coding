@@ -93,10 +93,12 @@ class CombinedStatusLine {
     try {
       // 1. Calculate current time tranche using the same timezone utilities as LSL
       const now = new Date();
-      const currentTranche = getTimeWindow(now); // This handles timezone conversion properly
+      // JavaScript Date already returns local time when using getHours()
+      const currentTranche = getTimeWindow(now); // Pass Date directly - getTimeWindow expects local date
       
       if (process.env.DEBUG_STATUS) {
-        console.error(`DEBUG: Current time: ${now.getHours()}:${now.getMinutes()}`);
+        console.error(`DEBUG: UTC time: ${now.getUTCHours()}:${now.getUTCMinutes()}`);
+        console.error(`DEBUG: Local time (CEST): ${now.getHours()}:${now.getMinutes()}`);
         console.error(`DEBUG: Current tranche calculated: ${currentTranche}`);
       }
       
@@ -144,40 +146,20 @@ class CombinedStatusLine {
         }
       }
       
-      // 3. If no current tranche file found, look for most recent session files as fallback
-      let allFiles = [];
-      for (const historyDir of checkDirs) {
-        if (existsSync(historyDir)) {
-          const files = fs.readdirSync(historyDir)
-            .filter(f => f.includes(today) && f.includes('session') && f.endsWith('.md'))
-            .map(f => {
-              const filePath = join(historyDir, f);
-              const stats = fs.statSync(filePath);
-              // Extract tranche time for proper sorting - handle both _ and - separators
-              const timeMatch = f.match(/(\d{4})[-_](\d{4})[_-].*session/) || f.match(/(\d{4})-(\d{4})-session/);
-              const trancheEnd = timeMatch ? parseInt(timeMatch[2]) : 0;
-              return { file: f, mtime: stats.mtime, location: historyDir, trancheEnd };
-            });
-          allFiles = allFiles.concat(files);
-        }
+      // 3. No current tranche file found - show current time window with status
+      // We should always show the current time window, not fall back to old sessions
+      const remainingMinutes = this.calculateTimeRemaining(currentTranche);
+      
+      if (process.env.DEBUG_STATUS) {
+        console.error(`DEBUG: No session file for current tranche, showing time window with ${remainingMinutes} min remaining`);
       }
       
-      if (allFiles.length > 0) {
-        // Sort by tranche end time (most recent tranche first)
-        allFiles.sort((a, b) => b.trancheEnd - a.trancheEnd);
-        const mostRecent = allFiles[0].file;
-        
-        const timeMatch = mostRecent.match(/(\d{4})[-_](\d{4})[_-].*session/) || mostRecent.match(/(\d{4})-(\d{4})-session/);
-        if (timeMatch) {
-          const timeRange = `${timeMatch[1]}-${timeMatch[2]}`;
-          const remainingMinutes = this.calculateTimeRemaining(timeRange);
-          
-          if (remainingMinutes !== null && remainingMinutes <= 0) {
-            return `🔴${timeRange}-session(ended)`;
-          } else {
-            return `${timeRange}-session`;
-          }
-        }
+      if (remainingMinutes !== null && remainingMinutes <= 5 && remainingMinutes > 0) {
+        return `🟠${currentTranche}(${remainingMinutes}min)`;
+      } else if (remainingMinutes !== null && remainingMinutes <= 0) {
+        return `🔴${currentTranche}(ended)`;
+      } else {
+        return `${currentTranche}`;
       }
       
       // 2. Check current transcript to predict target filename
