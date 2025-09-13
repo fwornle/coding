@@ -1,25 +1,39 @@
 # Live Session Logging (LSL) System
 
-A comprehensive conversation classification and routing system that automatically organizes Claude Code transcripts into appropriate project session logs. The LSL system ensures all conversations are properly classified and routed to the correct `.specstory/history/` directories without data loss.
+A bulletproof conversation classification and routing system with Global Coordinator architecture that automatically organizes Claude Code transcripts into appropriate project session logs. The enhanced LSL system ensures all conversations are properly classified and routed to the correct `.specstory/history/` directories with zero data loss and automatic recovery from failures.
 
 ## Overview
 
-The Live Session Logging system monitors Claude Code conversations in real-time and performs intelligent classification to determine whether content belongs to **coding infrastructure** work or **project-specific** work. All content is preserved and routed to the appropriate destination.
+The Live Session Logging system monitors Claude Code conversations in real-time with a robust Global Coordinator that ensures continuous operation across all sessions. The system performs intelligent classification to determine whether content belongs to **coding infrastructure** work or **project-specific** work, while maintaining bulletproof reliability through health monitoring and automatic recovery.
 
 ### Core Principles
 
+- **Bulletproof Reliability**: Global Coordinator ensures LSL never fails across any session
 - **No Data Loss**: Every conversation exchange is preserved and routed appropriately
 - **Real-time Classification**: Decisions made during active conversations for immediate routing
-- **Batch Processing**: Efficient bulk processing of historical transcripts
+- **Health Monitoring**: Automatic detection and recovery from failed processes
+- **Batch Processing**: Efficient bulk processing of historical transcripts with parallel workers
 - **Three-Layer Analysis**: PathAnalyzer → KeywordMatcher → SemanticAnalyzer for accurate classification
 
 ## System Architecture
 
 ![LSL System Architecture](images/lsl-system-architecture.png)
 
-The LSL system consists of three main components:
+The enhanced LSL system consists of four main components:
 
-### 1. ReliableCodingClassifier
+### 1. Global LSL Coordinator
+**Location**: `scripts/global-lsl-coordinator.cjs`
+
+The bulletproof coordination layer that ensures LSL reliability:
+
+- **Session Registry**: Tracks all active Claude sessions across projects
+- **Health Monitor**: 30-second health checks with automatic recovery
+- **Process Manager**: Spawns and restarts transcript monitors as needed
+- **Cleanup Service**: Removes stale sessions and orphaned processes
+
+![Global LSL Coordinator Architecture](images/lsl-global-coordinator-architecture.png)
+
+### 2. ReliableCodingClassifier
 **Location**: `src/live-logging/ReliableCodingClassifier.js`
 
 The core classification engine implementing a three-layer decision architecture:
@@ -28,7 +42,7 @@ The core classification engine implementing a three-layer decision architecture:
 - **Layer 2: KeywordMatcher** - Fast keyword-based classification using coding-specific dictionary
 - **Layer 3: SemanticAnalyzer** - LLM-powered semantic understanding (used selectively for performance)
 
-### 2. Enhanced Transcript Monitor
+### 3. Enhanced Transcript Monitor
 **Location**: `scripts/enhanced-transcript-monitor.js`
 
 Real-time conversation monitoring with:
@@ -37,15 +51,18 @@ Real-time conversation monitoring with:
 - Automatic routing to appropriate session files
 - Status line integration with coding activity indicators
 - Fast-path processing for bulk operations
+- Integration with Global Coordinator for health monitoring
 
-### 3. LSL Generation Scripts
+### 4. LSL Generation Scripts
 **Location**: `scripts/generate-proper-lsl-from-transcripts.js`
 
-Batch processing system for historical transcript analysis:
+Enhanced batch processing system for historical transcript analysis:
 
-- Processes all transcript files from `~/.claude/projects/`
-- Generates session files in appropriate `.specstory/history/` directories
-- Optimized for performance with 200x speed improvement over previous versions
+- **Parallel Processing**: 5 concurrent workers for maximum efficiency
+- **Mode Support**: Local mode (all content) and Foreign mode (coding infrastructure only)
+- **Fast-Path Classification**: Skip semantic analysis for 200x speed improvement
+- **Smart Routing**: Processes all transcript files from `~/.claude/projects/`
+- **Session Generation**: Creates session files in appropriate `.specstory/history/` directories
 
 ## Classification Logic
 
@@ -176,36 +193,104 @@ The LSL system provides real-time feedback through Claude Code's status line:
 
 ### Real-time Monitoring
 
-The LSL system runs automatically during Claude Code sessions:
+The LSL system runs automatically with Global Coordinator integration:
 
 ```bash
-# System monitors conversations automatically
-# Classification happens in real-time
-# Session files updated continuously
+# Start Claude Code with automatic LSL
+coding --claude
+# or
+claude-mcp
+
+# Global Coordinator automatically:
+# - Registers the session
+# - Starts transcript monitoring
+# - Provides health monitoring
+# - Enables automatic recovery
 ```
 
-### Manual LSL Generation
+![LSL Coordinator Sequence](images/lsl-coordinator-sequence.png)
 
-To regenerate session logs from transcripts:
+### Batch Mode Processing
+
+The system supports multiple batch processing modes for different use cases:
+
+![LSL Batch Mode Workflows](images/lsl-batch-mode-workflows.png)
+
+#### Local Mode (Main Project)
+For processing a project's own transcripts with all content included:
 
 ```bash
-# For nano-degree project (all content)
-CODING_TARGET_PROJECT="/Users/q284340/Agentic/nano-degree" \
-  node /Users/q284340/Agentic/coding/scripts/generate-proper-lsl-from-transcripts.js
+# Process all content for nano-degree project
+node scripts/generate-proper-lsl-from-transcripts.js --mode=local --parallel
 
-# For coding project (coding content only)
+# Legacy environment variable method (still supported)
+CODING_TARGET_PROJECT="/Users/q284340/Agentic/nano-degree" \
+  node scripts/generate-proper-lsl-from-transcripts.js
+```
+
+**Use Case**: Generate complete session files for the main project being worked on.
+**Content**: All conversations, both coding and project-specific content.
+**Output**: Native session files in project's `.specstory/history/`.
+
+#### Foreign Mode (Cross-Project Content)
+For extracting coding infrastructure content from other projects:
+
+```bash
+# Extract coding content from all other projects
+node scripts/generate-proper-lsl-from-transcripts.js --mode=foreign --parallel
+
+# Legacy coding project method (still supported)
 CODING_TARGET_PROJECT="/Users/q284340/Agentic/coding" \
-  node /Users/q284340/Agentic/coding/scripts/generate-proper-lsl-from-transcripts.js
+  node scripts/generate-proper-lsl-from-transcripts.js
 ```
 
-### Bulk Processing with Optimizations
+**Use Case**: Collect coding infrastructure conversations scattered across multiple project transcripts.
+**Content**: Only coding-related conversations (ukb, vkb, MCP, semantic analysis, etc.).
+**Output**: Cross-project session files in coding project's `.specstory/history/`.
 
-For fast processing of large transcript archives:
+#### Fast Processing with Timeout
+For quick processing of large transcript archives:
 
 ```bash
-# Uses fast-path classification (keyword + path only)
-CODING_TARGET_PROJECT="/Users/q284340/Agentic/nano-degree" \
-  timeout 30s node /Users/q284340/Agentic/coding/scripts/generate-proper-lsl-from-transcripts.js
+# Fast local processing with 30-second timeout
+timeout 30s node scripts/generate-proper-lsl-from-transcripts.js --mode=local --parallel
+
+# Fast foreign processing with timeout
+timeout 30s node scripts/generate-proper-lsl-from-transcripts.js --mode=foreign --parallel
+```
+
+**Use Case**: Emergency session recovery or quick updates when time is limited.
+**Performance**: Uses fast-path classification (skip semantic analysis) for 200x speed improvement.
+
+#### Parallel Processing Architecture
+Both local and foreign modes use parallel processing:
+
+- **5 Concurrent Workers**: Process multiple transcript files simultaneously
+- **Batch Classification**: Efficient exchange processing with shared classifier instances
+- **Smart Queuing**: Optimal file distribution across worker processes
+- **Result Aggregation**: Consolidated session file generation
+
+#### Batch Mode Comparison
+
+| Mode | Content | Target Project | Output Files | Use Case |
+|------|---------|----------------|--------------|----------|
+| **Local** | All content | Current project | Native sessions | Main project work |
+| **Foreign** | Coding only | Coding project | Cross-project sessions | Infrastructure collection |
+| **Legacy** | Based on target | Any project | Mixed | Backward compatibility |
+
+### Global Coordinator Management
+
+The Global LSL Coordinator provides additional management commands:
+
+```bash
+# Check coordinator status
+node scripts/global-lsl-coordinator.cjs status
+
+# Manually ensure LSL for a session
+node scripts/global-lsl-coordinator.cjs ensure "/path/to/project" <claude_pid>
+
+# Run manual cleanup
+node scripts/global-lsl-coordinator.cjs cleanup
 ```
 
 ## Configuration
@@ -290,23 +375,27 @@ Each classification includes detailed decision information:
 
 ## System Status
 
-### Current State: ✅ Fully Operational
+### Current State: ✅ Bulletproof Operation
 
-The LSL system is production-ready with:
+The enhanced LSL system is production-ready with bulletproof reliability:
 
-- **Real-time classification** during active sessions
-- **Batch processing** for historical transcripts
+- **Global Coordinator**: Ensures LSL never fails across any session
+- **Health Monitoring**: 30-second intervals with automatic recovery
+- **Real-time classification** during active sessions with continuous monitoring
+- **Enhanced batch processing** with parallel workers and multiple modes
 - **Performance optimization** achieving 200x speed improvement
-- **Zero data loss** with comprehensive content routing
-- **Status line integration** providing real-time feedback
+- **Zero data loss** with comprehensive content routing and failover
+- **Status line integration** providing real-time feedback and activity indicators
 
-### Recent Improvements
+### Recent Major Improvements
 
+- **Global LSL Coordinator**: Bulletproof session management and health monitoring
+- **Enhanced batch modes**: Local and foreign processing with parallel workers
+- **Session registry**: Complete tracking of active sessions across projects  
+- **Automatic recovery**: Failed transcript monitors are automatically restarted
 - **Three-layer classification** architecture for improved accuracy
-- **Fast-path processing** for bulk operations
-- **Command filtering** to remove administrative commands
-- **Timezone handling** for accurate time window calculation
-- **Cross-project routing** for content organization
+- **Fast-path processing** for bulk operations with 200x speed improvement
+- **Process lifecycle management**: Clean startup, monitoring, and shutdown procedures
 
 ## Troubleshooting
 
@@ -330,17 +419,35 @@ The LSL system is production-ready with:
 ### Debug Commands
 
 ```bash
+# Check Global Coordinator status
+node scripts/global-lsl-coordinator.cjs status
+
 # Test classification system
 DEBUG_STATUS=1 node scripts/enhanced-transcript-monitor.js --test
 
-# Analyze specific transcript file
-node scripts/analyze-transcript.js /path/to/transcript.jsonl
+# Check session registry
+cat .mcp-sync/session-registry.json | jq .
 
-# Check system status
-node scripts/lsl-system-status.js
+# Monitor coordinator logs
+tail -f logs/global-lsl-coordinator.log
+
+# Test batch processing with debug output
+DEBUG_STATUS=1 node scripts/generate-proper-lsl-from-transcripts.js --mode=local --parallel
 ```
 
 ## Architecture Diagrams
+
+### Enhanced System Overview
+![Enhanced LSL System Overview](images/lsl-enhanced-system-overview.png)
+
+### Global Coordinator Architecture
+![Global LSL Coordinator Architecture](images/lsl-global-coordinator-architecture.png)
+
+### Coordinator Session Lifecycle
+![LSL Coordinator Sequence](images/lsl-coordinator-sequence.png)
+
+### Batch Processing Workflows
+![LSL Batch Mode Workflows](images/lsl-batch-mode-workflows.png)
 
 ### Classification Flow
 ![Classification Decision Tree](images/lsl-classification-flow.png)
@@ -353,4 +460,4 @@ node scripts/lsl-system-status.js
 
 ---
 
-The Live Session Logging system represents the current state of conversation classification and routing for Claude Code, ensuring all conversations are intelligently organized while maintaining high performance and zero data loss.
+The Enhanced Live Session Logging system with Global Coordinator represents the pinnacle of bulletproof conversation classification and routing for Claude Code. With automatic recovery, health monitoring, and parallel batch processing, the system ensures all conversations are intelligently organized while maintaining ultra-high performance, zero data loss, and absolute reliability across all usage scenarios.

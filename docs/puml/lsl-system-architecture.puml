@@ -9,38 +9,38 @@ package "Live Session Logging (LSL) System" {
   rectangle "Core LSL Architecture" as Core {
     
     ' Global Coordination
-    component [Global LSL Coordinator] as GLC {
-      [Session Registry] as Registry
-      [Health Monitor] as Health  
-      [Process Manager] as ProcessMgr
-      [Cleanup Service] as Cleanup
+    rectangle "Global LSL Coordinator" as GLC {
+      component [Session Registry] as Registry
+      component [Health Monitor] as Health  
+      component [Process Manager] as ProcessMgr
+      component [Cleanup Service] as Cleanup
     }
     
     ' Real-time Processing
-    component [Enhanced Transcript Monitor] as ETM {
-      [Real-time Classifier] as RTClassifier
-      [Exchange Parser] as Parser
-      [Content Router] as Router
-      [Session Writer] as Writer
+    rectangle "Enhanced Transcript Monitor" as ETM {
+      component [Real-time Classifier] as RTClassifier
+      component [Exchange Parser] as Parser
+      component [Content Router] as Router
+      component [Session Writer] as Writer
     }
     
     ' Classification Engine
-    component [ReliableCodingClassifier] as RCC {
+    rectangle "ReliableCodingClassifier" as RCC {
       rectangle "Three-Layer Analysis" {
-        [PathAnalyzer] as L1
-        [KeywordMatcher] as L2  
-        [SemanticAnalyzer] as L3
+        component [PathAnalyzer] as L1
+        component [KeywordMatcher] as L2  
+        component [SemanticAnalyzer] as L3
         L1 --> L2 : "if no paths"
         L2 --> L3 : "if low confidence"
       }
     }
     
     ' Batch Processing
-    component [LSL Generation Scripts] as LSLGen {
-      [Transcript Scanner] as Scanner
-      [Parallel Processor] as Parallel
-      [Fast-Path Classifier] as FastPath
-      [Bulk Writer] as BulkWriter
+    rectangle "LSL Generation Scripts" as LSLGen {
+      component [Transcript Scanner] as Scanner
+      component [Parallel Processor] as Parallel
+      component [Fast-Path Classifier] as FastPath
+      component [Bulk Writer] as BulkWriter
     }
     
   }
