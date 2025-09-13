@@ -1,156 +1,111 @@
-@startuml lsl-system-architecture
+@startuml lsl-system-architecture-compact
 !include _standard-style.puml
 
-title LSL System Architecture - Updated with Global Coordinator
+title LSL System Architecture - Compact Layout
 
-package "Live Session Logging (LSL) System" {
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
 
-  ' Core Architecture
-  rectangle "Core LSL Architecture" as Core {
-    
-    ' Global Coordination
-    rectangle "Global LSL Coordinator" as GLC {
-      component [Session Registry] as Registry
-      component [Health Monitor] as Health  
-      component [Process Manager] as ProcessMgr
-      component [Cleanup Service] as Cleanup
-    }
-    
-    ' Real-time Processing
-    rectangle "Enhanced Transcript Monitor" as ETM {
-      component [Real-time Classifier] as RTClassifier
-      component [Exchange Parser] as Parser
-      component [Content Router] as Router
-      component [Session Writer] as Writer
-    }
-    
-    ' Classification Engine
-    rectangle "ReliableCodingClassifier" as RCC {
-      rectangle "Three-Layer Analysis" {
-        component [PathAnalyzer] as L1
-        component [KeywordMatcher] as L2  
-        component [SemanticAnalyzer] as L3
-        L1 --> L2 : "if no paths"
-        L2 --> L3 : "if low confidence"
-      }
-    }
-    
-    ' Batch Processing
-    rectangle "LSL Generation Scripts" as LSLGen {
-      component [Transcript Scanner] as Scanner
-      component [Parallel Processor] as Parallel
-      component [Fast-Path Classifier] as FastPath
-      component [Bulk Writer] as BulkWriter
-    }
-    
+package "LSL System Core" {
+  
+  rectangle "Global LSL Coordinator" as GLC #lightblue {
+    component "Session Registry" as Registry
+    component "Health Monitor" as Health  
+    component "Process Manager" as ProcessMgr
+    component "Cleanup Service" as Cleanup
+    Registry -- Health
+    Health -- ProcessMgr 
+    ProcessMgr -- Cleanup
   }
-
-  ' Data Storage
-  package "Data Layer" as Data {
-    database "session-registry.json" as SessionDB {
-      [Active Sessions] as ActiveSessions
-      [Monitor PIDs] as MonitorPIDs
-      [Health Status] as HealthStatus
-      [Project Mappings] as ProjectMappings
-    }
-    
-    database "coding-keywords.json" as KeywordDB {
-      [Primary Keywords] as PrimaryKW
-      [Secondary Keywords] as SecondaryKW
-      [File Patterns] as FilePatterns
-      [Path Patterns] as PathPatterns
-    }
-    
-    folder "Claude Transcripts" as Transcripts {
-      file "project-transcript-1.jsonl" as T1
-      file "project-transcript-2.jsonl" as T2
-      file "project-transcript-3.jsonl" as T3
-    }
-  }
-
-  ' Output Layer
-  package "Session Files" as Sessions {
-    folder "coding/.specstory/history/" as CodingHistory {
-      file "YYYY-MM-DD_HHMM-HHMM-session.md" as CodingSession
-      file "YYYY-MM-DD_HHMM-HHMM-session-from-PROJECT.md" as CrossProjectSession
-    }
-    
-    folder "project/.specstory/history/" as ProjectHistory {
-      file "YYYY-MM-DD_HHMM-HHMM-session.md" as ProjectSession
-    }
-    
-    folder "nano-degree/.specstory/history/" as NanoHistory {
-      file "YYYY-MM-DD_HHMM-HHMM-session.md" as NanoSession
-    }
-  }
-
-  ' Integration Points
-  package "Integration Layer" as Integration {
-    [launch-claude.sh] as LaunchScript
-    [Status Line Provider] as StatusLine
-    [coding launcher] as CodingLauncher
-    [MCP Services] as MCP
-  }
-
 }
 
-' Relationships
-GLC --> Registry : "manages"
-GLC --> Health : "monitors"
-GLC --> ProcessMgr : "controls"  
-GLC --> Cleanup : "maintains"
+package "Real-Time Processing" {
+  
+  rectangle "Enhanced Transcript Monitor" as ETM #lightgreen {
+    component "Real-time Classifier" as RTClassifier
+    component "Exchange Parser" as Parser
+    component "Content Router" as Router
+    component "Session Writer" as Writer
+    RTClassifier -- Parser
+    Parser -- Router
+    Router -- Writer
+  }
+}
 
-Health --> ETM : "health checks"
-ProcessMgr --> ETM : "spawn/restart"
-ETM --> RTClassifier : "classifies"
-RTClassifier --> RCC : "uses engine"
-RCC --> KeywordDB : "references"
-Router --> CodingHistory : "coding content"
-Router --> ProjectHistory : "project content"
-Router --> NanoHistory : "all content"
+package "Classification Engine" {
+  
+  rectangle "Three-Layer Classifier" as RCC #lightyellow {
+    component "1. PathAnalyzer" as L1
+    component "2. KeywordMatcher" as L2  
+    component "3. SemanticAnalyzer" as L3
+    L1 --> L2 : "no file ops"
+    L2 --> L3 : "low confidence"
+  }
+}
 
-LSLGen --> Scanner : "finds transcripts"
-Scanner --> Transcripts : "reads"
-Parallel --> FastPath : "batch classify"
-FastPath --> RCC : "uses classifier"
-BulkWriter --> Sessions : "generates"
+package "Batch Processing" {
+  
+  rectangle "LSL Generation Scripts" as LSLGen #lightcoral {
+    component "Transcript Scanner" as Scanner
+    component "Parallel Workers (5x)" as Parallel
+    component "Fast-Path Classifier" as FastPath
+    component "Session Generator" as Generator
+    Scanner --> Parallel
+    Parallel --> FastPath
+    FastPath --> Generator
+  }
+}
 
-Registry --> SessionDB : "persists"
-LaunchScript --> GLC : "ensures LSL"
-ETM --> StatusLine : "provides status"
-CodingLauncher --> LaunchScript : "executes"
+package "Data & Storage" {
+  database "Session Registry" as SessionDB #lightsalmon
+  database "Classification Data" as KeywordDB #lightsteelblue  
+  folder "Input Sources" as Sources #lightgray
+}
 
-note right of GLC
-  **Global Coordinator Features:**
-  - Bulletproof LSL across all sessions
-  - Health monitoring every 30 seconds
-  - Automatic recovery from failures
-  - Cross-project session coordination
-  - Clean process lifecycle management
+package "Output Destinations" {
+  folder "Coding Project" as CodingOut #wheat
+  folder "Target Projects" as ProjectOut #lightcyan
+}
+
+' Main connections
+GLC --> ETM : coordinates
+ETM --> RCC : classifies with
+RCC --> KeywordDB : uses data
+ETM --> CodingOut : routes coding
+ETM --> ProjectOut : routes project
+
+' Batch processing
+LSLGen --> Sources : scans
+LSLGen --> RCC : batch classify
+LSLGen --> CodingOut : generates
+LSLGen --> ProjectOut : generates
+
+' Coordinator management
+GLC --> SessionDB : maintains
+Health --> ETM : monitors
+ProcessMgr --> ETM : spawns/restarts
+
+' Notes
+note bottom of GLC
+  **Bulletproof Coordination**
+  • Health monitoring (30s)
+  • Automatic recovery
+  • Cross-project tracking
 end note
 
-note right of RCC
-  **Three-Layer Classification:**
-  - Layer 1: File operation detection (100% accuracy)
-  - Layer 2: Keyword matching (fast & reliable)
-  - Layer 3: Semantic analysis (selective use)
-  - Performance: 200x speed improvement
+note bottom of RCC
+  **Smart Classification**
+  • File ops (100% accuracy)
+  • Keywords (fast)
+  • Semantic (selective)
+  • 200x performance
 end note
 
 note bottom of LSLGen
-  **Batch Processing Modes:**
-  - Local mode: All content for main project
-  - Foreign mode: Coding content from other projects
-  - Parallel processing: 5 concurrent workers
-  - Fast-path: Skip semantic analysis for speed
-end note
-
-note top of SessionDB
-  **Session Registry:**
-  - Tracks active Claude sessions
-  - Monitors transcript process health
-  - Maps projects to session files
-  - Automatic cleanup of stale entries
+  **Parallel Processing**
+  • Local/Foreign modes
+  • 5 concurrent workers
+  • Fast-path optimization
 end note
 
 @enduml

@@ -1,7 +1,6 @@
 !include _standard-style.puml
 
 @startuml lsl-coordinator-sequence
-!theme plain
 
 title Global LSL Coordinator Session Lifecycle
 

@@ -1,7 +1,6 @@
 !include _standard-style.puml
 
 @startuml lsl-batch-mode-workflows
-!theme plain
 
 title LSL Batch Mode Processing Workflows
 

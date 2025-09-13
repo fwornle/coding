@@ -1,6 +1,5 @@
 @startuml
 !include _standard-style.puml
-!theme plain
 title Live Session Logging (LSL) Architecture Overview
 
 participant "Claude Code\nSession" as Claude

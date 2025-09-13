@@ -1,7 +1,6 @@
 !include _standard-style.puml
 
 @startuml lsl-enhanced-system-overview
-!theme plain
 
 title Enhanced LSL System with Global Coordinator
 

@@ -192,12 +192,14 @@
       "mcp__spec-workflow__spec-status",
       "Bash(npm test:*)",
       "Bash(awk:*)",
-      "Read(//Users/q284340/.claude/projects/**)"
+      "Read(//Users/q284340/.claude/projects/**)",
+      "Bash(CODING_REPO=/Users/q284340/Agentic/coding node /Users/q284340/Agentic/coding/scripts/combined-status-line.js)",
+      "Read(//Users/q284340/.claude/**)"
     ],
     "deny": []
   },
   "statusLine": {
     "type": "command",
-    "command": "node ./scripts/combined-status-line.js"
+    "command": "CODING_REPO=/Users/q284340/Agentic/coding node /Users/q284340/Agentic/coding/scripts/combined-status-line.js"
   }
 }

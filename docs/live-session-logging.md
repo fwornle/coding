@@ -22,6 +22,7 @@ The Live Session Logging system monitors Claude Code conversations in real-time 
 The enhanced LSL system consists of four main components:
 
 ### 1. Global LSL Coordinator
+
 **Location**: `scripts/global-lsl-coordinator.cjs`
 
 The bulletproof coordination layer that ensures LSL reliability:
@@ -34,6 +35,7 @@ The bulletproof coordination layer that ensures LSL reliability:
 ![Global LSL Coordinator Architecture](images/lsl-global-coordinator-architecture.png)
 
 ### 2. ReliableCodingClassifier
+
 **Location**: `src/live-logging/ReliableCodingClassifier.js`
 
 The core classification engine implementing a three-layer decision architecture:
@@ -43,6 +45,7 @@ The core classification engine implementing a three-layer decision architecture:
 - **Layer 3: SemanticAnalyzer** - LLM-powered semantic understanding (used selectively for performance)
 
 ### 3. Enhanced Transcript Monitor
+
 **Location**: `scripts/enhanced-transcript-monitor.js`
 
 Real-time conversation monitoring with:
@@ -151,8 +154,8 @@ YYYY-MM-DD_HHMM-HHMM-session-from-PROJECT.md  # Cross-project content
 ### Time Window System
 
 Sessions are organized into 1-hour time windows:
-- `0030-0130`, `0130-0230`, `0230-0330`, etc.
-- Times displayed in local timezone (automatically converted from UTC)
+- `0000-0100`, `0100-0200`, `0200-0300`, etc.
+- Times displayed in local timezone (automatically converted from UTC)  
 - Time windows help organize conversations chronologically
 
 ### Directory Structure
@@ -161,9 +164,9 @@ Sessions are organized into 1-hour time windows:
 project-root/
 ├── .specstory/
 │   └── history/
-│       ├── 2025-09-12_1530-1630-session.md
-│       ├── 2025-09-12_1630-1730-session.md
-│       └── 2025-09-12_1730-1830-session-from-nano-degree.md
+│       ├── 2025-09-12_1500-1600-session.md
+│       ├── 2025-09-12_1600-1700-session.md
+│       └── 2025-09-12_1700-1800-session-from-nano-degree.md
 ```
 
 ## Status Line Integration
@@ -173,12 +176,12 @@ The LSL system provides real-time feedback through Claude Code's status line:
 ### Coding Activity Indicator
 
 ```
-📋🟠2130-2230(3min) →coding
+📋🟠2100-2200(3min) →coding
 ```
 
 - **📋**: Session logging active
 - **🟠**: Window closing soon (orange indicator)
-- **2130-2230**: Current time window
+- **2100-2200**: Current time window
 - **(3min)**: Time remaining in window
 - **→coding**: Coding infrastructure activity detected
 

@@ -1,7 +1,6 @@
 !include _standard-style.puml
 
 @startuml lsl-global-coordinator-architecture
-!theme plain
 
 title Global LSL Coordinator Architecture
 
