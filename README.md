@@ -67,6 +67,14 @@ The system provides:
 - **[VSCode Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced CoPilot with same agents
 - **[SynchronizationAgent](docs/components/semantic-analysis/synchronization-agent.md)** - Single source of truth
 
+### AST-Based Code Analysis (Serena)
+
+- **[Serena AST Analysis](docs/integrations/serena-ast-analysis.md)** - 🧠 **AST-based semantic code analysis and retrieval**
+- **Smart Code Search** - Search by code structure, not just text patterns
+- **Semantic Relationships** - Understand function calls, inheritance, and dependencies
+- **Security Analysis** - Find vulnerabilities through code structure analysis
+- **Refactoring Support** - Intelligent code reorganization suggestions
+
 ### Real-time Constraint Monitoring
 
 - **[MCP Constraint Monitor](https://github.com/fwornle/mcp-server-constraint-monitor)** - 🛡️ **Standalone MCP server** for universal constraint monitoring
@@ -105,6 +113,7 @@ The system provides:
 
 ### 🔌 Integrations
 
+- **[Serena AST Analysis](docs/integrations/serena-ast-analysis.md)** - 🧠 **AST-based semantic code analysis and retrieval**
 - **[VSCode CoPilot Integration](docs/integrations/vscode-copilot-integration.md)** - Enhanced development experience
 - **[API Reference](docs/integrations/api-reference.md)** - HTTP and MCP APIs
 - **[Testing Guide](docs/integrations/vscode-testing-guide.md)** - Integration testing
@@ -175,6 +184,40 @@ determine_insights {
 ```
 
 *Both commands use the same 11-agent system*
+
+### Serena AST Analysis Examples
+
+**Smart Code Search:**
+```bash
+# Find all authentication functions by structure, not text
+search_code_by_ast {
+  "pattern": "function_def", 
+  "context": "authentication",
+  "include_dependencies": true
+}
+```
+
+**Security Analysis:**
+```bash
+# Find potential SQL injection points through AST analysis
+search_code_by_ast {
+  "pattern": "function_call",
+  "name": "*.query", 
+  "context": "user_input",
+  "analysis_type": "security"
+}
+```
+
+**Refactoring Assistant:**
+```bash
+# Analyze code dependencies before refactoring
+retrieve_semantic_code {
+  "target": "UserService",
+  "relationship": "calls", 
+  "depth": 3,
+  "suggest_improvements": true
+}
+```
 
 ## 🔍 System Status
 
