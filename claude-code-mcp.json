@@ -56,6 +56,10 @@
     "spec-workflow": {
       "command": "npx",
       "args": ["-y", "@pimzino/spec-workflow-mcp@latest", "{{CODING_TOOLS_PATH}}"]
+    },
+    "serena": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "ide-assistant", "--project", "{{CODING_TOOLS_PATH}}"]
     }
   }
 }

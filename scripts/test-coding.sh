@@ -902,6 +902,74 @@ else
     print_info "Install with: git clone https://github.com/fwornle/mcp-server-constraint-monitor.git integrations/mcp-constraint-monitor"
 fi
 
+print_check "Serena MCP server (AST-based code analysis)"
+SERENA_DIR="$CODING_ROOT/integrations/serena"
+if dir_exists "$SERENA_DIR"; then
+    print_pass "Serena MCP server found"
+    
+    print_check "Serena pyproject.toml"
+    if [ -f "$SERENA_DIR/pyproject.toml" ]; then
+        print_pass "Serena project configuration found"
+    else
+        print_fail "Serena pyproject.toml missing"
+    fi
+    
+    print_check "Serena virtual environment"
+    if [ -d "$SERENA_DIR/.venv" ]; then
+        print_pass "Serena virtual environment exists"
+        
+        # Test if serena can be imported
+        print_check "Serena package import test"
+        cd "$SERENA_DIR"
+        if timeout 10s .venv/bin/python -c "import serena; print('Serena import successful')" >/dev/null 2>&1; then
+            print_pass "Serena package imports successfully"
+        else
+            print_warning "Serena package import test failed"
+        fi
+    else
+        print_repair "Installing Serena dependencies..."
+        cd "$SERENA_DIR"
+        if command_exists uv; then
+            uv sync && print_fixed "Serena dependencies installed"
+        else
+            print_fail "uv package manager not found - required for Serena"
+        fi
+    fi
+    
+    print_check "Serena MCP server functionality"
+    if [ -f "$SERENA_DIR/pyproject.toml" ] && [ -d "$SERENA_DIR/.venv" ]; then
+        cd "$SERENA_DIR"
+        # Test basic server functionality
+        if timeout 10s .venv/bin/python -c "
+import sys
+sys.path.insert(0, '.')
+try:
+    from serena.mcp_server import main
+    print('Serena MCP server module loads successfully')
+except ImportError as e:
+    print(f'Import error: {e}')
+    sys.exit(1)
+" >/dev/null 2>&1; then
+            print_pass "Serena MCP server module functional"
+        else
+            print_warning "Serena MCP server module test failed"
+        fi
+    else
+        print_warning "Serena functionality test skipped (dependencies missing)"
+    fi
+    
+    print_check "Serena configuration in MCP setup"
+    if grep -q "serena" "$CODING_ROOT/claude-code-mcp.json" 2>/dev/null; then
+        print_pass "Serena configured in MCP server list"
+    else
+        print_fail "Serena not found in MCP configuration"
+    fi
+else
+    print_fail "Serena MCP server not found"
+    print_info "Should be located at integrations/serena"
+    print_info "Install with: git clone https://github.com/oraios/serena integrations/serena && cd integrations/serena && uv sync"
+fi
+
 # =============================================================================
 # PHASE 6: FALLBACK SERVICES FOR NON-CLAUDE AGENTS
 # =============================================================================

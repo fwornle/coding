@@ -231,6 +231,12 @@ check_dependencies() {
         missing_deps+=("plantuml")
     fi
     
+    # Check for uv (required for Serena)
+    if ! command -v uv >/dev/null 2>&1; then
+        warning "uv not found. Required for Serena MCP server installation."
+        info "Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    fi
+    
     # Platform-specific checks
     if [[ "$PLATFORM" == "macos" ]]; then
         if ! command -v brew >/dev/null 2>&1; then
@@ -478,6 +484,74 @@ install_semantic_analysis() {
         success "Semantic analysis MCP server installed successfully"
     else
         warning "Semantic analysis repository not available - skipping build"
+    fi
+    
+    cd "$CODING_REPO"
+}
+
+# Install Serena MCP server for AST-based code analysis
+install_serena() {
+    echo -e "\n${CYAN}🔍 Installing Serena MCP server for AST-based code analysis...${NC}"
+    
+    local serena_dir="$CODING_REPO/integrations/serena"
+    
+    # Check if uv is available
+    if ! command -v uv >/dev/null 2>&1; then
+        warning "uv not found. Serena requires uv for installation."
+        info "Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
+        INSTALLATION_WARNINGS+=("Serena: uv package manager required but not found")
+        return 1
+    fi
+    
+    # Install or update Serena
+    if [[ -d "$serena_dir" ]]; then
+        info "Serena already exists, updating..."
+        cd "$serena_dir"
+        
+        if timeout 10s git pull origin main 2>/dev/null; then
+            success "Serena updated from repository"
+        else
+            warning "Could not update Serena, using existing version"
+        fi
+        
+        # Update dependencies
+        info "Updating Serena dependencies..."
+        if uv sync; then
+            success "Serena dependencies updated"
+        else
+            warning "Failed to update Serena dependencies"
+            INSTALLATION_WARNINGS+=("Serena: Failed to update dependencies")
+        fi
+    else
+        info "Cloning Serena repository..."
+        
+        # Clone the repository
+        if git clone "https://github.com/oraios/serena" "$serena_dir" 2>/dev/null; then
+            success "Serena repository cloned"
+        else
+            error_exit "Failed to clone Serena repository from https://github.com/oraios/serena"
+            return 1
+        fi
+        
+        # Install dependencies
+        info "Installing Serena dependencies..."
+        cd "$serena_dir"
+        
+        if uv sync; then
+            success "Serena dependencies installed"
+        else
+            error_exit "Failed to install Serena dependencies"
+            return 1
+        fi
+    fi
+    
+    # Verify installation
+    if [[ -f "$serena_dir/pyproject.toml" ]]; then
+        success "Serena MCP server installed successfully"
+        info "Serena provides AST-based code indexing and semantic retrieval"
+    else
+        warning "Serena installation verification failed"
+        INSTALLATION_WARNINGS+=("Serena: Installation verification failed")
     fi
     
     cd "$CODING_REPO"
@@ -965,6 +1039,13 @@ EOF
         warning "Constraint monitor system not installed"
     fi
     
+    # Check Serena MCP server
+    if [[ -f "$CODING_REPO/integrations/serena/pyproject.toml" ]]; then
+        success "Serena MCP server is installed"
+    else
+        warning "Serena MCP server not installed"
+    fi
+    
     
     if [[ $errors -eq 0 ]]; then
         success "Installation verification passed!"
@@ -1309,6 +1390,7 @@ main() {
     install_memory_visualizer
     install_browserbase
     install_semantic_analysis
+    install_serena
     install_mcp_servers
     create_command_wrappers
     setup_unified_launcher
@@ -1317,7 +1399,8 @@ main() {
     create_example_configs
     setup_mcp_config
     setup_vscode_extension
-    install_enhanced_lsl    verify_installation
+    install_enhanced_lsl
+    verify_installation
     
     # Create activation script for immediate use
     cat > "$CODING_REPO/.activate" << EOF
