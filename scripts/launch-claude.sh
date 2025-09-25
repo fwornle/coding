@@ -169,7 +169,7 @@ start_transcript_monitoring() {
   fi
   
   # Use global coordinator to ensure robust LSL
-  if node "$coding_repo/scripts/global-lsl-coordinator.cjs" ensure "$project_dir" $$; then
+  if node "$coding_repo/scripts/global-lsl-coordinator.js" ensure "$project_dir" $$; then
     log "Global LSL Coordinator: LSL setup successful"
   else
     log "Warning: Global LSL Coordinator setup failed, falling back to direct monitor"

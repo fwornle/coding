@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": 1758819278492,
+  "projects": {
+    "curriculum-alignment": {
+      "projectPath": "/Users/q284340/Agentic/curriculum-alignment",
+      "monitorPid": 78406,
+      "startTime": 1758819278492,
+      "parentPid": null,
+      "lastHealthCheck": 1758819278492,
+      "status": "active",
+      "exchanges": 0
+    },
+    "nano-degree": {
+      "projectPath": "/Users/q284340/Agentic/nano-degree",
+      "monitorPid": 59009,
+      "startTime": 1758818934497,
+      "parentPid": null,
+      "lastHealthCheck": 1758818934497,
+      "status": "active",
+      "exchanges": 0
+    }
+  },
+  "coordinator": {
+    "pid": 35139,
+    "startTime": 1758817953061,
+    "healthCheckInterval": 30000
+  }
+}

@@ -341,6 +341,27 @@ class ReliableClassifier {
       const context = this.extractContext(input);
       const decisionPath = [];
 
+      // Pre-filter: Session Continuation Detection (prevents false positives)
+      if (this.isSessionContinuation(context.content)) {
+        this.stats.sessionContinuations = (this.stats.sessionContinuations || 0) + 1;
+        return this.buildResult(
+          {
+            isCoding: false,
+            confidence: 0.95,
+            reason: 'Session continuation message detected - never redirect summaries',
+            details: { sessionContinuation: true }
+          },
+          [{
+            layer: 'session-filter',
+            input: { content: context.content.substring(0, 100) + '...' },
+            output: { sessionContinuation: true },
+            duration: 1
+          }],
+          'session-filter',
+          Date.now() - startTime
+        );
+      }
+
       // Layer 1: Path Analysis (fastest)
       const pathResult = this.pathAnalyzer.analyze(context.fileOperations);
       decisionPath.push({
@@ -453,6 +474,60 @@ class ReliableClassifier {
     }
 
     return context;
+  }
+
+  /**
+   * Detect session continuation messages to prevent false positives
+   * These are always summaries/context and should never be redirected
+   */
+  isSessionContinuation(content) {
+    if (!content || typeof content !== 'string') return false;
+    
+    const normalizedContent = content.toLowerCase().trim();
+    
+    // Primary session continuation patterns
+    const sessionPatterns = [
+      /^this session is being continued from a previous conversation/,
+      /^this conversation is being continued from/,
+      /session.*continued.*previous.*conversation/,
+      /previous conversation.*ran out of context/,
+      /conversation.*summarized below/,
+      /^analysis:/,  // Often starts continuation summaries
+      /^summary:/,   // Summary introductions
+      /let me chronologically analyze this conversation/,
+      /this conversation begins with/,
+      /conversation is summarized/
+    ];
+    
+    // Check for explicit session continuation indicators
+    for (const pattern of sessionPatterns) {
+      if (pattern.test(normalizedContent)) {
+        return true;
+      }
+    }
+    
+    // Check for summary structure (multiple sections with analysis format)
+    const summaryIndicators = [
+      'primary request and intent:',
+      'key technical concepts:',
+      'files and code sections:',
+      'errors and fixes:',
+      'problem solving:',
+      'user messages:',
+      'current work:',
+      'pending tasks:'
+    ];
+    
+    const foundIndicators = summaryIndicators.filter(indicator => 
+      normalizedContent.includes(indicator)
+    ).length;
+    
+    // If content has 3+ summary indicators, it's likely a continuation
+    if (foundIndicators >= 3) {
+      return true;
+    }
+    
+    return false;
   }
 
   /**

@@ -1,25 +1,25 @@
 {
-  "timestamp": 1758817345944,
-  "projectPath": "/Users/q284340/Agentic/coding",
-  "transcriptPath": "/Users/q284340/.claude/projects/-Users-q284340-Agentic-coding/5ab64faa-bbe9-4d94-b134-f000e92c77fd.jsonl",
+  "timestamp": 1758819832640,
+  "projectPath": "/Users/q284340/Agentic/curriculum-alignment",
+  "transcriptPath": "/Users/q284340/.claude/projects/-Users-q284340-Agentic-curriculum-alignment/ca137daf-b706-4d7b-9d49-16bd4ba84c1f.jsonl",
   "status": "running",
   "userHash": "g9b30a",
   "metrics": {
-    "memoryMB": 5,
-    "memoryTotalMB": 71,
-    "cpuUser": 987724,
-    "cpuSystem": 188981,
-    "uptimeSeconds": 160,
-    "processId": 10977
+    "memoryMB": 67,
+    "memoryTotalMB": 89,
+    "cpuUser": 4981887,
+    "cpuSystem": 827011,
+    "uptimeSeconds": 555,
+    "processId": 78406
   },
   "transcriptInfo": {
     "status": "active",
-    "sizeBytes": 12284395,
-    "ageMs": 31626,
-    "lastFileSize": 12284395
+    "sizeBytes": 16758967,
+    "ageMs": 4408,
+    "lastFileSize": 16758967
   },
   "activity": {
-    "lastExchange": "e7fd9ae3-88d7-4de2-bfe9-38737f9f6766",
+    "lastExchange": "82da8b2a-6a30-45eb-b0c7-5e1e2b2d54ee",
     "exchangeCount": 10,
     "isSuspicious": false,
     "suspicionReason": null
