@@ -1,16 +1,16 @@
 {
-  "timestamp": 1758703174540,
+  "timestamp": 1758814823782,
   "projectPath": "/Users/q284340/Agentic/coding",
   "transcriptPath": "/Users/q284340/.claude/projects/-Users-q284340-Agentic-coding/368b2e35-1e63-460b-a5da-de09195b5750.jsonl",
   "status": "running",
   "userHash": "g9b30a",
   "metrics": {
-    "memoryMB": 6,
+    "memoryMB": 7,
     "memoryTotalMB": 8,
-    "cpuUser": 104021,
-    "cpuSystem": 99257,
-    "uptimeSeconds": 525,
-    "processId": 53438
+    "cpuUser": 6642393,
+    "cpuSystem": 13819510,
+    "uptimeSeconds": 108968,
+    "processId": 18083
   },
   "lastExchange": null,
   "exchangeCount": 0,

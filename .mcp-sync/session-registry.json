@@ -149,6 +149,26 @@
       "lastHealthCheck": 1758702649365,
       "transcriptMonitorPid": 53438,
       "status": "active"
+    },
+    "/Users/q284340/Agentic/coding_68558": {
+      "sessionId": "/Users/q284340/Agentic/coding_68558",
+      "projectDir": "/Users/q284340/Agentic/coding",
+      "pid": 68558,
+      "claudeProcess": "unknown",
+      "startTime": 1758703276957,
+      "lastHealthCheck": 1758703276957,
+      "transcriptMonitorPid": 68772,
+      "status": "active"
+    },
+    "/Users/q284340/Agentic/curriculum-alignment_17846": {
+      "sessionId": "/Users/q284340/Agentic/curriculum-alignment_17846",
+      "projectDir": "/Users/q284340/Agentic/curriculum-alignment",
+      "pid": 17846,
+      "claudeProcess": "unknown",
+      "startTime": 1758705855186,
+      "lastHealthCheck": 1758705855186,
+      "transcriptMonitorPid": 18083,
+      "status": "active"
     }
   },
   "lastCleanup": 1758008489225,

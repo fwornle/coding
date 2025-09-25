@@ -607,7 +607,7 @@ class SystemIntegrationTests {
     console.log('  🧪 Testing deployment script...');
     
     const result = await TestUtils.runScript(
-      join(projectRoot, 'scripts/deploy-multi-user-lsl.js'),
+      join(projectRoot, 'scripts/deploy-enhanced-lsl.sh'),
       ['--dry-run'],
       { 
         env: { TRANSCRIPT_SOURCE_PROJECT: this.tempDir },

@@ -1,0 +1,103 @@
+{
+  "semantic_analysis": {
+    "models": {
+      "xai": {
+        "default_model": "grok-2-1212",
+        "base_url": "https://api.x.ai/v1",
+        "usage_endpoint": null,
+        "console_url": "https://console.x.ai",
+        "free_credits": 25.0,
+        "default_limit": 20.0,
+        "rate_limit": {
+          "requests_per_second": 1,
+          "requests_per_hour": 60
+        }
+      },
+      "openai": {
+        "default_model": "gpt-4o-mini",
+        "base_url": "https://api.openai.com/v1",
+        "usage_endpoint": null,
+        "console_url": "https://platform.openai.com/usage",
+        "rate_limit": {
+          "requests_per_minute": 500,
+          "tokens_per_minute": 30000
+        }
+      },
+      "anthropic": {
+        "default_model": "claude-3-haiku-20240307",
+        "base_url": "https://api.anthropic.com/v1",
+        "usage_endpoint": "https://api.anthropic.com/v1/usage",
+        "console_url": "https://console.anthropic.com/settings/billing",
+        "rate_limit": {
+          "requests_per_minute": 60,
+          "tokens_per_minute": 40000
+        }
+      }
+    },
+    "timeout": 10000,
+    "temperature": 0.7,
+    "max_tokens": 200,
+    "fallback_credits": {
+      "high_usage_threshold": 95,
+      "conservative_estimate": 90,
+      "unknown_default": 75
+    }
+  },
+  "live_logging": {
+    "session_duration": 3600000,
+    "max_file_size": 1048576,
+    "consolidation": {
+      "enabled": true,
+      "session_duration": 3600000,
+      "auto_consolidate": true,
+      "keep_originals": false
+    },
+    "transcript_monitoring": {
+      "polling_interval": 5000,
+      "debounce_delay": 2000,
+      "max_retries": 3
+    }
+  },
+  "status_line": {
+    "cache_timeout": 5000,
+    "api_check_interval": 30000,
+    "display": {
+      "show_trajectory": true,
+      "show_live_filename": true,
+      "show_api_credits": true,
+      "credit_thresholds": {
+        "critical": 10,
+        "warning": 20,
+        "moderate": 80
+      }
+    }
+  },
+  "constraint_monitor": {
+    "compliance_threshold": 8.0,
+    "max_violations": 5
+  },
+  "file_patterns": {
+    "live_transcript": "{date}_{time}_live-transcript.md",
+    "live_session": "{date}_{time}_{session_id}_live-session.md",
+    "consolidated_session": "{date}_{time}_consolidated-live-session.md",
+    "trajectory_analysis": "{date}_{time}_trajectory-analysis.md"
+  },
+  "timezone": {
+    "display_timezone": "Europe/Berlin"
+  },
+  "api_key_env_vars": [
+    "XAI_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY"
+  ],
+  "credit_checking": {
+    "enabled": true,
+    "cache_duration": 300000,
+    "max_requests_per_hour": 12,
+    "endpoints": {
+      "xai": null,
+      "openai": null,
+      "anthropic": "/v1/usage"
+    }
+  }
+}

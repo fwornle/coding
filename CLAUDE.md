@@ -2,6 +2,22 @@
 
 This file provides essential guidance to Claude Code when working in this repository.
 
+## 🚨🚨🚨 MANDATORY VERIFICATION RULE 🚨🚨🚨
+
+**CRITICAL**: NEVER CLAIM SUCCESS OR COMPLETION WITHOUT VERIFICATION
+
+**ABSOLUTE RULE**: Before stating ANY result, completion, or success:
+1. **ALWAYS run verification commands** to check the actual state
+2. **ALWAYS show proof** with actual command output  
+3. **NEVER assume or guess** - only report what you can verify
+4. **If verification shows failure**, report the failure accurately
+
+**EXAMPLES**:
+- ❌ WRONG: "Fixed all hash files - now using g9b30a"
+- ✅ CORRECT: "Let me verify the fix: `ls .specstory/history/*_g*.md | grep -v g9b30a | wc -l` shows 286 files still have wrong hashes"
+
+**WHY THIS MATTERS**: False success claims waste time and break user trust. ALWAYS verify before reporting.
+
 ## 🚨 CRITICAL: MCP MEMORY KNOWLEDGE BASE ACCESS
 
 **IMPORTANT**: The knowledge base is accessed through the MCP memory service, which provides an internal knowledge graph that automatically syncs with configured topic-specific files (shared-memory-*.json where * could be ui, resi, raas, coding, etc.).

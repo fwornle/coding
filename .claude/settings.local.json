@@ -194,7 +194,22 @@
       "Bash(awk:*)",
       "Read(//Users/q284340/.claude/projects/**)",
       "Bash(CODING_REPO=/Users/q284340/Agentic/coding node /Users/q284340/Agentic/coding/scripts/combined-status-line.js)",
-      "Read(//Users/q284340/.claude/**)"
+      "Read(//Users/q284340/.claude/**)",
+      "mcp__serena__get_current_config",
+      "mcp__serena__activate_project",
+      "mcp__serena__search_for_pattern",
+      "mcp__serena__list_dir",
+      "mcp__serena__find_file",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__find_symbol",
+      "mcp__serena__replace_symbol_body",
+      "mcp__serena__think_about_whether_you_are_done",
+      "mcp__serena__find_referencing_symbols",
+      "mcp__serena__insert_after_symbol",
+      "Read(//Users/q284340/Agentic/nano-degree/**)",
+      "Bash(do if head -10 \"$file\")",
+      "Bash(then echo \"$file\")",
+      "mcp__serena__insert_before_symbol"
     ],
     "deny": []
   },

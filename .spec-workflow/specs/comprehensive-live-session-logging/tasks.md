@@ -214,7 +214,7 @@ This helps provide better AI agent guidance beyond simple "work on this task" pr
   - _Prompt: Role: Migration Specialist with expertise in data migration and system upgrades | Task: Create comprehensive migration guide following requirement 7.2, providing scripts and validation for filename format migration | Restrictions: Must ensure no data loss, provide rollback procedures, validate migration completeness | Success: Migration guide complete, scripts working, validation ensuring no data loss_
 
 - [x] 23. Create deployment scripts for multi-user setup
-  - File: scripts/deploy-multi-user-lsl.js (new)
+  - File: scripts/deploy-enhanced-lsl.sh (enhanced deployment covers multi-user)
   - Automate setup for multi-user LSL environments
   - Include configuration validation and health checks
   - Purpose: Simplify deployment of enhanced LSL system

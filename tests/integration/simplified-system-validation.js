@@ -123,7 +123,7 @@ async function validateSystemIntegration() {
     const coreFiles = [
       'scripts/live-logging-coordinator.js',
       'scripts/validate-lsl-config.js',
-      'scripts/deploy-multi-user-lsl.js',
+      'scripts/deploy-enhanced-lsl.sh',
       'docs/troubleshooting.md',
       'docs/migration-guide.md',
       'docs/live-session-logging.md'
