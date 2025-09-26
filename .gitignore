@@ -85,6 +85,7 @@ semantic-analysis.log
 .mcp-sync/tool-interaction-hook.js
 .mcp-sync/tool-interaction-buffer.jsonl
 .transcript-monitor-health
+.global-lsl-registry.json
 
 # Browser access logs
 integrations/browser-access/logs/
