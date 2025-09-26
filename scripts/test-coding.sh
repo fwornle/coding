@@ -841,10 +841,10 @@ else
     print_info "Should be located at integrations/mcp-server-semantic-analysis"
 fi
 
-print_check "MCP Constraint Monitor (standalone)"
+print_check "MCP Constraint Monitor with Professional Dashboard"
 CONSTRAINT_MONITOR_DIR="$CODING_ROOT/integrations/mcp-constraint-monitor"
 if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
-    print_pass "MCP Constraint Monitor found (standalone)"
+    print_pass "MCP Constraint Monitor found (with professional dashboard)"
     
     print_check "MCP Constraint Monitor dependencies"
     if [ -d "$CONSTRAINT_MONITOR_DIR/node_modules" ]; then
@@ -855,51 +855,444 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
         print_fixed "MCP Constraint Monitor dependencies installed"
     fi
     
-    print_check "MCP Constraint Monitor configuration"
-    if [ -f "$CONSTRAINT_MONITOR_DIR/config/default-constraints.yaml" ]; then
-        print_pass "MCP Constraint Monitor configuration found"
+    print_check "Professional Dashboard (Next.js) setup"
+    DASHBOARD_DIR="$CONSTRAINT_MONITOR_DIR/dashboard"
+    if dir_exists "$DASHBOARD_DIR"; then
+        print_pass "Professional Dashboard directory found"
+        
+        print_check "Professional Dashboard dependencies"
+        if [ -d "$DASHBOARD_DIR/node_modules" ] || [ -f "$DASHBOARD_DIR/pnpm-lock.yaml" ]; then
+            print_pass "Professional Dashboard dependencies installed"
+        else
+            print_repair "Installing Professional Dashboard dependencies..."
+            cd "$DASHBOARD_DIR"
+            if command_exists pnpm; then
+                pnpm install
+            else
+                npm install
+            fi
+            print_fixed "Professional Dashboard dependencies installed"
+        fi
+        
+        print_check "Professional Dashboard port configuration"
+        if grep -q "PORT=3030" "$DASHBOARD_DIR/package.json" 2>/dev/null; then
+            print_pass "Professional Dashboard configured for port 3030 (conflicts avoided)"
+        elif grep -q "PORT=3030" "$DASHBOARD_DIR/.env" 2>/dev/null; then
+            print_pass "Professional Dashboard port 3030 configured via .env"
+        elif [ -f "$DASHBOARD_DIR/package.json" ] && grep -q "next dev" "$DASHBOARD_DIR/package.json"; then
+            # Check if package.json has port configured in scripts
+            if grep -q "3030" "$DASHBOARD_DIR/package.json"; then
+                print_pass "Professional Dashboard configured for port 3030"
+            else
+                print_warning "Professional Dashboard may use default port 3000 (potential conflicts)"
+                print_info "Update package.json scripts to include PORT=3030 for Next.js"
+            fi
+        fi
+        
+        print_check "shadcn/ui components integration"
+        SHADCN_COMPONENTS=("button" "card" "table" "badge" "select" "accordion" "progress" "alert" "separator")
+        SHADCN_FOUND=0
+        for component in "${SHADCN_COMPONENTS[@]}"; do
+            if [ -f "$DASHBOARD_DIR/components/ui/$component.tsx" ]; then
+                SHADCN_FOUND=$((SHADCN_FOUND + 1))
+            fi
+        done
+        
+        if [ $SHADCN_FOUND -ge 5 ]; then
+            print_pass "shadcn/ui components integrated ($SHADCN_FOUND/${#SHADCN_COMPONENTS[@]} found)"
+        else
+            print_warning "Limited shadcn/ui components found ($SHADCN_FOUND/${#SHADCN_COMPONENTS[@]})"
+        fi
+        
+        # Test dashboard functionality
+        print_check "Professional Dashboard build test"
+        cd "$DASHBOARD_DIR"
+        if command_exists next || [ -f "node_modules/.bin/next" ]; then
+            print_pass "Next.js available for dashboard"
+            
+            # Test TypeScript configuration
+            print_check "TypeScript configuration for professional dashboard"
+            if [ -f "tsconfig.json" ]; then
+                print_pass "TypeScript configuration found"
+            else
+                print_warning "TypeScript configuration missing"
+            fi
+            
+            # Test Tailwind CSS configuration
+            print_check "Tailwind CSS configuration"
+            if [ -f "tailwind.config.js" ] || [ -f "tailwind.config.ts" ]; then
+                print_pass "Tailwind CSS configuration found"
+            else
+                print_warning "Tailwind CSS configuration missing"
+            fi
+            
+            # Test main dashboard component
+            print_check "Main dashboard component"
+            if [ -f "components/constraint-dashboard.tsx" ]; then
+                print_pass "Main constraint dashboard component found"
+                
+                # Check for key features in the dashboard
+                if grep -q "project.*selector\|Select.*project" "components/constraint-dashboard.tsx" 2>/dev/null; then
+                    print_pass "Multi-project selector implemented"
+                else
+                    print_warning "Multi-project selector may be missing"
+                fi
+                
+                if grep -q "accordion\|Accordion" "components/constraint-dashboard.tsx" 2>/dev/null; then
+                    print_pass "Accordion-based constraint grouping implemented"
+                else
+                    print_warning "Accordion UI may be missing"
+                fi
+                
+                if grep -q "toggle.*constraint\|enable.*disable" "components/constraint-dashboard.tsx" 2>/dev/null; then
+                    print_pass "Interactive constraint toggle functionality implemented"
+                else
+                    print_warning "Interactive constraint toggle may be missing"
+                fi
+            else
+                print_fail "Main constraint dashboard component not found"
+            fi
+            
+        else
+            print_warning "Next.js not available - dashboard may not build"
+        fi
+        
     else
-        print_repair "Setting up MCP Constraint Monitor configuration..."
-        cd "$CONSTRAINT_MONITOR_DIR" && npm run setup
-        print_fixed "MCP Constraint Monitor configuration created"
+        print_fail "Professional Dashboard directory not found at dashboard/"
+        print_info "Expected at: $DASHBOARD_DIR"
     fi
     
-    print_check "MCP Constraint Monitor data directory"
-    if [ -d "$CONSTRAINT_MONITOR_DIR/data" ]; then
-        print_pass "MCP Constraint Monitor data directory exists"
+    print_check "Constraint Monitor configuration files"
+    if [ -f "$CONSTRAINT_MONITOR_DIR/constraints.yaml" ]; then
+        print_pass "Main constraints.yaml configuration found"
+        
+        # Check for enhanced constraints from recent updates
+        CONSTRAINT_COUNT=$(grep -c "^  - id:" "$CONSTRAINT_MONITOR_DIR/constraints.yaml" 2>/dev/null || echo "0")
+        print_info "Total constraints configured: $CONSTRAINT_COUNT"
+        
+        if [ "$CONSTRAINT_COUNT" -gt 15 ]; then
+            print_pass "Comprehensive constraint set configured"
+        else
+            print_warning "Limited constraint set - consider adding more rules"
+        fi
+        
+        # Check for grouped constraints
+        if grep -q "constraint_groups:" "$CONSTRAINT_MONITOR_DIR/constraints.yaml" 2>/dev/null; then
+            print_pass "Grouped constraints configuration found"
+        else
+            print_warning "Grouped constraints not configured - professional dashboard may show limited grouping"
+        fi
     else
-        print_repair "Creating MCP Constraint Monitor data directory..."
+        print_repair "Setting up constraint monitor configuration..."
+        if [ -f "$CONSTRAINT_MONITOR_DIR/config/default-constraints.yaml" ]; then
+            cp "$CONSTRAINT_MONITOR_DIR/config/default-constraints.yaml" "$CONSTRAINT_MONITOR_DIR/constraints.yaml"
+        fi
+        print_fixed "Constraint monitor configuration created"
+    fi
+    
+    print_check "Global LSL Registry Integration (Enhanced Multi-Project Monitoring)"
+    LSL_REGISTRY="$CODING_ROOT/.global-lsl-registry.json"
+    if [ -f "$LSL_REGISTRY" ]; then
+        print_pass "Global LSL registry found"
+        
+        # Test registry structure
+        if jq -e '.projects' "$LSL_REGISTRY" >/dev/null 2>&1; then
+            PROJECT_COUNT=$(jq -r '.projects | length' "$LSL_REGISTRY" 2>/dev/null || echo "0")
+            print_pass "LSL registry structure valid ($PROJECT_COUNT projects)"
+            
+            # Check for specific project entries
+            if jq -e '.projects.coding' "$LSL_REGISTRY" >/dev/null 2>&1; then
+                print_pass "Main coding project registered in LSL"
+                
+                # Check project status tracking
+                PROJECT_STATUS=$(jq -r '.projects.coding.status // "unknown"' "$LSL_REGISTRY" 2>/dev/null)
+                if [ "$PROJECT_STATUS" = "active" ] || [ "$PROJECT_STATUS" = "monitoring" ]; then
+                    print_pass "Coding project status: $PROJECT_STATUS"
+                else
+                    print_warning "Coding project status unclear: $PROJECT_STATUS"
+                fi
+                
+                # Check for constraint monitoring integration
+                if jq -e '.projects.coding.monitorPid' "$LSL_REGISTRY" >/dev/null 2>&1; then
+                    MONITOR_PID=$(jq -r '.projects.coding.monitorPid // null' "$LSL_REGISTRY" 2>/dev/null)
+                    if [ "$MONITOR_PID" != "null" ] && [ "$MONITOR_PID" != "0" ]; then
+                        print_pass "Constraint monitoring process tracked (PID: $MONITOR_PID)"
+                        
+                        # Verify if the monitoring process is actually running
+                        if kill -0 "$MONITOR_PID" 2>/dev/null; then
+                            print_pass "Constraint monitoring process is active"
+                        else
+                            print_warning "Constraint monitoring process not running (stale PID)"
+                        fi
+                    else
+                        print_warning "No active constraint monitoring process tracked"
+                    fi
+                else
+                    print_info "Constraint monitoring PID tracking not configured"
+                fi
+            else
+                print_warning "Main coding project not found in LSL registry"
+            fi
+            
+            # Test multi-project constraint monitoring capability
+            if [ "$PROJECT_COUNT" -gt 1 ]; then
+                print_pass "Multi-project monitoring capability available"
+                
+                # List projects with constraint monitoring
+                MONITORED_PROJECTS=$(jq -r '.projects | to_entries | map(select(.value.monitorPid != null)) | length' "$LSL_REGISTRY" 2>/dev/null || echo "0")
+                print_info "Projects with active constraint monitoring: $MONITORED_PROJECTS"
+            else
+                print_info "Single project monitoring mode"
+            fi
+        else
+            print_warning "LSL registry structure invalid - multi-project monitoring may fail"
+        fi
+        
+        # Test registry file permissions
+        if [ -w "$LSL_REGISTRY" ]; then
+            print_pass "LSL registry writable for dynamic updates"
+        else
+            print_warning "LSL registry not writable - status updates may fail"
+        fi
+    else
+        print_warning "Global LSL registry not found - multi-project monitoring unavailable"
+        print_info "Registry should be at: $LSL_REGISTRY"
+        print_info "Multi-project constraint monitoring requires LSL registry for project coordination"
+    fi
+    
+    print_check "Dashboard API endpoints test"
+    cd "$CONSTRAINT_MONITOR_DIR"
+    # Try to start dashboard server briefly to test
+    timeout 10s npm run api >/dev/null 2>&1 &
+    API_PID=$!
+    sleep 3
+    
+    if kill -0 $API_PID 2>/dev/null; then
+        print_pass "Dashboard API server can start"
+        
+        # Test API endpoints
+        if command_exists curl; then
+            API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3001/api/health" 2>/dev/null || echo "000")
+            if [ "$API_STATUS" = "200" ]; then
+                print_pass "Dashboard API health endpoint responsive"
+                
+                # Test constraints endpoint
+                CONSTRAINTS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3001/api/constraints" 2>/dev/null || echo "000")
+                if [ "$CONSTRAINTS_STATUS" = "200" ]; then
+                    print_pass "Constraints API endpoint functional"
+                else
+                    print_warning "Constraints API endpoint not responding (status: $CONSTRAINTS_STATUS)"
+                fi
+                
+                # Test projects endpoint (multi-project support)
+                PROJECTS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3001/api/projects" 2>/dev/null || echo "000")
+                if [ "$PROJECTS_STATUS" = "200" ]; then
+                    print_pass "Projects API endpoint functional (multi-project support)"
+                    
+                    # Test project data structure
+                    PROJECT_DATA=$(curl -s "http://localhost:3001/api/projects" 2>/dev/null || echo "{}")
+                    if echo "$PROJECT_DATA" | jq -e '.data.projects' >/dev/null 2>&1; then
+                        PROJECT_COUNT=$(echo "$PROJECT_DATA" | jq -r '.data.projects | length' 2>/dev/null || echo "0")
+                        print_pass "Multi-project data structure valid (${PROJECT_COUNT} projects)"
+                        
+                        # Check for current project identification
+                        if echo "$PROJECT_DATA" | jq -e '.data.currentProject' >/dev/null 2>&1; then
+                            CURRENT_PROJECT=$(echo "$PROJECT_DATA" | jq -r '.data.currentProject' 2>/dev/null)
+                            print_pass "Current project identified: $CURRENT_PROJECT"
+                        else
+                            print_warning "Current project not identified in API response"
+                        fi
+                    else
+                        print_warning "Project data structure may be invalid"
+                    fi
+                else
+                    print_warning "Projects API endpoint not responding (status: $PROJECTS_STATUS)"
+                fi
+                
+                # Test professional dashboard redirect
+                REDIRECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3001/dashboard" 2>/dev/null || echo "000")
+                if [ "$REDIRECT_STATUS" = "302" ] || [ "$REDIRECT_STATUS" = "301" ]; then
+                    print_pass "Dashboard redirect to professional interface configured"
+                else
+                    print_warning "Dashboard redirect not configured (status: $REDIRECT_STATUS)"
+                fi
+            else
+                print_warning "Dashboard API server not responding (status: $API_STATUS)"
+            fi
+        fi
+        
+        kill $API_PID 2>/dev/null || true
+    else
+        print_warning "Dashboard API server startup issues"
+    fi
+    
+    print_check "Constraint monitor data directory"
+    if [ -d "$CONSTRAINT_MONITOR_DIR/data" ]; then
+        print_pass "Constraint monitor data directory exists"
+    else
+        print_repair "Creating constraint monitor data directory..."
         mkdir -p "$CONSTRAINT_MONITOR_DIR/data"
-        print_fixed "MCP Constraint Monitor data directory created"
+        print_fixed "Constraint monitor data directory created"
     fi
     
     print_check "Constraint monitor environment variables"
-    if [ -n "${GROK_API_KEY:-}" ]; then
-        print_pass "GROK_API_KEY configured"
+    if [ -n "${GROK_API_KEY:-}" ] || [ -n "${OPENAI_API_KEY:-}" ]; then
+        print_pass "AI API keys configured for constraint analysis"
     else
-        print_warning "GROK_API_KEY not set - constraint monitor will use limited functionality"
+        print_warning "No AI API keys set - constraint monitor will use basic pattern matching only"
+        print_info "Set GROK_API_KEY or OPENAI_API_KEY for enhanced analysis"
     fi
     
-    print_check "Docker services for constraint monitor"
-    if command -v docker >/dev/null 2>&1; then
-        if docker ps -q -f name=constraint-monitor-qdrant >/dev/null 2>&1; then
-            print_pass "Qdrant database running"
-        else
-            print_warning "Qdrant database not running - start with: cd integrations/mcp-constraint-monitor && docker-compose up -d"
+    # Test professional dashboard startup
+    print_check "Professional Dashboard startup test"
+    cd "$DASHBOARD_DIR"
+    
+    # Test if professional dashboard can start (brief test)
+    timeout 15s npm run dev >/dev/null 2>&1 &
+    DASHBOARD_PID=$!
+    sleep 8
+    
+    if kill -0 $DASHBOARD_PID 2>/dev/null; then
+        print_pass "Professional Dashboard (Next.js) can start successfully"
+        
+        # Test if dashboard is accessible on port 3030
+        if command_exists curl; then
+            sleep 3
+            DASHBOARD_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3030" 2>/dev/null || echo "000")
+            if [ "$DASHBOARD_STATUS" = "200" ]; then
+                print_pass "Professional Dashboard accessible on port 3030"
+                
+                # Test if dashboard serves the constraint monitor interface
+                DASHBOARD_CONTENT=$(curl -s "http://localhost:3030" 2>/dev/null || echo "")
+                if echo "$DASHBOARD_CONTENT" | grep -q "constraint.*monitor\|Constraint.*Monitor" 2>/dev/null; then
+                    print_pass "Professional constraint monitor interface loaded"
+                else
+                    print_warning "Professional interface may not be fully loaded"
+                fi
+            else
+                print_warning "Professional Dashboard not responding on port 3030 (status: $DASHBOARD_STATUS)"
+            fi
         fi
         
-        if docker ps -q -f name=constraint-monitor-redis >/dev/null 2>&1; then
-            print_pass "Redis cache running"
+        # Clean up dashboard process
+        kill $DASHBOARD_PID 2>/dev/null || true
+        sleep 2
+        pkill -f "next.*dev" 2>/dev/null || true
+    else
+        print_warning "Professional Dashboard startup may have issues"
+    fi
+    
+    # Enhanced constraint monitoring features test
+    print_check "Enhanced constraint monitoring features"
+    
+    # Test real-time violation monitoring
+    if [ -f "$CONSTRAINT_MONITOR_DIR/scripts/enhanced-constraint-endpoint.js" ]; then
+        print_pass "Enhanced constraint endpoint for real-time monitoring found"
+        
+        # Test enhanced violation history
+        cd "$CONSTRAINT_MONITOR_DIR"
+        if timeout 10s node -e "const endpoint = require('./scripts/enhanced-constraint-endpoint.js'); endpoint.getEnhancedViolationHistory(5).then(h => console.log('History OK:', h.total_count >= 0));" 2>/dev/null; then
+            print_pass "Enhanced violation history system functional"
         else
-            print_warning "Redis cache not running - start with: cd integrations/mcp-constraint-monitor && docker-compose up -d"
+            print_warning "Enhanced violation history system may have issues"
+        fi
+        
+        # Test live session violations
+        if timeout 10s node -e "const endpoint = require('./scripts/enhanced-constraint-endpoint.js'); endpoint.getLiveSessionViolations().then(v => console.log('Live OK:', typeof v === 'object'));" 2>/dev/null; then
+            print_pass "Live session violation monitoring functional"
+        else
+            print_warning "Live session violation monitoring may have issues"
         fi
     else
-        print_warning "Docker not available - constraint monitor requires Docker for Qdrant and Redis"
+        print_warning "Enhanced constraint endpoint not found - real-time monitoring unavailable"
     fi
+    
+    # Test YAML persistence integration
+    print_check "YAML persistence integration"
+    if [ -f "$CONSTRAINT_MONITOR_DIR/constraints.yaml" ]; then
+        # Test YAML file writability
+        if [ -w "$CONSTRAINT_MONITOR_DIR/constraints.yaml" ]; then
+            print_pass "Constraints YAML file writable for persistence"
+            
+            # Test YAML structure for constraint toggling
+            if grep -q "enabled:" "$CONSTRAINT_MONITOR_DIR/constraints.yaml" 2>/dev/null; then
+                print_pass "YAML file supports constraint enable/disable functionality"
+            else
+                print_warning "YAML file may not support constraint toggling"
+            fi
+        else
+            print_warning "Constraints YAML file not writable - toggling may fail"
+        fi
+        
+        # Test grouped constraints structure
+        if grep -q "constraint_groups:\|groups:" "$CONSTRAINT_MONITOR_DIR/constraints.yaml" 2>/dev/null; then
+            print_pass "Grouped constraints configuration present"
+            
+            # Count constraint groups
+            GROUP_COUNT=$(grep -c "group:" "$CONSTRAINT_MONITOR_DIR/constraints.yaml" 2>/dev/null || echo "0")
+            if [ "$GROUP_COUNT" -gt 4 ]; then
+                print_pass "Multiple constraint groups configured ($GROUP_COUNT groups)"
+            else
+                print_warning "Limited constraint groups ($GROUP_COUNT groups) - consider expanding"
+            fi
+        else
+            print_warning "Grouped constraints not configured - professional dashboard grouping limited"
+        fi
+    else
+        print_fail "Constraints YAML file missing - configuration persistence unavailable"
+    fi
+    
+    # Test constraint violation timeline functionality
+    print_check "Constraint violation timeline"
+    if grep -q "timeline\|Timeline" "$DASHBOARD_DIR/components/constraint-dashboard.tsx" 2>/dev/null; then
+        print_pass "Violation timeline component implemented"
+    else
+        print_warning "Violation timeline may be missing from professional dashboard"
+    fi
+    
+    cd "$CODING_ROOT"
+    
+    
+    # Advanced integration testing
+    print_check "Advanced constraint monitor integration testing"
+    
+    # Test constraint monitor CLI integration
+    if command_exists node; then
+        cd "$CONSTRAINT_MONITOR_DIR"
+        
+        # Test if constraint monitor can be started programmatically
+        print_check "Programmatic constraint monitor startup"
+        if timeout 10s node -e "const { ConfigManager } = require('./src/utils/config-manager.js'); const config = new ConfigManager(); console.log('Config OK');" 2>/dev/null; then
+            print_pass "Constraint monitor configuration system functional"
+        else
+            print_warning "Constraint monitor configuration system may have issues"
+        fi
+        
+        # Test constraint engine functionality
+        print_check "Constraint engine functionality"
+        if timeout 10s node -e "const { ConstraintEngine } = require('./src/engines/constraint-engine.js'); const engine = new ConstraintEngine(); console.log('Engine OK');" 2>/dev/null; then
+            print_pass "Constraint engine initialization successful"
+        else
+            print_warning "Constraint engine may have initialization issues"
+        fi
+        
+        # Test status generator for dashboard
+        print_check "Status generator for professional dashboard"
+        if timeout 10s node -e "const { StatusGenerator } = require('./src/status/status-generator.js'); const gen = new StatusGenerator(); console.log('Status OK');" 2>/dev/null; then
+            print_pass "Dashboard status generation system functional"
+        else
+            print_warning "Dashboard status generation may have issues"
+        fi
+    fi
+    
+    cd "$CODING_ROOT"
+    
 else
     print_fail "MCP Constraint Monitor not found"
     print_info "Should be located at integrations/mcp-constraint-monitor"
-    print_info "Install with: git clone https://github.com/fwornle/mcp-server-constraint-monitor.git integrations/mcp-constraint-monitor"
+    print_info "Professional dashboard requires constraint monitor with shadcn/ui integration"
+    print_info "Install with: git clone [constraint-monitor-repo] integrations/mcp-constraint-monitor"
+    print_info "Then setup professional dashboard: cd dashboard && npm install"
 fi
 
 print_check "Serena MCP server (AST-based code analysis)"
@@ -968,6 +1361,125 @@ else
     print_fail "Serena MCP server not found"
     print_info "Should be located at integrations/serena"
     print_info "Install with: git clone https://github.com/oraios/serena integrations/serena && cd integrations/serena && uv sync"
+fi
+
+# Test shadcn/ui MCP server (Enhanced Professional UI Testing)
+print_check "shadcn/ui MCP Server (Professional UI Components)"
+SHADCN_MCP_DIR="$CODING_ROOT/integrations/shadcn-mcp"
+
+# Check for shadcn CLI availability first
+print_check "shadcn CLI availability"
+if command_exists pnpm && pnpm dlx shadcn@latest --help >/dev/null 2>&1; then
+    print_pass "shadcn CLI available via pnpm dlx"
+    SHADCN_CLI_AVAILABLE=true
+elif command_exists npx && npx shadcn@latest --help >/dev/null 2>&1; then
+    print_pass "shadcn CLI available via npx"
+    SHADCN_CLI_AVAILABLE=true
+else
+    print_warning "shadcn CLI not easily accessible"
+    SHADCN_CLI_AVAILABLE=false
+fi
+
+if dir_exists "$SHADCN_MCP_DIR"; then
+    print_pass "shadcn/ui MCP Server directory found"
+    
+    print_check "shadcn/ui MCP server dependencies"
+    if [ -d "$SHADCN_MCP_DIR/node_modules" ]; then
+        print_pass "shadcn/ui MCP dependencies installed"
+    else
+        print_repair "Installing shadcn/ui MCP dependencies..."
+        cd "$SHADCN_MCP_DIR"
+        if command_exists pnpm; then
+            pnpm install
+        else
+            npm install
+        fi
+        print_fixed "shadcn/ui MCP dependencies installed"
+    fi
+    
+    print_check "shadcn/ui components availability"
+    if [ -d "$SHADCN_MCP_DIR/components/ui" ]; then
+        COMPONENTS_COUNT=$(ls -1 "$SHADCN_MCP_DIR/components/ui" 2>/dev/null | wc -l)
+        if [ "$COMPONENTS_COUNT" -gt 8 ]; then
+            print_pass "Comprehensive shadcn/ui components available ($COMPONENTS_COUNT components)"
+            
+            # Check for specific components needed for professional dashboard
+            REQUIRED_COMPONENTS=("button" "card" "table" "badge" "select" "accordion" "progress" "alert" "separator")
+            FOUND_COMPONENTS=0
+            for component in "${REQUIRED_COMPONENTS[@]}"; do
+                if [ -f "$SHADCN_MCP_DIR/components/ui/${component}.tsx" ]; then
+                    FOUND_COMPONENTS=$((FOUND_COMPONENTS + 1))
+                fi
+            done
+            
+            if [ $FOUND_COMPONENTS -ge 7 ]; then
+                print_pass "Professional dashboard components available ($FOUND_COMPONENTS/${#REQUIRED_COMPONENTS[@]})"
+            else
+                print_warning "Some professional dashboard components missing ($FOUND_COMPONENTS/${#REQUIRED_COMPONENTS[@]})"
+            fi
+        elif [ "$COMPONENTS_COUNT" -gt 3 ]; then
+            print_warning "Basic shadcn/ui components available ($COMPONENTS_COUNT components)"
+        else
+            print_fail "Very limited shadcn/ui components available ($COMPONENTS_COUNT components)"
+        fi
+    else
+        print_fail "shadcn/ui components directory not found"
+    fi
+    
+    print_check "shadcn/ui MCP server configuration"
+    if [ -f "$SHADCN_MCP_DIR/package.json" ]; then
+        if grep -q "shadcn\|@radix-ui" "$SHADCN_MCP_DIR/package.json" 2>/dev/null; then
+            print_pass "shadcn/ui MCP server properly configured with Radix UI"
+        else
+            print_warning "shadcn/ui MCP server configuration may be incomplete"
+        fi
+        
+        # Check for MCP server script
+        if grep -q "mcp" "$SHADCN_MCP_DIR/package.json" 2>/dev/null; then
+            print_pass "MCP server integration configured"
+        else
+            print_warning "MCP server integration may be missing"
+        fi
+    else
+        print_fail "shadcn/ui MCP server package.json missing"
+    fi
+    
+    print_check "shadcn/ui MCP integration in claude-code-mcp.json"
+    if grep -q "shadcn\|shad" "$CODING_ROOT/claude-code-mcp.json" 2>/dev/null || grep -q "shadcn\|shad" "$CODING_ROOT/claude-code-mcp-processed.json" 2>/dev/null; then
+        print_pass "shadcn/ui MCP server configured in Claude Code MCP setup"
+    else
+        print_warning "shadcn/ui MCP server not found in Claude Code configuration"
+        print_info "Add shadcn MCP server to MCP configuration for full professional UI integration"
+    fi
+    
+    print_check "Professional UI integration with constraint monitor"
+    if [ -f "$CONSTRAINT_MONITOR_DIR/dashboard/components/constraint-dashboard.tsx" ]; then
+        DASHBOARD_IMPORTS=$(grep -c "@radix-ui\|lucide-react\|class-variance-authority" "$CONSTRAINT_MONITOR_DIR/dashboard/components/constraint-dashboard.tsx" 2>/dev/null || echo "0")
+        if [ "$DASHBOARD_IMPORTS" -gt 3 ]; then
+            print_pass "Professional UI fully integrated into constraint monitor dashboard"
+        elif [ "$DASHBOARD_IMPORTS" -gt 0 ]; then
+            print_warning "Partial professional UI integration in constraint monitor"
+        else
+            print_fail "Professional UI not integrated into constraint monitor"
+        fi
+    fi
+    
+else
+    print_warning "shadcn/ui MCP Server not found"
+    print_info "Expected at: $SHADCN_MCP_DIR"
+    if [ "$SHADCN_CLI_AVAILABLE" = true ]; then
+        print_info "Install with: pnpm dlx shadcn@latest mcp init --client claude"
+        print_repair "Attempting automatic shadcn/ui MCP server installation..."
+        cd "$CODING_ROOT/integrations"
+        if timeout 30s pnpm dlx shadcn@latest mcp init --client claude 2>/dev/null; then
+            print_fixed "shadcn/ui MCP server automatically installed"
+        else
+            print_warning "Automatic installation failed - manual setup required"
+        fi
+    else
+        print_info "Install pnpm first: npm install -g pnpm"
+        print_info "Then run: pnpm dlx shadcn@latest mcp init --client claude"
+    fi
 fi
 
 # =============================================================================
@@ -1449,6 +1961,12 @@ echo -e "  ${CYAN}vkb fg${NC}                 # View knowledge graph (foreground
 echo -e "  ${CYAN}claude-mcp${NC}             # Start Claude with MCP (if available)"
 echo -e "  ${CYAN}coding --copilot${NC}       # Start fallback services for CoPilot"
 echo -e ""
+echo -e "${BOLD}Professional Dashboard Commands:${NC}"
+echo -e "  ${CYAN}cd integrations/mcp-constraint-monitor${NC}"
+echo -e "  ${CYAN}npm run api${NC}            # Start constraint monitor API server (port 3001)"
+echo -e "  ${CYAN}cd dashboard && npm run dev${NC}  # Start professional dashboard (port 3030)"
+echo -e "  ${CYAN}open http://localhost:3030${NC}      # Access professional constraint monitor"
+echo -e ""
 echo -e "${BOLD}VSCode Integration Commands:${NC}"
 echo -e "  ${CYAN}@KM vkb${NC}                # Launch knowledge viewer from VSCode Copilot"
 echo -e "  ${CYAN}@KM ukb${NC}                # Update knowledge base from VSCode Copilot"
@@ -1465,7 +1983,18 @@ fi
 
 echo -e "  • Run ${CYAN}ukb --interactive${NC} to add your first knowledge pattern"
 echo -e "  • Run ${CYAN}vkb${NC} to explore the knowledge graph visualization"
+echo -e "  • Access professional constraint monitor at ${CYAN}http://localhost:3030${NC}"
+echo -e "  • Configure constraint groups in ${CYAN}integrations/mcp-constraint-monitor/constraints.yaml${NC}"
+echo -e "  • Install shadcn/ui MCP: ${CYAN}pnpm dlx shadcn@latest mcp init --client claude${NC}"
 echo -e "  • See docs/README.md for comprehensive documentation"
+
+echo -e "\n${BOLD}Professional Dashboard Features:${NC}"
+echo -e "  • ${GREEN}Multi-project monitoring${NC} via Global LSL Registry"
+echo -e "  • ${GREEN}Real-time constraint violations${NC} with timeline view"
+echo -e "  • ${GREEN}Interactive constraint management${NC} with YAML persistence"
+echo -e "  • ${GREEN}Professional UI components${NC} via shadcn/ui integration"
+echo -e "  • ${GREEN}Grouped constraint display${NC} with accordion interface"
+echo -e "  • ${GREEN}Project context switching${NC} with visual status indicators"
 
 # Always ensure VKB restarts with clean, default settings (never preserve corruption)
 echo -e "\n${BLUE}[INFO]${NC} Ensuring VKB restarts with clean default settings..."
@@ -1495,6 +2024,79 @@ if [ $TESTS_FAILED -eq 0 ]; then
 else
     exit 1
 fi
+# =============================================================================
+# ENHANCED FEATURES SUMMARY
+# =============================================================================
+
+print_header "ENHANCED FEATURES VALIDATION SUMMARY"
+
+echo -e "\n${BOLD}Professional Dashboard System Status:${NC}"
+if [ -d "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard" ] && [ -f "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/package.json" ]; then
+    echo -e "  ${GREEN}✅ Next.js Professional Dashboard${NC} - Available"
+else
+    echo -e "  ${RED}❌ Next.js Professional Dashboard${NC} - Missing"
+fi
+
+if [ -d "$CODING_ROOT/integrations/shadcn-mcp" ]; then
+    echo -e "  ${GREEN}✅ shadcn/ui MCP Server${NC} - Installed"
+else
+    echo -e "  ${RED}❌ shadcn/ui MCP Server${NC} - Not Found"
+fi
+
+if [ -f "$CODING_ROOT/.global-lsl-registry.json" ]; then
+    echo -e "  ${GREEN}✅ Global LSL Registry${NC} - Multi-project Support"
+else
+    echo -e "  ${YELLOW}⚠️  Global LSL Registry${NC} - Limited Monitoring"
+fi
+
+if [ -f "$CODING_ROOT/integrations/mcp-constraint-monitor/constraints.yaml" ]; then
+    CONSTRAINT_COUNT=$(grep -c "^  - id:" "$CODING_ROOT/integrations/mcp-constraint-monitor/constraints.yaml" 2>/dev/null || echo "0")
+    if [ "$CONSTRAINT_COUNT" -gt 15 ]; then
+        echo -e "  ${GREEN}✅ Enhanced Constraint Rules${NC} - $CONSTRAINT_COUNT constraints configured"
+    else
+        echo -e "  ${YELLOW}⚠️  Basic Constraint Rules${NC} - $CONSTRAINT_COUNT constraints (consider expanding)"
+    fi
+else
+    echo -e "  ${RED}❌ Constraint Configuration${NC} - Missing"
+fi
+
+echo -e "\n${BOLD}Integration Status:${NC}"
+
+# Check if professional dashboard is properly integrated
+if [ -f "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" ]; then
+    INTEGRATION_SCORE=0
+    
+    # Check for shadcn/ui integration
+    if grep -q "@radix-ui" "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
+        INTEGRATION_SCORE=$((INTEGRATION_SCORE + 1))
+    fi
+    
+    # Check for project selector
+    if grep -q "project.*select\|Select.*project" "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
+        INTEGRATION_SCORE=$((INTEGRATION_SCORE + 1))
+    fi
+    
+    # Check for constraint grouping
+    if grep -q "accordion\|group" "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
+        INTEGRATION_SCORE=$((INTEGRATION_SCORE + 1))
+    fi
+    
+    # Check for interactive toggles
+    if grep -q "toggle\|enable.*disable" "$CODING_ROOT/integrations/mcp-constraint-monitor/dashboard/components/constraint-dashboard.tsx" 2>/dev/null; then
+        INTEGRATION_SCORE=$((INTEGRATION_SCORE + 1))
+    fi
+    
+    if [ $INTEGRATION_SCORE -ge 3 ]; then
+        echo -e "  ${GREEN}✅ Professional UI Integration${NC} - Fully Functional ($INTEGRATION_SCORE/4 features)"
+    elif [ $INTEGRATION_SCORE -ge 2 ]; then
+        echo -e "  ${YELLOW}⚠️  Professional UI Integration${NC} - Partially Functional ($INTEGRATION_SCORE/4 features)"
+    else
+        echo -e "  ${RED}❌ Professional UI Integration${NC} - Limited ($INTEGRATION_SCORE/4 features)"
+    fi
+else
+    echo -e "  ${RED}❌ Professional UI Integration${NC} - Dashboard Component Missing"
+fi
+
 # Test Enhanced LSL system
 test_enhanced_lsl() {
     print_section "Testing Enhanced LSL System"

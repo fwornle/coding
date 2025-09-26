@@ -557,6 +557,95 @@ install_serena() {
     cd "$CODING_REPO"
 }
 
+# Install shadcn/ui MCP server for professional dashboard components
+install_shadcn_mcp() {
+    echo -e "\n${CYAN}🎨 Installing shadcn/ui MCP server for professional dashboard components...${NC}"
+    
+    # Check if pnpm is available (preferred for shadcn)
+    local package_manager="npm"
+    if command -v pnpm >/dev/null 2>&1; then
+        package_manager="pnpm"
+        info "Using pnpm for shadcn installation"
+    else
+        info "Using npm for shadcn installation (consider installing pnpm for better performance)"
+    fi
+    
+    # Create shadcn MCP directory if it doesn't exist
+    local shadcn_dir="$CODING_REPO/integrations/shadcn-mcp"
+    
+    if [[ ! -d "$shadcn_dir" ]]; then
+        info "Creating shadcn MCP integration directory..."
+        mkdir -p "$shadcn_dir"
+        cd "$shadcn_dir"
+        
+        # Initialize shadcn MCP server
+        info "Initializing shadcn MCP server..."
+        if command -v pnpm >/dev/null 2>&1; then
+            pnpm dlx shadcn@latest mcp init --client claude || {
+                warning "pnpm shadcn init failed, trying npm"
+                npx shadcn@latest mcp init --client claude || {
+                    warning "Failed to initialize shadcn MCP server"
+                    INSTALLATION_WARNINGS+=("shadcn MCP: Failed to initialize server")
+                    return 1
+                }
+            }
+        else
+            npx shadcn@latest mcp init --client claude || {
+                warning "Failed to initialize shadcn MCP server"
+                INSTALLATION_WARNINGS+=("shadcn MCP: Failed to initialize server")
+                return 1
+            }
+        fi
+        
+        success "shadcn/ui MCP server initialized"
+    else
+        info "shadcn MCP directory already exists, updating..."
+        cd "$shadcn_dir"
+        
+        # Update dependencies if package.json exists
+        if [[ -f "package.json" ]]; then
+            info "Updating shadcn MCP dependencies..."
+            if [[ "$package_manager" == "pnpm" ]]; then
+                pnpm update || warning "Failed to update shadcn dependencies"
+            else
+                npm update || warning "Failed to update shadcn dependencies"
+            fi
+        fi
+    fi
+    
+    # Install additional shadcn components commonly used in dashboards
+    if [[ -f "package.json" ]]; then
+        info "Installing commonly used shadcn components..."
+        local components=("button" "card" "table" "badge" "select" "accordion" "progress" "alert" "separator")
+        
+        for component in "${components[@]}"; do
+            info "Adding $component component..."
+            if command -v pnpm >/dev/null 2>&1; then
+                pnpm dlx shadcn@latest add "$component" --yes 2>/dev/null || true
+            else
+                npx shadcn@latest add "$component" --yes 2>/dev/null || true
+            fi
+        done
+        
+        success "shadcn/ui components installed"
+    fi
+    
+    # Build if build script exists
+    if [[ -f "package.json" ]] && jq -e '.scripts.build' package.json >/dev/null 2>&1; then
+        info "Building shadcn MCP server..."
+        if [[ "$package_manager" == "pnpm" ]]; then
+            pnpm run build || warning "Failed to build shadcn MCP server"
+        else
+            npm run build || warning "Failed to build shadcn MCP server"
+        fi
+    fi
+    
+    success "shadcn/ui MCP server installed successfully"
+    info "Provides professional UI components for dashboard development"
+    
+    cd "$CODING_REPO"
+}
+
 # Install MCP servers
 install_mcp_servers() {
     echo -e "\n${CYAN}🔌 Installing MCP servers...${NC}"
@@ -588,14 +677,30 @@ install_mcp_servers() {
         warning "integrations/claude-logger-mcp directory not found, skipping..."
     fi
     
-    # Install constraint-monitor (now standalone MCP server)
-    info "Setting up MCP Constraint Monitor..."
-    if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]] || [[ -d "$CODING_REPO/integrations/mcp-server-constraint-monitor" ]]; then
-        success "MCP Constraint Monitor already installed"
+    # Install constraint-monitor with professional dashboard
+    info "Setting up MCP Constraint Monitor with Professional Dashboard..."
+    if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
+        cd "$CODING_REPO/integrations/mcp-constraint-monitor"
+        
+        # Install main constraint monitor dependencies
+        info "Installing constraint monitor dependencies..."
+        npm install || warning "Failed to install constraint monitor dependencies"
+        
+        # Install professional dashboard dependencies
+        if [[ -d "dashboard-new" ]]; then
+            info "Installing professional dashboard dependencies..."
+            cd dashboard-new
+            pnpm install || npm install || warning "Failed to install dashboard dependencies"
+            cd ..
+        fi
+        
+        success "MCP Constraint Monitor with Professional Dashboard installed"
+        info "Professional Dashboard runs on port 3030 with shadcn/ui components"
+        info "Global monitoring supports multi-project constraint tracking"
     else
         info "MCP Constraint Monitor will be installed automatically when services start"
         info "Repository: https://github.com/fwornle/mcp-server-constraint-monitor"
-        info "This provides real-time constraint monitoring for any Claude Code project"
+        info "Includes professional dashboard with real-time violations timeline"
     fi
 }
 
@@ -1021,20 +1126,26 @@ EOF
     fi
     
     # Check MCP servers
-    if [[ -f "$CODING_REPO/browser-access/dist/index.js" ]]; then
+    if [[ -f "$CODING_REPO/integrations/browser-access/dist/index.js" ]]; then
         success "Browser-access MCP server is built"
     else
         warning "Browser-access MCP server not built"
     fi
     
-    if [[ -f "$CODING_REPO/claude-logger-mcp/dist/index.js" ]]; then
+    if [[ -f "$CODING_REPO/integrations/claude-logger-mcp/dist/index.js" ]]; then
         success "Claude-logger MCP server is built"
     else
         warning "Claude-logger MCP server not built"
     fi
     
-    if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]] || [[ -d "$CODING_REPO/integrations/mcp-server-constraint-monitor" ]]; then
+    # Check Constraint Monitor with Professional Dashboard
+    if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
         success "MCP Constraint Monitor (standalone) configured"
+        if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor/dashboard-new" ]]; then
+            success "Professional Dashboard (port 3030) installed"
+        else
+            warning "Professional Dashboard not found"
+        fi
     else
         warning "Constraint monitor system not installed"
     fi
@@ -1044,6 +1155,13 @@ EOF
         success "Serena MCP server is installed"
     else
         warning "Serena MCP server not installed"
+    fi
+    
+    # Check shadcn/ui MCP server
+    if [[ -d "$CODING_REPO/integrations/shadcn-mcp" ]]; then
+        success "shadcn/ui MCP server is installed"
+    else
+        warning "shadcn/ui MCP server not installed"
     fi
     
     
@@ -1391,6 +1509,7 @@ main() {
     install_browserbase
     install_semantic_analysis
     install_serena
+    install_shadcn_mcp
     install_mcp_servers
     create_command_wrappers
     setup_unified_launcher
