@@ -212,7 +212,8 @@
       "mcp__serena__insert_before_symbol",
       "mcp__serena__think_about_task_adherence",
       "Read(//Users/q284340/Agentic/curriculum-alignment/**)",
-      "Read(//Users/q284340/Documents/CLAUDE/**)"
+      "Read(//Users/q284340/Documents/CLAUDE/**)",
+      "Bash(PORT=3030 npm run dev)"
     ],
     "deny": []
   },
