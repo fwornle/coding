@@ -429,7 +429,14 @@ ${changeLog.contributions.map(c => `- ${c.timestamp}: ${c.description} (${c.sign
     this.log('INFO', 'Starting light semantic analysis');
     
     try {
-      // For light analysis, create basic project state from known information
+      // For curriculum-alignment project, always use enhanced analysis with MACAS details
+      if (this.projectName === 'curriculum-alignment') {
+        this.log('INFO', 'Using enhanced analysis for curriculum-alignment project');
+        await this.performEnhancedLightAnalysis(changeLog);
+        return;
+      }
+      
+      // For other projects, create basic project state from known information
       const projectState = this.createBasicProjectState();
       
       // Write trajectory file
@@ -591,102 +598,54 @@ ${changeLog.contributions.map(c => `- ${c.timestamp}: ${c.description} (${c.sign
       timeZone: this.displayTimezone
     });
     
-    const lslFiles = this.getRecentLSLFiles();
-    const latestSession = lslFiles.length > 0 ? lslFiles[lslFiles.length - 1] : 'No recent sessions';
-    
-    const content = `# Comprehensive Project Trajectory - ${this.projectName}
+    const content = `# ${this.projectName.charAt(0).toUpperCase() + this.projectName.slice(1)} Repository Trajectory
 
-**Generated:** ${utcTimestamp} (UTC)
-**Local Time:** ${localTimestamp}
-**Repository:** ${this.projectPath}
-**Last Processed LSL:** ${latestSession}
+*Generated: ${utcTimestamp} | ${localTimestamp}*
 
----
-
-## Project Purpose
+## What This Repository Does
 
 ${projectState.purpose}
 
----
-
-## Current Capabilities
+## Current Implementation Status
 
 ${Array.isArray(projectState.currentCapabilities) 
   ? projectState.currentCapabilities.map(cap => `- ${cap}`).join('\n')
   : `- ${projectState.currentCapabilities}`
 }
 
----
-
-## Main Features
+## Key Features & Components
 
 ${Array.isArray(projectState.mainFeatures)
   ? projectState.mainFeatures.map(feature => `- ${feature}`).join('\n') 
   : `- ${projectState.mainFeatures}`
 }
 
----
-
-## Project Structure
-
-${projectState.projectStructure}
-
----
-
-## Architecture & Design
-
-### Core Architecture
+## Architecture Overview
 
 ${typeof projectState.architecture === 'object' ? projectState.architecture.core : projectState.architecture}
 
-### Focus
+**Focus Area:** ${typeof projectState.architecture === 'object' ? projectState.architecture.focus || 'General application development' : 'General application development'}
 
-${typeof projectState.architecture === 'object' ? projectState.architecture.focus || 'Project-specific focus' : 'Project-specific focus'}
-
----
-
-## Technical Stack
+## Technology Stack
 
 ${Array.isArray(projectState.technicalStack)
   ? projectState.technicalStack.map(tech => `- ${tech}`).join('\n')
   : `- ${projectState.technicalStack}`
 }
 
----
-
-## Project Maturity
+## Development Status
 
 ${typeof projectState.projectMaturity === 'object' 
-  ? `- **Stability**: ${projectState.projectMaturity.stability}
-- **Feature Completeness**: ${projectState.projectMaturity.completeness}
-- **Documentation**: ${projectState.projectMaturity.documentation}
-- **Test Coverage**: ${projectState.projectMaturity.testing}`
-  : `- **Status**: ${projectState.projectMaturity}`
+  ? `**Current State:** ${projectState.projectMaturity.completeness}
+**Stability:** ${projectState.projectMaturity.stability}
+**Documentation:** ${projectState.projectMaturity.documentation}
+**Testing:** ${projectState.projectMaturity.testing}`
+  : `**Status:** ${projectState.projectMaturity}`
 }
 
 ---
 
-## Change Log
-
-**Analysis Type:** ${analysisType}
-**Contribution Significance:** ${significance}
-**Accumulated Contributions:** ${changeLog.contributions ? changeLog.contributions.length : 0} entries
-**Significance Score:** ${changeLog.significanceScore}/15 (deep analysis triggered at 15+)
-**Last Deep Analysis:** ${new Date(changeLog.lastDeepAnalysis).toLocaleDateString('en-US', { 
-  month: 'numeric', 
-  day: 'numeric', 
-  year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  hour12: true,
-  timeZone: this.displayTimezone
-})}
-
-${analysisType.includes('Deep MCP') ? '✅ **Change log reset after deep analysis**' : ''}
-
----
-
-*This trajectory represents the comprehensive current state of the ${this.projectName} project based on ${analysisType.toLowerCase()} of recent contributions. Generated ${localTimestamp}*
+*Repository analysis based on semantic examination of codebase, documentation, and development history.*
 `;
 
     fs.writeFileSync(this.trajectoryFile, content);
