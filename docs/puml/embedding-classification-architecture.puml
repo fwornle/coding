@@ -1,0 +1,88 @@
+@startuml embedding-classification-architecture
+!include _standard-style.puml
+
+title Embedding Classification System Architecture
+
+package "Four-Layer Classification Pipeline" {
+  component [PathAnalyzer\n<1ms] as path <<core>>
+  component [KeywordMatcher\n<10ms] as keyword <<core>>
+  component [EmbeddingClassifier\n<3ms] as embedding <<core>>
+  component [SemanticAnalyzer\n<10ms] as semantic <<core>>
+  
+  path -down-> keyword : "isCoding: false"
+  keyword -down-> embedding : "isCoding: false"
+  embedding -down-> semantic : "isCoding: null"
+}
+
+package "Embedding System Components" {
+  component [EmbeddingGenerator] as generator <<util>>
+  component [RepositoryIndexer] as indexer <<core>>
+  component [ChangeDetector] as detector <<util>>
+  component [PerformanceMonitor] as monitor <<util>>
+}
+
+package "Storage & External Services" {
+  database "Qdrant Vector DB" as qdrant {
+    component [coding_infrastructure\nCollection] <<storage>>
+  }
+  
+  database "Cache Systems" as cache {
+    component [Classification Cache\n(LRU + TTL)] <<storage>>
+    component [Embedding Cache\n(LRU + TTL)] <<storage>>
+  }
+  
+  cloud "Python Environment" as python_env {
+    component [sentence-transformers\nall-MiniLM-L6-v2] <<external>>
+  }
+  
+  component [Repository Files] as fs <<external>>
+}
+
+embedding SYNC_LINE generator : "generateEmbedding()\nclassifyByEmbedding()"
+embedding SYNC_LINE qdrant : "search()\nsearchSimilarContent()"
+generator DATA_LINE python_env : "generateEmbeddingFromSubprocess()\nPython subprocess"
+generator DATA_LINE cache : "getCachedEmbedding()\ncacheEmbedding()"
+
+indexer DATA_LINE generator : "generateBatchEmbeddings()\nprocessBatch()"
+indexer DATA_LINE qdrant : "ensureCollection()\nupdateIndex()"
+indexer SYNC_LINE fs : "discoverRepositoryFiles()\nindexRepository()"
+
+detector SYNC_LINE fs : "file system monitoring\nchange detection"
+detector CONTROL_LINE indexer : "reindexing triggers\nfilterChangedFiles()"
+
+monitor OPTIONAL_LINE embedding : "recordMeasurement()\nembeddingClassifier metrics"
+monitor OPTIONAL_LINE generator : "embedding generation\nperformance tracking"
+monitor OPTIONAL_LINE qdrant : "similarity search\nhealth monitoring"
+
+note right of path
+  **Layer 1: PathAnalyzer**
+  • analyzePaths(exchange)
+  • File operation pattern matching
+  • Returns: { isCoding: boolean, reason }
+end note
+
+note right of embedding
+  **Layer 3: EmbeddingClassifier**
+  • classifyByEmbedding(exchange)
+  • Vector similarity via Qdrant
+  • Returns: { isCoding: true/false/null }
+  • Threshold-based classification
+end note
+
+note right of generator
+  **EmbeddingGenerator**
+  • generateEmbedding(text)
+  • sentence-transformers integration
+  • 384-dimensional vectors
+  • LRU cache with TTL
+end note
+
+note bottom of qdrant
+  **Vector Database Operations**
+  • Collection: coding_infrastructure
+  • HNSW indexing (m=16, ef_construct=100)
+  • Int8 quantization for memory efficiency
+  • Cosine distance similarity search
+end note
+
+@enduml

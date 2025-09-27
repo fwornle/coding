@@ -45,8 +45,17 @@ class PerformanceMonitor extends EventEmitter {
       pathAnalyzer: 1.0,      // <1ms critical target
       semanticAnalyzer: 10.0, // <10ms when used
       keywordMatcher: 10.0,   // <10ms fallback
-      overall: 15.0,          // <15ms total
-      initialization: 50.0    // <50ms component init
+      embeddingClassifier: 3.0, // <3ms embedding layer
+      overall: 30.0,          // <30ms total pipeline
+      initialization: 50.0,   // <50ms component init
+      // Embedding-specific targets
+      embeddingGeneration: 2.0, // <2ms for cached embeddings
+      embeddingGenerationCold: 1000.0, // <1s for cold generation
+      similaritySearch: 3.0,   // <3ms for Qdrant search
+      repositoryIndexing: 300000.0, // <5 minutes initial index
+      changeDetection: 5000.0, // <5s change detection
+      indexUpdate: 30000.0,    // <30s incremental updates
+      batchProcessing: 100.0   // <100ms per batch
     };
     
     // Performance tracking state
@@ -78,6 +87,15 @@ class PerformanceMonitor extends EventEmitter {
         totalCalls: 0,
         recentPerformance: 'good'
       },
+      embeddingClassifier: {
+        measurements: [],
+        avgTime: 0,
+        minTime: Infinity,
+        maxTime: 0,
+        violations: 0,
+        totalCalls: 0,
+        recentPerformance: 'good'
+      },
       overall: {
         measurements: [],
         avgTime: 0,
@@ -86,6 +104,64 @@ class PerformanceMonitor extends EventEmitter {
         violations: 0,
         totalCalls: 0,
         recentPerformance: 'good'
+      },
+      // Embedding-specific metrics
+      embeddingGeneration: {
+        measurements: [],
+        avgTime: 0,
+        minTime: Infinity,
+        maxTime: 0,
+        violations: 0,
+        totalCalls: 0,
+        recentPerformance: 'good',
+        cacheHits: 0,
+        cacheMisses: 0,
+        batchOperations: 0
+      },
+      similaritySearch: {
+        measurements: [],
+        avgTime: 0,
+        minTime: Infinity,
+        maxTime: 0,
+        violations: 0,
+        totalCalls: 0,
+        recentPerformance: 'good',
+        resultsReturned: 0,
+        averageScore: 0
+      },
+      repositoryIndexing: {
+        measurements: [],
+        avgTime: 0,
+        minTime: Infinity,
+        maxTime: 0,
+        violations: 0,
+        totalCalls: 0,
+        recentPerformance: 'good',
+        filesIndexed: 0,
+        indexSize: 0,
+        chunksCreated: 0
+      },
+      changeDetection: {
+        measurements: [],
+        avgTime: 0,
+        minTime: Infinity,
+        maxTime: 0,
+        violations: 0,
+        totalCalls: 0,
+        recentPerformance: 'good',
+        changesDetected: 0,
+        filesScanned: 0
+      },
+      indexUpdate: {
+        measurements: [],
+        avgTime: 0,
+        minTime: Infinity,
+        maxTime: 0,
+        violations: 0,
+        totalCalls: 0,
+        recentPerformance: 'good',
+        pointsUpdated: 0,
+        pointsDeleted: 0
       }
     };
     
@@ -102,7 +178,13 @@ class PerformanceMonitor extends EventEmitter {
       pathAnalyzer: { slope: 0, correlation: 0, status: 'stable' },
       semanticAnalyzer: { slope: 0, correlation: 0, status: 'stable' },
       keywordMatcher: { slope: 0, correlation: 0, status: 'stable' },
-      overall: { slope: 0, correlation: 0, status: 'stable' }
+      embeddingClassifier: { slope: 0, correlation: 0, status: 'stable' },
+      overall: { slope: 0, correlation: 0, status: 'stable' },
+      embeddingGeneration: { slope: 0, correlation: 0, status: 'stable' },
+      similaritySearch: { slope: 0, correlation: 0, status: 'stable' },
+      repositoryIndexing: { slope: 0, correlation: 0, status: 'stable' },
+      changeDetection: { slope: 0, correlation: 0, status: 'stable' },
+      indexUpdate: { slope: 0, correlation: 0, status: 'stable' }
     };
     
     // Monitoring overhead tracking
@@ -112,7 +194,31 @@ class PerformanceMonitor extends EventEmitter {
       maxTime: 0
     };
     
-    this.log('PerformanceMonitor initialized with targets:', this.targets);
+    // Embedding-specific performance state
+    this.embeddingMetrics = {
+      cacheEfficiency: {
+        hitRate: 0,
+        missRate: 0,
+        totalRequests: 0
+      },
+      memoryUsage: {
+        currentMB: 0,
+        peakMB: 0,
+        measurementCount: 0
+      },
+      qdrantMetrics: {
+        connectionPool: 0,
+        activeConnections: 0,
+        queryQueue: 0
+      },
+      batchPerformance: {
+        averageBatchSize: 0,
+        totalBatches: 0,
+        throughputPerSecond: 0
+      }
+    };
+    
+    this.log('PerformanceMonitor initialized with embedding targets:', this.targets);
   }
 
   /**
@@ -618,6 +724,308 @@ class PerformanceMonitor extends EventEmitter {
     }
     
     return summary;
+  }
+
+  /**
+   * Record embedding generation performance
+   * @param {number} duration - Generation time in milliseconds
+   * @param {boolean} cacheHit - Whether this was a cache hit
+   * @param {number} batchSize - Size of batch if applicable
+   */
+  recordEmbeddingGeneration(duration, cacheHit = false, batchSize = 1) {
+    const layer = 'embeddingGeneration';
+    const metric = this.metrics[layer];
+    
+    // Record basic measurement
+    this.recordMeasurement(layer, duration, { cacheHit, batchSize });
+    
+    // Update embedding-specific metrics
+    if (cacheHit) {
+      metric.cacheHits++;
+    } else {
+      metric.cacheMisses++;
+    }
+    
+    if (batchSize > 1) {
+      metric.batchOperations++;
+    }
+    
+    // Update cache efficiency
+    this.updateCacheEfficiency();
+    
+    // Update batch performance if applicable
+    if (batchSize > 1) {
+      this.updateBatchPerformance(batchSize, duration);
+    }
+  }
+
+  /**
+   * Record similarity search performance
+   * @param {number} duration - Search time in milliseconds
+   * @param {number} resultsCount - Number of results returned
+   * @param {number} topScore - Highest similarity score
+   */
+  recordSimilaritySearch(duration, resultsCount = 0, topScore = 0) {
+    const layer = 'similaritySearch';
+    const metric = this.metrics[layer];
+    
+    this.recordMeasurement(layer, duration, { resultsCount, topScore });
+    
+    // Update similarity-specific metrics
+    metric.resultsReturned += resultsCount;
+    
+    // Update average score (exponential moving average)
+    const alpha = 0.1;
+    if (metric.averageScore === 0) {
+      metric.averageScore = topScore;
+    } else {
+      metric.averageScore = alpha * topScore + (1 - alpha) * metric.averageScore;
+    }
+  }
+
+  /**
+   * Record repository indexing performance
+   * @param {number} duration - Indexing time in milliseconds
+   * @param {number} filesCount - Number of files indexed
+   * @param {number} chunksCount - Number of chunks created
+   * @param {number} indexSize - Size of index in bytes
+   */
+  recordRepositoryIndexing(duration, filesCount = 0, chunksCount = 0, indexSize = 0) {
+    const layer = 'repositoryIndexing';
+    const metric = this.metrics[layer];
+    
+    this.recordMeasurement(layer, duration, { filesCount, chunksCount, indexSize });
+    
+    // Update indexing-specific metrics
+    metric.filesIndexed += filesCount;
+    metric.chunksCreated += chunksCount;
+    metric.indexSize = indexSize; // Current size, not cumulative
+  }
+
+  /**
+   * Record change detection performance
+   * @param {number} duration - Detection time in milliseconds
+   * @param {number} filesScanned - Number of files scanned
+   * @param {number} changesFound - Number of changes detected
+   */
+  recordChangeDetection(duration, filesScanned = 0, changesFound = 0) {
+    const layer = 'changeDetection';
+    const metric = this.metrics[layer];
+    
+    this.recordMeasurement(layer, duration, { filesScanned, changesFound });
+    
+    // Update change detection metrics
+    metric.filesScanned += filesScanned;
+    metric.changesDetected += changesFound;
+  }
+
+  /**
+   * Record index update performance
+   * @param {number} duration - Update time in milliseconds
+   * @param {number} pointsUpdated - Number of points updated
+   * @param {number} pointsDeleted - Number of points deleted
+   */
+  recordIndexUpdate(duration, pointsUpdated = 0, pointsDeleted = 0) {
+    const layer = 'indexUpdate';
+    const metric = this.metrics[layer];
+    
+    this.recordMeasurement(layer, duration, { pointsUpdated, pointsDeleted });
+    
+    // Update index update metrics
+    metric.pointsUpdated += pointsUpdated;
+    metric.pointsDeleted += pointsDeleted;
+  }
+
+  /**
+   * Update cache efficiency metrics
+   */
+  updateCacheEfficiency() {
+    const metric = this.metrics.embeddingGeneration;
+    const totalRequests = metric.cacheHits + metric.cacheMisses;
+    
+    if (totalRequests > 0) {
+      this.embeddingMetrics.cacheEfficiency = {
+        hitRate: (metric.cacheHits / totalRequests * 100).toFixed(1),
+        missRate: (metric.cacheMisses / totalRequests * 100).toFixed(1),
+        totalRequests: totalRequests
+      };
+    }
+  }
+
+  /**
+   * Update batch performance metrics
+   * @param {number} batchSize - Size of the batch
+   * @param {number} duration - Time taken for batch
+   */
+  updateBatchPerformance(batchSize, duration) {
+    const batchMetrics = this.embeddingMetrics.batchPerformance;
+    
+    batchMetrics.totalBatches++;
+    
+    // Update average batch size (exponential moving average)
+    const alpha = 0.1;
+    if (batchMetrics.averageBatchSize === 0) {
+      batchMetrics.averageBatchSize = batchSize;
+    } else {
+      batchMetrics.averageBatchSize = alpha * batchSize + (1 - alpha) * batchMetrics.averageBatchSize;
+    }
+    
+    // Calculate throughput (items per second)
+    const throughput = batchSize / (duration / 1000);
+    if (batchMetrics.throughputPerSecond === 0) {
+      batchMetrics.throughputPerSecond = throughput;
+    } else {
+      batchMetrics.throughputPerSecond = alpha * throughput + (1 - alpha) * batchMetrics.throughputPerSecond;
+    }
+  }
+
+  /**
+   * Record memory usage for embedding operations
+   * @param {number} memoryMB - Current memory usage in MB
+   */
+  recordMemoryUsage(memoryMB) {
+    const memoryMetrics = this.embeddingMetrics.memoryUsage;
+    
+    memoryMetrics.currentMB = memoryMB;
+    memoryMetrics.peakMB = Math.max(memoryMetrics.peakMB, memoryMB);
+    memoryMetrics.measurementCount++;
+    
+    // Alert if memory usage is too high
+    if (memoryMB > 500) { // 500MB threshold
+      this.triggerAlert('embedding', 'warning', `High memory usage: ${memoryMB}MB`, {
+        currentMB: memoryMB,
+        peakMB: memoryMetrics.peakMB,
+        threshold: 500
+      });
+    }
+  }
+
+  /**
+   * Record Qdrant connection metrics
+   * @param {number} activeConnections - Number of active connections
+   * @param {number} queueSize - Size of query queue
+   */
+  recordQdrantMetrics(activeConnections, queueSize) {
+    this.embeddingMetrics.qdrantMetrics = {
+      activeConnections,
+      queryQueue: queueSize,
+      timestamp: Date.now()
+    };
+    
+    // Alert if queue is backing up
+    if (queueSize > 10) {
+      this.triggerAlert('qdrant', 'warning', `Qdrant queue backing up: ${queueSize} queries`, {
+        queueSize,
+        activeConnections
+      });
+    }
+  }
+
+  /**
+   * Get embedding-specific performance metrics
+   * @returns {object} Embedding metrics summary
+   */
+  getEmbeddingMetrics() {
+    const embeddingLayers = [
+      'embeddingGeneration', 'similaritySearch', 'repositoryIndexing',
+      'changeDetection', 'indexUpdate', 'embeddingClassifier'
+    ];
+    
+    const metrics = {};
+    
+    embeddingLayers.forEach(layer => {
+      const metric = this.metrics[layer];
+      if (metric) {
+        metrics[layer] = {
+          avgTime: Number(metric.avgTime.toFixed(3)),
+          totalCalls: metric.totalCalls,
+          violations: metric.violations,
+          recentPerformance: metric.recentPerformance,
+          target: this.targets[layer]
+        };
+        
+        // Add layer-specific metrics
+        if (layer === 'embeddingGeneration') {
+          metrics[layer].cacheHitRate = this.embeddingMetrics.cacheEfficiency.hitRate;
+          metrics[layer].batchOperations = metric.batchOperations;
+        } else if (layer === 'similaritySearch') {
+          metrics[layer].averageScore = Number(metric.averageScore.toFixed(3));
+          metrics[layer].resultsReturned = metric.resultsReturned;
+        } else if (layer === 'repositoryIndexing') {
+          metrics[layer].filesIndexed = metric.filesIndexed;
+          metrics[layer].chunksCreated = metric.chunksCreated;
+          metrics[layer].indexSizeMB = (metric.indexSize / 1024 / 1024).toFixed(2);
+        } else if (layer === 'changeDetection') {
+          metrics[layer].changesDetected = metric.changesDetected;
+          metrics[layer].filesScanned = metric.filesScanned;
+        } else if (layer === 'indexUpdate') {
+          metrics[layer].pointsUpdated = metric.pointsUpdated;
+          metrics[layer].pointsDeleted = metric.pointsDeleted;
+        }
+      }
+    });
+    
+    return {
+      layers: metrics,
+      cacheEfficiency: this.embeddingMetrics.cacheEfficiency,
+      memoryUsage: this.embeddingMetrics.memoryUsage,
+      qdrantMetrics: this.embeddingMetrics.qdrantMetrics,
+      batchPerformance: this.embeddingMetrics.batchPerformance
+    };
+  }
+
+  /**
+   * Check embedding system health
+   * @returns {object} Health status for embedding components
+   */
+  checkEmbeddingHealth() {
+    const health = {
+      status: 'healthy',
+      issues: [],
+      recommendations: []
+    };
+    
+    // Check cache efficiency
+    const cacheHitRate = parseFloat(this.embeddingMetrics.cacheEfficiency.hitRate);
+    if (cacheHitRate < 30 && this.embeddingMetrics.cacheEfficiency.totalRequests > 50) {
+      health.issues.push(`Low cache hit rate: ${cacheHitRate}%`);
+      health.recommendations.push('Optimize caching strategy or increase cache size');
+      health.status = 'warning';
+    }
+    
+    // Check memory usage
+    const memoryMB = this.embeddingMetrics.memoryUsage.currentMB;
+    if (memoryMB > 400) {
+      health.issues.push(`High memory usage: ${memoryMB}MB`);
+      health.recommendations.push('Monitor for memory leaks or reduce batch sizes');
+      health.status = 'warning';
+    }
+    
+    // Check Qdrant queue
+    const queueSize = this.embeddingMetrics.qdrantMetrics.queryQueue;
+    if (queueSize > 5) {
+      health.issues.push(`Qdrant query queue backing up: ${queueSize}`);
+      health.recommendations.push('Increase connection pool or optimize queries');
+      health.status = 'warning';
+    }
+    
+    // Check performance violations
+    const embeddingMetric = this.metrics.embeddingClassifier;
+    if (embeddingMetric && embeddingMetric.violations > 10) {
+      health.issues.push(`Frequent embedding classification violations: ${embeddingMetric.violations}`);
+      health.recommendations.push('Optimize embedding search or increase performance targets');
+      health.status = 'warning';
+    }
+    
+    // Check batch performance
+    const throughput = this.embeddingMetrics.batchPerformance.throughputPerSecond;
+    if (throughput < 10 && this.embeddingMetrics.batchPerformance.totalBatches > 5) {
+      health.issues.push(`Low batch throughput: ${throughput.toFixed(1)} items/sec`);
+      health.recommendations.push('Optimize batch processing or increase batch sizes');
+      health.status = 'warning';
+    }
+    
+    return health;
   }
 }
 

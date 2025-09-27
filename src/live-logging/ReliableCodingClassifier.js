@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Reliable Coding Classifier - Rock-Solid Replacement for FastEmbeddingClassifier
+ * Reliable Coding Classifier - Rock-Solid Four-Layer Classification System
  * 
- * Implements three-layer classification architecture:
+ * Implements four-layer classification architecture:
  * Layer 1: PathAnalyzer - File operation detection (100% accuracy)
- * Layer 2: SemanticAnalyzer - LLM-based semantic analysis 
- * Layer 3: KeywordMatcher - Fast keyword fallback
+ * Layer 2: KeywordMatcher - Fast keyword matching
+ * Layer 3: EmbeddingClassifier - Semantic vector similarity search
+ * Layer 4: SemanticAnalyzer - LLM-based deep semantic analysis
  * 
  * Features:
  * - Drop-in replacement for FastEmbeddingClassifier
@@ -23,6 +24,7 @@ import { SemanticAnalyzer } from './SemanticAnalyzer.js';
 import PathAnalyzer from './PathAnalyzer.js';
 import SemanticAnalyzerAdapter from './SemanticAnalyzerAdapter.js';
 import KeywordMatcher from './KeywordMatcher.js';
+const EmbeddingClassifier = require('./EmbeddingClassifier.js');
 import OperationalLogger from './OperationalLogger.js';
 import PerformanceMonitor from './PerformanceMonitor.js';
 
@@ -43,8 +45,9 @@ class ReliableCodingClassifier {
     
     // Layer components (initialized lazily)
     this.pathAnalyzer = null;
-    this.semanticAnalyzer = null;
     this.keywordMatcher = null;
+    this.embeddingClassifier = null;
+    this.semanticAnalyzer = null;
     
     // Performance tracking (compatible with FastEmbeddingClassifier)
     this.stats = {
@@ -55,8 +58,9 @@ class ReliableCodingClassifier {
       cacheMisses: 0,
       // New metrics
       pathAnalysisHits: 0,
-      semanticAnalysisHits: 0,
       keywordAnalysisHits: 0,
+      embeddingAnalysisHits: 0,
+      semanticAnalysisHits: 0,
       // User prompt set metrics
       userPromptSetsProcessed: 0,
       semanticAnalysisSkipped: 0,
@@ -134,6 +138,16 @@ class ReliableCodingClassifier {
       // Initialize keyword matcher
       this.keywordMatcher = new KeywordMatcher({
         debug: this.debug
+      });
+      
+      // Initialize embedding classifier (Layer 3)
+      this.embeddingClassifier = new EmbeddingClassifier({
+        debug: this.debug,
+        qdrantHost: this.options.qdrantHost || 'localhost',
+        qdrantPort: this.options.qdrantPort || 6333,
+        similarityThreshold: this.options.embeddingSimilarityThreshold || 0.7,
+        maxClassificationTimeMs: this.options.embeddingMaxTimeMs || 3000,
+        autoIndexOnStartup: this.options.embeddingAutoIndex !== false
       });
       
       // Initialize operational logger
@@ -579,7 +593,7 @@ class ReliableCodingClassifier {
       this.stats.totalClassifications++;
       
       // Ensure initialization is complete
-      if (!this.pathAnalyzer || !this.keywordMatcher) {
+      if (!this.pathAnalyzer || !this.keywordMatcher || !this.embeddingClassifier) {
         await this.initialize();
       }
       
@@ -633,93 +647,131 @@ class ReliableCodingClassifier {
           result = this.formatResult('CODING_INFRASTRUCTURE', keywordResult.confidence, keywordResult.reason, keywordAnalysisTime);
           this.log(`✅ KEYWORD LAYER TRIGGERED: Classification set to CODING_INFRASTRUCTURE`);
         } else {
-          // Layer 3: Semantic Analysis (expensive, only if needed and not skipped)
-          // Enhanced with user prompt set optimization
-          if (this.semanticAnalyzer && !result && !this.skipSemanticAnalysis) {
-            let skipSemanticForThis = false;
+          // Layer 3: Embedding Classification (semantic vector similarity)
+          const embeddingAnalysisStart = Date.now();
+          const embeddingResult = await this.embeddingClassifier.classifyByEmbedding(exchange);
+          const embeddingAnalysisTime = Date.now() - embeddingAnalysisStart;
+          
+          decisionPath.push({
+            layer: 'embedding',
+            input: { content: this.sanitizeForLogging(exchange.content || '') },
+            output: embeddingResult,
+            duration: embeddingAnalysisTime
+          });
+          
+          // Record EmbeddingClassifier performance
+          this.performanceMonitor.recordMeasurement('embeddingClassifier', embeddingAnalysisTime, {
+            isCoding: embeddingResult.isCoding,
+            confidence: embeddingResult.confidence,
+            maxSimilarity: embeddingResult.similarity_scores?.max_similarity,
+            inconclusiveOrError: embeddingResult.inconclusive || embeddingResult.error
+          });
+          
+          // DEBUG: Log embedding analysis result
+          this.log(`🔍 EMBEDDING ANALYSIS RESULT: isCoding=${embeddingResult.isCoding}, confidence=${embeddingResult.confidence}, maxSimilarity=${embeddingResult.similarity_scores?.max_similarity}`);
+          
+          if (embeddingResult.isCoding === true) {
+            layer = 'embedding';
+            this.stats.embeddingAnalysisHits++;
+            result = this.formatResult('CODING_INFRASTRUCTURE', embeddingResult.confidence, embeddingResult.reason, embeddingAnalysisTime);
+            this.log(`✅ EMBEDDING LAYER TRIGGERED: Classification set to CODING_INFRASTRUCTURE`);
+          } else if (embeddingResult.isCoding === false) {
+            // Embedding classifier returned definitive negative result
+            layer = 'embedding';
+            result = this.formatResult('NOT_CODING_INFRASTRUCTURE', embeddingResult.confidence, embeddingResult.reason, embeddingAnalysisTime);
+            this.log(`❌ EMBEDDING LAYER: Classification set to NOT_CODING_INFRASTRUCTURE`);
+          } else {
+            // Embedding classifier returned inconclusive or error - proceed to Layer 4
+            this.log(`🔄 EMBEDDING LAYER INCONCLUSIVE: Proceeding to SemanticAnalyzer (Layer 4)`);
+          }
+        }
+        
+        // Layer 4: Semantic Analysis (expensive, only if needed and not skipped)
+        // Enhanced with user prompt set optimization
+        if (this.semanticAnalyzer && !result && !this.skipSemanticAnalysis) {
+          let skipSemanticForThis = false;
+          
+          // Check if we should skip semantic analysis due to user prompt set optimization
+          if (this.enableUserPromptSets && options.promptSetContext) {
+            const { promptSetExchanges, isPromptSetEnd } = options.promptSetContext;
             
-            // Check if we should skip semantic analysis due to user prompt set optimization
-            if (this.enableUserPromptSets && options.promptSetContext) {
-              const { promptSetExchanges, isPromptSetEnd } = options.promptSetContext;
+            if (promptSetExchanges && promptSetExchanges.length > 1 && !isPromptSetEnd) {
+              // We're in the middle of a prompt set - check if we can use cached result
               
-              if (promptSetExchanges && promptSetExchanges.length > 1 && !isPromptSetEnd) {
-                // We're in the middle of a prompt set - check if we can use cached result
+              // Perform intelligent cache management first
+              this.manageCacheOptimization();
+              
+              const cacheKey = this.createPromptSetCacheKey(promptSetExchanges);
+              if (this.promptSetCache.has(cacheKey)) {
+                const cachedResult = this.promptSetCache.get(cacheKey);
                 
-                // Perform intelligent cache management first
-                this.manageCacheOptimization();
+                // Enhanced cost optimization tracking
+                this.trackCostMetrics(true, 'prompt-set-cache-hit');
+                skipSemanticForThis = true;
                 
-                const cacheKey = this.createPromptSetCacheKey(promptSetExchanges);
-                if (this.promptSetCache.has(cacheKey)) {
-                  const cachedResult = this.promptSetCache.get(cacheKey);
-                  
-                  // Enhanced cost optimization tracking
-                  this.trackCostMetrics(true, 'prompt-set-cache-hit');
-                  skipSemanticForThis = true;
-                  
-                  // Use cached classification but update processing time
-                  result = this.formatResult(
-                    cachedResult.classification,
-                    cachedResult.confidence,
-                    `Cached from prompt set: ${cachedResult.reason}`,
-                    Date.now() - startTime
-                  );
-                  layer = 'cached-semantic';
-                  
-                  decisionPath.push({
-                    layer: 'cached-semantic',
-                    input: { cacheKey, promptSetSize: promptSetExchanges.length },
-                    output: { cached: true, originalResult: cachedResult },
-                    duration: 1 // Cached results are very fast
-                  });
-                }
+                // Use cached classification but update processing time
+                result = this.formatResult(
+                  cachedResult.classification,
+                  cachedResult.confidence,
+                  `Cached from prompt set: ${cachedResult.reason}`,
+                  Date.now() - startTime
+                );
+                layer = 'cached-semantic';
+                
+                decisionPath.push({
+                  layer: 'cached-semantic',
+                  input: { cacheKey, promptSetSize: promptSetExchanges.length },
+                  output: { cached: true, originalResult: cachedResult },
+                  duration: 1 // Cached results are very fast
+                });
               }
             }
+          }
+          
+          if (!skipSemanticForThis) {
+            const semanticAnalysisStart = Date.now();
+            const semanticResult = await this.semanticAnalyzer.analyzeSemantics(exchange);
+            const semanticAnalysisTime = Date.now() - semanticAnalysisStart;
             
-            if (!skipSemanticForThis) {
-              const semanticAnalysisStart = Date.now();
-              const semanticResult = await this.semanticAnalyzer.analyzeSemantics(exchange);
-              const semanticAnalysisTime = Date.now() - semanticAnalysisStart;
+            // Track fresh semantic analysis cost
+            this.trackCostMetrics(false, 'fresh-semantic-analysis');
+            
+            decisionPath.push({
+              layer: 'semantic',
+              input: { exchange: this.sanitizeForLogging(exchange) },
+              output: semanticResult,
+              duration: semanticAnalysisTime
+            });
+            
+            // Record SemanticAnalyzer performance
+            this.performanceMonitor.recordMeasurement('semanticAnalyzer', semanticAnalysisTime, {
+              isCoding: semanticResult.isCoding,
+              confidence: semanticResult.confidence,
+              cacheHit: false,
+              contentLength: exchange.content?.length || 0
+            });
+            
+            if (semanticResult.isCoding) {
+              layer = 'semantic';
+              this.stats.semanticAnalysisHits++;
+              result = this.formatResult('CODING_INFRASTRUCTURE', semanticResult.confidence, semanticResult.reason, semanticAnalysisTime);
               
-              // Track fresh semantic analysis cost
-              this.trackCostMetrics(false, 'fresh-semantic-analysis');
-              
-              decisionPath.push({
-                layer: 'semantic',
-                input: { exchange: this.sanitizeForLogging(exchange) },
-                output: semanticResult,
-                duration: semanticAnalysisTime
-              });
-              
-              // Record SemanticAnalyzer performance
-              this.performanceMonitor.recordMeasurement('semanticAnalyzer', semanticAnalysisTime, {
-                isCoding: semanticResult.isCoding,
-                confidence: semanticResult.confidence,
-                cacheHit: false,
-                contentLength: exchange.content?.length || 0
-              });
-              
-              if (semanticResult.isCoding) {
-                layer = 'semantic';
-                this.stats.semanticAnalysisHits++;
-                result = this.formatResult('CODING_INFRASTRUCTURE', semanticResult.confidence, semanticResult.reason, semanticAnalysisTime);
-                
-                // Cache result for prompt set if applicable
-                if (this.enableUserPromptSets && options.promptSetContext) {
-                  const { promptSetExchanges } = options.promptSetContext;
-                  if (promptSetExchanges && promptSetExchanges.length > 0) {
-                    const cacheKey = this.createPromptSetCacheKey(promptSetExchanges);
-                    this.promptSetCache.set(cacheKey, {
-                      classification: result.classification,
-                      confidence: result.confidence,
-                      reason: semanticResult.reason,
-                      timestamp: Date.now()
-                    });
-                    
-                    // Clean up old cache entries (keep last 100)
-                    if (this.promptSetCache.size > 100) {
-                      const oldestKey = this.promptSetCache.keys().next().value;
-                      this.promptSetCache.delete(oldestKey);
-                    }
+              // Cache result for prompt set if applicable
+              if (this.enableUserPromptSets && options.promptSetContext) {
+                const { promptSetExchanges } = options.promptSetContext;
+                if (promptSetExchanges && promptSetExchanges.length > 0) {
+                  const cacheKey = this.createPromptSetCacheKey(promptSetExchanges);
+                  this.promptSetCache.set(cacheKey, {
+                    classification: result.classification,
+                    confidence: result.confidence,
+                    reason: semanticResult.reason,
+                    timestamp: Date.now()
+                  });
+                  
+                  // Clean up old cache entries (keep last 100)
+                  if (this.promptSetCache.size > 100) {
+                    const oldestKey = this.promptSetCache.keys().next().value;
+                    this.promptSetCache.delete(oldestKey);
                   }
                 }
               }

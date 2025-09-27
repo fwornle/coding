@@ -1,0 +1,99 @@
+@startuml embedding-classification-workflow
+!include _standard-style.puml
+
+title Embedding Classification Workflow
+
+participant User
+participant "ReliableCoding\nClassifier" as classifier
+participant "PathAnalyzer\n(Layer 1)" as path
+participant "KeywordMatcher\n(Layer 2)" as keyword  
+participant "EmbeddingClassifier\n(Layer 3)" as embedding
+participant "EmbeddingGenerator" as generator
+participant "Qdrant DB" as qdrant
+participant "SemanticAnalyzer\n(Layer 4)" as semantic
+
+User -> classifier : classify(exchange, options)
+activate classifier
+
+classifier -> path : analyzePaths(exchange)
+activate path
+
+alt **Path Analysis: isCoding = true**
+    path --> classifier : { isCoding: true, reason: "coding file operations" }
+    note right : Direct path match\n<1ms
+    classifier --> User : **CODING_INFRASTRUCTURE (Layer 1)**
+else **Path Analysis: isCoding = false**
+    deactivate path
+    classifier -> keyword : matchKeywords(exchange)
+    activate keyword
+    
+    alt **Keyword Match: isCoding = true**
+        keyword --> classifier : { isCoding: true, confidence: 0.8 }
+        note right : Coding keywords found\n<10ms
+        classifier --> User : **CODING_INFRASTRUCTURE (Layer 2)**
+    else **Keywords: isCoding = false**
+        deactivate keyword
+        classifier -> embedding : classifyByEmbedding(exchange)
+        activate embedding
+        
+        embedding -> generator : generateEmbedding(textContent)
+        activate generator
+        
+        alt **Cache Hit**
+            generator --> embedding : embedding vector (<2ms)
+            note right : LRU cache hit
+        else **Cache Miss**
+            generator -> generator : generateEmbeddingFromSubprocess()
+            generator --> embedding : 384-dim vector (<1000ms)
+            note right : Python subprocess
+        end
+        deactivate generator
+        
+        embedding -> qdrant : search(coding_infrastructure, vector)
+        activate qdrant
+        qdrant --> embedding : similarity results with scores
+        deactivate qdrant
+        
+        embedding -> embedding : analyzeSimilarityResults()
+        
+        alt **High Similarity: isCoding = true**
+            embedding --> classifier : { isCoding: true, confidence: 0.85, maxSimilarity: 0.9 }
+            note right : Vector similarity above threshold\n<3ms total
+            classifier --> User : **CODING_INFRASTRUCTURE (Layer 3)**
+        else **Low Similarity: isCoding = false**
+            embedding --> classifier : { isCoding: false, confidence: 0.4 }
+            note right : Definitive negative result
+            classifier --> User : **NOT_CODING_INFRASTRUCTURE (Layer 3)**
+        else **Inconclusive: isCoding = null**
+            embedding --> classifier : { isCoding: null, inconclusive: true }
+            deactivate embedding
+            classifier -> semantic : analyzeSemantics(exchange)
+            activate semantic
+            semantic --> classifier : { isCoding: true, confidence: 0.7 }
+            note right : LLM analysis fallback\n<10ms
+            classifier --> User : **Result from Layer 4**
+            deactivate semantic
+        end
+    end
+end
+
+deactivate classifier
+
+note over classifier
+  **Actual Performance Targets:**
+  • PathAnalyzer: <1ms
+  • KeywordMatcher: <10ms  
+  • EmbeddingClassifier: <3ms
+  • SemanticAnalyzer: <10ms
+  • **Total Pipeline: <30ms**
+end note
+
+note over embedding
+  **Layer 3 Decision Logic:**
+  • similarity ≥ threshold → isCoding: true
+  • similarity < threshold → isCoding: false
+  • error/no results → isCoding: null
+  • null triggers Layer 4 fallback
+end note
+
+@enduml

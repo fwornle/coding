@@ -49,7 +49,10 @@ end
 == Content Classification & Routing ==
 etm1 -> rcc : classify exchange content
 rcc -> rcc : session continuation filter
-rcc -> rcc : keyword analysis
+rcc -> rcc : Layer 1: PathAnalyzer
+rcc -> rcc : Layer 2: KeywordMatcher  
+rcc -> rcc : Layer 3: EmbeddingClassifier
+rcc -> rcc : Layer 4: SemanticAnalyzer (if needed)
 alt Coding Infrastructure Content
   rcc -> etm1 : CODING_INFRASTRUCTURE
   etm1 -> coding_lsl : 2025-09-25_1800-1900_<user-hash>_from-<project-A>.md
@@ -60,7 +63,10 @@ end
 
 etm2 -> rcc : classify exchange content
 rcc -> rcc : session continuation filter
-rcc -> rcc : keyword analysis
+rcc -> rcc : Layer 1: PathAnalyzer
+rcc -> rcc : Layer 2: KeywordMatcher
+rcc -> rcc : Layer 3: EmbeddingClassifier
+rcc -> rcc : Layer 4: SemanticAnalyzer (if needed)
 alt Coding Infrastructure Content
   rcc -> etm2 : CODING_INFRASTRUCTURE
   etm2 -> coding_lsl : 2025-09-25_1900-2000_<user-hash>_from-<project-B>.md

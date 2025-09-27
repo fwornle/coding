@@ -21,6 +21,7 @@ package "Classification System" {
   component [Session Continuation\nFilter] as sessionfilter <<util>>
   component [Path Analyzer] as pathanalyzer <<util>>
   component [Keyword Matcher] as keywords <<util>>
+  component [Embedding Classifier] as embedding <<core>>
   component [Semantic Analyzer] as semantic <<api>>
   component [Performance\nMonitor] as perfmon <<util>>
 }
@@ -60,9 +61,11 @@ recovery CONTROL_LINE lifecycle : triggers restart
 extract SYNC_LINE sessionfilter : pre-filter
 sessionfilter SYNC_LINE pathanalyzer : analyze
 pathanalyzer SYNC_LINE keywords : keyword check
+keywords SYNC_LINE embedding : vector similarity
+embedding OPTIONAL_LINE semantic : fallback
 keywords DATA_LINE keyworddb : loads
-keywords OPTIONAL_LINE semantic : fallback
 perfmon DATA_LINE keywords : monitors
+perfmon DATA_LINE embedding : monitors
 perfmon DATA_LINE semantic : monitors
 
 ' File Management relationships

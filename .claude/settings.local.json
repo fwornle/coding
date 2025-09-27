@@ -213,7 +213,9 @@
       "mcp__serena__think_about_task_adherence",
       "Read(//Users/q284340/Agentic/curriculum-alignment/**)",
       "Read(//Users/q284340/Documents/CLAUDE/**)",
-      "Bash(PORT=3030 npm run dev)"
+      "Bash(PORT=3030 npm run dev)",
+      "mcp__spec-workflow__approvals",
+      "mcp__serena__read_memory"
     ],
     "deny": []
   },

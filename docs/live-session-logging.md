@@ -13,7 +13,7 @@ The LSL system provides **real-time transcript monitoring** with intelligent cla
 - **🔄 Real-time Monitoring**: Captures conversations as they happen during active Claude sessions
 - **🛡️ Bulletproof Reliability**: Global Coordinator ensures LSL never fails across any session
 - **📦 Zero Data Loss**: Every conversation exchange is preserved and routed appropriately
-- **🎯 Smart Classification**: Three-layer analysis prevents false positives and ensures accurate routing
+- **🎯 Smart Classification**: Four-layer analysis prevents false positives and ensures accurate routing
 - **🏥 Health Monitoring**: Automatic detection and recovery from failed processes
 - **🌍 Multi-Project Support**: Simultaneous monitoring across multiple concurrent projects
 - **⚡ Session Continuation Detection**: Prevents inappropriate redirection of session continuation messages
@@ -92,33 +92,47 @@ Multi-project coordination system that ensures healthy monitoring across all pro
 
 ### 3. ReliableCodingClassifier
 
-**Location**: `scripts/reliable-classifier.js`
+**Location**: `src/live-logging/ReliableCodingClassifier.js`
 
-Three-layer classification system that accurately determines content routing with session continuation detection.
+Four-layer classification system that accurately determines content routing with advanced semantic understanding.
 
 ![Classification Flow](images/lsl-classification-flow.png)
 
 **Classification Layers**:
 
-1. **Session Filter Layer**: Pre-filter that detects session continuation messages
-   - Prevents inappropriate redirection of conversation summaries
-   - Pattern matching for "This session is being continued..." messages
-   - Summary structure detection (Primary request, Key concepts, etc.)
+1. **PathAnalyzer (Layer 1)**: File operation pattern matching
+   - Analyzes file paths and operations for direct coding infrastructure detection
+   - Fastest decision path with <1ms response time
+   - High accuracy for known file patterns and operations
 
-2. **Keyword Analysis Layer**: Fast keyword-based classification
-   - Uses `scripts/coding-keywords.json` for coding-related term detection
+2. **KeywordMatcher (Layer 2)**: Fast keyword-based classification  
+   - Uses intelligent keyword analysis for coding-related term detection
    - Immediate classification for clear coding infrastructure content
-   - 200x faster than semantic analysis for obvious cases
+   - <10ms response time for obvious cases
 
-3. **Semantic Analysis Layer**: LLM-powered deep understanding
-   - Used when keyword analysis is inconclusive
-   - Provides nuanced classification for edge cases
-   - Includes performance monitoring and caching
+3. **EmbeddingClassifier (Layer 3)**: Semantic vector similarity search
+   - Uses sentence-transformers and Qdrant vector database
+   - 384-dimensional embeddings with cosine similarity search
+   - <3ms response time with HNSW indexing and int8 quantization
+   - Searches against indexed coding infrastructure repository content
+
+4. **SemanticAnalyzer (Layer 4)**: LLM-powered deep understanding
+   - Used when embedding classification is inconclusive (isCoding: null)
+   - Provides nuanced classification for complex edge cases
+   - <10ms response time with performance monitoring and caching
+
+**Additional Components**:
+- **RepositoryIndexer**: Automatically indexes coding repository content into Qdrant vector database
+- **EmbeddingGenerator**: Generates 384-dimensional embeddings using sentence-transformers
+- **ChangeDetector**: Monitors repository changes and triggers reindexing when needed
+- **PerformanceMonitor**: Enhanced monitoring with embedding-specific metrics
 
 **Performance Features**:
-- **Performance Monitoring**: Tracks classification times and identifies bottlenecks
-- **Layer Optimization**: Skips expensive semantic analysis when possible
-- **Confidence Scoring**: Layer-specific confidence metrics
+- **Four-Layer Optimization**: Progressively more expensive layers, early exit when confident
+- **Vector Database**: HNSW indexing with int8 quantization for <3ms similarity search
+- **Embedding Cache**: LRU cache with TTL for <2ms cached embedding retrieval
+- **Repository Indexing**: Automatic background indexing of coding infrastructure content
+- **Performance Monitoring**: Tracks classification times across all four layers
 
 ### 4. LSL File Manager
 
@@ -257,9 +271,11 @@ node scripts/global-lsl-coordinator.js ensure /path/to/<project>
 ### Performance Metrics
 
 **Classification Performance**:
-- Keyword Layer: < 1ms (typical)
-- Semantic Layer: 1000-1500ms (when needed)
-- Session Filter: < 1ms (pre-filter)
+- PathAnalyzer (Layer 1): <1ms (file pattern matching)
+- KeywordMatcher (Layer 2): <10ms (keyword analysis)
+- EmbeddingClassifier (Layer 3): <3ms (vector similarity search)
+- SemanticAnalyzer (Layer 4): <10ms (LLM analysis when needed)
+- **Total Pipeline**: <30ms (all layers combined)
 
 **Memory Usage**:
 - Enhanced Transcript Monitor: 9-69MB per project
@@ -336,7 +352,7 @@ The LSL system integrates with:
 
 - [Global LSL Coordinator Documentation](architecture/global-lsl-coordinator.md)
 - [Enhanced Transcript Monitor API](reference/enhanced-transcript-monitor.md)
-- [Classification System Guide](components/reliable-coding-classifier.md)
+- [Four-Layer Classification System Guide](components/embedding-classification/README.md)
 - [Troubleshooting LSL Issues](troubleshooting.md)
 
 ---

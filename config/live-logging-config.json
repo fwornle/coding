@@ -58,6 +58,113 @@
       "max_retries": 3
     }
   },
+  "embedding_classifier": {
+    "enabled": true,
+    "qdrant": {
+      "host": "localhost",
+      "port": 6333,
+      "collection_name": "coding_infrastructure",
+      "timeout": 5000,
+      "retries": 3,
+      "retry_delay": 1000,
+      "index_config": {
+        "vectors": {
+          "size": 384,
+          "distance": "Cosine"
+        },
+        "hnsw_config": {
+          "m": 16,
+          "ef_construct": 100,
+          "max_indexing_threads": 2
+        },
+        "quantization_config": {
+          "scalar": {
+            "type": "int8",
+            "always_ram": true
+          }
+        }
+      }
+    },
+    "embedding": {
+      "model": "sentence-transformers/all-MiniLM-L6-v2",
+      "dimensions": 384,
+      "python_timeout": 10000,
+      "batch_size": 32,
+      "cache_size": 1000,
+      "cache_ttl": 3600000
+    },
+    "classification": {
+      "similarity_threshold": 0.7,
+      "confidence_threshold": 0.8,
+      "max_response_time": 3,
+      "fallback_to_semantic": true,
+      "max_candidates": 10
+    },
+    "repository_indexing": {
+      "auto_index": true,
+      "index_patterns": [
+        "**/*.md",
+        "**/README*",
+        "**/CLAUDE.md",
+        "package.json",
+        "src/**/*.js",
+        ".spec-workflow/**/*"
+      ],
+      "exclude_patterns": [
+        "node_modules/**",
+        ".git/**",
+        "*.log",
+        "**/.DS_Store",
+        "**/tmp/**",
+        "**/temp/**"
+      ],
+      "chunk_size": 1000,
+      "overlap": 200,
+      "max_file_size": 1048576,
+      "initial_index_timeout": 300000
+    },
+    "change_detection": {
+      "enabled": true,
+      "scan_interval": 30000,
+      "debounce_delay": 5000,
+      "significance_threshold": 0.2,
+      "min_files_changed": 2,
+      "doc_changes_weight": 3,
+      "reindex_timeout": 30000,
+      "watched_patterns": [
+        "**/*.md",
+        "**/README*",
+        "**/CHANGELOG*",
+        "**/CLAUDE.md",
+        "package.json",
+        "src/**/*.js",
+        ".spec-workflow/**/*"
+      ]
+    },
+    "performance": {
+      "cache_embeddings": true,
+      "cache_size": 1000,
+      "cache_ttl": 3600000,
+      "parallel_processing": true,
+      "max_concurrent": 4,
+      "memory_limit": 524288000,
+      "gc_threshold": 0.8
+    },
+    "monitoring": {
+      "track_performance": true,
+      "log_classifications": false,
+      "log_similarity_scores": false,
+      "alert_on_slow_classification": true,
+      "slow_classification_threshold": 5
+    },
+    "debug": {
+      "enabled": false,
+      "log_embeddings": false,
+      "log_qdrant_operations": false,
+      "log_change_detection": false,
+      "verbose_classification": false
+    }
+  },
   "status_line": {
     "cache_timeout": 5000,
     "api_check_interval": 30000,

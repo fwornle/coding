@@ -18,10 +18,11 @@ package "Live Session Logging (LSL)" <<core>> {
   }
   
   package "ReliableCodingClassifier" #E8F5E8 {
-    component "Three-Layer Decision Engine" as DecisionEngine <<agent>> {
+    component "Four-Layer Decision Engine" as DecisionEngine <<agent>> {
       [Layer 1: PathAnalyzer] as PathAnalyzer <<core>>
       [Layer 2: KeywordMatcher] as KeywordMatcher <<util>>
-      [Layer 3: SemanticAnalyzer] as SemanticAnalyzer <<agent>>
+      [Layer 3: EmbeddingClassifier] as EmbeddingClassifier <<core>>
+      [Layer 4: SemanticAnalyzer] as SemanticAnalyzer <<agent>>
     }
     [Operational Logger] as OpLogger <<util>>
     [Classifier Orchestrator] as Orchestrator <<core>>
@@ -61,10 +62,13 @@ TranscriptAnalyzer --> Orchestrator
 Orchestrator --> PathAnalyzer : "1. File ops check\n(<10ms)"
 PathAnalyzer --> OpLogger : logs decision
 
-Orchestrator --> KeywordMatcher : "2. Keyword analysis\n(<5ms)"
+Orchestrator --> KeywordMatcher : "2. Keyword analysis\n(<10ms)"
 KeywordMatcher --> OpLogger : logs decision
 
-Orchestrator --> SemanticAnalyzer : "3. Semantic analysis\n(if needed)"
+Orchestrator --> EmbeddingClassifier : "3. Vector similarity\n(<3ms)"
+EmbeddingClassifier --> OpLogger : logs decision
+
+Orchestrator --> SemanticAnalyzer : "4. Semantic analysis\n(if needed)"
 SemanticAnalyzer --> GrokAPI : direct HTTP call
 SemanticAnalyzer --> OpLogger : logs decision
 
@@ -85,13 +89,15 @@ StatusLine --> ConstraintMCP : hook integration
 OpLogger --> Orchestrator : performance metrics
 
 note right of DecisionEngine
-  **Three-Layer Architecture**
-  • Layer 1: Path-based (100% accuracy, <10ms)
-  • Layer 2: Keyword analysis (<5ms)
-  • Layer 3: LLM semantic (95% accuracy, ~1s)
+  **Four-Layer Architecture**
+  • Layer 1: PathAnalyzer (<1ms, file patterns)
+  • Layer 2: KeywordMatcher (<10ms, keyword analysis)
+  • Layer 3: EmbeddingClassifier (<3ms, vector similarity)
+  • Layer 4: SemanticAnalyzer (<10ms, LLM analysis)
   
   Early exit on high confidence
-  Operational logging for debugging
+  Progressive complexity with fallback
+  Vector database powered semantic search
 end note
 
 note bottom of GrokAPI

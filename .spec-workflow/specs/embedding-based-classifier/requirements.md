@@ -2,15 +2,15 @@
 
 ## Introduction
 
-The Live Session Logging (LSL) system currently uses a keyword-based classification approach that has proven ineffective at distinguishing between coding infrastructure work and general software development work. This enhancement replaces the failed KeywordMatcher layer in the ReliableCodingClassifier with an embedding-based approach using vector similarity, leveraging the proven mcp-constraint-monitor technology stack (Qdrant vector database + sentence-transformers embeddings).
+The Live Session Logging (LSL) system currently uses a three-layer classification approach (PathAnalyzer → KeywordMatcher → SemanticAnalyzer) that needs enhancement to better distinguish between coding infrastructure work and general software development work. This enhancement adds an EmbeddingClassifier as a new Layer 3 in the ReliableCodingClassifier, creating a four-layer system using vector similarity and leveraging the proven mcp-constraint-monitor technology stack (Qdrant vector database + sentence-transformers embeddings).
 
-The enhancement provides semantic understanding of content classification to accurately identify when conversations are about the coding infrastructure itself (vs. general software development), while maintaining the existing three-layer architecture (PathAnalyzer → EmbeddingClassifier → SemanticAnalyzer) and achieving <3ms classification time for real-time LSL processing.
+The enhancement provides semantic understanding of content classification to accurately identify when conversations are about the coding infrastructure itself (vs. general software development), while extending the existing architecture to a four-layer system (PathAnalyzer → KeywordMatcher → EmbeddingClassifier → SemanticAnalyzer) and achieving <3ms classification time for real-time LSL processing.
 
 ## Alignment with Product Vision
 
 This enhancement directly supports core product goals:
 
-- **Real-Time Classification**: Replaces failed keyword approach with semantic vector similarity for accurate content routing
+- **Real-Time Classification**: Enhances existing keyword approach with semantic vector similarity for improved content routing accuracy
 - **Infrastructure Intelligence**: Repository indexing enables accurate identification of coding infrastructure-specific discussions
 - **Pattern Recognition**: Vector embeddings capture semantic patterns that simple keyword matching cannot detect
 - **Development Process Intelligence**: Accurate classification enables proper trajectory analysis and workflow optimization
@@ -33,15 +33,15 @@ Aligns with Phase 1 Foundation goals: "Real-time content classification and rout
 
 ### Requirement 2: EmbeddingClassifier Implementation  
 
-**User Story:** As a developer, I want the classification system to use vector similarity instead of keyword matching, so that content is accurately routed based on semantic meaning rather than superficial word presence.
+**User Story:** As a developer, I want the classification system to use vector similarity in addition to keyword matching, so that content is accurately routed based on semantic meaning when keyword matching is inconclusive.
 
 #### Acceptance Criteria
 
-1. WHEN classifying content THEN the EmbeddingClassifier SHALL replace the KeywordMatcher as Layer 2 in ReliableCodingClassifier  
-2. WHEN performing classification THEN the system SHALL generate embeddings for incoming content and compute cosine similarity against the coding infrastructure collection
+1. WHEN classifying content THEN the EmbeddingClassifier SHALL be added as Layer 3 in the ReliableCodingClassifier four-layer system (PathAnalyzer → KeywordMatcher → EmbeddingClassifier → SemanticAnalyzer)
+2. WHEN the KeywordMatcher returns inconclusive results THEN the EmbeddingClassifier SHALL generate embeddings for incoming content and compute cosine similarity against the coding infrastructure collection
 3. WHEN classification completes THEN the system SHALL return results within 3ms using optimized Qdrant settings (HNSW indexing, int8 quantization)
 4. WHEN confidence scoring THEN the system SHALL provide reasoning based on similarity scores: "Coding infrastructure similarity: X.XX"
-5. WHEN integration occurs THEN the EmbeddingClassifier SHALL maintain the same interface as KeywordMatcher for seamless replacement
+5. WHEN integration occurs THEN the EmbeddingClassifier SHALL integrate seamlessly into the existing ReliableCodingClassifier architecture without breaking existing functionality
 
 ### Requirement 3: Significant Change Detection and Index Updates
 
@@ -73,10 +73,10 @@ Aligns with Phase 1 Foundation goals: "Real-time content classification and rout
 - **Single Responsibility Principle**: RepositoryIndexer handles indexing, EmbeddingClassifier handles classification, ChangeDetector handles updates
 - **Modular Design**: Embedding functionality isolated in reusable components that can be leveraged by other systems
 - **Dependency Management**: Minimize dependencies by reusing existing mcp-constraint-monitor components (Qdrant client, embedding generation)
-- **Clear Interfaces**: EmbeddingClassifier provides identical interface to KeywordMatcher for drop-in replacement
+- **Clear Interfaces**: EmbeddingClassifier provides consistent interface pattern for seamless integration into existing classification pipeline
 
 ### Performance
-- **Classification Speed**: <3ms end-to-end classification time for real-time LSL processing
+- **Layer 3 Classification Speed**: <3ms for EmbeddingClassifier processing (within <30ms total four-layer pipeline)
 - **Index Updates**: <30 seconds for incremental index updates after file changes
 - **Memory Efficiency**: Reasonable memory usage even with large repository indexes (target: <500MB for typical projects)
 - **Startup Time**: <5 seconds for EmbeddingClassifier initialization including Qdrant connection

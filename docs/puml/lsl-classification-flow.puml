@@ -1,79 +1,84 @@
-@startuml LSL Classification Flow
+@startuml lsl-classification-flow
 !include _standard-style.puml
 
-title ReliableCodingClassifier - Three-Layer Classification System
+title LSL Four-Layer Classification Flow
 
-start
+participant "Enhanced\nTranscript Monitor" as monitor
+participant "ReliableCoding\nClassifier" as classifier
+participant "PathAnalyzer\n(Layer 1)" as path
+participant "KeywordMatcher\n(Layer 2)" as keyword
+participant "EmbeddingClassifier\n(Layer 3)" as embedding
+participant "SemanticAnalyzer\n(Layer 4)" as semantic
+participant "LSL File Manager" as filemanager
 
-:New Exchange\nReceived;
+monitor -> classifier : classify(exchange)
+activate classifier
 
-partition "**Layer 1: Path Analyzer**" {
-  :Path-based Analysis\n& Session Detection;
-  
-  note right
-    - Session continuation patterns
-    - File operation detection
-    - Path-based classification
-    - Fast pre-filtering
-  end note
-  
-  if (High Confidence\nPath Match?) then (yes)
-    :Return Classification\n(path layer, <10ms);
-    stop
-  else (no)
-    :Continue to\nKeyword Analysis;
-  endif
-}
+classifier -> path : analyzePaths(exchange)
+activate path
 
-partition "**Layer 2: Keyword Analysis**" {
-  :Load Coding Keywords\nDictionary;
-  
-  note left
-    scripts/coding-keywords.json
-    - "serena", "codebase"
-    - "debug", "implement"
-    - "git", "npm", "build"
-  end note
-  
-  :Analyze Content for\nCoding Terms;
-  
-  :Calculate Keyword\nScore & Confidence;
-  
-  if (High Confidence\nCoding Match?) then (yes)
-    :Return CODING_INFRASTRUCTURE\n(keyword layer, ~1ms);
-    stop
-  elseif (Clear Non-Coding?) then (yes)
-    :Return NOT_CODING\n(keyword layer, ~1ms);
-    stop
-  else (inconclusive)
-    :Continue to\nSemantic Analysis;
-  endif
-}
-
-partition "**Layer 3: Semantic Analysis**" {
-  :Performance Check\n(LLM Available?);
-  
-  if (Performance\nCritical?) then (yes)
-    :Use Cached Result\nor Skip;
-  else (no)
-    :Send to LLM for\nSemantic Understanding;
+alt **Direct File Pattern Match**
+    path --> classifier : { isCoding: true, confidence: 0.95 }
+    note right : File operations on\ncoding infrastructure\n<1ms
+    classifier --> monitor : **CODING_INFRASTRUCTURE (Layer 1)**
+    monitor -> filemanager : redirect to coding project
+else **No File Pattern Match**
+    deactivate path
+    classifier -> keyword : matchKeywords(exchange)
+    activate keyword
     
-    note right
-      1000-1500ms typical
-      Deep content understanding
-      Context-aware classification
-    end note
-    
-    :Receive LLM\nClassification;
-  endif
-  
-  :Return Final\nClassification\n(semantic layer);
-}
+    alt **Strong Keyword Match**
+        keyword --> classifier : { isCoding: true, confidence: 0.8 }
+        note right : Clear coding keywords\n<10ms
+        classifier --> monitor : **CODING_INFRASTRUCTURE (Layer 2)**
+        monitor -> filemanager : redirect to coding project
+    else **Weak/No Keyword Match**
+        deactivate keyword
+        classifier -> embedding : classifyByEmbedding(exchange)
+        activate embedding
+        
+        alt **High Vector Similarity**
+            embedding --> classifier : { isCoding: true, confidence: 0.85 }
+            note right : Semantic similarity to\ncoding infrastructure\n<3ms
+            classifier --> monitor : **CODING_INFRASTRUCTURE (Layer 3)**
+            monitor -> filemanager : redirect to coding project
+        else **Low Vector Similarity**
+            embedding --> classifier : { isCoding: false, confidence: 0.6 }
+            note right : Definitive negative\nresult
+            classifier --> monitor : **NOT_CODING_INFRASTRUCTURE (Layer 3)**
+            monitor -> filemanager : keep in local project
+        else **Inconclusive Embedding**
+            embedding --> classifier : { isCoding: null, inconclusive: true }
+            deactivate embedding
+            classifier -> semantic : analyzeSemantics(exchange)
+            activate semantic
+            semantic --> classifier : { isCoding: true/false, confidence: 0.7 }
+            note right : LLM deep analysis\n<10ms
+            classifier --> monitor : **Final Decision (Layer 4)**
+            deactivate semantic
+            monitor -> filemanager : route based on decision
+        end
+    end
+end
 
-:Performance Monitoring\n& Statistics Update;
+deactivate classifier
 
-:Route Content to\nAppropriate Project;
+note over classifier
+  **Four-Layer Performance:**
+  • Layer 1 (Path): <1ms
+  • Layer 2 (Keyword): <10ms
+  • Layer 3 (Embedding): <3ms
+  • Layer 4 (Semantic): <10ms
+  • **Total Pipeline: <30ms**
+end note
 
-stop
+note over embedding
+  **Vector Similarity Features:**
+  • Qdrant vector database
+  • 384-dimensional embeddings
+  • HNSW indexing + int8 quantization
+  • Repository content indexed
+  • LRU cache with TTL
+end note
 
 @enduml

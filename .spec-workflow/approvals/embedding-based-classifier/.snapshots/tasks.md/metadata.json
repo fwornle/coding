@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/embedding-based-classifier/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-09-27T09:25:39.591Z",
+      "trigger": "initial",
+      "approvalId": "approval_1758965139578_yyxndd18s",
+      "approvalTitle": "Tasks Document - Four-Layer Classification Implementation Plan"
+    }
+  ]
+}
