@@ -1,0 +1,30 @@
+{
+  "timestamp": "2025-09-27T17:34:46.174Z",
+  "projectPath": "/Users/q284340/Agentic/coding",
+  "strict": false,
+  "totalTime": 9410,
+  "overallResult": "warning",
+  "stepsPassedCount": 4,
+  "stepResults": {
+    "systemWatchdog": {
+      "status": "error",
+      "details": "Watchdog check failed: Command failed: node \"/Users/q284340/Agentic/coding/scripts/system-monitor-watchdog.js\"\n"
+    },
+    "coordinator": {
+      "status": "success",
+      "details": "Coordinator running (PID: 45412, uptime: 0ms)"
+    },
+    "projectRegistration": {
+      "status": "success",
+      "details": "Project \"coding\" registered with coordinator"
+    },
+    "serviceHealth": {
+      "status": "warning",
+      "details": "1/2 services healthy"
+    },
+    "recoveryTest": {
+      "status": "success",
+      "details": "All recovery components present"
+    }
+  }
+}

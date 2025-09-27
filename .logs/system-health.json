@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-09-27T17:34:36.848Z",
+  "watchdog": {
+    "version": "1.0.0",
+    "logPath": "/Users/q284340/Agentic/coding/.logs/system-watchdog.log",
+    "lastCheck": "2025-09-27T17:34:36.848Z"
+  },
+  "coordinator": {
+    "alive": false,
+    "reason": "pid_dead",
+    "pid": 43529,
+    "registryPath": "/Users/q284340/Agentic/coding/.global-service-registry.json"
+  },
+  "system": {
+    "platform": "darwin",
+    "nodeVersion": "v24.5.0",
+    "uptime": 0.023780417,
+    "workingDirectory": "/Users/q284340/Agentic/coding"
+  }
+}

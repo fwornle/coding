@@ -1,0 +1,78 @@
+@startuml 4-layer-monitoring-architecture
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam handwritten false
+skinparam shadowing false
+skinparam classBorderColor #333333
+skinparam classBackgroundColor #F8F9FA
+skinparam arrowColor #333333
+
+title 4-Layer Monitoring Architecture\nBulletproof LSL System Protection
+
+package "Layer 1: System-Level Watchdog" as Layer1 #FFE6E6 {
+  component [System Monitor Watchdog] as SMW
+  component [macOS launchd] as launchd
+  note right of SMW : Ultimate Failsafe\n• Runs every 60 seconds\n• Cannot be killed by user\n• Restarts dead coordinators
+}
+
+package "Layer 2: Global Service Coordinator" as Layer2 #E6F3FF {
+  component [Global Service Coordinator] as GSC
+  component [Service Registry] as Registry
+  component [Health Monitor] as HM
+  note right of GSC : Self-Healing Daemon\n• Manages all services\n• Exponential backoff recovery\n• Cross-project coordination
+}
+
+package "Layer 3: Monitoring Verifier" as Layer3 #E6FFE6 {
+  component [Monitoring Verifier] as MV
+  component [Launch Script] as Launch
+  note right of MV : Mandatory Verification\n• 5-step health check\n• Blocks Claude startup\n• Ensures all layers healthy
+}
+
+package "Layer 4: Service-Level Self-Monitoring" as Layer4 #FFF0E6 {
+  component [Enhanced Transcript Monitor] as ETM
+  component [MCP Constraint Monitor] as MCM
+  component [Health Files] as HealthFiles
+  note right of ETM : Individual Service Health\n• Health file generation\n• Self-restart capabilities\n• Real-time metrics
+}
+
+' Layer 1 connections
+launchd --> SMW : "Executes every 60s"
+SMW --> GSC : "Health checks & restart"
+
+' Layer 2 connections  
+GSC --> Registry : "Tracks services"
+GSC --> HM : "Health monitoring"
+GSC --> ETM : "Manages & restarts"
+GSC --> MCM : "Manages & restarts"
+
+' Layer 3 connections
+Launch --> MV : "Mandatory verification"
+MV --> SMW : "Check watchdog"
+MV --> GSC : "Check coordinator"
+MV --> ETM : "Check services"
+MV --> MCM : "Check services"
+
+' Layer 4 connections
+ETM --> HealthFiles : "Generates"
+MCM --> HealthFiles : "Port health checks"
+HealthFiles --> HM : "Read by"
+
+' Data flow
+component [Claude Code Session] as Claude
+Launch --> Claude : "Only if all layers healthy"
+
+' Failure handling
+SMW .down.> GSC : "Restarts if dead"
+GSC .down.> ETM : "Restarts if failed"
+GSC .down.> MCM : "Restarts if failed"
+MV .up.> Launch : "Blocks if unhealthy"
+
+legend right
+  |= Layer |= Purpose |= Protection |
+  | 1 | System Watchdog | Ultimate failsafe |
+  | 2 | Service Coordinator | Service management |
+  | 3 | Monitoring Verifier | Startup validation |
+  | 4 | Service Health | Individual monitoring |
+endlegend
+
+@enduml

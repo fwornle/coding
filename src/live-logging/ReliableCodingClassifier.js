@@ -24,7 +24,7 @@ import { SemanticAnalyzer } from './SemanticAnalyzer.js';
 import PathAnalyzer from './PathAnalyzer.js';
 import SemanticAnalyzerAdapter from './SemanticAnalyzerAdapter.js';
 import KeywordMatcher from './KeywordMatcher.js';
-const EmbeddingClassifier = require('./EmbeddingClassifier.js');
+// EmbeddingClassifier is CommonJS - will be imported dynamically in initialize()
 import OperationalLogger from './OperationalLogger.js';
 import PerformanceMonitor from './PerformanceMonitor.js';
 
@@ -140,7 +140,9 @@ class ReliableCodingClassifier {
         debug: this.debug
       });
       
-      // Initialize embedding classifier (Layer 3)
+      // Initialize embedding classifier (Layer 3) - dynamic import for CommonJS module
+      const EmbeddingClassifierModule = await import('./EmbeddingClassifier.js');
+      const EmbeddingClassifier = EmbeddingClassifierModule.default;
       this.embeddingClassifier = new EmbeddingClassifier({
         debug: this.debug,
         qdrantHost: this.options.qdrantHost || 'localhost',

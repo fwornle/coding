@@ -11,6 +11,25 @@ log() {
   echo "[Claude] $1"
 }
 
+# 🚨 MANDATORY MONITORING VERIFICATION 🚨
+# This MUST succeed before Claude starts - implements user's requirement for robust monitoring
+verify_monitoring_systems() {
+  local target_project="$1"
+  
+  log "🔐 MANDATORY: Verifying monitoring systems before Claude startup..."
+  
+  # Use the monitoring verifier with strict mode
+  if node "$SCRIPT_DIR/monitoring-verifier.js" --project "$target_project" --strict; then
+    log "✅ MONITORING VERIFIED: All systems operational - Claude startup approved"
+    return 0
+  else
+    log "❌ MONITORING FAILED: Critical systems not operational"
+    log "🚨 BLOCKING CLAUDE STARTUP - monitoring must be healthy first"
+    log "💡 Run 'node scripts/monitoring-verifier.js --install-all' to fix"
+    exit 1
+  fi
+}
+
 ensure_statusline_config() {
   local target_project="$1"
   local coding_repo="$2"
@@ -78,6 +97,10 @@ else
   TARGET_PROJECT_DIR="$CODING_REPO"
   log "Working in coding repository: $TARGET_PROJECT_DIR"
 fi
+
+# 🚨 MANDATORY MONITORING VERIFICATION - MUST BE FIRST 🚨
+# User requirement: "monitoring should be one of the first things coding/bin/coding does"
+verify_monitoring_systems "$TARGET_PROJECT_DIR"
 
 # Ensure statusLine config is present in target project
 ensure_statusline_config "$TARGET_PROJECT_DIR" "$CODING_REPO"

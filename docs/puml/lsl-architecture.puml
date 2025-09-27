@@ -1,9 +1,17 @@
 @startuml lsl-architecture
 !include _standard-style.puml
 
-title LSL System - Multi-Layer Classification Architecture
+title LSL System - 4-Layer Monitoring + Multi-Layer Classification Architecture
+
+package "4-Layer Monitoring Protection" #FFE6E6 {
+  [System Watchdog (launchd)] as Watchdog <<infra>>
+  [Global Service Coordinator] as GSC <<infra>>
+  [Monitoring Verifier] as Verifier <<infra>>
+  note right of Watchdog : Ultimate failsafe\nMonitors the monitor
+}
 
 package "Claude Code Session" {
+  [Launch Script] as Launch <<external>>
   [User Interactions] as User <<external>>
   [Tool Calls & Responses] as Tools <<external>>
   [Real-time Transcript] as Transcript <<external>>
@@ -49,7 +57,16 @@ package "MCP Integration" <<infra>> {
   [Constraint Monitor MCP] as ConstraintMCP <<api>>
 }
 
-' Main flow connections
+' 4-Layer Monitoring connections
+Launch --> Verifier : "Mandatory verification\n(blocks if unhealthy)"
+Verifier --> Watchdog : checks
+Verifier --> GSC : checks
+Verifier --> TranscriptAnalyzer : validates
+Watchdog --> GSC : "Monitors & restarts"
+GSC --> TranscriptAnalyzer : "Manages & restarts"
+
+' Main flow connections (protected by 4-layer monitoring)
+Launch --> User : "Only if monitoring healthy"
 User --> Transcript : generates
 Tools --> Transcript : enriches
 Transcript --> TranscriptAnalyzer : monitors
