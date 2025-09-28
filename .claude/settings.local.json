@@ -31,7 +31,10 @@
       "Bash(lsof:*)",
       "Bash(curl:*)",
       "Bash(PORT=3030 npm run dev)",
-      "mcp__serena__insert_before_symbol"
+      "mcp__serena__insert_before_symbol",
+      "mcp__constraint-monitor__check_constraints",
+      "Bash(npm start)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
