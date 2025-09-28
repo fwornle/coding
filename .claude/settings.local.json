@@ -9,7 +9,13 @@
       "Bash(plantuml:*)",
       "mcp__serena__check_onboarding_performed",
       "Bash(bin/coding:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "mcp__serena__find_file",
+      "mcp__serena__replace_symbol_body",
+      "mcp__serena__activate_project",
+      "mcp__serena__get_symbols_overview",
+      "Read(//Users/q284340/Agentic/curriculum-alignment/**)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

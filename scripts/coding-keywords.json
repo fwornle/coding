@@ -17,7 +17,7 @@
       "WebSearchAgent", "KnowledgeGraphAgent", "SemanticAnalysisAgent",
       "JSON-RPC", "MQTT broker", "json-rpc server",
       "browser-access", "stagehand", "vscode-km-copilot", 
-      "insight-orchestrator", "conversation-analyzer",
+      "conversation-analyzer",
       "shared-memory.json", "graphology", "adaptive-classifier",
       "workflow orchestration", "service orchestration",
       "agent registry", "universal launcher", "fallback services"

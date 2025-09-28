@@ -2,16 +2,15 @@
 
 ## Overview
 
-The automated insight extraction system is now **fully implemented** and provides comprehensive analysis of coding sessions, repository changes, and technology research to automatically generate knowledge base entries with detailed insights and diagrams.
+The automated insight extraction system has been **simplified** as of 2025-09-28. The complex InsightOrchestrator was deprecated in favor of a more reliable, lightweight approach that integrates with the existing session logging infrastructure.
 
 ## System Architecture
 
 ### Core Components
 
-1. **Insight Orchestrator** (`scripts/insight-orchestrator.js`)
-   - Monitors session completion and triggers analysis
-   - Coordinates multi-source analysis pipeline
-   - Creates knowledge base entries with detailed insight files
+1. **~~Insight Orchestrator~~ (DEPRECATED 2025-09-24)**
+   - ❌ The 900+ line complex analysis pipeline was archived
+   - ✅ Replaced with simplified session logging in auto-insight-trigger.js
 
 2. **MCP Semantic Analysis** (`scripts/mcp-semantic-analysis.js`)
    - Provides semantic analysis capabilities
@@ -19,10 +18,11 @@ The automated insight extraction system is now **fully implemented** and provide
    - Repository change analysis
    - Technology pattern extraction
 
-3. **Auto Insight Trigger** (`scripts/auto-insight-trigger.js`)
-   - Automatic session detection and triggering
-   - Cooldown management and state tracking
-   - Integration with post-session logger
+3. **Auto Insight Trigger** (`scripts/auto-insight-trigger.js`) - **SIMPLIFIED**
+   - ✅ Graceful fallback for session completion
+   - ✅ Maintains API compatibility with post-session logger
+   - ✅ Simplified logging instead of complex analysis
+   - ❌ Complex multi-source analysis removed
 
 4. **Diagram Generator** (`scripts/diagram-generator.js`)
    - Automated PlantUML and Mermaid diagram generation
@@ -38,13 +38,13 @@ The automated insight extraction system is now **fully implemented** and provide
    - Automatic triggering after session completion
    - Smart content routing (coding vs project-specific)
 
-## Features Implemented
+## Features Status
 
-### ✅ Multi-Source Analysis Pipeline
-- **Session logs analysis**: Current and past sessions up to analyzed logs
-- **Codebase analysis**: Git commit history and associated code changes  
-- **Web search integration**: Key technology research (configurable)
-- **Pattern extraction**: Architectural patterns, anti-patterns, best practices
+### ❌ Multi-Source Analysis Pipeline (DEPRECATED)
+- **Session logs analysis**: ~~Removed~~ → Basic session logging only
+- **Codebase analysis**: ~~Removed~~ → Git integration not active  
+- **Web search integration**: ~~Removed~~ → No external research
+- **Pattern extraction**: ~~Removed~~ → Manual knowledge management only
 
 ### ✅ Knowledge Base Integration
 - **UKB integration**: Proper 9-point synopsis creation via UKB CLI
@@ -52,11 +52,11 @@ The automated insight extraction system is now **fully implemented** and provide
 - **MCP memory sync**: Automatic sync to shared-memory-*.json files
 - **Cross-team compatibility**: Works with coding, ui, resi teams
 
-### ✅ Automated Diagram Generation
-- **PlantUML diagrams**: Architecture, workflow, pattern diagrams
-- **Mermaid diagrams**: Alternative rendering with modern syntax
-- **PNG generation**: Automatic image rendering when tools available
-- **Source preservation**: Both source and rendered images stored
+### ⚠️ Automated Diagram Generation (LIMITED)
+- **PlantUML diagrams**: Manual generation via separate tools
+- **Mermaid diagrams**: Manual generation via separate tools
+- **PNG generation**: Available but not automated
+- **Source preservation**: Manual workflow required
 
 ### ✅ Cross-Platform Compatibility
 - **Claude Code integration**: Native MCP tool support
@@ -64,11 +64,11 @@ The automated insight extraction system is now **fully implemented** and provide
 - **Manual triggering**: CLI interface for on-demand analysis
 - **Scheduled analysis**: Cron/systemd integration support
 
-### ✅ Intelligent Triggering
-- **Significance detection**: Configurable threshold (default: 7/10)
-- **Cooldown management**: Prevents excessive analysis (default: 30 min)
-- **Session correlation**: Links conversations with git commits
-- **State tracking**: Remembers analyzed sessions and commits
+### ⚠️ Intelligent Triggering (SIMPLIFIED)
+- **Significance detection**: ~~Removed~~ → All sessions logged equally
+- **Cooldown management**: ✅ Still active (default: 30 min)
+- **Session correlation**: ❌ No longer links with git commits
+- **State tracking**: ✅ Basic state tracking maintained
 
 ## Usage Examples
 
@@ -78,7 +78,8 @@ The automated insight extraction system is now **fully implemented** and provide
 # When you finish a Claude Code session, insights are extracted automatically
 ```
 
-### Manual Triggering  
+### Manual Triggering
+
 ```bash
 # Check for new sessions and trigger if needed
 node scripts/auto-insight-trigger.js check
@@ -152,32 +153,32 @@ The system is designed to work with the existing `claude-mcp` workflow:
 
 ## Status Check
 
-The system is **fully operational** and ready for use. All core components are implemented and tested:
+The system is **simplified and stable** as of 2025-09-28. Core functionality maintained with reduced complexity:
 
-- ✅ Session monitoring and analysis
-- ✅ Multi-source data integration  
-- ✅ Knowledge base updates via UKB
-- ✅ Detailed insight file generation
-- ✅ Automated diagram creation
+- ✅ Session monitoring and basic logging
+- ❌ Multi-source data integration (deprecated)
+- ⚠️ Knowledge base updates via UKB (manual)
+- ❌ Automated insight file generation (deprecated)
+- ❌ Automated diagram creation (deprecated)
 - ✅ Cross-platform compatibility
-- ✅ Post-session integration
+- ✅ Post-session integration (graceful fallback)
 
 ## Next Steps
 
-1. **Enable in production**: The system is ready for daily use
-2. **Monitor performance**: Check logs and adjust thresholds as needed  
-3. **Customize patterns**: Add domain-specific analysis patterns
-4. **Extend integrations**: Add more MCP tools or external APIs
+1. **Current status**: Simplified system prevents session shutdown errors
+2. **Manual workflows**: Use UKB and VKB commands for knowledge management
+3. **Consider restoration**: Re-implement specific features if needed
+4. **Alternative approaches**: Explore lighter-weight automation options
 
 ## Testing
 
-Run the comprehensive test suite:
-```bash
-node scripts/test-insight-workflow.js
-```
+Test basic functionality:
 
-The test verifies all components work together correctly and generates a detailed report.
+```bash
+# Test auto-insight-trigger works without errors
+node scripts/auto-insight-trigger.js status
+```
 
 ---
 
-**🎉 The automated insight extraction system is now complete and ready to revolutionize your development workflow!**
+**ℹ️ The automated insight extraction system has been simplified to ensure reliability and prevent session shutdown errors.**

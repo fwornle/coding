@@ -2,31 +2,33 @@
 
 ## Overview
 
-**AutomaticCodePatternAnalysisWorkflow** is a systematic approach to detecting, documenting, and enforcing architectural patterns across development teams using AST-based pattern recognition.
+**AutomaticCodePatternAnalysisWorkflow** was a systematic approach to detecting, documenting, and enforcing architectural patterns across development teams using AST-based pattern recognition.
 
-## Semantic Analysis Workflow Integration
+**⚠️ STATUS**: This system was **deprecated on 2025-09-24** as part of the InsightOrchestrator simplification.
 
-This pattern was the primary pattern detected by the Semantic Analysis System during the automated workflow execution. It represents the core architecture of the semantic analysis system itself, demonstrating a self-referential pattern detection capability.
+## Historical Semantic Analysis Workflow Integration
 
-### Automated Detection Process
-1. **Initial Trigger**: Post-session analysis of code pattern discussions
-2. **AST Analysis**: Deep code structure analysis using Babel parser
-3. **Pattern Recognition**: Identified multi-layer pattern detection architecture
-4. **Significance Scoring**: Rated at 8/10 as foundational infrastructure
-5. **Self-Documentation**: The system documented its own pattern detection capabilities
+This pattern was detected by the now-deprecated Semantic Analysis System during automated workflow execution. It represents the core architecture of the complex analysis system that has since been simplified.
 
-### Integration with Semantic Analysis System
+### Former Automated Detection Process (DEPRECATED)
+1. **~~Initial Trigger~~**: Post-session analysis of code pattern discussions → Now simplified
+2. **~~AST Analysis~~**: Deep code structure analysis using Babel parser → Removed  
+3. **~~Pattern Recognition~~**: Multi-layer pattern detection architecture → Removed
+4. **~~Significance Scoring~~**: Rated at 8/10 as foundational infrastructure → Removed
+5. **~~Self-Documentation~~**: System documented its own capabilities → Manual process
+
+### Former Integration with Semantic Analysis System (DEPRECATED)
 ```javascript
-// Core semantic analysis workflow implementation
+// DEPRECATED: Core semantic analysis workflow implementation
 const semanticAnalysisWorkflow = {
   name: 'code-pattern-analysis',
-  trigger: 'post-session-complete',
+  trigger: 'post-session-complete', // Now simplified to basic logging
   stages: [
     {
       name: 'session-analysis',
-      handler: 'insight-orchestrator.js',
+      handler: 'insight-orchestrator.js', // DEPRECATED 2025-09-24
       inputs: ['.specstory/history/*.md'],
-      outputs: ['detected-patterns.json']
+      outputs: ['detected-patterns.json'] // No longer generated
     },
     {
       name: 'ast-analysis',

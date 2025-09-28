@@ -1,20 +1,20 @@
 {
-  "timestamp": "2025-09-28T05:30:00.484Z",
+  "timestamp": "2025-09-28T06:07:30.808Z",
   "watchdog": {
     "version": "1.0.0",
     "logPath": "/Users/q284340/Agentic/coding/.logs/system-watchdog.log",
-    "lastCheck": "2025-09-28T05:30:00.484Z"
+    "lastCheck": "2025-09-28T06:07:30.808Z"
   },
   "coordinator": {
     "alive": true,
     "pid": 20157,
-    "registryAge": 4881,
+    "registryAge": 13843,
     "registryPath": "/Users/q284340/Agentic/coding/.global-service-registry.json"
   },
   "system": {
     "platform": "darwin",
     "nodeVersion": "v24.5.0",
-    "uptime": 0.021320875,
-    "workingDirectory": "/Users/q284340/Agentic/coding"
+    "uptime": 0.020081417,
+    "workingDirectory": "/Users/q284340/Agentic/nano-degree"
   }
 }

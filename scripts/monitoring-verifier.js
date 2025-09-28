@@ -306,15 +306,18 @@ class MonitoringVerifier {
       await new Promise(resolve => setTimeout(resolve, 5000));
       
       const criticalServices = [
-        { name: 'Enhanced Transcript Monitor', healthFile: '.transcript-monitor-health' }
+        { name: 'Enhanced Transcript Monitor', healthFile: '.transcript-monitor-health', checkInCoding: true }
         // MCP services are managed by claude-mcp, not by project monitoring
       ];
       
       const serviceResults = [];
       
       for (const service of criticalServices) {
-        if (service.healthFile && this.projectPath) {
-          const healthPath = path.join(this.projectPath, service.healthFile);
+        if (service.healthFile) {
+          // For Enhanced Transcript Monitor, always check in coding directory since it runs from there
+          const healthPath = service.checkInCoding 
+            ? path.join(this.codingRepoPath, service.healthFile)
+            : path.join(this.projectPath, service.healthFile);
           const exists = fs.existsSync(healthPath);
           
           if (exists) {

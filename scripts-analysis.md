@@ -53,8 +53,8 @@ Let me analyze what we ACTUALLY need vs what can be deleted:
 - **conversation-topic-segmenter.js**
 - **semantic-tool-interpreter.js**
 - **repository-trajectory-generator.js**
-- **insight-orchestrator.js**
-- **auto-insight-trigger.js**
+- **~~insight-orchestrator.js~~** → ALREADY DEPRECATED 2025-09-24
+- **auto-insight-trigger.js** → KEEP (simplified, prevents session errors)
 - **violation-capture-service.js**
 - **constraint-monitor-integration.js**
 - **enhanced-constraint-endpoint.js**

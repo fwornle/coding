@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-09-28T05:30:07.721Z",
-  "projectPath": "/Users/q284340/Agentic/coding",
-  "strict": false,
-  "totalTime": 7287,
+  "timestamp": "2025-09-28T06:07:38.050Z",
+  "projectPath": "/Users/q284340/Agentic/nano-degree",
+  "strict": true,
+  "totalTime": 7283,
   "overallResult": "success",
   "stepsPassedCount": 5,
   "stepResults": {
@@ -12,11 +12,11 @@
     },
     "coordinator": {
       "status": "success",
-      "details": "Coordinator running (PID: 33679, uptime: 529958ms)"
+      "details": "Coordinator running (PID: 78363, uptime: 2780282ms)"
     },
     "projectRegistration": {
       "status": "success",
-      "details": "Project \"coding\" registered with coordinator"
+      "details": "Project \"nano-degree\" registered with coordinator"
     },
     "serviceHealth": {
       "status": "success",

@@ -16,7 +16,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { InsightOrchestrator } from './insight-orchestrator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,15 +163,37 @@ class AutoInsightTrigger {
   /**
    * Run the insight orchestrator
    */
+  /**
+   * Run the insight orchestrator
+   * Note: InsightOrchestrator has been deprecated, this is now a stub
+   */
+  /**
+   * Run insight analysis (simplified fallback)
+   * Note: Full InsightOrchestrator was deprecated 2025-09-24
+   */
   async runInsightOrchestrator(options = {}) {
-    const orchestrator = new InsightOrchestrator({
-      significanceThreshold: options.significanceThreshold || this.config.significanceThreshold,
-      webSearchEnabled: options.webSearchEnabled !== false,
-      maxSessionsToAnalyze: options.maxSessionsToAnalyze || 5
-    });
+    this.logger.info('Running simplified insight analysis (InsightOrchestrator deprecated)');
     
-    await orchestrator.start();
-    return { message: 'Insight orchestrator completed' };
+    try {
+      // Simple session logging without complex analysis
+      const sessionInfo = {
+        timestamp: new Date().toISOString(),
+        significanceThreshold: options.significanceThreshold || this.config.significanceThreshold,
+        sessionId: options.sessionId || 'unknown',
+        projectPath: options.targetRepo || process.cwd()
+      };
+      
+      this.logger.info(`Session completed: ${sessionInfo.sessionId} (simplified analysis)`);
+      
+      return { 
+        message: 'Simplified insight analysis completed',
+        sessionInfo,
+        note: 'Full InsightOrchestrator functionality was deprecated - this is a minimal fallback'
+      };
+    } catch (error) {
+      this.logger.error(`Simplified insight analysis failed: ${error.message}`);
+      throw error;
+    }
   }
   
   /**
