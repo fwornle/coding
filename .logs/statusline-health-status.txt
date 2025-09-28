@@ -1,1 +1,1 @@
-[GCM:✅] [Sessions: C:🟢 CA:🟢 ND:🟢] [Guards:✅]
+[GCM:✅] [Sessions: C:🟢 CA:🟡 ND:🟢] [Guards:✅]
