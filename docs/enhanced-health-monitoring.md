@@ -54,6 +54,9 @@ The system uses multiple discovery methods to ensure all active sessions are mon
 1. **Registry-based Discovery**: Uses Global LSL Registry for registered sessions
 2. **Dynamic Discovery**: Scans Claude transcript directories for unregistered sessions
 3. **Cross-reference Validation**: Verifies monitor processes are alive and healthy
+4. **Live Transcript Scanning**: Finds sessions regardless of activity age (removed 1-hour filter)
+
+**Recent Enhancement**: Removed the 1-hour transcript activity filter to ensure dormant sessions like nano-degree are properly discovered and displayed. The system now shows all sessions with existing transcript monitors, regardless of when they last had activity.
 
 ### Smart Abbreviation Engine
 
@@ -91,6 +94,21 @@ The system provides seamless recovery without requiring user intervention:
 - **Coordinator Recovery**: Restarts coordination processes when needed
 - **Health Check Recovery**: Resumes health checking when coordinator fails
 
+### Global Monitoring Enhancements
+
+**Recent Additions**: Enhanced constraint monitoring system now includes:
+
+1. **Port Connectivity Monitoring**: Tests dashboard (port 3030) and API (port 3031) connectivity
+2. **CPU Usage Detection**: Identifies stuck processes consuming excessive CPU (>50%)
+3. **Process Health Validation**: Verifies running processes match expected PIDs
+4. **Stuck Server Detection**: Automatically detects and reports unresponsive dashboard servers
+
+**Implementation**: Added comprehensive health checks in `statusline-health-monitor.js`:
+- HTTP connectivity tests for dashboard and API endpoints
+- Process CPU monitoring via `ps` command parsing
+- Automatic detection of high CPU usage processes
+- Integration with global monitoring to catch issues that previously went unnoticed
+
 ## StatusLine Display Format
 
 ### Current Display
@@ -115,6 +133,14 @@ The system provides seamless recovery without requiring user intervention:
 - **🟡** - Warning (active session, no monitor)
 - **🔴** - Error (session issues detected)
 - **⚫** - Unknown/Offline
+
+### Enhanced Status Filtering
+
+**Recent Enhancement**: Added dormant session filtering to reduce statusLine clutter:
+- Sessions marked as 'dormant' are automatically hidden from statusLine display
+- Only active sessions with healthy monitors are shown
+- Ensures statusLine remains clean and focused on relevant projects
+- Sessions can be rediscovered when they become active again
 
 ## Health Data Storage
 

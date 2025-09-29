@@ -1,10 +1,16 @@
 # Integrated Trajectory Generation System v3.0
 
 **Status**: ✅ Active Production System  
-**Last Updated**: 2025-09-07  
-**Version**: 3.0  
+**Last Updated**: 2025-09-29  
+**Version**: 3.1  
 **Integration**: LSL System v3.0  
 **Compatibility**: Claude Code v1.0+
+
+**Recent Updates**: 
+- Fixed Groq API integration with correct model name format
+- Enhanced JSON parsing for robust markdown response handling
+- Added live trajectory analysis via enhanced transcript monitor
+- Updated configuration for `openai/gpt-oss-20b` model format
 
 ---
 
@@ -167,6 +173,28 @@ graph LR
 ### 4. Change Log Integration
 
 **Purpose**: Tracks and documents system evolution over time
+
+### 5. Real-Time Trajectory Analysis
+
+**Recent Addition**: Live trajectory analysis integration with enhanced transcript monitor
+
+**Key Features**:
+- Real-time trajectory analysis during active coding sessions
+- Groq API integration with `openai/gpt-oss-20b` model
+- Enhanced JSON parsing to handle markdown code blocks
+- Automatic generation of trajectory insights during development
+
+**Configuration**: Managed through `config/live-logging-config.json`:
+```json
+{
+  "trajectory_analysis": {
+    "enabled": true,
+    "inference_provider": "groq",
+    "inference_model": "openai/gpt-oss-20b",
+    "analysis_interval": 300000
+  }
+}
+```
 
 **Change Log Structure**:
 

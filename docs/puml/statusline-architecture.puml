@@ -3,104 +3,98 @@
 
 title StatusLine Architecture & Session Discovery
 
-package "StatusLine Generation Flow" {
-  component [combined-status-line.js] as CSL <<entry>>
-  component [statusline-health-monitor.js] as SHM <<core>>
-  component [Smart Abbreviation Engine] as SAE <<logic>>
+' Main entry point
+component [combined-status-line.js] as CSL <<entry>>
+
+' Core processing engine  
+component [statusline-health-monitor.js] as SHM <<core>>
+
+' Discovery methods stacked vertically
+package "Session Discovery" {
+  component [LSL Registry] as M1 <<discovery>>
+  component [Claude Transcript Scan] as M2 <<discovery>>
+  component [Health File Scan] as M3 <<discovery>>
 }
 
-package "Session Discovery Methods" {
-  component [Method 1: LSL Registry] as M1 <<discovery>>
-  component [Method 2: Claude Transcript Scan] as M2 <<discovery>>
-  component [Method 3: Health File Scan] as M3 <<discovery>>
+' Data sources stacked vertically
+package "Data Sources" {
+  database [~/.claude/projects/] as Claude_Transcripts
+  database [.global-lsl-registry.json] as LSL_Registry
+  database [project/.health/] as Health_Files
 }
 
-package "Claude Code Integration" {
-    component [coding] as C_Session
-    component [curriculum-alignment] as CA_Session  
-    component [nano-degree] as ND_Session
-    component [future-project-n] as FP_Session
+' Session abbreviation engine
+component [Smart Abbreviation Engine] as SAE <<logic>>
+
+' Active sessions
+package "Active Sessions" {
+    component [coding → C] as C_Session
+    component [curriculum-alignment → CA] as CA_Session  
+    component [nano-degree → ND] as ND_Session
 }
 
-package "Health Data Sources" {
-  database [~/.claude/projects/] as Claude_Transcripts <<discovery>>
-  database [project/.transcript-monitor-health] as Health_Files <<status>>
-  database [.global-lsl-registry.json] as LSL_Registry <<coordination>>
-  database [.global-service-registry.json] as Service_Registry <<services>>
+' Output status components arranged vertically
+package "Status Output" {
+  component [✅ Global Monitor] as GCM_Status
+  component [C:🟢 CA:🟢 ND:🟢 Session Status] as ISS
+  component [🛡️ Constraint Monitor] as CM_Status
+  component [🔍 Semantic Analysis] as SA_Status
+  component [🧠 Memory Service] as MEM_Status
+  component [📋 Time Window] as TW_Status
 }
 
-package "Status Components" {
-  component [Global Coding Monitor] as GCM_Status <<component>>
-  component [Individual Session Status] as ISS <<component>>
-  component [Constraint Monitor] as CM_Status <<component>>
-  component [Semantic Analysis] as SA_Status <<component>>
-  component [Memory Service] as MEM_Status <<component>>
-  component [Time Window] as TW_Status <<component>>
-}
+' Main processing flow (top to bottom)
+CSL --> SHM : orchestrates
 
-' Main flow
-CSL CONTROL_LINE SHM : builds combined status
-SHM SYNC_LINE M1 : registered projects
-SHM SYNC_LINE M2 : dynamic discovery
-SHM SYNC_LINE M3 : active monitors
+' Discovery methods flow downward
+SHM --> M1 : registry lookup
+SHM --> M2 : dynamic scan
+SHM --> M3 : health check
 
-' Discovery methods
-M1 SYNC_LINE LSL_Registry : reads registered projects
-M2 ASYNC_LINE Claude_Transcripts : scans for active sessions
-M3 SYNC_LINE Health_Files : checks monitor health
+' Data source connections
+M1 --> LSL_Registry : reads
+M2 --> Claude_Transcripts : scans
+M3 --> Health_Files : checks
 
-' Session monitoring
-SHM SYNC_LINE C_Session : monitors via ETM
-SHM SYNC_LINE CA_Session : monitors via ETM
-SHM SYNC_LINE ND_Session : monitors via ETM
-SHM SYNC_LINE FP_Session : monitors via ETM
+' Session processing flows through SAE
+SHM --> SAE : process sessions
+SAE --> C_Session : abbreviate
+SAE --> CA_Session : abbreviate  
+SAE --> ND_Session : abbreviate
 
-' Smart abbreviations
-SHM CONTROL_LINE SAE : generates abbreviations
-SAE SYNC_LINE ISS : creates individual status
+' Status generation flows downward to output
+SAE --> GCM_Status : global status
+SAE --> ISS : session status
+SHM --> CM_Status : constraint check
+SHM --> SA_Status : semantic check
+SHM --> MEM_Status : memory check
+SHM --> TW_Status : time window
 
-' Status generation
-SHM CONTROL_LINE GCM_Status : ✅ global health
-SHM CONTROL_LINE ISS : C:🟢 CA:🟢 ND:🟢
-SHM SYNC_LINE CM_Status : 🛡️ severity
-SHM SYNC_LINE SA_Status : 🔍 semantic analysis  
-SHM SYNC_LINE MEM_Status : 🧠 memory service
-SHM SYNC_LINE TW_Status : 📋 time window
+' Layout hints for vertical orientation
+CSL -[hidden]down-> SHM
+SHM -[hidden]down-> SAE
+
+note top of CSL
+  **StatusLine Output Example:**
+  ✅C:🟢 CA:🟢 ND:🟢 🛡️ 8.5 🔍EX 🧠 ✅ 📋9-10
+end note
 
 note right of M2
-  **Dynamic Discovery Process:**
-  1. Scan ~/.claude/projects/ directory
-  2. Find directories matching pattern:
-     "-Users-q284340-Agentic-{project}"
-  3. Extract project name from directory
-  4. Check for active transcript files
-  5. Discover unregistered sessions
+  **Discovery Process:**
+  • Scan ~/.claude/projects/
+  • Pattern: "-Users-*-Agentic-{project}"
+  • Extract project names
+  • Find active transcripts
+  • No 1-hour filter (recent fix)
 end note
 
 note right of SAE
-  **Smart Abbreviation Algorithm:**
-  - coding → C
-  - curriculum-alignment → CA  
-  - nano-degree → ND
-  - multi-word projects → First letters
-  - Handles conflicts intelligently
-end note
-
-note bottom of CSL
-  **Example Output Breakdown:**
-  ✅C:🟢 CA:🟢 ND:🟢 🛡️ 8.5 🔍EX 🧠 ✅ 📋9-10
-  
-  **Session Status Section:**
-  ✅ = Global monitor healthy
-  C:🟢 = Coding session healthy (PID 97464)
-  CA:🟢 = Curriculum-Alignment healthy (PID 57051)  
-  ND:🟢 = Nano-Degree healthy (PID 57093)
-  
-  **Service Status Section:**
-  🛡️ 8.5 = Constraint monitor (severity level)
-  🔍EX = Semantic analysis (EX=active state)
-  🧠 ✅ = Memory service healthy
-  📋9-10 = Time window (9-10 range)
+  **Abbreviation Rules:**
+  • coding → C
+  • curriculum-alignment → CA  
+  • nano-degree → ND
+  • Handles conflicts intelligently
+  • Filters dormant sessions
 end note
 
 @enduml
