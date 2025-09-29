@@ -160,7 +160,7 @@ if check_docker; then
                 if ! docker ps | grep -q constraint-monitor-qdrant; then
                     docker run -d --name constraint-monitor-qdrant \
                         -p 6333:6333 -p 6334:6334 \
-                        qdrant/qdrant:v1.7.0 || echo "   ⚠️ Failed to start Qdrant container"
+                        qdrant/qdrant:v1.15.0 || echo "   ⚠️ Failed to start Qdrant container"
                 fi
                 
                 # Start Redis container

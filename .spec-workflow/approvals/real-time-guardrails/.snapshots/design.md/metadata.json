@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/real-time-guardrails/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-09-29T11:24:19.048Z",
+      "trigger": "initial",
+      "approvalId": "approval_1759145059041_wnh9vsnd9",
+      "approvalTitle": "Real-Time Trajectory System Design Document"
+    }
+  ]
+}

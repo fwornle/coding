@@ -1,0 +1,14 @@
+# Spec Workflow MCP Server Configuration File
+# ============================================
+
+# Project directory path
+projectDir = "/Users/q284340/Agentic/coding"
+
+# Dashboard port
+port = 3456
+
+# Auto-start dashboard
+autoStartDashboard = true
+
+# Language
+lang = "en"
