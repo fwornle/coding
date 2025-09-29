@@ -32,6 +32,19 @@
           "requests_per_minute": 60,
           "tokens_per_minute": 40000
         }
+      },
+      "groq": {
+        "default_model": "openai/gpt-oss-20b",
+        "base_url": "https://api.groq.com/openai/v1",
+        "usage_endpoint": null,
+        "console_url": "https://console.groq.com/settings/billing",
+        "free_credits": null,
+        "default_limit": null,
+        "rate_limit": {
+          "requests_per_second": 30,
+          "requests_per_minute": 14400,
+          "tokens_per_minute": 7200000
+        }
       }
     },
     "timeout": 10000,
@@ -183,6 +196,37 @@
     "compliance_threshold": 8.0,
     "max_violations": 5
   },
+  "trajectory_analysis": {
+    "enabled": true,
+    "inference_provider": "groq",
+    "inference_model": "openai/gpt-oss-20b",
+    "analysis_interval": 100,
+    "intervention_threshold": 0.8,
+    "cross_project_sync": true,
+    "watchdog_integration": true,
+    "state_persistence": {
+      "enabled": true,
+      "directory": ".specstory/trajectory",
+      "files": {
+        "live_state": "live-state.json",
+        "session_transitions": "session-transitions.log",
+        "cross_project_insights": "cross-project-insights.json"
+      }
+    },
+    "real_time_monitoring": {
+      "enabled": true,
+      "update_interval": 500,
+      "status_line_integration": true
+    },
+    "trajectory_states": {
+      "exploring": { "icon": "🔍EX", "description": "Information gathering phase" },
+      "on_track": { "icon": "📈ON", "description": "Productive trajectory progression" },
+      "off_track": { "icon": "📉OFF", "description": "Deviating from optimal path" },
+      "implementing": { "icon": "⚙️IMP", "description": "Active code modification" },
+      "verifying": { "icon": "✅VER", "description": "Testing and validation phase" },
+      "blocked": { "icon": "🚫BLK", "description": "Intervention preventing action" }
+    }
+  },
   "file_patterns": {
     "live_transcript": "{date}_{time}_live-transcript.md",
     "live_session": "{date}_{time}_{session_id}_live-session.md",
@@ -194,8 +238,11 @@
   },
   "api_key_env_vars": [
     "XAI_API_KEY",
+    "GROQ_API_KEY",
+    "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY"
+    "CLAUDE_API_KEY",
+    "GEMINI_API_KEY"
   ],
   "credit_checking": {
     "enabled": true,

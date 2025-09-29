@@ -142,47 +142,63 @@ class StatusLineHealthMonitor {
         
         for (const projectDir of projectDirs) {
           const projectDirPath = path.join(claudeProjectsDir, projectDir);
-          const transcriptFiles = fs.readdirSync(projectDirPath)
-            .filter(file => file.endsWith('.jsonl'))
-            .map(file => ({
-              path: path.join(projectDirPath, file),
-              stats: fs.statSync(path.join(projectDirPath, file))
-            }))
-            .filter(file => Date.now() - file.stats.mtime.getTime() < 3600000) // Active within 1 hour
-            .sort((a, b) => b.stats.mtime - a.stats.mtime);
           
-          if (transcriptFiles.length > 0) {
-            // Extract project name from directory: "-Users-q284340-Agentic-curriculum-alignment" -> "curriculum-alignment"
-            const projectName = projectDir.replace(/^-Users-q284340-Agentic-/, '');
-            
-            // Skip if already found via registry
-            if (sessions[projectName]) continue;
-            
-            // Check if this project has a centralized health file
-            const projectPath = `/Users/q284340/Agentic/${projectName}`;
-            const centralizedHealthFile = this.getCentralizedHealthFile(projectPath);
-            
-            if (fs.existsSync(centralizedHealthFile)) {
-              // Has monitor running
-              sessions[projectName] = await this.getProjectSessionHealthFromFile(centralizedHealthFile);
-            } else {
-              // Active session but no monitor - unmonitored session
-              const mostRecent = transcriptFiles[0];
-              const age = Date.now() - mostRecent.stats.mtime.getTime();
+          // Extract project name from directory: "-Users-q284340-Agentic-curriculum-alignment" -> "curriculum-alignment"
+          const projectName = projectDir.replace(/^-Users-q284340-Agentic-/, '');
+          
+          // Skip if already found via registry
+          if (sessions[projectName]) continue;
+          
+          // Check if this project has a centralized health file FIRST
+          const projectPath = `/Users/q284340/Agentic/${projectName}`;
+          const centralizedHealthFile = this.getCentralizedHealthFile(projectPath);
+          
+          if (fs.existsSync(centralizedHealthFile)) {
+            // Has monitor running - use health file data
+            sessions[projectName] = await this.getProjectSessionHealthFromFile(centralizedHealthFile);
+          } else {
+            // No health file - check transcript activity to determine status
+            try {
+              const transcriptFiles = fs.readdirSync(projectDirPath)
+                .filter(file => file.endsWith('.jsonl'))
+                .map(file => ({
+                  path: path.join(projectDirPath, file),
+                  stats: fs.statSync(path.join(projectDirPath, file))
+                }))
+                .sort((a, b) => b.stats.mtime - a.stats.mtime);
               
-              if (age < 300000) { // Active within 5 minutes
-                sessions[projectName] = {
-                  status: 'unmonitored',
-                  icon: '🟡',
-                  details: 'No transcript monitor'
-                };
-              } else {
-                sessions[projectName] = {
-                  status: 'inactive',
-                  icon: '⚫',
-                  details: 'Session idle'
-                };
+              if (transcriptFiles.length > 0) {
+                const mostRecent = transcriptFiles[0];
+                const age = Date.now() - mostRecent.stats.mtime.getTime();
+                
+                if (age < 300000) { // Active within 5 minutes
+                  sessions[projectName] = {
+                    status: 'unmonitored',
+                    icon: '🟡',
+                    details: 'No transcript monitor'
+                  };
+                } else if (age < 86400000) { // Active within 24 hours 
+                  sessions[projectName] = {
+                    status: 'inactive',
+                    icon: '⚫',
+                    details: 'Session idle'
+                  };
+                } else {
+                  // Older than 24 hours - show as dormant but still track it
+                  sessions[projectName] = {
+                    status: 'dormant',
+                    icon: '💤',
+                    details: 'Session dormant'
+                  };
+                }
               }
+            } catch (dirError) {
+              // Directory read error - mark as unknown but still include it
+              sessions[projectName] = {
+                status: 'unknown',
+                icon: '❓',
+                details: 'Directory access error'
+              };
             }
           }
         }
@@ -340,29 +356,115 @@ class StatusLineHealthMonitor {
    */
   async getConstraintMonitorHealth() {
     try {
-      // Check if constraint monitor is responding
-      // Note: This would need to integrate with the actual MCP constraint monitor
-      // For now, we'll check if the constraint monitor process is running
-      const { stdout } = await execAsync('ps aux | grep "constraint-monitor" | grep -v grep');
+      // Enhanced health checking with port connectivity and CPU monitoring
+      const dashboardPort = 3030; // From .env.ports: CONSTRAINT_DASHBOARD_PORT
+      const apiPort = 3031;       // From .env.ports: CONSTRAINT_API_PORT
       
-      if (stdout.trim().length > 0) {
-        return {
-          status: 'healthy',
-          icon: '✅',
-          details: 'Guardrails active'
-        };
-      } else {
+      // Check process existence and CPU usage
+      const { stdout: psOutput } = await execAsync('ps aux | grep "constraint-monitor\\|dashboard.*next\\|constraint.*api" | grep -v grep');
+      const processes = psOutput.trim().split('\n').filter(line => line.length > 0);
+      
+      let processHealth = {
+        running: processes.length > 0,
+        highCpu: false,
+        details: []
+      };
+      
+      // Analyze CPU usage for stuck processes
+      for (const processLine of processes) {
+        const parts = processLine.trim().split(/\s+/);
+        if (parts.length >= 3) {
+          const cpuUsage = parseFloat(parts[2]) || 0;
+          const pid = parts[1];
+          if (cpuUsage > 50) { // High CPU threshold
+            processHealth.highCpu = true;
+            processHealth.details.push(`PID ${pid}: ${cpuUsage}% CPU`);
+          }
+        }
+      }
+      
+      // Test port connectivity
+      let portHealth = {
+        dashboard: false,
+        api: false
+      };
+      
+      try {
+        // Quick HTTP connectivity test for dashboard
+        const dashboardResponse = await Promise.race([
+          execAsync(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${dashboardPort} --max-time 3`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]);
+        const dashboardStatus = parseInt(dashboardResponse.stdout.trim());
+        portHealth.dashboard = dashboardStatus >= 200 && dashboardStatus < 500;
+      } catch (error) {
+        // Dashboard port not responding
+        portHealth.dashboard = false;
+      }
+      
+      try {
+        // Quick HTTP connectivity test for API
+        const apiResponse = await Promise.race([
+          execAsync(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${apiPort}/api/health --max-time 3`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        ]);
+        const apiStatus = parseInt(apiResponse.stdout.trim());
+        portHealth.api = apiStatus >= 200 && apiStatus < 500;
+      } catch (error) {
+        // API port not responding
+        portHealth.api = false;
+      }
+      
+      // Determine overall health status
+      if (!processHealth.running) {
         return {
           status: 'inactive',
           icon: '⚫',
-          details: 'Guardrails offline'
+          details: 'Constraint monitor offline'
         };
       }
+      
+      if (processHealth.highCpu) {
+        return {
+          status: 'stuck',
+          icon: '🔴',
+          details: `High CPU usage: ${processHealth.details.join(', ')}`
+        };
+      }
+      
+      if (!portHealth.dashboard && !portHealth.api) {
+        return {
+          status: 'unresponsive',
+          icon: '🔴', 
+          details: 'Ports 3030,3031 unresponsive'
+        };
+      }
+      
+      if (!portHealth.dashboard || !portHealth.api) {
+        const failedPorts = [];
+        if (!portHealth.dashboard) failedPorts.push('3030');
+        if (!portHealth.api) failedPorts.push('3031');
+        
+        return {
+          status: 'degraded',
+          icon: '🟡',
+          details: `Port ${failedPorts.join(',')} down`
+        };
+      }
+      
+      // All checks passed
+      return {
+        status: 'healthy',
+        icon: '✅',
+        details: 'Ports 3030,3031 responsive'
+      };
+      
     } catch (error) {
+      this.log(`Constraint monitor health check error: ${error.message}`, 'DEBUG');
       return {
         status: 'unknown',
         icon: '❓',
-        details: 'Unable to check'
+        details: 'Health check failed'
       };
     }
   }
@@ -380,7 +482,10 @@ class StatusLineHealthMonitor {
     statusLine += `[GCM:${gcmHealth.icon}]`;
     
     // Project Sessions - show individual session statuses with abbreviations
-    const sessionEntries = Object.entries(sessionHealth);
+    // Filter out dormant sessions to avoid clutter
+    const sessionEntries = Object.entries(sessionHealth)
+      .filter(([projectName, health]) => health.status !== 'dormant');
+    
     if (sessionEntries.length > 0) {
       const sessionStatuses = sessionEntries
         .map(([projectName, health]) => {
