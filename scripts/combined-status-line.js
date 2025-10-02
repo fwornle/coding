@@ -842,7 +842,8 @@ class CombinedStatusLine {
           .join(' ');
         
         // Include GCM and sessions without colons
-        parts.push(`[GCM${gcmIcon}] [${sessionStatuses}]`);
+        parts.push(`[GCM${gcmIcon}]`);
+        parts.push(`[${sessionStatuses}]`);
         
         // Determine overall session health for color coding
         const hasUnhealthy = sessionStatuses.includes('🔴');

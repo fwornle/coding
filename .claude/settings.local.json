@@ -62,5 +62,27 @@
   "statusLine": {
     "type": "command",
     "command": "CODING_REPO=/Users/q284340/Agentic/coding node /Users/q284340/Agentic/coding/scripts/combined-status-line.js"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+          }
+        ]
+      }
+    ]
   }
 }
