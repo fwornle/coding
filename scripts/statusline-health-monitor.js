@@ -36,6 +36,13 @@ class StatusLineHealthMonitor {
     this.lastStatus = null;
     this.updateTimer = null;
     
+    // Auto-healing configuration
+    this.autoHealEnabled = options.autoHeal !== false; // Default true
+    this.healingAttempts = new Map(); // Track healing attempts per service
+    this.maxHealingAttempts = options.maxHealingAttempts || 3;
+    this.healingCooldown = options.healingCooldown || 300000; // 5 minutes between healing attempts
+    this.lastHealingTime = new Map(); // Track last healing time per service
+    
     this.ensureLogDirectory();
   }
   /**
@@ -367,8 +374,15 @@ class StatusLineHealthMonitor {
       const dashboardPort = 3030; // From .env.ports: CONSTRAINT_DASHBOARD_PORT
       const apiPort = 3031;       // From .env.ports: CONSTRAINT_API_PORT
       
-      // Check process existence and CPU usage
-      const { stdout: psOutput } = await execAsync('ps aux | grep "constraint-monitor\\|dashboard.*next\\|constraint.*api" | grep -v grep');
+      // Check process existence and CPU usage (with fallback for no processes)
+      let psOutput = '';
+      try {
+        const result = await execAsync('ps aux | grep "constraint-monitor\\|dashboard.*next\\|constraint.*api" | grep -v grep || true');
+        psOutput = result.stdout;
+      } catch (grepError) {
+        // grep returns exit code 1 when no matches found, that's ok
+        psOutput = '';
+      }
       const processes = psOutput.trim().split('\n').filter(line => line.length > 0);
       
       let processHealth = {
@@ -423,48 +437,59 @@ class StatusLineHealthMonitor {
       }
       
       // Determine overall health status
+      let healthResult;
+      
       if (!processHealth.running) {
-        return {
+        healthResult = {
           status: 'inactive',
           icon: '⚫',
           details: 'Constraint monitor offline'
         };
-      }
-      
-      if (processHealth.highCpu) {
-        return {
+      } else if (processHealth.highCpu) {
+        healthResult = {
           status: 'stuck',
           icon: '🔴',
           details: `High CPU usage: ${processHealth.details.join(', ')}`
         };
-      }
-      
-      if (!portHealth.dashboard && !portHealth.api) {
-        return {
+      } else if (!portHealth.dashboard && !portHealth.api) {
+        healthResult = {
           status: 'unresponsive',
           icon: '🔴', 
           details: 'Ports 3030,3031 unresponsive'
         };
-      }
-      
-      if (!portHealth.dashboard || !portHealth.api) {
+      } else if (!portHealth.dashboard || !portHealth.api) {
         const failedPorts = [];
         if (!portHealth.dashboard) failedPorts.push('3030');
         if (!portHealth.api) failedPorts.push('3031');
         
-        return {
+        healthResult = {
           status: 'degraded',
           icon: '🟡',
           details: `Port ${failedPorts.join(',')} down`
         };
+      } else {
+        // All checks passed
+        healthResult = {
+          status: 'healthy',
+          icon: '✅',
+          details: 'Ports 3030,3031 responsive'
+        };
       }
       
-      // All checks passed
-      return {
-        status: 'healthy',
-        icon: '✅',
-        details: 'Ports 3030,3031 responsive'
-      };
+      // Trigger auto-healing for unhealthy states
+      if (this.autoHealEnabled && ['inactive', 'stuck', 'unresponsive', 'degraded'].includes(healthResult.status)) {
+        this.log(`Detected unhealthy constraint monitor: ${healthResult.status}`, 'WARN');
+        
+        // Run auto-healing asynchronously to not block health check
+        setImmediate(async () => {
+          const healed = await this.autoHealConstraintMonitor(healthResult);
+          if (healed) {
+            this.log(`🎉 Constraint monitor auto-healed successfully`, 'INFO');
+          }
+        });
+      }
+      
+      return healthResult;
       
     } catch (error) {
       this.log(`Constraint monitor health check error: ${error.message}`, 'DEBUG');
@@ -473,6 +498,168 @@ class StatusLineHealthMonitor {
         icon: '❓',
         details: 'Health check failed'
       };
+    }
+  }
+
+  /**
+   * Auto-heal constraint monitor service when issues are detected
+   */
+  async autoHealConstraintMonitor(healthStatus) {
+    if (!this.autoHealEnabled) return false;
+    
+    const serviceKey = 'constraint-monitor';
+    const now = Date.now();
+    
+    // Check if we're in cooldown period
+    const lastHeal = this.lastHealingTime.get(serviceKey) || 0;
+    if (now - lastHeal < this.healingCooldown) {
+      this.log(`Auto-heal cooldown for ${serviceKey}, waiting ${Math.round((this.healingCooldown - (now - lastHeal)) / 1000)}s`, 'DEBUG');
+      return false;
+    }
+    
+    // Check if we've exceeded max attempts
+    const attempts = this.healingAttempts.get(serviceKey) || 0;
+    if (attempts >= this.maxHealingAttempts) {
+      this.log(`Max healing attempts (${this.maxHealingAttempts}) reached for ${serviceKey}`, 'ERROR');
+      return false;
+    }
+    
+    let healed = false;
+    
+    try {
+      this.log(`🔧 Auto-healing constraint monitor (status: ${healthStatus.status})`, 'INFO');
+      
+      // Different healing strategies based on the issue
+      switch (healthStatus.status) {
+        case 'stuck':
+          // High CPU - kill and restart
+          this.log('Detected stuck process with high CPU, killing and restarting...', 'INFO');
+          await this.killConstraintMonitorProcesses();
+          await this.startConstraintMonitorServices();
+          healed = true;
+          break;
+          
+        case 'unresponsive':
+        case 'degraded':
+          // Ports not responding - try graceful restart first
+          this.log('Services unresponsive, attempting graceful restart...', 'INFO');
+          await this.restartConstraintMonitorGracefully();
+          healed = true;
+          break;
+          
+        case 'inactive':
+        case 'down':
+          // Not running - start services
+          this.log('Services not running, starting...', 'INFO');
+          await this.startConstraintMonitorServices();
+          healed = true;
+          break;
+          
+        default:
+          this.log(`No auto-heal action for status: ${healthStatus.status}`, 'DEBUG');
+          return false;
+      }
+      
+      if (healed) {
+        // Update tracking
+        this.healingAttempts.set(serviceKey, attempts + 1);
+        this.lastHealingTime.set(serviceKey, now);
+        
+        // Wait a bit for services to stabilize
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Verify healing worked
+        const newHealth = await this.getConstraintMonitorHealth();
+        if (newHealth.status === 'healthy') {
+          this.log(`✅ Auto-healing successful! Constraint monitor is now healthy`, 'INFO');
+          // Reset attempts on successful heal
+          this.healingAttempts.set(serviceKey, 0);
+          return true;
+        } else {
+          this.log(`⚠️ Auto-healing completed but service still unhealthy: ${newHealth.status}`, 'WARN');
+          return false;
+        }
+      }
+    } catch (error) {
+      this.log(`Auto-healing failed: ${error.message}`, 'ERROR');
+      this.healingAttempts.set(serviceKey, attempts + 1);
+      this.lastHealingTime.set(serviceKey, now);
+      return false;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Kill constraint monitor processes forcefully
+   */
+  async killConstraintMonitorProcesses() {
+    try {
+      // Kill all constraint monitor related processes
+      await execAsync('pkill -f "constraint-monitor" || true');
+      await execAsync('pkill -f "dashboard.*next.*3030" || true');
+      await execAsync('lsof -ti:3030,3031 | xargs kill -9 2>/dev/null || true');
+      
+      this.log('Killed constraint monitor processes', 'INFO');
+      
+      // Wait for processes to fully terminate
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (error) {
+      this.log(`Error killing processes: ${error.message}`, 'WARN');
+    }
+  }
+  
+  /**
+   * Start constraint monitor services
+   */
+  async startConstraintMonitorServices() {
+    try {
+      const monitorPath = path.join(this.codingRepoPath, 'integrations', 'mcp-constraint-monitor');
+      
+      // Start dashboard on port 3030
+      this.log('Starting constraint monitor dashboard on port 3030...', 'INFO');
+      execAsync(`cd "${monitorPath}" && PORT=3030 npm run dashboard > /dev/null 2>&1 &`).catch(err => {
+        this.log(`Dashboard start error (non-critical): ${err.message}`, 'DEBUG');
+      });
+      
+      // Start API on port 3031 if needed
+      this.log('Starting constraint monitor API on port 3031...', 'INFO');
+      execAsync(`cd "${monitorPath}" && PORT=3031 npm run api > /dev/null 2>&1 &`).catch(err => {
+        this.log(`API start error (non-critical): ${err.message}`, 'DEBUG');
+      });
+      
+      this.log('Constraint monitor services start initiated', 'INFO');
+    } catch (error) {
+      this.log(`Error starting services: ${error.message}`, 'ERROR');
+      throw error;
+    }
+  }
+  
+  /**
+   * Gracefully restart constraint monitor
+   */
+  async restartConstraintMonitorGracefully() {
+    try {
+      this.log('Attempting graceful restart of constraint monitor...', 'INFO');
+      
+      // Try to stop gracefully first
+      await execAsync('pkill -SIGTERM -f "constraint-monitor" || true');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Force kill if still running
+      const { stdout } = await execAsync('pgrep -f "constraint-monitor" || true');
+      if (stdout.trim()) {
+        this.log('Processes still running after SIGTERM, forcing kill...', 'INFO');
+        await this.killConstraintMonitorProcesses();
+      }
+      
+      // Start services
+      await this.startConstraintMonitorServices();
+      
+      this.log('Graceful restart completed', 'INFO');
+    } catch (error) {
+      this.log(`Graceful restart failed: ${error.message}`, 'ERROR');
+      throw error;
     }
   }
 
@@ -605,6 +792,7 @@ async function main() {
   const args = process.argv.slice(2);
   const isDebug = args.includes('--debug');
   const isDaemon = args.includes('--daemon');
+  const autoHeal = args.includes('--auto-heal');
   
   if (args.includes('--help')) {
     console.log(`
@@ -614,9 +802,10 @@ Usage:
   node statusline-health-monitor.js [options]
 
 Options:
-  --daemon    Run in daemon mode
-  --debug     Enable debug output
-  --help      Show this help
+  --daemon      Run in daemon mode (continuous monitoring)
+  --debug       Enable debug output
+  --auto-heal   Enable auto-healing for unhealthy services
+  --help        Show this help
 
 The monitor aggregates health data from:
   - Global Coding Monitor (GCM)
@@ -628,12 +817,20 @@ Status Line Format:
 
 Health Indicators:
   🟢 Healthy    🟡 Warning    🔴 Unhealthy    ❌ Failed    ⚫ Inactive
+
+Auto-Healing:
+  When --auto-heal is enabled, the monitor will automatically:
+  - Restart services that are down
+  - Kill and restart stuck processes with high CPU
+  - Attempt graceful recovery for unresponsive services
+  - Limit healing attempts to prevent infinite loops
 `);
     process.exit(0);
   }
 
   const monitor = new StatusLineHealthMonitor({
-    debug: isDebug
+    debug: isDebug,
+    autoHeal: autoHeal
   });
 
   // Setup signal handlers
