@@ -98,7 +98,39 @@ else
   log "Working in coding repository: $TARGET_PROJECT_DIR"
 fi
 
-# 🚨 MANDATORY MONITORING VERIFICATION - MUST BE FIRST 🚨
+# Load environment configuration BEFORE starting services (from coding repo)
+if [ -f "$CODING_REPO/.env" ]; then
+  set -a
+  source "$CODING_REPO/.env"
+  set +a
+fi
+
+if [ -f "$CODING_REPO/.env.ports" ]; then
+  set -a
+  source "$CODING_REPO/.env.ports"
+  set +a
+fi
+
+# Start all services using simple startup script BEFORE monitoring verification
+# Services need to be running for the monitoring verifier to check them
+log "Starting coding services for Claude..."
+
+# Check if Node.js is available
+if ! command -v node &> /dev/null; then
+  log "Error: Node.js is required but not found in PATH"
+  exit 1
+fi
+
+# Start services using the simple startup script (from coding repo)
+if ! "$CODING_REPO/start-services.sh"; then
+  log "Error: Failed to start services"
+  exit 1
+fi
+
+# Brief wait for services to stabilize
+sleep 2
+
+# 🚨 MANDATORY MONITORING VERIFICATION - AFTER SERVICES START 🚨
 # User requirement: "monitoring should be one of the first things coding/bin/coding does"
 verify_monitoring_systems "$TARGET_PROJECT_DIR"
 
@@ -151,33 +183,7 @@ if [ -f "$CODING_REPO/.mcp-sync/sync-required.json" ]; then
   log "MCP memory sync required, will be handled by Claude on startup"
 fi
 
-# Load environment configuration (from coding repo)
-if [ -f "$CODING_REPO/.env" ]; then
-  set -a
-  source "$CODING_REPO/.env"
-  set +a
-fi
-
-if [ -f "$CODING_REPO/.env.ports" ]; then
-  set -a
-  source "$CODING_REPO/.env.ports"
-  set +a
-fi
-
-# Start all services using simple startup script
-log "Starting coding services for Claude..."
-
-# Check if Node.js is available
-if ! command -v node &> /dev/null; then
-  log "Error: Node.js is required but not found in PATH"
-  exit 1
-fi
-
-# Start services using the simple startup script (from coding repo)
-if ! "$CODING_REPO/start-services.sh"; then
-  log "Error: Failed to start services"
-  exit 1
-fi
+# Environment was already loaded and services already started before monitoring verification
 
 # Global LSL Coordinator for robust transcript monitoring
 start_transcript_monitoring() {

@@ -317,8 +317,8 @@ class MonitoringVerifier {
           // Use centralized health directory in coding project
           let healthPath;
           if (service.useCentralizedHealth) {
-            const projectName = this.projectPath ? path.basename(this.projectPath) : 'coding';
-            healthPath = path.join(this.codingRepoPath, '.health', `${projectName}-${service.healthFile}`);
+            // All monitoring services run from coding project, so always use 'coding' prefix
+            healthPath = path.join(this.codingRepoPath, '.health', `coding-${service.healthFile}`);
           } else {
             // Fallback to old logic for other services
             healthPath = service.checkInCoding 

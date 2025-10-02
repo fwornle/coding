@@ -335,11 +335,18 @@ class StatusLineHealthMonitor {
           icon: '🟡',
           details: 'Stale health data'
         };
-      } else {
+      } else if (age < 21600000) { // 2min - 6 hours: unhealthy (red)
         return {
           status: 'unhealthy',
           icon: '🔴',
           details: 'Health data too old'
+        };
+      } else {
+        // > 6 hours: inactive (black)
+        return {
+          status: 'inactive',
+          icon: '⚫',
+          details: 'Session inactive (>6h)'
         };
       }
     } catch (error) {

@@ -53,9 +53,8 @@
       "Bash(basename:*)",
       "mcp__spec-workflow__spec-workflow-guide",
       "mcp__spec-workflow__approvals",
-      "Bash(TRANSCRIPT_DEBUG=true node /Users/q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js --test)",
-      "Bash(TRANSCRIPT_DEBUG=true TRAJECTORY_DEBUG=true node scripts/enhanced-transcript-monitor.js --test)",
-      "Bash(PORT=3030 npm run dashboard)"
+      "Bash(PORT=3030 npm run dashboard)",
+      "Bash(sort:*)"
     ],
     "deny": [],
     "ask": []

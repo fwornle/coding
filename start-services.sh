@@ -177,7 +177,34 @@ if check_docker; then
                 
                 if [ "$qdrant_check" -gt 0 ] && [ "$redis_check" -gt 0 ]; then
                     echo "✅ Constraint Monitor databases started manually"
-                    CONSTRAINT_MONITOR_STATUS="✅ FULLY OPERATIONAL"
+
+                    # Start constraint monitor web services
+                    echo "🚀 Starting constraint monitor web services..."
+                    cd "$CODING_DIR/integrations/mcp-constraint-monitor"
+
+                    # Start dashboard on port 3030 in background
+                    PORT=3030 npm run dashboard > /dev/null 2>&1 &
+                    dashboard_pid=$!
+
+                    # Start API server on port 3031 in background
+                    npm run api > /dev/null 2>&1 &
+                    api_pid=$!
+
+                    # Wait for services to start
+                    sleep 3
+
+                    # Check if web services are running
+                    dashboard_running=$(lsof -ti:3030 | wc -l)
+                    api_running=$(lsof -ti:3031 | wc -l)
+
+                    if [ "$dashboard_running" -gt 0 ] && [ "$api_running" -gt 0 ]; then
+                        echo "✅ Constraint Monitor web services started (dashboard:3030, api:3031)"
+                        CONSTRAINT_MONITOR_STATUS="✅ FULLY OPERATIONAL"
+                    else
+                        echo "⚠️ Failed to start constraint monitor web services"
+                        CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
+                        CONSTRAINT_MONITOR_WARNING="Web services startup failed"
+                    fi
                 else
                     echo "⚠️ Failed to start some containers manually"
                     CONSTRAINT_MONITOR_STATUS="⚠️ DEGRADED MODE"
@@ -232,7 +259,7 @@ cd "$CODING_DIR"
 # Kill any existing transcript monitor or live-logging processes
 echo "🧹 Stopping existing live-logging processes..."
 pkill -f "transcript-monitor.js" 2>/dev/null || true
-pkill -f "start-live-logging.js" 2>/dev/null || true
+pkill -f "live-logging-coordinator.js" 2>/dev/null || true
 sleep 2
 
 # Start the transcript monitor (this handles session transitions)
@@ -241,9 +268,9 @@ nohup node scripts/enhanced-transcript-monitor.js > transcript-monitor.log 2>&1 
 TRANSCRIPT_PID=$!
 echo "   Transcript Monitor PID: $TRANSCRIPT_PID"
 
-# Start the live-logging coordinator (this handles MCP integration) 
+# Start the live-logging coordinator (this handles MCP integration)
 echo "🔄 Starting Live Logging Coordinator..."
-nohup node scripts/start-live-logging.js > live-logging.log 2>&1 &
+nohup node scripts/live-logging-coordinator.js > live-logging.log 2>&1 &
 LIVE_LOGGING_PID=$!
 echo "   Live Logging Coordinator PID: $LIVE_LOGGING_PID"
 
@@ -317,6 +344,23 @@ else
     echo "❌ Semantic Analysis MCP Server NOT configured"
 fi
 
+# Check Constraint Monitor web services (if status is FULLY OPERATIONAL)
+if [ "$CONSTRAINT_MONITOR_STATUS" = "✅ FULLY OPERATIONAL" ]; then
+    if check_port 3030; then
+        echo "✅ Constraint Monitor Dashboard running on port 3030"
+        services_running=$((services_running + 1))
+    else
+        echo "❌ Constraint Monitor Dashboard NOT running on port 3030"
+    fi
+
+    if check_port 3031; then
+        echo "✅ Constraint Monitor API running on port 3031"
+        services_running=$((services_running + 1))
+    else
+        echo "❌ Constraint Monitor API NOT running on port 3031"
+    fi
+fi
+
 # Update services tracking file
 cat > .services-running.json << EOF
 {
@@ -348,10 +392,18 @@ echo "════════════════════════�
 echo "📊 SERVICES STATUS SUMMARY"
 echo "═══════════════════════════════════════════════════════════════════════"
 echo ""
-if [ $services_running -ge 4 ]; then
-    echo "✅ Core services started successfully! ($services_running/4 running)"
+# Calculate expected service count based on constraint monitor status
+expected_services=4
+if [ "$CONSTRAINT_MONITOR_STATUS" = "✅ FULLY OPERATIONAL" ]; then
+    expected_services=6  # Core 4 + Dashboard + API
+fi
+
+if [ $services_running -ge $expected_services ]; then
+    echo "✅ All services started successfully! ($services_running/$expected_services running)"
+elif [ $services_running -ge 4 ]; then
+    echo "✅ Core services started successfully! ($services_running/$expected_services running)"
 else
-    echo "⚠️  Some core services not running ($services_running/4). Check logs for issues."
+    echo "⚠️  Some core services not running ($services_running/$expected_services). Check logs for issues."
 fi
 echo ""
 echo "🛡️ CONSTRAINT MONITOR: $CONSTRAINT_MONITOR_STATUS"

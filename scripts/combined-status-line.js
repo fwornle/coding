@@ -833,71 +833,60 @@ class CombinedStatusLine {
       const sessionEntries = Object.entries(globalHealth.sessions || {});
       
       if (sessionEntries.length > 0) {
-        // Extract individual session statuses from rawStatus for proper abbreviations
-        if (globalHealth.rawStatus) {
-          const sessionsMatch = globalHealth.rawStatus.match(/\[Sessions:\s*([^\]]+)\]/);
-          if (sessionsMatch) {
-            const sessionStatuses = sessionsMatch[1].trim();
-            parts.push(`${gcmIcon}${sessionStatuses}`);
-            
-            // Determine overall session health for color coding
-            const hasUnhealthy = sessionStatuses.includes('🔴');
-            const hasWarning = sessionStatuses.includes('🟡');
-            
-            if (hasUnhealthy) overallColor = 'red';
-            else if (hasWarning && overallColor === 'green') overallColor = 'yellow';
-          } else {
-            // Fallback to manual construction if parsing fails
-            const sessionStatuses = sessionEntries
-              .map(([project, health]) => {
-                const abbrev = this.getProjectAbbreviation(project);
-                return `${abbrev}:${health.icon}`;
-              })
-              .join(' ');
-            parts.push(`${gcmIcon}${sessionStatuses}`);
-          }
-        } else {
-          // Manual construction when no rawStatus
-          const sessionStatuses = sessionEntries
-            .map(([project, health]) => {
-              const abbrev = this.getProjectAbbreviation(project);
-              return `${abbrev}:${health.icon}`;
-            })
-            .join(' ');
-          parts.push(`${gcmIcon}${sessionStatuses}`);
-        }
+        // Build the full GCM and Sessions display without labels
+        const sessionStatuses = sessionEntries
+          .map(([project, health]) => {
+            const abbrev = this.getProjectAbbreviation(project);
+            return `${abbrev}${health.icon}`;
+          })
+          .join(' ');
+        
+        // Include GCM and sessions without colons
+        parts.push(`[GCM${gcmIcon}] [${sessionStatuses}]`);
+        
+        // Determine overall session health for color coding
+        const hasUnhealthy = sessionStatuses.includes('🔴');
+        const hasWarning = sessionStatuses.includes('🟡');
+        
+        if (hasUnhealthy) overallColor = 'red';
+        else if (hasWarning && overallColor === 'green') overallColor = 'yellow';
       } else {
-        parts.push(`${gcmIcon}`);
+        // Just GCM with no sessions
+        parts.push(`[GCM${gcmIcon}]`);
         if (gcmIcon === '❌') overallColor = 'red';
         else if (gcmIcon === '🟡' && overallColor === 'green') overallColor = 'yellow';
       }
     }
 
-    // Constraint Monitor Status - use original constraint status text to preserve trajectory
+    // Constraint Monitor Status with TRJ label (trajectory)
     if (constraint.status === 'operational') {
+      const score = constraint.compliance.toFixed(1);
+      const violationsCount = constraint.violations || 0;
+      
+      // Extract trajectory if available from raw data
+      let trajectoryIcon = '🔍EX'; // Default
       if (constraint.rawData && constraint.rawData.text) {
-        // Use the original constraint monitor text which includes trajectory
-        parts.push(constraint.rawData.text);
-      } else {
-        const score = constraint.compliance.toFixed(1);
-        const violationsCount = constraint.violations || 0;
-        
-        if (violationsCount > 0) {
-          parts.push(`🛡️ ${score} ⚠️${violationsCount}`);
-          overallColor = 'yellow';
-        } else {
-          parts.push(`🛡️ ${score} 🔍EX`); // Add back trajectory
+        const trajMatch = constraint.rawData.text.match(/(📈|🔍|📉|🚫|⚙️|✅)(\w+)/);
+        if (trajMatch) {
+          trajectoryIcon = trajMatch[0];
         }
       }
+      
+      if (violationsCount > 0) {
+        parts.push(`[TRJ🛡️ ${score} ⚠️${violationsCount}]`);
+        overallColor = 'yellow';
+      } else {
+        parts.push(`[TRJ🛡️ ${score} ${trajectoryIcon}]`);
+      }
     } else if (constraint.status === 'degraded') {
-      parts.push('🛡️ ⚠️');
+      parts.push('[TRJ🛡️ ⚠️]');
       overallColor = 'yellow';
     } else {
-      parts.push('🛡️ ❌');
+      parts.push('[TRJ🛡️ ❌]');
       overallColor = 'red';
     }
 
-    // Semantic Analysis Status with API credit monitoring
+    // Semantic Analysis Status (Brain = AI/LLM API health, Checkmark = Credits OK)
     if (semantic.status === 'operational') {
       const apiUsage = await this.getAPIUsageEstimate();
       
@@ -906,24 +895,24 @@ class CombinedStatusLine {
         const thresholds = this.config.status_line?.display?.credit_thresholds || { critical: 10, warning: 20, moderate: 80 };
         
         if (remaining < thresholds.critical) {
-          parts.push(`🧠 ❌${remaining}%`); // Critical - very low credits
+          parts.push(`[SEM🧠 API❌${remaining}%]`); // Critical - very low credits
           overallColor = 'red';
         } else if (remaining < thresholds.warning) {
-          parts.push(`🧠 ⚠️${remaining}%`); // Warning - low credits
+          parts.push(`[SEM🧠 API⚠️${remaining}%]`); // Warning - low credits
           if (overallColor === 'green') overallColor = 'yellow';
         } else if (remaining < thresholds.moderate) {
-          parts.push(`🧠 ✅${remaining}%`); // Show percentage when moderate
+          parts.push(`[SEM🧠 API✅${remaining}%]`); // Show percentage when moderate
         } else {
-          parts.push('🧠 ✅'); // High credits - clean display
+          parts.push('[SEM🧠 API✅]'); // High credits - clean display
         }
       } else {
-        parts.push('🧠 ✅'); // Unknown usage - assume OK
+        parts.push('[SEM🧠 API✅]'); // Unknown usage - assume OK
       }
     } else if (semantic.status === 'degraded') {
-      parts.push('🧠 ⚠️');
+      parts.push('[SEM🧠 API⚠️]');
       if (overallColor === 'green') overallColor = 'yellow';
     } else {
-      parts.push('🧠 ❌');
+      parts.push('[SEM🧠 API❌]');
       overallColor = 'red';
     }
 
