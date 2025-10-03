@@ -864,7 +864,11 @@ class CombinedStatusLine {
 
     // Constraint Monitor Status with TRJ label (trajectory)
     if (constraint.status === 'operational') {
-      const score = constraint.compliance.toFixed(1);
+      // Convert compliance to percentage (0-10 scale to 0-100%)
+      const compliancePercent = constraint.compliance <= 10 ?
+        Math.round(constraint.compliance * 10) :
+        Math.round(constraint.compliance);
+      const score = `${compliancePercent}%`;
       const violationsCount = constraint.violations || 0;
       
       // Extract trajectory if available from raw data
