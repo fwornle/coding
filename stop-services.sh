@@ -77,7 +77,7 @@ for port in 8080 8001; do
 done
 
 # Log shutdown
-echo "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ") - Services stopped" >> live-logging.log
+echo "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ") - Services stopped" >> logs/live-logging.log
 
 # Remove services tracking file
 if [ -f "$SERVICES_FILE" ]; then

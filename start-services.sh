@@ -270,12 +270,12 @@ echo "   Transcript Monitor PID: $TRANSCRIPT_PID"
 
 # Start the live-logging coordinator (this handles MCP integration)
 echo "🔄 Starting Live Logging Coordinator..."
-nohup node scripts/live-logging-coordinator.js > live-logging.log 2>&1 &
+nohup node scripts/live-logging-coordinator.js > logs/live-logging.log 2>&1 &
 LIVE_LOGGING_PID=$!
 echo "   Live Logging Coordinator PID: $LIVE_LOGGING_PID"
 
 # Log startup
-echo "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ") - Live Logging System started: Transcript Monitor PID $TRANSCRIPT_PID, Coordinator PID $LIVE_LOGGING_PID" >> live-logging.log
+echo "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ") - Live Logging System started: Transcript Monitor PID $TRANSCRIPT_PID, Coordinator PID $LIVE_LOGGING_PID" >> logs/live-logging.log
 
 # Start VKB Server
 echo "🟢 Starting VKB Server (port 8080)..."
