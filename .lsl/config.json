@@ -29,7 +29,7 @@
   },
   "file_management": {
     "auto_rotation": true,
-    "compression": true,
+    "compression": false,
     "archiving": true,
     "max_file_size": 104857600,
     "max_archive_age": 2592000000
