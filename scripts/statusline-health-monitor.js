@@ -370,10 +370,10 @@ class StatusLineHealthMonitor {
    */
   async getConstraintMonitorHealth() {
     try {
-      // Enhanced health checking with port connectivity and CPU monitoring
+      // Enhanced health checking with port connectivity, compilation errors, and CPU monitoring
       const dashboardPort = 3030; // From .env.ports: CONSTRAINT_DASHBOARD_PORT
       const apiPort = 3031;       // From .env.ports: CONSTRAINT_API_PORT
-      
+
       // Check process existence and CPU usage (with fallback for no processes)
       let psOutput = '';
       try {
@@ -435,15 +435,54 @@ class StatusLineHealthMonitor {
         // API port not responding
         portHealth.api = false;
       }
-      
+
+      // Check for compilation errors in dashboard logs
+      let compilationHealth = {
+        hasErrors: false,
+        errorDetails: ''
+      };
+
+      try {
+        // Check recent log files for TypeScript/Next.js compilation errors
+        const logCheckPath = path.join(this.codingRepoPath, 'integrations/mcp-constraint-monitor/dashboard');
+        const buildCheck = await execAsync(`cd "${logCheckPath}" 2>/dev/null && grep -l "Parsing ecmascript\\|Expression expected\\|Module not found\\|Type error\\|Build error" .next/server/*.js 2>/dev/null | head -1`);
+
+        if (buildCheck.stdout.trim()) {
+          compilationHealth.hasErrors = true;
+          compilationHealth.errorDetails = 'TypeScript compilation errors detected';
+        }
+      } catch (error) {
+        // No compilation errors found (grep returns 1 when no matches)
+        compilationHealth.hasErrors = false;
+      }
+
+      // Also check if dashboard responds with actual content (not error page)
+      if (portHealth.dashboard && !compilationHealth.hasErrors) {
+        try {
+          const contentCheck = await execAsync(`curl -s http://localhost:${dashboardPort} --max-time 3 | grep -q "Constraint Monitor" && echo "ok" || echo "error"`);
+          if (contentCheck.stdout.trim() === 'error') {
+            compilationHealth.hasErrors = true;
+            compilationHealth.errorDetails = 'Dashboard returning error page';
+          }
+        } catch (error) {
+          // Ignore content check errors
+        }
+      }
+
       // Determine overall health status
       let healthResult;
-      
+
       if (!processHealth.running) {
         healthResult = {
           status: 'inactive',
           icon: '⚫',
           details: 'Constraint monitor offline'
+        };
+      } else if (compilationHealth.hasErrors) {
+        healthResult = {
+          status: 'compilation_error',
+          icon: '🔴',
+          details: compilationHealth.errorDetails || 'Compilation errors detected'
         };
       } else if (processHealth.highCpu) {
         healthResult = {
@@ -454,14 +493,14 @@ class StatusLineHealthMonitor {
       } else if (!portHealth.dashboard && !portHealth.api) {
         healthResult = {
           status: 'unresponsive',
-          icon: '🔴', 
+          icon: '🔴',
           details: 'Ports 3030,3031 unresponsive'
         };
       } else if (!portHealth.dashboard || !portHealth.api) {
         const failedPorts = [];
         if (!portHealth.dashboard) failedPorts.push('3030');
         if (!portHealth.api) failedPorts.push('3031');
-        
+
         healthResult = {
           status: 'degraded',
           icon: '🟡',
