@@ -1077,7 +1077,7 @@ class CombinedStatusLine {
       const codingPath = process.env.CODING_TOOLS_PATH || '/Users/q284340/Agentic/coding';
       
       // Start transcript monitor in background
-      const startCommand = `cd "${targetProject}" && TRANSCRIPT_DEBUG=false node "${codingPath}/scripts/enhanced-transcript-monitor.js" > transcript-monitor.log 2>&1 &`;
+      const startCommand = `cd "${targetProject}" && TRANSCRIPT_DEBUG=false node "${codingPath}/scripts/enhanced-transcript-monitor.js" > logs/transcript-monitor.log 2>&1 &`;
       
       await execAsync(startCommand);
       
