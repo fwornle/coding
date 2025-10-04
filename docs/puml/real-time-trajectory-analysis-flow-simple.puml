@@ -1,0 +1,78 @@
+@startuml real-time-trajectory-analysis-flow-simple
+!include _standard-style.puml
+
+title Real-Time Trajectory Analysis System - Flow and Integration
+
+actor "User" as User
+participant "Monitor" as Monitor
+participant "Analyzer" as Analyzer
+participant "Groq API" as GroqAPI
+participant "State File" as StateFile
+participant "Status Line" as StatusLine
+participant "UI" as UI
+
+User ->> Monitor : "Types code or asks questions"
+activate Monitor
+
+Monitor -> Monitor : "Detects significant exchanges\n(smart analysis rules)"
+Monitor -->> Analyzer : "Exchange data for analysis"
+activate Analyzer
+
+Analyzer -> Analyzer : "Check analysis frequency\n(max 50/hour)"
+
+alt Analysis allowed
+    Analyzer ->> GroqAPI : "Analyze conversation pattern\nClassify trajectory state"
+    activate GroqAPI
+    GroqAPI -> GroqAPI : "Process with gpt-oss-20b\nInfer trajectory state"
+    GroqAPI --> Analyzer : "State classification result\n{state: 'implementing', confidence: 0.8}"
+    deactivate GroqAPI
+
+    Analyzer ->> StateFile : "Update live-state.json"
+    activate StateFile
+    StateFile -> StateFile : "Store state with timestamp\nand transition history"
+
+    note right of StateFile
+        {
+          "currentState": "implementing",
+          "lastUpdate": 1759590073127,
+          "stateHistory": [
+            {
+              "from": "exploring",
+              "to": "implementing",
+              "confidence": 0.8,
+              "reasoning": "User is modifying code..."
+            }
+          ]
+        }
+    end note
+
+    deactivate StateFile
+else Analysis rate limited
+    Analyzer -> Analyzer : "Skip analysis\n(preserve rate limits)"
+end
+
+deactivate Analyzer
+
+loop Every 5 seconds
+    StatusLine ->> StateFile : "Read current trajectory state"
+    activate StatusLine
+    StateFile --> StatusLine : "currentState: 'implementing'"
+    StatusLine -> StatusLine : "Map to icon: ⚙️ IMP"
+    StatusLine ->> UI : "Display: [🛡️ 85% ⚙️ IMP]"
+    activate UI
+    UI ->> User : "Real-time trajectory display"
+    deactivate UI
+    deactivate StatusLine
+end
+
+note over GroqAPI
+    Uses gpt-oss-20b model
+    for trajectory classification
+end note
+
+note over StatusLine
+    Reads from trajectory system
+    not constraint monitor
+end note
+
+@enduml

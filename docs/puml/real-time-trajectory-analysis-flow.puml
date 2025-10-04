@@ -1,0 +1,72 @@
+@startuml real-time-trajectory-analysis-flow
+!include _standard-style.puml
+
+title Real-Time Trajectory Analysis System
+
+actor "User" as User
+participant "Monitor" as Monitor
+participant "Analyzer" as Analyzer
+participant "Groq API" as GroqAPI
+participant "State File" as StateFile
+participant "Status Line" as StatusLine
+participant "UI" as UI
+
+User ->> Monitor : "Code input"
+activate Monitor
+
+Monitor -> Monitor : "Detect patterns"
+Monitor -->> Analyzer : "Analysis request"
+activate Analyzer
+
+Analyzer -> Analyzer : "Check rate limits"
+
+alt Analysis allowed
+    Analyzer ->> GroqAPI : "Classify activity"
+    activate GroqAPI
+    GroqAPI -> GroqAPI : "Process conversation"
+    GroqAPI --> Analyzer : "Trajectory state"
+    deactivate GroqAPI
+
+    Analyzer ->> StateFile : "Update state"
+    activate StateFile
+    StateFile -> StateFile : "Store with metadata"
+
+    note right of StateFile
+        State format:
+        {
+          "currentState": "implementing",
+          "lastUpdate": timestamp,
+          "confidence": 0.8
+        }
+    end note
+
+    deactivate StateFile
+else Rate limited
+    Analyzer -> Analyzer : "Skip analysis"
+end
+
+deactivate Analyzer
+
+loop Every 5 seconds
+    StatusLine ->> StateFile : "Read state"
+    activate StatusLine
+    StateFile --> StatusLine : "Current state"
+    StatusLine -> StatusLine : "Map to icon"
+    StatusLine ->> UI : "Status display"
+    activate UI
+    UI ->> User : "Show status"
+    deactivate UI
+    deactivate StatusLine
+end
+
+note over GroqAPI
+    Uses gpt-oss-20b model
+    for trajectory classification
+end note
+
+note over StatusLine
+    Reads from trajectory system
+    not constraint monitor
+end note
+
+@enduml

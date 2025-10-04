@@ -1,0 +1,70 @@
+@startuml status-line-trajectory-integration-fix
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontSize 10
+
+title Status Line Trajectory Integration Fix (2025-10-04)
+
+top to bottom direction
+
+package "Before Fix (Broken Integration)" as BeforeFix {
+    rectangle "Status Line System" as StatusBefore {
+        component [CombinedStatusLine] as StatusLineBefore
+        component [getConstraintStatus()] as ConstraintBefore
+    }
+
+    rectangle "Constraint Monitor" as ConstraintMonitorBefore {
+        component [constraint-status-line.js] as ConstraintStatusBefore
+        database "Constraint Data" as ConstraintDataBefore
+    }
+
+    rectangle "Trajectory System" as TrajSystemBefore {
+        component [RealTimeTrajectoryAnalyzer] as TrajAnalyzerBefore
+        database "live-state.json" as LiveStateBefore
+    }
+
+    StatusLineBefore --> ConstraintBefore : "1. Get constraint status"
+    ConstraintBefore --> ConstraintMonitorBefore : "2. API call"
+    ConstraintStatusBefore --> ConstraintDataBefore : "3. Read constraint data"
+    ConstraintBefore <-- ConstraintStatusBefore : "4. Extract trajectory from\nconstraint data (WRONG!)"
+    StatusLineBefore <-- ConstraintBefore : "5. Always shows 🔍EX"
+
+    note right of TrajSystemBefore : "Trajectory system working\nbut NOT connected to\nstatus line!"
+
+    TrajAnalyzerBefore ..> LiveStateBefore : "Updates real trajectory\nstates independently"
+}
+
+package "After Fix (Proper Integration)" as AfterFix {
+    rectangle "Status Line System" as StatusAfter {
+        component [CombinedStatusLine] as StatusLineAfter
+        component [getConstraintStatus()] as ConstraintAfter
+        component [getTrajectoryState()] as TrajectoryAfter
+    }
+
+    rectangle "Constraint Monitor" as ConstraintMonitorAfter {
+        component [constraint-status-line.js] as ConstraintStatusAfter
+        database "Constraint Data" as ConstraintDataAfter
+    }
+
+    rectangle "Trajectory System" as TrajSystemAfter {
+        component [RealTimeTrajectoryAnalyzer] as TrajAnalyzerAfter
+        database "live-state.json" as LiveStateAfter
+    }
+
+    StatusLineAfter --> ConstraintAfter : "1. Get constraint compliance"
+    StatusLineAfter --> TrajectoryAfter : "2. Get trajectory state"
+    ConstraintAfter --> ConstraintMonitorAfter : "3. API call"
+    ConstraintStatusAfter --> ConstraintDataAfter : "4. Read constraint data"
+    TrajectoryAfter --> LiveStateAfter : "5. Read live-state.json"
+    ConstraintAfter <-- ConstraintStatusAfter : "6. Compliance percentage only"
+    TrajectoryAfter <-- LiveStateAfter : "7. Real trajectory state"
+    StatusLineAfter <-- ConstraintAfter : "8. 🛡️ 85%"
+    StatusLineAfter <-- TrajectoryAfter : "9. ⚙️ IMP (real state!)"
+
+    TrajAnalyzerAfter --> LiveStateAfter : "Updates with Groq\ngpt-oss-20b analysis"
+}
+
+note bottom of AfterFix : "✅ Status line now shows:\n[GCM✅] [C🟢] [🛡️ 85% ⚙️ IMP] [🧠API✅]"
+note bottom of BeforeFix : "❌ Status line was stuck on:\n[GCM✅] [C🟢] [🛡️ 85% 🔍 EX] [🧠API✅]"
+
+@enduml

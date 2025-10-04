@@ -1,16 +1,17 @@
 # Integrated Trajectory Generation System v3.0
 
-**Status**: ✅ Active Production System  
-**Last Updated**: 2025-09-29  
-**Version**: 3.1  
-**Integration**: LSL System v3.0  
+**Status**: ✅ Active Production System
+**Last Updated**: 2025-10-04
+**Version**: 3.2
+**Integration**: LSL System v3.0 + Real-Time Trajectory Analysis
 **Compatibility**: Claude Code v1.0+
 
-**Recent Updates**: 
+**Recent Updates**:
 - Fixed Groq API integration with correct model name format
 - Enhanced JSON parsing for robust markdown response handling
 - Added live trajectory analysis via enhanced transcript monitor
-- Updated configuration for `openai/gpt-oss-20b` model format
+- Updated configuration for `gpt-oss-20b` model format
+- **2025-10-04**: Fixed status line integration to properly read real-time trajectory states
 
 ---
 
@@ -170,19 +171,125 @@ graph LR
 - **Data Management**: Storage, processing, and analytics
 - **Security Features**: Authentication, authorization, monitoring
 
+## Real-Time Trajectory Analysis System (Live Session State Tracking)
+
+**Component**: `src/live-logging/RealTimeTrajectoryAnalyzer.js`
+**Purpose**: Real-time classification of development activity patterns during Claude Code sessions
+**Integration**: Status line system, LSL system
+
+### Key Features
+
+**AI-Powered State Classification**:
+- Groq `gpt-oss-20b` model analyzes conversation patterns in real-time
+- Classifies development activity into trajectory states
+- Smart analysis with configurable frequency limits (50 analyses/hour default)
+- Fallback provider system (Groq → OpenAI) for reliability
+
+**Trajectory States**:
+- `🔍 EX` (Exploring): Information gathering and analysis phase
+- `📈 ON` (On Track): Productive trajectory progression
+- `📉 OFF` (Off Track): Deviating from optimal path
+- `⚙️ IMP` (Implementing): Active code modification
+- `✅ VER` (Verifying): Testing and validation phase
+- `🚫 BLK` (Blocked): Intervention preventing action
+
+**State Persistence**:
+- JSON format with timestamps and confidence scores
+- State history tracking for analysis
+- Real-time updates during active sessions
+- Automatic cleanup and maintenance
+
+### Integration with Status Line System
+
+**Critical Fix (2025-10-04)**: The status line system was incorrectly trying to extract trajectory information from constraint monitor data. This has been fixed to properly read from the trajectory analysis system.
+
+**Before Fix**: Status line was stuck showing `🔍EX` most of the time
+**After Fix**: Status line shows real-time trajectory states like `⚙️ IMP`, `✅ VER`, etc.
+
+**Architecture Diagrams**:
+- [Status Line Integration](images/status-line-trajectory-integration.png) - Current integration architecture
+- [Real-Time Analysis Flow](images/real-time-trajectory-analysis-flow.png) - Complete trajectory analysis system flow
+
+**Implementation**:
+```javascript
+// scripts/combined-status-line.js
+getTrajectoryState() {
+  try {
+    const trajectoryPath = join(rootDir, '.specstory', 'trajectory', 'live-state.json');
+    if (existsSync(trajectoryPath)) {
+      const trajectoryData = JSON.parse(readFileSync(trajectoryPath, 'utf8'));
+      const currentState = trajectoryData.currentState || 'exploring';
+
+      const stateIconMap = {
+        'exploring': '🔍 EX',
+        'on_track': '📈 ON',
+        'off_track': '📉 OFF',
+        'implementing': '⚙️ IMP',
+        'verifying': '✅ VER',
+        'blocked': '🚫 BLK'
+      };
+
+      return stateIconMap[currentState] || '🔍 EX';
+    }
+  } catch (error) {
+    // Fallback to default if file doesn't exist or can't be read
+  }
+  return '🔍 EX'; // Default fallback
+}
+```
+
+### Configuration Example
+
+**File**: `config/live-logging-config.json`
+```json
+{
+  "trajectory_analysis": {
+    "enabled": true,
+    "inference_provider": "groq",
+    "inference_model": "gpt-oss-20b",
+    "fallback_provider": "openai",
+    "fallback_model": "gpt-4o-mini",
+    "analysis_interval": 5000,
+    "smart_analysis": {
+      "enabled": true,
+      "only_significant_exchanges": true,
+      "skip_consecutive_reads": true,
+      "max_analyses_per_hour": 50
+    },
+    "intervention_threshold": 0.8,
+    "trajectory_states": {
+      "exploring": { "icon": "🔍 EX", "description": "Information gathering phase" },
+      "on_track": { "icon": "📈 ON", "description": "Productive trajectory progression" },
+      "off_track": { "icon": "📉 OFF", "description": "Deviating from optimal path" },
+      "implementing": { "icon": "⚙️ IMP", "description": "Active code modification" },
+      "verifying": { "icon": "✅ VER", "description": "Testing and validation phase" },
+      "blocked": { "icon": "🚫 BLK", "description": "Intervention preventing action" }
+    }
+  }
+}
+```
+
 ### 4. Change Log Integration
 
 **Purpose**: Tracks and documents system evolution over time
 
 ### 5. Real-Time Trajectory Analysis
 
+**Real-Time Trajectory Analysis vs Trajectory Generation**
+
+This document covers the **Trajectory Generation System** (comprehensive project reports). For **Real-Time Trajectory Analysis** (session state tracking), see the dedicated section below.
+
+### Real-Time Trajectory Analysis Integration
+
 **Recent Addition**: Live trajectory analysis integration with enhanced transcript monitor
 
 **Key Features**:
 - Real-time trajectory analysis during active coding sessions
-- Groq API integration with `openai/gpt-oss-20b` model
+- Groq API integration with `gpt-oss-20b` model
 - Enhanced JSON parsing to handle markdown code blocks
 - Automatic generation of trajectory insights during development
+- State persistence in `.specstory/trajectory/live-state.json`
+- Status line integration for real-time state display
 
 **Configuration**: Managed through `config/live-logging-config.json`:
 ```json
@@ -190,11 +297,17 @@ graph LR
   "trajectory_analysis": {
     "enabled": true,
     "inference_provider": "groq",
-    "inference_model": "openai/gpt-oss-20b",
-    "analysis_interval": 300000
+    "inference_model": "gpt-oss-20b",
+    "analysis_interval": 5000,
+    "smart_analysis": {
+      "enabled": true,
+      "max_analyses_per_hour": 50
+    }
   }
 }
 ```
+
+**State Output**: Real-time trajectory states are written to `.specstory/trajectory/live-state.json` and read by the status line system for display.
 
 **Change Log Structure**:
 

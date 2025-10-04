@@ -4,12 +4,26 @@
 
 The Claude Code status line system provides real-time monitoring of the development environment through a modular, service-oriented architecture. The system aggregates status information from multiple independent services and presents it as a unified, color-coded status display.
 
+## Trajectory Integration
+
+The status line system integrates with the real-time trajectory analysis system to display current development states. The trajectory states are read directly from `.specstory/trajectory/live-state.json`, which is maintained by the trajectory analysis system using AI-powered inference.
+
+**Key Features**:
+- **Real-time trajectory integration**: `getTrajectoryState()` method reads from trajectory system
+- **Proper formatting**: Trajectory symbols with correct spacing (e.g., `🔍 EX`)
+- **AI-powered analysis**: Uses Groq gpt-oss-20b model for trajectory classification
+- **Live state reading**: Displays actual development trajectory states in real-time
+
+**Integration Architecture Diagrams**:
+- [Status Line Trajectory Integration](../images/status-line-trajectory-integration.png) - Current integration architecture
+- [Real-Time Trajectory Analysis Flow](../images/real-time-trajectory-analysis-flow.png) - Complete system flow
+
 ## System Architecture
 
 ```
 Claude Code → Wrapper → Main Script → Service APIs → Status Display
      ↓           ↓          ↓            ↓             ↓
-  5s Timer → Env Setup → Aggregator → Data Sources → [GCM✅] [C🟢] [🛡️ 85% 🔍EX] [🧠API✅]
+  5s Timer → Env Setup → Aggregator → Data Sources → [GCM✅] [C🟢] [🛡️ 85% 🔍 EX] [🧠API✅]
 ```
 
 ### Component Layers
@@ -63,6 +77,7 @@ Claude Code → Wrapper → Main Script → Service APIs → Status Display
 - `getCoreServicesStatus()` - Core infrastructure status
 - `getConstraintStatus()` - Constraint monitoring data
 - `getSemanticStatus()` - AI/API status checking
+- `getTrajectoryState()` - Real-time trajectory state from trajectory system
 
 **Data Flow**:
 1. Parallel status collection from all services
@@ -89,6 +104,8 @@ Claude Code → Wrapper → Main Script → Service APIs → Status Display
 **Purpose**: Coding compliance and constraint violations
 **Output**: `[🛡️ {percentage}% {trajectory}]`
 
+**Trajectory State Integration**: Trajectory information is read in real-time from the trajectory analysis system via `.specstory/trajectory/live-state.json`, not from constraint monitor data.
+
 **Compliance Calculation**:
 - Starts at 100% (perfect compliance)
 - Deducts points for constraint violations
@@ -96,13 +113,50 @@ Claude Code → Wrapper → Main Script → Service APIs → Status Display
 - Volume penalty: 2% per excess violation
 - Range: 0-100%
 
-**Trajectory Detection**:
-- `🔍EX` (Exploring): Research and analysis phase
-- `📈ON` (On Track): Focused implementation
-- `📉OFF` (Off Track): Diverged from plan
-- `⚙️IMP` (Implementing): Active coding
-- `✅VER` (Verifying): Testing and validation
-- `🚫BLK` (Blocked): Stuck or waiting
+**Trajectory States** (from Real-Time Trajectory Analysis System):
+- `🔍 EX` (Exploring): Research and analysis phase
+- `📈 ON` (On Track): Focused implementation
+- `📉 OFF` (Off Track): Diverged from plan
+- `⚙️ IMP` (Implementing): Active coding
+- `✅ VER` (Verifying): Testing and validation
+- `🚫 BLK` (Blocked): Stuck or waiting
+
+**Trajectory State Source**: Real-time trajectory states are read from `.specstory/trajectory/live-state.json` which is maintained by the trajectory analysis system using AI-powered inference (Groq gpt-oss-20b model) to classify development activity patterns.
+
+#### Real-Time Trajectory Analysis Integration
+**File**: `.specstory/trajectory/live-state.json`
+**Component**: `src/live-logging/RealTimeTrajectoryAnalyzer.js`
+**Purpose**: AI-powered trajectory classification and session state tracking
+**Integration**: Direct file-based reading via `getTrajectoryState()` method
+
+**Trajectory State Management**:
+- Real-time AI analysis classifies development activity patterns
+- States updated via Groq `gpt-oss-20b` model inference
+- State persistence in JSON format with timestamps and confidence scores
+- Fallback to default state (🔍 EX) if file unavailable
+
+**State Classification Process**:
+1. **Exchange Analysis**: AI evaluates Claude Code conversation patterns
+2. **State Inference**: Groq model classifies activity into trajectory states
+3. **State Persistence**: Updates live-state.json with new state and metadata
+4. **Status Integration**: Status line reads current state in real-time
+
+**Example State File Structure**:
+```json
+{
+  "currentState": "implementing",
+  "lastUpdate": 1759590073127,
+  "stateHistory": [
+    {
+      "timestamp": 1759590073126,
+      "from": "exploring",
+      "to": "implementing",
+      "confidence": 0.8,
+      "reasoning": "User is performing code modifications..."
+    }
+  ]
+}
+```
 
 #### Semantic Analysis Engine (🧠)
 **Purpose**: AI-powered code analysis and API health
@@ -125,7 +179,7 @@ Claude Code → Wrapper → Main Script → Service APIs → Status Display
 |-----------|------------|----------|--------|
 | GCM | ✅ | ⚠️ | ❌ |
 | Core | 🟢 | 🟡 | 🔴 |
-| Constraint | 85% 🔍EX | ⚠️ violations | ❌ offline |
+| Constraint | 85% 🔍 EX | ⚠️ violations | ❌ offline |
 | Semantic | API✅ | API⚠️ | API❌ |
 
 ## Data Collection

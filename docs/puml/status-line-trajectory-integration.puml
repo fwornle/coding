@@ -1,0 +1,50 @@
+@startuml status-line-trajectory-integration
+!include _standard-style.puml
+
+title Status Line Trajectory Integration Architecture
+
+left to right direction
+
+rectangle "Status Line System" as StatusLine {
+    component [CombinedStatusLine]<<core>> as MainStatus
+    component [getConstraintStatus()]<<api>> as GetConstraint
+    component [getTrajectoryState()]<<api>> as GetTrajectory
+}
+
+rectangle "Constraint Monitor" as ConstraintMonitor {
+    component [constraint-status-line.js]<<api>> as ConstraintAPI
+    database "Constraint Data"<<storage>> as ConstraintData
+}
+
+rectangle "Trajectory System" as TrajSystem {
+    component [RealTimeTrajectoryAnalyzer]<<agent>> as Analyzer
+    database "live-state.json"<<storage>> as LiveState
+}
+
+MainStatus --> GetConstraint : "Request compliance"
+MainStatus --> GetTrajectory : "Request state"
+
+GetConstraint --> ConstraintAPI : "API call"
+ConstraintAPI --> ConstraintData : "Read violations"
+ConstraintAPI --> GetConstraint : "Compliance %"
+
+GetTrajectory --> LiveState : "Read JSON"
+LiveState --> GetTrajectory : "Current state"
+
+Analyzer --> LiveState : "AI analysis updates"
+
+note bottom of LiveState
+    Trajectory states:
+    🔍 EX - Exploring
+    📈 ON - On Track
+    ⚙️ IMP - Implementing
+    ✅ VER - Verifying
+    🚫 BLK - Blocked
+end note
+
+note top of MainStatus
+    Output format:
+    [GCM✅] [C🟢] [🛡️ 85% ⚙️ IMP] [🧠API✅]
+end note
+
+@enduml
