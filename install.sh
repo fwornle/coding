@@ -1097,7 +1097,7 @@ EOF
 }
 
 # Verify installation
-    install_enhanced_lslverify_installation() {
+verify_installation() {
     echo -e "\n${CYAN}🔍 Verifying installation...${NC}"
     
     local errors=0
@@ -1593,12 +1593,10 @@ show_installation_status() {
     fi
 }
 
-# Run main function
-main "$@"
 # Install Enhanced Live Session Logging system
 install_enhanced_lsl() {
     echo -e "\n${CYAN}📝 Installing Enhanced LSL system...${NC}"
-    
+
     # Run LSL deployment script
     if [[ -x "$CODING_REPO/scripts/deploy-enhanced-lsl.sh" ]]; then
         info "Running Enhanced LSL deployment..."
@@ -1608,3 +1606,6 @@ install_enhanced_lsl() {
         warning "Enhanced LSL deployment script not found or not executable"
     fi
 }
+
+# Run main function
+main "$@"
