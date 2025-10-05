@@ -277,9 +277,19 @@ class BatchLSLProcessor {
         sourceProject = 'coding';
       } else {
         // Extract from path pattern: ~/.claude/projects/-Users-q284340-Agentic-PROJECT-NAME
-        const pathMatch = filePath.match(/\.claude\/projects\/[^\/]*-([^\/]+)\/[^\/]*\.jsonl$/);
+        // Match everything after the last "Agentic-" until the next slash
+        const pathMatch = filePath.match(/Agentic-([^\/]+)/);
         if (pathMatch) {
           sourceProject = pathMatch[1];
+        } else {
+          // Fallback: extract the project directory name from Claude projects folder
+          const projectDirMatch = filePath.match(/\.claude\/projects\/[^\/]*-([^\/]+(?:-[^\/]+)*)/);
+          if (projectDirMatch) {
+            // Take everything after the first hyphen in the directory name
+            const dirName = projectDirMatch[0].split('/').pop();
+            // Remove leading hyphen and extract project name
+            sourceProject = dirName.substring(1); // Remove leading hyphen
+          }
         }
       }
       

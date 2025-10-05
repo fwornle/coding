@@ -66,7 +66,10 @@ class EnhancedTranscriptMonitor {
     this.options = config;
 
     this.transcriptPath = this.findCurrentTranscript();
-    this.lastProcessedUuid = null;
+
+    // State file for persisting lastProcessedUuid across restarts
+    this.stateFile = this.getStateFilePath();
+    this.lastProcessedUuid = this.loadLastProcessedUuid();
     this.exchangeCount = 0;
     this.lastFileSize = 0;
     
@@ -138,6 +141,52 @@ class EnhancedTranscriptMonitor {
     
     // Store in coding project's .health directory
     return path.join(codingPath, '.health', healthFileName);
+  }
+
+  /**
+   * Get state file path for persisting lastProcessedUuid
+   */
+  getStateFilePath() {
+    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    const projectName = path.basename(this.config.projectPath);
+    const stateFileName = `${projectName}-transcript-monitor-state.json`;
+    return path.join(codingPath, '.health', stateFileName);
+  }
+
+  /**
+   * Load lastProcessedUuid from state file to prevent re-processing exchanges after restarts
+   */
+  loadLastProcessedUuid() {
+    try {
+      if (fs.existsSync(this.stateFile)) {
+        const state = JSON.parse(fs.readFileSync(this.stateFile, 'utf-8'));
+        this.debug(`Loaded lastProcessedUuid from state file: ${state.lastProcessedUuid}`);
+        return state.lastProcessedUuid || null;
+      }
+    } catch (error) {
+      this.debug(`Failed to load state file: ${error.message}`);
+    }
+    return null;
+  }
+
+  /**
+   * Save lastProcessedUuid to state file for persistence across restarts
+   */
+  saveLastProcessedUuid() {
+    try {
+      const stateDir = path.dirname(this.stateFile);
+      if (!fs.existsSync(stateDir)) {
+        fs.mkdirSync(stateDir, { recursive: true });
+      }
+      const state = {
+        lastProcessedUuid: this.lastProcessedUuid,
+        lastUpdated: new Date().toISOString(),
+        transcriptPath: this.transcriptPath
+      };
+      fs.writeFileSync(this.stateFile, JSON.stringify(state, null, 2));
+    } catch (error) {
+      this.debug(`Failed to save state file: ${error.message}`);
+    }
   }
 
   /**
@@ -1575,6 +1624,9 @@ class EnhancedTranscriptMonitor {
       this.lastProcessedUuid = exchange.id;
       this.exchangeCount++;
     }
+
+    // Save state after processing all exchanges to prevent re-processing on restart
+    this.saveLastProcessedUuid();
 
     console.log(`📊 EXCHANGE SUMMARY: ${userPromptCount} user prompts, ${nonUserPromptCount} non-user prompts (total: ${exchanges.length})`);
     
