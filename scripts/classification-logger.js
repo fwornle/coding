@@ -29,7 +29,13 @@ class ClassificationLogger {
     this.logDir = options.logDir || path.join(process.cwd(), '.specstory', 'logs', 'classification');
     this.projectName = options.projectName || 'unknown';
     this.sessionId = options.sessionId || `session-${Date.now()}`;
-    this.userHash = options.userHash || 'unknown';
+
+    // userHash is REQUIRED - throw error if not provided
+    if (!options.userHash) {
+      throw new Error('ClassificationLogger requires userHash parameter - use UserHashGenerator.generateHash()');
+    }
+    this.userHash = options.userHash;
+
     this.decisions = [];
     this.windowedLogs = new Map(); // Track logs by time window
 
@@ -273,16 +279,70 @@ class ClassificationLogger {
   }
 
   /**
+   * Read all classification decisions from JSONL files in log directory
+   */
+  readAllDecisionsFromDisk() {
+    const allDecisions = [];
+
+    try {
+      const files = fs.readdirSync(this.logDir);
+      const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
+
+      for (const file of jsonlFiles) {
+        const filePath = path.join(this.logDir, file);
+        const content = fs.readFileSync(filePath, 'utf8');
+        const lines = content.trim().split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry.type === 'classification_decision') {
+              allDecisions.push(entry);
+            }
+          } catch (e) {
+            // Skip invalid JSON lines
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ Error reading classification logs: ${error.message}`);
+    }
+
+    return allDecisions;
+  }
+
+  /**
    * Generate overall classification status file with links to all window summaries
    */
   generateStatusFile() {
-    const statusFile = path.join(this.logDir, `classification-status-${this.projectName}.md`);
+    // Determine if this is for redirected decisions (from another project)
+    const hasRedirectedDecisions = this.readAllDecisionsFromDisk().some(d =>
+      d.sourceProject && d.sourceProject !== this.projectName && d.classification?.isCoding
+    );
 
-    const stats = this.calculateStatistics();
-    const classificationDecisions = this.decisions.filter(d => d.type === 'classification_decision');
+    // Filename: classification-status_<user-hash>.md or classification-status_<user-hash>_from-<project>.md
+    const baseFilename = hasRedirectedDecisions
+      ? `classification-status_${this.userHash}_from-${this.projectName}.md`
+      : `classification-status_${this.userHash}.md`;
+    const statusFile = path.join(this.logDir, baseFilename);
 
-    // Group decisions by window to create file links
+    // Read ALL decisions from disk (not just in-memory ones)
+    const allDecisions = this.readAllDecisionsFromDisk();
+
+    // Calculate statistics from all decisions
+    const stats = this.calculateStatisticsForDecisions(allDecisions);
+    const classificationDecisions = allDecisions;
+
+    // Group decisions by window AND by layer for category-based navigation
     const decisionsByWindow = new Map();
+    const decisionsByLayer = {
+      'session-filter': [],
+      'path': [],
+      'keyword': [],
+      'embedding': [],
+      'semantic': []
+    };
+
     for (const decision of classificationDecisions) {
       const promptTimestamp = decision.timeRange?.start || new Date().toISOString();
       const localDate = utcToLocalTime(promptTimestamp);
@@ -298,6 +358,12 @@ class ClassificationLogger {
         decisionsByWindow.set(fullWindow, []);
       }
       decisionsByWindow.get(fullWindow).push(decision);
+
+      // Group by classification layer
+      const finalLayer = decision.classification.finalLayer;
+      if (decisionsByLayer[finalLayer]) {
+        decisionsByLayer[finalLayer].push({ window: fullWindow, decision });
+      }
     }
 
     let markdown = `# Classification Status - ${this.projectName}\n\n`;
@@ -312,19 +378,221 @@ class ClassificationLogger {
     markdown += `- **Classified as LOCAL**: ${stats.localCount} (${stats.localPercentage}%)\n\n`;
 
     markdown += `### Classification Method Distribution\n\n`;
+    markdown += `Click on a classification method to view all sessions decided by that layer.\n\n`;
     markdown += `| Layer | Method | Decisions | Percentage |\n`;
     markdown += `|-------|--------|-----------|------------|\n`;
-    markdown += `| 0 | Session Filter | ${stats.layer0Count} | ${Math.round(stats.layer0Count / stats.totalPromptSets * 100)}% |\n`;
-    markdown += `| 1 | Path Analysis | ${stats.layer1Count} | ${Math.round(stats.layer1Count / stats.totalPromptSets * 100)}% |\n`;
-    markdown += `| 2 | Keyword Matching | ${stats.layer2Count} | ${Math.round(stats.layer2Count / stats.totalPromptSets * 100)}% |\n`;
-    markdown += `| 3 | Embedding Search | ${stats.layer3Count} | ${Math.round(stats.layer3Count / stats.totalPromptSets * 100)}% |\n`;
-    markdown += `| 4 | Semantic Analysis | ${stats.layer4Count} | ${Math.round(stats.layer4Count / stats.totalPromptSets * 100)}% |\n\n`;
+    markdown += `| 0 | [Session Filter](#layer-0-session-filter) | ${stats.layer0Count} | ${Math.round(stats.layer0Count / stats.totalPromptSets * 100)}% |\n`;
+    markdown += `| 1 | [Path Analysis](#layer-1-path-analysis) | ${stats.layer1Count} | ${Math.round(stats.layer1Count / stats.totalPromptSets * 100)}% |\n`;
+    markdown += `| 2 | [Keyword Matching](#layer-2-keyword-matching) | ${stats.layer2Count} | ${Math.round(stats.layer2Count / stats.totalPromptSets * 100)}% |\n`;
+    markdown += `| 3 | [Embedding Search](#layer-3-embedding-search) | ${stats.layer3Count} | ${Math.round(stats.layer3Count / stats.totalPromptSets * 100)}% |\n`;
+    markdown += `| 4 | [Semantic Analysis](#layer-4-semantic-analysis) | ${stats.layer4Count} | ${Math.round(stats.layer4Count / stats.totalPromptSets * 100)}% |\n\n`;
 
     markdown += `**Average Processing Time**: ${stats.avgProcessingTime}ms\n\n`;
     markdown += `---\n\n`;
 
-    markdown += `## Session Windows\n\n`;
-    markdown += `Click on any window to view detailed classification decisions for that time period.\n\n`;
+    // Add category sections with windows grouped by layer
+    markdown += `## Classification Categories\n\n`;
+    markdown += `Sessions grouped by the classification layer that made the final decision.\n\n`;
+
+    // Layer 0: Session Filter
+    markdown += `### Layer 0: Session Filter\n\n`;
+    const layer0Windows = new Set(decisionsByLayer['session-filter'].map(d => d.window));
+    const sortedLayer0Windows = Array.from(layer0Windows).sort();
+
+    // Separate into CODING (redirected) and LOCAL
+    const layer0Coding = [];
+    const layer0Local = [];
+    for (const window of sortedLayer0Windows) {
+      const decisions = decisionsByWindow.get(window);
+      const codingCount = decisions.filter(d => d.classification.isCoding && d.classification.finalLayer === 'session-filter').length;
+      const localCount = decisions.filter(d => !d.classification.isCoding && d.classification.finalLayer === 'session-filter').length;
+
+      if (codingCount > 0) {
+        layer0Coding.push({ window, codingCount, localCount });
+      }
+      if (localCount > 0) {
+        layer0Local.push({ window, codingCount, localCount });
+      }
+    }
+
+    if (layer0Coding.length > 0 || layer0Local.length > 0) {
+      if (layer0Coding.length > 0) {
+        markdown += `#### Redirected (CODING)\n\n`;
+        for (const { window, codingCount } of layer0Coding) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
+        }
+        markdown += `\n`;
+      }
+
+      if (layer0Local.length > 0) {
+        markdown += `#### Local (LOCAL)\n\n`;
+        for (const { window, localCount } of layer0Local) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
+        }
+        markdown += `\n`;
+      }
+    } else {
+      markdown += `*No sessions decided by this layer*\n\n`;
+    }
+
+    // Layer 1: Path Analysis
+    markdown += `### Layer 1: Path Analysis\n\n`;
+    const layer1Windows = new Set(decisionsByLayer['path'].map(d => d.window));
+    const sortedLayer1Windows = Array.from(layer1Windows).sort();
+
+    const layer1Coding = [];
+    const layer1Local = [];
+    for (const window of sortedLayer1Windows) {
+      const decisions = decisionsByWindow.get(window);
+      const codingCount = decisions.filter(d => d.classification.isCoding && d.classification.finalLayer === 'path').length;
+      const localCount = decisions.filter(d => !d.classification.isCoding && d.classification.finalLayer === 'path').length;
+
+      if (codingCount > 0) layer1Coding.push({ window, codingCount });
+      if (localCount > 0) layer1Local.push({ window, localCount });
+    }
+
+    if (layer1Coding.length > 0 || layer1Local.length > 0) {
+      if (layer1Coding.length > 0) {
+        markdown += `#### Redirected (CODING)\n\n`;
+        for (const { window, codingCount } of layer1Coding) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
+        }
+        markdown += `\n`;
+      }
+
+      if (layer1Local.length > 0) {
+        markdown += `#### Local (LOCAL)\n\n`;
+        for (const { window, localCount } of layer1Local) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
+        }
+        markdown += `\n`;
+      }
+    } else {
+      markdown += `*No sessions decided by this layer*\n\n`;
+    }
+
+    // Layer 2: Keyword Matching
+    markdown += `### Layer 2: Keyword Matching\n\n`;
+    const layer2Windows = new Set(decisionsByLayer['keyword'].map(d => d.window));
+    const sortedLayer2Windows = Array.from(layer2Windows).sort();
+
+    const layer2Coding = [];
+    const layer2Local = [];
+    for (const window of sortedLayer2Windows) {
+      const decisions = decisionsByWindow.get(window);
+      const codingCount = decisions.filter(d => d.classification.isCoding && d.classification.finalLayer === 'keyword').length;
+      const localCount = decisions.filter(d => !d.classification.isCoding && d.classification.finalLayer === 'keyword').length;
+
+      if (codingCount > 0) layer2Coding.push({ window, codingCount });
+      if (localCount > 0) layer2Local.push({ window, localCount });
+    }
+
+    if (layer2Coding.length > 0 || layer2Local.length > 0) {
+      if (layer2Coding.length > 0) {
+        markdown += `#### Redirected (CODING)\n\n`;
+        for (const { window, codingCount } of layer2Coding) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
+        }
+        markdown += `\n`;
+      }
+
+      if (layer2Local.length > 0) {
+        markdown += `#### Local (LOCAL)\n\n`;
+        for (const { window, localCount } of layer2Local) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
+        }
+        markdown += `\n`;
+      }
+    } else {
+      markdown += `*No sessions decided by this layer*\n\n`;
+    }
+
+    // Layer 3: Embedding Search
+    markdown += `### Layer 3: Embedding Search\n\n`;
+    const layer3Windows = new Set(decisionsByLayer['embedding'].map(d => d.window));
+    const sortedLayer3Windows = Array.from(layer3Windows).sort();
+
+    const layer3Coding = [];
+    const layer3Local = [];
+    for (const window of sortedLayer3Windows) {
+      const decisions = decisionsByWindow.get(window);
+      const codingCount = decisions.filter(d => d.classification.isCoding && d.classification.finalLayer === 'embedding').length;
+      const localCount = decisions.filter(d => !d.classification.isCoding && d.classification.finalLayer === 'embedding').length;
+
+      if (codingCount > 0) layer3Coding.push({ window, codingCount });
+      if (localCount > 0) layer3Local.push({ window, localCount });
+    }
+
+    if (layer3Coding.length > 0 || layer3Local.length > 0) {
+      if (layer3Coding.length > 0) {
+        markdown += `#### Redirected (CODING)\n\n`;
+        for (const { window, codingCount } of layer3Coding) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
+        }
+        markdown += `\n`;
+      }
+
+      if (layer3Local.length > 0) {
+        markdown += `#### Local (LOCAL)\n\n`;
+        for (const { window, localCount } of layer3Local) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
+        }
+        markdown += `\n`;
+      }
+    } else {
+      markdown += `*No sessions decided by this layer*\n\n`;
+    }
+
+    // Layer 4: Semantic Analysis
+    markdown += `### Layer 4: Semantic Analysis\n\n`;
+    const layer4Windows = new Set(decisionsByLayer['semantic'].map(d => d.window));
+    const sortedLayer4Windows = Array.from(layer4Windows).sort();
+
+    const layer4Coding = [];
+    const layer4Local = [];
+    for (const window of sortedLayer4Windows) {
+      const decisions = decisionsByWindow.get(window);
+      const codingCount = decisions.filter(d => d.classification.isCoding && d.classification.finalLayer === 'semantic').length;
+      const localCount = decisions.filter(d => !d.classification.isCoding && d.classification.finalLayer === 'semantic').length;
+
+      if (codingCount > 0) layer4Coding.push({ window, codingCount });
+      if (localCount > 0) layer4Local.push({ window, localCount });
+    }
+
+    if (layer4Coding.length > 0 || layer4Local.length > 0) {
+      if (layer4Coding.length > 0) {
+        markdown += `#### Redirected (CODING)\n\n`;
+        for (const { window, codingCount } of layer4Coding) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
+        }
+        markdown += `\n`;
+      }
+
+      if (layer4Local.length > 0) {
+        markdown += `#### Local (LOCAL)\n\n`;
+        for (const { window, localCount } of layer4Local) {
+          const summaryFile = `${window}-summary.md`;
+          markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
+        }
+        markdown += `\n`;
+      }
+    } else {
+      markdown += `*No sessions decided by this layer*\n\n`;
+    }
+
+    markdown += `---\n\n`;
+
+    markdown += `## All Session Windows\n\n`;
+    markdown += `Complete chronological list of all classification sessions.\n\n`;
 
     // Sort windows chronologically
     const sortedWindows = Array.from(decisionsByWindow.entries()).sort((a, b) => a[0].localeCompare(b[0]));

@@ -102,7 +102,7 @@ class OperationalLogger {
       classification: {
         result: classificationResult.classification || classificationResult.isCoding,
         confidence: classificationResult.confidence || 0,
-        layer: classificationResult.layer || 'unknown',
+        layer: classificationResult.layer || null,
         processingTimeMs: classificationResult.processingTimeMs || 0,
         reason: classificationResult.reason || 'No reason provided'
       },
@@ -112,7 +112,7 @@ class OperationalLogger {
       performance: {
         timestamp: Date.now(),
         processingTime: classificationResult.processingTimeMs || 0,
-        layer: classificationResult.layer || 'unknown'
+        layer: classificationResult.layer || null
       }
     };
     

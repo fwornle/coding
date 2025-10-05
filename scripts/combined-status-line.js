@@ -397,12 +397,73 @@ class CombinedStatusLine {
       // Check if health file is recent (within 30 seconds)
       const stats = fs.statSync(healthStatusFile);
       const age = Date.now() - stats.mtime.getTime();
-      
+
       if (age > 30000) {
         result.status = 'stale';
         result.gcm.status = 'stale';
       }
-      
+
+      // CRITICAL: Check for stale trajectory data across all projects
+      // User requirement: "make the GCM robust in detecting such blatant system failures"
+      let trajectoryIssues = [];
+
+      // Check trajectory staleness for coding project
+      const codingTrajectoryPath = join(rootDir, '.specstory', 'trajectory', 'live-state.json');
+      if (existsSync(codingTrajectoryPath)) {
+        const trajStats = fs.statSync(codingTrajectoryPath);
+        const trajAge = Date.now() - trajStats.mtime.getTime();
+        const oneHour = 60 * 60 * 1000;
+
+        if (trajAge > oneHour) {
+          trajectoryIssues.push(`coding trajectory stale (${Math.floor(trajAge / 1000 / 60)}min old)`);
+        }
+      } else if (result.sessions['coding']) {
+        // Coding session exists but no trajectory file
+        trajectoryIssues.push('coding trajectory missing');
+      }
+
+      // Check trajectory staleness for other active projects
+      for (const [projectName, sessionData] of Object.entries(result.sessions)) {
+        if (projectName === 'coding') continue; // Already checked above
+
+        // Try to find project directory
+        const possiblePaths = [
+          join('/Users/q284340/Agentic', projectName, '.specstory', 'trajectory', 'live-state.json'),
+          join(rootDir, '..', projectName, '.specstory', 'trajectory', 'live-state.json')
+        ];
+
+        let found = false;
+        for (const trajPath of possiblePaths) {
+          if (existsSync(trajPath)) {
+            found = true;
+            const trajStats = fs.statSync(trajPath);
+            const trajAge = Date.now() - trajStats.mtime.getTime();
+            const oneHour = 60 * 60 * 1000;
+
+            if (trajAge > oneHour) {
+              trajectoryIssues.push(`${projectName} trajectory stale (${Math.floor(trajAge / 1000 / 60)}min old)`);
+            }
+            break;
+          }
+        }
+
+        if (!found && sessionData.status === 'healthy') {
+          trajectoryIssues.push(`${projectName} trajectory missing`);
+        }
+      }
+
+      // If trajectory issues detected, downgrade GCM status
+      if (trajectoryIssues.length > 0) {
+        result.gcm.status = 'warning';
+        result.gcm.icon = '🟡';
+        result.gcm.trajectoryIssues = trajectoryIssues;
+
+        // If status is still 'operational', downgrade to 'degraded'
+        if (result.status === 'operational') {
+          result.status = 'degraded';
+        }
+      }
+
       return result;
     } catch (error) {
       return { 

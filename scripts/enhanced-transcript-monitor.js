@@ -133,9 +133,11 @@ class EnhancedTranscriptMonitor {
     this.classificationLogger = null;
     try {
       const projectName = path.basename(this.config.projectPath);
+      const userHash = UserHashGenerator.generateHash({ debug: false });
       this.classificationLogger = new ClassificationLogger({
         projectName: projectName,
-        sessionId: `live-${Date.now()}`
+        sessionId: `live-${Date.now()}`,
+        userHash: userHash
       });
       this.classificationLogger.initializeLogFile();
       this.debug('Classification logger initialized');
@@ -1001,9 +1003,21 @@ class EnhancedTranscriptMonitor {
       console.log(`   UserMessage preview: ${exchange.userMessage ? exchange.userMessage.substring(0, 200) : 'null'}`);
     }
     
+    // CRITICAL FIX: Wait for classifier initialization instead of returning false immediately
     if (!this.reliableCodingClassifier) {
-      console.warn('ReliableCodingClassifier not available, defaulting to false');
-      return false;
+      // Wait up to 10 seconds for classifier to initialize
+      const maxWaitTime = 10000; // 10 seconds
+      const checkInterval = 100; // Check every 100ms
+      const startTime = Date.now();
+      
+      while (!this.reliableCodingClassifierReady && (Date.now() - startTime) < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+      }
+      
+      if (!this.reliableCodingClassifier) {
+        console.warn('⚠️ ReliableCodingClassifier not available after waiting, defaulting to false');
+        return false;
+      }
     }
     
     try {
@@ -1050,6 +1064,9 @@ class EnhancedTranscriptMonitor {
         };
 
         this.classificationLogger.logDecision(decision);
+
+        // Generate MD summaries immediately for real-time updates
+        this.classificationLogger.finalize();
       }
 
       return result.isCoding;
@@ -1748,8 +1765,22 @@ class EnhancedTranscriptMonitor {
     let transcriptRefreshCounter = 0;
     const TRANSCRIPT_REFRESH_INTERVAL = 30; // Refresh transcript path every 30 cycles (60 seconds at 2s intervals)
 
+    // Add classification finalization counter for periodic MD report generation
+    let finalizationCounter = 0;
+    const FINALIZATION_INTERVAL = 900; // Finalize every 900 cycles (30 minutes at 2s intervals)
+
     this.intervalId = setInterval(async () => {
       if (this.isProcessing) return;
+
+      // Periodically finalize classification logger to generate MD summary reports
+      finalizationCounter++;
+      if (finalizationCounter >= FINALIZATION_INTERVAL) {
+        finalizationCounter = 0;
+        if (this.classificationLogger) {
+          console.log('📊 Generating classification summary reports...');
+          this.classificationLogger.finalize();
+        }
+      }
 
       // CRITICAL FIX: Periodically refresh transcript path to detect new Claude sessions
       transcriptRefreshCounter++;
@@ -1807,7 +1838,12 @@ class EnhancedTranscriptMonitor {
       }
       
       // Note: No longer need to clear redirect files
-      
+
+      // Finalize classification logger (generates summary MD files)
+      if (this.classificationLogger) {
+        this.classificationLogger.finalize();
+      }
+
       await this.stop();
       process.exit(0);
     };

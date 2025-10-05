@@ -7,6 +7,21 @@ set -e
 
 echo "🚀 Starting Coding Services..."
 
+# Load environment variables from .env files (for API keys like GROQ_API_KEY)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    set -a
+    source "$SCRIPT_DIR/.env"
+    set +a
+    echo "✅ Loaded environment variables from .env"
+fi
+
+if [ -f "$SCRIPT_DIR/.env.ports" ]; then
+    set -a
+    source "$SCRIPT_DIR/.env.ports"
+    set +a
+fi
+
 # Function to check if port is in use
 check_port() {
     local port=$1

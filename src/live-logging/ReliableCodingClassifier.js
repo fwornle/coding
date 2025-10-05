@@ -140,16 +140,13 @@ class ReliableCodingClassifier {
         debug: this.debug
       });
       
-      // Initialize embedding classifier (Layer 3) - dynamic import for CommonJS module
-      const EmbeddingClassifierModule = await import('./EmbeddingClassifier.js');
-      const EmbeddingClassifier = EmbeddingClassifierModule.default;
-      this.embeddingClassifier = new EmbeddingClassifier({
+      // Initialize embedding classifier (Layer 3) - using fast JavaScript-based embeddings
+      this.embeddingClassifier = await this.createEmbeddingClassifier({
         debug: this.debug,
         qdrantHost: this.options.qdrantHost || 'localhost',
         qdrantPort: this.options.qdrantPort || 6333,
-        similarityThreshold: this.options.embeddingSimilarityThreshold || 0.7,
-        maxClassificationTimeMs: this.options.embeddingMaxTimeMs || 3000,
-        autoIndexOnStartup: this.options.embeddingAutoIndex !== false
+        similarityThreshold: this.options.embeddingSimilarityThreshold || 0.65,
+        maxClassificationTimeMs: this.options.embeddingMaxTimeMs || 3000
       });
       
       // Initialize operational logger
@@ -179,6 +176,92 @@ class ReliableCodingClassifier {
       }
       throw error;
     }
+  }
+
+  /**
+   * Create embedding classifier using fast JavaScript-based embeddings
+   * @private
+   */
+  async createEmbeddingClassifier(options) {
+    const { QdrantClient } = await import('@qdrant/js-client-rest');
+    const { getFastEmbeddingGenerator } = await import(path.join(this.codingRepo, 'scripts/fast-embedding-generator.js'));
+    
+    const qdrant = new QdrantClient({
+      url: `http://${options.qdrantHost}:${options.qdrantPort}`
+    });
+    
+    const embeddingGenerator = getFastEmbeddingGenerator();
+    
+    return {
+      async classifyByEmbedding(exchange) {
+        const startTime = Date.now();
+        
+        try {
+          // Extract text content
+          const textContent = exchange.content || exchange.userMessage || '';
+          if (!textContent || textContent.trim().length === 0) {
+            return {
+              isCoding: null,
+              confidence: 0.0,
+              reason: 'No text content to analyze',
+              inconclusive: true
+            };
+          }
+          
+          // Generate embedding
+          const truncatedText = textContent.substring(0, 3000);
+          const embedding = await embeddingGenerator.generate(truncatedText);
+          
+          // Search in Qdrant
+          const searchResults = await qdrant.search('coding_infrastructure', {
+            vector: embedding,
+            limit: 5,
+            with_payload: true
+          });
+          
+          if (!searchResults || searchResults.length === 0) {
+            return {
+              isCoding: null,
+              confidence: 0.0,
+              reason: 'No similar content found in index',
+              inconclusive: true
+            };
+          }
+          
+          // Analyze similarity scores
+          const maxSimilarity = searchResults[0].score;
+          const avgSimilarity = searchResults.reduce((sum, r) => sum + r.score, 0) / searchResults.length;
+          
+          const isCoding = maxSimilarity >= options.similarityThreshold;
+          const confidence = Math.min(maxSimilarity * 1.2, 0.95); // Scale up slightly
+          
+          return {
+            isCoding,
+            confidence,
+            reason: isCoding 
+              ? `High semantic similarity to coding content (max: ${maxSimilarity.toFixed(3)})`
+              : `Low semantic similarity to coding content (max: ${maxSimilarity.toFixed(3)})`,
+            similarity_scores: {
+              max_similarity: maxSimilarity,
+              avg_similarity: avgSimilarity,
+              top_matches: searchResults.length
+            },
+            processingTimeMs: Date.now() - startTime
+          };
+          
+        } catch (error) {
+          if (options.debug) {
+            console.error('Embedding classification error:', error.message);
+          }
+          return {
+            isCoding: null,
+            confidence: 0.0,
+            reason: `Error: ${error.message}`,
+            error: true
+          };
+        }
+      }
+    };
   }
 
   /**
