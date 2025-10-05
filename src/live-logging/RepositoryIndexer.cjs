@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { glob } = require('glob');
-const EmbeddingGenerator = require('../utils/EmbeddingGenerator');
+const EmbeddingGenerator = require('../utils/EmbeddingGenerator.cjs');
 
 /**
  * RepositoryIndexer - Repository content scanner and Qdrant index manager

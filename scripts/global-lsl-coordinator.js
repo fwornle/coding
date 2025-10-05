@@ -129,13 +129,14 @@ class GlobalLSLCoordinator {
     return new Promise((resolve) => {
       const monitorScript = path.join(this.codingRepoPath, 'scripts', 'enhanced-transcript-monitor.js');
       const logFile = path.join(projectPath, 'transcript-monitor.log');
-      
+
       // Kill any existing monitors for this project first
       const projectName = path.basename(projectPath);
-      exec(`pkill -f "enhanced-transcript-monitor.js.*${projectName}"`, () => {
-        
-        // Start new monitor
-        const child = spawn('node', [monitorScript], {
+      // CRITICAL FIX: Pass project path as argument so pkill can find it
+      exec(`pkill -f "enhanced-transcript-monitor.js ${projectPath}"`, () => {
+
+        // CRITICAL FIX: Add project path as argument so pkill pattern can match
+        const child = spawn('node', [monitorScript, projectPath], {
           cwd: projectPath,
           detached: true,
           stdio: ['ignore', 'ignore', 'ignore'],
@@ -147,9 +148,9 @@ class GlobalLSLCoordinator {
             CODING_TOOLS_PATH: this.codingRepoPath
           }
         });
-        
+
         child.unref(); // Allow parent to exit
-        
+
         // Verify monitor started successfully
         setTimeout(async () => {
           try {

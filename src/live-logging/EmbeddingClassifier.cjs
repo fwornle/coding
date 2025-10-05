@@ -1,6 +1,6 @@
 const { QdrantClient } = require('@qdrant/js-client-rest');
-const EmbeddingGenerator = require('../utils/EmbeddingGenerator');
-const RepositoryIndexer = require('./RepositoryIndexer');
+const EmbeddingGenerator = require('../utils/EmbeddingGenerator.cjs');
+const RepositoryIndexer = require('./RepositoryIndexer.cjs');
 
 /**
  * EmbeddingClassifier - Layer 3 of Four-Layer ReliableCodingClassifier

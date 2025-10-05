@@ -192,6 +192,8 @@ Four-layer classification system that accurately determines content routing with
 
 ![Classification Flow](images/lsl-classification-flow.png)
 
+![4-Layer Classification Flow](images/lsl-4-layer-classification.png)
+
 **Classification Layers**:
 
 1. **PathAnalyzer (Layer 1)**: File operation pattern matching
@@ -205,10 +207,12 @@ Four-layer classification system that accurately determines content routing with
    - <10ms response time for obvious cases
 
 3. **EmbeddingClassifier (Layer 3)**: Semantic vector similarity search
-   - Uses sentence-transformers and Qdrant vector database
-   - 384-dimensional embeddings with cosine similarity search
-   - <3ms response time with HNSW indexing and int8 quantization
-   - Searches against indexed coding infrastructure repository content
+   - Uses sentence-transformers/all-MiniLM-L6-v2 model for 384-dimensional embeddings
+   - Qdrant vector database with HNSW indexing for fast similarity search
+   - Searches against indexed coding infrastructure repository (183 files)
+   - Similarity threshold: 0.65 (configurable)
+   - <3ms response time with optimized vector search
+   - Returns top 5 similar documents with confidence scores
 
 4. **SemanticAnalyzer (Layer 4)**: LLM-powered deep understanding
    - Used when embedding classification is inconclusive (isCoding: null)
@@ -220,6 +224,7 @@ Four-layer classification system that accurately determines content routing with
 - **EmbeddingGenerator**: Generates 384-dimensional embeddings using sentence-transformers
 - **ChangeDetector**: Monitors repository changes and triggers reindexing when needed
 - **PerformanceMonitor**: Enhanced monitoring with embedding-specific metrics
+- **ClassificationLogger**: Comprehensive logging system tracking all 4-layer decisions
 
 **Performance Features**:
 - **Four-Layer Optimization**: Progressively more expensive layers, early exit when confident
@@ -227,6 +232,199 @@ Four-layer classification system that accurately determines content routing with
 - **Embedding Cache**: LRU cache with TTL for <2ms cached embedding retrieval
 - **Repository Indexing**: Automatic background indexing of coding infrastructure content
 - **Performance Monitoring**: Tracks classification times across all four layers
+
+### Classification Logging System
+
+**Location**: `scripts/classification-logger.js`
+
+The Classification Logger provides comprehensive tracking and analysis of all classification decisions across the 4-layer system.
+
+**Key Features**:
+- **Full Decision Trace**: Captures complete decision path through all 4 layers
+- **JSONL Format**: Machine-readable logs for programmatic analysis
+- **Markdown Summaries**: Human-readable reports with statistics and examples
+- **Performance Metrics**: Tracks processing time for each layer and overall classification
+- **Confidence Tracking**: Records confidence scores for quality monitoring
+
+**Log File Organization**:
+```
+.specstory/logs/classification/
+├── classification-<project>-<timestamp>.jsonl              # Raw decision data
+└── classification-<project>-<timestamp>-summary.md         # Human-readable summary
+```
+
+**JSONL Log Format**:
+```json
+{
+  "promptSetId": "82da8b2a-6a30-45eb-b0c7-5e1e2b2d54ee",
+  "timeRange": {
+    "start": "2025-10-05T09:34:30.629Z",
+    "end": "2025-10-05T09:34:32.801Z"
+  },
+  "lslFile": "2025-10-05_0900-1000_g9b30a.md",
+  "lslLineRange": { "start": 145, "end": 289 },
+  "classification": {
+    "isCoding": true,
+    "confidence": 0.9,
+    "finalLayer": "path"
+  },
+  "layerDecisions": [
+    {
+      "layer": "path",
+      "decision": "coding",
+      "confidence": 0.9,
+      "reasoning": "Path: Coding file operations detected",
+      "processingTimeMs": 1
+    }
+  ],
+  "sourceProject": "curriculum-alignment",
+  "targetFile": "foreign"
+}
+```
+
+**Summary Report Statistics**:
+```markdown
+## Statistics
+- Total Prompt Sets: 26
+- Classified as CODING: 15 (58%)
+- Classified as LOCAL: 11 (42%)
+- Layer 1 (Path) Decisions: 9
+- Layer 2 (Keyword) Decisions: 6
+- Layer 3 (Embedding) Decisions: 1
+- Layer 4 (Semantic) Decisions: 7
+- Average Processing Time: 2173ms
+- Average Confidence: 0.73
+```
+
+**Example Classification Decision**:
+```markdown
+### Prompt Set: 82da8b2a-6a30-45eb-b0c7-5e1e2b2d54ee
+- **Time**: 2025-10-05T09:34:30.629Z → 2025-10-05T09:34:32.801Z
+- **LSL File**: 2025-10-05_0900-1000_g9b30a.md (lines 145-289)
+- **Classification**: CODING (confidence: 0.90, layer: path)
+- **Target**: foreign (redirected to coding repository)
+- **Processing Time**: 2172ms
+
+**Decision Path**:
+1. **Layer 1 (Path)**: coding
+   - Confidence: 0.90
+   - Reasoning: Path: Coding file operations detected
+   - Processing: 1ms
+   - **✓ FINAL DECISION**
+```
+
+**Integration with Monitoring**:
+- Both live (`enhanced-transcript-monitor.js`) and batch (`batch-lsl-processor.js`) modes log all decisions
+- Logs generated at end of each session/batch processing run
+- Automatic finalization generates summary reports for analysis
+
+### Vector Database & Repository Indexing
+
+**Qdrant Collection**: `coding_infrastructure`
+
+The embedding classifier searches against a vector database containing indexed coding repository content.
+
+![Vector Database Indexing Process](images/lsl-vector-db-indexing.png)
+
+**Collection Configuration**:
+```javascript
+{
+  vectors: {
+    size: 384,              // sentence-transformers/all-MiniLM-L6-v2
+    distance: 'Cosine'      // Cosine similarity for semantic matching
+  },
+  optimizers_config: {
+    indexing_threshold: 10000
+  },
+  hnsw_config: {
+    m: 16,                  // Number of bi-directional links
+    ef_construct: 100       // Size of dynamic candidate list
+  }
+}
+```
+
+**Indexed Content** (as of latest reindex):
+```
+Collection: coding_infrastructure
+Points: 183 files
+Indexed Vectors: 183
+Vector Dimensions: 384
+
+File Types Indexed:
+- src/**/*.js (JavaScript source files)
+- scripts/**/*.js (Utility scripts)
+- scripts/**/*.cjs (CommonJS modules)
+- docs/**/*.md (Documentation)
+- config/**/*.json (Configuration files)
+```
+
+**Repository Indexing**:
+
+**Simple Indexer** (`scripts/simple-reindex.js`):
+- Fast, lightweight indexing for complete repository refresh
+- Indexes first 3000 characters of each file for speed
+- Progress reporting every 25 files
+- Generates MD5 hash IDs for consistent point identification
+
+**Usage**:
+```bash
+# Full repository reindex
+cd /Users/q284340/Agentic/coding
+node scripts/simple-reindex.js
+
+# Output:
+# 🔍 Finding files to index...
+# 📁 Found 183 files to index
+# 📊 Progress: 25/183 files processed
+# ...
+# ✅ Indexing complete!
+#    Files processed: 183
+#    Chunks created: 183
+#    Errors: 0
+```
+
+**Verify Qdrant Status**:
+```bash
+# Check collection info
+curl http://localhost:6333/collections/coding_infrastructure
+
+# Response:
+{
+  "result": {
+    "status": "green",
+    "points_count": 183,
+    "indexed_vectors_count": 183,
+    "vectors_count": 183,
+    "segments_count": 1
+  }
+}
+```
+
+**Advanced Indexer** (`scripts/reindex-coding-infrastructure.cjs`):
+- Full-featured indexing with change detection
+- Monitors repository for file changes
+- Incremental updates for modified files
+- Comprehensive error handling and retry logic
+
+**Point Payload Structure**:
+```javascript
+{
+  id: "a3f5e7d9...",              // MD5 hash of file path
+  vector: [0.123, -0.456, ...],  // 384-dimensional embedding
+  payload: {
+    file_path: "src/live-logging/ReliableCodingClassifier.js",
+    file_type: ".js",
+    content_preview: "/**\n * ReliableCodingClassifier...",
+    indexed_at: "2025-10-05T09:30:00.000Z"
+  }
+}
+```
+
+**Search Performance**:
+- HNSW indexing enables <3ms similarity search
+- Returns top 5 similar documents with scores
+- Threshold: 0.65 (documents below this are considered non-coding)
+- Average similarity scores used for confidence calculation
 
 ### 3. LSL File Manager
 

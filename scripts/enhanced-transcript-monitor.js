@@ -18,6 +18,7 @@ import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import LSLFileManager from '../src/live-logging/LSLFileManager.js';
 import RealTimeTrajectoryAnalyzer from '../src/live-logging/RealTimeTrajectoryAnalyzer.js';
+import ClassificationLogger from './classification-logger.js';
 
 // ConfigurableRedactor instance for consistent redaction
 let redactor = null;
@@ -127,6 +128,24 @@ class EnhancedTranscriptMonitor {
       console.error('Failed to initialize trajectory analyzer:', error.message);
       this.trajectoryAnalyzer = null;
     }
+
+    // Initialize classification logger for tracking 4-layer classification decisions
+    this.classificationLogger = null;
+    try {
+      const projectName = path.basename(this.config.projectPath);
+      this.classificationLogger = new ClassificationLogger({
+        projectName: projectName,
+        sessionId: `live-${Date.now()}`
+      });
+      this.classificationLogger.initializeLogFile();
+      this.debug('Classification logger initialized');
+    } catch (error) {
+      console.error('Failed to initialize classification logger:', error.message);
+      this.classificationLogger = null;
+    }
+
+    // Track LSL line numbers for each exchange
+    this.exchangeLineNumbers = new Map(); // Map exchange ID to {start, end} line numbers
   }
   /**
    * Get centralized health file path in coding project to avoid cluttering individual projects
@@ -990,14 +1009,49 @@ class EnhancedTranscriptMonitor {
     try {
       // Use the correct method - 'classify' not 'classifyExchange'
       const result = await this.reliableCodingClassifier.classify(exchange);
-      
+
       if (isSept14) {
         console.log(`   🔍 Classification result: ${result.isCoding}`);
         console.log(`   Score: ${result.score}`);
         console.log(`   Reason: ${result.reason}`);
         console.log(`   Components: ${JSON.stringify(result.components)}`);
       }
-      
+
+      // Log classification decision with full 4-layer trace
+      if (this.classificationLogger && result.decisionPath) {
+        // Transform decisionPath to expected format
+        const layerDecisions = result.decisionPath.map(layer => ({
+          layer: layer.layer,
+          decision: layer.output.isCoding ? 'coding' : (layer.output.isCoding === false ? 'local' : 'inconclusive'),
+          confidence: layer.output.confidence || 0,
+          reasoning: layer.output.reason || layer.output.reasoning || 'No reason provided',
+          processingTimeMs: layer.duration || 0
+        }));
+
+        const decision = {
+          promptSetId: exchange.uuid || `exchange-${Date.now()}`,
+          timeRange: {
+            start: exchange.timestamp || new Date().toISOString(),
+            end: new Date().toISOString()
+          },
+          lslFile: 'pending', // Will be updated when written to LSL
+          lslLineRange: {
+            start: 0,
+            end: 0
+          },
+          classification: {
+            isCoding: result.isCoding,
+            confidence: result.confidence,
+            finalLayer: result.layer
+          },
+          layerDecisions: layerDecisions,
+          sourceProject: path.basename(this.config.projectPath),
+          targetFile: result.isCoding ? 'foreign' : 'local'
+        };
+
+        this.classificationLogger.logDecision(decision);
+      }
+
       return result.isCoding;
     } catch (error) {
       console.error(`Error in isCodingRelated: ${error.message}`);
@@ -1019,9 +1073,14 @@ class EnhancedTranscriptMonitor {
     // Use timezone-utils for consistent time window calculation
     const timeWindow = getTimeWindow(localDate);
     
+    // CRITICAL FIX: Use local date components instead of .toISOString() which converts back to UTC
+    const year = localDate.getFullYear();
+    const month = String(localDate.getMonth() + 1).padStart(2, '0');
+    const day = String(localDate.getDate()).padStart(2, '0');
+    
     return {
       timeString: timeWindow,
-      date: localDate.toISOString().split('T')[0],
+      date: `${year}-${month}-${day}`,
       // CRITICAL FIX: Preserve original timestamp to avoid timezone reconstruction bugs
       originalTimestamp: timestamp || targetTime.getTime()
     };

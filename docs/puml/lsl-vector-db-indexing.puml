@@ -1,0 +1,118 @@
+@startuml lsl-vector-db-indexing
+!include _standard-style.puml
+
+title Vector Database Indexing - Repository to Qdrant
+
+actor "Administrator" as Admin
+participant "simple-reindex.js" as Indexer
+database "Coding\nRepository" as Repo
+participant "embedding_generator.py" as EmbedGen
+participant "sentence-transformers" as Model
+database "Qdrant\nVector DB" as Qdrant
+
+Admin ->> Indexer: node scripts/simple-reindex.js
+activate Indexer
+
+Indexer ->> Qdrant: ensureCollection()
+activate Qdrant
+alt Collection exists
+  Qdrant --> Indexer: Collection ready
+else Collection missing
+  Indexer ->> Qdrant: createCollection()
+  note right
+    Configuration:
+    - Vectors: 384 dimensions
+    - Distance: Cosine
+    - HNSW: m=16, ef_construct=100
+    - Indexing threshold: 10000
+  end note
+  Qdrant --> Indexer: Collection created
+end
+deactivate Qdrant
+
+Indexer ->> Repo: glob(patterns)
+activate Repo
+note right
+  Patterns:
+  - src/**/*.js
+  - scripts/**/*.js
+  - scripts/**/*.cjs
+  - docs/**/*.md
+  - config/**/*.json
+
+  Excludes:
+  - node_modules
+  - .git
+  - dist/build
+  - test files
+end note
+Repo --> Indexer: 183 files found
+deactivate Repo
+
+loop For each file (183 total)
+  Indexer ->> Repo: readFile(path)
+  activate Repo
+  Repo --> Indexer: file content
+  deactivate Repo
+
+  Indexer --> Indexer: Limit to 3000 chars\n(for speed)
+
+  Indexer ->> EmbedGen: generateEmbedding(text)
+  activate EmbedGen
+
+  EmbedGen ->> Model: encode(text)
+  activate Model
+  note right
+    Model:
+    sentence-transformers/
+    all-MiniLM-L6-v2
+
+    Output: 384-dim vector
+  end note
+  Model --> EmbedGen: embedding[384]
+  deactivate Model
+
+  EmbedGen --> Indexer: vector
+  deactivate EmbedGen
+
+  Indexer --> Indexer: Generate MD5 hash ID\nfrom file path
+
+  Indexer ->> Qdrant: upsert(point)
+  activate Qdrant
+  note right
+    Point structure:
+    - id: MD5 hash
+    - vector: [384 floats]
+    - payload:
+      * file_path
+      * file_type
+      * content_preview
+      * indexed_at
+
+    wait: false (async)
+  end note
+  Qdrant --> Indexer: Point added
+  deactivate Qdrant
+
+  alt Every 25 files
+    Indexer ->> Admin: Progress: N/183 files
+  end
+end
+
+Indexer ->> Qdrant: getCollection()
+activate Qdrant
+Qdrant --> Indexer: Collection stats
+deactivate Qdrant
+
+Indexer ->> Admin: Indexing complete!\nFiles: 183\nChunks: 183\nErrors: 0
+deactivate Indexer
+
+note over Qdrant
+  Final State:
+  - points_count: 183
+  - indexed_vectors_count: 183
+  - status: green
+  - segments_count: 1
+end note
+
+@enduml

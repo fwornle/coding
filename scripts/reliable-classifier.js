@@ -2,14 +2,14 @@
 
 /**
  * Unified Reliable Classifier
- * 
+ *
  * Consolidates functionality from:
  * - exchange-classifier.js (keyword-based classification)
- * - llm-content-classifier.js (LLM-based classification)  
- * - adaptive-embedding-classifier.cjs (embedding-based classification)
- * 
+ * - llm-content-classifier.cjs (embedding-based classification)
+ * - llm-content-classifier.js (LLM-based classification)
+ *
  * Features:
- * - 3-layer classification system (Path → Keyword → Semantic)
+ * - 4-layer classification system (Path → Keyword → Embedding → Semantic)
  * - Robust retry logic and error handling
  * - Confidence scoring and threshold management
  * - Consistent API across all classification modes
@@ -197,8 +197,172 @@ class KeywordMatcher {
 }
 
 /**
- * Semantic classifier - LLM-based deep analysis
- * Used when path and keyword analysis are inconclusive
+ * Embedding Classifier - Layer 3
+ * Vector similarity classification using Qdrant
+ * Gracefully degrades if Qdrant is unavailable or empty
+ */
+class EmbeddingClassifier {
+  constructor(options = {}) {
+    this.enabled = options.enabled !== false;
+    this.similarityThreshold = options.similarityThreshold || 0.65;
+    this.qdrantHost = options.qdrantHost || 'localhost';
+    this.qdrantPort = options.qdrantPort || 6333;
+    this.collection = options.collection || 'coding_infrastructure';
+    this.debug = options.debug || false;
+
+    this.stats = {
+      total: 0,
+      hits: 0,
+      misses: 0,
+      errors: 0
+    };
+
+    // Will be initialized lazily
+    this.qdrant = null;
+    this.embeddingGenerator = null;
+  }
+
+  async initializeQdrant() {
+    if (this.qdrant) return;
+
+    try {
+      const { QdrantClient } = await import('@qdrant/js-client-rest');
+      this.qdrant = new QdrantClient({
+        url: `http://${this.qdrantHost}:${this.qdrantPort}`
+      });
+    } catch (error) {
+      if (this.debug) console.log(`EmbeddingClassifier: Qdrant unavailable - ${error.message}`);
+      this.enabled = false;
+    }
+  }
+
+  async generateEmbedding(text) {
+    // Simple embedding generation via Python subprocess
+    const { spawn } = await import('child_process');
+    const codingPath = process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    const scriptPath = `${codingPath}/src/utils/embedding_generator.py`;
+
+    return new Promise((resolve, reject) => {
+      const pythonProcess = spawn('python3', [scriptPath]);
+      let stdout = '';
+      let stderr = '';
+
+      const input = JSON.stringify({
+        texts: [text.substring(0, 3000)], // Limit text length
+        model: 'sentence-transformers/all-MiniLM-L6-v2'
+      });
+
+      pythonProcess.stdin.write(input);
+      pythonProcess.stdin.end();
+
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code === 0) {
+          try {
+            const result = JSON.parse(stdout);
+            resolve(result.embeddings[0]);
+          } catch (error) {
+            reject(new Error(`Embedding parse error: ${error.message}`));
+          }
+        } else {
+          reject(new Error(`Python embedding failed: ${stderr}`));
+        }
+      });
+    });
+  }
+
+  async analyze(content, context = {}) {
+    this.stats.total++;
+
+    if (!this.enabled) {
+      this.stats.misses++;
+      return {
+        isCoding: null,
+        confidence: 0,
+        reason: 'Embedding layer: disabled or unavailable',
+        details: { enabled: false }
+      };
+    }
+
+    try {
+      await this.initializeQdrant();
+
+      if (!this.qdrant) {
+        this.stats.misses++;
+        return {
+          isCoding: null,
+          confidence: 0,
+          reason: 'Embedding layer: Qdrant client failed to initialize',
+          details: { qdrantAvailable: false }
+        };
+      }
+
+      // Generate embedding for content
+      const embedding = await this.generateEmbedding(content);
+
+      // Search Qdrant for similar coding infrastructure content
+      const searchResults = await this.qdrant.search(this.collection, {
+        vector: embedding,
+        limit: 5,
+        with_payload: true
+      });
+
+      if (!searchResults || searchResults.length === 0) {
+        this.stats.misses++;
+        return {
+          isCoding: null,
+          confidence: 0,
+          reason: 'Embedding: No similar content found in coding infrastructure',
+          details: { searchResults: 0 }
+        };
+      }
+
+      // Average similarity score from top results
+      const avgScore = searchResults.reduce((sum, r) => sum + r.score, 0) / searchResults.length;
+      const isCoding = avgScore >= this.similarityThreshold;
+
+      this.stats.hits++;
+
+      return {
+        isCoding,
+        confidence: avgScore,
+        reason: `Embedding: ${searchResults.length} matches, avg similarity: ${avgScore.toFixed(3)}`,
+        details: {
+          topMatches: searchResults.slice(0, 3).map(r => ({
+            file: r.payload.file_path,
+            score: r.score.toFixed(3)
+          }))
+        }
+      };
+
+    } catch (error) {
+      this.stats.errors++;
+      if (this.debug) console.log(`EmbeddingClassifier error: ${error.message}`);
+
+      return {
+        isCoding: null,
+        confidence: 0,
+        reason: `Embedding layer error: ${error.message}`,
+        details: { error: true }
+      };
+    }
+  }
+
+  getStats() {
+    return { ...this.stats };
+  }
+}
+
+/**
+ * Semantic classifier - Layer 4 (LLM-based deep analysis)
+ * Used as final fallback when embedding analysis is inconclusive
  */
 class SemanticAnalyzer {
   constructor(options = {}) {
@@ -300,24 +464,26 @@ class SemanticAnalyzer {
 
 /**
  * Unified Reliable Classifier
- * Orchestrates the 3-layer classification system
+ * Orchestrates the 4-layer classification system
  */
 class ReliableClassifier {
   constructor(options = {}) {
     this.codingRepo = options.codingRepo || '/Users/q284340/Agentic/coding';
     this.confidenceThreshold = options.confidenceThreshold || 0.7;
     this.retryAttempts = options.retryAttempts || 3;
-    
-    // Initialize analyzers
+
+    // Initialize analyzers (4 layers)
     this.pathAnalyzer = new PathAnalyzer(this.codingRepo);
     this.keywordMatcher = new KeywordMatcher();
+    this.embeddingClassifier = new EmbeddingClassifier(options.embedding || {});
     this.semanticAnalyzer = new SemanticAnalyzer(options.semantic || {});
-    
+
     // Performance tracking
     this.stats = {
       total: 0,
       pathDecisions: 0,
       keywordDecisions: 0,
+      embeddingDecisions: 0,
       semanticDecisions: 0,
       errors: 0
     };
@@ -325,7 +491,7 @@ class ReliableClassifier {
 
   /**
    * Main classification method
-   * Uses 3-layer approach: Path → Keyword → Semantic
+   * Uses 4-layer approach: Path → Keyword → Embedding → Semantic
    */
   async classify(input, options = {}) {
     this.stats.total++;
@@ -395,7 +561,24 @@ class ReliableClassifier {
         return this.buildResult(keywordResult, decisionPath, 'keyword', Date.now() - startTime);
       }
 
-      // Layer 3: Semantic Analysis (slower, more accurate)
+      // Layer 3: Embedding Classification (vector similarity)
+      const embeddingStart = Date.now();
+      const embeddingResult = await this.embeddingClassifier.analyze(context.content, context);
+      decisionPath.push({
+        layer: 'embedding',
+        input: { content: context.content.substring(0, 200) + '...' },
+        output: embeddingResult,
+        duration: Date.now() - embeddingStart
+      });
+
+      // Decision if embedding analysis is conclusive and confident
+      if (embeddingResult.isCoding !== null && embeddingResult.confidence > this.confidenceThreshold) {
+        this.stats.embeddingDecisions++;
+        this.confidenceThreshold = originalThreshold; // Restore before return
+        return this.buildResult(embeddingResult, decisionPath, 'embedding', Date.now() - startTime);
+      }
+
+      // Layer 4: Semantic Analysis (LLM fallback - slowest but most accurate)
       const semanticStart = Date.now();
       const semanticResult = await this.semanticAnalyzer.analyze(context.content, context);
       decisionPath.push({

@@ -28,6 +28,7 @@ import { dirname } from 'path';
 import { getReliableClassifier } from './reliable-classifier.js';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
 import { getTimeWindow, formatTimestamp, generateLSLFilename } from './timezone-utils.js';
+import ClassificationLogger from './classification-logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -44,10 +45,18 @@ class BatchLSLProcessor {
     this.timeWindow = options.timeWindow || null; // { start: Date, end: Date }
     this.retryAttempts = options.retryAttempts || 3;
     this.sessionDuration = options.sessionDuration || 3600000; // 1 hour in ms
-    
+
     // Initialize components
     this.classifier = getReliableClassifier();
     this.extractor = new ClaudeConversationExtractor(this.projectPath);
+
+    // Initialize classification logger for batch mode
+    const projectName = path.basename(this.projectPath);
+    this.classificationLogger = new ClassificationLogger({
+      projectName: projectName,
+      sessionId: `batch-${Date.now()}`
+    });
+    this.classificationLogger.initializeLogFile();
     
     // Performance tracking
     this.stats = {
@@ -88,6 +97,11 @@ class BatchLSLProcessor {
       throw error;
     } finally {
       this.printStats();
+
+      // Finalize classification logging and generate summary report
+      if (this.classificationLogger) {
+        this.classificationLogger.finalize();
+      }
     }
   }
 
@@ -619,9 +633,44 @@ class BatchLSLProcessor {
       const classification = await this.classifier.classify(classificationInput, {
         threshold: 4 // Use moderate threshold for individual prompt set classification
       });
-      
+
       console.log(`📋 Classified prompt set ${promptSet.id}: ${classification.isCoding ? 'CODING' : 'LOCAL'} (confidence: ${classification.confidence})`);
-      
+
+      // Log classification decision with full 4-layer trace
+      if (this.classificationLogger && classification.decisionPath) {
+        // Transform decisionPath to expected format
+        const layerDecisions = classification.decisionPath.map(layer => ({
+          layer: layer.layer,
+          decision: layer.output.isCoding ? 'coding' : (layer.output.isCoding === false ? 'local' : 'inconclusive'),
+          confidence: layer.output.confidence || 0,
+          reasoning: layer.output.reason || layer.output.reasoning || 'No reason provided',
+          processingTimeMs: layer.duration || 0
+        }));
+
+        const decision = {
+          promptSetId: promptSet.id,
+          timeRange: {
+            start: promptSet.startTime,
+            end: promptSet.endTime
+          },
+          lslFile: 'pending', // Will be updated when file is created
+          lslLineRange: {
+            start: 0,
+            end: 0
+          },
+          classification: {
+            isCoding: classification.isCoding,
+            confidence: classification.confidence,
+            finalLayer: classification.layer
+          },
+          layerDecisions: layerDecisions,
+          sourceProject: path.basename(this.projectPath),
+          targetFile: classification.isCoding ? 'foreign' : 'local'
+        };
+
+        this.classificationLogger.logDecision(decision);
+      }
+
       return classification;
       
     } catch (error) {

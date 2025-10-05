@@ -33,8 +33,8 @@ const { performance } = require('perf_hooks');
 const { QdrantClient } = require('@qdrant/js-client-rest');
 
 // Import components
-const RepositoryIndexer = require('../src/live-logging/RepositoryIndexer');
-const EmbeddingGenerator = require('../src/utils/EmbeddingGenerator');
+const RepositoryIndexer = require('../src/live-logging/RepositoryIndexer.cjs');
+const EmbeddingGenerator = require('../src/utils/EmbeddingGenerator.cjs');
 const PerformanceMonitor = require('../src/live-logging/PerformanceMonitor');
 
 class RepositoryReindexer {
