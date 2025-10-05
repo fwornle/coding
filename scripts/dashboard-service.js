@@ -34,7 +34,8 @@ const child = spawn('npm', ['run', 'dev'], {
   env: {
     ...process.env,
     PORT: PORT.toString(),
-    NODE_ENV: 'development'
+    NODE_ENV: 'development',
+    NEXT_PUBLIC_API_BASE_URL: 'http://localhost:3031'
   },
   stdio: 'inherit'
 });
