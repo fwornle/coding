@@ -6,8 +6,7 @@ title Vector Database Indexing - Repository to Qdrant
 actor "Administrator" as Admin
 participant "simple-reindex.js" as Indexer
 database "Coding\nRepository" as Repo
-participant "embedding_generator.py" as EmbedGen
-participant "sentence-transformers" as Model
+participant "FastEmbeddingGenerator.js\n(@xenova/transformers)" as EmbedGen
 database "Qdrant\nVector DB" as Qdrant
 
 Admin ->> Indexer: node scripts/simple-reindex.js
@@ -57,22 +56,17 @@ loop For each file (183 total)
 
   Indexer --> Indexer: Limit to 3000 chars\n(for speed)
 
-  Indexer ->> EmbedGen: generateEmbedding(text)
+  Indexer ->> EmbedGen: generate(text)
   activate EmbedGen
-
-  EmbedGen ->> Model: encode(text)
-  activate Model
   note right
-    Model:
-    sentence-transformers/
-    all-MiniLM-L6-v2
+    Native JavaScript
+    Transformers.js pipeline
 
+    Model: Xenova/all-MiniLM-L6-v2
     Output: 384-dim vector
+    Performance: ~50ms
   end note
-  Model --> EmbedGen: embedding[384]
-  deactivate Model
-
-  EmbedGen --> Indexer: vector
+  EmbedGen --> Indexer: vector[384]
   deactivate EmbedGen
 
   Indexer --> Indexer: Generate MD5 hash ID\nfrom file path

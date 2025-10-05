@@ -6,11 +6,11 @@
  */
 
 import { QdrantClient } from '@qdrant/js-client-rest';
-import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { glob } from 'glob';
+import { getFastEmbeddingGenerator } from './fast-embedding-generator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,6 +22,7 @@ class SimpleIndexer {
       url: 'http://localhost:6333'
     });
     this.collection = 'coding_infrastructure';
+    this.embeddingGenerator = getFastEmbeddingGenerator();
     this.stats = {
       filesProcessed: 0,
       chunksCreated: 0,
@@ -53,47 +54,8 @@ class SimpleIndexer {
   }
 
   async generateEmbedding(text) {
-    return new Promise((resolve, reject) => {
-      const pythonScript = path.join(rootDir, 'src', 'utils', 'embedding_generator.py');
-      const pythonProcess = spawn('python3', [pythonScript]);
-
-      let stdout = '';
-      let stderr = '';
-
-      // Send input via stdin
-      const input = JSON.stringify({
-        texts: [text],
-        model: 'sentence-transformers/all-MiniLM-L6-v2'
-      });
-
-      pythonProcess.stdin.write(input);
-      pythonProcess.stdin.end();
-
-      pythonProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      pythonProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      pythonProcess.on('close', (code) => {
-        if (code === 0) {
-          try {
-            const result = JSON.parse(stdout);
-            if (result.error) {
-              reject(new Error(result.error));
-            } else {
-              resolve(result.embeddings[0]); // Return first embedding
-            }
-          } catch (error) {
-            reject(new Error(`Failed to parse embedding: ${error.message}`));
-          }
-        } else {
-          reject(new Error(`Python process exited with code ${code}: ${stderr}`));
-        }
-      });
-    });
+    // Fast native JavaScript embedding (10-100x faster than Python spawning)
+    return await this.embeddingGenerator.generate(text);
   }
 
   async indexFile(filePath) {

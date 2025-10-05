@@ -19,6 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getTimeWindow, utcToLocalTime } from './timezone-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,34 +29,60 @@ class ClassificationLogger {
     this.logDir = options.logDir || path.join(process.cwd(), '.specstory', 'logs', 'classification');
     this.projectName = options.projectName || 'unknown';
     this.sessionId = options.sessionId || `session-${Date.now()}`;
-    this.logFile = null;
+    this.userHash = options.userHash || 'unknown';
     this.decisions = [];
+    this.windowedLogs = new Map(); // Track logs by time window
 
     // Ensure log directory exists
     fs.mkdirSync(this.logDir, { recursive: true });
   }
 
   /**
-   * Initialize log file for current batch run
+   * Get or create log file for a specific time window
+   * Aligns with LSL file windows (e.g., 2025-10-05_1400-1500)
+   */
+  getLogFileForWindow(timestamp) {
+    const localDate = utcToLocalTime(timestamp);
+    const window = getTimeWindow(localDate);
+    
+    // Format: YYYY-MM-DD_HHMM-HHMM_<userhash> (matching LSL file format exactly)
+    const year = localDate.getFullYear();
+    const month = String(localDate.getMonth() + 1).padStart(2, '0');
+    const day = String(localDate.getDate()).padStart(2, '0');
+    const datePrefix = `${year}-${month}-${day}`;
+
+    const fullWindow = `${datePrefix}_${window}_${this.userHash}`;
+
+    if (!this.windowedLogs.has(fullWindow)) {
+      const filename = `${fullWindow}.jsonl`;
+      const logFile = path.join(this.logDir, filename);
+
+      // Initialize new window log file
+      if (!fs.existsSync(logFile)) {
+        const header = {
+          type: 'session_start',
+          timestamp: new Date().toISOString(),
+          projectName: this.projectName,
+          timeWindow: fullWindow,
+          logVersion: '1.0.0'
+        };
+        fs.writeFileSync(logFile, JSON.stringify(header) + '\n', 'utf8');
+      }
+
+      this.windowedLogs.set(fullWindow, logFile);
+    }
+
+    return this.windowedLogs.get(fullWindow);
+  }
+
+  /**
+   * Initialize logging (for backward compatibility)
    */
   initializeLogFile() {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `classification-${this.projectName}-${timestamp}.jsonl`;
-    this.logFile = path.join(this.logDir, filename);
-
-    // Write header entry
-    const header = {
-      type: 'session_start',
-      timestamp: new Date().toISOString(),
-      projectName: this.projectName,
-      sessionId: this.sessionId,
-      logVersion: '1.0.0'
-    };
-
-    fs.writeFileSync(this.logFile, JSON.stringify(header) + '\n', 'utf8');
-    console.log(`📝 Classification log: ${this.logFile}`);
-
-    return this.logFile;
+    // No-op for window-based logging
+    // Log files are created on-demand per time window
+    console.log(`📝 Classification logs will be organized by time windows in: ${this.logDir}`);
+    return this.logDir;
   }
 
   /**
@@ -82,10 +109,12 @@ class ClassificationLogger {
     // Store in memory
     this.decisions.push(logEntry);
 
-    // Append to log file
-    if (this.logFile) {
-      fs.appendFileSync(this.logFile, JSON.stringify(logEntry) + '\n', 'utf8');
-    }
+    // Determine which time window this decision belongs to
+    const promptTimestamp = decision.timeRange?.start || new Date().toISOString();
+    const logFile = this.getLogFileForWindow(promptTimestamp);
+
+    // Append to appropriate windowed log file
+    fs.appendFileSync(logFile, JSON.stringify(logEntry) + '\n', 'utf8');
 
     return logEntry;
   }
@@ -119,65 +148,169 @@ class ClassificationLogger {
   }
 
   /**
-   * Generate human-readable summary report
+   * Generate human-readable summary reports (one per time window)
    */
   generateSummaryReport() {
-    const summaryFile = this.logFile.replace('.jsonl', '-summary.md');
+    const summaryFiles = [];
 
-    let markdown = `# Classification Decision Log Summary\n\n`;
-    markdown += `**Session**: ${this.sessionId}\n`;
-    markdown += `**Project**: ${this.projectName}\n`;
-    markdown += `**Timestamp**: ${new Date().toISOString()}\n`;
-    markdown += `**Total Decisions**: ${this.decisions.length}\n\n`;
-
-    markdown += `---\n\n`;
-
-    // Statistics
-    const stats = this.calculateStatistics();
-    markdown += `## Statistics\n\n`;
-    markdown += `- **Total Prompt Sets**: ${stats.totalPromptSets}\n`;
-    markdown += `- **Classified as CODING**: ${stats.codingCount} (${stats.codingPercentage}%)\n`;
-    markdown += `- **Classified as LOCAL**: ${stats.localCount} (${stats.localPercentage}%)\n`;
-    markdown += `- **Layer 1 (Path) Decisions**: ${stats.layer1Count}\n`;
-    markdown += `- **Layer 2 (Keyword) Decisions**: ${stats.layer2Count}\n`;
-    markdown += `- **Layer 3 (Embedding) Decisions**: ${stats.layer3Count}\n`;
-    markdown += `- **Layer 4 (Semantic) Decisions**: ${stats.layer4Count}\n`;
-    markdown += `- **Average Processing Time**: ${stats.avgProcessingTime}ms\n\n`;
-
-    markdown += `---\n\n`;
-
-    // Individual decisions
-    markdown += `## Individual Prompt Set Decisions\n\n`;
-
+    // Group decisions by time window
+    const decisionsByWindow = new Map();
     for (const decision of this.decisions) {
       if (decision.type !== 'classification_decision') continue;
 
-      markdown += `### Prompt Set: ${decision.promptSetId}\n\n`;
-      markdown += `**Time Range**: ${decision.timeRange.start} → ${decision.timeRange.end}\n`;
-      markdown += `**LSL File**: \`${path.basename(decision.lslFile)}\`\n`;
-      markdown += `**LSL Lines**: ${decision.lslLineRange.start}-${decision.lslLineRange.end}\n`;
-      markdown += `**Target**: ${decision.targetFile === 'foreign' ? '🌍 FOREIGN (coding)' : '📍 LOCAL'}\n`;
-      markdown += `**Final Classification**: ${decision.classification.isCoding ? '✅ CODING' : '❌ LOCAL'} (confidence: ${decision.classification.confidence})\n`;
-      markdown += `**Decided by**: Layer ${decision.classification.finalLayer}\n\n`;
+      const promptTimestamp = decision.timeRange?.start || new Date().toISOString();
+      const localDate = utcToLocalTime(promptTimestamp);
+      const window = getTimeWindow(localDate);
 
-      markdown += `#### Layer-by-Layer Trace\n\n`;
+      // Format: YYYY-MM-DD_HHMM-HHMM_<userhash> (matching LSL file format exactly)
+      const year = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      const datePrefix = `${year}-${month}-${day}`;
 
-      for (const layer of decision.layerDecisions) {
-        const emoji = layer.decision === 'coding' ? '✅' : layer.decision === 'local' ? '❌' : '⚠️';
-        markdown += `${emoji} **Layer ${this.getLayerNumber(layer.layer)} (${layer.layer})**\n`;
-        markdown += `- Decision: ${layer.decision}\n`;
-        markdown += `- Confidence: ${layer.confidence}\n`;
-        markdown += `- Reasoning: ${layer.reasoning}\n`;
-        markdown += `- Processing Time: ${layer.processingTimeMs}ms\n\n`;
+      const fullWindow = `${datePrefix}_${window}_${this.userHash}`;
+
+      if (!decisionsByWindow.has(fullWindow)) {
+        decisionsByWindow.set(fullWindow, []);
       }
-
-      markdown += `---\n\n`;
+      decisionsByWindow.get(fullWindow).push(decision);
     }
 
-    fs.writeFileSync(summaryFile, markdown, 'utf8');
-    console.log(`📊 Summary report: ${summaryFile}`);
+    // Generate one summary per window
+    for (const [fullWindow, windowDecisions] of decisionsByWindow.entries()) {
+      const summaryFile = path.join(this.logDir, `${fullWindow}-summary.md`);
 
-    return summaryFile;
+      let markdown = `# Classification Decision Log Summary\n\n`;
+      markdown += `**Time Window**: ${fullWindow}\n`;
+      markdown += `**Project**: ${this.projectName}\n`;
+      markdown += `**Generated**: ${new Date().toISOString()}\n`;
+      markdown += `**Decisions in Window**: ${windowDecisions.length}\n\n`;
+
+      markdown += `---\n\n`;
+
+      // Statistics for this window
+      const stats = this.calculateStatisticsForDecisions(windowDecisions);
+      markdown += `## Statistics\n\n`;
+      markdown += `- **Total Prompt Sets**: ${stats.totalPromptSets}\n`;
+      markdown += `- **Classified as CODING**: ${stats.codingCount} (${stats.codingPercentage}%)\n`;
+      markdown += `- **Classified as LOCAL**: ${stats.localCount} (${stats.localPercentage}%)\n`;
+      markdown += `- **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: ${stats.layer0Count || 0}\n`;
+      markdown += `- **[Layer 1 (Path) Decisions](#layer-1-path)**: ${stats.layer1Count}\n`;
+      markdown += `- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: ${stats.layer2Count}\n`;
+      markdown += `- **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: ${stats.layer3Count}\n`;
+      markdown += `- **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: ${stats.layer4Count}\n`;
+      markdown += `- **Average Processing Time**: ${stats.avgProcessingTime}ms\n\n`;
+
+      markdown += `---\n\n`;
+
+      // Group decisions by final layer for easy navigation
+      const decisionsByLayer = {
+        'session-filter': [],
+        'path': [],
+        'keyword': [],
+        'embedding': [],
+        'semantic': []
+      };
+
+      for (const decision of windowDecisions) {
+        const finalLayer = decision.classification.finalLayer;
+        if (decisionsByLayer[finalLayer]) {
+          decisionsByLayer[finalLayer].push(decision);
+        }
+      }
+
+      // Generate sections for each layer
+      const layerNames = {
+        'session-filter': 'Layer 0: Session Filter',
+        'path': 'Layer 1: Path',
+        'keyword': 'Layer 2: Keyword',
+        'embedding': 'Layer 3: Embedding',
+        'semantic': 'Layer 4: Semantic'
+      };
+
+      for (const [layerKey, layerTitle] of Object.entries(layerNames)) {
+        const decisions = decisionsByLayer[layerKey];
+        if (decisions.length === 0) continue;
+
+        markdown += `## ${layerTitle}\n\n`;
+        markdown += `**Decisions**: ${decisions.length}\n\n`;
+
+        for (const decision of decisions) {
+          markdown += `### Prompt Set: ${decision.promptSetId}\n\n`;
+          markdown += `**Time Range**: ${decision.timeRange.start} → ${decision.timeRange.end}\n`;
+          markdown += `**LSL File**: \`${path.basename(decision.lslFile)}\`\n`;
+          markdown += `**LSL Lines**: ${decision.lslLineRange.start}-${decision.lslLineRange.end}\n`;
+          markdown += `**Target**: ${decision.targetFile === 'foreign' ? '🌍 FOREIGN (coding)' : '📍 LOCAL'}\n`;
+          markdown += `**Final Classification**: ${decision.classification.isCoding ? '✅ CODING' : '❌ LOCAL'} (confidence: ${decision.classification.confidence})\n\n`;
+
+          markdown += `#### Layer-by-Layer Trace\n\n`;
+
+          for (const layer of decision.layerDecisions) {
+            const emoji = layer.decision === 'coding' ? '✅' : layer.decision === 'local' ? '❌' : '⚠️';
+            markdown += `${emoji} **Layer ${this.getLayerNumber(layer.layer)} (${layer.layer})**\n`;
+            markdown += `- Decision: ${layer.decision}\n`;
+            markdown += `- Confidence: ${layer.confidence}\n`;
+            markdown += `- Reasoning: ${layer.reasoning}\n`;
+            markdown += `- Processing Time: ${layer.processingTimeMs}ms\n\n`;
+          }
+
+          markdown += `---\n\n`;
+        }
+      }
+
+      fs.writeFileSync(summaryFile, markdown, 'utf8');
+      summaryFiles.push(summaryFile);
+    }
+
+    if (summaryFiles.length > 0) {
+      console.log(`📊 Generated ${summaryFiles.length} summary report(s) by time window`);
+    }
+
+    return summaryFiles;
+  }
+
+  /**
+   * Calculate statistics from a subset of decisions (for a specific time window)
+   */
+  calculateStatisticsForDecisions(decisions) {
+    const codingCount = decisions.filter(d => d.classification.isCoding).length;
+    const localCount = decisions.filter(d => !d.classification.isCoding).length;
+
+    const layerCounts = {
+      'session-filter': 0,
+      path: 0,
+      keyword: 0,
+      embedding: 0,
+      semantic: 0
+    };
+
+    let totalProcessingTime = 0;
+
+    for (const decision of decisions) {
+      const finalLayer = decision.classification.finalLayer;
+      if (layerCounts[finalLayer] !== undefined) {
+        layerCounts[finalLayer]++;
+      }
+
+      // Sum up processing times
+      if (decision.layerDecisions) {
+        totalProcessingTime += decision.layerDecisions.reduce((sum, layer) => sum + (layer.processingTimeMs || 0), 0);
+      }
+    }
+
+    return {
+      totalPromptSets: decisions.length,
+      codingCount,
+      localCount,
+      codingPercentage: decisions.length > 0 ? Math.round((codingCount / decisions.length) * 100) : 0,
+      localPercentage: decisions.length > 0 ? Math.round((localCount / decisions.length) * 100) : 0,
+      layer0Count: layerCounts['session-filter'],
+      layer1Count: layerCounts.path,
+      layer2Count: layerCounts.keyword,
+      layer3Count: layerCounts.embedding,
+      layer4Count: layerCounts.semantic,
+      avgProcessingTime: decisions.length > 0 ? Math.round(totalProcessingTime / decisions.length) : 0
+    };
   }
 
   /**
@@ -190,6 +323,7 @@ class ClassificationLogger {
     const localCount = classificationDecisions.filter(d => !d.classification.isCoding).length;
 
     const layerCounts = {
+      'session-filter': 0,
       path: 0,
       keyword: 0,
       embedding: 0,
@@ -216,6 +350,7 @@ class ClassificationLogger {
       localCount,
       codingPercentage: classificationDecisions.length > 0 ? Math.round((codingCount / classificationDecisions.length) * 100) : 0,
       localPercentage: classificationDecisions.length > 0 ? Math.round((localCount / classificationDecisions.length) * 100) : 0,
+      layer0Count: layerCounts['session-filter'],
       layer1Count: layerCounts.path,
       layer2Count: layerCounts.keyword,
       layer3Count: layerCounts.embedding,
@@ -229,6 +364,7 @@ class ClassificationLogger {
    */
   getLayerNumber(layerName) {
     const mapping = {
+      'session-filter': '0',
       'path': '1',
       'keyword': '2',
       'embedding': '3',
@@ -249,8 +385,9 @@ class ClassificationLogger {
       statistics: this.calculateStatistics()
     };
 
-    if (this.logFile) {
-      fs.appendFileSync(this.logFile, JSON.stringify(footer) + '\n', 'utf8');
+    // Write session end to all active windowed log files
+    for (const logFile of this.windowedLogs.values()) {
+      fs.appendFileSync(logFile, JSON.stringify(footer) + '\n', 'utf8');
     }
 
     // Generate summary report

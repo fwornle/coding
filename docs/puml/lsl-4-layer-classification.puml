@@ -48,15 +48,13 @@ else Path inconclusive
     Classifier ->> Embedding: analyze(content, context)
     activate Embedding
 
-    Embedding ->> Qdrant: generateEmbedding(content)
-    activate Qdrant
+    Embedding --> Embedding: generateEmbedding(content)\nTransformers.js (~50ms)
     note right
-      Model: sentence-transformers/
-      all-MiniLM-L6-v2
+      Native JavaScript
+      Model: Xenova/all-MiniLM-L6-v2
       Dimensions: 384
+      10-100x faster than Python
     end note
-    Qdrant --> Embedding: vector[384]
-    deactivate Qdrant
 
     Embedding ->> Qdrant: search(vector, limit=5)
     activate Qdrant

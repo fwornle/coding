@@ -65,7 +65,8 @@
       "mcp__serena__get_current_config",
       "Bash(npm install:*)",
       "Read(//Users/q284340/.claude/**)",
-      "WebFetch(domain:console.groq.com)"
+      "WebFetch(domain:console.groq.com)",
+      "Read(//private/tmp/**)"
     ],
     "deny": [],
     "ask": []

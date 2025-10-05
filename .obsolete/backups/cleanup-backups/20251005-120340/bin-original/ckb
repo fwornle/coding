@@ -1,0 +1,306 @@
+#!/bin/bash
+
+# CKB - Check Knowledge Base
+# Validates shared-memory.json for quality and structural integrity
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Configuration
+# Determine script directory dynamically
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODING_ROOT="$(dirname "$SCRIPT_DIR")"
+
+KNOWLEDGE_BASE="${SHARED_MEMORY_PATH:-$CODING_ROOT/shared-memory.json}"
+INSIGHTS_DIR="$CODING_ROOT/knowledge-management/insights"
+TEMP_DIR="/tmp/ckb-$$"
+mkdir -p "$TEMP_DIR"
+
+# Cleanup on exit
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+# Statistics
+TOTAL_ISSUES=0
+TOTAL_WARNINGS=0
+FIXED_ISSUES=0
+
+echo -e "${CYAN}🔍 CKB - Check Knowledge Base v1.0${NC}"
+echo -e "${CYAN}====================================${NC}"
+echo ""
+
+# Check if knowledge base exists
+if [[ ! -f "$KNOWLEDGE_BASE" ]]; then
+    echo -e "${RED}❌ Knowledge base not found: $KNOWLEDGE_BASE${NC}"
+    exit 1
+fi
+
+# Validate JSON structure
+echo -e "${BLUE}📋 Validating JSON structure...${NC}"
+if ! jq empty "$KNOWLEDGE_BASE" 2>/dev/null; then
+    echo -e "${RED}❌ Invalid JSON structure!${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ JSON structure is valid${NC}"
+echo ""
+
+# Load knowledge base into memory
+KB_DATA=$(cat "$KNOWLEDGE_BASE")
+
+# Extract entities and relations
+echo "$KB_DATA" | jq '.entities[]' > "$TEMP_DIR/entities.json"
+echo "$KB_DATA" | jq '.relations[]' > "$TEMP_DIR/relations.json"
+
+# Get project entities for context checking
+PROJECT_ENTITIES=$(echo "$KB_DATA" | jq -r '.entities[] | select(.entityType == "Project") | .name')
+SYSTEM_ENTITIES=$(echo "$KB_DATA" | jq -r '.entities[] | select(.entityType == "System") | .name')
+
+echo -e "${BLUE}📊 Knowledge Base Overview:${NC}"
+ENTITY_COUNT=$(echo "$KB_DATA" | jq '.entities | length')
+RELATION_COUNT=$(echo "$KB_DATA" | jq '.relations | length')
+echo -e "  Entities: $ENTITY_COUNT"
+echo -e "  Relations: $RELATION_COUNT"
+echo ""
+
+# Function to check if entity is connected to graph
+is_connected() {
+    local entity_name="$1"
+    local has_relations=$(echo "$KB_DATA" | jq --arg name "$entity_name" '
+        .relations[] | select(.from == $name or .to == $name) | .from' | head -1)
+    
+    if [[ -n "$has_relations" ]]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+# Function to find project context for entity
+find_project_context() {
+    local entity_name="$1"
+    local visited_file="$TEMP_DIR/visited_$$.txt"
+    > "$visited_file"
+    
+    # Recursive function to traverse relations
+    find_context_recursive() {
+        local current="$1"
+        local depth="$2"
+        
+        # Prevent infinite loops
+        if grep -q "^$current$" "$visited_file" 2>/dev/null || [[ $depth -gt 10 ]]; then
+            return
+        fi
+        echo "$current" >> "$visited_file"
+        
+        # Check if current is a project or system
+        if echo "$PROJECT_ENTITIES" | grep -q "^$current$"; then
+            echo "$current"
+            return
+        fi
+        if echo "$SYSTEM_ENTITIES" | grep -q "^$current$"; then
+            echo "$current"
+            return
+        fi
+        
+        # Check parents
+        local parents=$(echo "$KB_DATA" | jq -r --arg name "$current" '
+            .relations[] | select(.to == $name) | .from')
+        
+        for parent in $parents; do
+            local context=$(find_context_recursive "$parent" $((depth + 1)))
+            if [[ -n "$context" ]]; then
+                echo "$context"
+                return
+            fi
+        done
+    }
+    
+    find_context_recursive "$entity_name" 0
+}
+
+# Check 1: Noise nodes (isolated or poorly named)
+echo -e "${BLUE}🔍 Checking for noise nodes...${NC}"
+NOISE_NODES=""
+ISOLATED_NODES=""
+
+while IFS= read -r entity; do
+    name=$(echo "$entity" | jq -r '.name')
+    entity_type=$(echo "$entity" | jq -r '.entityType')
+    
+    # Check if isolated
+    if [[ $(is_connected "$name") == "false" ]]; then
+        ISOLATED_NODES+="  - $name ($entity_type)\\n"
+        ((TOTAL_ISSUES++))
+    fi
+    
+    # Check for noise patterns
+    if [[ "$name" =~ Pattern.*Pattern$ ]] || \
+       [[ "$name" =~ ^[A-Z][a-z]+[a-z]+Pattern$ && "$entity_type" != "TransferablePattern" ]] || \
+       [[ "$name" =~ \*\* ]] || \
+       [[ "$name" =~ WorkflowPattern$ && "$name" != "ClaudeCodeStartupPattern" ]]; then
+        NOISE_NODES+="  - $name: Suspicious naming pattern\\n"
+        ((TOTAL_ISSUES++))
+    fi
+done < <(echo "$KB_DATA" | jq -c '.entities[]')
+
+if [[ -n "$ISOLATED_NODES" ]]; then
+    echo -e "${RED}❌ Isolated nodes found:${NC}"
+    echo -e "$ISOLATED_NODES"
+fi
+
+if [[ -n "$NOISE_NODES" ]]; then
+    echo -e "${RED}❌ Noise nodes detected:${NC}"
+    echo -e "$NOISE_NODES"
+fi
+
+# Check 2: Project context connections
+echo -e "${BLUE}🔍 Checking project context connections...${NC}"
+UNCONNECTED_NODES=""
+
+while IFS= read -r entity; do
+    name=$(echo "$entity" | jq -r '.name')
+    entity_type=$(echo "$entity" | jq -r '.entityType')
+    
+    # Skip project and system entities themselves
+    if [[ "$entity_type" == "Project" ]] || [[ "$entity_type" == "System" ]]; then
+        continue
+    fi
+    
+    context=$(find_project_context "$name")
+    if [[ -z "$context" ]]; then
+        UNCONNECTED_NODES+="  - $name: No project/system context found\\n"
+        ((TOTAL_ISSUES++))
+    fi
+done < <(echo "$KB_DATA" | jq -c '.entities[]')
+
+if [[ -n "$UNCONNECTED_NODES" ]]; then
+    echo -e "${RED}❌ Nodes without project context:${NC}"
+    echo -e "$UNCONNECTED_NODES"
+fi
+
+# Check 3: Documentation links and naming
+echo -e "${BLUE}🔍 Checking documentation links and naming...${NC}"
+DOC_ISSUES=""
+
+while IFS= read -r entity; do
+    name=$(echo "$entity" | jq -r '.name')
+    
+    # Check for details link in observations
+    details_link=$(echo "$entity" | jq -r '.observations[] | select(type == "string") | select(contains("Details:") or contains("details:") or contains("http://localhost:8080"))')
+    
+    if [[ -n "$details_link" ]]; then
+        # Extract URL
+        url=$(echo "$details_link" | grep -oE 'http://[^ ]+' | head -1)
+        if [[ -n "$url" ]]; then
+            # Extract filename
+            filename=$(echo "$url" | grep -oE '[^/]+\.md$')
+            if [[ -n "$filename" ]]; then
+                # Check if file exists
+                if [[ ! -f "$INSIGHTS_DIR/$filename" ]]; then
+                    DOC_ISSUES+="  - $name: Missing documentation file: $filename\\n"
+                    ((TOTAL_ISSUES++))
+                fi
+                
+                # Check camelCase naming
+                if ! [[ "$filename" =~ ^[A-Z][a-zA-Z0-9]*\.md$ ]]; then
+                    DOC_ISSUES+="  - $name: Documentation file not camelCase: $filename\\n"
+                    ((TOTAL_WARNINGS++))
+                fi
+            fi
+        fi
+    fi
+    
+    # Check entity naming conventions
+    if [[ "$name" =~ [[:space:]] ]] || [[ "$name" =~ [^a-zA-Z0-9_-] ]]; then
+        DOC_ISSUES+="  - $name: Entity name contains invalid characters\\n"
+        ((TOTAL_WARNINGS++))
+    fi
+done < <(echo "$KB_DATA" | jq -c '.entities[]')
+
+if [[ -n "$DOC_ISSUES" ]]; then
+    echo -e "${YELLOW}⚠️  Documentation issues:${NC}"
+    echo -e "$DOC_ISSUES"
+fi
+
+# Check 4: Control characters in observations
+echo -e "${BLUE}🔍 Checking for control characters...${NC}"
+CONTROL_CHAR_ISSUES=""
+
+while IFS= read -r entity; do
+    name=$(echo "$entity" | jq -r '.name')
+    
+    # Check for ANSI escape sequences
+    if echo "$entity" | jq -r '.observations[]' 2>/dev/null | grep -q $'\x1b'; then
+        CONTROL_CHAR_ISSUES+="  - $name: Contains ANSI escape sequences\\n"
+        ((TOTAL_ISSUES++))
+    fi
+done < <(echo "$KB_DATA" | jq -c '.entities[]')
+
+if [[ -n "$CONTROL_CHAR_ISSUES" ]]; then
+    echo -e "${RED}❌ Control character issues:${NC}"
+    echo -e "$CONTROL_CHAR_ISSUES"
+fi
+
+# Check 5: Entity relationships hierarchy
+echo -e "${BLUE}🔍 Checking entity hierarchy...${NC}"
+HIERARCHY_ISSUES=""
+
+# Check for sub-patterns that should be connected to parent patterns
+while IFS= read -r entity; do
+    name=$(echo "$entity" | jq -r '.name')
+    entity_type=$(echo "$entity" | jq -r '.entityType')
+    
+    # Special cases for commands and tools
+    if [[ "$name" =~ Command$ ]] && [[ "$name" != "ClaudeCodeStartupPattern" ]]; then
+        # Should be connected to KnowledgePersistencePattern or similar
+        parent_pattern=$(echo "$KB_DATA" | jq -r --arg name "$name" '
+            .relations[] | select(.from == $name and .to == "KnowledgePersistencePattern") | .to' | head -1)
+        
+        if [[ -z "$parent_pattern" ]]; then
+            HIERARCHY_ISSUES+="  - $name: Command/tool not connected to parent pattern\\n"
+            ((TOTAL_WARNINGS++))
+        fi
+    fi
+done < <(echo "$KB_DATA" | jq -c '.entities[]')
+
+if [[ -n "$HIERARCHY_ISSUES" ]]; then
+    echo -e "${YELLOW}⚠️  Hierarchy issues:${NC}"
+    echo -e "$HIERARCHY_ISSUES"
+fi
+
+# Summary
+echo ""
+echo -e "${CYAN}📊 Summary:${NC}"
+echo -e "  Total Issues: ${RED}$TOTAL_ISSUES${NC}"
+echo -e "  Total Warnings: ${YELLOW}$TOTAL_WARNINGS${NC}"
+
+if [[ $TOTAL_ISSUES -eq 0 ]] && [[ $TOTAL_WARNINGS -eq 0 ]]; then
+    echo ""
+    echo -e "${GREEN}✅ Knowledge base is clean and well-structured!${NC}"
+    exit 0
+else
+    echo ""
+    echo -e "${YELLOW}💡 Recommendations:${NC}"
+    echo -e "  1. Remove isolated nodes with: ukb --remove-entity \"EntityName\""
+    echo -e "  2. Connect nodes to projects with: ukb --add-relation \"Entity,Project,implements\""
+    echo -e "  3. Fix documentation files to use camelCase naming"
+    echo -e "  4. Remove control characters from observations"
+    echo ""
+    
+    # Offer to generate fix commands
+    if [[ -n "$ISOLATED_NODES" ]]; then
+        echo -e "${CYAN}🔧 Commands to remove isolated nodes:${NC}"
+        echo "$ISOLATED_NODES" | grep -E '^  - ' | sed 's/^  - //' | cut -d' ' -f1 | while read node; do
+            echo "ukb --remove-entity \"$node\""
+        done
+        echo ""
+    fi
+    
+    exit 1
+fi

@@ -237,45 +237,15 @@ class EmbeddingClassifier {
   }
 
   async generateEmbedding(text) {
-    // Simple embedding generation via Python subprocess
-    const { spawn } = await import('child_process');
-    const codingPath = process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
-    const scriptPath = `${codingPath}/src/utils/embedding_generator.py`;
+    // Fast native JavaScript embedding generation (10-100x faster than Python)
+    if (!this.embeddingGenerator) {
+      const { getFastEmbeddingGenerator } = await import('./fast-embedding-generator.js');
+      this.embeddingGenerator = getFastEmbeddingGenerator();
+    }
 
-    return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python3', [scriptPath]);
-      let stdout = '';
-      let stderr = '';
-
-      const input = JSON.stringify({
-        texts: [text.substring(0, 3000)], // Limit text length
-        model: 'sentence-transformers/all-MiniLM-L6-v2'
-      });
-
-      pythonProcess.stdin.write(input);
-      pythonProcess.stdin.end();
-
-      pythonProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      pythonProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      pythonProcess.on('close', (code) => {
-        if (code === 0) {
-          try {
-            const result = JSON.parse(stdout);
-            resolve(result.embeddings[0]);
-          } catch (error) {
-            reject(new Error(`Embedding parse error: ${error.message}`));
-          }
-        } else {
-          reject(new Error(`Python embedding failed: ${stderr}`));
-        }
-      });
-    });
+    // Limit text length for performance
+    const truncatedText = text.substring(0, 3000);
+    return await this.embeddingGenerator.generate(truncatedText);
   }
 
   async analyze(content, context = {}) {

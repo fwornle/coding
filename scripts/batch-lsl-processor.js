@@ -29,6 +29,7 @@ import { getReliableClassifier } from './reliable-classifier.js';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
 import { getTimeWindow, formatTimestamp, generateLSLFilename } from './timezone-utils.js';
 import ClassificationLogger from './classification-logger.js';
+import UserHashGenerator from './user-hash-generator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,9 +53,11 @@ class BatchLSLProcessor {
 
     // Initialize classification logger for batch mode
     const projectName = path.basename(this.projectPath);
+    const userHash = UserHashGenerator.generateHash({ debug: false });
     this.classificationLogger = new ClassificationLogger({
       projectName: projectName,
-      sessionId: `batch-${Date.now()}`
+      sessionId: `batch-${Date.now()}`,
+      userHash: userHash
     });
     this.classificationLogger.initializeLogFile();
     
