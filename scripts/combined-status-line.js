@@ -6,7 +6,7 @@
  * Shows status of both live guardrails and semantic analysis services
  */
 
-import fs, { readFileSync, existsSync } from 'fs';
+import fs, { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -55,12 +55,15 @@ class CombinedStatusLine {
       await this.ensureTranscriptMonitorRunning();
       
       const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, liveLogTarget, redirectStatus, globalHealthStatus);
-      
+
       this.statusCache = status;
       this.lastUpdate = now;
-      
+
       return status;
     } catch (error) {
+      // CRITICAL: Log the actual error so we can debug!
+      console.error(`ERROR in generateStatus: ${error.message}`);
+      console.error(error.stack);
       return this.getErrorStatus(error);
     }
   }
@@ -218,45 +221,69 @@ class CombinedStatusLine {
    * Get trajectory state from live-state.json
    */
   getTrajectoryState() {
-    try {
-      // Determine which project we're currently working in
-      const targetProject = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+    // Map states to icons (from config/live-logging-config.json) - SINGLE SOURCE OF TRUTH
+    const stateIconMap = {
+      'exploring': '🔍EX',
+      'on_track': '📈ON',
+      'off_track': '📉OFF',
+      'implementing': '⚙️IMP',
+      'verifying': '✅VER',
+      'blocked': '🚫BLK'
+    };
 
-      // Map states to icons (from config/live-logging-config.json)
-      const stateIconMap = {
-        'exploring': '🔍 EX',
-        'on_track': '📈 ON',
-        'off_track': '📉 OFF',
-        'implementing': '⚙️ IMP',
-        'verifying': '✅ VER',
-        'blocked': '🚫 BLK'
+    // Determine which project we're currently working in
+    const targetProject = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
+    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+
+    // Try to read from current project first (if not coding)
+    let trajectoryPath;
+    if (targetProject && !targetProject.includes(codingPath)) {
+      trajectoryPath = join(targetProject, '.specstory', 'trajectory', 'live-state.json');
+    } else {
+      trajectoryPath = join(rootDir, '.specstory', 'trajectory', 'live-state.json');
+    }
+
+    // Auto-create trajectory file with defaults if missing (for new repositories)
+    if (!existsSync(trajectoryPath)) {
+      const trajectoryDir = dirname(trajectoryPath);
+      if (!existsSync(trajectoryDir)) {
+        const fs = require('fs');
+        fs.mkdirSync(trajectoryDir, { recursive: true });
+      }
+
+      const defaultState = {
+        currentState: 'exploring',
+        lastUpdated: new Date().toISOString(),
+        confidence: 0.8
       };
 
-      // Try to read from current project first (if not coding)
-      if (targetProject && !targetProject.includes(codingPath)) {
-        const targetTrajectoryPath = join(targetProject, '.specstory', 'trajectory', 'live-state.json');
-        if (existsSync(targetTrajectoryPath)) {
-          const trajectoryData = JSON.parse(readFileSync(targetTrajectoryPath, 'utf8'));
-          const currentState = trajectoryData.currentState || 'exploring';
-          return stateIconMap[currentState] || '🔍 EX';
-        }
-        // If we're in a non-coding project and it doesn't have a trajectory file,
-        // use default (exploring) rather than falling back to coding's state
-        return '🔍 EX';
+      writeFileSync(trajectoryPath, JSON.stringify(defaultState, null, 2));
+      console.error(`ℹ️ Auto-created trajectory state file: ${trajectoryPath}`);
+
+      return stateIconMap['exploring'];
+    }
+
+    try {
+      const trajectoryData = JSON.parse(readFileSync(trajectoryPath, 'utf8'));
+      const currentState = trajectoryData.currentState;
+
+      if (!currentState) {
+        // Auto-repair: add missing currentState field
+        trajectoryData.currentState = 'exploring';
+        trajectoryData.lastUpdated = new Date().toISOString();
+        writeFileSync(trajectoryPath, JSON.stringify(trajectoryData, null, 2));
+        console.error(`⚠️ Auto-repaired trajectory file (added missing currentState): ${trajectoryPath}`);
       }
 
-      // We're in the coding project - read its trajectory state
-      const trajectoryPath = join(rootDir, '.specstory', 'trajectory', 'live-state.json');
-      if (existsSync(trajectoryPath)) {
-        const trajectoryData = JSON.parse(readFileSync(trajectoryPath, 'utf8'));
-        const currentState = trajectoryData.currentState || 'exploring';
-        return stateIconMap[currentState] || '🔍 EX';
+      const icon = stateIconMap[currentState];
+      if (!icon) {
+        throw new Error(`Unknown trajectory state "${currentState}" in ${trajectoryPath}`);
       }
+
+      return icon;
     } catch (error) {
-      // Fallback to default if file doesn't exist or can't be read
+      throw new Error(`Failed to read trajectory state from ${trajectoryPath}: ${error.message}`);
     }
-    return '🔍 EX'; // Default fallback
   }
 
   async getConstraintStatus() {
@@ -998,13 +1025,16 @@ class CombinedStatusLine {
       
       // Get real-time trajectory state from live-state.json
       const trajectoryIcon = this.getTrajectoryState();
-      
+
+      // Build constraint section: shield + score + optional violations + trajectory
+      // These are independent concepts that should BOTH be visible
+      let constraintPart = `[🛡️ ${score}`;
       if (violationsCount > 0) {
-        parts.push(`[🛡️ ${score} ⚠️ ${violationsCount}]`);
+        constraintPart += ` ⚠️ ${violationsCount}`;
         overallColor = 'yellow';
-      } else {
-        parts.push(`[🛡️ ${score} ${trajectoryIcon}]`);
       }
+      constraintPart += ` ${trajectoryIcon}]`;
+      parts.push(constraintPart);
     } else if (constraint.status === 'degraded') {
       parts.push('[🛡️ ⚠️]');
       overallColor = 'yellow';
@@ -1213,7 +1243,7 @@ class CombinedStatusLine {
 
   getErrorStatus(error) {
     return {
-      text: '⚠️SYS:ERR',
+      text: '⚠️ SYS:ERR',
       color: 'red',
       tooltip: `System error: ${error.message || 'Unknown error'}`,
       onClick: 'open-dashboard'
@@ -1225,22 +1255,26 @@ class CombinedStatusLine {
 async function main() {
   try {
     const timeout = setTimeout(() => {
-      console.log('⚠️SYS:TIMEOUT');
-      process.exit(0);
+      console.error('⚠️ SYS:TIMEOUT - Status line generation took >4s');
+      console.log('⚠️ SYS:TIMEOUT');
+      process.exit(1);
     }, 4000);
 
     const statusLine = new CombinedStatusLine();
     const status = await statusLine.generateStatus();
-    
+
     clearTimeout(timeout);
-    
+
     // Claude Code status line expects plain text output
     // Rich features like tooltips may need different configuration
     console.log(status.text);
     process.exit(0);
   } catch (error) {
-    console.log('⚠️SYS:ERR');
-    process.exit(0);
+    // CRITICAL: Log actual error to stderr so we can debug, not silent failure!
+    console.error(`⚠️ FATAL ERROR in status line generation: ${error.message}`);
+    console.error(error.stack);
+    console.log('⚠️ SYS:ERR');
+    process.exit(1);
   }
 }
 
