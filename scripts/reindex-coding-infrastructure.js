@@ -22,7 +22,7 @@
  * 
  * Examples:
  *   node scripts/reindex-coding-infrastructure.js --full --validate
- *   node scripts/reindex-coding-infrastructure.js --pattern "**/*.md" --verbose
+ *   node scripts/reindex-coding-infrastructure.js --pattern "*.md" --verbose
  *   node scripts/reindex-coding-infrastructure.js --partial --dry-run
  */
 
