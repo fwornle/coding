@@ -1625,16 +1625,19 @@ class EnhancedTranscriptMonitor {
         if (newTranscriptPath && newTranscriptPath !== this.transcriptPath) {
           console.log(`🔄 Transcript file changed: ${path.basename(newTranscriptPath)}`);
           console.log(`   Previous: ${path.basename(this.transcriptPath)} (${this.lastFileSize} bytes)`);
-          
+
           // Reset file tracking for new transcript
           this.transcriptPath = newTranscriptPath;
           this.lastFileSize = 0;
-          this.lastProcessedUuid = null;
-          
+          // BUG FIX: Don't reset lastProcessedUuid - it should persist across transcript files
+          // to prevent re-processing and duplicate writes to LSL files
+          // this.lastProcessedUuid = null; // REMOVED - was causing duplicate writes
+
           // Log transcript switch to health file
           this.logHealthError(`Transcript switched to: ${path.basename(newTranscriptPath)}`);
-          
+
           console.log(`   ✅ Now monitoring: ${path.basename(this.transcriptPath)}`);
+          console.log(`   📌 Continuing from last processed UUID to prevent duplicates`);
         }
       }
 
