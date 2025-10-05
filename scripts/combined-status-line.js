@@ -451,8 +451,18 @@ class CombinedStatusLine {
       }
 
       // Check trajectory staleness for other active projects
-      for (const [projectName, sessionData] of Object.entries(result.sessions)) {
-        if (projectName === 'coding') continue; // Already checked above
+      // Map abbreviations back to full project names
+      const abbreviationToProject = {
+        'C': 'coding',
+        'CA': 'curriculum-alignment',
+        'ND': 'nano-degree'
+      };
+
+      for (const [projectAbbrev, sessionData] of Object.entries(result.sessions)) {
+        if (projectAbbrev === 'coding' || projectAbbrev === 'C') continue; // Already checked above
+
+        // Get full project name from abbreviation
+        const projectName = abbreviationToProject[projectAbbrev] || projectAbbrev;
 
         // Try to find project directory
         const possiblePaths = [
@@ -469,14 +479,14 @@ class CombinedStatusLine {
             const oneHour = 60 * 60 * 1000;
 
             if (trajAge > oneHour) {
-              trajectoryIssues.push(`${projectName} trajectory stale (${Math.floor(trajAge / 1000 / 60)}min old)`);
+              trajectoryIssues.push(`${projectAbbrev} trajectory stale (${Math.floor(trajAge / 1000 / 60)}min old)`);
             }
             break;
           }
         }
 
         if (!found && sessionData.status === 'healthy') {
-          trajectoryIssues.push(`${projectName} trajectory missing`);
+          trajectoryIssues.push(`${projectAbbrev} trajectory missing`);
         }
       }
 
