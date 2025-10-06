@@ -54,10 +54,13 @@ class BatchLSLProcessor {
     // Initialize classification logger for batch mode
     const projectName = path.basename(this.projectPath);
     const userHash = UserHashGenerator.generateHash({ debug: false });
+    this.projectName = projectName; // Store for use in regenerate method
+    this.userHash = userHash; // Store for use in regenerate method
     this.classificationLogger = new ClassificationLogger({
       projectName: projectName,
       sessionId: `batch-${Date.now()}`,
-      userHash: userHash
+      userHash: userHash,
+      codingRepo: this.codingRepo
     });
     this.classificationLogger.initializeLogFile();
     
@@ -91,6 +94,8 @@ class BatchLSLProcessor {
           return await this.rebuildMissing(args[0]);
         case 'foreign-only':
           return await this.processForeignOnly(args[0]);
+        case 'regenerate-markdown':
+          return await this.regenerateMarkdownFromJsonl(args[0]);
         default:
           throw new Error(`Unknown processing mode: ${mode}`);
       }
@@ -272,6 +277,71 @@ class BatchLSLProcessor {
     }
 
     return results;
+  }
+
+  /**
+   * Regenerate markdown files from existing JSONL classification logs
+   * This resolves "pending" LSL references to actual LSL files when they exist
+   */
+  async regenerateMarkdownFromJsonl(datePattern) {
+    console.log(`🔄 Regenerating markdown from JSONL files matching: ${datePattern || 'all'}`);
+
+    const classificationLogDir = path.join(this.projectPath, '.specstory', 'logs', 'classification');
+
+    // Find all JSONL files
+    const jsonlFiles = fs.readdirSync(classificationLogDir)
+      .filter(f => f.endsWith('.jsonl'))
+      .filter(f => !datePattern || f.includes(datePattern))
+      .map(f => path.join(classificationLogDir, f));
+
+    console.log(`Found ${jsonlFiles.length} JSONL files to regenerate`);
+
+    // Create a temporary classification logger to regenerate files
+    const tempLogger = new ClassificationLogger({
+      projectName: this.projectName,
+      logDir: classificationLogDir,
+      codingRepo: this.codingRepo,
+      userHash: this.userHash,
+      sessionId: 'regenerate-' + Date.now()
+    });
+
+    for (const jsonlFile of jsonlFiles) {
+      try {
+        // Read all decisions from JSONL
+        const content = fs.readFileSync(jsonlFile, 'utf8');
+        const lines = content.trim().split('\n').filter(line => line.trim());
+
+        // Load all decisions into the temp logger
+        tempLogger.decisions = [];
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry.type === 'classification_decision') {
+              tempLogger.decisions.push(entry);
+            }
+          } catch (e) {
+            // Skip invalid lines
+          }
+        }
+
+        if (tempLogger.decisions.length === 0) {
+          console.log(`⏭️  Skipping ${path.basename(jsonlFile)}: no decisions found`);
+          continue;
+        }
+
+        // Regenerate summary report which creates the markdown files
+        tempLogger.generateSummaryReport();
+        console.log(`✅ Regenerated markdown for ${path.basename(jsonlFile)}`);
+        this.stats.created++;
+
+      } catch (error) {
+        console.error(`❌ Failed to regenerate from ${path.basename(jsonlFile)}:`, error.message);
+        console.error(`Stack trace:`, error.stack);
+        this.stats.errors++;
+      }
+    }
+
+    return jsonlFiles.length;
   }
 
   /**
@@ -650,13 +720,23 @@ class BatchLSLProcessor {
           processingTimeMs: layer.duration || 0
         }));
 
+        // Calculate LSL filename from prompt set timestamp
+        const targetProject = classification.isCoding ? 'coding' : path.basename(this.projectPath);
+        const sourceProject = classification.isCoding ? path.basename(this.projectPath) : null;
+        const lslFilename = generateLSLFilename(
+          promptSet.startTime,
+          this.userHash,
+          targetProject,
+          sourceProject
+        );
+
         const decision = {
           promptSetId: promptSet.id,
           timeRange: {
             start: promptSet.startTime,
             end: promptSet.endTime
           },
-          lslFile: 'pending', // Will be updated when file is created
+          lslFile: lslFilename,
           lslLineRange: {
             start: 0,
             end: 0
@@ -718,7 +798,7 @@ class BatchLSLProcessor {
       // Add each prompt set as a section
       for (let i = 0; i < promptSets.length; i++) {
         const promptSet = promptSets[i];
-        markdownContent += `## Prompt Set ${i + 1} (${promptSet.id})\n\n`;
+        markdownContent += `<a name="${promptSet.id}"></a>\n## Prompt Set ${i + 1} (${promptSet.id})\n\n`;
         markdownContent += `**Time:** ${new Date(promptSet.startTime).toISOString()}\n`;
         markdownContent += `**Duration:** ${promptSet.endTime - promptSet.startTime}ms\n`;
         markdownContent += `**Tool Calls:** ${promptSet.toolCallCount}\n\n`;
@@ -1134,7 +1214,7 @@ ${foreignOnly ? `**Coding Repository:** ${this.codingRepo}` : ''}
       }
       
       const timeStr = timestamp.toISOString();
-      
+
       let content = `### ${exchange.type} - ${timeStr} (${exchange.source || 'Direct'})
 
 `;
@@ -1377,17 +1457,19 @@ Usage: batch-lsl-processor.js <mode> [args...]
 
 Modes:
   post-session                    - Process most recent session
-  from-transcripts <dir>          - Process transcripts from directory  
+  from-transcripts <dir>          - Process transcripts from directory
   retroactive <start> <end>       - Regenerate for date range (YYYY-MM-DD)
   recover <transcript-path>       - Recover from specific transcript
   rebuild-missing <date-range>    - Rebuild missing files (start,end)
   foreign-only <source-project>   - Only create foreign project files
+  regenerate-markdown [pattern]   - Regenerate markdown from JSONL (optional date pattern)
 
 Examples:
   batch-lsl-processor.js post-session
   batch-lsl-processor.js from-transcripts ~/.claude/projects/my-project
   batch-lsl-processor.js retroactive 2025-09-13 2025-09-14
   batch-lsl-processor.js foreign-only /Users/q284340/Agentic/nano-degree
+  batch-lsl-processor.js regenerate-markdown 2025-10-06
 `);
     process.exit(1);
   }

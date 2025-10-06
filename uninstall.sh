@@ -155,7 +155,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         rm -f "$USER_MCP_CONFIG"
         echo "  Removed user-level MCP configuration"
     fi
-    
+
     # Remove from Claude app directory
     if [[ "$OSTYPE" == "darwin"* ]]; then
         CLAUDE_CONFIG_DIR="$HOME/Library/Application Support/Claude"
@@ -164,13 +164,65 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
         CLAUDE_CONFIG_DIR="${APPDATA:-$HOME/AppData/Roaming}/Claude"
     fi
-    
+
     if [[ -n "$CLAUDE_CONFIG_DIR" ]] && [[ -f "$CLAUDE_CONFIG_DIR/claude-code-mcp.json" ]]; then
         rm -f "$CLAUDE_CONFIG_DIR/claude-code-mcp.json"
         echo "  Removed Claude app MCP configuration"
     fi
 else
     echo "  Keeping user-level MCP configuration"
+fi
+
+# Remove constraint monitor and LSL hooks
+echo -e "\n${BLUE}🔗 Removing Hooks (Constraints + LSL)...${NC}"
+SETTINGS_FILE="$HOME/.claude/settings.json"
+
+if [[ ! -f "$SETTINGS_FILE" ]]; then
+    echo "  No settings file found - hooks already removed"
+else
+    # Check if jq is available
+    if ! command -v jq >/dev/null 2>&1; then
+        echo -e "${YELLOW}  ⚠️  jq not found - cannot automatically remove hooks${NC}"
+        echo "  Please manually edit: $SETTINGS_FILE"
+        echo "  Remove PreToolUse hooks containing 'pre-tool-hook-wrapper.js'"
+        echo "  Remove PostToolUse hooks containing 'tool-interaction-hook-wrapper.js'"
+    else
+        # Backup settings file
+        BACKUP_FILE="${SETTINGS_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
+        cp "$SETTINGS_FILE" "$BACKUP_FILE"
+        echo "  Backed up settings to: $BACKUP_FILE"
+
+        # Remove both PreToolUse and PostToolUse hooks
+        TEMP_FILE=$(mktemp)
+        jq 'if .hooks.PreToolUse then
+                .hooks.PreToolUse = [
+                    .hooks.PreToolUse[] |
+                    select(.hooks[]?.command | contains("pre-tool-hook-wrapper.js") | not)
+                ]
+            else . end |
+            if .hooks.PreToolUse == [] then
+                del(.hooks.PreToolUse)
+            else . end |
+            if .hooks.PostToolUse then
+                .hooks.PostToolUse = [
+                    .hooks.PostToolUse[] |
+                    select(.hooks[]?.command | contains("tool-interaction-hook-wrapper.js") | not)
+                ]
+            else . end |
+            if .hooks.PostToolUse == [] then
+                del(.hooks.PostToolUse)
+            else . end' "$SETTINGS_FILE" > "$TEMP_FILE"
+
+        # Validate and apply
+        if jq empty "$TEMP_FILE" 2>/dev/null; then
+            mv "$TEMP_FILE" "$SETTINGS_FILE"
+            echo "  ✅ Removed PreToolUse and PostToolUse hooks from settings"
+        else
+            rm -f "$TEMP_FILE"
+            echo -e "${RED}  ❌ Failed to update settings - JSON validation failed${NC}"
+            echo "  Original settings preserved in: $BACKUP_FILE"
+        fi
+    fi
 fi
 
 echo -e "\n${GREEN}✅ Uninstall completed!${NC}"

@@ -1556,6 +1556,7 @@ main() {
     setup_mcp_config
     setup_vscode_extension
     install_enhanced_lsl
+    install_constraint_monitor_hooks
     verify_installation
     
     # Create activation script for immediate use
@@ -1641,6 +1642,137 @@ install_enhanced_lsl() {
         success "Enhanced LSL system installed"
     else
         warning "Enhanced LSL deployment script not found or not executable"
+    fi
+}
+
+# Install constraint monitor hooks and LSL logging hooks
+install_constraint_monitor_hooks() {
+    echo -e "\n${CYAN}🔗 Installing Hooks (Constraints + LSL)...${NC}"
+
+    local settings_file="$HOME/.claude/settings.json"
+    local pre_hook_cmd="node $CODING_REPO/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+    local post_hook_cmd="node $CODING_REPO/scripts/tool-interaction-hook-wrapper.js"
+
+    # Create .claude directory if it doesn't exist
+    mkdir -p "$HOME/.claude"
+
+    # Check if jq is available for JSON manipulation
+    if ! command -v jq >/dev/null 2>&1; then
+        warning "jq not found - attempting manual JSON configuration"
+
+        # Create settings file if it doesn't exist
+        if [[ ! -f "$settings_file" ]]; then
+            cat > "$settings_file" << EOF
+{
+  "\$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$pre_hook_cmd"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$post_hook_cmd"
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+            success "Created new settings file with both constraint and LSL hooks"
+            return 0
+        else
+            warning "Cannot merge hooks without jq - please install jq and run installer again"
+            INSTALLATION_WARNINGS+=("Hooks: Not installed - jq required for merge")
+            return 1
+        fi
+    fi
+
+    # Backup existing settings
+    if [[ -f "$settings_file" ]]; then
+        local backup_file="${settings_file}.backup.$(date +%Y%m%d_%H%M%S)"
+        cp "$settings_file" "$backup_file"
+        info "Backed up existing settings to: $backup_file"
+    else
+        # Create new settings file
+        echo '{"$schema": "https://json.schemastore.org/claude-code-settings.json"}' > "$settings_file"
+    fi
+
+    # Use jq to add or update hooks
+    local temp_file=$(mktemp)
+
+    # Check if hooks already exist
+    local pre_exists=$(jq -e '.hooks.PreToolUse[]? | select(.hooks[]?.command | contains("pre-tool-hook-wrapper.js"))' "$settings_file" 2>/dev/null && echo "yes" || echo "no")
+    local post_exists=$(jq -e '.hooks.PostToolUse[]? | select(.hooks[]?.command | contains("tool-interaction-hook-wrapper.js"))' "$settings_file" 2>/dev/null && echo "yes" || echo "no")
+
+    if [[ "$pre_exists" == "yes" ]] && [[ "$post_exists" == "yes" ]]; then
+        info "Both PreToolUse and PostToolUse hooks already installed"
+        return 0
+    fi
+
+    # Add both PreToolUse and PostToolUse hooks configuration
+    jq --arg pre_cmd "$pre_hook_cmd" --arg post_cmd "$post_hook_cmd" '
+        .hooks.PreToolUse =
+        if .hooks.PreToolUse then
+            .hooks.PreToolUse + [{
+                "matcher": "*",
+                "hooks": [{
+                    "type": "command",
+                    "command": $pre_cmd
+                }]
+            }]
+        else
+            [{
+                "matcher": "*",
+                "hooks": [{
+                    "type": "command",
+                    "command": $pre_cmd
+                }]
+            }]
+        end |
+        .hooks.PostToolUse =
+        if .hooks.PostToolUse then
+            .hooks.PostToolUse + [{
+                "matcher": "*",
+                "hooks": [{
+                    "type": "command",
+                    "command": $post_cmd
+                }]
+            }]
+        else
+            [{
+                "matcher": "*",
+                "hooks": [{
+                    "type": "command",
+                    "command": $post_cmd
+                }]
+            }]
+        end
+    ' "$settings_file" > "$temp_file"
+
+    # Validate JSON
+    if jq empty "$temp_file" 2>/dev/null; then
+        mv "$temp_file" "$settings_file"
+        success "Hooks installed to ~/.claude/settings.json"
+        info "  - PreToolUse: Constraint monitoring (blocks violations)"
+        info "  - PostToolUse: LSL logging (captures interactions)"
+    else
+        rm -f "$temp_file"
+        warning "Failed to update settings file - JSON validation failed"
+        INSTALLATION_WARNINGS+=("Hooks: Installation failed - JSON error")
+        return 1
     fi
 }
 

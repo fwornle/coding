@@ -173,7 +173,7 @@ export function generateLSLFilename(timestamp, projectName, targetProject, sourc
   const baseName = `${year}-${month}-${day}_${timeWindow}_${userHash}`;
   
   // Determine if this is a local file or redirected file
-  if (targetProject === sourceProject) {
+  if (!sourceProject || targetProject === sourceProject) {
     // Local project - no "from-project" suffix
     return `${baseName}.md`;
   } else {

@@ -1043,7 +1043,7 @@ class EnhancedTranscriptMonitor {
         }));
 
         const decision = {
-          promptSetId: exchange.uuid || `exchange-${Date.now()}`,
+          promptSetId: exchange.uuid || `ps_${exchange.timestamp || new Date().toISOString()}`,
           timeRange: {
             start: exchange.timestamp || new Date().toISOString(),
             end: new Date().toISOString()
@@ -1466,12 +1466,12 @@ class EnhancedTranscriptMonitor {
   async logTextOnlyExchange(exchange, sessionFile, isRedirected) {
     const timestamp = formatTimestamp(exchange.timestamp);
     const exchangeTime = timestamp.lslFormat;
-    
+
     // Build exchange entry
     const exchangeEntry = {
       timestamp: exchangeTime,
       user_message: exchange.userMessage,
-      assistant_response: exchange.assistantResponse,
+      assistant_response: exchange.assistantResponse || exchange.claudeResponse,
       type: 'text_exchange',
       has_tool_calls: false
     };
@@ -1487,17 +1487,21 @@ class EnhancedTranscriptMonitor {
 
     // Format and append to session file
     let content = `### Text Exchange - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-    
+
     const userMsg = exchange.userMessage || '(No user message)';
-    const assistantResp = exchange.assistantResponse || '(No response)';
-    
+    const assistantResp = exchange.assistantResponse || exchange.claudeResponse || '(No response)';
+
     // Ensure userMsg and assistantResp are strings
     const userMsgStr = typeof userMsg === 'string' ? userMsg : JSON.stringify(userMsg);
     const assistantRespStr = typeof assistantResp === 'string' ? assistantResp : JSON.stringify(assistantResp);
-    
-    content += `**User Message:** ${userMsgStr.slice(0, 500)}${userMsgStr.length > 500 ? '...' : ''}\n\n`;
-    content += `**Assistant Response:** ${assistantRespStr.slice(0, 500)}${assistantRespStr.length > 500 ? '...' : ''}\n\n`;
-    content += `**Type:** Text-only exchange (no tool calls)\n\n---\n\n`;
+
+    content += `**User Message:** ${userMsgStr}\n\n`;
+
+    if (assistantRespStr && assistantRespStr !== '(No response)' && assistantRespStr.trim()) {
+      content += `**Claude Response:** ${assistantRespStr}\n\n`;
+    }
+
+    content += `---\n\n`;
     
     try {
       this.debug(`📝 WRITING TEXT CONTENT: ${content.length} chars to ${sessionFile}`);

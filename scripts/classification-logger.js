@@ -19,7 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getTimeWindow, utcToLocalTime } from './timezone-utils.js';
+import { getTimeWindow, utcToLocalTime, generateLSLFilename } from './timezone-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,6 +29,7 @@ class ClassificationLogger {
     this.logDir = options.logDir || path.join(process.cwd(), '.specstory', 'logs', 'classification');
     this.projectName = options.projectName || 'unknown';
     this.sessionId = options.sessionId || `session-${Date.now()}`;
+    this.codingRepo = options.codingRepo || '/Users/q284340/Agentic/coding';
 
     // userHash is REQUIRED - throw error if not provided
     if (!options.userHash) {
@@ -182,90 +183,30 @@ class ClassificationLogger {
       decisionsByWindow.get(fullWindow).push(decision);
     }
 
-    // Generate one summary per window
+    // Generate separate logs for LOCAL and CODING decisions per window
     for (const [fullWindow, windowDecisions] of decisionsByWindow.entries()) {
-      const summaryFile = path.join(this.logDir, `${fullWindow}-summary.md`);
+      // Split decisions by target
+      const localDecisions = windowDecisions.filter(d => !d.classification.isCoding);
+      const codingDecisions = windowDecisions.filter(d => d.classification.isCoding);
 
-      let markdown = `# Classification Decision Log Summary\n\n`;
-      markdown += `**Time Window**: ${fullWindow}\n`;
-      markdown += `**Project**: ${this.projectName}\n`;
-      markdown += `**Generated**: ${new Date().toISOString()}\n`;
-      markdown += `**Decisions in Window**: ${windowDecisions.length}\n\n`;
-
-      markdown += `---\n\n`;
-
-      // Statistics for this window
-      const stats = this.calculateStatisticsForDecisions(windowDecisions);
-      markdown += `## Statistics\n\n`;
-      markdown += `- **Total Prompt Sets**: ${stats.totalPromptSets}\n`;
-      markdown += `- **Classified as CODING**: ${stats.codingCount} (${stats.codingPercentage}%)\n`;
-      markdown += `- **Classified as LOCAL**: ${stats.localCount} (${stats.localPercentage}%)\n`;
-      markdown += `- **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: ${stats.layer0Count || 0}\n`;
-      markdown += `- **[Layer 1 (Path) Decisions](#layer-1-path)**: ${stats.layer1Count}\n`;
-      markdown += `- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: ${stats.layer2Count}\n`;
-      markdown += `- **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: ${stats.layer3Count}\n`;
-      markdown += `- **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: ${stats.layer4Count}\n`;
-      markdown += `- **Average Processing Time**: ${stats.avgProcessingTime}ms\n\n`;
-
-      markdown += `---\n\n`;
-
-      // Group decisions by final layer for easy navigation
-      const decisionsByLayer = {
-        'session-filter': [],
-        'path': [],
-        'keyword': [],
-        'embedding': [],
-        'semantic': []
-      };
-
-      for (const decision of windowDecisions) {
-        const finalLayer = decision.classification.finalLayer;
-        if (decisionsByLayer[finalLayer]) {
-          decisionsByLayer[finalLayer].push(decision);
-        }
+      // Generate LOCAL classification log (stored locally in project)
+      if (localDecisions.length > 0) {
+        const localFile = path.join(this.logDir, `${fullWindow}.md`);
+        const localContent = this.generateClassificationMarkdown(fullWindow, localDecisions, 'LOCAL');
+        fs.writeFileSync(localFile, localContent, 'utf8');
+        summaryFiles.push(localFile);
       }
 
-      // Generate sections for each layer
-      const layerNames = {
-        'session-filter': 'Layer 0: Session Filter',
-        'path': 'Layer 1: Path',
-        'keyword': 'Layer 2: Keyword',
-        'embedding': 'Layer 3: Embedding',
-        'semantic': 'Layer 4: Semantic'
-      };
+      // Generate CODING classification log (stored in coding repo with _from-<project> postfix)
+      if (codingDecisions.length > 0) {
+        const codingLogDir = path.join(this.codingRepo, '.specstory', 'logs', 'classification');
+        fs.mkdirSync(codingLogDir, { recursive: true });
 
-      for (const [layerKey, layerTitle] of Object.entries(layerNames)) {
-        const decisions = decisionsByLayer[layerKey];
-        if (decisions.length === 0) continue;
-
-        markdown += `## ${layerTitle}\n\n`;
-        markdown += `**Decisions**: ${decisions.length}\n\n`;
-
-        for (const decision of decisions) {
-          markdown += `### Prompt Set: ${decision.promptSetId}\n\n`;
-          markdown += `**Time Range**: ${decision.timeRange.start} → ${decision.timeRange.end}  \n`;
-          markdown += `**LSL File**: \`${path.basename(decision.lslFile)}\`  \n`;
-          markdown += `**LSL Lines**: ${decision.lslLineRange.start}-${decision.lslLineRange.end}  \n`;
-          markdown += `**Target**: ${decision.targetFile === 'foreign' ? '🌍 FOREIGN (coding)' : '📍 LOCAL'}  \n`;
-          markdown += `**Final Classification**: ${decision.classification.isCoding ? '✅ CODING' : '❌ LOCAL'} (confidence: ${decision.classification.confidence})\n\n`;
-
-          markdown += `#### Layer-by-Layer Trace\n\n`;
-
-          for (const layer of decision.layerDecisions) {
-            const emoji = layer.decision === 'coding' ? '✅' : layer.decision === 'local' ? '❌' : '⚠️';
-            markdown += `${emoji} **Layer ${this.getLayerNumber(layer.layer)} (${layer.layer})**\n`;
-            markdown += `- Decision: ${layer.decision}\n`;
-            markdown += `- Confidence: ${layer.confidence}\n`;
-            markdown += `- Reasoning: ${layer.reasoning}\n`;
-            markdown += `- Processing Time: ${layer.processingTimeMs}ms\n\n`;
-          }
-
-          markdown += `---\n\n`;
-        }
+        const codingFile = path.join(codingLogDir, `${fullWindow}_from-${this.projectName}.md`);
+        const codingContent = this.generateClassificationMarkdown(fullWindow, codingDecisions, 'CODING');
+        fs.writeFileSync(codingFile, codingContent, 'utf8');
+        summaryFiles.push(codingFile);
       }
-
-      fs.writeFileSync(summaryFile, markdown, 'utf8');
-      summaryFiles.push(summaryFile);
     }
 
     if (summaryFiles.length > 0) {
@@ -276,6 +217,126 @@ class ClassificationLogger {
     this.generateStatusFile();
 
     return summaryFiles;
+  }
+
+  /**
+   * Generate markdown content for classification log
+   */
+  generateClassificationMarkdown(fullWindow, windowDecisions, target) {
+    let markdown = `# Classification Decision Log${target === 'CODING' ? ' (Foreign/Coding)' : ' (Local)'}\n\n`;
+    markdown += `**Time Window**: ${fullWindow}<br>\n`;
+    markdown += `**Project**: ${this.projectName}<br>\n`;
+    markdown += `**Target**: ${target}<br>\n`;
+    markdown += `**Generated**: ${new Date().toISOString()}<br>\n`;
+    markdown += `**Decisions in Window**: ${windowDecisions.length}\n\n`;
+
+    markdown += `---\n\n`;
+
+    // Statistics for this window
+    const stats = this.calculateStatisticsForDecisions(windowDecisions);
+    markdown += `## Statistics\n\n`;
+    markdown += `- **Total Prompt Sets**: ${stats.totalPromptSets}\n`;
+    markdown += `- **Classified as CODING**: ${stats.codingCount} (${stats.codingPercentage}%)\n`;
+    markdown += `- **Classified as LOCAL**: ${stats.localCount} (${stats.localPercentage}%)\n`;
+    markdown += `- **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: ${stats.layer0Count || 0}\n`;
+    markdown += `- **[Layer 1 (Path) Decisions](#layer-1-path)**: ${stats.layer1Count}\n`;
+    markdown += `- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: ${stats.layer2Count}\n`;
+    markdown += `- **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: ${stats.layer3Count}\n`;
+    markdown += `- **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: ${stats.layer4Count}\n`;
+    markdown += `- **Average Processing Time**: ${stats.avgProcessingTime}ms\n\n`;
+
+    markdown += `---\n\n`;
+
+    // Group decisions by final layer for easy navigation
+    const decisionsByLayer = {
+      'session-filter': [],
+      'path': [],
+      'keyword': [],
+      'embedding': [],
+      'semantic': []
+    };
+
+    for (const decision of windowDecisions) {
+      const finalLayer = decision.classification.finalLayer;
+      if (decisionsByLayer[finalLayer]) {
+        decisionsByLayer[finalLayer].push(decision);
+      }
+    }
+
+    // Generate sections for each layer
+    const layerNames = {
+      'session-filter': 'Layer 0: Session Filter',
+      'path': 'Layer 1: Path',
+      'keyword': 'Layer 2: Keyword',
+      'embedding': 'Layer 3: Embedding',
+      'semantic': 'Layer 4: Semantic'
+    };
+
+    for (const [layerKey, layerTitle] of Object.entries(layerNames)) {
+      const decisions = decisionsByLayer[layerKey];
+      if (decisions.length === 0) continue;
+
+      markdown += `## ${layerTitle}\n\n`;
+      markdown += `**Decisions**: ${decisions.length}\n\n`;
+
+      for (const decision of decisions) {
+        // Create link to LSL file anchor
+        let lslFileName = path.basename(decision.lslFile);
+
+        // If LSL file is "pending", try to calculate what it should be
+        if (lslFileName === 'pending' && decision.timeRange?.start) {
+          const targetProject = decision.classification.isCoding ? 'coding' : this.projectName;
+          const sourceProject = decision.classification.isCoding ? this.projectName : null;
+          const calculatedFilename = generateLSLFilename(
+            decision.timeRange.start,
+            this.userHash,
+            targetProject,
+            sourceProject
+          );
+
+          // Check if the calculated file exists
+          const historyDir = decision.classification.isCoding
+            ? path.join(this.codingRepo, '.specstory', 'history')
+            : path.join(this.logDir, '../../history');
+          const calculatedPath = path.join(historyDir, calculatedFilename);
+
+          if (fs.existsSync(calculatedPath)) {
+            lslFileName = calculatedFilename;
+          }
+        }
+
+        const lslFilePath = decision.classification.isCoding
+          ? `../../../history/${lslFileName}`  // CODING logs are in coding/.specstory/logs/classification, LSL in coding/.specstory/history
+          : `../../history/${lslFileName}`;     // LOCAL logs are in project/.specstory/logs/classification, LSL in project/.specstory/history
+        const lslLink = lslFileName !== 'pending' ? `[${lslFileName}](${lslFilePath}#${decision.promptSetId})` : `\`${lslFileName}\``;
+
+        // Make prompt set heading clickable
+        const promptSetHeading = lslFileName !== 'pending'
+          ? `### Prompt Set: [${decision.promptSetId}](${lslFilePath}#${decision.promptSetId})\n\n`
+          : `### Prompt Set: ${decision.promptSetId}\n\n`;
+        markdown += promptSetHeading;
+        markdown += `**Time Range**: ${decision.timeRange.start} → ${decision.timeRange.end}<br>\n`;
+        markdown += `**LSL File**: ${lslLink}<br>\n`;
+        markdown += `**LSL Lines**: ${decision.lslLineRange.start}-${decision.lslLineRange.end}<br>\n`;
+        markdown += `**Target**: ${decision.targetFile === 'foreign' ? '🌍 FOREIGN (coding)' : '📍 LOCAL'}<br>\n`;
+        markdown += `**Final Classification**: ${decision.classification.isCoding ? '✅ CODING' : '❌ LOCAL'} (confidence: ${decision.classification.confidence})\n\n`;
+
+        markdown += `#### Layer-by-Layer Trace\n\n`;
+
+        for (const layer of decision.layerDecisions) {
+          const emoji = layer.decision === 'coding' ? '✅' : layer.decision === 'local' ? '❌' : '⚠️';
+          markdown += `${emoji} **Layer ${this.getLayerNumber(layer.layer)} (${layer.layer})**\n`;
+          markdown += `- Decision: ${layer.decision}\n`;
+          markdown += `- Confidence: ${layer.confidence}\n`;
+          markdown += `- Reasoning: ${layer.reasoning}\n`;
+          markdown += `- Processing Time: ${layer.processingTimeMs}ms\n\n`;
+        }
+
+        markdown += `---\n\n`;
+      }
+    }
+
+    return markdown;
   }
 
   /**
@@ -419,7 +480,7 @@ class ClassificationLogger {
       if (layer0Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer0Coding) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -428,7 +489,7 @@ class ClassificationLogger {
       if (layer0Local.length > 0) {
         markdown += `#### Local (LOCAL)\n\n`;
         for (const { window, localCount } of layer0Local) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `${window}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
         }
         markdown += `\n`;
@@ -457,7 +518,7 @@ class ClassificationLogger {
       if (layer1Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer1Coding) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -466,7 +527,7 @@ class ClassificationLogger {
       if (layer1Local.length > 0) {
         markdown += `#### Local (LOCAL)\n\n`;
         for (const { window, localCount } of layer1Local) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `${window}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
         }
         markdown += `\n`;
@@ -495,7 +556,7 @@ class ClassificationLogger {
       if (layer2Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer2Coding) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -504,7 +565,7 @@ class ClassificationLogger {
       if (layer2Local.length > 0) {
         markdown += `#### Local (LOCAL)\n\n`;
         for (const { window, localCount } of layer2Local) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `${window}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
         }
         markdown += `\n`;
@@ -533,7 +594,7 @@ class ClassificationLogger {
       if (layer3Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer3Coding) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -542,7 +603,7 @@ class ClassificationLogger {
       if (layer3Local.length > 0) {
         markdown += `#### Local (LOCAL)\n\n`;
         for (const { window, localCount } of layer3Local) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `${window}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
         }
         markdown += `\n`;
@@ -571,7 +632,7 @@ class ClassificationLogger {
       if (layer4Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer4Coding) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -580,7 +641,7 @@ class ClassificationLogger {
       if (layer4Local.length > 0) {
         markdown += `#### Local (LOCAL)\n\n`;
         for (const { window, localCount } of layer4Local) {
-          const summaryFile = `${window}-summary.md`;
+          const summaryFile = `${window}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${localCount} local decisions\n`;
         }
         markdown += `\n`;
@@ -598,11 +659,21 @@ class ClassificationLogger {
     const sortedWindows = Array.from(decisionsByWindow.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
     for (const [window, decisions] of sortedWindows) {
-      const summaryFile = `${window}-summary.md`;
       const codingCount = decisions.filter(d => d.classification.isCoding).length;
       const localCount = decisions.filter(d => !d.classification.isCoding).length;
 
-      markdown += `- **[${window}](${summaryFile})** - ${decisions.length} decisions (${codingCount} coding, ${localCount} local)\n`;
+      // Create appropriate links for CODING and LOCAL
+      const links = [];
+      if (codingCount > 0) {
+        const codingFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+        links.push(`[CODING: ${codingCount}](${codingFile})`);
+      }
+      if (localCount > 0) {
+        const localFile = `${window}.md`;
+        links.push(`[LOCAL: ${localCount}](${localFile})`);
+      }
+
+      markdown += `- **${window}** - ${decisions.length} decisions (${links.join(', ')})\n`;
     }
 
     markdown += `\n---\n\n`;
