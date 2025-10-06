@@ -718,22 +718,29 @@ install_mcp_servers() {
     info "Setting up MCP Constraint Monitor with Professional Dashboard..."
     if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
         cd "$CODING_REPO/integrations/mcp-constraint-monitor"
-        
-        # Install main constraint monitor dependencies
-        info "Installing constraint monitor dependencies..."
-        npm install || warning "Failed to install constraint monitor dependencies"
-        
-        # Install professional dashboard dependencies
-        if [[ -d "dashboard-new" ]]; then
-            info "Installing professional dashboard dependencies..."
-            cd dashboard-new
-            pnpm install || npm install || warning "Failed to install dashboard dependencies"
-            cd ..
+
+        # Run the constraint monitor's own install script (skip hooks - we handle those in main install)
+        if [[ -f "install.sh" ]]; then
+            info "Running constraint monitor installation (dependencies only)..."
+            bash install.sh --skip-hooks || warning "Constraint monitor installation had issues"
+        else
+            # Fallback to manual installation if install.sh doesn't exist
+            info "Installing constraint monitor dependencies..."
+            npm install || warning "Failed to install constraint monitor dependencies"
+
+            # Install dashboard dependencies
+            if [[ -d "dashboard" ]]; then
+                info "Installing professional dashboard dependencies..."
+                cd dashboard
+                pnpm install || npm install || warning "Failed to install dashboard dependencies"
+                cd ..
+            fi
         fi
-        
+
         success "MCP Constraint Monitor with Professional Dashboard installed"
         info "Professional Dashboard runs on port 3030 with shadcn/ui components"
         info "Global monitoring supports multi-project constraint tracking"
+        info "Hooks will be configured in the main installation process"
     else
         info "MCP Constraint Monitor will be installed automatically when services start"
         info "Repository: https://github.com/fwornle/mcp-server-constraint-monitor"
