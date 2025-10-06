@@ -1,4 +1,0 @@
-#!/bin/bash
-# Universal claude-mcp wrapper
-CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
-exec "$CODING_REPO/scripts/claude-mcp-launcher.sh" "$@"

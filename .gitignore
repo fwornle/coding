@@ -28,6 +28,7 @@
 # Cache directories
 .cache/
 __pycache__/
+.serena/cache/
 
 # Knowledge base data (if you want to exclude the actual data)
 # Uncomment the line below if you don't want to track the knowledge base content
