@@ -30,6 +30,10 @@
 __pycache__/
 .serena/cache/
 
+# Prevent future staging/committing of these large files
+.specstory/archive/2025-10-05_0800-0900_g9b30a.md
+.obsolete/workflow-archives/specstory-archive/2025-10-05_0800-0900_g9b30a.md
+
 # Knowledge base data (if you want to exclude the actual data)
 # Uncomment the line below if you don't want to track the knowledge base content
 # /knowledge-management/coding-knowledge-base/
