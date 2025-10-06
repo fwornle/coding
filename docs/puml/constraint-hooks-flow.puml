@@ -1,0 +1,74 @@
+@startuml
+!include _standard-style.puml
+
+title Constraint Monitor - PreToolUse Hook Flow
+
+actor "Claude Code" as Claude
+participant "PreToolUse Hook" as PreHook
+participant "pre-tool-hook-wrapper.js" as Wrapper
+participant "real-time-constraint-hook.js" as Hook
+participant "ConstraintEnforcer" as Enforcer
+participant "constraints.yaml" as Config
+database "Dashboard API" as Dashboard
+
+Claude -> PreHook : Tool call initiated\n(Write, Edit, etc.)
+activate PreHook
+
+PreHook -> Wrapper : Execute hook command\n(stdin: tool data)
+activate Wrapper
+
+Wrapper -> Hook : Import and call\npreToolHook(toolCall, context)
+activate Hook
+
+Hook -> Enforcer : enforceToolConstraints(toolCall, context)
+activate Enforcer
+
+Enforcer -> Config : Load constraint definitions
+Config --> Enforcer : 18 active constraints
+
+Enforcer -> Enforcer : Check all patterns\nagainst tool call
+
+alt Violation Detected (Critical/Error)
+    Enforcer -> Dashboard : Log violation\n(HTTP POST /api/violations)
+    Dashboard --> Enforcer : Logged
+
+    Enforcer --> Hook : throw Error(\n"CONSTRAINT VIOLATION")
+    Hook --> Wrapper : Error thrown\n(exit code 1)
+    Wrapper --> PreHook : Hook failed
+    PreHook --> Claude : 🚫 Tool call BLOCKED\n+ Violation message
+
+    note right of Claude
+        Claude receives:
+        - Constraint ID
+        - Violation message
+        - Suggested fix
+        - Compliance score impact
+    end note
+
+else Violation Detected (Warning/Info)
+    Enforcer -> Dashboard : Log violation\n(HTTP POST /api/violations)
+    Dashboard --> Enforcer : Logged
+
+    Enforcer --> Hook : {continue: true,\ncompliance: score}
+    Hook --> Wrapper : Success (exit code 0)
+    Wrapper --> PreHook : Hook passed
+    PreHook --> Claude : ⚠️ Tool call ALLOWED\n+ Warning message
+
+else No Violation
+    Enforcer --> Hook : {continue: true,\ncompliance: 10.0}
+    Hook --> Wrapper : Success (exit code 0)
+    Wrapper --> PreHook : Hook passed
+    PreHook --> Claude : ✅ Tool call proceeds
+end
+
+deactivate Enforcer
+deactivate Hook
+deactivate Wrapper
+deactivate PreHook
+
+note over Claude
+    PostToolUse hook runs AFTER
+    for LSL logging (separate flow)
+end note
+
+@enduml

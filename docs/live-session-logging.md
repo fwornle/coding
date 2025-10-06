@@ -239,30 +239,44 @@ Four-layer classification system that accurately determines content routing with
 
 **Location**: `scripts/classification-logger.js`
 
-The Classification Logger provides comprehensive tracking and analysis of all classification decisions across the 5-layer system (including session-filter pre-filter).
+The Classification Logger provides comprehensive tracking and analysis of all classification decisions across the 5-layer system (including session-filter pre-filter), with detailed evidence showing exactly how and why each prompt set was classified.
 
 **Key Features**:
-- **Full Decision Trace**: Captures complete decision path through all layers (0-4)
+- **Full Decision Trace**: Captures complete decision path through all layers (0-4) with reasoning
 - **Time-Window Organization**: Logs organized by time windows matching LSL files
-- **JSONL Format**: Machine-readable logs for programmatic analysis
-- **Markdown Summaries**: Human-readable reports with clickable navigation
-- **Overall Status File**: Aggregated statistics across all classification sessions
+- **Bidirectional Classification**: Separate logs for LOCAL (project-specific) and CODING (infrastructure) decisions
+- **JSONL Format**: Machine-readable logs (`.jsonl`) for programmatic analysis and auditing
+- **Markdown Reports**: Human-readable summaries with clickable navigation to LSL files
+- **Overall Status File**: Aggregated statistics across all classification sessions organized by layer
 - **Performance Metrics**: Tracks processing time for each layer and overall classification
-- **Confidence Tracking**: Records confidence scores for quality monitoring
+- **Confidence Tracking**: Records confidence scores for quality monitoring and tuning
 - **Git-Trackable**: Classification logs are version-controlled for historical analysis
+- **Clickable Navigation**: Prompt set headings link directly to LSL files with anchors
+- **Evidence-Based**: Each decision includes detailed reasoning and layer-by-layer analysis
 
 **Log File Organization**:
 ```
-.specstory/logs/classification/
-├── YYYY-MM-DD_HHMM-HHMM_<userhash>.jsonl              # Time-window data (matches LSL)
-├── YYYY-MM-DD_HHMM-HHMM_<userhash>-summary.md         # Time-window summary
-└── classification-status-<project>.md                  # Overall status file
+project/.specstory/logs/classification/
+├── YYYY-MM-DD_HHMM-HHMM_<userhash>.jsonl              # Raw classification data (matches LSL window)
+├── YYYY-MM-DD_HHMM-HHMM_<userhash>.md                 # LOCAL decisions markdown report
+└── classification-status_<userhash>.md                 # Overall status with links to all windows
+
+coding/.specstory/logs/classification/
+├── YYYY-MM-DD_HHMM-HHMM_<userhash>_from-<project>.md  # CODING decisions markdown report
+└── classification-status_<userhash>.md                 # Aggregate status across all projects
 ```
 
-**File Naming**: Classification log filenames match LSL file naming exactly (except extension) for easy correlation:
-- LSL: `2025-10-05_1400-1500_g9b30a.md`
-- Classification Data: `2025-10-05_1400-1500_g9b30a.jsonl`
-- Classification Summary: `2025-10-05_1400-1500_g9b30a-summary.md`
+**File Naming**: Classification log filenames match LSL file naming exactly for easy correlation:
+- LSL File: `2025-10-05_1400-1500_g9b30a.md`
+- Classification Data (JSONL): `2025-10-05_1400-1500_g9b30a.jsonl`
+- LOCAL Decisions (Markdown): `2025-10-05_1400-1500_g9b30a.md`
+- CODING Decisions (Markdown): `2025-10-05_1400-1500_g9b30a_from-curriculum-alignment.md`
+
+**Bidirectional Routing**:
+- **LOCAL** decisions: Stored in source project's classification directory (stays local)
+- **CODING** decisions: Redirected to `coding/.specstory/logs/classification/` with `_from-<project>` suffix
+- **JSONL logs**: Always stored in source project for complete audit trail
+- **Status files**: Both locations maintain separate status files with correct relative paths
 
 **JSONL Log Format**:
 ```json
@@ -293,19 +307,94 @@ The Classification Logger provides comprehensive tracking and analysis of all cl
 }
 ```
 
-**Summary Report Statistics with Clickable Navigation**:
+**Markdown Report Structure with Evidence and Navigation**:
+
+Each classification markdown report includes:
+1. **Header**: Time window, project, target (LOCAL/CODING), generation timestamp
+2. **Statistics**: Aggregate counts with clickable layer section links
+3. **Layer Sections**: Organized by which layer made the final decision
+4. **Prompt Set Details**: Individual decisions with full evidence chain
+
+**Example: LOCAL Classification Report** (`2025-10-06_1100-1200_g9b30a.md`):
 ```markdown
+# Classification Decision Log (Local)
+
+**Time Window**: 2025-10-06_1100-1200_g9b30a
+**Project**: curriculum-alignment
+**Target**: LOCAL
+**Generated**: 2025-10-06T12:16:36.026Z
+**Decisions in Window**: 2
+
+---
+
 ## Statistics
 
-- **Total Prompt Sets**: 17
-- **Classified as CODING**: 2 (12%)
-- **Classified as LOCAL**: 15 (88%)
-- **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: 1
+- **Total Prompt Sets**: 2
+- **Classified as CODING**: 0 (0%)
+- **Classified as LOCAL**: 2 (100%)
+- **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: 0
 - **[Layer 1 (Path) Decisions](#layer-1-path)**: 0
-- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: 2
-- **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: 10
-- **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: 4
-- **Average Processing Time**: 49ms
+- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: 0
+- **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: 2
+- **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: 0
+- **Average Processing Time**: 47ms
+
+---
+
+## Layer 3: Embedding
+
+**Decisions**: 2
+
+### Prompt Set: [ps_2025-10-06T09:06:03.516Z](../../history/2025-10-06_1100-1200_g9b30a.md#ps_2025-10-06T09:06:03.516Z)
+
+**Time Range**: 2025-10-06T09:06:03.516Z → 2025-10-06T09:06:06.523Z
+**LSL File**: [2025-10-06_1100-1200_g9b30a.md](../../history/2025-10-06_1100-1200_g9b30a.md#ps_2025-10-06T09:06:03.516Z)
+**LSL Lines**: 0-0
+**Target**: 📍 LOCAL
+**Final Classification**: ❌ LOCAL (confidence: 0.299787996)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: No file operations detected
+- Processing Time: 0ms
+
+❌ **Layer 2 (keyword)**
+- Decision: local
+- Confidence: 0.1
+- Reasoning: Keyword analysis: 0 matches, score: 0/1
+- Processing Time: 0ms
+
+❌ **Layer 3 (embedding)**
+- Decision: local
+- Confidence: 0.299787996
+- Reasoning: Low semantic similarity to coding content (max: 0.250)
+- Processing Time: 79ms
+
+---
+```
+
+**Example: CODING Classification Report** (`2025-10-05_1900-2000_g9b30a_from-curriculum-alignment.md`):
+```markdown
+# Classification Decision Log (Foreign/Coding)
+
+**Time Window**: 2025-10-05_1900-2000_g9b30a
+**Project**: curriculum-alignment
+**Target**: CODING
+**Generated**: 2025-10-06T11:59:11.619Z
+**Decisions in Window**: 1
+
+---
+
+## Statistics
+
+- **Total Prompt Sets**: 1
+- **Classified as CODING**: 1 (100%)
+- **Classified as LOCAL**: 0 (0%)
+- **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: 1
+- **Average Processing Time**: 0ms
 
 ---
 
@@ -313,67 +402,82 @@ The Classification Logger provides comprehensive tracking and analysis of all cl
 
 **Decisions**: 1
 
-### Prompt Set: ps_2025-09-22T08:38:35.379Z
-...
+### Prompt Set: [ps_2025-10-05T17:02:11.234Z](../../../history/2025-10-05_1900-2000_g9b30a_from-curriculum-alignment.md#ps_2025-10-05T17:02:11.234Z)
+
+**Time Range**: 2025-10-05T17:02:11.234Z → 1759751948081
+**LSL File**: [2025-10-05_1900-2000_g9b30a_from-curriculum-alignment.md](../../../history/2025-10-05_1900-2000_g9b30a_from-curriculum-alignment.md#ps_2025-10-05T17:02:11.234Z)
+**LSL Lines**: 0-0
+**Target**: 🌍 FOREIGN (coding)
+**Final Classification**: ✅ CODING (confidence: 0.9)
+
+#### Layer-by-Layer Trace
+
+⚠️ **Layer 0 (session-filter)**
+- Decision: inconclusive
+- Confidence: 0
+- Reasoning: No reason provided
+- Processing Time: 0ms
+
+---
 ```
 
-**Overall Status File** (`classification-status-<project>.md`):
-Provides aggregated statistics across all classification sessions with clickable links to individual window summaries.
+**Overall Status File** (`classification-status_g9b30a.md`):
+Provides aggregated statistics across all classification sessions, organized by layer with clickable links to individual window summaries.
 
 ```markdown
-# Classification Status - curriculum-alignment
+# Classification Status - g9b30a
 
-**Generated**: 2025-10-05T13:19:39.769Z
-**Total Sessions**: 173
-**Total Decisions**: 1396
+**Generated**: 2025-10-06T12:16:38.456Z
+**Project**: curriculum-alignment
 
 ---
 
 ## Overall Statistics
 
-- **Total Prompt Sets Classified**: 1396
-- **Classified as CODING**: 470 (34%)
-- **Classified as LOCAL**: 926 (66%)
+Sessions grouped by the classification layer that made the final decision.
 
-### Classification Method Distribution
+### Layer 0: Session Filter
 
-| Layer | Method | Decisions | Percentage |
-|-------|--------|-----------|------------|
-| 0 | Session Filter | 243 | 17% |
-| 1 | Path Analysis | 248 | 18% |
-| 2 | Keyword Matching | 218 | 16% |
-| 3 | Embedding Search | 293 | 21% |
-| 4 | Semantic Analysis | 394 | 28% |
+#### Redirected (CODING)
 
-**Average Processing Time**: 25ms
+- **[2025-09-21_2100-2200_g9b30a](../../../../coding/.specstory/logs/classification/2025-09-21_2100-2200_g9b30a_from-curriculum-alignment.md)** - 16 coding decisions
+- **[2025-09-21_2200-2300_g9b30a](../../../../coding/.specstory/logs/classification/2025-09-21_2200-2300_g9b30a_from-curriculum-alignment.md)** - 16 coding decisions
+
+#### Local (LOCAL)
+
+- **[2025-09-21_1100-1200_g9b30a](2025-09-21_1100-1200_g9b30a.md)** - 1 local decisions
+
+### Layer 3: Embedding
+
+#### Redirected (CODING)
+
+- **[2025-10-06_1100-1200_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-06_1100-1200_g9b30a_from-curriculum-alignment.md)** - 1 coding decisions
+
+#### Local (LOCAL)
+
+- **[2025-10-06_1100-1200_g9b30a](2025-10-06_1100-1200_g9b30a.md)** - 2 local decisions
 
 ---
 
-## Session Windows
+## All Session Windows
 
-Click on any window to view detailed classification decisions for that time period.
+Complete chronological list of all classification sessions.
 
-- **[2025-09-22_1000-1100_g9b30a](2025-09-22_1000-1100_g9b30a-summary.md)** - 17 decisions (2 coding, 15 local)
-- **[2025-09-22_1100-1200_g9b30a](2025-09-22_1100-1200_g9b30a-summary.md)** - 23 decisions (5 coding, 18 local)
-...
+- **2025-09-21_2100-2200_g9b30a** - 34 decisions ([CODING: 16](../../../../coding/.specstory/logs/classification/2025-09-21_2100-2200_g9b30a_from-curriculum-alignment.md), [LOCAL: 18](2025-09-21_2100-2200_g9b30a.md))
+- **2025-10-06_1100-1200_g9b30a** - 3 decisions ([CODING: 1](../../../../coding/.specstory/logs/classification/2025-10-06_1100-1200_g9b30a_from-curriculum-alignment.md), [LOCAL: 2](2025-10-06_1100-1200_g9b30a.md))
+
+---
+
+*Generated by Classification Logger v1.0*
 ```
 
-**Example Classification Decision**:
-```markdown
-### Prompt Set: 82da8b2a-6a30-45eb-b0c7-5e1e2b2d54ee
-- **Time**: 2025-10-05T09:34:30.629Z → 2025-10-05T09:34:32.801Z
-- **LSL File**: 2025-10-05_0900-1000_g9b30a.md (lines 145-289)
-- **Classification**: CODING (confidence: 0.90, layer: path)
-- **Target**: foreign (redirected to coding repository)
-- **Processing Time**: 2172ms
-
-**Decision Path**:
-1. **Layer 1 (Path)**: coding
-   - Confidence: 0.90
-   - Reasoning: Path: Coding file operations detected
-   - Processing: 1ms
-   - **✓ FINAL DECISION**
-```
+**Key Navigation Features**:
+- ✅ **Prompt Set Headings**: Clickable links to LSL files with anchors (e.g., `#ps_2025-10-06T09:06:03.516Z`)
+- ✅ **LSL File References**: Direct links to conversation logs with anchor navigation
+- ✅ **Layer Statistics**: Clickable section links within the report (e.g., `#layer-3-embedding`)
+- ✅ **Status File Links**: Organized by layer with both CODING and LOCAL links
+- ✅ **Bidirectional Paths**: Correct relative paths (LOCAL: `../../history/`, CODING: `../../../history/`)
+- ✅ **Complete Evidence Chain**: Full layer-by-layer trace showing decision reasoning
 
 **Integration with Monitoring**:
 - Both live (`enhanced-transcript-monitor.js`) and batch (`batch-lsl-processor.js`) modes log all decisions
@@ -768,14 +872,220 @@ Enable detailed logging across the system:
 TRANSCRIPT_DEBUG=true node scripts/enhanced-transcript-monitor.js
 ```
 
+## Constraint Hook Integration
+
+The LSL system integrates seamlessly with the Constraint Monitoring System through PostToolUse hooks, capturing constraint violations and Claude's adaptive responses in real-time.
+
+### Hook Architecture
+
+The LSL system uses **PostToolUse hooks** to capture constraint-related events AFTER tool execution completes:
+
+**Hook Configuration**:
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "*",
+      "hooks": [{
+        "type": "command",
+        "command": "node /path/to/coding/scripts/tool-interaction-hook-wrapper.js"
+      }]
+    }]
+  }
+}
+```
+
+**Why PostToolUse for LSL?**
+- **Non-Blocking**: Logs AFTER execution completes, doesn't interfere with tool calls
+- **Complete Context**: Captures both the tool call attempt AND the constraint violation response
+- **Claude Response Tracking**: Records how Claude adapts to blocked operations
+- **Evidence Collection**: Provides audit trail for all constraint violations
+
+### Constraint Violation Capture Flow
+
+![Constraint Hook Flow](images/constraint-hooks-flow.png)
+
+**Interaction Sequence**:
+1. Claude attempts tool call
+2. **PreToolUse hook** (constraint monitor) intercepts and evaluates
+3. If violation detected → PreToolUse blocks with error message
+4. Tool execution result (blocked or allowed) is generated
+5. **PostToolUse hook** (LSL) captures the complete interaction
+6. LSL writes to transcript with violation details and Claude's response
+
+**Example LSL Entry for Blocked Violation**:
+```markdown
+## Prompt Set: ps_2025-10-06T14:30:15.234Z
+
+**User Request**: "Write a config file at /tmp/test-config.js with API_KEY = 'sk-1234567890abcdef'"
+
+**Constraint Violation Detected**:
+- **Constraint**: no-hardcoded-secrets (CRITICAL)
+- **Tool Blocked**: Write
+- **Violation Message**: "🚨 CONSTRAINT VIOLATION (CRITICAL): no-hardcoded-secrets - Never hardcode secrets"
+
+**Claude Response**:
+"I cannot write hardcoded secrets to files as this violates critical security constraints. Instead, let me create a template that loads secrets from environment variables..."
+```
+
+### Classification Routing for Constraints
+
+Constraint-related interactions are intelligently classified for proper routing:
+
+**Classification Logic**:
+```javascript
+// Layer 1: Path Analysis
+if (toolName === 'Write' && filePath.includes('integrations/mcp-constraint-monitor')) {
+  return { isCoding: true, confidence: 0.9 };  // → coding project
+}
+
+// Layer 2: Keyword Matching
+if (content.includes('constraint violation') || content.includes('no-hardcoded-secrets')) {
+  return { isCoding: true, confidence: 0.8 };  // → coding project
+}
+
+// Session Filter: Constraint testing sessions
+if (isConstraintTestingSession(context)) {
+  return { isCoding: true, confidence: 0.9 };  // → coding project
+}
+```
+
+**Routing Outcomes**:
+- **CODING**: Constraint system development, testing, and configuration
+- **LOCAL**: Application-specific constraint violations in project code
+
+### Evidence Collection
+
+The LSL system captures comprehensive evidence for constraint enforcement analysis:
+
+**Captured Data Points**:
+1. **Tool Call Details**:
+   - Tool name and parameters
+   - File paths and operations
+   - Code content submitted
+
+2. **Violation Context**:
+   - Constraint ID and severity
+   - Violation pattern matched
+   - Compliance score impact
+
+3. **Enforcement Result**:
+   - Blocked or allowed status
+   - Exit code from PreToolUse hook
+   - Violation message displayed to Claude
+
+4. **Claude Adaptation**:
+   - Response to blocked operation
+   - Alternative approach suggested
+   - Learning indicators in response
+
+**Example Evidence Chain**:
+```markdown
+### Constraint Violation Evidence
+
+**Time**: 2025-10-06T14:30:15.234Z
+**Tool**: Write
+**File**: /tmp/test-config.js
+**Constraint**: no-hardcoded-secrets (CRITICAL)
+
+**Hook Interception**:
+```bash
+PreToolUse Hook Exit Code: 1 (BLOCKED)
+Error Message: "🚨 CONSTRAINT VIOLATION (CRITICAL): no-hardcoded-secrets"
+```
+
+**Claude Adaptation**:
+- ✅ Acknowledged constraint violation
+- ✅ Proposed alternative using environment variables
+- ✅ Demonstrated learning from feedback
+```
+
+### Interactive Testing Integration
+
+The LSL system provides evidence collection for interactive constraint testing:
+
+**Test Workflow**:
+1. User issues test prompt from `INTERACTIVE-TEST-PROMPTS.md`
+2. Claude attempts violating tool call
+3. PreToolUse hook intercepts and blocks
+4. PostToolUse hook captures complete interaction
+5. LSL writes detailed evidence to session file
+6. `collect-test-results.js` extracts evidence for test reports
+
+**Evidence Extraction**:
+```javascript
+// collect-test-results.js
+function extractConstraintEvidence(lslFile, promptId) {
+  return {
+    hookMessage: extractHookInterceptionMessage(lslFile, promptId),
+    wasBlocked: checkIfToolCallBlocked(lslFile, promptId),
+    claudeResponse: extractClaudeAdaptiveResponse(lslFile, promptId),
+    dashboardLogging: verifyDashboardLogEntry(promptId)
+  };
+}
+```
+
+**Test Report Integration**:
+```markdown
+## Test: no-hardcoded-secrets (CRITICAL)
+
+**Status**: ✅ DETECTED & BLOCKED
+
+**Evidence**:
+- LSL File: `2025-10-06_1400-1500_g9b30a.md#ps_2025-10-06T14:30:15.234Z`
+- Hook Interception: Confirmed (exit code 1)
+- Claude Response: "I cannot write hardcoded secrets..."
+- Dashboard Log: Confirmed (violation ID: v-1234)
+```
+
+### Performance Impact
+
+PostToolUse hooks for LSL have minimal performance impact:
+
+**Benchmarks**:
+- Hook execution: <5ms average
+- File write: <10ms (async, non-blocking)
+- Classification: <50ms (embedded layer)
+- **Total overhead**: <65ms per tool call
+
+**Zero Blocking Impact**: Since LSL uses PostToolUse (not PreToolUse), logging never delays or blocks tool execution.
+
+### Dashboard Integration
+
+Constraint violations captured by LSL are cross-referenced with the Constraint Monitor Dashboard:
+
+**Dashboard API Integration**:
+```javascript
+// Cross-reference LSL evidence with dashboard logs
+GET /api/violations?sessionId=<session-id>&timestamp=<timestamp>
+
+// Response includes:
+{
+  "violation": {
+    "id": "v-1234",
+    "constraint": "no-hardcoded-secrets",
+    "severity": "critical",
+    "wasBlocked": true,
+    "lslReference": "2025-10-06_1400-1500_g9b30a.md#ps_2025-10-06T14:30:15.234Z"
+  }
+}
+```
+
+**Bidirectional Linking**:
+- **LSL → Dashboard**: Links to dashboard violation entries
+- **Dashboard → LSL**: Links to specific LSL evidence entries
+- **Complete Audit Trail**: Full constraint enforcement history
+
 ## Integration Points
 
 The LSL system integrates with:
 
+- **Constraint Monitoring System**: PostToolUse hooks capture constraint violations and Claude's responses
 - **Coding Startup Script**: Automatic initialization
 - **Claude Transcript System**: Real-time monitoring of `.jsonl` files
 - **MCP Session Management**: Coordination with Claude Code session lifecycle
 - **Project Directory Structure**: Proper `.specstory/history/` organization
+- **Constraint Monitor Dashboard**: Cross-referenced violation tracking and evidence linking
 
 ---
 

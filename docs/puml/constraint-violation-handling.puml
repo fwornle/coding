@@ -1,0 +1,98 @@
+@startuml
+!include _standard-style.puml
+
+title Constraint Monitor - Violation Detection & Handling
+
+participant "ConstraintEnforcer" as Enforcer
+participant "Pattern Matcher" as Matcher
+participant "Severity Calculator" as Severity
+participant "Dashboard" as Dashboard
+participant "LSL Logging" as LSL
+participant "Hook Response" as Response
+
+-> Enforcer : Tool call / Prompt
+activate Enforcer
+
+Enforcer -> Matcher : Check all 18 constraints
+activate Matcher
+
+loop For each constraint
+    Matcher -> Matcher : Match pattern against\ntool parameters/prompt
+
+    alt Pattern matches
+        Matcher -> Matcher : Record violation
+    end
+end
+
+Matcher --> Enforcer : Violation list
+deactivate Matcher
+
+alt Violations found
+    Enforcer -> Severity : Calculate severity\nand compliance impact
+    activate Severity
+
+    Severity -> Severity : Determine highest severity:\n- CRITICAL: -3.0\n- ERROR: -2.0\n- WARNING: -1.0\n- INFO: -0.5
+
+    Severity --> Enforcer : Compliance score\n+ Risk assessment
+    deactivate Severity
+
+    Enforcer -> Dashboard : POST /api/violations
+    activate Dashboard
+    note right of Dashboard
+        Violation data:
+        - constraintId
+        - severity
+        - message
+        - suggestion
+        - compliance score
+        - timestamp
+        - project context
+    end note
+    Dashboard --> Enforcer : Logged (200 OK)
+    deactivate Dashboard
+
+    Enforcer -> LSL : Log to classification system
+    activate LSL
+    note right of LSL
+        PostToolUse hook captures:
+        - Tool interaction
+        - Constraint violations
+        - Claude's response
+        - Routing decision
+    end note
+    LSL --> Enforcer : Logged
+    deactivate LSL
+
+    alt CRITICAL or ERROR severity
+        Enforcer -> Response : Block execution
+        Response --> : 🚫 throw Error(\n"CONSTRAINT VIOLATION\nDETECTED")
+        note right of Response
+            Exit code 1
+            Hook fails
+            Tool call blocked
+        end note
+
+    else WARNING or INFO severity
+        Enforcer -> Response : Allow with warning
+        Response --> : ⚠️ return {\ncontinue: true,\ncompliance: score\n}
+        note right of Response
+            Exit code 0
+            Hook succeeds
+            Tool call proceeds
+            Claude sees warning
+        end note
+    end
+
+else No violations
+    Enforcer -> Response : Allow
+    Response --> : ✅ return {\ncontinue: true,\ncompliance: 10.0\n}
+    note right of Response
+        Perfect compliance
+        No warnings
+        Clean execution
+    end note
+end
+
+deactivate Enforcer
+
+@enduml

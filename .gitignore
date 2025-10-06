@@ -95,7 +95,8 @@ semantic-analysis.log
 *-report-*.json
 .specstory/validation-report.json
 .specstory/change-log.json
-.specstory/logs/
+.specstory/logs/*
+!.specstory/logs/classification/
 .logs/
 scripts/monitoring-*.log
 scripts/watchdog-*.log

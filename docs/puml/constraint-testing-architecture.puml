@@ -1,0 +1,91 @@
+@startuml
+!include _standard-style.puml
+
+title Constraint Monitor - Testing Architecture
+
+package "Testing Framework" {
+    component "test-all-constraints-comprehensive.js" as AutoTest
+    component "collect-test-results.js" as Collector
+    component "INTERACTIVE-TEST-PROMPTS.md" as Prompts
+}
+
+package "Hook System" {
+    component "pre-tool-hook-wrapper.js" as PreHook
+    component "real-time-constraint-hook.js" as Hook
+}
+
+package "Test Data" {
+    database "18 Test Scenarios" as Scenarios {
+        frame "Critical (3)" as Critical {
+            [no-hardcoded-secrets]
+            [no-eval-usage]
+            [no-parallel-files]
+        }
+        frame "Error (4)" as Error {
+            [proper-error-handling]
+            [debug-not-speculate]
+            [no-evolutionary-names]
+            [plantuml-standard-styling]
+        }
+        frame "Warning (4)" as Warning {
+            [no-console-log]
+            [no-var-declarations]
+            [plantuml-file-location]
+            [image-reference-pattern]
+        }
+        frame "Info (7)" as Info {
+            [proper-function-naming]
+            [no-magic-numbers]
+            [plantuml-diagram-workflow]
+            [plantuml-readability-guidelines]
+            [plantuml-file-organization]
+            [documentation-filename-format]
+            [update-main-readme]
+        }
+    }
+}
+
+package "Test Results" {
+    database "comprehensive-constraint-test-report.md" as Report
+    database "LSL Transcripts" as LSL
+    database ".specstory/history/" as History
+}
+
+AutoTest --> Scenarios : Load test cases
+AutoTest --> PreHook : Call preToolHook()\ndirectly with test data
+PreHook --> Hook : Process constraints
+Hook --> AutoTest : Return blocking/allowed
+AutoTest --> Report : Generate report:\n- 8/18 detected (44%)\n- All blocks confirmed\n- Pattern improvements needed
+
+note right of Report
+    **Test Results:**
+    ✅ Security: 2/2 (100%)
+    ✅ Architecture: 3/3 (100%)
+    ⚠️ Code Quality: 1/5 (20%)
+    ⚠️ PlantUML: 2/5 (40%)
+    ❌ Documentation: 0/3 (0%)
+end note
+
+actor "User" as User
+actor "Claude Code Session" as Claude
+
+User --> Prompts : Select test prompt
+User --> Claude : Issue prompt in live session
+Claude --> PreHook : Hook intercepts\n(real PreToolUse event)
+PreHook --> Hook : Check constraints
+Hook --> Claude : Block or allow\n+ violation message
+Claude --> History : LSL captures\ninteraction + response
+User --> Collector : Run collect-test-results.js
+Collector --> History : Parse LSL transcripts
+Collector --> Report : Update with evidence:\n- Hook message\n- Claude's response\n- Actual blocking behavior
+
+note right of Collector
+    **Evidence Captured:**
+    - User prompt
+    - Hook interception message
+    - Was blocked: YES/NO
+    - Claude's adaptive response
+    - Dashboard logging confirmation
+end note
+
+@enduml
