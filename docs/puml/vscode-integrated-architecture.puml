@@ -1,6 +1,5 @@
 @startuml vscode-integrated-architecture
-!include _standard-style.puml
-
+!theme amiga
 title Knowledge Management System Architecture with VSCode Integration
 
 package "Developer Environment" {
@@ -25,12 +24,6 @@ package "Integration Layer" {
   [Service Manager] as servicemanager
 }
 
-package "Memory Service Layer" {
-  [Graphology In-Memory Graph] as graphology
-  [Memory Sync Manager] as sync
-  [Local Storage (.coding-tools/memory.json)] as local
-}
-
 package "Data Storage Layer" {
   [shared-memory.json] as storage
   [.backups/] as backups
@@ -42,11 +35,9 @@ package "Visualization Layer" {
   [Web Browser] as browser
 }
 
-package "Agent Integration" {
-  [Claude Code] as claude
+package "MCP Integration" {
+  [Coding Agent] as agent
   [MCP Memory Server] as mcp
-  [GitHub CoPilot] as copilot_agent
-  [Fallback Services] as fallback
 }
 
 ' VSCode Integration Flow
@@ -79,33 +70,22 @@ vkb --> visualizer : Start/manage server
 visualizer --> browser : Interactive visualization
 httpserver --> visualizer : Launch requests
 
-' Memory Service Integration
-httpserver --> graphology : Graph operations
-graphology --> sync : Auto-sync (30s)
-sync --> local : Local persistence
-sync --> storage : Cross-agent sync
-local <--> graphology : Fast recovery
-
-' Agent Integration
-claude <--> mcp : MCP operations
-mcp <--> storage : Direct sync
-copilot_agent --> fallback : Fallback services
-fallback --> graphology : Memory operations
-claude --> ukb : Trigger knowledge capture
-copilot_agent --> logs : Generate conversations
+' MCP Integration
+agent <--> mcp : MCP operations
+mcp <--> storage : Sync operations
+agent --> ukb : Trigger knowledge capture
+agent --> logs : Generate conversations
 
 ' Extension Integration Points
 extension --> ukb : Direct UKB calls
 extension --> vkb : Launch VKB viewer
-extension --> graphology : Search operations
-httpserver --> sync : Knowledge updates
+extension --> storage : Search operations
+httpserver --> storage : Knowledge updates
 
 note right of extension : VSCode Extension Bridge\nIntegrates ukb/vkb into Copilot\nReal-time WebSocket updates
 note right of httpserver : HTTP API Server\nHandles VSCode requests\nManages service lifecycle
 note right of storage : Authoritative data source\nGit-tracked for team sharing
 note right of visualizer : Interactive D3.js graph\nColor-coded by entity type
-note right of graphology : Graphology In-Memory Graph\nFast operations, rich algorithms\nJSON serialization
-note right of sync : Auto-Sync Manager\n30-second intervals\nImmediate on updates
-note right of fallback : Fallback Services\nGraphology + Playwright + Logging\nAgent-agnostic functionality
+note right of mcp : Persistent memory\nCross-session knowledge
 
 @enduml

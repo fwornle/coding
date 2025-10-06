@@ -1,6 +1,5 @@
 @startuml vscode-extension-flow
-!include _standard-style.puml
-
+!theme amiga
 title VSCode Extension Knowledge Management Flow
 
 actor Developer as dev
@@ -28,7 +27,7 @@ ext -> ext : Parse pattern data
 ext -> client : updateKnowledge(pattern)
 client -> http : POST /api/knowledge/update
 http -> svc : Process update
-svc -> kb : Update Graphology graph + sync
+svc -> kb : Write to shared-memory.json
 kb -> http : Update confirmation
 http -> client : Response data
 client -> ext : Pattern entity

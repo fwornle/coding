@@ -11,13 +11,13 @@ box "Coding Infrastructure" #LightBlue
   participant "Launch Script" as launch <<util>>
 end box
 
-box "Project: <project-A>" #LightGreen
+box "Project: curriculum-alignment" #LightGreen
   participant "Enhanced Transcript\nMonitor (78406)" as etm1 <<core>>
   database "Claude Transcript\n.jsonl" as trans1 <<external>>
   database "Local LSL Files\n.specstory/history/" as lsl1 <<storage>>
 end box
 
-box "Project: <project-B>" #LightYellow  
+box "Project: nano-degree" #LightYellow  
   participant "Enhanced Transcript\nMonitor (78100)" as etm2 <<core>>
   database "Claude Transcript\n.jsonl" as trans2 <<external>>
   database "Local LSL Files\n.specstory/history/" as lsl2 <<storage>>
@@ -29,13 +29,13 @@ box "Shared Services" #LightPink
 end box
 
 == Project Startup ==
-user -> launch : coding --project <project-A>
+user -> launch : coding --project curriculum-alignment
 launch -> glc : ensure monitoring
-glc -> etm1 : spawn process with ENV:\nTRANSCRIPT_SOURCE_PROJECT=/path/to/<project-A>
+glc -> etm1 : spawn process with ENV:\nTRANSCRIPT_SOURCE_PROJECT=/path/to/curriculum-alignment
 
-user -> launch : coding --project <project-B>  
+user -> launch : coding --project nano-degree  
 launch -> glc : ensure monitoring
-glc -> etm2 : spawn process with ENV:\nTRANSCRIPT_SOURCE_PROJECT=/path/to/<project-B>
+glc -> etm2 : spawn process with ENV:\nTRANSCRIPT_SOURCE_PROJECT=/path/to/nano-degree
 
 == Real-Time Monitoring ==
 loop Every 60 seconds
@@ -49,30 +49,24 @@ end
 == Content Classification & Routing ==
 etm1 -> rcc : classify exchange content
 rcc -> rcc : session continuation filter
-rcc -> rcc : Layer 1: PathAnalyzer
-rcc -> rcc : Layer 2: KeywordMatcher  
-rcc -> rcc : Layer 3: EmbeddingClassifier
-rcc -> rcc : Layer 4: SemanticAnalyzer (if needed)
+rcc -> rcc : keyword analysis
 alt Coding Infrastructure Content
   rcc -> etm1 : CODING_INFRASTRUCTURE
-  etm1 -> coding_lsl : 2025-09-25_1800-1900_<user-hash>_from-<project-A>.md
+  etm1 -> coding_lsl : 2025-09-25_1800-1900_g9b30a_from-curriculum-alignment.md
 else Project-Specific Content  
   rcc -> etm1 : NOT_CODING_INFRASTRUCTURE
-  etm1 -> lsl1 : 2025-09-25_1800-1900_<user-hash>.md
+  etm1 -> lsl1 : 2025-09-25_1800-1900_g9b30a.md
 end
 
 etm2 -> rcc : classify exchange content
 rcc -> rcc : session continuation filter
-rcc -> rcc : Layer 1: PathAnalyzer
-rcc -> rcc : Layer 2: KeywordMatcher
-rcc -> rcc : Layer 3: EmbeddingClassifier
-rcc -> rcc : Layer 4: SemanticAnalyzer (if needed)
+rcc -> rcc : keyword analysis
 alt Coding Infrastructure Content
   rcc -> etm2 : CODING_INFRASTRUCTURE
-  etm2 -> coding_lsl : 2025-09-25_1900-2000_<user-hash>_from-<project-B>.md
+  etm2 -> coding_lsl : 2025-09-25_1900-2000_g9b30a_from-nano-degree.md
 else Project-Specific Content
   rcc -> etm2 : NOT_CODING_INFRASTRUCTURE  
-  etm2 -> lsl2 : 2025-09-25_1900-2000_<user-hash>.md
+  etm2 -> lsl2 : 2025-09-25_1900-2000_g9b30a.md
 end
 
 == Health Monitoring ==
@@ -84,8 +78,8 @@ loop Every 30 seconds
   
   note over glc
     Health Check Results:
-    - <project-A>: 11 exchanges, healthy
-    - <project-B>: 18 exchanges, healthy
+    - curriculum-alignment: 11 exchanges, healthy
+    - nano-degree: 18 exchanges, healthy
   end note
 end
 

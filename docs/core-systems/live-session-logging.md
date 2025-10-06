@@ -6,7 +6,7 @@ A bulletproof real-time conversation monitoring and classification system that e
 
 The LSL system provides **real-time transcript monitoring** with intelligent classification to determine whether content belongs to **coding infrastructure** work or **project-specific** work. The system features a robust 4-layer monitoring architecture, global coordination across multiple projects, comprehensive health monitoring, and bulletproof reliability through multiple failsafe mechanisms.
 
-![LSL Architecture](images/lsl-architecture.png)
+![LSL Architecture](../images/lsl-architecture.png)
 
 ### Core Principles
 
@@ -21,7 +21,7 @@ The LSL system provides **real-time transcript monitoring** with intelligent cla
 
 ## 4-Layer Monitoring Architecture
 
-![4-Layer Monitoring Architecture](images/4-layer-monitoring-architecture.png)
+![4-Layer Monitoring Architecture](../images/4-layer-monitoring-architecture.png)
 
 The LSL system is protected by a comprehensive 4-layer monitoring architecture designed to prevent any single point of failure:
 
@@ -105,7 +105,7 @@ Each critical service implements self-health checks and can self-restart when ex
 
 ## LSL Components Architecture
 
-![LSL Components](images/lsl-components.png)
+![LSL Components](../images/lsl-components.png)
 
 The LSL system consists of core components working within the 4-layer monitoring framework:
 
@@ -190,9 +190,9 @@ The core monitoring system that runs as a background process for each project, n
 
 Four-layer classification system that accurately determines content routing with advanced semantic understanding.
 
-![Classification Flow](images/lsl-classification-flow.png)
+![Classification Flow](../images/lsl-classification-flow.png)
 
-![4-Layer Classification Flow](images/lsl-4-layer-classification.png)
+![4-Layer Classification Flow](../images/lsl-4-layer-classification.png)
 
 **Classification Layers**:
 
@@ -490,7 +490,7 @@ Complete chronological list of all classification sessions.
 
 The embedding classifier searches against a vector database containing indexed coding repository content.
 
-![Vector Database Indexing Process](images/lsl-vector-db-indexing.png)
+![Vector Database Indexing Process](../images/lsl-vector-db-indexing.png)
 
 **Collection Configuration**:
 ```javascript
@@ -634,7 +634,7 @@ Handles the creation and management of LSL session files with intelligent routin
 
 ## Multi-Project Architecture
 
-![Multi-Project Flow](images/lsl-multi-project-architecture.png)
+![Multi-Project Flow](../images/lsl-multi-project-architecture.png)
 
 ### Project-Specific Monitoring
 
@@ -903,7 +903,7 @@ The LSL system uses **PostToolUse hooks** to capture constraint-related events A
 
 ### Constraint Violation Capture Flow
 
-![Constraint Hook Flow](images/constraint-hooks-flow.png)
+![Constraint Hook Flow](../images/constraint-hooks-flow.png)
 
 **Interaction Sequence**:
 1. Claude attempts tool call
