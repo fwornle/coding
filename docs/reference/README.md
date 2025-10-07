@@ -29,12 +29,12 @@ Complete reference materials for the Semantic Analysis & Knowledge Management Sy
 ### Integration APIs
 - **HTTP REST APIs**: See [API Reference](../integrations/api-reference.md)
 - **MCP Tools**: See [MCP Server Setup](../components/semantic-analysis/mcp-server-setup.md)
-- **VSCode Extensions**: See [VSCode Integration](../integrations/vscode-copilot-integration.md)
+- **VSCode Extensions**: See [VSCode Integration](../integrations/vscode-copilot.md)
 
 ## 📖 Quick Start References
 
 For immediate help getting started:
-1. **Installation**: [Quick Start Guide](../installation/quick-start.md)
+1. **Installation**: [Quick Start Guide](../getting-started.md)
 2. **First Commands**: [UKB User Guide](../ukb/user-guide.md)
 3. **Troubleshooting**: [System Diagnostics](troubleshooting-knowledge-base.md)
 

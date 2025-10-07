@@ -269,6 +269,6 @@ CACHE_TTL_HOURS=24
 ---
 
 **Next Steps:**
-- [Quick Start Guide](../installation/quick-start.md) - Set up the system
+- [Quick Start Guide](../getting-started.md) - Set up the system
 - [System Diagnostics](system-diagnostics.md) - Verify configuration
 - [Troubleshooting](troubleshooting.md) - Resolve common issues

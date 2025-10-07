@@ -35,7 +35,7 @@ Central documentation for the unified semantic analysis & knowledge management s
 
 ### Reference
 - **[API Keys Setup](reference/api-keys-setup.md)** - LLM provider configuration
-- **[Troubleshooting](reference/troubleshooting.md)** - Common issues and solutions
+- **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 - **[CLI Commands](reference/commands.md)** - Command-line reference
 
 ---
@@ -66,7 +66,7 @@ Each integration component is self-contained with its own comprehensive document
 
 **Architecture Deep Dive?** Explore [Architecture](architecture/overview.md)
 
-**Having Issues?** Consult [Troubleshooting](reference/troubleshooting.md)
+**Having Issues?** Consult [Troubleshooting](troubleshooting.md)
 
 ---
 

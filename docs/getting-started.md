@@ -358,7 +358,7 @@ source ~/.bashrc
 - **[Constraint Monitoring](core-systems/constraint-monitoring.md)** - Real-time code quality
 - **[Knowledge Management](knowledge-management/README.md)** - UKB/VKB workflows
 - **[Integration Components](integrations/README.md)** - External component documentation
-- **[Troubleshooting](reference/troubleshooting.md)** - Detailed troubleshooting guide
+- **[Troubleshooting](../troubleshooting.md)** - Detailed troubleshooting guide
 
 ---
 
