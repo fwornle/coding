@@ -6,7 +6,7 @@ UKB-CLI (Update Knowledge Base Command Line Interface) is a modern, cross-platfo
 
 ## Documentation Structure
 
-### 📐 [Architecture](./architecture.md)
+### 📐 Architecture
 Comprehensive technical architecture documentation including:
 - System architecture diagrams
 - Component design
@@ -21,14 +21,14 @@ Complete API documentation covering:
 - Data types and schemas
 - Error handling
 
-### 🎯 [Use Cases](./use-cases.md)
+### 🎯 Use Cases
 Real-world scenarios and examples:
 - Daily development workflows
 - Knowledge capture patterns
 - Team collaboration
 - Integration examples
 
-### 🔄 [Migration Guide](./migration-guide.md)
+### 🔄 Migration Notes
 Step-by-step guide for migrating from legacy UKB:
 - Installation instructions
 - Command mapping
@@ -104,7 +104,7 @@ ukb-cli interactive
 
 ## Architecture Highlights
 
-![System Architecture](images/ukb-cli-architecture.png)
+**System Architecture**:
 
 The system follows a layered architecture:
 - **CLI Layer**: User interface and command routing
@@ -183,7 +183,7 @@ We welcome contributions! Areas of focus:
 - **Issues**: GitHub Issues
 - **Discussions**: GitHub Discussions
 - **Documentation**: This directory
-- **Examples**: See [use-cases.md](./use-cases.md)
+- **Examples**: See [Use Cases](#🎯-use-cases) section above
 
 ## License
 

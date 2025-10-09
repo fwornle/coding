@@ -207,8 +207,8 @@ graph LR
 **After Fix**: Status line shows real-time trajectory states like `⚙️ IMP`, `✅ VER`, etc.
 
 **Architecture Diagrams**:
-- [Status Line Integration](images/status-line-trajectory-integration.png) - Current integration architecture
-- [Real-Time Analysis Flow](images/real-time-trajectory-analysis-flow.png) - Complete trajectory analysis system flow
+- [Status Line Integration](../images/status-line-trajectory-integration.png) - Current integration architecture
+- [Real-Time Analysis Flow](../images/real-time-trajectory-analysis-flow.png) - Complete trajectory analysis system flow
 
 **Implementation**:
 ```javascript
@@ -921,7 +921,7 @@ console.log('Report sections:', Object.keys(report));
 
 - **[Live Session Logging System](live-session-logging.md)** - Real-time session documentation and redirect detection
 - **[Main README](../README.md)** - System overview and general usage
-- **[Installation Guide](installation/)** - Setup and configuration instructions
+- **[Getting Started](../getting-started.md)** - Installation and setup instructions
 
 ---
 

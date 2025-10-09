@@ -467,7 +467,7 @@ cat ~/.ukb/debug.log
 ## Next Steps
 
 - **[UkbCli Architecture Insights](../../knowledge-management/insights/UkbCli.md)** - Complete technical documentation with architecture diagrams
-- **[Use Cases](ukb-use-cases.md)** - Detailed workflow examples  
+- **[Use Cases](README.md#🎯-use-cases)** - Detailed workflow examples  
 - **[VSCode Integration](../integrations/vscode-extension.md)** - IDE integration
 - **[System Architecture](../architecture/system-overview.md)** - Technical details
 

@@ -624,7 +624,7 @@ npm run stop
 
 ### Getting Help
 
-- **Documentation**: [docs/](./README.md)
+- **Documentation**: [Semantic Analysis MCP Server](../../integrations/mcp-semantic-analysis.md)
 - **Issues**: [GitHub Issues](https://github.com/your-org/semantic-analysis-system/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/your-org/semantic-analysis-system/discussions)
 

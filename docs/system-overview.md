@@ -180,7 +180,7 @@ Bulletproof reliability through redundant monitoring:
 3. **Monitoring Verifier** - Mandatory session-level verification (blocks Claude startup if unhealthy)
 4. **Service-Level Health** - Individual service self-monitoring and auto-restart
 
-**Learn more:** [Monitoring Systems Documentation](architecture/monitoring-systems.md)
+**Learn more:** [4-Layer Monitoring Architecture](core-systems/status-line.md#architecture)
 
 ### Classification & Routing
 
@@ -192,7 +192,7 @@ Intelligent content classification for proper knowledge organization:
 - **Layer 3**: Embedding classifier (vector similarity) - <50ms
 - **Layer 4**: Semantic analyzer (LLM-powered) - <100ms when needed
 
-**Learn more:** [Classification & Routing Documentation](architecture/classification-routing.md)
+**Learn more:** [LSL Classification System](core-systems/live-session-logging.md#reliablecodingclassifier)
 
 ### Unified Memory Systems
 
@@ -204,7 +204,7 @@ Three synchronized knowledge stores:
 
 **SynchronizationAgent** ensures consistency across all three stores.
 
-**Learn more:** [Architecture Overview](architecture/overview.md)
+**Learn more:** [Architecture Overview](architecture/README.md)
 
 ---
 

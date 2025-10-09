@@ -29,9 +29,9 @@ Central documentation for the unified semantic analysis & knowledge management s
 - **[Knowledge Workflows](knowledge-management/workflows.md)** - Common patterns and use cases
 
 ### Architecture
-- **[Architecture Overview](architecture/overview.md)** - Unified system architecture and design
-- **[Monitoring Systems](architecture/monitoring-systems.md)** - 4-layer monitoring architecture
-- **[Classification & Routing](architecture/classification-routing.md)** - LSL classification system
+- **[Architecture Overview](architecture/README.md)** - System architecture, principles, and patterns
+- **[4-Layer Monitoring](core-systems/status-line.md#architecture)** - Health monitoring architecture
+- **[LSL Classification](core-systems/live-session-logging.md#reliablecodingclassifier)** - Classification and routing system
 
 ### Reference
 - **[API Keys Setup](reference/api-keys-setup.md)** - LLM provider configuration
@@ -64,7 +64,7 @@ Each integration component is self-contained with its own comprehensive document
 
 **Managing Knowledge?** Visit [Knowledge Management](knowledge-management/README.md)
 
-**Architecture Deep Dive?** Explore [Architecture](architecture/overview.md)
+**Architecture Deep Dive?** Explore [Architecture](architecture/README.md)
 
 **Having Issues?** Consult [Troubleshooting](troubleshooting.md)
 

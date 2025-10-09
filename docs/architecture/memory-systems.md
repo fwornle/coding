@@ -599,7 +599,7 @@ SYNC_RETRY_COUNT=3
 
 ## See Also
 
-- [Unified System Overview](unified-system-overview.md)
+- [System Overview](../system-overview.md)
 - [SynchronizationAgent Implementation](../components/semantic-analysis/synchronization-agent.md)
 - [MCP Memory Server Setup](../components/semantic-analysis/mcp-server-setup.md)
 - [Graphology Integration](../integrations/graphology-integration.md)

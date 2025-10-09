@@ -682,7 +682,7 @@ disabled_constraints:
 ## See Also
 
 - **[Live Session Logging System](live-session-logging.md)** - LSL integration details
-- **[Constraint Monitor Effectiveness Report](constraint-monitor-effectiveness-report.md)** - Real-world testing results
+- **[Testing Architecture](#testing-architecture)** - Automated and interactive testing
 - **[Test Report](../integrations/mcp-constraint-monitor/comprehensive-constraint-test-report.md)** - Latest test results
 - **[Interactive Test Guide](../integrations/mcp-constraint-monitor/INTERACTIVE-TESTING-GUIDE.md)** - Manual testing procedures
 - **[Claude Code Hooks Documentation](https://docs.claude.com/en/docs/claude-code/hooks)** - Official hooks reference

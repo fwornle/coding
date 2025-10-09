@@ -6,7 +6,7 @@ VKB-CLI (View Knowledge Base Command Line Interface) is a modern, cross-platform
 
 ## Documentation Structure
 
-### 📐 [Architecture](./architecture.md)
+### 📐 Architecture
 Comprehensive technical architecture documentation including:
 - System architecture diagrams
 - Component design and integration
@@ -21,14 +21,14 @@ Complete API documentation covering:
 - Server configuration options
 - Health monitoring endpoints
 
-### 🎯 [Use Cases](./use-cases.md)
+### 🎯 Use Cases
 Real-world scenarios and examples:
 - Development workflow integration
 - Server management operations
 - Programmatic server control
 - Team collaboration patterns
 
-### 🔄 [Migration Guide](./migration-guide.md)
+### 🔄 Migration Notes
 Step-by-step guide for migrating from legacy VKB:
 - Installation instructions
 - Command mapping
@@ -109,7 +109,7 @@ vkb restart
 
 ## Architecture Highlights
 
-![System Architecture](images/vkb-cli-architecture.png)
+**System Architecture**:
 
 The system follows a layered architecture:
 - **CLI Layer**: User interface and command routing
@@ -199,7 +199,7 @@ We welcome contributions! Areas of focus:
 - **Issues**: GitHub Issues
 - **Discussions**: GitHub Discussions  
 - **Documentation**: This directory
-- **Examples**: See [use-cases.md](./use-cases.md)
+- **Examples**: See [Use Cases](#🎯-use-cases) section above
 
 ## License
 
