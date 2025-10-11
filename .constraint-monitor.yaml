@@ -72,6 +72,7 @@ constraints:
     severity: critical
     enabled: true
     suggestion: Use environment variables or secure key management
+    semantic_validation: true
   - id: no-eval-usage
     group: security
     pattern: \beval\s*\(
@@ -93,6 +94,7 @@ constraints:
     severity: error
     enabled: true
     suggestion: Use debugging tools and verification commands to identify root causes
+    semantic_validation: true
   - id: no-evolutionary-names
     group: architecture
     pattern: (?:class|function|const|let|var)\s+\w*(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)\w*
@@ -100,6 +102,7 @@ constraints:
     severity: error
     enabled: true
     suggestion: Rename to descriptive functional name and refactor the original
+    semantic_validation: true
   - id: plantuml-standard-styling
     group: plantuml
     pattern: "@startuml.*\\n(?!.*!include _standard-style\\.puml)"
