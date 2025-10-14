@@ -150,20 +150,23 @@ class MonitoringVerifier {
       } else {
         // Watchdog detected dead coordinator - trigger recovery
         this.warn('⚠️ System Watchdog: Coordinator dead, triggering recovery...');
-        
-        const recoveryResult = await execAsync(`node "${this.systemWatchdogScript}"`);
-        if (recoveryResult.returnCode === 0) {
+
+        try {
+          await execAsync(`node "${this.systemWatchdogScript}"`);
+          // If we get here, recovery succeeded (exit code 0)
           this.results.systemWatchdog = {
             status: 'warning',
             details: 'Coordinator was dead but successfully recovered'
           };
           this.success('✅ System Watchdog: Recovery successful');
           return true;
-        } else {
+        } catch (recoveryError) {
+          // Recovery failed (non-zero exit code)
           this.results.systemWatchdog = {
             status: 'error',
             details: 'Coordinator dead and recovery failed'
           };
+          this.error(`❌ System Watchdog: Recovery failed - ${recoveryError.message}`);
           return false;
         }
       }
@@ -317,11 +320,12 @@ class MonitoringVerifier {
           // Use centralized health directory in coding project
           let healthPath;
           if (service.useCentralizedHealth) {
-            // All monitoring services run from coding project, so always use 'coding' prefix
-            healthPath = path.join(this.codingRepoPath, '.health', `coding-${service.healthFile}`);
+            // Health files use project name as prefix
+            const projectName = this.projectPath ? path.basename(this.projectPath) : 'coding';
+            healthPath = path.join(this.codingRepoPath, '.health', `${projectName}-${service.healthFile}`);
           } else {
             // Fallback to old logic for other services
-            healthPath = service.checkInCoding 
+            healthPath = service.checkInCoding
               ? path.join(this.codingRepoPath, service.healthFile)
               : path.join(this.projectPath, service.healthFile);
           }

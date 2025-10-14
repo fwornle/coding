@@ -271,23 +271,33 @@ fi
 echo "🟢 Starting Live Logging System..."
 cd "$CODING_DIR"
 
-# Kill any existing transcript monitor or live-logging processes
-echo "🧹 Stopping existing live-logging processes..."
-pkill -f "transcript-monitor.js" 2>/dev/null || true
-pkill -f "live-logging-coordinator.js" 2>/dev/null || true
-sleep 2
+# Check for existing processes before starting (prevent duplicates)
+echo "🧹 Checking for existing live-logging processes..."
 
-# Start the transcript monitor (this handles session transitions)
-echo "📋 Starting Transcript Monitor with session transitions..."
-nohup node scripts/enhanced-transcript-monitor.js > transcript-monitor.log 2>&1 &
-TRANSCRIPT_PID=$!
-echo "   Transcript Monitor PID: $TRANSCRIPT_PID"
+# Check if enhanced-transcript-monitor is already running
+if pgrep -f "enhanced-transcript-monitor.js" > /dev/null 2>&1; then
+    echo "⚠️  Transcript Monitor already running globally, skipping startup..."
+    echo "   (Per-project monitors will be started by global-lsl-coordinator)"
+    TRANSCRIPT_PID="already-running"
+else
+    # Start the transcript monitor (this handles session transitions)
+    echo "📋 Starting Transcript Monitor with session transitions..."
+    nohup node scripts/enhanced-transcript-monitor.js > transcript-monitor.log 2>&1 &
+    TRANSCRIPT_PID=$!
+    echo "   Transcript Monitor PID: $TRANSCRIPT_PID"
+fi
 
-# Start the live-logging coordinator (this handles MCP integration)
-echo "🔄 Starting Live Logging Coordinator..."
-nohup node scripts/live-logging-coordinator.js > logs/live-logging.log 2>&1 &
-LIVE_LOGGING_PID=$!
-echo "   Live Logging Coordinator PID: $LIVE_LOGGING_PID"
+# Check if live-logging coordinator is already running
+if pgrep -f "live-logging-coordinator.js" > /dev/null 2>&1; then
+    LIVE_LOGGING_PID="already-running"
+    echo "⚠️  Live Logging Coordinator already running, skipping startup..."
+else
+    # Start the live-logging coordinator (this handles MCP integration)
+    echo "🔄 Starting Live Logging Coordinator..."
+    nohup node scripts/live-logging-coordinator.js > logs/live-logging.log 2>&1 &
+    LIVE_LOGGING_PID=$!
+    echo "   Live Logging Coordinator PID: $LIVE_LOGGING_PID"
+fi
 
 # Log startup
 echo "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ") - Live Logging System started: Transcript Monitor PID $TRANSCRIPT_PID, Coordinator PID $LIVE_LOGGING_PID" >> logs/live-logging.log
@@ -315,15 +325,21 @@ echo "🔍 Verifying services..."
 services_running=0
 
 # Check Live Logging System
-if ps -p $TRANSCRIPT_PID > /dev/null 2>&1; then
+if [ "$TRANSCRIPT_PID" = "already-running" ]; then
+    echo "✅ Transcript Monitor running (pre-existing)"
+    services_running=$((services_running + 1))
+elif ps -p $TRANSCRIPT_PID > /dev/null 2>&1; then
     echo "✅ Transcript Monitor running (PID: $TRANSCRIPT_PID)"
     services_running=$((services_running + 1))
 else
     echo "❌ Transcript Monitor NOT running"
 fi
 
-if ps -p $LIVE_LOGGING_PID > /dev/null 2>&1; then
-    echo "✅ Live Logging Coordinator running (PID: $LIVE_LOGGING_PID)"  
+if [ "$LIVE_LOGGING_PID" = "already-running" ]; then
+    echo "✅ Live Logging Coordinator running (pre-existing)"
+    services_running=$((services_running + 1))
+elif ps -p $LIVE_LOGGING_PID > /dev/null 2>&1; then
+    echo "✅ Live Logging Coordinator running (PID: $LIVE_LOGGING_PID)"
     services_running=$((services_running + 1))
 else
     echo "❌ Live Logging Coordinator NOT running"
