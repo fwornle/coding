@@ -79,6 +79,7 @@ Detailed standalone documentation for specific systems:
 - **[Enhanced Health Monitoring](enhanced-health-monitoring.md)** - Comprehensive health tracking and status reporting
 
 ### Core System Details
+- **[Multi-Collection Classification](multi-collection-classification.md)** - 4-collection semantic classification with 768-dim embeddings (nomic-embed-text-v1)
 - **[Constraint Monitoring System](constraint-monitoring-system.md)** - Detailed constraint enforcement documentation
 - **[Trajectory Generation System](trajectory-generation-system.md)** - Repository analysis and trajectory reporting
 - **[Adaptive Transcript Format Detection](adaptive-transcript-format-detection.md)** - LSL format detection and adaptation
@@ -95,4 +96,4 @@ Historical documentation and migration guides have been archived in `.obsolete/d
 
 ---
 
-*Last updated: 2025-10-06*
+*Last updated: 2025-10-16*
