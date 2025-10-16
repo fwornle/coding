@@ -145,7 +145,7 @@ class ReliableCodingClassifier {
         debug: this.debug,
         qdrantHost: this.options.qdrantHost || 'localhost',
         qdrantPort: this.options.qdrantPort || 6333,
-        similarityThreshold: this.options.embeddingSimilarityThreshold || 0.65,
+        similarityThreshold: this.options.embeddingSimilarityThreshold || 0.5,
         maxClassificationTimeMs: this.options.embeddingMaxTimeMs || 3000
       });
       
@@ -180,22 +180,31 @@ class ReliableCodingClassifier {
 
   /**
    * Create embedding classifier using fast JavaScript-based embeddings
+   * Supports multi-collection relative scoring for improved classification accuracy
    * @private
    */
   async createEmbeddingClassifier(options) {
     const { QdrantClient } = await import('@qdrant/js-client-rest');
     const { getFastEmbeddingGenerator } = await import(path.join(this.codingRepo, 'scripts/fast-embedding-generator.js'));
-    
+
     const qdrant = new QdrantClient({
       url: `http://${options.qdrantHost}:${options.qdrantPort}`
     });
-    
+
     const embeddingGenerator = getFastEmbeddingGenerator();
-    
+
+    // Define collections to query with relative scoring
+    const collections = options.collections || [
+      { name: 'coding_infrastructure', type: 'coding' },
+      { name: 'coding_lsl', type: 'coding' },
+      { name: 'curriculum_alignment', type: 'project' },
+      { name: 'nano_degree', type: 'project' }
+    ];
+
     return {
       async classifyByEmbedding(exchange) {
         const startTime = Date.now();
-        
+
         try {
           // Extract text content
           const textContent = exchange.content || exchange.userMessage || '';
@@ -207,48 +216,86 @@ class ReliableCodingClassifier {
               inconclusive: true
             };
           }
-          
-          // Generate embedding
+
+          // Generate embedding once for all collection queries
           const truncatedText = textContent.substring(0, 3000);
           const embedding = await embeddingGenerator.generate(truncatedText);
-          
-          // Search in Qdrant
-          const searchResults = await qdrant.search('coding_infrastructure', {
-            vector: embedding,
-            limit: 5,
-            with_payload: true
-          });
-          
-          if (!searchResults || searchResults.length === 0) {
-            return {
-              isCoding: null,
-              confidence: 0.0,
-              reason: 'No similar content found in index',
-              inconclusive: true
-            };
-          }
-          
-          // Analyze similarity scores
-          const maxSimilarity = searchResults[0].score;
-          const avgSimilarity = searchResults.reduce((sum, r) => sum + r.score, 0) / searchResults.length;
-          
-          const isCoding = maxSimilarity >= options.similarityThreshold;
-          const confidence = Math.min(maxSimilarity * 1.2, 0.95); // Scale up slightly
-          
+
+          // Query all collections in parallel
+          const collectionResults = await Promise.all(
+            collections.map(async ({ name, type }) => {
+              try {
+                const searchResults = await qdrant.search(name, {
+                  vector: embedding,
+                  limit: 5,
+                  with_payload: true
+                });
+
+                if (!searchResults || searchResults.length === 0) {
+                  return { collection: name, type, maxScore: 0, avgScore: 0, results: [] };
+                }
+
+                const maxScore = searchResults[0].score;
+                const avgScore = searchResults.reduce((sum, r) => sum + r.score, 0) / searchResults.length;
+
+                return { collection: name, type, maxScore, avgScore, results: searchResults };
+              } catch (error) {
+                // Collection might not exist yet - return zero scores
+                if (options.debug) {
+                  console.log(`Collection ${name} not available: ${error.message}`);
+                }
+                return { collection: name, type, maxScore: 0, avgScore: 0, results: [] };
+              }
+            })
+          );
+
+          // Find collection with highest similarity
+          const sortedByMaxScore = collectionResults.sort((a, b) => b.maxScore - a.maxScore);
+          const topCollection = sortedByMaxScore[0];
+
+          // Calculate relative scoring metrics
+          const codingCollections = collectionResults.filter(c => c.type === 'coding');
+          const projectCollections = collectionResults.filter(c => c.type === 'project');
+
+          const maxCodingScore = Math.max(...codingCollections.map(c => c.maxScore), 0);
+          const maxProjectScore = Math.max(...projectCollections.map(c => c.maxScore), 0);
+
+          // Determine classification based on relative scores
+          const isCoding = maxCodingScore > maxProjectScore && maxCodingScore >= options.similarityThreshold;
+
+          // Calculate confidence based on score difference
+          const scoreDifference = Math.abs(maxCodingScore - maxProjectScore);
+          const baseConfidence = topCollection.maxScore;
+          const confidence = Math.min(baseConfidence + (scoreDifference * 0.5), 0.95);
+
+          // Build detailed reason
+          const collectionScores = collectionResults
+            .map(c => `${c.collection}=${c.maxScore.toFixed(3)}`)
+            .join(', ');
+
+          const reason = isCoding
+            ? `Semantic similarity favors coding (${collectionScores})`
+            : `Semantic similarity favors project content (${collectionScores})`;
+
           return {
             isCoding,
             confidence,
-            reason: isCoding 
-              ? `High semantic similarity to coding content (max: ${maxSimilarity.toFixed(3)})`
-              : `Low semantic similarity to coding content (max: ${maxSimilarity.toFixed(3)})`,
+            reason,
             similarity_scores: {
-              max_similarity: maxSimilarity,
-              avg_similarity: avgSimilarity,
-              top_matches: searchResults.length
+              max_coding_score: maxCodingScore,
+              max_project_score: maxProjectScore,
+              top_collection: topCollection.collection,
+              score_difference: scoreDifference,
+              all_collections: collectionResults.map(c => ({
+                name: c.collection,
+                type: c.type,
+                max_score: c.maxScore,
+                avg_score: c.avgScore
+              }))
             },
             processingTimeMs: Date.now() - startTime
           };
-          
+
         } catch (error) {
           if (options.debug) {
             console.error('Embedding classification error:', error.message);

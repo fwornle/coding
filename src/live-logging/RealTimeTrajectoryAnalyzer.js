@@ -542,11 +542,25 @@ Return JSON: {"state": "state_name", "confidence": 0.0-1.0, "reasoning": "brief 
   getCurrentTrajectoryState() {
     const stateConfig = this.config.trajectoryConfig.trajectory_states?.[this.currentState] || {};
 
+    // CRITICAL FIX: Read actual trajectory file's lastUpdate instead of using internal lastAnalysisTime
+    // to ensure health monitoring gets accurate timestamps
+    let actualLastUpdate = this.lastAnalysisTime;
+    try {
+      const trajectoryFile = path.join(this.projectPath, '.specstory', 'trajectory', 'live-state.json');
+      if (fs.existsSync(trajectoryFile)) {
+        const trajectoryData = JSON.parse(fs.readFileSync(trajectoryFile, 'utf8'));
+        actualLastUpdate = trajectoryData.lastUpdate || this.lastAnalysisTime;
+      }
+    } catch (error) {
+      // Fallback to internal timestamp if file read fails
+      actualLastUpdate = this.lastAnalysisTime;
+    }
+
     return {
       state: this.currentState,
       icon: stateConfig.icon || '❓',
       description: stateConfig.description || 'Unknown state',
-      lastUpdate: this.lastAnalysisTime,
+      lastUpdate: actualLastUpdate,
       stateHistory: this.stateHistory.slice(-5), // Last 5 transitions
       interventionCount: this.interventionCount,
       analysisHealth: {

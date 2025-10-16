@@ -2,7 +2,7 @@
  * Fast JavaScript Embedding Generator using Transformers.js
  *
  * Replaces slow Python process spawning with native JavaScript implementation
- * Uses the same model: sentence-transformers/all-MiniLM-L6-v2
+ * Uses high-quality model: nomic-embed-text-v1 (768 dimensions)
  *
  * Performance: ~10-100x faster than Python spawning
  * - Python: ~500ms per embedding (process spawn overhead)
@@ -14,7 +14,7 @@ import { pipeline } from '@xenova/transformers';
 class FastEmbeddingGenerator {
   constructor() {
     this.extractor = null;
-    this.modelName = 'Xenova/all-MiniLM-L6-v2'; // Pre-converted ONNX model
+    this.modelName = 'Xenova/nomic-embed-text-v1'; // Higher quality ONNX model with better semantic understanding
     this.initPromise = null;
   }
 
@@ -51,7 +51,7 @@ class FastEmbeddingGenerator {
   /**
    * Generate embedding for a single text
    * @param {string} text - Input text
-   * @returns {Promise<number[]>} 384-dimensional embedding vector
+   * @returns {Promise<number[]>} 768-dimensional embedding vector
    */
   async generate(text) {
     await this.initialize();
@@ -68,7 +68,7 @@ class FastEmbeddingGenerator {
   /**
    * Generate embeddings for multiple texts in batch
    * @param {string[]} texts - Array of input texts
-   * @returns {Promise<number[][]>} Array of 384-dimensional embedding vectors
+   * @returns {Promise<number[][]>} Array of 768-dimensional embedding vectors
    */
   async generateBatch(texts) {
     await this.initialize();
@@ -82,10 +82,10 @@ class FastEmbeddingGenerator {
 
   /**
    * Get embedding dimensions
-   * @returns {number} Vector dimensions (384 for all-MiniLM-L6-v2)
+   * @returns {number} Vector dimensions (768 for nomic-embed-text-v1)
    */
   getDimensions() {
-    return 384;
+    return 768;
   }
 }
 

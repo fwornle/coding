@@ -1,7 +1,7 @@
 {
   "project": "coding",
   "description": "Minimal Positive Keywords for Coding Infrastructure Classification",
-  "classification_version": "2.1-minimal",
+  "classification_version": "2.2-threshold-fix",
   "keywords": {
     "primary": [
       "mcp-constraint-monitor", "semantic-analysis-system", "coding infrastructure",
@@ -16,19 +16,19 @@
       "DeduplicationAgent", "DocumentationAgent", "CoordinatorAgent",
       "WebSearchAgent", "KnowledgeGraphAgent", "SemanticAnalysisAgent",
       "JSON-RPC", "MQTT broker", "json-rpc server",
-      "browser-access", "stagehand", "vscode-km-copilot", 
+      "browser-access", "stagehand", "vscode-km-copilot",
       "conversation-analyzer",
       "shared-memory.json", "graphology", "adaptive-classifier",
       "workflow orchestration", "service orchestration",
       "agent registry", "universal launcher", "fallback services"
     ],
     "file_patterns": [
-      "enhanced-transcript-monitor", "post-session-logger", 
+      "enhanced-transcript-monitor", "post-session-logger",
       "reliable-coding-classifier", "semantic-analysis", "mcp-constraint-monitor",
       "coding-keywords.json", "session-index.json", "ukb-cli.js", "vkb-cli.js"
     ],
     "path_patterns": [
-      "/coding/", "/Agentic/coding/", "knowledge-management/", 
+      "/coding/", "/Agentic/coding/", "knowledge-management/",
       "semantic-analysis-system/", "integrations/mcp-", "src/live-logging/",
       ".specstory/history/", "scripts/", "bin/coding"
     ],
@@ -42,9 +42,9 @@
     "minimum_score": 1,
     "primary_weight": 4,
     "secondary_weight": 2,
-    "file_pattern_weight": 3,
-    "path_pattern_weight": 3, 
-    "mcp_pattern_weight": 4,
+    "file_patterns_weight": 3,
+    "path_patterns_weight": 3,
+    "mcp_patterns_weight": 4,
     "exclusion_penalty": 0,
     "processing_timeout_ms": 5
   },

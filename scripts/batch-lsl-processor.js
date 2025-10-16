@@ -25,7 +25,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 // Import consolidated modules
-import { getReliableClassifier } from './reliable-classifier.js';
+import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
 import { getTimeWindow, formatTimestamp, generateLSLFilename } from './timezone-utils.js';
 import ClassificationLogger from './classification-logger.js';
@@ -48,7 +48,12 @@ class BatchLSLProcessor {
     this.sessionDuration = options.sessionDuration || 3600000; // 1 hour in ms
 
     // Initialize components
-    this.classifier = getReliableClassifier();
+    this.classifier = new ReliableCodingClassifier({
+      codingRepo: this.codingRepo,
+      projectPath: this.projectPath,
+      debug: false
+    });
+    this.classifierInitialized = false; // Track initialization state
     this.extractor = new ClaudeConversationExtractor(this.projectPath);
 
     // Initialize classification logger for batch mode
@@ -79,7 +84,15 @@ class BatchLSLProcessor {
    */
   async process(mode, ...args) {
     console.log(`🔄 Starting Batch LSL Processor in ${mode} mode...`);
-    
+
+    // Initialize classifier if not already done
+    if (!this.classifierInitialized) {
+      console.log('🔧 Initializing multi-collection classifier...');
+      await this.classifier.initialize();
+      this.classifierInitialized = true;
+      console.log('✅ Classifier initialized with multi-collection support');
+    }
+
     try {
       switch (mode) {
         case 'post-session':
