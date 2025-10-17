@@ -218,9 +218,9 @@
     "fallback_model": "gpt-4o-mini",
     "analysis_interval": 5000,
     "smart_analysis": {
-      "enabled": true,
-      "only_significant_exchanges": true,
-      "skip_consecutive_reads": true,
+      "enabled": false,
+      "only_significant_exchanges": false,
+      "skip_consecutive_reads": false,
       "max_analyses_per_hour": 50
     },
     "intervention_threshold": 0.8,
