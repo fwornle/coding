@@ -7,6 +7,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODING_REPO="$(dirname "$SCRIPT_DIR")"
 
+# Source agent-common setup functions
+source "$SCRIPT_DIR/agent-common-setup.sh"
+
 log() {
   echo "[Claude] $1"
 }
@@ -53,63 +56,6 @@ verify_monitoring_systems() {
   fi
 }
 
-ensure_statusline_config() {
-  local target_project="$1"
-  local coding_repo="$2"
-  local claude_dir="$target_project/.claude"
-  local settings_file="$claude_dir/settings.local.json"
-  
-  # Skip if we're in the coding repo itself (already has config)
-  if [ "$target_project" = "$coding_repo" ]; then
-    return 0
-  fi
-  
-  # Create .claude directory if it doesn't exist
-  if [ ! -d "$claude_dir" ]; then
-    mkdir -p "$claude_dir"
-    log "Created .claude directory in project"
-  fi
-  
-  # Check if settings file exists
-  if [ ! -f "$settings_file" ]; then
-    # Create minimal settings file with statusLine config
-    cat > "$settings_file" << EOF
-{
-  "permissions": {
-    "allow": [
-      "CODING_REPO=$coding_repo node $coding_repo/scripts/combined-status-line.js"
-    ],
-    "additionalDirectories": []
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "CODING_REPO=$coding_repo node $coding_repo/scripts/combined-status-line.js"
-  }
-}
-EOF
-    log "Created .claude/settings.local.json with statusLine config"
-  else
-    # Check if statusLine is missing and add it
-    if ! grep -q '"statusLine"' "$settings_file" 2>/dev/null; then
-      # Use jq to add statusLine config if jq is available
-      if command -v jq >/dev/null 2>&1; then
-        local temp_file=$(mktemp)
-        jq ". + {\"statusLine\": {\"type\": \"command\", \"command\": \"CODING_REPO=$coding_repo node $coding_repo/scripts/combined-status-line.js\"}}" "$settings_file" > "$temp_file"
-        mv "$temp_file" "$settings_file"
-        log "Added statusLine config to existing settings"
-      else
-        # Fallback: add statusLine before the closing brace
-        sed -i.backup 's/}$/,\n  "statusLine": {\n    "type": "command",\n    "command": "CODING_REPO='"$coding_repo"' node '"$coding_repo"'\/scripts\/combined-status-line.js"\n  }\n}/' "$settings_file"
-        log "Added statusLine config to existing settings (fallback method)"
-      fi
-    fi
-    
-    # Ensure the permission is present
-    if ! grep -q "CODING_REPO.*combined-status-line.js" "$settings_file" 2>/dev/null; then
-      log "Warning: statusLine permission may need to be added manually to .claude/settings.local.json"
-    fi
-  fi
-}
 
 # Use target project directory if specified, otherwise use coding repo
 if [ -n "$CODING_PROJECT_DIR" ]; then
@@ -160,190 +106,14 @@ sleep 2
 # User requirement: "monitoring should be one of the first things coding/bin/coding does"
 verify_monitoring_systems "$TARGET_PROJECT_DIR"
 
-# Ensure statusLine config is present in target project
-ensure_statusline_config "$TARGET_PROJECT_DIR" "$CODING_REPO"
-
-show_session_reminder() {
-  # Check target project directory first
-  local target_specstory_dir="$TARGET_PROJECT_DIR/.specstory/history"
-  local coding_specstory_dir="$CODING_REPO/.specstory/history"
-  
-  local latest_session=""
-  local session_location=""
-  
-  # Look for recent sessions in target project
-  if [ -d "$target_specstory_dir" ]; then
-    latest_session=$(ls -t "$target_specstory_dir"/*.md 2>/dev/null | head -1)
-    if [ -n "$latest_session" ]; then
-      session_location="target project"
-    fi
-  fi
-  
-  # Also check coding repo for comparison
-  if [ -d "$coding_specstory_dir" ]; then
-    local coding_session=$(ls -t "$coding_specstory_dir"/*.md 2>/dev/null | head -1)
-    if [ -n "$coding_session" ]; then
-      # Compare timestamps if both exist
-      if [ -n "$latest_session" ]; then
-        if [ "$coding_session" -nt "$latest_session" ]; then
-          latest_session="$coding_session"
-          session_location="coding repo"
-        fi
-      else
-        latest_session="$coding_session"
-        session_location="coding repo"
-      fi
-    fi
-  fi
-  
-  if [ -n "$latest_session" ] && [ -f "$latest_session" ]; then
-    local session_file=$(basename "$latest_session")
-    echo "📋 Latest session log: $session_file ($session_location)"
-    echo "💡 Reminder: Ask Claude to read the session log for continuity"
-    echo ""
-  fi
-}
 
 # Check for MCP sync requirement (always from coding repo)
 if [ -f "$CODING_REPO/.mcp-sync/sync-required.json" ]; then
   log "MCP memory sync required, will be handled by Claude on startup"
 fi
 
-# Environment was already loaded and services already started before monitoring verification
-
-# Ensure .specstory/logs/ is not ignored by gitignore
-ensure_specstory_logs_tracked() {
-  local project_dir="$1"
-  local gitignore_file="$project_dir/.gitignore"
-
-  # Skip if no .gitignore exists
-  if [ ! -f "$gitignore_file" ]; then
-    return 0
-  fi
-
-  # Check if logs/ pattern exists and .specstory/logs/ is not exempted
-  if grep -q "^logs/" "$gitignore_file" 2>/dev/null; then
-    if ! grep -q "^\!\.specstory/logs/" "$gitignore_file" 2>/dev/null; then
-      log "⚠️  .gitignore has 'logs/' pattern that will ignore .specstory/logs/classification/"
-      log "🔧 Adding exception '!.specstory/logs/' to .gitignore..."
-
-      # Insert the exception right after the logs/ line
-      sed -i.backup '/^logs\//a\
-!.specstory/logs/
-' "$gitignore_file"
-
-      if [ $? -eq 0 ]; then
-        log "✅ Added .specstory/logs/ exception to .gitignore"
-      else
-        log "❌ Failed to update .gitignore - please manually add: !.specstory/logs/"
-      fi
-    fi
-  fi
-}
-
-# Global LSL Coordinator for robust transcript monitoring
-start_transcript_monitoring() {
-  local project_dir="$1"
-  local coding_repo="$2"
-
-  log "Using Global LSL Coordinator for robust transcript monitoring: $(basename "$project_dir")"
-
-  # Create .specstory directory if needed
-  if [ ! -d "$project_dir/.specstory/history" ]; then
-    mkdir -p "$project_dir/.specstory/history"
-  fi
-
-  # Ensure .specstory/logs/ is tracked in git
-  ensure_specstory_logs_tracked "$project_dir"
-  
-  # Use global coordinator to ensure robust LSL
-  if node "$coding_repo/scripts/global-lsl-coordinator.js" ensure "$project_dir" $$; then
-    log "Global LSL Coordinator: LSL setup successful"
-  else
-    log "Warning: Global LSL Coordinator setup failed, falling back to direct monitor"
-    
-    # Fallback: direct monitor startup (backward compatibility)
-    pkill -f "enhanced-transcript-monitor.js.*$(basename "$project_dir")" 2>/dev/null || true
-    cd "$project_dir"
-    nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" > transcript-monitor.log 2>&1 &
-    local new_pid=$!
-    
-    sleep 1
-    if kill -0 "$new_pid" 2>/dev/null; then
-      log "Fallback transcript monitoring started (PID: $new_pid)"
-    else
-      log "Error: Both coordinator and fallback transcript monitoring failed"
-    fi
-  fi
-}
-
-# Start robust transcript monitoring for target project
-if [ -d "$TARGET_PROJECT_DIR/.specstory" ] || mkdir -p "$TARGET_PROJECT_DIR/.specstory/history" 2>/dev/null; then
-  start_transcript_monitoring "$TARGET_PROJECT_DIR" "$CODING_REPO"
-else
-  log "Warning: Could not create .specstory directory for transcript monitoring"
-fi
-
-# Start StatusLine Health Monitor daemon (global monitoring for all sessions)
-start_statusline_health_monitor() {
-  local coding_repo="$1"
-  
-  # Check if health monitor is already running
-  if pgrep -f "statusline-health-monitor.js" >/dev/null 2>&1; then
-    log "StatusLine Health Monitor already running"
-    return 0
-  fi
-  
-  log "Starting StatusLine Health Monitor daemon..."
-  
-  # Start the health monitor daemon in background
-  cd "$coding_repo"
-  nohup node scripts/statusline-health-monitor.js --daemon > .logs/statusline-health-daemon.log 2>&1 &
-  local health_monitor_pid=$!
-  
-  # Brief wait to check if it started successfully
-  sleep 1
-  if kill -0 "$health_monitor_pid" 2>/dev/null; then
-    log "✅ StatusLine Health Monitor started (PID: $health_monitor_pid)"
-  else
-    log "⚠️ StatusLine Health Monitor may have failed to start"
-  fi
-}
-
-# Start Global LSL Coordinator monitoring daemon for auto-recovery
-start_global_lsl_monitoring() {
-  local coding_repo="$1"
-  
-  # Check if Global LSL Coordinator monitoring is already running
-  if pgrep -f "global-lsl-coordinator.js monitor" >/dev/null 2>&1; then
-    log "Global LSL Coordinator monitoring already running"
-    return 0
-  fi
-  
-  log "Starting Global LSL Coordinator monitoring daemon for auto-recovery..."
-  
-  # Start the coordinator monitoring daemon in background
-  cd "$coding_repo"
-  nohup node scripts/global-lsl-coordinator.js monitor > .logs/global-lsl-coordinator-monitor.log 2>&1 &
-  local coordinator_pid=$!
-  
-  # Brief wait to check if it started successfully
-  sleep 1
-  if kill -0 "$coordinator_pid" 2>/dev/null; then
-    log "✅ Global LSL Coordinator monitoring started (PID: $coordinator_pid)"
-  else
-    log "⚠️ Global LSL Coordinator monitoring may have failed to start"
-  fi
-}
-
-# Start the health monitor for global session monitoring
-start_statusline_health_monitor "$CODING_REPO"
-
-# Start the Global LSL Coordinator monitoring for auto-recovery
-start_global_lsl_monitoring "$CODING_REPO"
-
-# Show session summary for continuity
-show_session_reminder
+# Run agent-common initialization (LSL, monitoring, gitignore, etc.)
+agent_common_init "$TARGET_PROJECT_DIR" "$CODING_REPO"
 
 # Find MCP config (always from coding repo)
 MCP_CONFIG=""
