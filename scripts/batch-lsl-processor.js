@@ -27,7 +27,7 @@ import { dirname } from 'path';
 // Import consolidated modules
 import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
 import ClaudeConversationExtractor from './claude-conversation-extractor.js';
-import { getTimeWindow, formatTimestamp, generateLSLFilename } from './timezone-utils.js';
+import { getTimeWindow, formatTimestamp, generateLSLFilename, utcToLocalTime } from './timezone-utils.js';
 import ClassificationLogger from './classification-logger.js';
 import UserHashGenerator from './user-hash-generator.js';
 
@@ -48,13 +48,26 @@ class BatchLSLProcessor {
     this.retryAttempts = options.retryAttempts || 3;
     this.sessionDuration = options.sessionDuration || 3600000; // 1 hour in ms
 
-    // Initialize components
-    this.classifier = new ReliableCodingClassifier({
-      codingRepo: this.codingRepo,
-      projectPath: this.projectPath,
-      debug: false
-    });
-    this.classifierInitialized = false; // Track initialization state
+    // CRITICAL: Detect if we're processing the coding project itself
+    // When projectPath === codingRepo, no classification is needed - everything is local
+    this.isCodingProject = (this.projectPath === this.codingRepo);
+
+    if (this.isCodingProject) {
+      console.log('📦 Processing coding project itself - classification bypassed (all content is local)');
+    }
+
+    // Initialize components (only if needed for non-coding projects)
+    if (!this.isCodingProject) {
+      this.classifier = new ReliableCodingClassifier({
+        codingRepo: this.codingRepo,
+        projectPath: this.projectPath,
+        debug: false
+      });
+      this.classifierInitialized = false; // Track initialization state
+    } else {
+      this.classifier = null;
+      this.classifierInitialized = false;
+    }
     this.extractor = new ClaudeConversationExtractor(this.projectPath);
 
     // Initialize classification logger for batch mode
@@ -87,8 +100,8 @@ class BatchLSLProcessor {
   async process(mode, ...args) {
     console.log(`🔄 Starting Batch LSL Processor in ${mode} mode...`);
 
-    // Initialize classifier if not already done
-    if (!this.classifierInitialized) {
+    // Initialize classifier if not already done (skip for coding project itself)
+    if (!this.classifierInitialized && !this.isCodingProject) {
       console.log('🔧 Initializing multi-collection classifier...');
       await this.classifier.initialize();
       this.classifierInitialized = true;
@@ -437,19 +450,32 @@ class BatchLSLProcessor {
       const timeWindowGroups = new Map(); // key: "YYYY-MM-DD_HHMM-HHMM_local|foreign"
       
       for (const promptSet of promptSets) {
-        // Classify THIS prompt set individually
-        const classification = await this.classifyPromptSet(promptSet);
-        
-        // Determine time window for this prompt set
-        const timestamp = new Date(promptSet.startTime);
-        const date = timestamp.toISOString().split('T')[0];
-        const hour = timestamp.getUTCHours();
-        const startHour = String(hour).padStart(2, '0') + '00';
-        const endHour = String((hour + 1) % 24).padStart(2, '0') + '00';
-        const timeWindow = `${date}_${startHour}-${endHour}`;
-        
-        // Determine if this goes to local or foreign file
-        const fileType = classification.isCoding ? 'foreign' : 'local';
+        // CRITICAL: Skip classification entirely if processing coding project itself
+        let classification;
+        let fileType;
+
+        if (this.isCodingProject) {
+          // No classification needed - everything in coding project is local
+          fileType = 'local';
+          classification = {
+            isCoding: false,
+            confidence: 1.0,
+            reason: 'Processing coding project itself - all content is local by definition',
+            layer: 'bypass'
+          };
+        } else {
+          // Classify THIS prompt set individually for non-coding projects
+          classification = await this.classifyPromptSet(promptSet);
+          fileType = classification.isCoding ? 'foreign' : 'local';
+        }
+
+        // Determine time window for this prompt set (using local timezone, not UTC)
+        const utcTimestamp = promptSet.startTime;
+        const localDate = utcToLocalTime(utcTimestamp);
+        const dateStr = localDate.toISOString().split('T')[0];
+        const timeWindowStr = getTimeWindow(localDate);
+        const timeWindow = `${dateStr}_${timeWindowStr}`;
+
         const groupKey = `${timeWindow}_${fileType}`;
         
         if (!timeWindowGroups.has(groupKey)) {
@@ -680,6 +706,16 @@ class BatchLSLProcessor {
    * This is the core of the new architecture - each prompt set gets its own classification
    */
   async classifyPromptSet(promptSet) {
+    // Guard clause: Should never be called for coding project itself
+    if (this.isCodingProject) {
+      return {
+        isCoding: false,
+        confidence: 1.0,
+        reason: 'Processing coding project itself - classification bypassed',
+        layer: 'bypass'
+      };
+    }
+
     try {
       // Build classification input from prompt set exchanges
       const classificationInput = {

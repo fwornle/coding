@@ -81,7 +81,7 @@ class ClassificationLogger {
       if (!fs.existsSync(logFile)) {
         const header = {
           type: 'session_start',
-          timestamp: new Date().toISOString(),
+          timestamp: timestamp, // Use the window's timestamp, not current time
           projectName: this.projectName,
           timeWindow: fullWindow,
           logVersion: '1.0.0'
@@ -119,9 +119,12 @@ class ClassificationLogger {
    *   - targetFile: 'local' or 'foreign'
    */
   logDecision(decision) {
+    // Use the prompt timestamp (not current time) to match the time window
+    const promptTimestamp = decision.timeRange?.start || new Date().toISOString();
+
     const logEntry = {
       type: 'classification_decision',
-      timestamp: new Date().toISOString(),
+      timestamp: promptTimestamp, // Changed: use prompt time instead of new Date()
       sessionId: this.sessionId,
       ...decision
     };
@@ -130,7 +133,6 @@ class ClassificationLogger {
     this.decisions.push(logEntry);
 
     // Determine which time window this decision belongs to
-    const promptTimestamp = decision.timeRange?.start || new Date().toISOString();
     const logFile = this.getLogFileForWindow(promptTimestamp);
 
     // Append to appropriate windowed log file
@@ -806,18 +808,8 @@ class ClassificationLogger {
    * Finalize logging session
    */
   finalize() {
-    const footer = {
-      type: 'session_end',
-      timestamp: new Date().toISOString(),
-      sessionId: this.sessionId,
-      totalDecisions: this.decisions.length,
-      statistics: this.calculateStatistics()
-    };
-
-    // Write session end to all active windowed log files
-    for (const logFile of this.windowedLogs.values()) {
-      fs.appendFileSync(logFile, JSON.stringify(footer) + '\n', 'utf8');
-    }
+    // Don't write session_end to windowed files - they should be frozen after their window ends
+    // Statistics can be calculated from the classification_decision entries in each window
 
     // Generate summary report
     this.generateSummaryReport();

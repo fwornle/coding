@@ -5,6 +5,16 @@
  * Supports multiple parallel sessions with prompt-triggered trajectory updates
  */
 
+// Load environment variables from coding/.env
+import { config } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const codingRoot = join(__dirname, '..');
+config({ path: join(codingRoot, '.env') });
+
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
