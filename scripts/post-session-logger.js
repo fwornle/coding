@@ -333,6 +333,9 @@ class PostSessionLogger {
       
       // Require multiple specific infrastructure keywords AND no educational content
       return keywordCount >= 4 && !hasEducationalContent;
+    } catch (error) {
+      console.warn('⚠️  Error detecting coding content:', error.message);
+      return false;
     }
   }
 

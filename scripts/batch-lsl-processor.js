@@ -443,9 +443,22 @@ class BatchLSLProcessor {
       }
       
       // Parse into prompt sets (user interaction boundaries)
-      const promptSets = this.parseIntoPromptSets(entries);
+      let promptSets = this.parseIntoPromptSets(entries);
       console.log(`📦 Found ${promptSets.length} prompt sets in ${filename}`);
-      
+
+      // Filter out void/empty prompt sets (interrupted, no content, etc.)
+      const originalCount = promptSets.length;
+      promptSets = promptSets.filter(ps => !this.isVoidPromptSet(ps));
+      const filteredCount = originalCount - promptSets.length;
+      if (filteredCount > 0) {
+        console.log(`🗑️  Filtered out ${filteredCount} void prompt sets (interrupted/empty)`);
+      }
+
+      if (promptSets.length === 0) {
+        console.log(`⚠️  No meaningful prompt sets found after filtering in: ${filename}`);
+        return null;
+      }
+
       // Group prompt sets by time window AND classification
       const timeWindowGroups = new Map(); // key: "YYYY-MM-DD_HHMM-HHMM_local|foreign"
       
@@ -608,6 +621,54 @@ class BatchLSLProcessor {
 
     // Check for command-message format: <command-message>sl is running
     if (trimmedContent.includes('<command-message>sl is running')) return true;
+
+    return false;
+  }
+
+  /**
+   * Check if a prompt set is void (no meaningful content)
+   * Filters out interrupted sessions, empty exchanges, etc.
+   * @param {Object} promptSet - The prompt set to check
+   * @returns {Boolean} True if the prompt set should be filtered out
+   */
+  isVoidPromptSet(promptSet) {
+    if (!promptSet || !promptSet.exchanges || promptSet.exchanges.length === 0) {
+      return true;
+    }
+
+    // Check for interrupted sessions
+    const userExchanges = promptSet.exchanges.filter(e => e.type === 'user');
+    if (userExchanges.length > 0) {
+      const userContent = userExchanges[0].content || '';
+      if (userContent.trim() === '[Request interrupted by user]') {
+        return true;
+      }
+    }
+
+    // Check for zero duration (no actual interaction)
+    const duration = promptSet.endTime - promptSet.startTime;
+    if (duration === 0) {
+      return true;
+    }
+
+    // Check for no meaningful interaction:
+    // - No assistant response
+    // - No tool calls
+    // - User message is empty or whitespace only
+    const hasAssistantResponse = promptSet.hasAssistantResponse;
+    const hasToolCalls = promptSet.toolCallCount > 0;
+
+    if (!hasAssistantResponse && !hasToolCalls) {
+      // Check if user message has any content
+      if (userExchanges.length > 0) {
+        const userContent = (userExchanges[0].content || '').trim();
+        if (!userContent || userContent.length < 3) {
+          return true;
+        }
+      } else {
+        return true;
+      }
+    }
 
     return false;
   }
@@ -921,6 +982,106 @@ class BatchLSLProcessor {
     } catch (error) {
       console.error(`❌ File creation failed for ${group.timeWindow}:`, error.message);
       return null;
+    }
+  }
+
+  /**
+   * Clean up empty LSL files for closed time windows
+   * Only deletes files if their time window has passed (not current hour)
+   * Also removes corresponding classification log files
+   */
+  async cleanupEmptyLSLFiles() {
+    try {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const deletedFiles = [];
+
+      // Check both local and coding project directories
+      const dirsToCheck = [
+        path.join(this.projectPath, '.specstory', 'history'),
+        path.join(this.codingRepo, '.specstory', 'history')
+      ];
+
+      for (const dir of dirsToCheck) {
+        if (!fs.existsSync(dir)) continue;
+
+        const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+
+        for (const filename of files) {
+          const filePath = path.join(dir, filename);
+
+          // Parse time window from filename (YYYY-MM-DD_HHMM-HHMM_hash.md)
+          const timeWindowMatch = filename.match(/(\d{4}-\d{2}-\d{2})_(\d{4})-(\d{4})/);
+          if (!timeWindowMatch) continue;
+
+          const [, date, startTime, endTime] = timeWindowMatch;
+          const fileDate = new Date(date);
+          const fileHour = parseInt(startTime.substring(0, 2));
+
+          // Only process files from closed time windows (not current hour)
+          const isCurrentWindow =
+            fileDate.toDateString() === now.toDateString() &&
+            fileHour === currentHour;
+
+          if (isCurrentWindow) {
+            continue; // Skip current time window
+          }
+
+          // Read and check if file is empty (only void prompt sets)
+          const content = fs.readFileSync(filePath, 'utf8');
+
+          // Check for indicators of void/empty files:
+          // 1. Only one prompt set
+          // 2. Contains "[Request interrupted by user]"
+          // 3. Duration: 0ms
+          // 4. No tool calls (Tool Calls: 0)
+          const promptSetCount = (content.match(/## Prompt Set \d+/g) || []).length;
+          const hasInterrupted = content.includes('[Request interrupted by user]');
+          const hasDuration0 = content.includes('**Duration:** 0ms');
+          const hasNoToolCalls = content.includes('**Tool Calls:** 0');
+
+          const isEmpty = promptSetCount === 1 && hasInterrupted && hasDuration0 && hasNoToolCalls;
+
+          if (isEmpty) {
+            // Delete the LSL file
+            fs.unlinkSync(filePath);
+            deletedFiles.push(filename);
+            console.log(`🗑️  Deleted empty LSL file: ${filename}`);
+
+            // Also delete corresponding classification log file
+            const classificationDir = path.join(
+              dir.includes('coding') ? this.codingRepo : this.projectPath,
+              '.specstory',
+              'logs',
+              'classification'
+            );
+
+            if (fs.existsSync(classificationDir)) {
+              // Find classification files matching this time window
+              const classificationFiles = fs.readdirSync(classificationDir);
+              const timeWindowBase = `${date}_${startTime}-${endTime}`;
+
+              for (const classFile of classificationFiles) {
+                if (classFile.startsWith(timeWindowBase) && (classFile.endsWith('.jsonl') || classFile.endsWith('.md'))) {
+                  const classFilePath = path.join(classificationDir, classFile);
+                  fs.unlinkSync(classFilePath);
+                  console.log(`🗑️  Deleted classification log: ${classFile}`);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (deletedFiles.length > 0) {
+        console.log(`✅ Cleaned up ${deletedFiles.length} empty LSL files`);
+      }
+
+      return deletedFiles;
+
+    } catch (error) {
+      console.error(`❌ Cleanup failed: ${error.message}`);
+      return [];
     }
   }
 
