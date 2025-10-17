@@ -1,0 +1,108 @@
+@startuml agent-agnostic-architecture-new
+!include _standard-style.puml
+
+title Agent-Agnostic Architecture\nCoding System
+
+package "Agent Layer" {
+    component "Claude Code\n(MCP)" as claude <<agent>>
+    component "GitHub CoPilot\n(CLI)" as copilot <<agent>>
+    component "Future Agent\n(Any)" as future <<agent>>
+}
+
+package "Launcher Layer" {
+    component "bin/coding\n(Main Entry)" as main <<launcher>>
+    component "launch-claude.sh\n(Claude Specific)" as launch_claude <<launcher>>
+    component "launch-copilot.sh\n(CoPilot Specific)" as launch_copilot <<launcher>>
+    component "launch-future.sh\n(Future Agent)" as launch_future <<launcher>>
+}
+
+package "Common Setup Layer" {
+    component "agent-common-setup.sh" as common <<common>> {
+        [ensure_specstory_logs_tracked()]
+        [start_transcript_monitoring()]
+        [start_statusline_health_monitor()]
+        [start_global_lsl_monitoring()]
+        [show_session_reminder()]
+        [agent_common_init()]
+    }
+}
+
+package "Shared Services Layer" {
+    component "start-services.sh" as services <<service>> {
+        [VKB Server]
+        [Semantic Analysis]
+        [Constraint Monitor]
+        [Live Logging System]
+    }
+}
+
+package "Agent Adapter Layer" {
+    component "AgentAdapter\n(Interface)" as adapter_interface <<api>>
+    component "ClaudeMCPAdapter" as claude_adapter <<agent>>
+    component "CoPilotAdapter" as copilot_adapter <<agent>>
+    component "AgentRegistry" as registry <<core>>
+    component "AgentDetector" as detector <<core>>
+}
+
+' Main flow
+main --> launch_claude : "--claude or\nauto-detect"
+main --> launch_copilot : "--copilot"
+main --> launch_future : "--agent future"
+
+' Launchers source common setup
+launch_claude ..> common : sources
+launch_copilot ..> common : sources
+launch_future ..> common : sources
+
+' Launchers use services
+launch_claude --> services : starts
+launch_copilot --> services : starts
+launch_future --> services : starts
+
+' Launchers launch agents
+launch_claude --> claude : exec
+launch_copilot --> copilot : exec
+launch_future --> future : exec
+
+' Agent detection
+main --> detector : detects\navailable\nagents
+detector --> claude : checks
+detector --> copilot : checks
+detector --> future : checks
+
+' Adapter pattern
+main --> registry : gets adapter
+registry --> claude_adapter : provides
+registry --> copilot_adapter : provides
+claude_adapter ..|> adapter_interface : implements
+copilot_adapter ..|> adapter_interface : implements
+
+' Common setup provides to all
+common --> services : initializes
+
+note right of common
+  **Agent-Agnostic Functions:**
+  • LSL (Live Session Logging)
+  • Gitignore validation
+  • Health monitoring
+  • Session continuity
+  • Transcript monitoring
+end note
+
+note right of adapter_interface
+  **Required Interface:**
+  • initialize()
+  • cleanup()
+  • executeCommand()
+  • memoryCreate/Search/Read()
+  • browserNavigate/Act/Extract()
+  • logConversation()
+end note
+
+note bottom of services
+  **Shared by All Agents:**
+  VKB Server, Semantic Analysis,
+  Constraint Monitor, LSL System
+end note
+
+@enduml

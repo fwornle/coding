@@ -46,16 +46,17 @@ These files will be moved to `.obsolete/docs/architecture/` during Phase 2H clea
 
 ### 1. Agent-Agnostic Design
 
-The system supports multiple AI coding assistants through a unified adapter pattern:
+The system supports multiple AI coding assistants through a unified adapter pattern with shared infrastructure:
 
-```
-Claude Code → MCP Servers → Unified Interface
-CoPilot → Fallback Services → Unified Interface
-                              ↓
-                      Knowledge Management
-                      Browser Automation
-                      Session Logging
-```
+![Agent-Agnostic Architecture](../puml/agent-agnostic-architecture-new.png)
+
+**Architecture Layers:**
+
+1. **Agent Layer** - AI coding assistants (Claude, CoPilot, future agents)
+2. **Launcher Layer** - Agent-specific startup scripts
+3. **Common Setup Layer** - Shared initialization (`agent-common-setup.sh`)
+4. **Shared Services** - VKB, Semantic Analysis, Constraint Monitor, LSL
+5. **Adapter Layer** - Abstract interface + agent implementations
 
 **Benefits**:
 - No vendor lock-in
@@ -145,9 +146,42 @@ vkb
 
 ---
 
+## Adding New Agents
+
+The system makes it easy to add new AI coding assistants. See the [Agent Integration Guide](../agent-integration-guide.md) for step-by-step instructions.
+
+![Agent Integration Flow](../puml/agent-integration-flow.png)
+
+**Integration Steps:**
+1. Implement `AgentAdapter` interface
+2. Register adapter in `agent-registry.js`
+3. Add detection in `agent-detector.js`
+4. Create launcher script `launch-{agent}.sh`
+5. Update `bin/coding` routing
+6. Test with validation commands
+
+**Required APIs:**
+- Transcript generation (JSONL format)
+- AgentAdapter interface implementation
+- Memory operations (create/search/read)
+- Browser automation (navigate/act/extract)
+- Session logging
+
+See [API Contract](../integrations/api-reference.md) for complete details.
+
+---
+
 ## Architecture Diagrams
 
-Key architecture diagrams are located in `docs/images/`:
+Key architecture diagrams are located in `docs/puml/`:
+
+- **Agent-Agnostic Architecture** - [puml](../puml/agent-agnostic-architecture-new.puml) | [png](../puml/agent-agnostic-architecture-new.png)
+- **Agent Integration Flow** - [puml](../puml/agent-integration-flow.puml) | [png](../puml/agent-integration-flow.png)
+- **4-Layer Monitoring** - [puml](../puml/4-layer-monitoring-architecture.puml)
+- **LSL Classification** - [puml](../puml/lsl-5-layer-classification.puml)
+- **Constraint Monitor** - [puml](../puml/constraint-monitor-architecture.puml)
+
+Additional diagrams available in `docs/puml/`:
 
 - **4-layer-monitoring-architecture.png** - Health monitoring layers
 - **lsl-4-layer-classification.png** - LSL classification system

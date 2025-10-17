@@ -1,0 +1,76 @@
+@startuml agent-integration-flow
+!include _standard-style.puml
+
+title Agent Integration Flow\nAdding a New Coding Agent
+
+actor "Developer" as dev
+participant "bin/coding" as main
+participant "AgentDetector" as detector
+participant "AgentRegistry" as registry
+participant "launch-{agent}.sh" as launcher
+participant "agent-common-setup.sh" as common
+participant "start-services.sh" as services
+participant "New Agent" as agent
+participant "AgentAdapter" as adapter
+
+== Detection Phase ==
+dev -> main : coding --agent newagent
+main -> detector : detectAll()
+detector -> agent : check if available
+agent --> detector : available = true
+detector --> main : newagent detected
+
+== Registry Phase ==
+main -> registry : getAdapter("newagent")
+registry -> adapter : new NewAgentAdapter()
+adapter -> adapter : initialize()
+adapter --> registry : adapter instance
+registry --> main : ready
+
+== Launch Phase ==
+main -> launcher : exec launch-newagent.sh
+launcher -> services : start shared services
+services --> launcher : VKB, LSL, Constraints ready
+
+launcher -> common : source agent-common-setup.sh
+launcher -> common : agent_common_init()
+common -> common : ensure_specstory_logs_tracked()
+common -> common : start_transcript_monitoring()
+common -> common : start_statusline_health_monitor()
+common -> common : start_global_lsl_monitoring()
+common -> common : show_session_reminder()
+common --> launcher : common setup complete
+
+launcher -> agent : exec {agent command}
+agent --> launcher : agent running
+
+== Runtime Phase ==
+agent -> adapter : tool call (memory/browser/log)
+adapter -> adapter : process request
+adapter --> agent : response
+
+note right of adapter
+  **Agent Adapter provides:**
+  • Memory operations
+  • Browser automation
+  • Session logging
+  • Transcript monitoring
+end note
+
+note right of common
+  **Common setup ensures:**
+  • LSL system running
+  • Gitignore configured
+  • Monitoring active
+  • Session continuity
+end note
+
+note right of services
+  **Shared services:**
+  • VKB Server (8080)
+  • Semantic Analysis
+  • Constraint Monitor
+  • Live Logging System
+end note
+
+@enduml
