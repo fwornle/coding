@@ -49,49 +49,134 @@ class PathAnalyzer {
   async analyzePaths(exchange) {
     const startTime = Date.now();
     this.stats.totalAnalyses++;
-    
+
     try {
       const fileOperations = this.extractFileOperations(exchange);
-      
+
       if (fileOperations.length === 0) {
         return this.formatResult(false, [], 'No file operations detected', startTime);
       }
-      
+
       this.stats.fileOperationsDetected += fileOperations.length;
-      
+
       // Check each file operation for coding repo targeting
       const codingOperations = [];
       const nonCodingOperations = [];
-      
+      const codingWriteOperations = [];
+      const nonCodingWriteOperations = [];
+
       for (const filePath of fileOperations) {
+        const isWrite = this.isWriteOperation(exchange, filePath);
+
         if (this.isCodingPath(filePath)) {
           codingOperations.push(filePath);
+          if (isWrite) codingWriteOperations.push(filePath);
           this.stats.codingPathHits++;
         } else {
           nonCodingOperations.push(filePath);
+          if (isWrite) nonCodingWriteOperations.push(filePath);
         }
       }
-      
-      // If any operation targets coding repo, classify as coding
-      if (codingOperations.length > 0) {
-        const reason = `File operations targeting coding repo: ${codingOperations.join(', ')}`;
+
+      // Priority 1: Write operations determine classification
+      // If there are write operations, classify based on majority of writes
+      if (codingWriteOperations.length > 0 || nonCodingWriteOperations.length > 0) {
+        if (nonCodingWriteOperations.length > codingWriteOperations.length) {
+          const reason = `Majority of write operations target local project: ${nonCodingWriteOperations.join(', ')}`;
+          return this.formatResult(false, fileOperations, reason, startTime, {
+            codingOperations,
+            nonCodingOperations,
+            codingWriteOperations,
+            nonCodingWriteOperations
+          });
+        } else if (codingWriteOperations.length > nonCodingWriteOperations.length) {
+          const reason = `Majority of write operations target coding repo: ${codingWriteOperations.join(', ')}`;
+          return this.formatResult(true, fileOperations, reason, startTime, {
+            codingOperations,
+            nonCodingOperations,
+            codingWriteOperations,
+            nonCodingWriteOperations
+          });
+        }
+        // If equal writes, fall through to majority rule
+      }
+
+      // Priority 2: Majority rule - if >50% of operations are coding, classify as coding
+      const codingPercentage = (codingOperations.length / fileOperations.length) * 100;
+
+      if (codingPercentage > 50) {
+        const reason = `Majority (${codingPercentage.toFixed(1)}%) of file operations target coding repo: ${codingOperations.join(', ')}`;
         return this.formatResult(true, fileOperations, reason, startTime, {
           codingOperations,
-          nonCodingOperations
+          nonCodingOperations,
+          codingPercentage
         });
       }
-      
-      // All operations target customer project
-      const reason = `All file operations target customer project: ${nonCodingOperations.join(', ')}`;
+
+      // Majority of operations target customer project
+      const reason = `Majority (${(100 - codingPercentage).toFixed(1)}%) of file operations target local project: ${nonCodingOperations.join(', ')}`;
       return this.formatResult(false, fileOperations, reason, startTime, {
         codingOperations,
-        nonCodingOperations
+        nonCodingOperations,
+        codingPercentage
       });
-      
+
     } catch (error) {
       this.log(`Analysis error: ${error.message}`);
       return this.formatResult(false, [], `Analysis error: ${error.message}`, startTime);
     }
+  }
+
+  /**
+   * Determine if a file operation is a write operation
+   * @param {Object} exchange - Exchange containing tool calls
+   * @param {string} filePath - File path to check
+   * @returns {boolean} True if this is a write operation
+   */
+  isWriteOperation(exchange, filePath) {
+    const writeTools = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
+
+    // Check assistant response tool calls
+    if (exchange.assistantResponse && exchange.assistantResponse.toolCalls) {
+      for (const tool of exchange.assistantResponse.toolCalls) {
+        if (writeTools.has(tool.name)) {
+          const params = tool.parameters || tool.input || {};
+          const toolPath = params.file_path || params.path || params.notebook_path || params.filePath;
+          if (toolPath === filePath) {
+            return true;
+          }
+        }
+      }
+    }
+
+    // Check direct tool calls array
+    if (exchange.toolCalls) {
+      for (const tool of exchange.toolCalls) {
+        if (writeTools.has(tool.name)) {
+          const params = tool.parameters || tool.input || {};
+          const toolPath = params.file_path || params.path || params.notebook_path || params.filePath;
+          if (toolPath === filePath) {
+            return true;
+          }
+        }
+      }
+    }
+
+    // Check for write tools in text format
+    if (exchange.assistantResponse && typeof exchange.assistantResponse === 'string') {
+      const text = exchange.assistantResponse;
+      for (const toolName of writeTools) {
+        const toolRegex = new RegExp(`<(?:tool_use|invoke)\\s+name="${toolName}"[^>]*>.*?<parameter\\s+name="(?:file_path|path|notebook_path)"[^>]*>([^<]+)<\\/parameter>`, 'gs');
+        let match;
+        while ((match = toolRegex.exec(text)) !== null) {
+          if (match[1].trim() === filePath) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
