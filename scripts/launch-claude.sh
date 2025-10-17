@@ -211,17 +211,50 @@ fi
 
 # Environment was already loaded and services already started before monitoring verification
 
+# Ensure .specstory/logs/ is not ignored by gitignore
+ensure_specstory_logs_tracked() {
+  local project_dir="$1"
+  local gitignore_file="$project_dir/.gitignore"
+
+  # Skip if no .gitignore exists
+  if [ ! -f "$gitignore_file" ]; then
+    return 0
+  fi
+
+  # Check if logs/ pattern exists and .specstory/logs/ is not exempted
+  if grep -q "^logs/" "$gitignore_file" 2>/dev/null; then
+    if ! grep -q "^\!\.specstory/logs/" "$gitignore_file" 2>/dev/null; then
+      log "⚠️  .gitignore has 'logs/' pattern that will ignore .specstory/logs/classification/"
+      log "🔧 Adding exception '!.specstory/logs/' to .gitignore..."
+
+      # Insert the exception right after the logs/ line
+      sed -i.backup '/^logs\//a\
+!.specstory/logs/
+' "$gitignore_file"
+
+      if [ $? -eq 0 ]; then
+        log "✅ Added .specstory/logs/ exception to .gitignore"
+      else
+        log "❌ Failed to update .gitignore - please manually add: !.specstory/logs/"
+      fi
+    fi
+  fi
+}
+
 # Global LSL Coordinator for robust transcript monitoring
 start_transcript_monitoring() {
-  local project_dir="$1" 
+  local project_dir="$1"
   local coding_repo="$2"
-  
+
   log "Using Global LSL Coordinator for robust transcript monitoring: $(basename "$project_dir")"
-  
+
   # Create .specstory directory if needed
   if [ ! -d "$project_dir/.specstory/history" ]; then
     mkdir -p "$project_dir/.specstory/history"
   fi
+
+  # Ensure .specstory/logs/ is tracked in git
+  ensure_specstory_logs_tracked "$project_dir"
   
   # Use global coordinator to ensure robust LSL
   if node "$coding_repo/scripts/global-lsl-coordinator.js" ensure "$project_dir" $$; then
