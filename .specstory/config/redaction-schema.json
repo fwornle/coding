@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Redaction Patterns Configuration",
+  "description": "Schema for configurable redaction patterns in LSL system",
+  "type": "object",
+  "required": [
+    "version",
+    "patterns"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration version (semver)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the configuration"
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Global enable/disable flag"
+    },
+    "patterns": {
+      "type": "array",
+      "description": "Array of redaction patterns",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "pattern",
+          "flags",
+          "replacementType",
+          "replacement",
+          "enabled",
+          "severity"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z_]+$",
+            "description": "Unique identifier for the pattern"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what this pattern matches"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Regular expression pattern (without delimiters)"
+          },
+          "flags": {
+            "type": "string",
+            "pattern": "^[gimuy]*$",
+            "description": "Regular expression flags"
+          },
+          "replacementType": {
+            "type": "string",
+            "enum": [
+              "env_var",
+              "json_key",
+              "generic",
+              "bearer_token",
+              "connection_string",
+              "email",
+              "user_id",
+              "company_name"
+            ],
+            "description": "Type of replacement logic to use"
+          },
+          "replacement": {
+            "type": "string",
+            "description": "Replacement string (may include capture groups)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable/disable this pattern"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "description": "Security severity level"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
