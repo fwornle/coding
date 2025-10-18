@@ -1075,8 +1075,8 @@ class EnhancedTranscriptMonitor {
 
         this.classificationLogger.logDecision(decision);
 
-        // Generate MD summaries immediately for real-time updates
-        this.classificationLogger.finalize();
+        // Note: MD summaries generated periodically (every 30 mins) and on shutdown
+        // to avoid constant timestamp updates in git-tracked status files
       }
 
       return result.isCoding;
