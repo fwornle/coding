@@ -52,6 +52,7 @@ class ClassificationLogger {
 
     this.decisions = [];
     this.windowedLogs = new Map(); // Track logs by time window
+    this.lastFinalizedDecisionCount = 0; // Track number of decisions at last finalization
 
     // Ensure log directory exists
     fs.mkdirSync(this.logDir, { recursive: true });
@@ -811,10 +812,20 @@ class ClassificationLogger {
     // Don't write session_end to windowed files - they should be frozen after their window ends
     // Statistics can be calculated from the classification_decision entries in each window
 
-    // Generate summary report
-    this.generateSummaryReport();
+    // Only generate summary report if there are new decisions since last finalization
+    // This prevents unnecessary timestamp updates in git-tracked status files
+    // Check disk-based decisions since status file is generated from disk state
+    const allDecisionsFromDisk = this.readAllDecisionsFromDisk();
+    const currentDecisionCount = allDecisionsFromDisk.length;
+    const newDecisions = currentDecisionCount - this.lastFinalizedDecisionCount;
 
-    console.log(`✅ Classification logging complete: ${this.decisions.length} decisions logged`);
+    if (newDecisions > 0) {
+      this.generateSummaryReport();
+      this.lastFinalizedDecisionCount = currentDecisionCount;
+      console.log(`✅ Classification logging complete: ${currentDecisionCount} decisions logged (${newDecisions} new)`);
+    } else {
+      console.log(`⏭️  No new decisions since last finalization (${currentDecisionCount} total decisions)`);
+    }
   }
 }
 
