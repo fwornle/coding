@@ -29,6 +29,11 @@ import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import LSLFileManager from '../src/live-logging/LSLFileManager.js';
 import ClassificationLogger from './classification-logger.js';
 
+// Knowledge management dependencies
+import { DatabaseManager } from '../src/databases/DatabaseManager.js';
+import { EmbeddingGenerator } from '../src/knowledge-management/EmbeddingGenerator.js';
+import { UnifiedInferenceEngine } from '../src/inference/UnifiedInferenceEngine.js';
+
 // Trajectory analyzer integration (optional - requires @anthropic-ai/sdk)
 let RealTimeTrajectoryAnalyzer = null;
 try {
@@ -42,7 +47,7 @@ try {
 // Knowledge extraction integration (optional)
 let StreamingKnowledgeExtractor = null;
 try {
-  const module = await import('../src/knowledge/StreamingKnowledgeExtractor.js');
+  const module = await import('../src/knowledge-management/StreamingKnowledgeExtractor.js');
   StreamingKnowledgeExtractor = module.default;
 } catch (err) {
   // Knowledge extraction not available - continue without it
@@ -289,8 +294,33 @@ class EnhancedTranscriptMonitor {
     }
 
     try {
+      // Initialize database manager
+      const databaseManager = new DatabaseManager({
+        projectPath: this.config.projectPath,
+        debug: this.debug_enabled
+      });
+      await databaseManager.initialize();
+
+      // Initialize embedding generator
+      const embeddingGenerator = new EmbeddingGenerator({
+        projectPath: this.config.projectPath,
+        databaseManager: databaseManager,
+        debug: this.debug_enabled
+      });
+
+      // Initialize inference engine
+      const inferenceEngine = new UnifiedInferenceEngine({
+        projectPath: this.config.projectPath,
+        debug: this.debug_enabled
+      });
+
+      // Create knowledge extractor with all dependencies
       this.knowledgeExtractor = new StreamingKnowledgeExtractor({
         projectPath: this.config.projectPath,
+        databaseManager: databaseManager,
+        embeddingGenerator: embeddingGenerator,
+        inferenceEngine: inferenceEngine,
+        trajectoryAnalyzer: this.trajectoryAnalyzer, // Pass existing trajectory analyzer if available
         enableBudgetTracking: true,
         enableSensitivityDetection: true,
         debug: this.debug_enabled

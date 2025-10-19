@@ -152,26 +152,87 @@ groq (remote, fast) → openrouter (remote, accurate) → local (free, private)
 ### Prerequisites
 
 - Node.js 18+ or Bun
-- Qdrant server (local or remote)
+- Qdrant server (optional - for vector search features)
 - SQLite (built-in with better-sqlite3)
 
 ### Installation
 
+The knowledge management system is **automatically initialized** during fresh installations:
+
 ```bash
-# Install dependencies
-npm install
+# Run the installer (automatically initializes knowledge system)
+./install.sh
 
-# Initialize databases
-npm run db:init
-
-# Start Qdrant (if using Docker)
-docker run -p 6333:6333 qdrant/qdrant
-
-# Run tests to verify setup
-npm test
+# Or initialize manually if needed
+node scripts/initialize-knowledge-system.js
 ```
 
-### Quick Start
+The initialization script:
+1. Creates configuration from template (`.specstory/config/knowledge-system.json`)
+2. Initializes Qdrant collections (if Qdrant is running)
+3. Creates SQLite database schemas
+4. Verifies all components
+
+### Verification
+
+Check that the knowledge system is active:
+
+```bash
+# Check health status
+cat .health/coding-transcript-monitor-health.json | jq '.knowledgeExtraction'
+
+# Check status line
+CODING_REPO=/path/to/coding node scripts/combined-status-line.js
+
+# Run E2E tests
+node scripts/test-knowledge-extraction.js [--verbose]
+```
+
+**Expected status line**: `[📚✅]` - Knowledge extraction ready and operational
+
+**Expected test results**: 6/8 tests pass (2 tests require actual session data)
+
+### Status Line States
+
+The status line shows the current state of the knowledge management system:
+
+| Status | Icon | Meaning |
+|--------|------|---------|
+| Ready | `[📚✅]` | Knowledge extraction ready and operational |
+| Processing | `[📚⏳]` | Actively extracting knowledge from session |
+| Idle | `[📚💤]` | Operational but waiting/sleeping |
+| Warning | `[📚⚠️ ⚠️N]` | Has N errors but still operational |
+| Paused/Disabled | `[📚⏸️ ]` | Knowledge extraction disabled in config |
+| Offline | `[📚❌]` | System offline or initialization failed |
+
+### Automatic Operation
+
+Knowledge extraction happens **automatically** during Claude Code sessions:
+
+1. Start a coding session with `coding` or `coding --claude`
+2. The transcript monitor runs in the background
+3. Knowledge is extracted in real-time from exchanges
+4. Embeddings are generated and stored
+5. Knowledge is available for retrieval via VKB/UKB commands
+
+The system operates with:
+- **DatabaseManager** - Manages Qdrant (vectors) + SQLite (metadata)
+- **EmbeddingGenerator** - Generates embeddings (384-dim local, 1536-dim remote)
+- **UnifiedInferenceEngine** - Handles LLM inference across providers
+- **StreamingKnowledgeExtractor** - Real-time knowledge extraction during sessions
+
+### Database Configuration
+
+**Qdrant (Optional)**:
+- Host: localhost:6333
+- Collections: `knowledge_patterns` (1536-dim), `knowledge_patterns_small` (384-dim), `trajectory_analysis` (384-dim), `session_memory` (384-dim)
+- Without Qdrant: System works but no semantic search
+
+**SQLite (Required)**:
+- Path: `.cache/knowledge.db`
+- Tables: `budget_events`, `knowledge_extractions`, `session_metrics`, `embedding_cache`
+
+### Programmatic Quick Start
 
 ```javascript
 import { KnowledgeLearningSystem } from './src/KnowledgeLearningSystem.js';
