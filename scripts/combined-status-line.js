@@ -1125,15 +1125,15 @@ class CombinedStatusLine {
                         knowledge.extractionState === 'idle' ? '💤' : '⚠️';
 
       if (knowledge.errorCount > 0) {
-        parts.push(`[📚${stateIcon}⚠️${knowledge.errorCount}]`);
+        parts.push(`[📚${stateIcon} ⚠️${knowledge.errorCount}]`); // Space before warning emoji
         if (overallColor === 'green') overallColor = 'yellow';
       } else {
         parts.push(`[📚${stateIcon}]`);
       }
     } else if (knowledge.status === 'disabled') {
-      parts.push('[📚⏸️ ]'); // Paused/disabled
+      parts.push('[📚⏸️ ]'); // Paused/disabled (space for alignment)
     } else {
-      parts.push('[📚❌ ]'); // Offline
+      parts.push('[📚❌]'); // Offline (no space - red cross is wide enough)
       if (overallColor === 'green') overallColor = 'yellow';
     }
 

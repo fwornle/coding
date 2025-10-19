@@ -1,6 +1,6 @@
-# Classification Status - coding
+# Classification Status - nano-degree
 
-**Generated**: 2025-10-19T14:21:02.932Z
+**Generated**: 2025-10-19T14:20:38.984Z
 **Total Sessions**: 2
 **Total Decisions**: 7
 
@@ -44,13 +44,13 @@ Sessions grouped by the classification layer that made the final decision.
 
 #### Redirected (CODING)
 
-- **[2025-10-18_1100-1200_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-coding.md)** - 2 coding decisions
+- **[2025-10-18_1100-1200_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-nano-degree.md)** - 2 coding decisions
 
 ### Layer 3: Embedding Search
 
 #### Redirected (CODING)
 
-- **[2025-10-19_1600-1700_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-coding.md)** - 1 coding decisions
+- **[2025-10-19_1600-1700_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-nano-degree.md)** - 1 coding decisions
 
 #### Local (LOCAL)
 
@@ -66,8 +66,8 @@ Sessions grouped by the classification layer that made the final decision.
 
 Complete chronological list of all classification sessions.
 
-- **2025-10-18_1100-1200_g9b30a** - 6 decisions ([CODING: 2](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-coding.md), [LOCAL: 4](2025-10-18_1100-1200_g9b30a.md))
-- **2025-10-19_1600-1700_g9b30a** - 1 decisions ([CODING: 1](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-coding.md))
+- **2025-10-18_1100-1200_g9b30a** - 6 decisions ([CODING: 2](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-nano-degree.md), [LOCAL: 4](2025-10-18_1100-1200_g9b30a.md))
+- **2025-10-19_1600-1700_g9b30a** - 1 decisions ([CODING: 1](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-nano-degree.md))
 
 ---
 

@@ -1486,30 +1486,19 @@ initialize_knowledge_databases() {
         info "To enable Qdrant: docker run -d -p 6333:6333 qdrant/qdrant"
     fi
 
-    # Initialize databases
-    info "Initializing knowledge databases..."
-    if [[ "$qdrant_available" == false ]]; then
-        # Skip Qdrant initialization if not available
-        if node scripts/init-databases.js --skip-qdrant; then
-            success "✓ Knowledge databases initialized (SQLite only)"
-            info "  • SQLite database: $data_dir/knowledge.db"
-            info "  • Budget tracking, analytics, and embedding cache enabled"
-            info "  • Vector search disabled (Qdrant not available)"
-        else
-            warning "Database initialization had issues, but SQLite should still work"
-            INSTALLATION_WARNINGS+=("Knowledge databases: Initialization had warnings")
-        fi
-    else
-        # Full initialization with Qdrant
-        if node scripts/init-databases.js; then
-            success "✓ Knowledge databases initialized (Qdrant + SQLite)"
+    # Initialize knowledge management system (databases + config)
+    info "Initializing knowledge management system..."
+    if node scripts/initialize-knowledge-system.js --project-path "$CODING_REPO"; then
+        success "✓ Knowledge management system initialized"
+        info "  • Configuration: .specstory/config/knowledge-system.json"
+        if [[ "$qdrant_available" == true ]]; then
             info "  • Qdrant collections: knowledge_patterns, trajectory_analysis, session_memory"
-            info "  • SQLite database: $data_dir/knowledge.db"
-            info "  • Full vector search and analytics enabled"
-        else
-            warning "Database initialization had issues"
-            INSTALLATION_WARNINGS+=("Knowledge databases: Full initialization had warnings")
         fi
+        info "  • SQLite database: $data_dir/knowledge.db"
+        info "  • Knowledge extraction: enabled"
+    else
+        warning "Knowledge system initialization had issues"
+        INSTALLATION_WARNINGS+=("Knowledge system: Initialization had warnings")
     fi
 
     # Add environment variables for database paths if not already in .env
