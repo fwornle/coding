@@ -26,12 +26,16 @@
     "glob": "^10.3.0",
     "graphology": "^0.25.4",
     "graphology-utils": "^2.5.2",
-    "groq-sdk": "^0.31.0",
     "js-yaml": "^4.1.0",
-    "openai": "^6.3.0",
     "playwright": "^1.40.0",
     "proper-lockfile": "^4.1.2",
     "ws": "^8.16.0"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.21.0",
+    "groq-sdk": "^0.31.0",
+    "openai": "^6.3.0"
   },
   "devDependencies": {
     "eslint": "^8.55.0",
