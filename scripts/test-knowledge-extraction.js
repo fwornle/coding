@@ -149,13 +149,15 @@ class KnowledgeExtractionTest {
 
     // Test 5: Create Sample Session File
     await this.runTest('Create Sample Session File', async () => {
-      const sampleSession = `# Session Log: 2025-10-19 14:00-15:00
+            const sampleSession = `# Session Log: 2025-10-19 14:00-15:00
 
-## Exchange 1
+## User
 
-**User:** How do I implement a simple caching pattern in JavaScript?
+How do I implement a simple caching pattern in JavaScript?
 
-**Assistant:** Here's a simple caching pattern using a Map:
+## Assistant
+
+Here's a simple caching pattern using a Map:
 
 \`\`\`javascript
 class SimpleCache {
@@ -184,11 +186,13 @@ class SimpleCache {
 
 This implements a basic LRU (Least Recently Used) cache with a maximum size limit.
 
-## Exchange 2
+## User
 
-**User:** Can you add a TTL (Time To Live) feature?
+Can you add a TTL (Time To Live) feature?
 
-**Assistant:** Sure! Here's the enhanced version with TTL:
+## Assistant
+
+Sure! Here's the enhanced version with TTL:
 
 \`\`\`javascript
 class CacheWithTTL {
@@ -225,7 +229,7 @@ class CacheWithTTL {
 }
 \`\`\`
 
-This adds automatic expiration based on TTL values.
+This version adds expiration tracking for each cache entry.
 `;
 
       const testDir = join(projectPath, '.test-data');

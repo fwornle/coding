@@ -45,6 +45,16 @@ case "${1:-start}" in
             echo "Note: Browser cache clearing not implemented in Node.js version"
             shift || true
         fi
+        # Handle data source flags
+        DATA_SOURCE_MODE="batch"  # default
+        if [[ "${1:-}" == "--with-online" ]]; then
+            DATA_SOURCE_MODE="combined"
+            shift || true
+        elif [[ "${1:-}" == "--online-only" ]]; then
+            DATA_SOURCE_MODE="online"
+            shift || true
+        fi
+        export VKB_DATA_SOURCE="$DATA_SOURCE_MODE"
         node "$VKB_CLI" server start "$@"
         ;;
     
@@ -118,12 +128,21 @@ Commands:
 
 Options:
   --with-cache-clear  Clear cache before starting (not implemented)
+  --with-online       Include online-learned knowledge (combined view)
+  --online-only       Show only online-learned knowledge
+
+Data Sources:
+  • Batch (default):  Manual knowledge from shared-memory.json (UKB)
+  • Online:           Auto-learned knowledge from databases
+  • Combined:         Both batch and online knowledge
 
 Examples:
-  vkb                 Start the server
-  vkb fg              Start in foreground mode for debugging
-  vkb restart         Restart the server
-  vkb logs -n 50      Show last 50 log lines
+  vkb                      Start with batch knowledge only (default)
+  vkb --with-online        Start with both batch and online knowledge
+  vkb --online-only        Start with online knowledge only
+  vkb fg                   Start in foreground mode for debugging
+  vkb restart              Restart the server
+  vkb logs -n 50           Show last 50 log lines
 
 This is a lightweight wrapper around vkb-cli.
 For more options, use: vkb-cli --help
