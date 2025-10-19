@@ -7,7 +7,7 @@
  */
 
 import fs, { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import path, { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { getTimeWindow, getShortTimeWindow } from './timezone-utils.js';
@@ -359,7 +359,7 @@ class CombinedStatusLine {
     try {
       // Read knowledge extraction status from transcript monitor health file
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-      const projectName = path.basename(process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd());
+      const projectName = basename(process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd());
       const healthFile = join(codingPath, '.health', `${projectName}-transcript-monitor-health.json`);
 
       if (!existsSync(healthFile)) {
@@ -492,70 +492,39 @@ class CombinedStatusLine {
         result.gcm.status = 'stale';
       }
 
-      // CRITICAL: Check for stale trajectory data across all projects
-      // User requirement: "make the GCM robust in detecting such blatant system failures"
-      let trajectoryIssues = [];
+      // CRITICAL: Check for stale trajectory data in CURRENT project only
+      // GCM status should only reflect issues in the project where it's displayed
+      let currentProjectTrajectoryIssue = null;
 
-      // Check trajectory staleness for coding project
-      const codingTrajectoryPath = join(rootDir, '.specstory', 'trajectory', 'live-state.json');
-      if (existsSync(codingTrajectoryPath)) {
-        const trajStats = fs.statSync(codingTrajectoryPath);
+      // Determine current project from environment or working directory
+      const currentProjectPath = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
+
+      // Check trajectory for current project only
+      const currentTrajectoryPath = join(currentProjectPath, '.specstory', 'trajectory', 'live-state.json');
+      if (existsSync(currentTrajectoryPath)) {
+        const trajStats = fs.statSync(currentTrajectoryPath);
         const trajAge = Date.now() - trajStats.mtime.getTime();
         const oneHour = 60 * 60 * 1000;
 
         if (trajAge > oneHour) {
-          trajectoryIssues.push(`coding trajectory stale (${Math.floor(trajAge / 1000 / 60)}min old)`);
+          const ageMinutes = Math.floor(trajAge / 1000 / 60);
+          currentProjectTrajectoryIssue = `stale tr`;
         }
-      } else if (result.sessions['coding']) {
-        // Coding session exists but no trajectory file
-        trajectoryIssues.push('coding trajectory missing');
-      }
+      } else {
+        // Current project session active but no trajectory file
+        const currentProjectName = currentProjectPath.split('/').pop();
+        const currentSession = result.sessions[currentProjectName] || result.sessions['coding'] || result.sessions['C'];
 
-      // Check trajectory staleness for other active projects
-      // Map abbreviations back to full project names
-      const abbreviationToProject = {
-        'C': 'coding',
-        'CA': 'curriculum-alignment',
-        'ND': 'nano-degree'
-      };
-
-      for (const [projectAbbrev, sessionData] of Object.entries(result.sessions)) {
-        if (projectAbbrev === 'coding' || projectAbbrev === 'C') continue; // Already checked above
-
-        // Get full project name from abbreviation
-        const projectName = abbreviationToProject[projectAbbrev] || projectAbbrev;
-
-        // Try to find project directory
-        const possiblePaths = [
-          join('/Users/q284340/Agentic', projectName, '.specstory', 'trajectory', 'live-state.json'),
-          join(rootDir, '..', projectName, '.specstory', 'trajectory', 'live-state.json')
-        ];
-
-        let found = false;
-        for (const trajPath of possiblePaths) {
-          if (existsSync(trajPath)) {
-            found = true;
-            const trajStats = fs.statSync(trajPath);
-            const trajAge = Date.now() - trajStats.mtime.getTime();
-            const oneHour = 60 * 60 * 1000;
-
-            if (trajAge > oneHour) {
-              trajectoryIssues.push(`${projectAbbrev} trajectory stale (${Math.floor(trajAge / 1000 / 60)}min old)`);
-            }
-            break;
-          }
-        }
-
-        if (!found && sessionData.status === 'healthy') {
-          trajectoryIssues.push(`${projectAbbrev} trajectory missing`);
+        if (currentSession && currentSession.status === 'healthy') {
+          currentProjectTrajectoryIssue = 'no tr';
         }
       }
 
-      // If trajectory issues detected, downgrade GCM status
-      if (trajectoryIssues.length > 0) {
+      // If trajectory issue detected in CURRENT project, downgrade GCM status
+      if (currentProjectTrajectoryIssue) {
         result.gcm.status = 'warning';
         result.gcm.icon = '🟡';
-        result.gcm.trajectoryIssues = trajectoryIssues;
+        result.gcm.reason = currentProjectTrajectoryIssue;
 
         // If status is still 'operational', downgrade to 'degraded'
         if (result.status === 'operational') {
@@ -1067,9 +1036,11 @@ class CombinedStatusLine {
             return `${displayAbbrev}${health.icon}`;
           })
           .join(' ');
-        
-        // Include GCM and sessions without colons
-        parts.push(`[GCM${gcmIcon}]`);
+
+        // Include GCM with reason code if not healthy
+        const gcmReason = globalHealth.gcm?.reason;
+        const gcmDisplay = gcmReason ? `GCM${gcmIcon}(${gcmReason})` : `GCM${gcmIcon}`;
+        parts.push(`[${gcmDisplay}]`);
         parts.push(`[${sessionStatuses}]`);
         
         // Determine overall session health for color coding
@@ -1080,7 +1051,9 @@ class CombinedStatusLine {
         else if (hasWarning && overallColor === 'green') overallColor = 'yellow';
       } else {
         // Just GCM with no sessions
-        parts.push(`[GCM${gcmIcon}]`);
+        const gcmReason = globalHealth.gcm?.reason;
+        const gcmDisplay = gcmReason ? `GCM${gcmIcon}(${gcmReason})` : `GCM${gcmIcon}`;
+        parts.push(`[${gcmDisplay}]`);
         if (gcmIcon === '❌') overallColor = 'red';
         else if (gcmIcon === '🟡' && overallColor === 'green') overallColor = 'yellow';
       }
@@ -1158,9 +1131,9 @@ class CombinedStatusLine {
         parts.push(`[📚${stateIcon}]`);
       }
     } else if (knowledge.status === 'disabled') {
-      parts.push('[📚⏸️]'); // Paused/disabled
+      parts.push('[📚⏸️ ]'); // Paused/disabled
     } else {
-      parts.push('[📚❌]'); // Offline
+      parts.push('[📚❌ ]'); // Offline
       if (overallColor === 'green') overallColor = 'yellow';
     }
 

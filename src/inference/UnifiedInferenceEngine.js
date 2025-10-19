@@ -12,17 +12,71 @@
  * - Sensitivity-based routing (sensitive data → local models)
  * - Streaming response support
  * - Performance monitoring and stats
+ *
+ * IMPORTANT: All provider SDKs are OPTIONAL. The engine works with ANY combination of providers.
+ * Only the SDKs for configured providers need to be installed.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import OpenAI from 'openai';
-import Groq from 'groq-sdk';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { EventEmitter } from 'events';
+
+// Provider SDK classes - loaded dynamically only when needed
+let Anthropic, OpenAI, Groq, GoogleGenerativeAI;
 
 // Import components we'll integrate with
 // These will be implemented in subsequent tasks
 let BudgetTracker, SensitivityClassifier;
+
+// Dynamic imports for optional provider SDKs
+const loadProviderSDKs = async () => {
+  const sdks = {};
+
+  // Only load SDKs if environment variables suggest they're needed
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      const module = await import('@anthropic-ai/sdk');
+      Anthropic = module.default || module.Anthropic;
+      sdks.anthropic = true;
+      console.log('[UnifiedInferenceEngine] Anthropic SDK loaded');
+    } catch (e) {
+      console.warn('[UnifiedInferenceEngine] Anthropic SDK not available:', e.message);
+    }
+  }
+
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const module = await import('openai');
+      OpenAI = module.default || module.OpenAI;
+      sdks.openai = true;
+      console.log('[UnifiedInferenceEngine] OpenAI SDK loaded');
+    } catch (e) {
+      console.warn('[UnifiedInferenceEngine] OpenAI SDK not available:', e.message);
+    }
+  }
+
+  if (process.env.GROK_API_KEY) {
+    try {
+      const module = await import('groq-sdk');
+      Groq = module.default || module.Groq;
+      sdks.groq = true;
+      console.log('[UnifiedInferenceEngine] Groq SDK loaded');
+    } catch (e) {
+      console.warn('[UnifiedInferenceEngine] Groq SDK not available:', e.message);
+    }
+  }
+
+  if (process.env.GOOGLE_API_KEY) {
+    try {
+      const module = await import('@google/generative-ai');
+      GoogleGenerativeAI = module.GoogleGenerativeAI;
+      sdks.gemini = true;
+      console.log('[UnifiedInferenceEngine] Gemini SDK loaded');
+    } catch (e) {
+      console.warn('[UnifiedInferenceEngine] Gemini SDK not available:', e.message);
+    }
+  }
+
+  return sdks;
+};
 
 // Dynamic imports for optional dependencies
 const loadOptionalDependencies = async () => {
@@ -122,10 +176,13 @@ export class UnifiedInferenceEngine extends EventEmitter {
       return;
     }
 
+    // Load provider SDKs first (only those needed based on env vars)
+    await loadProviderSDKs();
+
     // Load optional dependencies
     await loadOptionalDependencies();
 
-    // Initialize providers
+    // Initialize providers (only those whose SDKs were successfully loaded)
     this.initializeProviders();
 
     // Initialize budget tracker if available
@@ -158,10 +215,12 @@ export class UnifiedInferenceEngine extends EventEmitter {
   /**
    * Initialize LLM providers based on available API keys
    * Pattern extracted and extended from semantic-validator.js
+   *
+   * IMPORTANT: Only initializes providers whose SDKs were successfully loaded
    */
   initializeProviders() {
     // Groq provider (supports multiple Groq models)
-    if (process.env.GROK_API_KEY || this.config.groqApiKey) {
+    if (Groq && (process.env.GROK_API_KEY || this.config.groqApiKey)) {
       try {
         this.providers.groq = new Groq({
           apiKey: this.config.groqApiKey || process.env.GROK_API_KEY,
@@ -174,7 +233,7 @@ export class UnifiedInferenceEngine extends EventEmitter {
     }
 
     // Anthropic provider
-    if (process.env.ANTHROPIC_API_KEY || this.config.anthropicApiKey) {
+    if (Anthropic && (process.env.ANTHROPIC_API_KEY || this.config.anthropicApiKey)) {
       try {
         this.providers.anthropic = new Anthropic({
           apiKey: this.config.anthropicApiKey || process.env.ANTHROPIC_API_KEY,
@@ -187,7 +246,7 @@ export class UnifiedInferenceEngine extends EventEmitter {
     }
 
     // OpenAI provider (new - not in semantic-validator)
-    if (process.env.OPENAI_API_KEY || this.config.openaiApiKey) {
+    if (OpenAI && (process.env.OPENAI_API_KEY || this.config.openaiApiKey)) {
       try {
         this.providers.openai = new OpenAI({
           apiKey: this.config.openaiApiKey || process.env.OPENAI_API_KEY,
@@ -200,7 +259,7 @@ export class UnifiedInferenceEngine extends EventEmitter {
     }
 
     // Gemini provider
-    if (process.env.GOOGLE_API_KEY || this.config.geminiApiKey) {
+    if (GoogleGenerativeAI && (process.env.GOOGLE_API_KEY || this.config.geminiApiKey)) {
       try {
         this.providers.gemini = new GoogleGenerativeAI(
           this.config.geminiApiKey || process.env.GOOGLE_API_KEY
@@ -218,7 +277,8 @@ export class UnifiedInferenceEngine extends EventEmitter {
                          process.env.LOCAL_MODEL_ENDPOINT ||
                          'http://localhost:11434'; // Ollama default
 
-    if (this.config.enableLocalModels !== false) {
+    // Requires OpenAI SDK for compatibility layer
+    if (OpenAI && this.config.enableLocalModels !== false) {
       try {
         // Use OpenAI-compatible client for Ollama/vLLM
         this.providers.local = new OpenAI({
@@ -234,6 +294,7 @@ export class UnifiedInferenceEngine extends EventEmitter {
 
     if (Object.keys(this.providers).length === 0) {
       console.warn('[UnifiedInferenceEngine] No providers initialized - inference will fail');
+      console.warn('[UnifiedInferenceEngine] Make sure at least one provider SDK is installed and configured');
     }
   }
 
