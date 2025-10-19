@@ -31,17 +31,20 @@ class StatusLineHealthMonitor {
     this.isDebug = options.debug || false;
 
     this.logPath = path.join(this.codingRepoPath, '.logs', 'statusline-health.log');
-    
+
+    // Global LSL registry path for multi-project monitoring
+    this.registryPath = path.join(this.codingRepoPath, '.global-lsl-registry.json');
+
     this.lastStatus = null;
     this.updateTimer = null;
-    
+
     // Auto-healing configuration
     this.autoHealEnabled = options.autoHeal !== false; // Default true
     this.healingAttempts = new Map(); // Track healing attempts per service
     this.maxHealingAttempts = options.maxHealingAttempts || 3;
     this.healingCooldown = options.healingCooldown || 300000; // 5 minutes between healing attempts
     this.lastHealingTime = new Map(); // Track last healing time per service
-    
+
     this.ensureLogDirectory();
   }
   /**
@@ -88,20 +91,34 @@ class StatusLineHealthMonitor {
     try {
       // Check if coordinator is running via status command
       const { stdout } = await execAsync(`node "${path.join(this.codingRepoPath, 'scripts/global-service-coordinator.js')}" --status`);
-      
+
       // Extract JSON from the output (it may have headers)
       const jsonMatch = stdout.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in coordinator response');
       }
-      
+
       const status = JSON.parse(jsonMatch[0]);
-      
+
       if (status.coordinator && status.coordinator.healthy) {
+        // Check actual project registrations from .global-lsl-registry.json
+        // (GCM v2.0.0 uses in-memory registry that starts empty)
+        let projectCount = 0;
+
+        if (fs.existsSync(this.registryPath)) {
+          try {
+            const registry = JSON.parse(fs.readFileSync(this.registryPath, 'utf8'));
+            projectCount = Object.keys(registry.projects || {}).length;
+          } catch (registryError) {
+            this.log(`Error reading registry: ${registryError.message}`, 'DEBUG');
+          }
+        }
+
+        // Coordinator is running and healthy with registered projects
         return {
           status: 'healthy',
           icon: '✅',
-          details: `${status.services} services, ${status.projects} projects`
+          details: `${projectCount} projects`
         };
       } else {
         return {
@@ -161,9 +178,9 @@ class StatusLineHealthMonitor {
           
           if (fs.existsSync(centralizedHealthFile)) {
             // Has monitor running - use health file data
-            sessions[projectName] = await this.getProjectSessionHealthFromFile(centralizedHealthFile);
+            sessions[projectName] = await this.getProjectSessionHealthFromFile(centralizedHealthFile, projectPath);
           } else {
-            // No health file - check transcript activity to determine status
+            // No health file - check transcript activity AND trajectory status
             try {
               const transcriptFiles = fs.readdirSync(projectDirPath)
                 .filter(file => file.endsWith('.jsonl'))
@@ -172,18 +189,30 @@ class StatusLineHealthMonitor {
                   stats: fs.statSync(path.join(projectDirPath, file))
                 }))
                 .sort((a, b) => b.stats.mtime - a.stats.mtime);
-              
+
+              // Check trajectory status
+              const trajectoryStatus = this.checkTrajectoryStatus(projectPath);
+
               if (transcriptFiles.length > 0) {
                 const mostRecent = transcriptFiles[0];
                 const age = Date.now() - mostRecent.stats.mtime.getTime();
-                
-                if (age < 300000) { // Active within 5 minutes
-                  sessions[projectName] = {
-                    status: 'unmonitored',
-                    icon: '🟡',
-                    details: 'No transcript monitor'
-                  };
-                } else if (age < 86400000) { // Active within 24 hours 
+
+                if (age < 900000) { // Active within 15 minutes
+                  // Downgrade to amber if trajectory missing/stale
+                  if (trajectoryStatus.status !== 'fresh') {
+                    sessions[projectName] = {
+                      status: 'warning',
+                      icon: '🟡',
+                      details: trajectoryStatus.status === 'missing' ? 'no tr' : 'stale tr'
+                    };
+                  } else {
+                    sessions[projectName] = {
+                      status: 'active',
+                      icon: '🟢',
+                      details: 'Active session'
+                    };
+                  }
+                } else if (age < 86400000) { // Idle within 24 hours
                   sessions[projectName] = {
                     status: 'inactive',
                     icon: '⚫',
@@ -226,7 +255,7 @@ class StatusLineHealthMonitor {
         if (fs.existsSync(projectDir)) {
           const centralizedHealthFile = this.getCentralizedHealthFile(projectDir);
           if (fs.existsSync(centralizedHealthFile)) {
-            sessions[projectName] = await this.getProjectSessionHealthFromFile(centralizedHealthFile);
+            sessions[projectName] = await this.getProjectSessionHealthFromFile(centralizedHealthFile, projectDir);
           }
         }
       }
@@ -315,7 +344,56 @@ class StatusLineHealthMonitor {
   async getProjectSessionHealth(projectName, projectInfo) {
     try {
       const healthFile = path.join(projectInfo.projectPath, '.transcript-monitor-health');
-      return await this.getProjectSessionHealthFromFile(healthFile);
+
+      // If health file exists, use it
+      if (fs.existsSync(healthFile)) {
+        return await this.getProjectSessionHealthFromFile(healthFile, projectInfo.projectPath);
+      }
+
+      // Otherwise, check transcript activity as fallback
+      const claudeProjectDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects', `-Users-q284340-Agentic-${projectName}`);
+
+      if (fs.existsSync(claudeProjectDir)) {
+        try {
+          const transcriptFiles = fs.readdirSync(claudeProjectDir)
+            .filter(file => file.endsWith('.jsonl'))
+            .map(file => ({
+              path: path.join(claudeProjectDir, file),
+              stats: fs.statSync(path.join(claudeProjectDir, file))
+            }))
+            .sort((a, b) => b.stats.mtime - a.stats.mtime);
+
+          if (transcriptFiles.length > 0) {
+            const mostRecent = transcriptFiles[0];
+            const age = Date.now() - mostRecent.stats.mtime.getTime();
+
+            if (age < 900000) { // Active within 15 minutes
+              return {
+                status: 'active',
+                icon: '🟢',
+                details: 'Active session'
+              };
+            } else if (age < 86400000) { // Idle within 24 hours
+              return {
+                status: 'inactive',
+                icon: '⚫',
+                details: 'Session idle'
+              };
+            } else {
+              return {
+                status: 'dormant',
+                icon: '💤',
+                details: 'Session dormant'
+              };
+            }
+          }
+        } catch (transcriptError) {
+          this.log(`Error checking transcripts for ${projectName}: ${transcriptError.message}`, 'DEBUG');
+        }
+      }
+
+      // No health file and no transcripts found
+      return await this.getProjectSessionHealthFromFile(healthFile, projectInfo.projectPath); // Will return 'No health file'
     } catch (error) {
       return {
         status: 'unknown',
@@ -326,9 +404,30 @@ class StatusLineHealthMonitor {
   }
 
   /**
+   * Check trajectory status for a project
+   */
+  checkTrajectoryStatus(projectPath) {
+    const trajectoryPath = path.join(projectPath, '.specstory', 'trajectory', 'live-state.json');
+
+    if (!fs.existsSync(trajectoryPath)) {
+      return { status: 'missing', age: null };
+    }
+
+    const stats = fs.statSync(trajectoryPath);
+    const age = Date.now() - stats.mtime.getTime();
+    const oneHour = 60 * 60 * 1000;
+
+    if (age > oneHour) {
+      return { status: 'stale', age };
+    }
+
+    return { status: 'fresh', age };
+  }
+
+  /**
    * Get health from a health file
    */
-  async getProjectSessionHealthFromFile(healthFile) {
+  async getProjectSessionHealthFromFile(healthFile, projectPath = null) {
     try {
       if (!fs.existsSync(healthFile)) {
         return {
@@ -340,10 +439,25 @@ class StatusLineHealthMonitor {
 
       const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
       const age = Date.now() - healthData.timestamp;
-      
+
+      // Check trajectory status if projectPath provided
+      let trajectoryStatus = null;
+      if (projectPath) {
+        trajectoryStatus = this.checkTrajectoryStatus(projectPath);
+      }
+
       // Determine health based on age and status
       if (age < 90000) { // < 90 seconds
         if (healthData.status === 'running' && healthData.streamingActive) {
+          // Check trajectory - downgrade to amber if missing/stale
+          if (trajectoryStatus && trajectoryStatus.status !== 'fresh') {
+            return {
+              status: 'warning',
+              icon: '🟡',
+              details: trajectoryStatus.status === 'missing' ? 'no tr' : 'stale tr'
+            };
+          }
+
           return {
             status: 'healthy',
             icon: '🟢',
@@ -730,14 +844,19 @@ class StatusLineHealthMonitor {
    */
   formatStatusLine(gcmHealth, sessionHealth, constraintHealth) {
     let statusLine = '';
-    
-    // Global Coding Monitor
-    statusLine += `[GCM:${gcmHealth.icon}]`;
-    
+
+    // Global Coding Monitor with reason code if not healthy
+    if (gcmHealth.icon === '🟡' || gcmHealth.icon === '🔴') {
+      const reason = gcmHealth.reason || this.getShortReason(gcmHealth.details || gcmHealth.status);
+      statusLine += `[GCM:${gcmHealth.icon}(${reason})]`;
+    } else {
+      statusLine += `[GCM:${gcmHealth.icon}]`;
+    }
+
     // Project Sessions - show individual session statuses with abbreviations
     // Filter out dormant sessions to avoid clutter
     const sessionEntries = Object.entries(sessionHealth)
-      .filter(([projectName, health]) => health.status !== 'dormant');
+      .filter(([, health]) => health.status !== 'dormant');
     
     if (sessionEntries.length > 0) {
       const sessionStatuses = sessionEntries

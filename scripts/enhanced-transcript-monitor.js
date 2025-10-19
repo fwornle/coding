@@ -27,8 +27,17 @@ import StreamingTranscriptReader from '../src/live-logging/StreamingTranscriptRe
 import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import LSLFileManager from '../src/live-logging/LSLFileManager.js';
-import RealTimeTrajectoryAnalyzer from '../src/live-logging/RealTimeTrajectoryAnalyzer.js';
 import ClassificationLogger from './classification-logger.js';
+
+// Trajectory analyzer integration (optional - requires @anthropic-ai/sdk)
+let RealTimeTrajectoryAnalyzer = null;
+try {
+  const module = await import('../src/live-logging/RealTimeTrajectoryAnalyzer.js');
+  RealTimeTrajectoryAnalyzer = module.default || module.RealTimeTrajectoryAnalyzer;
+} catch (err) {
+  // Trajectory analyzer not available (missing dependencies) - continue without it
+  console.log('Trajectory analyzer not available:', err.message);
+}
 
 // Knowledge extraction integration (optional)
 let StreamingKnowledgeExtractor = null;
@@ -146,18 +155,22 @@ class EnhancedTranscriptMonitor {
       this.semanticAnalyzer = null;
     }
     
-    // Initialize real-time trajectory analyzer
+    // Initialize real-time trajectory analyzer (if available)
     this.trajectoryAnalyzer = null;
-    try {
-      this.trajectoryAnalyzer = new RealTimeTrajectoryAnalyzer({
-        projectPath: this.config.projectPath,
-        codingToolsPath: process.env.CODING_TOOLS_PATH || process.env.CODING_REPO,
-        debug: this.debug_enabled
-      });
-      this.debug('Real-time trajectory analyzer initialized');
-    } catch (error) {
-      console.error('Failed to initialize trajectory analyzer:', error.message);
-      this.trajectoryAnalyzer = null;
+    if (RealTimeTrajectoryAnalyzer) {
+      try {
+        this.trajectoryAnalyzer = new RealTimeTrajectoryAnalyzer({
+          projectPath: this.config.projectPath,
+          codingToolsPath: process.env.CODING_TOOLS_PATH || process.env.CODING_REPO,
+          debug: this.debug_enabled
+        });
+        this.debug('Real-time trajectory analyzer initialized');
+      } catch (error) {
+        console.error('Failed to initialize trajectory analyzer:', error.message);
+        this.trajectoryAnalyzer = null;
+      }
+    } else {
+      this.debug('Trajectory analyzer not available (missing dependencies)');
     }
 
     // Initialize classification logger for tracking 4-layer classification decisions
