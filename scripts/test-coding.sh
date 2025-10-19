@@ -441,6 +441,99 @@ if command_exists ukb && [ -n "$CODING_TEAM" ]; then
     fi
 fi
 
+print_test "Continuous Learning Knowledge System Databases"
+
+print_check "better-sqlite3 dependency"
+if node -e "require('better-sqlite3')" 2>/dev/null; then
+    print_pass "better-sqlite3 module installed"
+else
+    print_fail "better-sqlite3 not installed"
+    print_repair "Installing better-sqlite3..."
+    cd "$CODING_ROOT" && npm install better-sqlite3
+    if [ $? -eq 0 ]; then
+        print_fixed "better-sqlite3 installed"
+    else
+        print_fail "Failed to install better-sqlite3"
+    fi
+fi
+
+print_check ".data directory for knowledge databases"
+DATA_DIR="$CODING_ROOT/.data"
+if dir_exists "$DATA_DIR"; then
+    print_pass ".data directory exists"
+else
+    print_fail ".data directory not found"
+    print_repair "Creating .data directory..."
+    mkdir -p "$DATA_DIR"
+    print_fixed ".data directory created"
+fi
+
+print_check "Database initialization script"
+DB_INIT_SCRIPT="$CODING_ROOT/scripts/init-databases.js"
+if file_exists "$DB_INIT_SCRIPT"; then
+    print_pass "Database initialization script found"
+else
+    print_fail "Database initialization script missing"
+fi
+
+print_check "SQLite knowledge database"
+SQLITE_DB="$DATA_DIR/knowledge.db"
+if file_exists "$SQLITE_DB"; then
+    print_pass "SQLite database exists: .data/knowledge.db"
+    # Check database size
+    DB_SIZE=$(du -h "$SQLITE_DB" | cut -f1)
+    print_info "Database size: $DB_SIZE"
+else
+    print_warning "SQLite database not initialized"
+    print_repair "Initializing knowledge databases..."
+    cd "$CODING_ROOT"
+    if node scripts/init-databases.js --skip-qdrant 2>&1 | grep -q "Database Initialization Complete"; then
+        print_fixed "Knowledge databases initialized (SQLite only)"
+    else
+        print_warning "Database initialization may need manual setup"
+        print_info "Run: npm run db:init:skip-qdrant"
+    fi
+fi
+
+print_check "Qdrant vector database (optional)"
+if timeout 3s curl -s http://localhost:6333/health >/dev/null 2>&1; then
+    print_pass "Qdrant is running on localhost:6333"
+
+    # Check collections
+    if timeout 3s curl -s http://localhost:6333/collections 2>&1 | grep -q "knowledge_patterns"; then
+        print_pass "Qdrant collections initialized"
+    else
+        print_warning "Qdrant running but collections may need initialization"
+        print_info "Run: npm run db:init"
+    fi
+else
+    print_info "Qdrant not running (optional for vector search)"
+    print_info "To enable: docker run -d -p 6333:6333 qdrant/qdrant"
+fi
+
+print_check "@qdrant/js-client-rest dependency"
+if node -e "require('@qdrant/js-client-rest')" 2>/dev/null; then
+    print_pass "@qdrant/js-client-rest module installed"
+else
+    print_fail "@qdrant/js-client-rest not installed"
+    print_repair "Installing @qdrant/js-client-rest..."
+    cd "$CODING_ROOT" && npm install @qdrant/js-client-rest
+    if [ $? -eq 0 ]; then
+        print_fixed "@qdrant/js-client-rest installed"
+    fi
+fi
+
+print_check "Database environment variables"
+if [ -f "$CODING_ROOT/.env" ]; then
+    if grep -q "QDRANT_URL" "$CODING_ROOT/.env"; then
+        print_pass "Database environment variables configured"
+    else
+        print_info "Database environment variables not in .env (will use defaults)"
+    fi
+else
+    print_warning ".env file not found"
+fi
+
 # =============================================================================
 # PHASE 4: AGENT DETECTION & AVAILABILITY
 # =============================================================================

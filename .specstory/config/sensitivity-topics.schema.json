@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/your-org/knowledge-system/schemas/sensitivity-topics.schema.json",
+  "title": "Sensitivity Topics Configuration",
+  "description": "Schema for validating sensitivity topics configuration",
+  "type": "object",
+  "required": ["version", "enabled"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "customPatterns": {
+      "type": "object",
+      "properties": {
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "pattern", "severity"],
+            "properties": {
+              "name": { "type": "string" },
+              "pattern": { "type": "string" },
+              "description": { "type": "string" },
+              "severity": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              },
+              "enabled": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "topicCategories": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "keywords", "severity"],
+            "properties": {
+              "name": { "type": "string" },
+              "keywords": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["none", "low", "medium", "high", "critical"]
+              },
+              "enabled": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "filePathRules": {
+      "type": "object",
+      "properties": {
+        "sensitivePatterns": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "domainSpecificRules": {
+      "type": "object",
+      "properties": {
+        "compliance": {
+          "type": "object",
+          "properties": {
+            "gdpr": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "detectPII": { "type": "boolean" },
+                "requireConsent": { "type": "boolean" },
+                "rightToErasure": { "type": "boolean" }
+              }
+            },
+            "hipaa": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "detectPHI": { "type": "boolean" },
+                "encryptAtRest": { "type": "boolean" },
+                "auditLogging": { "type": "boolean" }
+              }
+            },
+            "pci_dss": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "detectCardData": { "type": "boolean" },
+                "maskCardNumbers": { "type": "boolean" },
+                "separateProcessing": { "type": "boolean" }
+              }
+            },
+            "sox": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "detectFinancialData": { "type": "boolean" },
+                "immutableAuditLog": { "type": "boolean" },
+                "accessControls": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "dataClassification": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "severity": {
+                "type": "string",
+                "enum": ["none", "low", "medium", "high", "critical"]
+              },
+              "routeToLocal": { "type": "boolean" },
+              "allowCaching": { "type": "boolean" },
+              "examples": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "contextualRules": {
+      "type": "object",
+      "properties": {
+        "conversationContext": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "triggerPhrases": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "windowSize": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          }
+        },
+        "codeContext": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "sensitiveVariableNames": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "sensitiveFunctionNames": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "sensitiveComments": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "behaviorOverrides": {
+      "type": "object",
+      "properties": {
+        "alwaysLocal": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "neverCache": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requireExplicitConsent": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "auditLogging": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "logLevel": {
+          "type": "string",
+          "enum": ["none", "info", "verbose"]
+        },
+        "includeContext": { "type": "boolean" },
+        "retentionDays": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "alerts": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "criticalSeverityOnly": { "type": "boolean" },
+            "notificationChannels": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["slack", "email", "pagerduty", "webhook"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "testing": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "dryRun": { "type": "boolean" },
+        "verboseLogging": { "type": "boolean" }
+      }
+    }
+  }
+}

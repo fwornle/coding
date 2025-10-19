@@ -1,4 +1,5 @@
 #!/bin/bash
-# Universal ukb wrapper - delegates to ukb-cli.js
+# Universal ukb wrapper
 CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
-exec node "$CODING_REPO/bin/ukb-cli.js" "$@"
+export CODING_REPO
+exec "$CODING_REPO/knowledge-management/ukb" "$@"

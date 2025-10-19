@@ -1,0 +1,443 @@
+{
+  "$schema": "./knowledge-system.schema.json",
+  "_comment": "Continuous Learning Knowledge System Configuration Template",
+  "_description": "Customize this template for your project's specific needs. Copy to knowledge-system.json and adjust values.",
+
+  "budget": {
+    "_comment": "Budget limits and thresholds for LLM inference costs",
+    "monthlyLimit": 8.33,
+    "_monthlyLimit_description": "Maximum monthly spend in USD (default: $8.33 = $100/year). Set based on expected usage.",
+
+    "thresholds": {
+      "warning": 0.5,
+      "alert": 0.8,
+      "critical": 0.9
+    },
+    "_thresholds_description": "Alert thresholds as percentage of monthly limit. Warning at 50%, Alert at 80%, Critical at 90%.",
+
+    "trackingEnabled": true,
+    "_trackingEnabled_description": "Enable cost tracking and budget enforcement. Disable only for development/testing."
+  },
+
+  "inference": {
+    "_comment": "LLM provider configuration and routing strategy",
+
+    "providerPriority": ["local", "groq", "openrouter"],
+    "_providerPriority_description": "Provider fallback chain. Options: 'local' (Ollama/vLLM), 'groq', 'openrouter', 'anthropic', 'openai', 'gemini'. Cost-optimized order: local first.",
+    "_providerPriority_examples": {
+      "cost_optimized": ["local", "groq", "gemini", "openai", "anthropic"],
+      "latency_optimized": ["groq", "local", "gemini", "openai", "anthropic"],
+      "quality_optimized": ["anthropic", "openai", "groq", "local"]
+    },
+
+    "providers": {
+      "groq": {
+        "enabled": true,
+        "apiKey": "${GROQ_API_KEY}",
+        "baseURL": "https://api.groq.com/openai/v1",
+        "defaultModel": "llama-3.1-8b-instant",
+        "_models": "Available: llama-3.1-8b-instant, llama-3.1-70b-versatile, mixtral-8x7b-32768"
+      },
+      "openrouter": {
+        "enabled": true,
+        "apiKey": "${OPENROUTER_API_KEY}",
+        "baseURL": "https://openrouter.ai/api/v1",
+        "defaultModel": "meta-llama/llama-3.1-8b-instruct:free",
+        "_models": "See https://openrouter.ai/models for available models"
+      },
+      "local": {
+        "enabled": true,
+        "baseURL": "http://localhost:11434",
+        "defaultModel": "llama3.2:3b",
+        "_setup": "Install Ollama from https://ollama.ai, then run: ollama pull llama3.2:3b"
+      },
+      "anthropic": {
+        "enabled": false,
+        "apiKey": "${ANTHROPIC_API_KEY}",
+        "defaultModel": "claude-3-haiku-20240307",
+        "_note": "Enable for highest quality but higher cost"
+      },
+      "openai": {
+        "enabled": false,
+        "apiKey": "${OPENAI_API_KEY}",
+        "defaultModel": "gpt-3.5-turbo",
+        "_note": "Enable if you have existing OpenAI credits"
+      }
+    },
+
+    "circuitBreaker": {
+      "enabled": true,
+      "_enabled_description": "Enable circuit breaker to prevent cascading failures when providers are down",
+
+      "defaultConfig": {
+        "failureThreshold": 5,
+        "resetTimeout": 60000,
+        "halfOpenRequests": 3
+      },
+      "_defaultConfig_description": "Open circuit after 5 consecutive failures, reset after 1 minute, allow 3 test requests when half-open",
+
+      "perProviderConfig": {
+        "groq": {
+          "failureThreshold": 5,
+          "resetTimeout": 60000,
+          "_note": "Groq is generally reliable, allow more failures before opening circuit"
+        },
+        "openrouter": {
+          "failureThreshold": 3,
+          "resetTimeout": 120000,
+          "_note": "More sensitive to failures, longer reset timeout"
+        },
+        "local": {
+          "failureThreshold": 10,
+          "resetTimeout": 30000,
+          "_note": "Very lenient for local models, short reset timeout"
+        }
+      }
+    },
+
+    "caching": {
+      "enabled": true,
+      "type": "lru",
+      "_type_options": ["lru", "redis"],
+      "_type_description": "LRU for single-instance deployments, Redis for multi-instance",
+
+      "lru": {
+        "maxSize": 1000,
+        "ttl": 3600000,
+        "_ttl_description": "Time to live in milliseconds (default: 1 hour)"
+      },
+
+      "redis": {
+        "enabled": false,
+        "host": "localhost",
+        "port": 6379,
+        "ttl": 86400000,
+        "_ttl_description": "Time to live in milliseconds (default: 24 hours)",
+        "_note": "Enable for production multi-instance deployments"
+      },
+
+      "hitRateTarget": 0.4,
+      "_hitRateTarget_description": "Target cache hit rate (40% or higher recommended for cost savings)"
+    },
+
+    "offlineMode": false,
+    "_offlineMode_description": "Force local-only inference (no remote API calls). Enable when budget exhausted or offline."
+  },
+
+  "sensitivity": {
+    "_comment": "Privacy and sensitive data detection configuration",
+
+    "enabled": true,
+    "_enabled_description": "Enable automatic sensitive data detection and local routing",
+
+    "autoDetect": true,
+    "_autoDetect_description": "Automatically detect sensitive patterns (passwords, API keys, tokens, SSH keys, credentials)",
+
+    "routeToLocal": true,
+    "_routeToLocal_description": "Automatically route sensitive content to local models (never send to remote APIs)",
+
+    "customTopics": [],
+    "_customTopics_description": "Project-specific sensitive topics (e.g., ['customer_data', 'financial_info', 'health_records']). See sensitivity-topics.template.json for examples.",
+    "_customTopics_examples": [
+      "customer_pii",
+      "financial_transactions",
+      "health_records",
+      "authentication_tokens",
+      "proprietary_algorithms"
+    ],
+
+    "neverCache": true,
+    "_neverCache_description": "Never cache sensitive content (recommended: true for security)"
+  },
+
+  "embeddings": {
+    "_comment": "Vector embedding generation configuration",
+
+    "provider": "local",
+    "_provider_options": ["local", "openai", "cohere"],
+    "_provider_description": "Local (nomic-embed-text) recommended for cost savings. OpenAI for highest quality.",
+
+    "defaultDimension": 384,
+    "_defaultDimension_options": [384, 1536],
+    "_defaultDimension_description": "384-dim: Fast (<50ms), good for most use cases. 1536-dim: Slower (<200ms), higher accuracy for critical searches.",
+
+    "models": {
+      "384": "nomic-embed-text",
+      "1536": "text-embedding-3-small",
+      "_note": "384-dim uses Ollama nomic-embed-text (free), 1536-dim uses OpenAI (paid)"
+    },
+
+    "caching": {
+      "enabled": true,
+      "_enabled_description": "Cache embeddings to avoid regenerating for same content (huge cost savings)",
+
+      "maxSize": 10000,
+      "_maxSize_description": "Maximum number of cached embeddings (typical: 10,000)",
+
+      "ttl": 2592000000,
+      "_ttl_description": "Cache TTL in milliseconds (default: 30 days). Embeddings rarely change."
+    },
+
+    "batchSize": 32,
+    "_batchSize_description": "Number of embeddings to generate per batch (optimize for throughput vs latency)"
+  },
+
+  "knowledge": {
+    "_comment": "Knowledge extraction and storage configuration",
+
+    "extraction": {
+      "enabled": true,
+      "_enabled_description": "Enable automatic knowledge extraction from coding sessions",
+
+      "mode": "streaming",
+      "_mode_options": ["streaming", "batch"],
+      "_mode_description": "Streaming: Real-time extraction during sessions. Batch: Extract from historical logs.",
+
+      "minConfidence": 0.5,
+      "_minConfidence_description": "Minimum confidence threshold to store knowledge (0.0-1.0). Lower = more knowledge, higher = higher quality.",
+
+      "deduplicationThreshold": 0.95,
+      "_deduplicationThreshold_description": "Similarity threshold for deduplication (0.95 = 95% similar considered duplicate)"
+    },
+
+    "classification": {
+      "types": [
+        "coding_pattern",
+        "bug_solution",
+        "test_strategy",
+        "api_design",
+        "architectural_decision",
+        "deployment_approach",
+        "optimization",
+        "tool_usage",
+        "debugging_technique",
+        "general_knowledge"
+      ],
+      "_types_description": "Knowledge types for classification. Add project-specific types as needed."
+    },
+
+    "decay": {
+      "_comment": "Knowledge freshness and decay configuration",
+
+      "enabled": true,
+      "_enabled_description": "Enable time-based knowledge decay (older knowledge ranks lower)",
+
+      "policies": {
+        "tool_usage": {
+          "decayRate": 0.01,
+          "freshnessThreshold": 30,
+          "_description": "Fast decay: Tool usage patterns change quickly (30 days fresh, 1% decay per day)"
+        },
+        "deployment_approach": {
+          "decayRate": 0.008,
+          "freshnessThreshold": 45,
+          "_description": "Fast decay: Deployment practices evolve rapidly"
+        },
+        "coding_pattern": {
+          "decayRate": 0.004,
+          "freshnessThreshold": 60,
+          "_description": "Medium decay: Patterns stay relevant for ~2 months"
+        },
+        "optimization": {
+          "decayRate": 0.004,
+          "freshnessThreshold": 60,
+          "_description": "Medium decay: Optimization techniques have moderate longevity"
+        },
+        "test_strategy": {
+          "decayRate": 0.002,
+          "freshnessThreshold": 90,
+          "_description": "Slow decay: Test strategies remain relevant for ~3 months"
+        },
+        "architectural_decision": {
+          "decayRate": 0.002,
+          "freshnessThreshold": 90,
+          "_description": "Slow decay: Architecture decisions are long-lasting"
+        },
+        "abstract_concept": {
+          "decayRate": 0.001,
+          "freshnessThreshold": 180,
+          "_description": "Very slow decay: Abstract principles are timeless"
+        }
+      },
+
+      "recencyBoost": {
+        "enabled": true,
+        "recentThreshold": 7,
+        "boostMultiplier": 1.5,
+        "_description": "Boost ranking for knowledge accessed in last 7 days by 1.5x"
+      }
+    },
+
+    "conceptAbstraction": {
+      "enabled": true,
+      "_enabled_description": "Enable automatic concept abstraction from patterns",
+
+      "minInstances": 3,
+      "_minInstances_description": "Minimum observations required to abstract a concept (recommended: 3-5)",
+
+      "similarityThreshold": 0.7,
+      "_similarityThreshold_description": "Similarity threshold for grouping observations into concepts (0.7 = 70% similar)"
+    }
+  },
+
+  "trajectory": {
+    "_comment": "Trajectory tracking and intent classification configuration",
+
+    "enabled": true,
+    "_enabled_description": "Enable real-time trajectory tracking and intent classification",
+
+    "intentClassification": {
+      "enabled": true,
+      "strategy": "llm",
+      "_strategy_options": ["llm", "heuristic", "hybrid"],
+      "_strategy_description": "LLM: Highest accuracy (uses inference budget). Heuristic: Fast, keyword-based. Hybrid: LLM with heuristic fallback.",
+
+      "intents": [
+        "learning",
+        "debugging",
+        "feature-dev",
+        "refactoring",
+        "testing",
+        "optimization",
+        "documentation",
+        "exploration"
+      ],
+      "_intents_description": "Intent types for classification. Customize for your workflow."
+    },
+
+    "goalExtraction": {
+      "enabled": true,
+      "_enabled_description": "Extract session goals from user messages",
+
+      "maxGoalLength": 500,
+      "_maxGoalLength_description": "Maximum characters for extracted goal"
+    },
+
+    "conceptTracking": {
+      "enabled": true,
+      "_enabled_description": "Track active concepts being discussed/used in session",
+
+      "maxActiveConcepts": 5,
+      "_maxActiveConcepts_description": "Maximum number of active concepts to track simultaneously",
+
+      "conceptTimeout": 300000,
+      "_conceptTimeout_description": "Timeout for concept activity in milliseconds (default: 5 minutes)"
+    }
+  },
+
+  "database": {
+    "_comment": "Database configuration for vector and analytics storage",
+
+    "qdrant": {
+      "url": "http://localhost:6333",
+      "_url_description": "Qdrant server URL. Use Docker: docker run -p 6333:6333 qdrant/qdrant",
+
+      "collections": {
+        "384": "knowledge_384",
+        "1536": "knowledge_1536"
+      },
+
+      "hnsw": {
+        "m": 16,
+        "efConstruct": 200,
+        "fullScanThreshold": 10000,
+        "_description": "HNSW index parameters. m=16 for <10K items. Increase m for larger collections."
+      },
+
+      "quantization": {
+        "enabled": true,
+        "type": "scalar",
+        "_description": "Enable int8 quantization for 4x faster search with minimal accuracy loss"
+      }
+    },
+
+    "sqlite": {
+      "path": "${PROJECT_ROOT}/.specstory/knowledge/analytics.db",
+      "_path_description": "Path to SQLite database for analytics and metadata",
+
+      "walMode": true,
+      "_walMode_description": "Enable Write-Ahead Logging for better concurrency",
+
+      "busyTimeout": 5000,
+      "_busyTimeout_description": "Database lock timeout in milliseconds"
+    }
+  },
+
+  "monitoring": {
+    "_comment": "Monitoring and observability configuration",
+
+    "metricsEnabled": true,
+    "_metricsEnabled_description": "Enable Prometheus metrics export",
+
+    "metricsPort": 9090,
+    "_metricsPort_description": "Port for Prometheus metrics endpoint",
+
+    "healthCheckEnabled": true,
+    "_healthCheckEnabled_description": "Enable /health endpoint for health checks",
+
+    "logging": {
+      "level": "info",
+      "_level_options": ["debug", "info", "warn", "error"],
+      "_level_description": "Log level. Use 'debug' for troubleshooting, 'info' for production.",
+
+      "includeTimestamps": true,
+      "includeStackTraces": true
+    }
+  },
+
+  "agents": {
+    "_comment": "Agent-specific configuration overrides",
+    "_description": "Customize behavior per coding agent (claude, cursor, copilot, etc.)",
+
+    "claude": {
+      "enabled": true,
+      "preferredProvider": "groq",
+      "cacheEnabled": true
+    },
+
+    "cursor": {
+      "enabled": false,
+      "preferredProvider": "local",
+      "cacheEnabled": true,
+      "_note": "Configure when integrating with Cursor IDE"
+    },
+
+    "_note": "Add custom agent configurations as needed. Each agent can override global settings."
+  },
+
+  "_examples": {
+    "_comment": "Common configuration scenarios",
+
+    "development": {
+      "_description": "Development/testing configuration with local-only inference",
+      "budget": { "monthlyLimit": 1.00, "trackingEnabled": false },
+      "inference": { "providerPriority": ["local"], "offlineMode": true },
+      "embeddings": { "defaultDimension": 384 },
+      "monitoring": { "logging": { "level": "debug" } }
+    },
+
+    "production_cost_optimized": {
+      "_description": "Production with aggressive cost optimization",
+      "budget": { "monthlyLimit": 8.33, "trackingEnabled": true },
+      "inference": { "providerPriority": ["local", "groq", "gemini"] },
+      "embeddings": { "defaultDimension": 384, "caching": { "enabled": true } },
+      "knowledge": { "decay": { "enabled": true } }
+    },
+
+    "production_quality_optimized": {
+      "_description": "Production prioritizing quality over cost",
+      "budget": { "monthlyLimit": 25.00, "trackingEnabled": true },
+      "inference": { "providerPriority": ["anthropic", "openai", "groq", "local"] },
+      "embeddings": { "defaultDimension": 1536 },
+      "knowledge": { "extraction": { "minConfidence": 0.7 } }
+    },
+
+    "high_sensitivity": {
+      "_description": "Configuration for projects with sensitive data (healthcare, finance)",
+      "inference": { "providerPriority": ["local"], "offlineMode": true },
+      "sensitivity": { "enabled": true, "autoDetect": true, "routeToLocal": true, "neverCache": true },
+      "embeddings": { "provider": "local" },
+      "_note": "All inference and embeddings stay on-premises, never sent to external APIs"
+    }
+  }
+}

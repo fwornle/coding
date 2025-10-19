@@ -1,0 +1,283 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/your-org/knowledge-system/schemas/knowledge-system.schema.json",
+  "title": "Knowledge System Configuration",
+  "description": "Schema for validating knowledge system configuration",
+  "type": "object",
+  "required": ["budget", "inference", "embeddings", "knowledge", "database"],
+  "properties": {
+    "budget": {
+      "type": "object",
+      "required": ["monthlyLimit"],
+      "properties": {
+        "monthlyLimit": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Monthly budget limit in USD"
+        },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "warning": { "type": "number", "minimum": 0, "maximum": 1 },
+            "alert": { "type": "number", "minimum": 0, "maximum": 1 },
+            "critical": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "trackingEnabled": { "type": "boolean" }
+      }
+    },
+    "inference": {
+      "type": "object",
+      "required": ["providerPriority", "providers"],
+      "properties": {
+        "providerPriority": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["local", "groq", "openrouter", "anthropic", "openai", "gemini"]
+          },
+          "minItems": 1
+        },
+        "providers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "apiKey": { "type": "string" },
+              "baseURL": { "type": "string", "format": "uri" },
+              "defaultModel": { "type": "string" }
+            }
+          }
+        },
+        "circuitBreaker": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "defaultConfig": {
+              "type": "object",
+              "properties": {
+                "failureThreshold": { "type": "integer", "minimum": 1 },
+                "resetTimeout": { "type": "integer", "minimum": 1000 },
+                "halfOpenRequests": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        },
+        "caching": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "type": { "type": "string", "enum": ["lru", "redis"] },
+            "lru": {
+              "type": "object",
+              "properties": {
+                "maxSize": { "type": "integer", "minimum": 1 },
+                "ttl": { "type": "integer", "minimum": 1000 }
+              }
+            },
+            "hitRateTarget": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "offlineMode": { "type": "boolean" }
+      }
+    },
+    "sensitivity": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "autoDetect": { "type": "boolean" },
+        "routeToLocal": { "type": "boolean" },
+        "customTopics": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "neverCache": { "type": "boolean" }
+      }
+    },
+    "embeddings": {
+      "type": "object",
+      "required": ["provider", "defaultDimension"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["local", "openai", "cohere"]
+        },
+        "defaultDimension": {
+          "type": "integer",
+          "enum": [384, 1536]
+        },
+        "models": {
+          "type": "object",
+          "properties": {
+            "384": { "type": "string" },
+            "1536": { "type": "string" }
+          }
+        },
+        "caching": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "maxSize": { "type": "integer", "minimum": 1 },
+            "ttl": { "type": "integer", "minimum": 1000 }
+          }
+        },
+        "batchSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "knowledge": {
+      "type": "object",
+      "properties": {
+        "extraction": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "mode": { "type": "string", "enum": ["streaming", "batch"] },
+            "minConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "deduplicationThreshold": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "classification": {
+          "type": "object",
+          "properties": {
+            "types": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "decay": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "policies": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "decayRate": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "freshnessThreshold": { "type": "integer", "minimum": 1 }
+                }
+              }
+            }
+          }
+        },
+        "conceptAbstraction": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "minInstances": { "type": "integer", "minimum": 1 },
+            "similarityThreshold": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "trajectory": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "intentClassification": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "strategy": { "type": "string", "enum": ["llm", "heuristic", "hybrid"] },
+            "intents": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "goalExtraction": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "maxGoalLength": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "conceptTracking": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "maxActiveConcepts": { "type": "integer", "minimum": 1 },
+            "conceptTimeout": { "type": "integer", "minimum": 1000 }
+          }
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "required": ["qdrant", "sqlite"],
+      "properties": {
+        "qdrant": {
+          "type": "object",
+          "required": ["url"],
+          "properties": {
+            "url": { "type": "string", "format": "uri" },
+            "collections": {
+              "type": "object",
+              "properties": {
+                "384": { "type": "string" },
+                "1536": { "type": "string" }
+              }
+            },
+            "hnsw": {
+              "type": "object",
+              "properties": {
+                "m": { "type": "integer", "minimum": 4, "maximum": 64 },
+                "efConstruct": { "type": "integer", "minimum": 4 },
+                "fullScanThreshold": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "quantization": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "type": { "type": "string", "enum": ["scalar", "product", "binary"] }
+              }
+            }
+          }
+        },
+        "sqlite": {
+          "type": "object",
+          "required": ["path"],
+          "properties": {
+            "path": { "type": "string" },
+            "walMode": { "type": "boolean" },
+            "busyTimeout": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "metricsEnabled": { "type": "boolean" },
+        "metricsPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "healthCheckEnabled": { "type": "boolean" },
+        "logging": {
+          "type": "object",
+          "properties": {
+            "level": { "type": "string", "enum": ["debug", "info", "warn", "error"] },
+            "includeTimestamps": { "type": "boolean" },
+            "includeStackTraces": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "agents": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "preferredProvider": { "type": "string" },
+          "cacheEnabled": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

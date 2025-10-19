@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Enhanced Trajectory State Schema",
+  "description": "Extended trajectory state schema with intent classification, session goals, and active concepts. Maintains backward compatibility with v1.",
+  "version": "2.0.0",
+  "type": "object",
+  "required": ["currentState", "lastUpdate", "projectPath"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Schema version for migration support",
+      "default": "2.0.0"
+    },
+    "currentState": {
+      "type": "string",
+      "description": "Current trajectory state",
+      "enum": [
+        "exploring",
+        "planning",
+        "implementing",
+        "debugging",
+        "refactoring",
+        "testing",
+        "documenting",
+        "stuck",
+        "reviewing"
+      ]
+    },
+    "intent": {
+      "type": "string",
+      "description": "Current session intent (what user is trying to accomplish)",
+      "enum": [
+        "learning",
+        "debugging",
+        "feature-dev",
+        "refactoring",
+        "testing",
+        "optimization",
+        "documentation",
+        "exploration"
+      ],
+      "default": "exploration"
+    },
+    "goal": {
+      "type": "string",
+      "description": "Extracted session objective (what user wants to achieve)",
+      "maxLength": 500
+    },
+    "concepts": {
+      "type": "array",
+      "description": "Active concepts being used or learned in this session",
+      "items": {
+        "type": "object",
+        "required": ["name", "category"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Concept name (e.g., 'React', 'MVC', 'TDD')"
+          },
+          "category": {
+            "type": "string",
+            "description": "Concept category",
+            "enum": [
+              "design_pattern",
+              "technology",
+              "architecture",
+              "practice",
+              "tool",
+              "algorithm",
+              "principle"
+            ]
+          },
+          "isLearning": {
+            "type": "boolean",
+            "description": "True if learning this concept, false if applying it",
+            "default": true
+          },
+          "knowledgeId": {
+            "type": "string",
+            "description": "Optional link to knowledge base entry"
+          }
+        }
+      },
+      "maxItems": 10
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Confidence score for current trajectory classification (0.0-1.0)",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "intentHistory": {
+      "type": "array",
+      "description": "History of intent transitions during session",
+      "items": {
+        "type": "object",
+        "required": ["intent", "timestamp"],
+        "properties": {
+          "intent": {
+            "type": "string",
+            "enum": [
+              "learning",
+              "debugging",
+              "feature-dev",
+              "refactoring",
+              "testing",
+              "optimization",
+              "documentation",
+              "exploration"
+            ]
+          },
+          "timestamp": {
+            "type": "number",
+            "description": "Unix timestamp in milliseconds"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "trigger": {
+            "type": "string",
+            "description": "What triggered the intent change"
+          }
+        }
+      }
+    },
+    "lastUpdate": {
+      "type": "number",
+      "description": "Unix timestamp in milliseconds of last update"
+    },
+    "projectPath": {
+      "type": "string",
+      "description": "Absolute path to project"
+    },
+    "stateHistory": {
+      "type": "array",
+      "description": "History of state transitions",
+      "items": {
+        "type": "object",
+        "required": ["state", "timestamp"],
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "number"
+          },
+          "duration": {
+            "type": "number",
+            "description": "Duration in milliseconds"
+          },
+          "intent": {
+            "type": "string",
+            "description": "Intent at time of this state"
+          }
+        }
+      }
+    },
+    "interventionCount": {
+      "type": "integer",
+      "description": "Number of trajectory interventions",
+      "minimum": 0,
+      "default": 0
+    },
+    "sessionInfo": {
+      "type": "object",
+      "description": "Session metadata",
+      "properties": {
+        "startTime": {
+          "type": "number",
+          "description": "Session start timestamp"
+        },
+        "totalTransitions": {
+          "type": "integer",
+          "description": "Total state transitions",
+          "minimum": 0
+        },
+        "intentTransitions": {
+          "type": "integer",
+          "description": "Total intent transitions",
+          "minimum": 0,
+          "default": 0
+        },
+        "conceptsLearned": {
+          "type": "integer",
+          "description": "Number of new concepts learned",
+          "minimum": 0,
+          "default": 0
+        },
+        "conceptsApplied": {
+          "type": "integer",
+          "description": "Number of existing concepts applied",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata for extensibility",
+      "additionalProperties": true
+    }
+  }
+}
