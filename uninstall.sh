@@ -225,9 +225,30 @@ else
     fi
 fi
 
+echo -e "\n${BLUE}🗑️  Removing knowledge databases...${NC}"
+# Remove .data directory with database files (optional - ask user)
+if [[ -d "$CODING_REPO/.data" ]]; then
+    echo ""
+    read -p "Remove .data directory (contains SQLite knowledge database)? This will delete all learning history. (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm -rf "$CODING_REPO/.data"
+        echo "  Removed .data directory"
+    else
+        echo -e "${GREEN}  Kept .data directory with knowledge database${NC}"
+    fi
+fi
+
+# Inform about Qdrant collections
+echo -e "\n${YELLOW}ℹ️  Note about Qdrant collections:${NC}"
+echo "  If you were using Qdrant for vector search, you may want to remove collections:"
+echo "    docker exec qdrant-container /bin/sh -c \"rm -rf /qdrant/storage/collections/knowledge_*\""
+echo "  Or stop the Qdrant container:"
+echo "    docker stop qdrant-container"
+
 echo -e "\n${GREEN}✅ Uninstall completed!${NC}"
-echo -e "${GREEN}📊 Your knowledge data has been preserved:${NC}"
-echo "   $CODING_REPO/shared-memory.json (if exists)"
+echo -e "${GREEN}📊 Your knowledge data preservation status:${NC}"
+echo "   $CODING_REPO/shared-memory.json (if exists) - PRESERVED"
 
 # List team-specific knowledge files
 TEAM_FILES=$(find "$CODING_REPO" -name "shared-memory-*.json" 2>/dev/null || true)
@@ -236,6 +257,11 @@ if [[ -n "$TEAM_FILES" ]]; then
     echo "$TEAM_FILES" | while read -r file; do
         [[ -n "$file" ]] && echo "   $(basename "$file")"
     done
+fi
+
+if [[ -d "$CODING_REPO/.data" ]]; then
+    echo -e "${GREEN}📊 Knowledge database preserved:${NC}"
+    echo "   $CODING_REPO/.data/knowledge.db (SQLite database with learning history)"
 fi
 
 echo ""

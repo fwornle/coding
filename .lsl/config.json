@@ -29,7 +29,7 @@
   },
   "file_management": {
     "auto_rotation": true,
-    "compression": false,
+    "compression": true,
     "archiving": true,
     "max_file_size": 104857600,
     "max_archive_age": 2592000000
@@ -41,8 +41,8 @@
     "log_level": "info"
   },
   "deployment": {
-    "deployment_id": "lsl-20250914-164246",
-    "deployed_at": "2025-09-14T14:42:47Z",
+    "deployment_id": "lsl-20251019-134414",
+    "deployed_at": "2025-10-19T11:44:15Z",
     "version": "2.0.0",
     "components": [
       "enhanced-redaction-system",

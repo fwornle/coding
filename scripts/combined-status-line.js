@@ -47,14 +47,15 @@ class CombinedStatusLine {
 
       const constraintStatus = await this.getConstraintStatus();
       const semanticStatus = await this.getSemanticStatus();
+      const knowledgeStatus = await this.getKnowledgeSystemStatus();
       const liveLogTarget = await this.getCurrentLiveLogTarget();
       const redirectStatus = await this.getRedirectStatus();
       const globalHealthStatus = await this.getGlobalHealthStatus();
-      
+
       // Robust transcript monitor health check and auto-restart
       await this.ensureTranscriptMonitorRunning();
-      
-      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, liveLogTarget, redirectStatus, globalHealthStatus);
+
+      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus);
 
       this.statusCache = status;
       this.lastUpdate = now;
@@ -343,7 +344,7 @@ class CombinedStatusLine {
 
       const services = JSON.parse(readFileSync(servicesPath, 'utf8'));
       const hasSemanticAnalysis = services.services.includes('semantic-analysis');
-      
+
       if (hasSemanticAnalysis && services.services_running >= 2) {
         return { status: 'operational' };
       } else {
@@ -351,6 +352,41 @@ class CombinedStatusLine {
       }
     } catch (error) {
       return { status: 'offline', error: error.message };
+    }
+  }
+
+  async getKnowledgeSystemStatus() {
+    try {
+      // Read knowledge extraction status from transcript monitor health file
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+      const projectName = path.basename(process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd());
+      const healthFile = join(codingPath, '.health', `${projectName}-transcript-monitor-health.json`);
+
+      if (!existsSync(healthFile)) {
+        return {
+          status: 'offline',
+          extractionState: 'disabled',
+          budgetUsage: null,
+          cacheHitRate: null
+        };
+      }
+
+      const healthData = JSON.parse(readFileSync(healthFile, 'utf8'));
+      const knowledgeStatus = healthData.knowledgeExtraction || {};
+
+      return {
+        status: knowledgeStatus.enabled ? 'operational' : 'disabled',
+        extractionState: knowledgeStatus.state || 'unknown',
+        lastExtraction: knowledgeStatus.lastExtraction || null,
+        errorCount: knowledgeStatus.errorCount || 0,
+        enabled: knowledgeStatus.enabled || false
+      };
+    } catch (error) {
+      return {
+        status: 'offline',
+        extractionState: 'error',
+        error: error.message
+      };
     }
   }
 
@@ -1002,7 +1038,7 @@ class CombinedStatusLine {
     }
   }
 
-  async buildCombinedStatus(constraint, semantic, liveLogTarget, redirectStatus, globalHealth) {
+  async buildCombinedStatus(constraint, semantic, knowledge, liveLogTarget, redirectStatus, globalHealth) {
     const parts = [];
     let overallColor = 'green';
 
@@ -1082,11 +1118,11 @@ class CombinedStatusLine {
     // Semantic Analysis Status (Brain = AI/LLM API health, Checkmark = Credits OK)
     if (semantic.status === 'operational') {
       const apiUsage = await this.getAPIUsageEstimate();
-      
+
       if (apiUsage.remainingCredits !== 'unknown') {
         const remaining = typeof apiUsage.remainingCredits === 'number' ? apiUsage.remainingCredits : 100;
         const thresholds = this.config.status_line?.display?.credit_thresholds || { critical: 10, warning: 20, moderate: 80 };
-        
+
         if (remaining < thresholds.critical) {
           parts.push(`[🧠API❌${remaining}%]`); // Critical - very low credits
           overallColor = 'red';
@@ -1107,6 +1143,25 @@ class CombinedStatusLine {
     } else {
       parts.push('[🧠API❌]');
       overallColor = 'red';
+    }
+
+    // Knowledge System Status (Book icon for knowledge extraction)
+    if (knowledge.status === 'operational') {
+      const stateIcon = knowledge.extractionState === 'ready' ? '✅' :
+                        knowledge.extractionState === 'processing' ? '⏳' :
+                        knowledge.extractionState === 'idle' ? '💤' : '⚠️';
+
+      if (knowledge.errorCount > 0) {
+        parts.push(`[📚${stateIcon}⚠️${knowledge.errorCount}]`);
+        if (overallColor === 'green') overallColor = 'yellow';
+      } else {
+        parts.push(`[📚${stateIcon}]`);
+      }
+    } else if (knowledge.status === 'disabled') {
+      parts.push('[📚⏸️]'); // Paused/disabled
+    } else {
+      parts.push('[📚❌]'); // Offline
+      if (overallColor === 'green') overallColor = 'yellow';
     }
 
     // Add redirect indicator if active (compact)
@@ -1190,10 +1245,10 @@ class CombinedStatusLine {
     }
   }
 
-  buildCombinedTooltip(constraint, semantic) {
+  buildCombinedTooltip(constraint, semantic, knowledge) {
     const lines = ['⚙️ System Status Dashboard'];
     lines.push('━'.repeat(30));
-    
+
     // Constraint Monitor Section
     lines.push('🛡️  CONSTRAINT MONITOR');
     if (constraint.status === 'operational') {
@@ -1211,9 +1266,9 @@ class CombinedStatusLine {
       lines.push(`   ❌ Status: Offline`);
       lines.push(`   📊 Compliance: N/A`);
     }
-    
+
     lines.push('');
-    
+
     // Semantic Analysis Section
     lines.push('🧠 SEMANTIC ANALYSIS');
     if (semantic.status === 'operational') {
@@ -1227,12 +1282,34 @@ class CombinedStatusLine {
       lines.push(`   ❌ Status: Offline`);
       lines.push(`   🔍 Analysis: Unavailable`);
     }
-    
+
+    lines.push('');
+
+    // Knowledge System Section
+    lines.push('📚 KNOWLEDGE SYSTEM');
+    if (knowledge.status === 'operational') {
+      lines.push(`   ✅ Status: Operational`);
+      lines.push(`   🔄 State: ${knowledge.extractionState || 'unknown'}`);
+      if (knowledge.lastExtraction) {
+        const lastTime = new Date(knowledge.lastExtraction).toLocaleTimeString();
+        lines.push(`   ⏱️  Last Extraction: ${lastTime}`);
+      }
+      if (knowledge.errorCount > 0) {
+        lines.push(`   ⚠️  Errors: ${knowledge.errorCount}`);
+      }
+    } else if (knowledge.status === 'disabled') {
+      lines.push(`   ⏸️  Status: Disabled`);
+      lines.push(`   💡 Enable in config`);
+    } else {
+      lines.push(`   ❌ Status: Offline`);
+      lines.push(`   🔍 Extraction: Unavailable`);
+    }
+
     lines.push('');
     lines.push('━'.repeat(30));
     lines.push('🖱️  Click to open constraint dashboard');
     lines.push('🔄 Updates every 5 seconds');
-    
+
     return lines.join('\n');
   }
 

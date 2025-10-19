@@ -1,0 +1,561 @@
+{
+  "$schema": "./sensitivity-topics.schema.json",
+  "_comment": "Sensitivity Topics Configuration Template",
+  "_description": "Define project-specific sensitive data patterns and privacy rules. Copy to sensitivity-topics.json and customize for your domain.",
+
+  "version": "1.0",
+  "enabled": true,
+
+  "customPatterns": {
+    "_comment": "Project-specific regex patterns for sensitive data detection",
+    "_description": "Add patterns specific to your domain (e.g., customer IDs, internal codes, proprietary formats)",
+
+    "patterns": [
+      {
+        "name": "customer_id",
+        "pattern": "CUST-[0-9]{6,10}",
+        "description": "Internal customer ID format",
+        "severity": "high",
+        "enabled": true
+      },
+      {
+        "name": "internal_api_key",
+        "pattern": "sk_[a-zA-Z0-9]{32}",
+        "description": "Internal API key format",
+        "severity": "critical",
+        "enabled": true
+      },
+      {
+        "name": "session_token",
+        "pattern": "sess_[a-f0-9]{64}",
+        "description": "Session token format",
+        "severity": "high",
+        "enabled": true
+      }
+    ],
+
+    "_examples_by_domain": {
+      "healthcare": [
+        {
+          "name": "patient_mrn",
+          "pattern": "MRN[0-9]{7,10}",
+          "description": "Medical Record Number",
+          "severity": "critical"
+        },
+        {
+          "name": "phi_identifier",
+          "pattern": "(?i)(patient name|date of birth|medical record)",
+          "description": "Protected Health Information identifiers",
+          "severity": "critical"
+        }
+      ],
+      "finance": [
+        {
+          "name": "account_number",
+          "pattern": "ACCT[0-9]{8,12}",
+          "description": "Bank account number",
+          "severity": "critical"
+        },
+        {
+          "name": "transaction_id",
+          "pattern": "TXN[0-9]{10,15}",
+          "description": "Financial transaction identifier",
+          "severity": "high"
+        },
+        {
+          "name": "routing_number",
+          "pattern": "[0-9]{9}",
+          "description": "Bank routing number (US)",
+          "severity": "critical"
+        }
+      ],
+      "ecommerce": [
+        {
+          "name": "order_id",
+          "pattern": "ORD-[A-Z0-9]{8,12}",
+          "description": "Order identifier",
+          "severity": "medium"
+        },
+        {
+          "name": "customer_email_hash",
+          "pattern": "CUST_[a-f0-9]{32}",
+          "description": "Hashed customer email",
+          "severity": "medium"
+        }
+      ]
+    }
+  },
+
+  "topicCategories": {
+    "_comment": "Semantic topic categories for sensitive content detection",
+    "_description": "Define high-level topics that should trigger local routing",
+
+    "categories": [
+      {
+        "name": "customer_pii",
+        "keywords": [
+          "customer name",
+          "customer email",
+          "customer phone",
+          "customer address",
+          "personal information",
+          "user profile",
+          "contact details"
+        ],
+        "severity": "critical",
+        "enabled": true,
+        "_description": "Customer personally identifiable information"
+      },
+      {
+        "name": "authentication",
+        "keywords": [
+          "password",
+          "api key",
+          "secret key",
+          "access token",
+          "refresh token",
+          "bearer token",
+          "auth token",
+          "jwt token",
+          "session id",
+          "private key",
+          "certificate"
+        ],
+        "severity": "critical",
+        "enabled": true,
+        "_description": "Authentication credentials and secrets"
+      },
+      {
+        "name": "financial_data",
+        "keywords": [
+          "credit card",
+          "card number",
+          "cvv",
+          "bank account",
+          "routing number",
+          "payment method",
+          "billing information",
+          "transaction amount",
+          "account balance",
+          "financial record"
+        ],
+        "severity": "critical",
+        "enabled": true,
+        "_description": "Financial and payment information"
+      },
+      {
+        "name": "health_information",
+        "keywords": [
+          "medical record",
+          "patient data",
+          "diagnosis",
+          "prescription",
+          "health condition",
+          "medical history",
+          "treatment plan",
+          "lab results",
+          "phi",
+          "hipaa"
+        ],
+        "severity": "critical",
+        "enabled": false,
+        "_description": "Protected health information (enable for healthcare projects)"
+      },
+      {
+        "name": "proprietary_code",
+        "keywords": [
+          "proprietary algorithm",
+          "trade secret",
+          "confidential code",
+          "internal implementation",
+          "business logic",
+          "competitive advantage"
+        ],
+        "severity": "high",
+        "enabled": true,
+        "_description": "Proprietary business logic and algorithms"
+      },
+      {
+        "name": "infrastructure_secrets",
+        "keywords": [
+          "database password",
+          "database connection string",
+          "aws secret",
+          "azure key",
+          "gcp credentials",
+          "ssh private key",
+          "ssl certificate",
+          "encryption key",
+          "service account"
+        ],
+        "severity": "critical",
+        "enabled": true,
+        "_description": "Infrastructure and deployment secrets"
+      },
+      {
+        "name": "internal_systems",
+        "keywords": [
+          "internal api",
+          "internal endpoint",
+          "staging environment",
+          "production url",
+          "internal hostname",
+          "vpn configuration",
+          "network topology"
+        ],
+        "severity": "medium",
+        "enabled": true,
+        "_description": "Internal system architecture details"
+      }
+    ]
+  },
+
+  "filePathRules": {
+    "_comment": "File path patterns that indicate sensitive content",
+    "_description": "Files matching these patterns are automatically considered sensitive",
+
+    "sensitivePatterns": [
+      ".env",
+      ".env.local",
+      ".env.production",
+      "secrets.json",
+      "credentials.json",
+      "config/production.json",
+      "*.pem",
+      "*.key",
+      "*.p12",
+      "*.pfx",
+      "id_rsa",
+      "id_dsa",
+      "authorized_keys",
+      "known_hosts",
+      "*.crt",
+      "*.cer",
+      "wallet.dat",
+      "keystore.jks"
+    ],
+
+    "_examples_by_domain": {
+      "healthcare": [
+        "patient_data/*",
+        "phi/*",
+        "medical_records/*",
+        "hipaa_data/*"
+      ],
+      "finance": [
+        "customer_accounts/*",
+        "transaction_logs/*",
+        "pci_data/*",
+        "financial_records/*"
+      ],
+      "legal": [
+        "client_files/*",
+        "case_documents/*",
+        "privileged/*"
+      ]
+    }
+  },
+
+  "domainSpecificRules": {
+    "_comment": "Domain-specific sensitivity rules",
+    "_description": "Customize for your industry's compliance requirements",
+
+    "compliance": {
+      "gdpr": {
+        "enabled": false,
+        "_enabled_description": "Enable for EU projects requiring GDPR compliance",
+        "detectPII": true,
+        "requireConsent": true,
+        "rightToErasure": true,
+        "_note": "Automatically routes EU citizen data to local models"
+      },
+
+      "hipaa": {
+        "enabled": false,
+        "_enabled_description": "Enable for US healthcare projects requiring HIPAA compliance",
+        "detectPHI": true,
+        "encryptAtRest": true,
+        "auditLogging": true,
+        "_note": "All PHI processed locally, never sent to external APIs"
+      },
+
+      "pci_dss": {
+        "enabled": false,
+        "_enabled_description": "Enable for projects handling payment card data",
+        "detectCardData": true,
+        "maskCardNumbers": true,
+        "separateProcessing": true,
+        "_note": "Payment data processed in isolated environment"
+      },
+
+      "sox": {
+        "enabled": false,
+        "_enabled_description": "Enable for financial reporting systems (Sarbanes-Oxley)",
+        "detectFinancialData": true,
+        "immutableAuditLog": true,
+        "accessControls": true
+      }
+    },
+
+    "dataClassification": {
+      "_comment": "Data classification levels for your organization",
+
+      "public": {
+        "severity": "none",
+        "routeToLocal": false,
+        "allowCaching": true,
+        "examples": ["documentation", "public APIs", "marketing materials"]
+      },
+
+      "internal": {
+        "severity": "low",
+        "routeToLocal": false,
+        "allowCaching": true,
+        "examples": ["internal tools", "employee directories"]
+      },
+
+      "confidential": {
+        "severity": "medium",
+        "routeToLocal": true,
+        "allowCaching": false,
+        "examples": ["business plans", "financial reports", "customer lists"]
+      },
+
+      "restricted": {
+        "severity": "high",
+        "routeToLocal": true,
+        "allowCaching": false,
+        "examples": ["trade secrets", "M&A documents", "executive communications"]
+      },
+
+      "highly_restricted": {
+        "severity": "critical",
+        "routeToLocal": true,
+        "allowCaching": false,
+        "examples": ["customer PII", "payment data", "health records", "legal documents"]
+      }
+    }
+  },
+
+  "contextualRules": {
+    "_comment": "Context-based sensitivity detection",
+    "_description": "Detect sensitivity based on surrounding context and conversation flow",
+
+    "conversationContext": {
+      "enabled": true,
+      "_enabled_description": "Analyze entire conversation context for sensitivity signals",
+
+      "triggerPhrases": [
+        "this is confidential",
+        "don't share this",
+        "sensitive information",
+        "internal only",
+        "production credentials",
+        "customer data",
+        "private key",
+        "do not distribute"
+      ],
+
+      "windowSize": 5,
+      "_windowSize_description": "Number of previous messages to analyze for context (default: 5)"
+    },
+
+    "codeContext": {
+      "enabled": true,
+      "_enabled_description": "Detect sensitive code patterns",
+
+      "sensitiveVariableNames": [
+        "password",
+        "secret",
+        "apiKey",
+        "privateKey",
+        "token",
+        "credential",
+        "authToken",
+        "sessionId",
+        "encryptionKey"
+      ],
+
+      "sensitiveFunctionNames": [
+        "authenticate",
+        "decrypt",
+        "hashPassword",
+        "generateToken",
+        "encryptData",
+        "storeCredential"
+      ],
+
+      "sensitiveComments": [
+        "TODO: remove before commit",
+        "FIXME: security issue",
+        "WARNING: sensitive",
+        "HACK: temporary credentials"
+      ]
+    }
+  },
+
+  "behaviorOverrides": {
+    "_comment": "Override default behavior for specific scenarios",
+
+    "alwaysLocal": [
+      "health_information",
+      "financial_data",
+      "customer_pii",
+      "authentication"
+    ],
+    "_alwaysLocal_description": "These categories ALWAYS route to local models, even if explicitly requested otherwise",
+
+    "neverCache": [
+      "authentication",
+      "infrastructure_secrets",
+      "financial_data"
+    ],
+    "_neverCache_description": "These categories are NEVER cached, even if caching is globally enabled",
+
+    "requireExplicitConsent": [
+      "customer_pii",
+      "health_information"
+    ],
+    "_requireExplicitConsent_description": "Require explicit user confirmation before processing (future feature)"
+  },
+
+  "auditLogging": {
+    "_comment": "Audit logging for sensitive data access",
+
+    "enabled": true,
+    "_enabled_description": "Log all sensitive data access for compliance and security audits",
+
+    "logLevel": "info",
+    "_logLevel_options": ["none", "info", "verbose"],
+
+    "includeContext": true,
+    "_includeContext_description": "Include surrounding context in audit logs (sanitized)",
+
+    "retentionDays": 365,
+    "_retentionDays_description": "Audit log retention period (1 year for compliance)",
+
+    "alerts": {
+      "enabled": true,
+      "criticalSeverityOnly": true,
+      "notificationChannels": ["slack", "email"],
+      "_description": "Alert on critical severity sensitive data detections"
+    }
+  },
+
+  "_examples_by_project_type": {
+    "saas_b2b": {
+      "_description": "B2B SaaS application configuration",
+      "topicCategories": {
+        "categories": [
+          {
+            "name": "customer_pii",
+            "enabled": true,
+            "severity": "critical"
+          },
+          {
+            "name": "authentication",
+            "enabled": true,
+            "severity": "critical"
+          },
+          {
+            "name": "proprietary_code",
+            "enabled": true,
+            "severity": "high"
+          }
+        ]
+      },
+      "compliance": {
+        "gdpr": { "enabled": true },
+        "sox": { "enabled": false }
+      }
+    },
+
+    "healthcare_app": {
+      "_description": "Healthcare application requiring HIPAA compliance",
+      "topicCategories": {
+        "categories": [
+          {
+            "name": "health_information",
+            "enabled": true,
+            "severity": "critical"
+          },
+          {
+            "name": "customer_pii",
+            "enabled": true,
+            "severity": "critical"
+          }
+        ]
+      },
+      "compliance": {
+        "hipaa": { "enabled": true },
+        "gdpr": { "enabled": true }
+      },
+      "behaviorOverrides": {
+        "alwaysLocal": ["health_information", "customer_pii", "authentication"],
+        "neverCache": ["health_information", "customer_pii", "authentication"]
+      }
+    },
+
+    "fintech": {
+      "_description": "Financial technology application",
+      "topicCategories": {
+        "categories": [
+          {
+            "name": "financial_data",
+            "enabled": true,
+            "severity": "critical"
+          },
+          {
+            "name": "customer_pii",
+            "enabled": true,
+            "severity": "critical"
+          }
+        ]
+      },
+      "compliance": {
+        "pci_dss": { "enabled": true },
+        "sox": { "enabled": true },
+        "gdpr": { "enabled": true }
+      },
+      "behaviorOverrides": {
+        "alwaysLocal": ["financial_data", "customer_pii", "authentication"],
+        "neverCache": ["financial_data", "customer_pii", "authentication"]
+      }
+    },
+
+    "open_source_library": {
+      "_description": "Open source library with minimal sensitivity requirements",
+      "topicCategories": {
+        "categories": [
+          {
+            "name": "authentication",
+            "enabled": true,
+            "severity": "critical"
+          },
+          {
+            "name": "infrastructure_secrets",
+            "enabled": true,
+            "severity": "critical"
+          }
+        ]
+      },
+      "compliance": {
+        "gdpr": { "enabled": false },
+        "hipaa": { "enabled": false }
+      }
+    }
+  },
+
+  "testing": {
+    "_comment": "Test mode configuration",
+
+    "enabled": false,
+    "_enabled_description": "Enable test mode to see what would be detected as sensitive without actually routing to local",
+
+    "dryRun": false,
+    "_dryRun_description": "Log sensitivity detections but don't enforce routing (useful for tuning)",
+
+    "verboseLogging": false,
+    "_verboseLogging_description": "Include detailed pattern matching information in logs"
+  }
+}

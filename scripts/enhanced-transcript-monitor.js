@@ -30,6 +30,16 @@ import LSLFileManager from '../src/live-logging/LSLFileManager.js';
 import RealTimeTrajectoryAnalyzer from '../src/live-logging/RealTimeTrajectoryAnalyzer.js';
 import ClassificationLogger from './classification-logger.js';
 
+// Knowledge extraction integration (optional)
+let StreamingKnowledgeExtractor = null;
+try {
+  const module = await import('../src/knowledge/StreamingKnowledgeExtractor.js');
+  StreamingKnowledgeExtractor = module.default;
+} catch (err) {
+  // Knowledge extraction not available - continue without it
+  console.log('Knowledge extraction not available:', err.message);
+}
+
 // ConfigurableRedactor instance for consistent redaction
 let redactor = null;
 
@@ -109,6 +119,17 @@ class EnhancedTranscriptMonitor {
     this.initializeReliableCodingClassifier().catch(err => {
       console.error('Reliable coding classifier initialization failed:', err.message);
     });
+
+    // Initialize knowledge extraction (optional, non-blocking)
+    this.knowledgeExtractor = null;
+    this.knowledgeExtractionEnabled = config.enableKnowledgeExtraction !== false && StreamingKnowledgeExtractor !== null;
+    this.knowledgeExtractionStatus = { state: 'idle', lastExtraction: null, errorCount: 0 };
+    if (this.knowledgeExtractionEnabled) {
+      this.initializeKnowledgeExtractor().catch(err => {
+        this.debug(`Knowledge extractor initialization failed (non-critical): ${err.message}`);
+        this.knowledgeExtractionStatus.state = 'disabled';
+      });
+    }
     
     // Initialize semantic analyzer for content classification (fallback)
     this.semanticAnalyzer = null;
@@ -245,6 +266,79 @@ class EnhancedTranscriptMonitor {
   /**
    * Initialize reliable coding classifier
    */
+  /**
+   * Initialize knowledge extraction system (optional, non-blocking)
+   */
+  async initializeKnowledgeExtractor() {
+    if (!StreamingKnowledgeExtractor) {
+      this.debug('Knowledge extraction not available');
+      return;
+    }
+
+    try {
+      this.knowledgeExtractor = new StreamingKnowledgeExtractor({
+        projectPath: this.config.projectPath,
+        enableBudgetTracking: true,
+        enableSensitivityDetection: true,
+        debug: this.debug_enabled
+      });
+
+      await this.knowledgeExtractor.initialize();
+      this.knowledgeExtractionStatus.state = 'ready';
+      this.debug('✅ Knowledge extraction initialized');
+    } catch (error) {
+      this.debug(`❌ Failed to initialize knowledge extractor: ${error.message}`);
+      this.knowledgeExtractionStatus.state = 'error';
+      throw error;
+    }
+  }
+
+  /**
+   * Extract knowledge from exchanges asynchronously (non-blocking)
+   * This runs in the background and doesn't block LSL processing
+   */
+  async extractKnowledgeAsync(exchanges) {
+    if (!this.knowledgeExtractor || this.knowledgeExtractionStatus.state !== 'ready') {
+      return;
+    }
+
+    try {
+      this.knowledgeExtractionStatus.state = 'processing';
+      const startTime = Date.now();
+
+      // Convert exchanges to format expected by knowledge extractor
+      const transcript = exchanges.map(ex => ({
+        role: ex.isUserPrompt ? 'user' : 'assistant',
+        content: ex.isUserPrompt ? ex.userMessage : ex.assistantMessage,
+        timestamp: ex.timestamp
+      }));
+
+      // Extract knowledge (async, non-blocking)
+      const extractedKnowledge = await this.knowledgeExtractor.extractFromTranscript(transcript);
+
+      const duration = Date.now() - startTime;
+      this.knowledgeExtractionStatus.state = 'ready';
+      this.knowledgeExtractionStatus.lastExtraction = new Date().toISOString();
+
+      this.debug(`📚 Knowledge extracted: ${extractedKnowledge.length} items in ${duration}ms`);
+    } catch (error) {
+      this.knowledgeExtractionStatus.state = 'error';
+      throw error;
+    }
+  }
+
+  /**
+   * Get current knowledge extraction status (for status line)
+   */
+  getKnowledgeExtractionStatus() {
+    return {
+      enabled: this.knowledgeExtractionEnabled,
+      state: this.knowledgeExtractionStatus.state,
+      lastExtraction: this.knowledgeExtractionStatus.lastExtraction,
+      errorCount: this.knowledgeExtractionStatus.errorCount
+    };
+  }
+
   async initializeReliableCodingClassifier() {
     try {
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
@@ -1743,7 +1837,15 @@ class EnhancedTranscriptMonitor {
     this.saveLastProcessedUuid();
 
     console.log(`📊 EXCHANGE SUMMARY: ${userPromptCount} user prompts, ${nonUserPromptCount} non-user prompts (total: ${exchanges.length})`);
-    
+
+    // Trigger knowledge extraction asynchronously (non-blocking)
+    if (this.knowledgeExtractionEnabled && this.knowledgeExtractor && exchanges.length > 0) {
+      this.extractKnowledgeAsync(exchanges).catch(err => {
+        this.debug(`Knowledge extraction failed (non-critical): ${err.message}`);
+        this.knowledgeExtractionStatus.errorCount++;
+      });
+    }
+
     // Process any remaining user prompt set
     if (this.currentUserPromptSet.length > 0) {
       console.log(`🔄 Processing final user prompt set with ${this.currentUserPromptSet.length} exchanges`);
@@ -1991,7 +2093,8 @@ class EnhancedTranscriptMonitor {
         },
         streamingActive: this.streamingReader !== null,
         errors: this.healthErrors || [],
-        trajectory: this.trajectoryAnalyzer ? this.trajectoryAnalyzer.getCurrentTrajectoryState() : null
+        trajectory: this.trajectoryAnalyzer ? this.trajectoryAnalyzer.getCurrentTrajectoryState() : null,
+        knowledgeExtraction: this.getKnowledgeExtractionStatus()
       };
       
       // Add warning if suspicious activity detected

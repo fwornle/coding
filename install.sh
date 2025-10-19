@@ -633,8 +633,19 @@ install_shadcn_mcp() {
                 return 1
             }
         fi
-        
+
         success "shadcn/ui MCP server initialized"
+
+        # Install dependencies after initialization
+        info "Installing shadcn MCP dependencies..."
+        if [[ "$package_manager" == "pnpm" ]]; then
+            pnpm install || {
+                warning "pnpm install failed, trying npm"
+                npm install || warning "Failed to install shadcn dependencies"
+            }
+        else
+            npm install || warning "Failed to install shadcn dependencies"
+        fi
     else
         info "shadcn MCP directory already exists, updating..."
         cd "$shadcn_dir"
@@ -1400,21 +1411,31 @@ EOF
 # Install Node.js dependencies for agent-agnostic functionality
 install_node_dependencies() {
     info "Installing Node.js dependencies for agent-agnostic functionality..."
-    
+
     if [ ! -f "$CODING_REPO/package.json" ]; then
         error_exit "package.json not found. This is required for agent-agnostic functionality."
         return 1
     fi
-    
+
     cd "$CODING_REPO"
-    
+
     if npm install; then
-        success "✓ Node.js dependencies installed"
+        success "✓ Node.js dependencies installed (including better-sqlite3 for knowledge databases)"
+
+        # Rebuild better-sqlite3 to ensure native bindings are compiled
+        # This is necessary because pnpm (used by shadcn) may block build scripts
+        info "Rebuilding better-sqlite3 native bindings..."
+        if npm rebuild better-sqlite3 2>&1 | grep -q "rebuilt dependencies successfully"; then
+            success "✓ better-sqlite3 native bindings rebuilt"
+        else
+            warning "better-sqlite3 rebuild may have issues, but installation will continue"
+            INSTALLATION_WARNINGS+=("better-sqlite3 rebuild had warnings")
+        fi
     else
         error_exit "Failed to install Node.js dependencies"
         return 1
     fi
-    
+
     # Install Playwright browsers
     info "Installing Playwright browsers for browser automation fallback..."
     if npx playwright install chromium; then
@@ -1423,7 +1444,7 @@ install_node_dependencies() {
         warning "Failed to install Playwright browsers. Browser automation may not work."
         INSTALLATION_WARNINGS+=("Playwright browsers not installed")
     fi
-    
+
     # Install vkb-server dependencies
     info "Installing vkb-server dependencies..."
     if [ -d "$CODING_REPO/lib/vkb-server" ]; then
@@ -1436,6 +1457,72 @@ install_node_dependencies() {
         fi
         cd "$CODING_REPO"
     fi
+}
+
+# Initialize knowledge management databases (Qdrant + SQLite)
+initialize_knowledge_databases() {
+    echo -e "\n${CYAN}📊 Initializing Continuous Learning Knowledge Databases...${NC}"
+
+    cd "$CODING_REPO"
+
+    # Create .data directory for knowledge databases
+    local data_dir="$CODING_REPO/.data"
+    if [[ ! -d "$data_dir" ]]; then
+        info "Creating .data directory for knowledge databases..."
+        mkdir -p "$data_dir"
+        success ".data directory created"
+    else
+        info ".data directory already exists"
+    fi
+
+    # Check if Qdrant is available (optional)
+    local qdrant_available=false
+    info "Checking Qdrant availability (optional for vector search)..."
+    if timeout 3s curl -s http://localhost:6333/health >/dev/null 2>&1; then
+        qdrant_available=true
+        success "✓ Qdrant is running on localhost:6333"
+    else
+        info "Qdrant not running (optional - vector search features will be disabled)"
+        info "To enable Qdrant: docker run -d -p 6333:6333 qdrant/qdrant"
+    fi
+
+    # Initialize databases
+    info "Initializing knowledge databases..."
+    if [[ "$qdrant_available" == false ]]; then
+        # Skip Qdrant initialization if not available
+        if node scripts/init-databases.js --skip-qdrant; then
+            success "✓ Knowledge databases initialized (SQLite only)"
+            info "  • SQLite database: $data_dir/knowledge.db"
+            info "  • Budget tracking, analytics, and embedding cache enabled"
+            info "  • Vector search disabled (Qdrant not available)"
+        else
+            warning "Database initialization had issues, but SQLite should still work"
+            INSTALLATION_WARNINGS+=("Knowledge databases: Initialization had warnings")
+        fi
+    else
+        # Full initialization with Qdrant
+        if node scripts/init-databases.js; then
+            success "✓ Knowledge databases initialized (Qdrant + SQLite)"
+            info "  • Qdrant collections: knowledge_patterns, trajectory_analysis, session_memory"
+            info "  • SQLite database: $data_dir/knowledge.db"
+            info "  • Full vector search and analytics enabled"
+        else
+            warning "Database initialization had issues"
+            INSTALLATION_WARNINGS+=("Knowledge databases: Full initialization had warnings")
+        fi
+    fi
+
+    # Add environment variables for database paths if not already in .env
+    if [[ -f "$CODING_REPO/.env" ]]; then
+        if ! grep -q "QDRANT_URL" "$CODING_REPO/.env"; then
+            echo "" >> "$CODING_REPO/.env"
+            echo "# Continuous Learning Knowledge System - Database Configuration" >> "$CODING_REPO/.env"
+            echo "QDRANT_URL=http://localhost:6333" >> "$CODING_REPO/.env"
+            echo "SQLITE_PATH=$data_dir/knowledge.db" >> "$CODING_REPO/.env"
+        fi
+    fi
+
+    success "Knowledge databases ready for use"
 }
 
 
@@ -1546,6 +1633,7 @@ main() {
     detect_agents
     configure_team_setup
     install_node_dependencies
+    initialize_knowledge_databases
     install_plantuml
     detect_network_and_set_repos
     test_proxy_connectivity
