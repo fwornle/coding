@@ -1,6 +1,6 @@
-# Classification Status - nano-degree
+# Classification Status - curriculum-alignment
 
-**Generated**: 2025-10-19T14:30:39.073Z
+**Generated**: 2025-10-19T14:30:36.035Z
 **Total Sessions**: 2
 **Total Decisions**: 8
 
@@ -44,14 +44,14 @@ Sessions grouped by the classification layer that made the final decision.
 
 #### Redirected (CODING)
 
-- **[2025-10-18_1100-1200_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-nano-degree.md)** - 2 coding decisions
-- **[2025-10-19_1600-1700_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-nano-degree.md)** - 1 coding decisions
+- **[2025-10-18_1100-1200_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-curriculum-alignment.md)** - 2 coding decisions
+- **[2025-10-19_1600-1700_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-curriculum-alignment.md)** - 1 coding decisions
 
 ### Layer 3: Embedding Search
 
 #### Redirected (CODING)
 
-- **[2025-10-19_1600-1700_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-nano-degree.md)** - 1 coding decisions
+- **[2025-10-19_1600-1700_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-curriculum-alignment.md)** - 1 coding decisions
 
 #### Local (LOCAL)
 
@@ -67,8 +67,8 @@ Sessions grouped by the classification layer that made the final decision.
 
 Complete chronological list of all classification sessions.
 
-- **2025-10-18_1100-1200_g9b30a** - 6 decisions ([CODING: 2](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-nano-degree.md), [LOCAL: 4](2025-10-18_1100-1200_g9b30a.md))
-- **2025-10-19_1600-1700_g9b30a** - 2 decisions ([CODING: 2](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-nano-degree.md))
+- **2025-10-18_1100-1200_g9b30a** - 6 decisions ([CODING: 2](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-curriculum-alignment.md), [LOCAL: 4](2025-10-18_1100-1200_g9b30a.md))
+- **2025-10-19_1600-1700_g9b30a** - 2 decisions ([CODING: 2](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-curriculum-alignment.md))
 
 ---
 

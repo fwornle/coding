@@ -1,16 +1,16 @@
 # Classification Status - coding
 
-**Generated**: 2025-10-19T14:21:02.932Z
+**Generated**: 2025-10-19T14:31:35.720Z
 **Total Sessions**: 2
-**Total Decisions**: 7
+**Total Decisions**: 8
 
 ---
 
 ## Overall Statistics
 
-- **Total Prompt Sets Classified**: 7
-- **Classified as CODING**: 3 (43%)
-- **Classified as LOCAL**: 4 (57%)
+- **Total Prompt Sets Classified**: 8
+- **Classified as CODING**: 4 (50%)
+- **Classified as LOCAL**: 4 (50%)
 
 ### Classification Method Distribution
 
@@ -20,11 +20,11 @@ Click on a classification method to view all sessions decided by that layer.
 |-------|--------|-----------|------------|
 | 0 | [Session Filter](#layer-0-session-filter) | 0 | 0% |
 | 1 | [Path Analysis](#layer-1-path-analysis) | 0 | 0% |
-| 2 | [Keyword Matching](#layer-2-keyword-matching) | 2 | 29% |
-| 3 | [Embedding Search](#layer-3-embedding-search) | 5 | 71% |
+| 2 | [Keyword Matching](#layer-2-keyword-matching) | 3 | 38% |
+| 3 | [Embedding Search](#layer-3-embedding-search) | 5 | 63% |
 | 4 | [Semantic Analysis](#layer-4-semantic-analysis) | 0 | 0% |
 
-**Average Processing Time**: 1415ms
+**Average Processing Time**: 1239ms
 
 ---
 
@@ -45,6 +45,7 @@ Sessions grouped by the classification layer that made the final decision.
 #### Redirected (CODING)
 
 - **[2025-10-18_1100-1200_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-coding.md)** - 2 coding decisions
+- **[2025-10-19_1600-1700_g9b30a](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-coding.md)** - 1 coding decisions
 
 ### Layer 3: Embedding Search
 
@@ -67,7 +68,7 @@ Sessions grouped by the classification layer that made the final decision.
 Complete chronological list of all classification sessions.
 
 - **2025-10-18_1100-1200_g9b30a** - 6 decisions ([CODING: 2](../../../../coding/.specstory/logs/classification/2025-10-18_1100-1200_g9b30a_from-coding.md), [LOCAL: 4](2025-10-18_1100-1200_g9b30a.md))
-- **2025-10-19_1600-1700_g9b30a** - 1 decisions ([CODING: 1](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-coding.md))
+- **2025-10-19_1600-1700_g9b30a** - 2 decisions ([CODING: 2](../../../../coding/.specstory/logs/classification/2025-10-19_1600-1700_g9b30a_from-coding.md))
 
 ---
 
