@@ -312,9 +312,11 @@ fi
 # Log startup
 echo "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ") - Live Logging System started: Transcript Monitor PID $TRANSCRIPT_PID, Coordinator PID $LIVE_LOGGING_PID" >> logs/live-logging.log
 
-# Start VKB Server
-echo "🟢 Starting VKB Server (port 8080)..."
+# Start VKB Server (with online knowledge support)
+echo "🟢 Starting VKB Server (port 8080) with online knowledge..."
 cd "$CODING_DIR"
+# Set data source mode to combined (batch + online knowledge)
+export VKB_DATA_SOURCE=combined
 nohup node lib/vkb-server/cli.js server start --foreground > vkb-server.log 2>&1 &
 VKB_PID=$!
 
