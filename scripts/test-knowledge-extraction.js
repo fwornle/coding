@@ -101,9 +101,9 @@ class KnowledgeExtractionTest {
 
       // EmbeddingGenerator doesn't have explicit initialization
       // but we can test it by generating a sample embedding
-      const testEmbedding = await this.embeddingGenerator.generateEmbedding(
+      const testEmbedding = await this.embeddingGenerator.generate(
         'This is a test knowledge pattern',
-        { size: 384 }
+        { vectorSize: 384 }
       );
 
       if (!testEmbedding || !Array.isArray(testEmbedding) || testEmbedding.length !== 384) {
