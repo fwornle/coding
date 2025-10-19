@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/continuous-learning-knowledge-system/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-18T17:22:48.539Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760808168534_o6uprae6f",
+      "approvalTitle": "Requirements Specification for Continuous Learning Knowledge System"
+    }
+  ]
+}

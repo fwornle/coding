@@ -67,7 +67,8 @@
       "Read(//Users/q284340/.claude/**)",
       "WebFetch(domain:console.groq.com)",
       "Read(//private/tmp/**)",
-      "Bash(./collect-test-results.js)"
+      "Bash(./collect-test-results.js)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []

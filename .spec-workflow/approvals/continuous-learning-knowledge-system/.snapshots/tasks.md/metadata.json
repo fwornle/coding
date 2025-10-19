@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/continuous-learning-knowledge-system/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-18T20:08:48.471Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760818128466_p759bmvtg",
+      "approvalTitle": "Tasks Document - Implementation Plan for Continuous Learning Knowledge System"
+    }
+  ]
+}

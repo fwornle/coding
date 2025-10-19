@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/continuous-learning-knowledge-system/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-18T20:02:45.345Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760817765340_7jop8wiqi",
+      "approvalTitle": "Design Document for Continuous Learning Knowledge System"
+    }
+  ]
+}
