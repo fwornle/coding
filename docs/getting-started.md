@@ -86,11 +86,21 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-# Primary LLM provider (required)
+# LLM Provider (configure at least ONE - the system is provider-agnostic!)
+# Groq (recommended - fastest and cheapest)
+GROK_API_KEY=your-groq-key-here
+
+# Anthropic (high quality)
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 
-# Optional fallback providers
+# OpenAI (GPT-4, GPT-3.5)
 OPENAI_API_KEY=sk-your-openai-key-here
+
+# Google Gemini
+GOOGLE_API_KEY=your-google-key-here
+
+# Local models (Ollama/vLLM - privacy-first, free)
+LOCAL_MODEL_ENDPOINT=http://localhost:11434
 
 # Browser automation (if using browser-access)
 LOCAL_CDP_URL=ws://localhost:9222
@@ -99,6 +109,18 @@ LOCAL_CDP_URL=ws://localhost:9222
 CODING_TOOLS_PATH=/Users/<username>/Agentic/coding
 CODING_REPO=/Users/<username>/Agentic/coding
 ```
+
+**Note:** The system works with ANY coding agent (Claude Code, GitHub CoPilot, Cursor, etc.) and ANY LLM provider. Provider SDKs are installed as optional dependencies - only install what you need:
+
+```bash
+# Install only providers you'll use
+npm install groq-sdk              # For Groq
+npm install @anthropic-ai/sdk     # For Anthropic
+npm install openai                # For OpenAI or local models
+npm install @google/generative-ai # For Gemini
+```
+
+See [provider-configuration.md](provider-configuration.md) for detailed provider setup.
 
 ### MCP Configuration
 

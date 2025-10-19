@@ -46,6 +46,7 @@ coding --copilot
 ### Getting Started
 
 - **[Installation & Setup](docs/getting-started.md)** - Complete installation guide with configuration
+- **[Provider Configuration](docs/provider-configuration.md)** - LLM provider setup (Groq, Anthropic, OpenAI, Gemini, Local)
 - **[System Overview](docs/system-overview.md)** - High-level architecture and capabilities
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 
