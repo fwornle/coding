@@ -1,0 +1,231 @@
+@startuml continuous-learning-class-diagram
+!include _standard-style.puml
+
+title Continuous Learning Knowledge System - Class Diagram
+
+package "Inference" <<core>> {
+  class UnifiedInferenceEngine {
+    - providers: Map<string, Provider>
+    - circuitBreakers: Map<string, CircuitBreaker>
+    - cache: AgentAgnosticCache
+    - budgetTracker: BudgetTracker
+    - sensitivityClassifier: SensitivityClassifier
+    --
+    + infer(prompt, options): Promise<string>
+    + inferWithProvider(provider, prompt): Promise<string>
+    - selectProvider(options): string
+    - checkCircuitBreaker(provider): boolean
+    - cacheResult(key, value): void
+  }
+
+  class BudgetTracker {
+    - monthlyLimit: number
+    - currentUsage: number
+    - db: Database
+    - alerts: AlertConfig[]
+    --
+    + canAfford(provider, tokens): Promise<boolean>
+    + trackCost(provider, tokens, cost): Promise<void>
+    + getBudgetStatus(): Promise<BudgetStatus>
+    + sendAlert(threshold, usage): void
+    - estimateTokens(text): number
+    - calculateCost(provider, tokens): number
+  }
+
+  class SensitivityClassifier {
+    - sensitivityTopics: string[]
+    - patterns: RegExp[]
+    - layerWeights: number[]
+    --
+    + classify(content): Promise<SensitivityResult>
+    - checkPathSensitivity(content): number
+    - checkKeywordSensitivity(content): number
+    - checkPatternSensitivity(content): number
+    - checkHashSensitivity(content): number
+  }
+
+  class CircuitBreaker {
+    - failureThreshold: number
+    - resetTimeout: number
+    - state: 'CLOSED' | 'OPEN' | 'HALF_OPEN'
+    - failures: number
+    - lastFailure: Date
+    --
+    + canAttempt(): boolean
+    + recordSuccess(): void
+    + recordFailure(): void
+    - reset(): void
+  }
+}
+
+package "Knowledge Management" <<core>> {
+  class StreamingKnowledgeExtractor {
+    - buffer: Exchange[]
+    - bufferSize: number
+    - debounceMs: number
+    - inferenceEngine: UnifiedInferenceEngine
+    - dbManager: DatabaseManager
+    --
+    + processExchange(exchange): Promise<void>
+    + extractKnowledge(): Promise<Knowledge[]>
+    - flushBuffer(): Promise<void>
+    - classifyKnowledgeType(content): string
+  }
+
+  class KnowledgeRetriever {
+    - dbManager: DatabaseManager
+    - embeddingGen: EmbeddingGenerator
+    - decayTracker: TemporalDecayTracker
+    --
+    + search(query, options): Promise<KnowledgeResult[]>
+    + retrieveById(id): Promise<Knowledge>
+    - applyDecayBoost(results): KnowledgeResult[]
+    - rankResults(results): KnowledgeResult[]
+  }
+
+  class ConceptAbstractionAgent {
+    - minInstances: number
+    - similarityThreshold: number
+    - inferenceEngine: UnifiedInferenceEngine
+    - embeddingGen: EmbeddingGenerator
+    --
+    + abstractFromKnowledgeBase(options): Promise<Concept[]>
+    - findSimilarPatterns(embeddings): Pattern[][]
+    - generateConcept(patterns): Promise<Concept>
+  }
+
+  class TemporalDecayTracker {
+    - freshDays: number
+    - agingDays: number
+    - staleDays: number
+    - dbManager: DatabaseManager
+    --
+    + calculateDecayScore(knowledge): number
+    + markAsAging(knowledge): Promise<void>
+    + markAsStale(knowledge): Promise<void>
+    + runDecayDetection(): Promise<void>
+  }
+}
+
+package "Trajectory" <<core>> {
+  class RealTimeTrajectoryAnalyzer {
+    - inferenceEngine: UnifiedInferenceEngine
+    - historyService: HistoryService
+    - dbManager: DatabaseManager
+    --
+    + analyzeState(exchange): Promise<TrajectoryState>
+    + detectIntentTransition(current, previous): boolean
+    + getAnalytics(sessionId): Promise<Analytics>
+    - classifyIntent(exchange): Promise<Intent>
+    - extractGoal(exchange): Promise<string>
+    - extractConcepts(exchange): Promise<string[]>
+  }
+
+  class TrajectoryState {
+    + currentState: string
+    + intent: string
+    + goal: string
+    + concepts: string[]
+    + patterns_applied: string[]
+    + learning_points: string[]
+    + context_chain: IntentTransition[]
+    + timestamp: Date
+    + confidence: number
+  }
+}
+
+package "Database" <<storage>> {
+  class DatabaseManager {
+    - qdrantClient: QdrantClient
+    - sqlite: Database
+    - collections: Map<string, Collection>
+    --
+    + storeVector(collection, id, vector, payload): Promise<void>
+    + searchVectors(collection, query, limit): Promise<SearchResult[]>
+    + executeSQL(query, params): Promise<any>
+    + initializeSchema(): Promise<void>
+  }
+
+  class EmbeddingGenerator {
+    - localModel: LocalEmbedding
+    - remoteProvider: Provider
+    - cache: Map<string, number[]>
+    --
+    + generate(text, options): Promise<number[]>
+    + generateBatch(texts, options): Promise<number[][]>
+    - selectModel(options): string
+    - cacheEmbedding(text, embedding): void
+  }
+}
+
+package "Caching" <<storage>> {
+  class AgentAgnosticCache {
+    - backends: CacheBackend[]
+    - strategy: 'LRU' | 'LFU'
+    - maxSize: number
+    - ttl: number
+    --
+    + get(key): Promise<any>
+    + set(key, value, ttl): Promise<void>
+    + invalidate(key): Promise<void>
+    + getStats(): CacheStats
+    - evict(): void
+  }
+
+  interface CacheBackend {
+    + get(key): Promise<any>
+    + set(key, value, ttl): Promise<void>
+    + delete(key): Promise<void>
+  }
+
+  class FileBackend implements CacheBackend {
+    - cacheDir: string
+    + get(key): Promise<any>
+    + set(key, value, ttl): Promise<void>
+    + delete(key): Promise<void>
+  }
+
+  class HTTPBackend implements CacheBackend {
+    - httpClient: HTTPClient
+    - baseUrl: string
+    + get(key): Promise<any>
+    + set(key, value, ttl): Promise<void>
+    + delete(key): Promise<void>
+  }
+
+  class MCPBackend implements CacheBackend {
+    - mcpClient: MCPClient
+    + get(key): Promise<any>
+    + set(key, value, ttl): Promise<void>
+    + delete(key): Promise<void>
+  }
+}
+
+' Relationships
+UnifiedInferenceEngine --> BudgetTracker : uses
+UnifiedInferenceEngine --> SensitivityClassifier : uses
+UnifiedInferenceEngine --> CircuitBreaker : manages
+UnifiedInferenceEngine --> AgentAgnosticCache : caches
+
+StreamingKnowledgeExtractor --> UnifiedInferenceEngine : uses
+StreamingKnowledgeExtractor --> DatabaseManager : stores
+KnowledgeRetriever --> DatabaseManager : queries
+KnowledgeRetriever --> EmbeddingGenerator : generates
+KnowledgeRetriever --> TemporalDecayTracker : applies decay
+ConceptAbstractionAgent --> UnifiedInferenceEngine : uses
+ConceptAbstractionAgent --> EmbeddingGenerator : uses
+ConceptAbstractionAgent --> DatabaseManager : queries
+
+RealTimeTrajectoryAnalyzer --> UnifiedInferenceEngine : uses
+RealTimeTrajectoryAnalyzer --> DatabaseManager : stores
+RealTimeTrajectoryAnalyzer --> TrajectoryState : produces
+
+DatabaseManager --> EmbeddingGenerator : uses
+TemporalDecayTracker --> DatabaseManager : uses
+
+AgentAgnosticCache --> CacheBackend : delegates
+AgentAgnosticCache --> FileBackend : optional
+AgentAgnosticCache --> HTTPBackend : optional
+AgentAgnosticCache --> MCPBackend : optional
+
+@enduml

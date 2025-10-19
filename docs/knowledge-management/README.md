@@ -1,17 +1,97 @@
 # Knowledge Management
 
-**Purpose**: Capture, organize, and visualize development insights through UKB (Update Knowledge Base) and VKB (Visualize Knowledge Base).
+**Purpose**: Comprehensive knowledge management through **three complementary systems**.
 
 ---
 
-## What It Provides
+## 🚀 Quick Navigation
 
-The Coding system provides a complete knowledge management solution for development teams:
+**New to knowledge management?** Start here:
+
+| Document | Purpose | Audience |
+|----------|---------|----------|
+| **[System Comparison](system-comparison.md)** | **START HERE** - Understand all three knowledge systems | All users |
+| **[Continuous Learning System](continuous-learning-system.md)** | Real-time session learning (NEW) | Developers |
+| **UKB/VKB** (this document) | Manual knowledge capture & visualization | Team leads |
+| **[MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)** | Deep code analysis with 11 agents | Architects |
+
+---
+
+## Three Complementary Knowledge Systems
+
+The coding project provides **three knowledge management systems** that work together:
+
+### 1. UKB/VKB (Manual Knowledge Capture)
+
+**This Document** - Manual knowledge capture and visualization:
 
 - **UKB**: Command-line tool for capturing and updating knowledge
 - **VKB**: Web-based visualization server for exploring knowledge graphs
 - **MCP Memory**: Runtime knowledge graph storage and querying
 - **Multi-Project Support**: Domain-specific knowledge bases with centralized storage
+
+**When to use**: Manual capture of architectural decisions, team-wide knowledge sharing
+
+### 2. Continuous Learning System (Automatic Real-Time)
+
+**[Documentation](continuous-learning-system.md)** - Automatic real-time learning:
+
+- **Automatic extraction** from live coding sessions
+- **Budget-conscious** ($8.33/month limit)
+- **Privacy-first** (sensitive data → local models)
+- **Agent-agnostic** (Claude/Copilot/Cursor)
+
+**When to use**: Real-time learning, budget control, privacy-critical work
+
+### 3. MCP Semantic Analysis (Deep Code Analysis)
+
+**[Documentation](../integrations/mcp-semantic-analysis.md)** - 11-agent deep analysis:
+
+- **11 specialized agents** for comprehensive code analysis
+- **On-demand analysis** via MCP tools
+- **Repository-wide** pattern extraction
+- **Architecture diagrams** with PlantUML
+
+**When to use**: Full repository analysis, architecture review, pattern extraction
+
+---
+
+## How the Three Systems Work Together
+
+```
+┌─────────────────────────────────────────────────┐
+│  CONTINUOUS LEARNING (Automatic Real-Time)      │
+│  • Extracts knowledge during coding             │
+│  • Budget: $8.33/month strict limit             │
+│  • Storage: Qdrant + SQLite                     │
+└────────────────┬────────────────────────────────┘
+                 │
+                 │ When deeper analysis needed
+                 ▼
+┌─────────────────────────────────────────────────┐
+│  MCP SEMANTIC ANALYSIS (On-Demand)              │
+│  • 11 specialized agents                        │
+│  • Repository-wide analysis                     │
+│  • Architecture diagrams                        │
+└────────────────┬────────────────────────────────┘
+                 │
+                 │ Insights stored in
+                 ▼
+┌─────────────────────────────────────────────────┐
+│  UKB/VKB (Manual + Git-Tracked)                 │
+│  • shared-memory.json                           │
+│  • Team-wide sharing                            │
+│  • Visual knowledge graph                       │
+└─────────────────────────────────────────────────┘
+```
+
+**See [System Comparison](system-comparison.md) for detailed comparison.**
+
+---
+
+## What This Document Covers (UKB/VKB)
+
+This document focuses on the **UKB/VKB system** for manual knowledge capture and visualization.
 
 ### Core Capabilities
 

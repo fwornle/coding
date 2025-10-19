@@ -1,0 +1,145 @@
+@startuml continuous-learning-sequence-retrieval
+!include _standard-style.puml
+
+title Continuous Learning - Knowledge Retrieval Sequence
+
+actor "Developer" as Dev
+participant "Coding Agent\n(Claude/Copilot)" as Agent
+participant "KnowledgeRetriever" as Retriever
+participant "EmbeddingGenerator" as EmbedGen
+participant "DatabaseManager" as DB
+participant "Qdrant\n(Vector DB)" as Qdrant
+participant "TemporalDecay\nTracker" as Decay
+participant "AgentAgnostic\nCache" as Cache
+
+== Knowledge Search Request ==
+Dev -> Agent: "Find error handling patterns"
+activate Agent
+
+Agent -> Retriever: search('error handling patterns', options)
+activate Retriever
+
+note right of Retriever
+  **Search Options**
+  • limit: 5
+  • threshold: 0.7
+  • filters: {type: 'coding_pattern'}
+  • boostRecent: true
+end note
+
+Retriever -> Cache: get(searchCacheKey)
+activate Cache
+Cache --> Retriever: null (cache miss)
+deactivate Cache
+
+Retriever -> EmbedGen: generate('error handling patterns', {model: 'fast'})
+activate EmbedGen
+
+EmbedGen -> Cache: get(embeddingCacheKey)
+activate Cache
+Cache --> EmbedGen: null (cache miss)
+deactivate Cache
+
+note right of EmbedGen
+  **Model Selection**
+  • Fast search → 384-dim
+  • Local embedding model
+  • No budget impact
+end note
+
+EmbedGen -> EmbedGen: generateLocalEmbedding()
+EmbedGen --> Retriever: embedding[384]
+deactivate EmbedGen
+
+Retriever -> DB: searchVectors(collection, embedding, options)
+activate DB
+
+DB -> Qdrant: search(collection: 'knowledge_patterns_small')
+activate Qdrant
+
+note right of Qdrant
+  **HNSW Search**
+  • ef: 100
+  • Quantization: int8
+  • Filter: type='coding_pattern'
+end note
+
+Qdrant --> DB: searchResults[]
+deactivate Qdrant
+
+DB --> Retriever: results[10]
+deactivate DB
+
+== Apply Temporal Decay ==
+Retriever -> Decay: calculateDecayScores(results)
+activate Decay
+
+loop for each result
+  Decay -> Decay: calculateAge(result.timestamp)
+
+  alt Knowledge < 30 days (fresh)
+    Decay -> Decay: score *= 1.2
+  else Knowledge 30-90 days (aging)
+    Decay -> Decay: score *= 1.0
+  else Knowledge 90-180 days (stale)
+    Decay -> Decay: score *= 0.7
+  else Knowledge > 180 days (deprecated)
+    Decay -> Decay: score *= 0.3
+  end
+end
+
+Decay --> Retriever: adjustedResults[]
+deactivate Decay
+
+== Rank and Filter ==
+Retriever -> Retriever: rankResults(adjustedResults)
+
+note right of Retriever
+  **Ranking Factors**
+  • Semantic similarity (0.5 weight)
+  • Temporal decay (0.3 weight)
+  • Usage count (0.2 weight)
+end note
+
+Retriever -> Retriever: filterByThreshold(0.7)
+Retriever -> Retriever: limitResults(5)
+
+Retriever -> Cache: set(searchCacheKey, finalResults, ttl: 300)
+activate Cache
+Cache --> Retriever: cached
+deactivate Cache
+
+Retriever --> Agent: knowledgeResults[5]
+deactivate Retriever
+
+Agent -> Agent: formatResults(knowledgeResults)
+Agent --> Dev: Display knowledge with relevance scores
+deactivate Agent
+
+== Subsequent Search (Cache Hit) ==
+Dev -> Agent: "Find error handling patterns" (same query)
+activate Agent
+
+Agent -> Retriever: search('error handling patterns', options)
+activate Retriever
+
+Retriever -> Cache: get(searchCacheKey)
+activate Cache
+Cache --> Retriever: cachedResults[5]
+deactivate Cache
+
+note right of Retriever
+  **Cache Hit**
+  • No embedding generation
+  • No vector search
+  • No decay calculation
+  • Response time: ~20ms
+end note
+
+Retriever --> Agent: knowledgeResults[5]
+deactivate Retriever
+
+Agent --> Dev: Display knowledge (from cache)
+deactivate Agent
+
+@enduml

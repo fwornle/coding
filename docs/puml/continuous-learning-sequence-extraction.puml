@@ -1,0 +1,158 @@
+@startuml continuous-learning-sequence-extraction
+!include _standard-style.puml
+
+title Continuous Learning - Real-Time Knowledge Extraction Sequence
+
+actor "Developer" as Dev
+participant "Coding Agent\n(Claude/Copilot)" as Agent
+participant "StreamingKnowledge\nExtractor" as Extractor
+participant "RealTimeTrajectory\nAnalyzer" as Trajectory
+participant "UnifiedInference\nEngine" as Engine
+participant "BudgetTracker" as Budget
+participant "Sensitivity\nClassifier" as Sensitivity
+participant "DatabaseManager" as DB
+participant "AgentAgnostic\nCache" as Cache
+
+== Coding Session Started ==
+Dev -> Agent: "How do I implement caching?"
+activate Agent
+
+Agent -> Extractor: processExchange(exchange)
+activate Extractor
+
+Extractor -> Trajectory: analyzeState(exchange)
+activate Trajectory
+
+Trajectory -> Engine: infer(prompt, {task: 'intent-classification'})
+activate Engine
+
+Engine -> Budget: canAfford('groq', estimatedTokens)
+activate Budget
+Budget --> Engine: {allowed: true, remaining: 7.23}
+deactivate Budget
+
+Engine -> Sensitivity: classify(prompt)
+activate Sensitivity
+Sensitivity --> Engine: {isSensitive: false, level: 'PUBLIC'}
+deactivate Sensitivity
+
+Engine -> Cache: get(cacheKey)
+activate Cache
+Cache --> Engine: null (cache miss)
+deactivate Cache
+
+note right of Engine
+  **Provider Selection**
+  • Budget OK → use Groq
+  • Not sensitive → remote allowed
+  • Circuit closed → proceed
+end note
+
+Engine -> Engine: inferWithProvider('groq', prompt)
+Engine -> Budget: trackCost('groq', {input: 100, output: 50})
+activate Budget
+Budget -> DB: INSERT INTO budget_events
+activate DB
+DB --> Budget: success
+deactivate DB
+deactivate Budget
+
+Engine -> Cache: set(cacheKey, result, ttl: 300)
+activate Cache
+Cache --> Engine: cached
+deactivate Cache
+
+Engine --> Trajectory: {intent: 'learning', confidence: 0.92}
+deactivate Engine
+
+Trajectory -> DB: storeTrajectoryState(state)
+activate DB
+DB --> Trajectory: stored
+deactivate DB
+
+Trajectory --> Extractor: {intent: 'learning', state: 'exploring'}
+deactivate Trajectory
+
+== Knowledge Extraction ==
+Extractor -> Extractor: buffer.push(exchange)
+
+note right of Extractor
+  **Buffer Status**
+  • Size: 3/5 exchanges
+  • Debounce: 2s
+  • Not yet flushing
+end note
+
+Extractor --> Agent: extraction queued
+deactivate Extractor
+
+Agent --> Dev: "Use a Map for in-memory caching with TTL"
+deactivate Agent
+
+== Second Exchange (Buffer Flush Triggered) ==
+Dev -> Agent: "Show me an example"
+activate Agent
+
+Agent -> Extractor: processExchange(exchange)
+activate Extractor
+
+Extractor -> Extractor: buffer.push(exchange)
+Extractor -> Extractor: bufferSize >= 5 → flush()
+
+Extractor -> Engine: infer(bufferedExchanges, {task: 'knowledge-extraction'})
+activate Engine
+
+Engine -> Budget: canAfford('groq', estimatedTokens)
+activate Budget
+Budget --> Engine: {allowed: false, remaining: 0.15}
+deactivate Budget
+
+note right of Engine
+  **Budget Exceeded**
+  • Fallback to local model
+  • No cost tracking needed
+end note
+
+Engine -> Engine: inferWithProvider('local', bufferedExchanges)
+Engine --> Extractor: extractedKnowledge[]
+deactivate Engine
+
+loop for each knowledge
+  Extractor -> DB: storeVector(collection, id, embedding, payload)
+  activate DB
+  DB --> Extractor: stored
+  deactivate DB
+
+  Extractor -> DB: INSERT INTO knowledge_extractions
+  activate DB
+  DB --> Extractor: stored
+  deactivate DB
+end
+
+Extractor -> Extractor: buffer.clear()
+Extractor --> Agent: extraction complete
+deactivate Extractor
+
+Agent --> Dev: "Here's a caching example..."
+deactivate Agent
+
+== Session End ==
+Dev -> Agent: End session
+activate Agent
+
+Agent -> Extractor: endSession()
+activate Extractor
+
+Extractor -> Extractor: flush remaining buffer
+Extractor -> DB: UPDATE session_metrics
+activate DB
+DB --> Extractor: updated
+deactivate DB
+
+Extractor --> Agent: session complete
+deactivate Extractor
+
+Agent --> Dev: Session summary
+deactivate Agent
+
+@enduml
