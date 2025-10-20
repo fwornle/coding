@@ -59,6 +59,7 @@ export class KnowledgeExportService {
    * @param {Object} options - Export options
    * @param {string} options.projectFilter - Filter by project name
    * @param {string} options.sessionFilter - Filter by session ID
+   * @param {string} options.sourceFilter - Filter by source ('manual' | 'auto')
    * @param {Array<string>} options.typeFilter - Filter by knowledge types
    * @param {number} options.limit - Limit number of items
    * @param {number} options.minConfidence - Minimum confidence threshold
@@ -70,6 +71,7 @@ export class KnowledgeExportService {
     const {
       projectFilter = null,
       sessionFilter = null,
+      sourceFilter = null,
       typeFilter = null,
       limit = 1000,
       minConfidence = 0.5,
@@ -82,6 +84,7 @@ export class KnowledgeExportService {
       const knowledgeItems = await this.getKnowledgeItems({
         projectFilter,
         sessionFilter,
+        sourceFilter,
         typeFilter,
         limit,
         minConfidence
@@ -117,12 +120,14 @@ export class KnowledgeExportService {
    * Query knowledge items from SQLite
    *
    * @param {Object} filters - Query filters
+   * @param {string} filters.sourceFilter - Filter by source ('manual' | 'auto')
    * @returns {Promise<Array>} - Array of knowledge items
    */
   async getKnowledgeItems(filters = {}) {
     const {
       projectFilter,
       sessionFilter,
+      sourceFilter,
       typeFilter,
       limit,
       minConfidence
@@ -146,6 +151,11 @@ export class KnowledgeExportService {
     if (sessionFilter) {
       conditions.push('session_id = $sessionId');
       params.sessionId = sessionFilter;
+    }
+
+    if (sourceFilter) {
+      conditions.push('source = $source');
+      params.source = sourceFilter;
     }
 
     if (typeFilter && Array.isArray(typeFilter)) {
@@ -174,6 +184,7 @@ export class KnowledgeExportService {
         classification as project,
         confidence,
         extracted_at as extractedAt,
+        source,
         metadata
       FROM knowledge_extractions
       ${whereClause}
@@ -206,33 +217,36 @@ export class KnowledgeExportService {
       project,
       confidence,
       extractedAt,
+      source,
       metadata
     } = knowledgeItem;
 
-    // Get text from Qdrant payload if available
-    const text = metadata.text || metadata.pattern || metadata.summary || 'Knowledge item';
-
-    // Generate meaningful entity name from text
-    const entityName = this.generateEntityName(text, type, id);
+    // For manual knowledge (imported from JSON), use metadata.name directly
+    // For online knowledge, generate name from content
+    const entityName = metadata.name || this.generateEntityName(
+      metadata.text || metadata.pattern || metadata.summary || 'Knowledge item',
+      type,
+      id
+    );
 
     // Map knowledge type to entity type
-    const entityType = TYPE_TO_ENTITY_TYPE[type] || 'Knowledge';
+    const entityType = metadata.entityType || TYPE_TO_ENTITY_TYPE[type] || 'Knowledge';
 
-    // Create observation from knowledge text
-    const observation = {
+    // For manual knowledge, use original observations; for online, create from text
+    const observations = metadata.observations || [{
       type: 'insight',
-      content: text,
+      content: metadata.text || metadata.pattern || metadata.summary || 'Knowledge item',
       date: extractedAt || new Date().toISOString()
-    };
+    }];
 
     // Build entity
     return {
       name: entityName,
       entityType: entityType,
-      observations: [observation],
-      significance: Math.round(confidence * 10), // Convert 0-1 to 0-10 scale
+      observations: observations,
+      significance: metadata.significance || Math.round(confidence * 10), // Convert 0-1 to 0-10 scale
       metadata: {
-        source: 'online',
+        source: source, // Use actual source from database ('manual' | 'auto')
         knowledgeId: id,
         sessionId: sessionId || null,
         project: project || null,
@@ -370,9 +384,13 @@ export class KnowledgeExportService {
 
     const lines = [];
 
-    // Add entities
+    // Add entities with database source marker for frontend coloring
     entities.forEach(entity => {
-      lines.push(JSON.stringify({ ...entity, type: 'entity' }));
+      lines.push(JSON.stringify({
+        ...entity,
+        type: 'entity',
+        _source: 'database' // Frontend uses this to display online nodes as red
+      }));
     });
 
     // Add relations
