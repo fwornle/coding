@@ -68,7 +68,10 @@
       "WebFetch(domain:console.groq.com)",
       "Read(//private/tmp/**)",
       "Bash(./collect-test-results.js)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(sqlite3 .data/knowledge.db \"SELECT source, COUNT(*) as count FROM knowledge_extractions GROUP BY source\")",
+      "Bash(sqlite3 .data/knowledge.db \"PRAGMA table_info(knowledge_extractions)\")",
+      "mcp__memory__read_graph"
     ],
     "deny": [],
     "ask": []

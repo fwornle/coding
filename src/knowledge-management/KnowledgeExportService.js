@@ -139,49 +139,49 @@ export class KnowledgeExportService {
     const params = {};
 
     if (projectFilter) {
-      conditions.push('project = $project');
-      params.$project = projectFilter;
+      conditions.push('classification = $project');
+      params.project = projectFilter;
     }
 
     if (sessionFilter) {
-      conditions.push('sessionId = $sessionId');
-      params.$sessionId = sessionFilter;
+      conditions.push('session_id = $sessionId');
+      params.sessionId = sessionFilter;
     }
 
     if (typeFilter && Array.isArray(typeFilter)) {
       const placeholders = typeFilter.map((_, i) => `$type${i}`).join(', ');
-      conditions.push(`type IN (${placeholders})`);
+      conditions.push(`extraction_type IN (${placeholders})`);
       typeFilter.forEach((type, i) => {
-        params[`$type${i}`] = type;
+        params[`type${i}`] = type;
       });
     }
 
-    if (minConfidence) {
+    if (minConfidence !== undefined && minConfidence !== null) {
       conditions.push('confidence >= $minConfidence');
-      params.$minConfidence = minConfidence;
+      params.minConfidence = minConfidence;
     }
 
     const whereClause = conditions.length > 0
       ? `WHERE ${conditions.join(' AND ')}`
       : '';
 
-    // Query knowledge extractions
+    // Query knowledge extractions (using actual schema column names)
     const query = `
       SELECT
         id,
-        type,
-        sessionId,
-        project,
+        extraction_type as type,
+        session_id as sessionId,
+        classification as project,
         confidence,
-        extractedAt,
+        extracted_at as extractedAt,
         metadata
       FROM knowledge_extractions
       ${whereClause}
-      ORDER BY extractedAt DESC
+      ORDER BY extracted_at DESC
       LIMIT $limit
     `;
 
-    params.$limit = limit;
+    params.limit = limit;
 
     const rows = db.prepare(query).all(params);
 
