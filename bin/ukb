@@ -1,5 +1,8 @@
 #!/bin/bash
-# Universal ukb wrapper
+# Universal ukb wrapper - Database-first version
 CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
 export CODING_REPO
-exec "$CODING_REPO/knowledge-management/ukb" "$@"
+
+# Use database-first CLI by default
+# For legacy JSON-based CLI, use: bin/ukb-cli.js (knowledge-api)
+exec node "$CODING_REPO/lib/ukb-database/cli.js" "$@"

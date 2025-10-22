@@ -1,0 +1,87 @@
+@startuml
+!include _standard-style.puml
+
+title Complete Knowledge System - Service Dependencies
+
+package "Continuous Learning System\n(Automatic Real-Time)" as cls #E8F5E8 {
+  [Inference Engine] <<core>>
+  [Budget Tracker] <<util>>
+  [Knowledge Extractor] <<core>>
+}
+
+package "UKB/VKB System\n(Manual Knowledge Capture)" as ukb #FFF9E6 {
+  [UKB CLI] <<cli>>
+  [VKB Server] <<api>>
+}
+
+package "Shared Storage Layer" as storage #E0E0E0 {
+  database "Graph Database\n(Graphology + Level)" as graphdb <<storage>>
+  database "Qdrant\n(Vector DB)" as qdrant <<storage>>
+  database "SQLite\n(Analytics)" as sqlite <<storage>>
+}
+
+cloud "External LLM Providers" as llm #F0F0F0 {
+  [Groq API]
+  [OpenRouter]
+}
+
+cloud "Local LLM" as local #F0F0F0 {
+  [Ollama]
+}
+
+file "shared-memory-*.json\n(Git-tracked)" as json
+
+' Continuous Learning Dependencies
+[Inference Engine] -down-> [Budget Tracker] : monitors
+[Inference Engine] -right-> [Knowledge Extractor] : powers
+[Inference Engine] -down-> llm : calls
+[Inference Engine] -down-> local : fallback
+
+' Continuous Learning → Shared Storage
+[Knowledge Extractor] -down-> graphdb : entities/relations
+[Knowledge Extractor] -down-> qdrant : vectors
+[Budget Tracker] -down-> sqlite : budget/sessions
+
+' UKB/VKB → Shared Storage
+[UKB CLI] -down-> graphdb : entities/relations
+[VKB Server] -up-> graphdb : query
+[VKB Server] -up-> qdrant : semantic search
+
+' Export/Backup
+graphdb -right-> json : export
+
+note right of graphdb
+  **SHARED PRIMARY STORAGE**
+  Used by BOTH systems:
+  • Continuous Learning (auto)
+  • UKB/VKB (manual)
+
+  Team-scoped storage
+  Node ID: team:entityName
+end note
+
+note right of qdrant
+  **Vector Embeddings**
+  Written by: Continuous Learning
+  Queryable by: UKB/VKB
+
+  Semantic similarity search
+end note
+
+note right of sqlite
+  **Analytics Only**
+  • budget_events
+  • session_metrics
+  • embedding_cache
+
+  NOT for knowledge storage
+end note
+
+note right of json
+  **Export/Backup Format**
+  Git-tracked snapshots
+  Team collaboration
+  Export from Graph DB
+end note
+
+@enduml

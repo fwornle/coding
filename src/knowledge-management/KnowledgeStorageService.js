@@ -2,11 +2,11 @@
  * KnowledgeStorageService
  *
  * Unified storage interface for knowledge management system.
- * Coordinates storage across Qdrant (vectors) and SQLite (metadata/analytics).
+ * Coordinates storage across Graph DB (entities/relations) and Qdrant (vectors).
  *
  * Key Features:
  * - Unified API: Single interface for all knowledge storage operations
- * - Transactional storage: Atomic writes across both databases
+ * - Transactional storage: Atomic writes to Graph DB and Qdrant
  * - Deduplication: Prevents storing similar knowledge (>95% similarity)
  * - Batch operations: Efficient bulk storage and retrieval
  * - Semantic search: Vector-based similarity search
@@ -15,15 +15,16 @@
  * - Rollback support: Undo failed operations
  *
  * Storage Strategy:
- * - Concepts: Qdrant knowledge_patterns (1536-dim) + SQLite metadata
- * - Code patterns: Qdrant knowledge_patterns_small (384-dim) + SQLite metadata
- * - Knowledge events: SQLite knowledge_extractions table
+ * - Entities: Graph DB (knowledge entities, relations, metadata)
+ * - Vectors: Qdrant knowledge_patterns (1536-dim) for concepts
+ * - Vectors: Qdrant knowledge_patterns_small (384-dim) for code patterns
  * - Abstractions: Same collections with isAbstraction flag
  *
  * Usage:
  * ```javascript
  * const storage = new KnowledgeStorageService({
  *   databaseManager,
+ *   graphDatabase,
  *   embeddingGenerator
  * });
  *
@@ -84,10 +85,11 @@ export class KnowledgeStorageService extends EventEmitter {
 
     // Required dependencies
     this.databaseManager = config.databaseManager;
+    this.graphDatabase = config.graphDatabase;
     this.embeddingGenerator = config.embeddingGenerator;
 
-    if (!this.databaseManager || !this.embeddingGenerator) {
-      throw new Error('KnowledgeStorageService requires databaseManager and embeddingGenerator');
+    if (!this.databaseManager || !this.graphDatabase || !this.embeddingGenerator) {
+      throw new Error('KnowledgeStorageService requires databaseManager, graphDatabase, and embeddingGenerator');
     }
 
     // Storage configuration
@@ -448,12 +450,14 @@ export class KnowledgeStorageService extends EventEmitter {
    */
   async deleteKnowledge(knowledgeId) {
     try {
+      // Delete from Graph DB
+      if (this.graphDatabase && this.graphDatabase.deleteEntity) {
+        await this.graphDatabase.deleteEntity(knowledgeId);
+      }
+
       // Delete from both Qdrant collections
       await this.databaseManager.deleteVector('knowledge_patterns', knowledgeId);
       await this.databaseManager.deleteVector('knowledge_patterns_small', knowledgeId);
-
-      // Delete from SQLite
-      await this.databaseManager.deleteKnowledgeExtraction(knowledgeId);
 
       this.emit('knowledge-deleted', { id: knowledgeId });
       console.log(`[KnowledgeStorageService] Deleted: ${knowledgeId}`);
@@ -526,13 +530,32 @@ export class KnowledgeStorageService extends EventEmitter {
   }
 
   /**
-   * Store knowledge transactionally
+   * Store knowledge transactionally (Graph DB + Qdrant)
    */
   async storeTransactional(id, knowledge, embeddings) {
     const { embedding384, embedding1536 } = embeddings;
 
     try {
-      // Store in Qdrant (both collections)
+      // Store entity in Graph DB (primary storage)
+      const entity = {
+        name: id,
+        entityName: knowledge.text?.substring(0, 100) || id,
+        entityType: knowledge.type,
+        observations: [knowledge.text],
+        extractionType: knowledge.type,
+        classification: knowledge.project || 'coding',
+        confidence: knowledge.confidence || 1.0,
+        source: 'manual',
+        sessionId: knowledge.sessionId || null,
+        embeddingId: id,
+        metadata: knowledge.metadata || {}
+      };
+
+      await this.graphDatabase.storeEntity(entity, {
+        team: knowledge.project || 'coding'
+      });
+
+      // Store vectors in Qdrant (for semantic search)
       if (embedding384) {
         await this.databaseManager.storeVector(
           'knowledge_patterns_small',
@@ -550,17 +573,6 @@ export class KnowledgeStorageService extends EventEmitter {
           this.createPayload(knowledge)
         );
       }
-
-      // Store in SQLite
-      await this.databaseManager.storeKnowledgeExtraction({
-        id,
-        type: knowledge.type,
-        sessionId: knowledge.sessionId || null,
-        project: knowledge.project || null,
-        confidence: knowledge.confidence || 1.0,
-        extractedAt: knowledge.extractedAt || new Date().toISOString(),
-        metadata: JSON.stringify(knowledge.metadata || {})
-      });
     } catch (error) {
       // Rollback on failure
       await this.rollbackStorage(id);

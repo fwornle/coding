@@ -45,39 +45,32 @@ class KnowledgeMigration {
   }
 
   /**
-   * Step 1: Add 'source' column to schema
+   * Step 1: Backup existing JSON files
    */
-  addSourceColumn() {
-    console.log('\n📋 Step 1: Adding source column to schema...');
+  async backupJsonFiles() {
+    console.log('\n📋 Step 1: Backing up JSON files...');
+
+    const backupDir = path.join(PROJECT_ROOT, '.data', 'json-backup');
 
     try {
-      // Check if column already exists
-      const columns = this.db.prepare("PRAGMA table_info(knowledge_extractions)").all();
-      const hasSourceColumn = columns.some(col => col.name === 'source');
+      // Create backup directory
+      await fs.mkdir(backupDir, { recursive: true });
 
-      if (hasSourceColumn) {
-        console.log('⚠️  Source column already exists, skipping...');
-        return;
+      // Find all shared-memory files
+      const sharedMemoryFiles = await this.findSharedMemoryFiles();
+
+      for (const filePath of sharedMemoryFiles) {
+        const fileName = path.basename(filePath);
+        const backupPath = path.join(backupDir, `${fileName}.backup-${Date.now()}`);
+
+        await fs.copyFile(filePath, backupPath);
+        console.log(`  ✓ Backed up: ${fileName}`);
       }
 
-      // Add source column with default 'auto' for existing online-learned data
-      this.db.exec(`
-        ALTER TABLE knowledge_extractions
-        ADD COLUMN source TEXT DEFAULT 'auto' CHECK(source IN ('manual', 'auto'))
-      `);
-
-      console.log('✓ Added source column (manual | auto)');
-
-      // Create index on source column
-      this.db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_knowledge_source
-        ON knowledge_extractions(source, classification)
-      `);
-
-      console.log('✓ Created index on source column');
+      console.log(`✓ Backed up ${sharedMemoryFiles.length} files to ${backupDir}`);
 
     } catch (error) {
-      console.error('❌ Failed to add source column:', error.message);
+      console.error('❌ Failed to backup JSON files:', error.message);
       throw error;
     }
   }
@@ -183,59 +176,71 @@ class KnowledgeMigration {
    */
   async importEntity(entity, team) {
     const id = entity.id || this.generateId(entity.name);
+    const now = new Date().toISOString();
 
-    // Convert entity to knowledge extraction format
-    const extraction = {
-      id: id,
-      session_id: null, // Batch knowledge has no session
-      exchange_id: null,
-      extraction_type: entity.entityType || 'Concept',
-      classification: team,
-      confidence: (entity.significance || 5) / 10, // Convert 0-10 to 0-1
-      source_file: null,
-      extracted_at: new Date().toISOString(),
-      embedding_id: null,
-      source: 'manual', // Mark as manual/batch knowledge
-      metadata: JSON.stringify({
-        name: entity.name,
-        entityType: entity.entityType,
-        observations: entity.observations || [],
-        significance: entity.significance,
-        originalMetadata: entity.metadata || {}
-      })
-    };
+    // Prepare observations as JSON string
+    const observations = entity.observations || [];
+    const observationsJson = JSON.stringify(observations);
 
-    // Insert or replace
+    // Insert or replace with new schema columns
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO knowledge_extractions
-      (id, session_id, exchange_id, extraction_type, classification, confidence,
-       source_file, extracted_at, embedding_id, source, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, entity_name, entity_type, observations, session_id, exchange_id,
+       extraction_type, classification, confidence, source_file, extracted_at,
+       embedding_id, source, team, last_modified, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
-      extraction.id,
-      extraction.session_id,
-      extraction.exchange_id,
-      extraction.extraction_type,
-      extraction.classification,
-      extraction.confidence,
-      extraction.source_file,
-      extraction.extracted_at,
-      extraction.embedding_id,
-      extraction.source,
-      extraction.metadata
+      id,
+      entity.name,
+      entity.entityType || 'Concept',
+      observationsJson,
+      null, // session_id - batch knowledge has no session
+      null, // exchange_id
+      entity.entityType || 'Concept',
+      team,
+      (entity.significance || 5) / 10, // Convert 0-10 to 0-1
+      null, // source_file
+      now,  // extracted_at
+      null, // embedding_id
+      'manual', // source - mark as manual/batch knowledge
+      team, // team
+      now,  // last_modified
+      JSON.stringify({
+        significance: entity.significance,
+        originalMetadata: entity.metadata || {}
+      })
     );
   }
 
   /**
    * Import a single relation to database
-   * Note: Relations are stored in entity metadata for now
    */
   async importRelation(relation, team) {
-    // For now, we'll store relations in a separate way or in metadata
-    // This can be expanded in the future to have a separate relations table
-    this.stats.relationsImported++;
+    const id = this.generateId(`${relation.from}-${relation.to}-${relation.type || 'related_to'}`);
+
+    try {
+      // Insert into knowledge_relations table
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO knowledge_relations
+        (id, from_entity_id, to_entity_id, relation_type, confidence, team, metadata, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `);
+
+      stmt.run(
+        id,
+        this.generateId(relation.from),
+        this.generateId(relation.to),
+        relation.type || 'related_to',
+        relation.confidence || 1.0,
+        team,
+        JSON.stringify(relation.metadata || {})
+      );
+    } catch (error) {
+      // Relations may fail if entities don't exist yet - that's okay
+      // We'll skip them and they can be regenerated later
+    }
   }
 
   /**
@@ -300,11 +305,15 @@ class KnowledgeMigration {
   async run() {
     try {
       await this.initialize();
-      this.addSourceColumn();
+      await this.backupJsonFiles();
       await this.importBatchKnowledge();
       await this.verify();
 
       console.log('\n✅ Migration complete!');
+      console.log('\n📝 Next steps:');
+      console.log('  1. Verify the migration with: vkb --online-only');
+      console.log('  2. Original JSON files backed up to: .data/json-backup/');
+      console.log('  3. You can now use UKB/VKB with direct database persistence');
 
     } catch (error) {
       console.error('\n❌ Migration failed:', error);

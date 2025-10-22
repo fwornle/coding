@@ -27,10 +27,12 @@ The coding project provides **three knowledge management systems** that work tog
 
 - **UKB**: Command-line tool for capturing and updating knowledge
 - **VKB**: Web-based visualization server for exploring knowledge graphs
-- **MCP Memory**: Runtime knowledge graph storage and querying
-- **Multi-Project Support**: Domain-specific knowledge bases with centralized storage
+- **Graph Database Storage**: Agent-agnostic persistent storage (Graphology + Level)
+- **Multi-Project Support**: Domain-specific knowledge bases with team isolation
 
 **When to use**: Manual capture of architectural decisions, team-wide knowledge sharing
+
+**Storage Architecture**: See [Graph Storage Architecture](#graph-storage-architecture) below.
 
 ### 2. Continuous Learning System (Automatic Real-Time)
 
@@ -58,32 +60,19 @@ The coding project provides **three knowledge management systems** that work tog
 
 ## How the Three Systems Work Together
 
-```
-┌─────────────────────────────────────────────────┐
-│  CONTINUOUS LEARNING (Automatic Real-Time)      │
-│  • Extracts knowledge during coding             │
-│  • Budget: $8.33/month strict limit             │
-│  • Storage: Qdrant + SQLite                     │
-└────────────────┬────────────────────────────────┘
-                 │
-                 │ When deeper analysis needed
-                 ▼
-┌─────────────────────────────────────────────────┐
-│  MCP SEMANTIC ANALYSIS (On-Demand)              │
-│  • 11 specialized agents                        │
-│  • Repository-wide analysis                     │
-│  • Architecture diagrams                        │
-└────────────────┬────────────────────────────────┘
-                 │
-                 │ Insights stored in
-                 ▼
-┌─────────────────────────────────────────────────┐
-│  UKB/VKB (Manual + Git-Tracked)                 │
-│  • shared-memory.json                           │
-│  • Team-wide sharing                            │
-│  • Visual knowledge graph                       │
-└─────────────────────────────────────────────────┘
-```
+![Three Knowledge Management Systems Integration](../images/three-systems-integration.png)
+
+The three systems form a complementary knowledge management pipeline:
+
+1. **Continuous Learning** extracts knowledge automatically during coding sessions
+2. **MCP Semantic Analysis** provides deep repository analysis when needed
+3. **UKB/VKB** stores manual insights and analysis results in the graph database
+
+**Data Flow** (as of 2025-10-22):
+- Continuous Learning → Graph DB + Qdrant (entities/relations + vector search)
+- MCP Semantic Analysis → UKB/VKB (deep insights and patterns)
+- UKB/VKB → Graph Database (persistent storage)
+- SQLite → Analytics only (budget tracking, session metrics)
 
 **See [System Comparison](system-comparison.md) for detailed comparison.**
 
@@ -167,7 +156,7 @@ Command-line tool for capturing development insights:
 - Git history analysis with pattern detection
 - Structured problem-solution-rationale capture
 - Real-time validation and quality assurance
-- MCP synchronization for runtime access
+- Graph database persistence for agent-agnostic access
 
 ### [VKB - Visualize Knowledge Base](./vkb-visualize.md)
 
@@ -328,6 +317,162 @@ vkb                          # View knowledge graph
   "created": "ISO-8601 timestamp"
 }
 ```
+
+---
+
+## Graph Storage Architecture
+
+The knowledge management system uses a **graph-first storage architecture** that is agent-agnostic and works with any AI coding assistant (Claude Code, Copilot, Cursor, etc.).
+
+### Storage Components
+
+![Graph Storage Architecture](../images/graph-storage-architecture.png)
+
+**Primary Storage**: **Graphology + Level**
+
+1. **Graphology** (In-Memory Graph)
+   - Fast graph operations and traversals
+   - Multi-graph support (multiple edges between nodes)
+   - Rich graph algorithms ecosystem
+   - Native JavaScript implementation
+
+2. **Level v10.0.0** (Persistent Storage)
+   - Key-value persistence layer
+   - Atomic operations
+   - File-based storage in `.data/knowledge-graph/`
+   - Automatic persistence of graph state
+
+**Key Benefits**:
+- ✅ **Agent-agnostic**: No dependency on Claude Code or MCP Memory
+- ✅ **Team isolation**: Node ID pattern `${team}:${entityName}`
+- ✅ **Persistent**: Automatic file-based persistence
+- ✅ **Fast**: In-memory graph operations
+- ✅ **Backward compatible**: API matches previous SQLite format
+
+### Data Flow
+
+![Knowledge Management Data Flow](../images/graph-storage-data-flow.png)
+
+**Entity Creation**:
+```typescript
+// UKB command
+ukb add "Pattern" "API Design Pattern"
+
+// Flows to DatabaseManager
+→ GraphDatabaseService.storeEntity(entity, {team: 'coding'})
+
+// Creates graph node
+→ graphology.addNode('coding:APIDesignPattern', {
+    name: 'API Design Pattern',
+    entityType: 'Pattern',
+    observations: [...],
+    team: 'coding',
+    source: 'manual'
+  })
+
+// Persists to disk
+→ level.put('coding:APIDesignPattern', nodeData)
+```
+
+**Entity Query**:
+```typescript
+// VKB HTTP API
+GET /api/entities?team=coding
+
+// Fast in-memory graph traversal
+→ graphology.filterNodes(node => node.startsWith('coding:'))
+
+// Returns SQLite-compatible format
+→ JSON response with entity_name, entity_type, observations, etc.
+```
+
+### Storage Evolution
+
+![Storage Evolution](../images/storage-evolution.png)
+
+**Phase 1: JSON Storage** (2024)
+- Manual `shared-memory.json` files
+- Limited querying capability
+- No relationship modeling
+
+**Phase 2: SQLite + Qdrant** (Early 2025 - DEPRECATED)
+- Relational database for entities
+- Vector search with Qdrant
+- Complex joins for relationships
+- MCP Memory dependency
+
+**Phase 3: Graph DB + Qdrant** (Current - October 2025)
+- Native graph database (Graphology + Level) for entities/relations
+- Qdrant for vector search
+- Agent-agnostic architecture
+- No MCP Memory dependency
+- Team isolation via node IDs
+- SQLite retained for analytics only (budget, sessions, cache)
+
+### Node ID Pattern
+
+All graph nodes use a **team-scoped ID pattern**:
+
+```
+${team}:${entityName}
+```
+
+**Examples**:
+- `coding:ReactHooksPattern`
+- `project-x:AuthenticationSolution`
+- `data-team:ETLPipeline`
+
+This provides:
+- **Team isolation**: Each team's knowledge is separate
+- **No conflicts**: Different teams can have entities with same names
+- **Multi-team support**: Single graph database serves all teams
+- **Fast filtering**: Prefix-based team queries
+
+### API Compatibility
+
+The GraphDatabaseService maintains **backward compatibility** with the previous SQLite API:
+
+**Entity Format** (SQLite-compatible):
+```json
+{
+  "id": "auto-generated-uuid",
+  "entity_name": "Pattern Name",
+  "entity_type": "Pattern",
+  "team": "coding",
+  "observations": ["observation 1", "observation 2"],
+  "confidence": 0.9,
+  "source": "manual",
+  "metadata": {}
+}
+```
+
+This ensures:
+- ✅ VKB frontend works without changes
+- ✅ Existing tools and scripts continue to function
+- ✅ Gradual migration path from SQLite
+
+### Configuration
+
+**Current Configuration** (as of 2025-10-22):
+
+```javascript
+// DatabaseManager configuration
+{
+  sqlite: {
+    path: '.data/knowledge.db',
+    enabled: true  // Analytics only: budget_events, session_metrics, embedding_cache
+  },
+  qdrant: {
+    enabled: true  // Vector search
+  },
+  graphDbPath: '.data/knowledge-graph'  // Primary knowledge storage
+}
+```
+
+**Storage Responsibilities**:
+- **Graph DB**: All knowledge entities and relations
+- **Qdrant**: Vector embeddings for semantic search
+- **SQLite**: Analytics only (no knowledge tables)
 
 ---
 

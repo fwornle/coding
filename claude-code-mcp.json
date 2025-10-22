@@ -4,13 +4,6 @@
     "postSessionHook": "{{CODING_TOOLS_PATH}}/scripts/post-session-logger.js"
   },
   "mcpServers": {
-    "memory": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ]
-    },
     "browser-access": {
       "command": "node",
       "args": ["{{CODING_TOOLS_PATH}}/integrations/browser-access/dist/index.js"],

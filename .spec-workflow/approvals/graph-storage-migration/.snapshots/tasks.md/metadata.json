@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/graph-storage-migration/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-21T09:29:37.770Z",
+      "trigger": "initial",
+      "approvalId": "approval_1761038977765_ltr26y708",
+      "approvalTitle": "Graph Storage Migration - Tasks Document"
+    }
+  ]
+}

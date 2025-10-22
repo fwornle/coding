@@ -1,0 +1,60 @@
+@startuml
+!include _standard-style.puml
+
+title Complementary Knowledge Management Workflow
+
+actor "Developer" as dev
+
+rectangle "Live Coding Session" as session #E8F5E8 {
+  note right
+    Continuous Learning
+    System active
+  end note
+}
+
+rectangle "Knowledge Captured" as captured #E8F4FD {
+  database "Qdrant\n(Vectors)" as qdrant
+  database "SQLite\n(Analytics)" as sqlite
+
+  note bottom
+    Real-time extraction
+    during coding
+  end note
+}
+
+rectangle "MCP Semantic Analysis\n(On-Demand)" as analysis #FFF9E6 {
+  [Repository Analysis] <<agent>>
+  [Architecture Diagrams] <<agent>>
+  [Pattern Extraction] <<agent>>
+  [Lessons Learned] <<agent>>
+
+  note bottom
+    When deeper
+    analysis needed
+  end note
+}
+
+rectangle "UKB Knowledge Storage" as ukb #FFE8F4 {
+  database "Graph Database\n(Graphology + Level)" as graph
+  file "shared-memory.json\n(Git-tracked)" as json
+
+  note bottom
+    Persistent
+    agent-agnostic
+    Team sharing
+  end note
+}
+
+' Workflow flow
+dev --> session
+session -down-> captured : Real-time\nextraction
+captured -down-> analysis : When deeper\nanalysis needed
+analysis -down-> ukb : Insights\nstored in
+
+' Storage note
+note right of ukb
+  Available across
+  all projects
+end note
+
+@enduml

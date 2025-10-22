@@ -1,0 +1,56 @@
+@startuml
+!include _standard-style.puml
+
+title Proposed Storage Architecture (LevelGraph-based)
+
+rectangle "Application Layer\n(Claude Code, Copilot, Cursor, etc.)\nAGENT AGNOSTIC" as app #F5F5F5
+
+rectangle "Unified Knowledge Management API\n(KnowledgeStorageService)" as api #E8F4FD
+
+database "LevelGraph\n(Knowledge Graph)" as levelgraph <<storage>>
+database "Qdrant\n(Vector Search)" as qdrant <<storage>>
+database "SQLite\n(Analytics)" as sqlite <<storage>>
+file "JSON Files\n(Git-tracked)" as json
+
+note right of api
+  **Single entry point**
+  Coordinates all storage backends
+end note
+
+note right of levelgraph
+  **PRIMARY for knowledge**
+  • Entities (nodes)
+  • Relations (edges)
+  • Embedded (no server)
+end note
+
+note right of qdrant
+  **Semantic search**
+  • 1536-dim vectors
+  • 384-dim vectors
+  • Similarity queries
+end note
+
+note right of sqlite
+  **Metrics & budget only**
+  • budget_events
+  • session_metrics
+  • embedding_cache
+end note
+
+note right of json
+  **Export/backup**
+  • shared-memory-*.json
+  • Version control
+  • Portability
+end note
+
+' Connections
+app SYNC_LINE api
+
+api DATA_LINE levelgraph : Entities & Relations
+api DATA_LINE qdrant : Embeddings
+api DATA_LINE sqlite : Time-series data
+api OPTIONAL_LINE json : Export on demand
+
+@enduml
