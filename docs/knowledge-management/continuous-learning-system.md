@@ -212,11 +212,13 @@ Knowledge extraction happens **automatically** during Claude Code sessions:
 1. Start a coding session with `coding` or `coding --claude`
 2. The transcript monitor runs in the background
 3. Knowledge is extracted in real-time from exchanges
-4. Embeddings are generated and stored
-5. Knowledge is available for retrieval via VKB/UKB commands
+4. Embeddings are generated and stored in Qdrant + SQLite
+5. Knowledge is searchable via semantic queries during the session
+
+**Note**: This system stores knowledge in **Qdrant + SQLite** for real-time retrieval. For manual knowledge capture and team sharing, use **UKB/VKB** which stores in the **Graph Database**. See [System Comparison](system-comparison.md) for how these systems work together.
 
 The system operates with:
-- **DatabaseManager** - Manages Qdrant (vectors) + SQLite (metadata)
+- **DatabaseManager** - Manages Qdrant (vectors) + SQLite (metadata) for Continuous Learning
 - **EmbeddingGenerator** - Generates embeddings (384-dim local, 1536-dim remote)
 - **UnifiedInferenceEngine** - Handles LLM inference across providers
 - **StreamingKnowledgeExtractor** - Real-time knowledge extraction during sessions

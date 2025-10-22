@@ -63,14 +63,22 @@ export class DatabaseManager extends EventEmitter {
       enabled: config.sqlite?.enabled !== false
     };
 
+    // Graph database configuration
+    this.graphDbConfig = {
+      path: config.graphDbPath || path.join(process.cwd(), '.data', 'knowledge-graph'),
+      enabled: config.graphDb?.enabled !== false
+    };
+
     // Database clients
     this.qdrant = null;
     this.sqlite = null;
+    this.graphDB = null;
 
     // Health status
     this.health = {
       qdrant: { available: false, lastCheck: null, error: null },
-      sqlite: { available: false, lastCheck: null, error: null }
+      sqlite: { available: false, lastCheck: null, error: null },
+      graph: { available: false, lastCheck: null, error: null }
     };
 
     // Statistics
@@ -103,16 +111,26 @@ export class DatabaseManager extends EventEmitter {
       await this.initializeQdrant();
     }
 
-    // Initialize SQLite (required for budget tracking)
+    // Initialize SQLite (for analytics/budget tracking)
     if (this.sqliteConfig.enabled) {
       await this.initializeSQLite();
     }
 
+    // Initialize Graph Database (for knowledge entities and relationships)
+    if (this.graphDbConfig.enabled) {
+      await this.initializeGraphDB();
+    }
+
     this.initialized = true;
-    this.emit('initialized', { qdrant: this.health.qdrant.available, sqlite: this.health.sqlite.available });
+    this.emit('initialized', {
+      qdrant: this.health.qdrant.available,
+      sqlite: this.health.sqlite.available,
+      graph: this.health.graph.available
+    });
     console.log('[DatabaseManager] Initialized -',
       `Qdrant: ${this.health.qdrant.available ? 'available' : 'unavailable'},`,
-      `SQLite: ${this.health.sqlite.available ? 'available' : 'unavailable'}`
+      `SQLite: ${this.health.sqlite.available ? 'available' : 'unavailable'},`,
+      `Graph: ${this.health.graph.available ? 'available' : 'unavailable'}`
     );
   }
 
@@ -238,6 +256,46 @@ export class DatabaseManager extends EventEmitter {
   }
 
   /**
+   * Initialize Graph Database (Graphology + Level)
+   */
+  async initializeGraphDB() {
+    try {
+      // Dynamic import to avoid loading if not needed
+      const { GraphDatabaseService } = await import('../knowledge-management/GraphDatabaseService.js');
+
+      // Create graph database instance
+      this.graphDB = new GraphDatabaseService({
+        dbPath: this.graphDbConfig.path,
+        config: {
+          autoPersist: true,
+          persistIntervalMs: 1000
+        }
+      });
+
+      // Initialize the graph database
+      await this.graphDB.initialize();
+
+      this.health.graph = {
+        available: true,
+        lastCheck: Date.now(),
+        error: null
+      };
+
+      console.log(`[DatabaseManager] Graph database initialized at: ${this.graphDbConfig.path}`);
+    } catch (error) {
+      this.health.graph = {
+        available: false,
+        lastCheck: Date.now(),
+        error: error.message
+      };
+
+      console.warn('[DatabaseManager] Graph database not available:', error.message);
+      console.warn('[DatabaseManager] Knowledge queries will fall back to SQLite');
+      // Continue with degraded functionality - graph DB is optional
+    }
+  }
+
+  /**
    * Create SQLite schemas for all tables
    */
   async createSQLiteSchemas() {
@@ -257,21 +315,9 @@ export class DatabaseManager extends EventEmitter {
       )
     `);
 
-    // Knowledge extractions metadata
-    this.sqlite.exec(`
-      CREATE TABLE IF NOT EXISTS knowledge_extractions (
-        id TEXT PRIMARY KEY,
-        session_id TEXT,
-        exchange_id TEXT,
-        extraction_type TEXT NOT NULL,
-        classification TEXT,
-        confidence REAL,
-        source_file TEXT,
-        extracted_at TEXT DEFAULT (datetime('now')),
-        embedding_id TEXT,
-        metadata TEXT
-      )
-    `);
+    // NOTE: knowledge_extractions and knowledge_relations tables REMOVED
+    // Knowledge is now stored in Graph DB (see GraphDatabaseService)
+    // SQLite is now ONLY for analytics: budget_events, session_metrics, embedding_cache
 
     // Session metrics
     this.sqlite.exec(`
@@ -318,11 +364,6 @@ export class DatabaseManager extends EventEmitter {
       'CREATE INDEX IF NOT EXISTS idx_budget_timestamp ON budget_events(timestamp)',
       'CREATE INDEX IF NOT EXISTS idx_budget_provider ON budget_events(provider, operation_type)',
       'CREATE INDEX IF NOT EXISTS idx_budget_project ON budget_events(project, timestamp)',
-
-      // Knowledge extraction indexes
-      'CREATE INDEX IF NOT EXISTS idx_knowledge_session ON knowledge_extractions(session_id)',
-      'CREATE INDEX IF NOT EXISTS idx_knowledge_type ON knowledge_extractions(extraction_type, classification)',
-      'CREATE INDEX IF NOT EXISTS idx_knowledge_time ON knowledge_extractions(extracted_at)',
 
       // Session metrics indexes
       'CREATE INDEX IF NOT EXISTS idx_session_time ON session_metrics(start_time, end_time)',
@@ -489,41 +530,21 @@ export class DatabaseManager extends EventEmitter {
   }
 
   /**
-   * Store knowledge extraction metadata
+   * @deprecated Knowledge is now stored in Graph DB, not SQLite
+   * This method is kept for backwards compatibility but does nothing
    */
   async storeKnowledgeExtraction(extraction) {
-    if (!this.health.sqlite.available) {
-      console.warn('[DatabaseManager] SQLite unavailable, skipping extraction metadata');
-      return false;
-    }
+    console.warn('[DatabaseManager] storeKnowledgeExtraction is deprecated - knowledge is now stored in Graph DB');
+    return true; // Return success to avoid breaking existing code
+  }
 
-    try {
-      const stmt = this.sqlite.prepare(`
-        INSERT INTO knowledge_extractions (
-          id, session_id, exchange_id, extraction_type, classification,
-          confidence, source_file, embedding_id, metadata
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      stmt.run(
-        extraction.id,
-        extraction.sessionId,
-        extraction.exchangeId,
-        extraction.extractionType,
-        extraction.classification,
-        extraction.confidence,
-        extraction.sourceFile,
-        extraction.embeddingId,
-        JSON.stringify(extraction.metadata || {})
-      );
-
-      this.stats.sqlite.operations++;
-      return true;
-    } catch (error) {
-      this.stats.sqlite.errors++;
-      console.error('[DatabaseManager] Failed to store knowledge extraction:', error);
-      return false;
-    }
+  /**
+   * @deprecated Knowledge is now stored in Graph DB, not SQLite
+   * This method is kept for backwards compatibility but does nothing
+   */
+  async deleteKnowledgeExtraction(id) {
+    console.warn('[DatabaseManager] deleteKnowledgeExtraction is deprecated - knowledge is now stored in Graph DB');
+    return true; // Return success to avoid breaking existing code
   }
 
   /**
@@ -641,11 +662,33 @@ export class DatabaseManager extends EventEmitter {
   /**
    * Get database health status
    */
-  getHealth() {
+  async getHealth() {
+    // Get graph database health if available
+    let graphHealth = this.health.graph;
+    if (this.graphDB && this.health.graph.available) {
+      try {
+        graphHealth = await this.graphDB.getHealth();
+      } catch (error) {
+        graphHealth = {
+          ...this.health.graph,
+          error: error.message
+        };
+      }
+    }
+
+    // Determine overall health status
+    const allHealthy = this.health.qdrant.available &&
+                       this.health.sqlite.available &&
+                       this.health.graph.available;
+    const anyAvailable = this.health.qdrant.available ||
+                         this.health.sqlite.available ||
+                         this.health.graph.available;
+
     return {
       qdrant: this.health.qdrant,
       sqlite: this.health.sqlite,
-      overall: this.health.qdrant.available || this.health.sqlite.available
+      graph: graphHealth,
+      overall: allHealthy ? 'healthy' : (anyAvailable ? 'degraded' : 'unavailable')
     };
   }
 
@@ -694,6 +737,11 @@ export class DatabaseManager extends EventEmitter {
   async close() {
     if (this.sqlite) {
       this.sqlite.close();
+    }
+
+    // Close graph database
+    if (this.graphDB) {
+      await this.graphDB.close();
     }
 
     // Qdrant client doesn't need explicit closing

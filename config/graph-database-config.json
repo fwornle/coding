@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Graph Database Configuration for Knowledge Storage",
+  "database": {
+    "type": "graphology-level",
+    "path": ".data/knowledge-graph",
+    "options": {
+      "multi": true,
+      "valueEncoding": "json"
+    }
+  },
+  "persistence": {
+    "autoPersist": true,
+    "persistIntervalMs": 1000,
+    "batchSize": 100
+  },
+  "performance": {
+    "maxTraversalDepth": 5,
+    "maxResultsPerQuery": 1000
+  },
+  "query": {
+    "defaultLimit": 1000,
+    "maxLimit": 10000,
+    "enableCaching": true,
+    "cacheExpiryMs": 60000
+  }
+}

@@ -28,6 +28,8 @@
     "graphology": "^0.25.4",
     "graphology-utils": "^2.5.2",
     "js-yaml": "^4.1.0",
+    "level": "^10.0.0",
+    "levelgraph": "^4.0.0",
     "playwright": "^1.40.0",
     "proper-lockfile": "^4.1.2",
     "ws": "^8.16.0"

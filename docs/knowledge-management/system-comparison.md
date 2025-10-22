@@ -24,11 +24,11 @@ The coding project contains **TWO COMPLEMENTARY knowledge management systems** t
 | **Focus** | Repository analysis, git history, patterns | Live coding session learning |
 | **Activation** | On-demand via MCP tools | Automatic during coding sessions |
 | **Integration** | MCP Protocol (Claude Code) | Agent-agnostic (Claude, Copilot, Cursor, etc.) |
-| **Storage** | UKB (shared-memory.json via MCP Memory) | Qdrant (vectors) + SQLite (analytics) |
+| **Storage** | UKB (shared-memory.json + Graph DB) | Qdrant (vectors) + SQLite (analytics) |
 | **LLM Usage** | Ad-hoc analysis tasks | Continuous with budget tracking |
 | **Budget Control** | No built-in budget tracking | Strict $8.33/month limit enforced |
-| **Privacy** | Standard MCP privacy | 5-layer sensitivity detection, local fallback |
-| **Caching** | MCP Memory server | Agent-agnostic cache (file/HTTP/MCP) |
+| **Privacy** | Standard semantic analysis privacy | 5-layer sensitivity detection, local fallback |
+| **Caching** | Agent-agnostic graph database | Agent-agnostic cache (file/HTTP/MCP) |
 | **Analysis Speed** | 1-5 minutes (full repository) | Real-time (<2s for intent classification) |
 | **Deployment** | MCP server process | Embedded in coding workflow |
 
@@ -83,9 +83,9 @@ await mcp.extract_patterns({
 
 ### Storage
 
-- **UKB (Universal Knowledge Base)**: shared-memory.json via MCP Memory server
-- **Git-tracked**: Team-wide knowledge sharing
-- **MCP Memory**: Runtime access during Claude Code sessions
+- **UKB (Universal Knowledge Base)**: shared-memory.json + Graph Database (Graphology + Level)
+- **Git-tracked**: Team-wide knowledge sharing via shared-memory.json
+- **Graph Database**: Agent-agnostic persistent storage in `.data/knowledge-graph/`
 
 ---
 
@@ -153,36 +153,14 @@ const results = await system.searchKnowledge('caching patterns');
 
 ### Complementary Workflow
 
-```
-┌─────────────────────────────────────────────────┐
-│            Live Coding Session                  │
-│  (Continuous Learning System active)            │
-└────────────────┬────────────────────────────────┘
-                 │
-                 │ Real-time extraction
-                 ▼
-┌─────────────────────────────────────────────────┐
-│    Knowledge Captured in Qdrant + SQLite        │
-└────────────────┬────────────────────────────────┘
-                 │
-                 │ When deeper analysis needed
-                 ▼
-┌─────────────────────────────────────────────────┐
-│      MCP Semantic Analysis (On-Demand)          │
-│  • Analyze repository patterns                  │
-│  • Generate architecture diagrams               │
-│  • Extract design patterns                      │
-│  • Create lessons learned docs                  │
-└────────────────┬────────────────────────────────┘
-                 │
-                 │ Insights stored in
-                 ▼
-┌─────────────────────────────────────────────────┐
-│    UKB (shared-memory.json via MCP Memory)      │
-│  • Git-tracked for team sharing                 │
-│  • Available across all projects                │
-└─────────────────────────────────────────────────┘
-```
+![Complementary Knowledge Management Workflow](../images/complementary-workflow.png)
+
+The three systems work together in a complementary pipeline:
+
+1. **Live Coding Session** → Continuous Learning System actively extracts knowledge
+2. **Knowledge Captured** → Real-time storage in Qdrant (vectors) + SQLite (analytics)
+3. **MCP Semantic Analysis** → Triggered when deeper repository analysis is needed
+4. **UKB Storage** → Final insights stored in Graph Database + shared-memory.json for team sharing
 
 ### Example Combined Usage
 
@@ -213,7 +191,7 @@ const results = await system.searchKnowledge('caching patterns');
 3. **Next session** (Both systems):
    ```
    Continuous Learning: Retrieves previous auth patterns (from Qdrant)
-   MCP Memory: Provides UKB insights (from shared-memory.json)
+   Graph Database: Provides UKB insights (from .data/knowledge-graph/)
 
    Combined knowledge: "Here's what you learned about auth,
    plus architecture patterns from repository analysis"
@@ -306,19 +284,20 @@ These systems **do NOT replace each other**. They are designed to coexist:
 
 ### Integration Points
 
-1. **MCP Memory** (shared):
-   - Continuous Learning can use MCP Memory as cache backend
-   - MCP Semantic Analysis stores insights in MCP Memory
+1. **Graph Database** (shared):
+   - UKB/VKB store and query knowledge via GraphDatabaseService
+   - MCP Semantic Analysis can store insights in graph database
+   - Agent-agnostic: works with Claude Code, Copilot, Cursor
 
-2. **shared-memory.json** (MCP only):
-   - MCP Semantic Analysis writes to this (UKB)
+2. **shared-memory.json** (legacy/backup):
+   - MCP Semantic Analysis can write to this (UKB format)
    - Continuous Learning does NOT write to this
    - They use different storage systems by design
 
-3. **Claude Code** (client):
-   - Can call MCP tools (Semantic Analysis)
-   - Can use Continuous Learning (embedded)
-   - Both systems accessible in same session
+3. **AI Agents** (clients):
+   - Can use UKB commands (any CLI-based agent)
+   - Can use VKB HTTP API (any agent with HTTP access)
+   - MCP Semantic Analysis via MCP tools (Claude Code)
 
 ---
 
@@ -346,7 +325,7 @@ These systems **do NOT replace each other**. They are designed to coexist:
 
 | System | Purpose | Agents | Storage | Activation |
 |--------|---------|--------|---------|------------|
-| **MCP Semantic Analysis** | Deep code analysis | 11 agents | UKB (shared-memory.json) | On-demand (MCP tools) |
+| **MCP Semantic Analysis** | Deep code analysis | 11 agents | UKB (Graph DB + JSON) | On-demand (MCP tools) |
 | **Continuous Learning** | Real-time session learning | 1 agent | Qdrant + SQLite | Automatic (always on) |
 
 **Recommendation**: **Use BOTH systems** for maximum knowledge management capabilities. They complement each other and do not conflict.

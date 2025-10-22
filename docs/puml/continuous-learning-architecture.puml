@@ -84,6 +84,23 @@ package "Database Layer" <<storage>> {
     [session_metrics]
     [embedding_cache]
   }
+
+  note right of Qdrant
+    **Continuous Learning Only**
+    Real-time session knowledge
+    Not used by UKB/VKB
+  end note
+}
+
+package "UKB/VKB Storage" <<storage>> {
+  database "Graph Database\n(Graphology + Level)" as GraphDB {
+    note right
+      **Manual Knowledge Capture**
+      UKB/VKB use this
+      Team isolation
+      Git-tracked exports
+    end note
+  }
 }
 
 package "External Providers" <<infra>> {
@@ -141,5 +158,8 @@ AdapterAPI SYNC_LINE [GenericAdapter]
 [BudgetTracker] DATA_LINE SQLite
 [RealTimeTrajectoryAnalyzer] DATA_LINE Qdrant
 [RealTimeTrajectoryAnalyzer] DATA_LINE SQLite
+
+' Optional manual export to Graph DB
+[ConceptAbstractionAgent] OPTIONAL_LINE GraphDB : Manual export\nvia UKB
 
 @enduml

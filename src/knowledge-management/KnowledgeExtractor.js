@@ -10,7 +10,7 @@
  * - Extracts exchanges (user prompts + assistant responses)
  * - Classifies knowledge types (patterns, solutions, decisions, bugs, etc.)
  * - Generates embeddings for semantic search
- * - Stores in DatabaseManager (metadata in SQLite, vectors in Qdrant)
+ * - Stores entities/relations in Graph DB, vectors in Qdrant
  * - Confidence scoring for extracted knowledge
  * - Deduplication against existing knowledge
  *
@@ -27,6 +27,7 @@
  * ```javascript
  * const extractor = new KnowledgeExtractor({
  *   databaseManager,
+ *   graphDatabase,
  *   embeddingGenerator,
  *   inferenceEngine
  * });
@@ -76,11 +77,12 @@ export class KnowledgeExtractor extends EventEmitter {
 
     // Required dependencies
     this.databaseManager = config.databaseManager;
+    this.graphDatabase = config.graphDatabase;
     this.embeddingGenerator = config.embeddingGenerator;
     this.inferenceEngine = config.inferenceEngine;
 
-    if (!this.databaseManager || !this.embeddingGenerator || !this.inferenceEngine) {
-      throw new Error('KnowledgeExtractor requires databaseManager, embeddingGenerator, and inferenceEngine');
+    if (!this.databaseManager || !this.graphDatabase || !this.embeddingGenerator || !this.inferenceEngine) {
+      throw new Error('KnowledgeExtractor requires databaseManager, graphDatabase, embeddingGenerator, and inferenceEngine');
     }
 
     // Extraction configuration
@@ -514,11 +516,34 @@ Respond in JSON format:
   }
 
   /**
-   * Store knowledge in database
+   * Store knowledge in database (Graph DB + Qdrant)
    */
   async storeKnowledge(knowledge) {
     try {
-      // Store vector in Qdrant
+      // Store entity in Graph DB (primary storage)
+      const entity = {
+        name: knowledge.id,
+        entityName: knowledge.text.substring(0, 100),
+        entityType: knowledge.type,
+        observations: [knowledge.text],
+        extractionType: knowledge.type,
+        classification: knowledge.metadata.classification,
+        confidence: knowledge.confidence,
+        source: 'auto',
+        sessionId: knowledge.sessionId,
+        embeddingId: knowledge.id,
+        metadata: {
+          ...knowledge.metadata,
+          userPrompt: knowledge.userPrompt?.substring(0, 500),
+          assistantResponse: knowledge.assistantResponse?.substring(0, 500)
+        }
+      };
+
+      await this.graphDatabase.storeEntity(entity, {
+        team: knowledge.project || 'coding'
+      });
+
+      // Store vector in Qdrant (for semantic search)
       const collection = this.vectorSize === 384 ? 'knowledge_patterns_small' : 'knowledge_patterns';
       await this.databaseManager.storeVector(collection, knowledge.id, knowledge.embedding, {
         type: knowledge.type,
@@ -527,19 +552,6 @@ Respond in JSON format:
         sessionId: knowledge.sessionId,
         project: knowledge.project,
         extractedAt: knowledge.metadata.extractedAt
-      });
-
-      // Store metadata in SQLite
-      await this.databaseManager.storeKnowledgeExtraction({
-        id: knowledge.id,
-        sessionId: knowledge.sessionId,
-        exchangeId: null, // Could add if we track exchange IDs
-        extractionType: knowledge.type,
-        classification: knowledge.metadata.classification,
-        confidence: knowledge.confidence,
-        sourceFile: null,
-        embeddingId: knowledge.id,
-        metadata: knowledge.metadata
       });
 
       return true;

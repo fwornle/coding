@@ -1,201 +1,177 @@
-# Unified Multi-Database Memory Systems
+# Graph-Based Knowledge Storage Architecture
+
+**Migration Completed**: 2025-10-22
+**Status**: ✅ All knowledge now stored in Graph DB + Qdrant
 
 ## Overview
 
-The unified system maintains knowledge consistency across three distinct storage systems through the **SynchronizationAgent**, which serves as the single source of truth for data integrity. This multi-database approach provides resilience, performance optimization, and seamless integration with different AI coding assistants.
+The knowledge management system uses a **graph-first storage architecture** that is agent-agnostic, eliminating dependency on Claude Code or MCP Memory server. This architecture provides persistent, high-performance knowledge storage that works with any AI coding assistant.
+
+**Current State**: All online learning and batch operations write directly to Graph DB. SQLite is retained for analytics only (budget tracking, session metrics, embedding cache).
 
 ## Architecture Principles
 
-### 1. **Single Authority Pattern**
-The SynchronizationAgent is the **only component** allowed to modify data across databases:
-- No direct database writes from other agents
-- All updates flow through SynchronizationAgent
-- Atomic operations ensure consistency
+### 1. **Agent-Agnostic Design**
+The GraphDatabaseService is accessible to any coding agent:
+- No MCP Memory server dependency
+- Works with Claude Code, Copilot, Cursor, and others
+- CLI and HTTP API access methods
 
-### 2. **Multi-Database Synchronization**
-Three databases serve different purposes but contain identical knowledge:
-- **MCP Memory**: Fast in-memory access for Claude sessions
-- **Graphology**: HTTP API access for CoPilot integration  
-- **shared-memory.json**: Git-tracked persistence for team collaboration
+### 2. **Graph-Native Storage**
+Native graph database for knowledge representation:
+- **Graphology**: In-memory graph with rich algorithms
+- **Level**: Persistent key-value storage
+- **Team Isolation**: Node ID pattern `${team}:${entityName}`
 
-### 3. **Conflict Resolution**
-Automatic conflict resolution using:
-- Timestamp-based precedence
-- Merge strategies for observations
-- Validation and consistency checks
+### 3. **Backward Compatibility**
+Maintains API compatibility with previous SQLite format:
+- VKB frontend works without changes
+- Existing tools and scripts continue to function
+- Gradual migration path from SQLite
 
 ## Database Architecture
 
-![Multi-Database Architecture](../images/unified-memory-systems.png)
+![Graph Storage Architecture](../images/graph-storage-architecture.png)
 
-### MCP Memory Database
+### Graph Database Components
 
-#### Purpose
-In-memory graph database providing fast access for Claude Code sessions via MCP protocol.
+The knowledge management system uses two complementary storage layers:
 
-#### Characteristics
-- **Storage**: RAM-based for speed
-- **Persistence**: Session-based with cross-session continuity
-- **Access**: Direct MCP protocol communication
-- **Performance**: Millisecond response times
-- **Capacity**: Limited by available memory
+#### 1. Graphology (In-Memory Graph)
 
-#### Schema
+**Purpose**: Fast in-memory graph operations with native support for graph algorithms.
+
+**Characteristics**:
+- Pure JavaScript implementation
+- Multi-graph support (multiple edges between nodes)
+- Rich ecosystem of graph algorithms
+- Fast traversals and queries
+- Memory-efficient node/edge storage
+
+**Schema**:
 ```typescript
-interface MCPEntity {
-  id: string;
-  name: string;
-  entityType: string;
-  significance: number;
-  observations: string[];
-  metadata: {
-    created: string;
-    updated: string;
-    source: 'mcp' | 'sync';
-  };
-  relationships: MCPRelationship[];
-}
-
-interface MCPRelationship {
-  id: string;
-  from: string;
-  to: string;
-  relationType: string;
-  metadata: Record<string, any>;
-}
-```
-
-#### API Interface
-```typescript
-// MCP Tool Calls
-await mcp.callTool('create_knowledge_entity', {
-  name: 'ReactHooksPattern',
-  entityType: 'TechnicalPattern',
-  significance: 8,
-  observations: ['Use useEffect for side effects', 'useState for local state']
+// Node structure
+graph.addNode('coding:PatternName', {
+  name: 'PatternName',
+  entityType: 'Pattern',
+  team: 'coding',
+  observations: string[],
+  confidence: number,
+  source: 'manual' | 'automated',
+  metadata: Record<string, any>,
+  createdAt: string,
+  updatedAt: string
 });
 
-await mcp.callTool('search_knowledge', {
-  query: 'React hooks',
-  maxResults: 10
+// Edge structure
+graph.addEdge('coding:Pattern1', 'coding:Solution1', {
+  relationType: 'implements' | 'solves' | 'uses',
+  team: 'coding',
+  confidence: number,
+  metadata: Record<string, any>,
+  createdAt: string
 });
 ```
 
-### Graphology Database
+#### 2. Level v10.0.0 (Persistent Storage)
 
-#### Purpose
-Graph database optimized for HTTP API access, primarily serving VSCode CoPilot integration.
+**Purpose**: Persistent key-value storage for graph state.
 
-#### Characteristics
-- **Storage**: Persistent graph structure
-- **Persistence**: File-based with real-time updates
-- **Access**: HTTP REST API
-- **Performance**: Sub-second response times
-- **Capacity**: Scalable to thousands of entities
+**Characteristics**:
+- File-based persistence in `.data/knowledge-graph/`
+- Atomic write operations
+- Efficient key-value storage
+- Automatic synchronization from Graphology
+- Crash recovery support
 
-#### Schema
+**Storage Format**:
 ```typescript
-interface GraphologyNode {
-  id: string;
-  label: string;
-  attributes: {
-    type: string;
-    significance: number;
-    observations: string[];
-    metadata: Record<string, any>;
-    created: string;
-    updated: string;
-  };
-}
-
-interface GraphologyEdge {
-  id: string;
-  source: string;
-  target: string;
-  type: string;
-  attributes: {
-    metadata: Record<string, any>;
-    created: string;
-  };
-}
-```
-
-#### API Interface
-```bash
-# REST API Endpoints
-GET    /api/graph/full                    # Get complete graph
-GET    /api/graph/status                  # Health check
-POST   /api/graph/entity                  # Create entity
-PUT    /api/graph/entity/:id              # Update entity
-DELETE /api/graph/entity/:id              # Remove entity
-POST   /api/graph/relation                # Create relationship
-GET    /api/graph/search?q=query          # Search entities
-```
-
-### shared-memory.json (File System)
-
-#### Purpose
-Git-tracked authoritative knowledge base providing team collaboration and backup storage.
-
-#### Characteristics
-- **Storage**: JSON file in git repository
-- **Persistence**: Version-controlled with full history
-- **Access**: File system operations
-- **Performance**: Optimized for batch operations
-- **Capacity**: Practically unlimited
-
-#### Schema
-```json
-{
-  "metadata": {
-    "version": "2.0.0",
-    "total_entities": 42,
-    "total_relations": 67,
-    "last_updated": "2025-01-01T12:00:00Z",
-    "schema_version": "enhanced-v2",
-    "sync_status": {
-      "mcp_last_sync": "2025-01-01T12:00:00Z",
-      "graphology_last_sync": "2025-01-01T12:00:00Z"
-    }
-  },
-  "entities": [
-    {
-      "name": "ReactHooksPattern",
-      "entityType": "TechnicalPattern",
-      "significance": 8,
-      "observations": [
-        {
-          "type": "problem",
-          "content": "Class components are verbose and hard to test",
-          "date": "2025-01-01T10:00:00Z"
-        },
-        {
-          "type": "solution",
-          "content": "Use React hooks for simpler, more testable components",
-          "date": "2025-01-01T10:00:00Z"
-        }
-      ],
-      "metadata": {
-        "created_at": "2025-01-01T10:00:00Z",
-        "last_updated": "2025-01-01T12:00:00Z",
-        "source": "unified-agent-system",
-        "sync_version": 3
-      }
-    }
-  ],
-  "relations": [
-    {
-      "from": "ReactHooksPattern",
-      "relationType": "implemented_in",
-      "to": "MyReactProject",
-      "metadata": {
-        "created": "2025-01-01T10:30:00Z",
-        "source": "agent-analysis"
-      }
-    }
+// Persisted as key-value pairs
+key: 'coding:PatternName'
+value: {
+  name: 'PatternName',
+  entityType: 'Pattern',
+  // ... all node attributes
+  edges: [
+    { target: 'coding:Solution1', relationType: 'implements', ... }
   ]
 }
 ```
+
+### Data Access Methods
+
+The graph database is accessible through multiple interfaces for different use cases:
+
+#### 1. CLI Access (UKB Commands)
+```bash
+# Create entity
+ukb add "Pattern" "API Design Pattern"
+
+# Query entities
+ukb query --team coding --type Pattern
+
+# View relationships
+ukb relations --from "Pattern1"
+```
+
+**Used by**: Any CLI-based coding agent (Claude Code, Cursor, Aider, etc.)
+
+#### 2. HTTP API (VKB Server)
+```bash
+# Get all entities for team
+GET /api/entities?team=coding
+
+# Get entity details
+GET /api/entities/:id
+
+# Get relationships
+GET /api/relations?team=coding
+
+# Create entity
+POST /api/entities
+{
+  "name": "PatternName",
+  "entityType": "Pattern",
+  "team": "coding",
+  "observations": [...]
+}
+```
+
+**Used by**: Web interfaces, VS Code extensions, remote agents
+
+#### 3. Direct API (JavaScript)
+```typescript
+import { DatabaseManager } from './databases/DatabaseManager.js';
+
+const dbManager = new DatabaseManager({
+  graphDbPath: '.data/knowledge-graph'
+});
+
+await dbManager.initialize();
+
+// Store entity
+await dbManager.graphDB.storeEntity({
+  name: 'PatternName',
+  entityType: 'Pattern',
+  observations: ['observation 1'],
+  confidence: 0.9
+}, { team: 'coding' });
+
+// Query entities
+const entities = await dbManager.graphDB.queryEntities({
+  team: 'coding',
+  entityType: 'Pattern'
+});
+
+// Find related entities
+const related = await dbManager.graphDB.findRelated(
+  'PatternName',
+  2,  // maxDepth
+  { team: 'coding' }
+);
+```
+
+**Used by**: Internal services, integrations, automated workflows
 
 ## SynchronizationAgent Architecture
 

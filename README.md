@@ -112,7 +112,7 @@ Capture, organize, and visualize development insights:
 
 - **UKB (Update Knowledge Base)**: Auto git analysis + interactive capture
 - **VKB (Visualize Knowledge Base)**: Web-based graph visualization
-- **MCP Memory**: Runtime knowledge graph storage
+- **Graph Database**: Agent-agnostic persistent knowledge storage (Graphology + Level)
 - **Cross-Project Learning**: Share patterns across multiple projects
 - **Domain-Specific**: Automatic domain knowledge bases per team
 

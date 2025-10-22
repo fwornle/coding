@@ -1,0 +1,69 @@
+@startuml
+!include _standard-style.puml
+
+title Three Knowledge Management Systems Integration
+
+package "1. CONTINUOUS LEARNING\n(Automatic Real-Time)" as learning #E8F5E8 {
+  [StreamingExtractor] <<core>>
+  [KnowledgeRetriever] <<core>>
+
+  database "Graph DB\n(Entities)" as learning_graph <<storage>>
+  database "Qdrant\n(Vectors)" as qdrant <<storage>>
+  database "SQLite\n(Analytics)" as sqlite <<storage>>
+
+  note right of learning
+    **Automatic during sessions**
+    • Budget: $8.33/month
+    • Real-time extraction
+    • Privacy-first
+    • Writes to Graph DB + Qdrant
+  end note
+}
+
+package "2. MCP SEMANTIC ANALYSIS\n(On-Demand Deep Analysis)" as mcp #E8F4FD {
+  [11 Specialized Agents] <<agent>>
+  [InsightGeneration] <<core>>
+  [PatternExtraction] <<core>>
+
+  note right of mcp
+    **Manual trigger**
+    • Repository analysis
+    • Architecture diagrams
+    • Pattern extraction
+  end note
+}
+
+package "3. UKB/VKB\n(Manual + Git-Tracked)" as ukb #FFF9E6 {
+  [UKB CLI] <<cli>>
+  [VKB Server] <<api>>
+
+  database "Graph Database\n(Graphology + Level)" as graph <<storage>>
+  file "shared-memory.json\n(Git-tracked)" as json
+
+  note right of ukb
+    **Manual capture**
+    • Team sharing via git
+    • Visual graph explorer
+    • Agent-agnostic
+  end note
+}
+
+' Data flows
+[StreamingExtractor] -down-> learning_graph : Store entities\nand relations
+[StreamingExtractor] -down-> qdrant : Store vectors
+[StreamingExtractor] -down-> sqlite : Store analytics
+[KnowledgeRetriever] -up-> qdrant : Search
+[KnowledgeRetriever] -up-> learning_graph : Query
+
+[11 Specialized Agents] -down-> [InsightGeneration] : Analyze
+[InsightGeneration] -down-> [UKB CLI] : Store insights
+
+[UKB CLI] -down-> graph : Persist
+[VKB Server] -up-> graph : Query
+graph -right-> json : Export/Backup
+
+' Integration flows
+learning -down-> mcp : When deeper\nanalysis needed
+mcp -down-> ukb : Insights\nstored in
+
+@enduml

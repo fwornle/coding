@@ -1,0 +1,58 @@
+@startuml
+!include _standard-style.puml
+
+title Clear Data Flow - Proposed Architecture
+
+actor "User Input" as user
+component "KnowledgeStorageService" as orchestrator <<core>>
+
+database "LevelGraph" as levelgraph {
+  [Entities]
+  [Relations]
+}
+
+database "Qdrant" as qdrant {
+  [Embeddings]
+}
+
+database "SQLite" as sqlite {
+  [Metrics]
+  [Budget]
+}
+
+file "JSON" as json {
+  [Export/Backup]
+}
+
+' Flow
+user SYNC_LINE orchestrator
+
+orchestrator DATA_LINE levelgraph : Store entities\nand relations
+orchestrator DATA_LINE qdrant : Store embeddings
+orchestrator DATA_LINE sqlite : Store metrics\nand budget
+orchestrator OPTIONAL_LINE json : Export on demand
+
+note right of orchestrator
+  **Single Orchestrator**
+  • No hidden syncs
+  • No background processes
+  • Explicit data flow
+end note
+
+note bottom of levelgraph
+  Primary knowledge storage
+end note
+
+note bottom of qdrant
+  Semantic search
+end note
+
+note bottom of sqlite
+  Time-series analytics
+end note
+
+note bottom of json
+  Git-tracked backups
+end note
+
+@enduml

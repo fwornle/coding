@@ -72,13 +72,13 @@ This file provides essential guidance to Claude Code across all projects with gl
 
 #### Startup & Services
 - **Command**: `claude-mcp` (NEVER just `claude`) - always start claude via 'coding'
-- **Services**: VKB Server (port 8080), MCP Memory, Semantic Analysis
+- **Services**: VKB Server (port 8080), Semantic Analysis, Graph Database
 - **Automatic startup**: `coding` or `coding --claude` starts all services
 
 #### Knowledge Management
-- **MCP Memory Service**: Runtime knowledge graph storage and querying
+- **Graph Database**: Agent-agnostic persistent storage (Graphology + Level)
 - **Commands**: `ukb` (update), `vkb` (visualize)
-- **Files**: `shared-memory-*.json` (git-tracked persistent storage)
+- **Storage**: `.data/knowledge-graph/` (persistent graph storage)
 
 #### Session Logging (LSL System)
 - **Primary**: Live Session Logging with enhanced transcript monitor
@@ -131,7 +131,7 @@ This file provides essential guidance to Claude Code across all projects with gl
 
 | Project | Primary Tools | Key Commands | Focus Area |
 |---------|---------------|--------------|------------|
-| coding | MCP Memory, VKB, UKB | `claude-mcp`, `ukb`, `vkb` | Knowledge & Infrastructure |
+| coding | Graph Database, VKB, UKB | `claude-mcp`, `ukb`, `vkb` | Knowledge & Infrastructure |
 
 ---
 

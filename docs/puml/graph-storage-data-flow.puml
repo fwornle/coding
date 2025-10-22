@@ -1,0 +1,90 @@
+@startuml
+!include _standard-style.puml
+
+title Knowledge Management Data Flow\n(Graph Storage Backend)
+
+actor "Developer" as dev
+
+box "Knowledge Management Interface" #E8F5E8
+  participant "UKB CLI" as ukb <<cli>>
+  participant "VKB Server" as vkb <<api>>
+end box
+
+box "Core Services" #E8F4FD
+  participant "DatabaseManager" as dbmgr <<core>>
+  participant "GraphDatabaseService" as graphdb <<storage>>
+end box
+
+box "Storage Layer" #FFF9E6
+  database "Graphology\n(Memory)" as graph
+  database "Level\n(Disk)" as disk
+end box
+
+' Entity creation flow
+dev -> ukb : ukb add "Pattern" "API Design"
+activate ukb
+
+ukb -> dbmgr : storeEntity(entity, {team: 'coding'})
+activate dbmgr
+
+dbmgr -> graphdb : storeEntity(entity, context)
+activate graphdb
+
+graphdb -> graph : addNode(nodeId, attributes)
+note right
+  nodeId = "coding:APIDesign"
+  attributes = {
+    name, entityType,
+    observations, confidence,
+    team, source
+  }
+end note
+
+graphdb -> disk : persist graph state
+note right
+  Atomic write to
+  .data/knowledge-graph/
+end note
+
+graphdb --> dbmgr : entity stored
+deactivate graphdb
+
+dbmgr --> ukb : success
+deactivate dbmgr
+
+ukb --> dev : Entity created
+deactivate ukb
+
+' Query flow
+dev -> vkb : GET /api/entities?team=coding
+activate vkb
+
+vkb -> dbmgr : queryEntities({team: 'coding'})
+activate dbmgr
+
+dbmgr -> graphdb : queryEntities(filter)
+activate graphdb
+
+graphdb -> graph : filterNodes(by team prefix)
+note right
+  Fast in-memory
+  graph traversal
+end note
+
+graph --> graphdb : matching nodes
+
+graphdb --> dbmgr : entities (SQLite-compatible format)
+note left
+  Format matches old
+  SQLite response for
+  backward compatibility
+end note
+deactivate graphdb
+
+dbmgr --> vkb : JSON response
+deactivate dbmgr
+
+vkb --> dev : Entity list
+deactivate vkb
+
+@enduml

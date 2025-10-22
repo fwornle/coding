@@ -1,0 +1,48 @@
+@startuml
+!include _standard-style.puml
+
+title Continuous Learning System - Service Dependencies
+
+rectangle "Continuous Learning System" #E8F5E8 {
+  [Inference Engine] <<core>>
+  [Budget Tracker] <<util>>
+  [Knowledge Extractor] <<core>>
+  [Database Manager] <<core>>
+}
+
+database "Qdrant\n(Vector DB)" as qdrant <<storage>>
+database "SQLite\n(Analytics)" as sqlite <<storage>>
+
+cloud "External LLM Providers" as llm #F0F0F0 {
+  [Groq API]
+  [OpenRouter]
+}
+
+cloud "Local LLM" as local #F0F0F0 {
+  [Ollama]
+}
+
+' Dependencies
+[Inference Engine] -down-> [Budget Tracker] : monitors
+[Knowledge Extractor] -down-> [Database Manager] : stores via
+[Inference Engine] -right-> [Knowledge Extractor] : powers
+
+[Database Manager] -down-> qdrant : vectors
+[Database Manager] -down-> sqlite : metadata
+
+[Inference Engine] -down-> llm : calls
+[Inference Engine] -down-> local : fallback
+
+note right of qdrant
+  **Continuous Learning Only**
+  Not used by UKB/VKB
+end note
+
+note right of sqlite
+  **Analytics Only**
+  • budget_events
+  • session_metrics
+  • embedding_cache
+end note
+
+@enduml

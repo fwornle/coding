@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   testEnvironment: 'node',
   moduleFileExtensions: ['js', 'json'],
   testMatch: [
@@ -16,8 +16,5 @@ module.exports = {
   verbose: true,
   testTimeout: 30000,
   setupFilesAfterEnv: ['<rootDir>/test/setup.js'],
-  // Handle the module type issue
-  transformIgnorePatterns: [
-    'node_modules/(?!(your-esm-package)/)'
-  ]
+  transform: {}
 };

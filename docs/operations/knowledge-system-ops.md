@@ -1,7 +1,7 @@
 # Continuous Learning Knowledge System - Operations Guide
 
-**Version**: 1.0
-**Last Updated**: 2025-10-19
+**Version**: 2.0
+**Last Updated**: 2025-10-22
 **Target Audience**: DevOps Engineers, Site Reliability Engineers, System Administrators
 
 ## Table of Contents
@@ -21,50 +21,59 @@
 
 ## Overview
 
-### System Components
+**Scope**: This operations guide covers both the **Continuous Learning Knowledge System** (automatic real-time learning) and the **UKB/VKB system** (manual knowledge capture). As of 2025-10-22, both systems share the same Graph Database for knowledge storage.
 
-The Continuous Learning Knowledge System consists of the following operational components:
+### System Architecture (Current State)
 
-1. **Unified Inference Engine** - Multi-provider LLM inference with circuit breaker
+The knowledge management system consists of the following operational components:
+
+1. **Graph Database (Shared)** - Graphology + Level at `.data/knowledge-graph/`
+   - **Used by**: Both Continuous Learning AND UKB/VKB
+   - **Stores**: All knowledge entities and relations
+   - **Persistence**: Automatic file-based persistence
+
 2. **Qdrant Vector Database** - Semantic search with HNSW indexing
-3. **SQLite Analytics Database** - Metadata, cost tracking, and analytics
-4. **Knowledge Extraction Pipeline** - Real-time and batch extraction
-5. **Trajectory Tracking System** - Intent classification and goal tracking
-6. **Budget Tracking Service** - Cost monitoring and enforcement
+   - **Used by**: Continuous Learning (primary), queryable by UKB/VKB
+   - **Stores**: Vector embeddings for semantic similarity search
+
+3. **SQLite Analytics Database** - Analytics only at `.data/knowledge.db`
+   - **Stores**: Budget events, session metrics, embedding cache
+   - **Does NOT store**: Knowledge entities or relations (moved to Graph DB)
+
+4. **Unified Inference Engine** - Multi-provider LLM inference with circuit breaker
+5. **Knowledge Extraction Pipeline** - Real-time and batch extraction (writes to Graph DB)
+6. **Trajectory Tracking System** - Intent classification and goal tracking
+7. **Budget Tracking Service** - Cost monitoring and enforcement
+8. **UKB CLI** - Command-line knowledge capture tool (writes to Graph DB)
+9. **VKB Server** - HTTP API and visualization server (reads from Graph DB)
 
 ### Service Dependencies
 
-```
-┌─────────────────────────────────────────┐
-│   Continuous Learning System            │
-├─────────────────────────────────────────┤
-│                                         │
-│  ┌────────────┐      ┌──────────────┐   │
-│  │ Inference  │─────▶│ Budget       │   │
-│  │ Engine     │      │ Tracker      │   │
-│  └────────────┘      └──────────────┘   │
-│         │                    │          │
-│         ▼                    ▼          │
-│  ┌────────────┐      ┌──────────────┐   │
-│  │ Knowledge  │─────▶│ Database     │   │
-│  │ Extractor  │      │ Manager      │   │
-│  └────────────┘      └──────────────┘   │
-│                              │          │
-│                              ▼          │
-│                     ┌────────────────┐  │
-│                     │ Qdrant         │  │
-│                     │ + SQLite       │  │
-│                     └────────────────┘  │
-└─────────────────────────────────────────┘
-         │                    │
-         ▼                    ▼
-  ┌───────────┐        ┌───────────┐
-  │ Groq API  │        │ Local LLM │
-  │ OpenRouter│        │ (Ollama)  │
-  └───────────┘        └───────────┘
-```
+![Complete Knowledge System Dependencies](../images/complete-knowledge-system-dependencies.png)
+
+**Storage Architecture** (as of 2025-10-22):
+
+**Graph Database** (Shared by both systems):
+- **Location**: `.data/knowledge-graph/`
+- **Technology**: Graphology (in-memory) + Level (persistent storage)
+- **Stores**: All knowledge entities and relations from both Continuous Learning and UKB/VKB
+- **Team Isolation**: Node ID pattern `${team}:${entityName}`
+
+**Qdrant Vector Database**:
+- **Used by**: Continuous Learning (primary), queryable by UKB/VKB
+- **Stores**: Vector embeddings (384-dim and 1536-dim)
+- **Purpose**: Semantic similarity search
+
+**SQLite Analytics Database**:
+- **Location**: `.data/knowledge.db`
+- **Stores**: Budget events, session metrics, embedding cache ONLY
+- **Does NOT store**: Knowledge entities or relations (migrated to Graph DB as of 2025-10-22)
+
+**Key Point**: Both Continuous Learning and UKB/VKB write to the same Graph Database for knowledge storage. SQLite is now analytics-only.
 
 ### Critical Metrics
+
+**Continuous Learning System Metrics:**
 
 | Metric | Target | Alert Threshold | Critical Threshold |
 |--------|--------|----------------|-------------------|
@@ -75,9 +84,21 @@ The Continuous Learning Knowledge System consists of the following operational c
 | Cache Hit Rate | >40% | <30% | <20% |
 | Monthly LLM Cost | <$8.33 | >$7.50 | >$8.33 |
 | Qdrant Memory Usage | <4GB | >6GB | >8GB |
-| SQLite Database Size | <500MB | >800MB | >1GB |
+| SQLite Database Size (analytics only) | <200MB | >400MB | >500MB |
 | Knowledge Extraction Rate | >10/min | <5/min | <2/min |
 | Circuit Breaker State | Closed | Half-Open | Open |
+
+**Graph Database Metrics** (Shared by both systems):
+
+| Metric | Target | Alert Threshold | Critical Threshold |
+|--------|--------|----------------|-------------------|
+| Graph DB Size | <100MB | >200MB | >500MB |
+| Graph DB Query Latency | <50ms | >200ms | >500ms |
+| Total Entities | - | Sudden -10% | Sudden -20% |
+| Total Relations | - | Sudden -10% | Sudden -20% |
+| VKB Server Response Time | <100ms | >300ms | >1s |
+
+See [Graph Database Operations](#graph-database-operations-ukbvkb) section for detailed monitoring procedures.
 
 ---
 
@@ -284,14 +305,28 @@ async function performHealthCheck() {
     checks.checks.qdrant = { status: 'down', error: error.message };
   }
 
-  // Check SQLite database
+  // Check SQLite database (analytics only)
   try {
     const db = await getSQLiteConnection();
     db.prepare('SELECT 1').get();
-    checks.checks.sqlite = { status: 'up' };
+    checks.checks.sqlite = { status: 'up', note: 'Analytics only (budget, sessions, cache)' };
   } catch (error) {
     checks.status = 'unhealthy';
     checks.checks.sqlite = { status: 'down', error: error.message };
+  }
+
+  // Check Graph Database (knowledge storage)
+  try {
+    const graphStats = await graphDB.getStatistics();
+    checks.checks.graphDB = {
+      status: 'up',
+      entities: graphStats.totalEntities,
+      relations: graphStats.totalRelations,
+      teams: graphStats.teams.length
+    };
+  } catch (error) {
+    checks.status = 'unhealthy';
+    checks.checks.graphDB = { status: 'down', error: error.message };
   }
 
   // Check inference providers
@@ -399,14 +434,19 @@ echo "Starting knowledge system backup at $DATE"
 # Create backup directory
 mkdir -p "$BACKUP_DIR"
 
-# Backup SQLite database
-echo "Backing up SQLite database..."
-sqlite3 /var/lib/knowledge/analytics.db ".backup '$BACKUP_DIR/analytics_$DATE.db'"
-gzip "$BACKUP_DIR/analytics_$DATE.db"
+# Backup Graph Database (PRIMARY - all knowledge entities/relations)
+echo "Backing up Graph Database (primary knowledge storage)..."
+tar czf "$BACKUP_DIR/graph-db_$DATE.tar.gz" \
+  /var/lib/knowledge/.data/knowledge-graph
 
-# Backup Qdrant collections
+# Backup Qdrant collections (vector embeddings)
 echo "Backing up Qdrant collections..."
 docker exec qdrant /bin/sh -c "cd /qdrant/storage && tar czf - ." > "$BACKUP_DIR/qdrant_$DATE.tar.gz"
+
+# Backup SQLite database (analytics only: budget, sessions, cache)
+echo "Backing up SQLite analytics database..."
+sqlite3 /var/lib/knowledge/analytics.db ".backup '$BACKUP_DIR/analytics_$DATE.db'"
+gzip "$BACKUP_DIR/analytics_$DATE.db"
 
 # Backup configuration files
 echo "Backing up configuration..."
@@ -451,7 +491,40 @@ Add to crontab:
 
 ### 2. Database Optimization
 
-#### SQLite Maintenance
+#### Graph Database Maintenance
+
+Create `/scripts/optimize-graph-db.sh`:
+
+```bash
+#!/bin/bash
+set -e
+
+GRAPH_DB_PATH="/var/lib/knowledge/.data/knowledge-graph"
+
+echo "Starting Graph Database maintenance..."
+
+# Verify graph database integrity
+echo "Checking graph database integrity..."
+ukb query --stats > /tmp/graph-stats.txt || {
+  echo "ERROR: Graph database query failed"
+  exit 1
+}
+
+# Check for entity/relation count anomalies
+ENTITY_COUNT=$(grep "Total Entities" /tmp/graph-stats.txt | awk '{print $3}')
+RELATION_COUNT=$(grep "Total Relations" /tmp/graph-stats.txt | awk '{print $3}')
+
+echo "Entity count: $ENTITY_COUNT"
+echo "Relation count: $RELATION_COUNT"
+
+# Export to JSON for backup
+echo "Exporting to JSON..."
+ukb export /var/backups/graph-export-$(date +%Y%m%d).json
+
+echo "Graph Database maintenance completed successfully"
+```
+
+#### SQLite Maintenance (Analytics Only)
 
 Create `/scripts/optimize-sqlite.sh`:
 
@@ -461,7 +534,7 @@ set -e
 
 DB_PATH="/var/lib/knowledge/analytics.db"
 
-echo "Starting SQLite optimization..."
+echo "Starting SQLite analytics database optimization..."
 
 # Analyze database for query optimization
 sqlite3 "$DB_PATH" "ANALYZE;"
@@ -485,6 +558,10 @@ echo "SQLite optimization completed successfully"
 Run weekly:
 
 ```cron
+# Graph DB maintenance (primary)
+0 3 * * 0 /scripts/optimize-graph-db.sh >> /var/log/knowledge-optimize.log 2>&1
+
+# SQLite analytics maintenance
 0 4 * * 0 /scripts/optimize-sqlite.sh >> /var/log/knowledge-optimize.log 2>&1
 ```
 
@@ -980,8 +1057,9 @@ psql "$PG_CONNECTION" -t -c "SELECT COUNT(*) FROM knowledge_items;"
 
 | Component | RTO | RPO | Recovery Strategy |
 |-----------|-----|-----|-------------------|
-| SQLite Database | 30 minutes | 24 hours | Daily backups, restore from S3 |
+| Graph Database | 30 minutes | 24 hours | Daily backups, restore from S3 |
 | Qdrant Collections | 1 hour | 24 hours | Daily snapshots, rebuild from backup |
+| SQLite Analytics | 15 minutes | 24 hours | Daily backups (analytics only) |
 | Inference Engine | 5 minutes | 0 (stateless) | Restart containers/processes |
 | Configuration | 5 minutes | 0 | Version controlled, redeploy |
 
@@ -1011,8 +1089,22 @@ echo "Clearing existing data..."
 rm -rf "$RECOVERY_DIR"/*
 mkdir -p "$RECOVERY_DIR"
 
-# 3. Restore SQLite database
-echo "Restoring SQLite database..."
+# 3. Restore Graph Database (PRIMARY - all knowledge entities/relations)
+echo "Restoring Graph Database..."
+tar xzf "$BACKUP_DIR/graph-db_$BACKUP_DATE.tar.gz" -C "$RECOVERY_DIR"
+
+# Verify graph database integrity
+ukb query --stats || {
+  echo "ERROR: Graph database integrity check failed"
+  exit 1
+}
+
+# 4. Restore Qdrant data
+echo "Restoring Qdrant data..."
+tar xzf "$BACKUP_DIR/qdrant_$BACKUP_DATE.tar.gz" -C /var/lib/qdrant/storage/
+
+# 5. Restore SQLite analytics database
+echo "Restoring SQLite analytics database..."
 gunzip -c "$BACKUP_DIR/analytics_$BACKUP_DATE.db.gz" > "$RECOVERY_DIR/analytics.db"
 
 # Verify SQLite integrity
@@ -1021,22 +1113,18 @@ sqlite3 "$RECOVERY_DIR/analytics.db" "PRAGMA integrity_check;" | grep -q "ok" ||
   exit 1
 }
 
-# 4. Restore Qdrant data
-echo "Restoring Qdrant data..."
-tar xzf "$BACKUP_DIR/qdrant_$BACKUP_DATE.tar.gz" -C /var/lib/qdrant/storage/
-
-# 5. Restore configuration
+# 6. Restore configuration
 echo "Restoring configuration..."
 tar xzf "$BACKUP_DIR/config_$BACKUP_DATE.tar.gz" -C /
 
-# 6. Restart services
+# 7. Restart services
 echo "Starting services..."
 docker-compose up -d qdrant
 sleep 10  # Wait for Qdrant to start
 
 systemctl start knowledge-system
 
-# 7. Verify services
+# 8. Verify services
 echo "Verifying services..."
 curl -f http://localhost:6333/healthz || {
   echo "ERROR: Qdrant health check failed"
@@ -1048,10 +1136,17 @@ curl -f http://localhost:3000/health || {
   exit 1
 }
 
-# 8. Smoke test
+# 9. Smoke test
 echo "Running smoke tests..."
 node /scripts/smoke-test.js || {
   echo "ERROR: Smoke tests failed"
+  exit 1
+}
+
+# 10. Verify Graph Database
+echo "Verifying Graph Database..."
+ukb query --stats || {
+  echo "ERROR: Graph database verification failed"
   exit 1
 }
 
@@ -1085,21 +1180,53 @@ curl -f http://localhost:6333/collections/knowledge_384
 
 ### 3. Data Corruption Recovery
 
-If Qdrant collection is corrupted:
+#### Graph Database Corruption
+
+If Graph Database is corrupted:
 
 ```bash
 #!/bin/bash
-# /scripts/rebuild-qdrant-from-sqlite.sh
+# /scripts/rebuild-graph-db.sh
 
-echo "Rebuilding Qdrant collections from SQLite..."
+echo "Rebuilding Graph Database..."
 
-# Extract knowledge items from SQLite
-sqlite3 /var/lib/knowledge/analytics.db <<EOF
-.mode json
-.output /tmp/knowledge_items.json
-SELECT id, type, content, embedding_384, embedding_1536, metadata
-FROM knowledge_items;
-EOF
+# Stop services using Graph DB
+vkb stop
+systemctl stop knowledge-system
+
+# Restore from latest backup
+LATEST_BACKUP=$(ls -t /var/backups/knowledge-system/graph-db_*.tar.gz | head -1)
+echo "Restoring from: $LATEST_BACKUP"
+
+# Clear corrupted data
+rm -rf .data/knowledge-graph
+mkdir -p .data/knowledge-graph
+
+# Extract backup
+tar xzf "$LATEST_BACKUP" -C .data/
+
+# Verify restoration
+ukb query --stats || {
+  echo "ERROR: Graph database restoration failed"
+  exit 1
+}
+
+# Restart services
+systemctl start knowledge-system
+vkb start
+
+echo "Graph Database rebuild completed"
+```
+
+#### Qdrant Collection Corruption
+
+If Qdrant collection is corrupted, rebuild from Graph Database:
+
+```bash
+#!/bin/bash
+# /scripts/rebuild-qdrant-from-graph.sh
+
+echo "Rebuilding Qdrant collections from Graph Database..."
 
 # Recreate Qdrant collections
 curl -X DELETE 'http://localhost:6333/collections/knowledge_384'
@@ -1108,8 +1235,11 @@ curl -X DELETE 'http://localhost:6333/collections/knowledge_1536'
 # Create collections with proper schema
 node /scripts/initialize-qdrant.js
 
-# Re-import vectors
-node /scripts/import-vectors-from-json.js /tmp/knowledge_items.json
+# Export knowledge from Graph DB
+ukb export /tmp/knowledge_export.json
+
+# Re-import with embeddings
+node /scripts/import-to-qdrant.js /tmp/knowledge_export.json
 
 echo "Qdrant rebuild completed"
 ```
@@ -1894,7 +2024,119 @@ fi
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-19
-**Next Review**: 2025-11-19
+## Graph Database Operations
+
+This section covers operations for the **Graph Database** (Graphology + Level) which is used by **both** Continuous Learning (automatic extraction) and UKB/VKB (manual capture) for all knowledge storage.
+
+### Storage Location
+
+- **Path**: `.data/knowledge-graph/`
+- **Format**: LevelDB key-value store with Graphology in-memory graph
+- **Persistence**: Automatic persistence from Graphology to Level
+- **Used by**:
+  - Continuous Learning System (automatic extraction writes here)
+  - UKB CLI (manual knowledge capture writes here)
+  - VKB Server (visualization reads from here)
+
+### Health Checks
+
+Add to health check endpoint:
+
+```javascript
+// Check Graph Database
+try {
+  const graphStats = await graphDB.getStatistics();
+  checks.checks.graphDB = {
+    status: 'up',
+    entities: graphStats.totalEntities,
+    relations: graphStats.totalRelations,
+    teams: graphStats.teams.length
+  };
+} catch (error) {
+  checks.status = 'unhealthy';
+  checks.checks.graphDB = { status: 'down', error: error.message };
+}
+```
+
+### Backup Procedures
+
+Graph Database is backed up in the main backup script (see line 398):
+
+```bash
+# Backup Graph Database (UKB/VKB)
+tar czf "$BACKUP_DIR/graph-db_$DATE.tar.gz" \
+  .data/knowledge-graph
+```
+
+### Restore Procedure
+
+```bash
+#!/bin/bash
+# Restore Graph Database from backup
+
+BACKUP_FILE="$1"
+RESTORE_PATH=".data/knowledge-graph"
+
+# Stop VKB server if running
+vkb stop
+
+# Backup current state (if exists)
+if [ -d "$RESTORE_PATH" ]; then
+  mv "$RESTORE_PATH" "${RESTORE_PATH}.pre-restore.$(date +%s)"
+fi
+
+# Extract backup
+tar xzf "$BACKUP_FILE" -C "$(dirname $RESTORE_PATH)"
+
+# Restart VKB server
+vkb start
+
+echo "Graph Database restored from $BACKUP_FILE"
+```
+
+### Maintenance Tasks
+
+**Weekly**:
+- Verify graph database integrity via `ukb query --stats`
+- Check entity/relation counts for anomalies
+
+**Monthly**:
+- Export knowledge to `shared-memory-*.json` for git backup
+- Review team isolation (check node IDs follow `team:entity` pattern)
+
+### Monitoring Metrics
+
+| Metric | Target | Alert Threshold |
+|--------|--------|----------------|
+| Total Entities | - | Sudden decrease >10% |
+| Total Relations | - | Sudden decrease >10% |
+| Graph DB Size | <100MB | >500MB |
+| Query Latency | <50ms | >200ms |
+
+### Troubleshooting
+
+**Issue**: Graph database corrupted
+```bash
+# Check for corruption
+ukb query --stats
+
+# If corrupted, restore from latest backup
+./scripts/restore-graph-db.sh /var/backups/knowledge-system/graph-db_YYYYMMDD.tar.gz
+```
+
+**Issue**: Missing entities after restart
+```bash
+# Verify persistence
+ls -lh .data/knowledge-graph/
+
+# If empty, restore from shared-memory JSON
+ukb import shared-memory-coding.json
+```
+
+---
+
+**Document Version**: 2.0
+**Last Updated**: 2025-10-22
+**Major Changes**: Updated to reflect Graph DB as shared primary knowledge storage (both Continuous Learning and UKB/VKB), SQLite now analytics-only
+**Next Review**: 2025-11-22
 **Owner**: DevOps Team

@@ -1,0 +1,77 @@
+@startuml
+!include _standard-style.puml
+
+title Knowledge Storage Evolution
+
+!define PHASE_BOX(name, description) rectangle name #FAFAFA {\n  note as N##name\n    description\n  end note\n}
+
+rectangle "Phase 1: JSON Storage" as phase1 #FFE8F4 {
+  file "shared-memory.json" as json1
+  note bottom of json1
+    **Limitations:**
+    • Manual persistence
+    • No relationships
+    • Hard to query
+    • File conflicts
+  end note
+}
+
+rectangle "Phase 2: SQLite + Qdrant" as phase2 #E8F4FD {
+  database "SQLite" as sqlite
+  database "Qdrant" as qdrant
+
+  note bottom
+    **Improvements:**
+    ✓ Relational queries
+    ✓ Vector search
+    ✓ Relationships
+
+    **Limitations:**
+    • Not graph-native
+    • Join complexity
+    • MCP dependency
+  end note
+}
+
+rectangle "Phase 3: Graph Storage (Current)" as phase3 #E8F5E8 {
+  database "Graphology +\nLevel" as graph
+
+  note bottom
+    **Benefits:**
+    ✓ Agent-agnostic
+    ✓ No MCP dependency
+    ✓ Native graph ops
+    ✓ Team isolation
+    ✓ Fast traversals
+    ✓ Backward compatible
+  end note
+}
+
+' Migration paths
+json1 -right-> sqlite : "Migration 1\n(2025-01)"
+sqlite -right-> graph : "Migration 2\n(2025-10)"
+
+' Components
+rectangle "Migration Tools" as tools #FFF9E6 {
+  component "migrate-to-db.js" as mig1
+  component "GraphMigrationService" as mig2
+}
+
+mig1 .up.> sqlite : creates
+mig2 .up.> graph : creates
+
+' Current state
+note right of phase3
+  **Current State**
+
+  Storage: Graphology + Level
+  Node ID: ${team}:${entityName}
+  Persistence: .data/knowledge-graph/
+  API: Backward compatible
+
+  **No longer using:**
+  ✗ MCP Memory server
+  ✗ SQLite for entities
+end note
+
+@enduml
