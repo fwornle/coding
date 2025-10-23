@@ -10,29 +10,13 @@ Previously, the LSL system was hardcoded to handle specific transcript formats. 
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Adaptive LSL System                     │
-├─────────────────────────────────────────────────────────────┤
-│  StreamingTranscriptReader                                  │
-│  ├─ extractExchangesFromBatch() [Entry Point]              │
-│  └─ legacyExtractExchangesFromBatch() [Fallback]           │
-├─────────────────────────────────────────────────────────────┤
-│  AdaptiveExchangeExtractor                                  │
-│  ├─ extractExchanges() [Main Logic]                        │
-│  ├─ getOrDetectFormat() [Caching]                          │
-│  └─ extractWithStrategy() [Format-Specific]                │
-├─────────────────────────────────────────────────────────────┤
-│  AdaptiveTranscriptFormatDetector                           │
-│  ├─ detectFormat() [Analysis Engine]                       │
-│  ├─ analyzeMessageBatch() [Pattern Recognition]            │
-│  ├─ generatePatternsFromAnalysis() [Schema Creation]       │
-│  └─ saveFormatsConfig() [Persistence]                      │
-├─────────────────────────────────────────────────────────────┤
-│  Configuration Storage                                      │
-│  └─ config/transcript-formats.json [Learned Schemas]       │
-└─────────────────────────────────────────────────────────────┘
-```
+![Adaptive LSL System Architecture](images/adaptive-lsl-system.png)
+
+The system consists of four layers:
+1. **Entry Point Layer** (StreamingTranscriptReader) - Entry points with automatic fallback
+2. **Extraction Layer** (AdaptiveExchangeExtractor) - Main logic with format detection and caching
+3. **Detection Layer** (AdaptiveTranscriptFormatDetector) - Pattern recognition and schema creation
+4. **Configuration Storage** - Persisted format schemas learned from real transcripts
 
 ## Key Components
 

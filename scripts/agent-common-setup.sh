@@ -47,6 +47,30 @@ ensure_specstory_logs_tracked() {
   fi
 }
 
+# Ensure .data/ directory is ignored in gitignore
+# This directory contains MCP Memory LevelDB files (volatile runtime data)
+ensure_data_directory_ignored() {
+  local project_dir="$1"
+  local gitignore_file="$project_dir/.gitignore"
+
+  # Create .gitignore if it doesn't exist
+  if [ ! -f "$gitignore_file" ]; then
+    touch "$gitignore_file"
+  fi
+
+  # Check if .data/ is already ignored
+  if ! grep -q "^\.data/" "$gitignore_file" 2>/dev/null; then
+    log "🔧 Adding .data/ to .gitignore (MCP Memory LevelDB runtime data)..."
+
+    # Add .data/ pattern to gitignore
+    echo "" >> "$gitignore_file"
+    echo "# MCP Memory LevelDB (volatile runtime data)" >> "$gitignore_file"
+    echo ".data/" >> "$gitignore_file"
+
+    log "✅ Added .data/ to .gitignore"
+  fi
+}
+
 # ==============================================================================
 # SESSION REMINDER
 # ==============================================================================
@@ -267,6 +291,9 @@ agent_common_init() {
   log "Target project: $target_project_dir"
   log "Coding services from: $coding_repo"
 
+  # Ensure .data/ directory is ignored (MCP Memory LevelDB runtime data)
+  ensure_data_directory_ignored "$target_project_dir"
+
   # Start robust transcript monitoring for target project
   if [ -d "$target_project_dir/.specstory" ] || mkdir -p "$target_project_dir/.specstory/history" 2>/dev/null; then
     start_transcript_monitoring "$target_project_dir" "$coding_repo"
@@ -292,6 +319,7 @@ agent_common_init() {
 # Export functions for use in agent-specific launchers
 export -f log
 export -f ensure_specstory_logs_tracked
+export -f ensure_data_directory_ignored
 export -f show_session_reminder
 export -f start_transcript_monitoring
 export -f start_statusline_health_monitor

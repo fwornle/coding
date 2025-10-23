@@ -13,7 +13,9 @@ Coding is an intelligent development infrastructure that:
 - **Accumulates** knowledge that improves over time
 - **Works** seamlessly with Claude Code, GitHub CoPilot, and other AI assistants
 
-![Unified Semantic Architecture](images/unified-semantic-architecture.png)
+![Coding System Architecture](images/coding-system-architecture.png)
+
+The complete architecture showing all core systems, knowledge management, MCP integrations, and storage layers.
 
 ---
 
@@ -194,17 +196,28 @@ Intelligent content classification for proper knowledge organization:
 
 **Learn more:** [LSL Classification System](core-systems/live-session-logging.md#reliablecodingclassifier)
 
-### Unified Memory Systems
+### Storage Architecture
 
-Three synchronized knowledge stores:
+The coding project uses a **three-tier storage architecture** optimized for different data types:
 
-- **MCP Memory** - Runtime graph database (fast, volatile)
-- **Graphology** - In-process graph (local analysis)
-- **shared-memory.json** - Persistent git-tracked storage
+1. **Graph Database** (Graphology + Level) - `.data/knowledge-graph/`
+   - **Primary knowledge storage** for entities and relations
+   - Used by both Continuous Learning (automatic) and UKB/VKB (manual)
+   - Persistent local storage (binary LevelDB format)
+   - Auto-persists every 5 seconds
 
-**SynchronizationAgent** ensures consistency across all three stores.
+2. **Qdrant Vector Database**
+   - Semantic similarity search via embeddings
+   - Written by Continuous Learning, queryable by UKB/VKB
+   - 384-dim (fast) and 1536-dim (accurate) collections
 
-**Learn more:** [Architecture Overview](architecture/README.md)
+3. **SQLite Analytics Database** - `.data/knowledge.db`
+   - Budget tracking, session metrics, embedding cache
+   - **NOT for knowledge storage** (moved to Graph DB as of 2025-10-22)
+
+**Optional**: Manual export to `shared-memory-*.json` for git-tracked team collaboration.
+
+**Learn more:** [Storage Architecture](architecture/memory-systems.md) | [Knowledge Management](knowledge-management/README.md)
 
 ---
 

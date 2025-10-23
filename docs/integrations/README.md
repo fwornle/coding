@@ -88,24 +88,12 @@ Each integration component:
 
 ### How Integrations Connect
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Coding Core System                      │
-│                                                               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │     LSL      │  │  Trajectory  │  │  Constraint  │      │
-│  │    System    │  │  Generation  │  │  Monitoring  │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-         │                    │                    │
-         │ MCP Protocol       │ Direct Call        │ PreToolUse Hook
-         │                    │                    │
-    ┌────▼─────┐         ┌───▼────┐          ┌────▼─────┐
-    │ Semantic │         │Serena  │          │Constraint│
-    │ Analysis │         │  AST   │          │ Monitor  │
-    └──────────┘         └────────┘          └──────────┘
-         MCP                 MCP                  MCP
-```
+![Integration Architecture](../images/integration-architecture.png)
+
+The core systems (LSL, Trajectory, Constraint Monitoring) communicate with MCP integrations through different protocols:
+- **MCP Protocol**: Semantic Analysis
+- **Direct Call**: Serena AST
+- **PreToolUse Hook**: Constraint Monitor
 
 ### Communication Protocols
 

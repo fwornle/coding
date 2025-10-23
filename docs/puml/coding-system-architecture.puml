@@ -1,0 +1,112 @@
+@startuml
+!include _standard-style.puml
+
+title Coding Project - Complete System Architecture
+
+' User/AI Assistant Layer
+actor "Developer" as dev
+actor "AI Assistant\n(Claude/Copilot/etc)" as ai
+
+' Core Systems
+package "Core Systems" as core #E8F5E8 {
+  [Live Session Logging\n(LSL)] as lsl <<core>>
+  [Constraint Monitoring] as constraints <<core>>
+  [Trajectory Generation] as trajectory <<core>>
+  [Status Line System] as status <<core>>
+}
+
+' Knowledge Management
+package "Knowledge Management" as km #FFF9E6 {
+  [Knowledge Extractor\n(Continuous Learning)] as extractor <<core>>
+  [UKB CLI\n(Manual Capture)] as ukb <<cli>>
+  [VKB Server\n(Visualization)] as vkb <<api>>
+}
+
+' MCP Integration Layer
+package "MCP Integrations" as mcp #E0E7FF {
+  [Semantic Analysis\n(11 Agents)] as semantic <<mcp>>
+  [Constraint Monitor\n(Dashboard)] as mcp_constraints <<mcp>>
+  [Serena AST\n(Code Analysis)] as serena <<mcp>>
+  [Browser Access\n(Stagehand)] as browser <<mcp>>
+  [Spec Workflow] as spec_workflow <<mcp>>
+}
+
+' Storage Layer
+package "Storage Layer" as storage #F5F5F5 {
+  database "Graph Database\n(Graphology + Level)\n.data/knowledge-graph/" as graphdb <<storage>>
+  database "Qdrant\n(Vector Search)" as qdrant <<storage>>
+  database "SQLite\n(Analytics)\n.data/knowledge.db" as sqlite <<storage>>
+}
+
+' File Outputs
+folder ".specstory/history/" as lsl_logs #F0F0F0
+folder ".spec-workflow/" as spec_files #F0F0F0
+file "shared-memory-*.json\n(manual export)" as json #F0F0F0
+
+' User interactions
+dev -down-> ai : uses
+ai -down-> lsl : all interactions
+ai -down-> constraints : tool calls
+ai -down-> ukb : manual insights
+
+' Core system flows
+lsl -down-> extractor : classified content
+lsl -right-> lsl_logs : session logs
+constraints -down-> mcp_constraints : violations
+trajectory -down-> semantic : deep analysis
+
+' Knowledge flows
+extractor -down-> graphdb : entities/relations
+extractor -down-> qdrant : embeddings
+ukb -down-> graphdb : entities/relations
+vkb -up-> graphdb : queries
+vkb -up-> qdrant : semantic search
+
+' MCP integrations
+semantic -down-> graphdb : insights
+spec_workflow -down-> spec_files : requirements/design/tasks
+
+' Analytics
+lsl -down-> sqlite : session metrics
+constraints -down-> sqlite : violations
+extractor -down-> sqlite : budget tracking
+
+' Status monitoring
+status -up-> lsl : monitors
+status -up-> constraints : monitors
+status -up-> trajectory : monitors
+
+' Optional export
+graphdb -right-> json : manual export\n(ukb export)
+
+' Notes
+note right of graphdb
+  **PRIMARY KNOWLEDGE STORAGE**
+  • Both auto & manual knowledge
+  • Team-scoped (team:entity)
+  • Persistent (Level DB)
+  • Auto-saves every 5s
+end note
+
+note right of sqlite
+  **ANALYTICS ONLY**
+  • Budget tracking
+  • Session metrics
+  • Embedding cache
+  • NOT knowledge storage
+end note
+
+note right of json
+  **OPTIONAL**
+  Manual export only
+  Not automatic
+  For git tracking
+end note
+
+note bottom of mcp
+  **Extension Point**
+  Additional MCP servers
+  can be added as needed
+end note
+
+@enduml

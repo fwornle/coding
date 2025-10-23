@@ -1,0 +1,37 @@
+@startuml
+!include _standard-style.puml
+
+title Integration Architecture - How Components Connect
+
+package "Coding Core System" as core #E8F5E8 {
+  [LSL\nSystem] as lsl <<core>>
+  [Trajectory\nGeneration] as trajectory <<core>>
+  [Constraint\nMonitoring] as constraints <<core>>
+}
+
+package "MCP Integration Layer" as mcp #E0E7FF {
+  [Semantic\nAnalysis] as semantic <<mcp>>
+  [Serena\nAST] as serena <<mcp>>
+  [Constraint\nMonitor] as monitor <<mcp>>
+}
+
+' Connections
+lsl -down-> semantic : MCP Protocol
+trajectory -down-> serena : Direct Call
+constraints -down-> monitor : PreToolUse Hook
+
+note bottom of mcp
+  **MCP Servers** provide:
+  • Standardized tool definitions
+  • Bi-directional communication
+  • Resource and prompt support
+end note
+
+note right of core
+  **Core Systems** use integrations for:
+  • Deep code analysis (Semantic)
+  • AST-based navigation (Serena)
+  • Quality enforcement (Monitor)
+end note
+
+@enduml

@@ -78,10 +78,12 @@ note right of sqlite
 end note
 
 note right of json
-  **Export/Backup Format**
-  Git-tracked snapshots
-  Team collaboration
-  Export from Graph DB
+  **Manual Export Only**
+  Optional git-tracked backups
+  Requires explicit command:
+  ukb export <file> --team <team>
+
+  NOT automatic
 end note
 
 @enduml

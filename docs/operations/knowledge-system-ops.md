@@ -21,14 +21,14 @@
 
 ## Overview
 
-**Scope**: This operations guide covers both the **Continuous Learning Knowledge System** (automatic real-time learning) and the **UKB/VKB system** (manual knowledge capture). As of 2025-10-22, both systems share the same Graph Database for knowledge storage.
+**Scope**: This operations guide covers both the **Continuous Learning Knowledge System** (automatic real-time learning) and the **UKB/VKB system** (manual knowledge capture). Both systems share the same Graph Database for knowledge storage.
 
-### System Architecture (Current State)
+### System Architecture
 
 The knowledge management system consists of the following operational components:
 
 1. **Graph Database (Shared)** - Graphology + Level at `.data/knowledge-graph/`
-   - **Used by**: Both Continuous Learning AND UKB/VKB
+   - **Used by**: Both Continuous Learning and UKB/VKB
    - **Stores**: All knowledge entities and relations
    - **Persistence**: Automatic file-based persistence
 
@@ -38,7 +38,7 @@ The knowledge management system consists of the following operational components
 
 3. **SQLite Analytics Database** - Analytics only at `.data/knowledge.db`
    - **Stores**: Budget events, session metrics, embedding cache
-   - **Does NOT store**: Knowledge entities or relations (moved to Graph DB)
+   - **Does NOT store**: Knowledge entities or relations (stored in Graph DB)
 
 4. **Unified Inference Engine** - Multi-provider LLM inference with circuit breaker
 5. **Knowledge Extraction Pipeline** - Real-time and batch extraction (writes to Graph DB)
