@@ -21,13 +21,14 @@ import Graph from 'graphology';
 import { Level } from 'level';
 import fs from 'fs/promises';
 import path from 'path';
+import { getKnowledgeGraphPath } from './knowledge-paths.js';
 
 export class GraphDatabaseService extends EventEmitter {
   /**
    * Create a GraphDatabaseService instance
    *
    * @param {Object} options - Configuration options
-   * @param {string} [options.dbPath='.data/knowledge-graph'] - Path to Level database
+   * @param {string} [options.dbPath] - Path to Level database (defaults to central coding/.data/knowledge-graph)
    * @param {Object} [options.config={}] - Graph database configuration
    * @param {boolean} [options.config.autoPersist=true] - Auto-persist graph changes
    * @param {number} [options.config.persistIntervalMs=1000] - Persistence interval
@@ -37,7 +38,9 @@ export class GraphDatabaseService extends EventEmitter {
   constructor(options = {}) {
     super();
 
-    this.dbPath = options.dbPath || '.data/knowledge-graph';
+    // CRITICAL: Always use central database in coding/.data/knowledge-graph
+    // This ensures ALL projects share the same knowledge base
+    this.dbPath = options.dbPath || getKnowledgeGraphPath();
     this.config = options.config || {};
 
     // Graph instance (will be initialized in initialize())

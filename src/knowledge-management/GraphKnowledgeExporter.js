@@ -18,6 +18,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { getKnowledgeExportPath, getKnowledgeConfigPath } from './knowledge-paths.js';
 
 export class GraphKnowledgeExporter {
   /**
@@ -33,8 +34,9 @@ export class GraphKnowledgeExporter {
    */
   constructor(graphService, options = {}) {
     this.graphService = graphService;
-    this.exportDir = options.exportDir || path.join(process.cwd(), '.data', 'knowledge-export');
-    this.configPath = options.configPath || path.join(process.cwd(), '.data', 'knowledge-config.json');
+    // CRITICAL: Always use central export directory in coding/.data/knowledge-export
+    this.exportDir = options.exportDir || getKnowledgeExportPath();
+    this.configPath = options.configPath || getKnowledgeConfigPath();
     this.debounceMs = options.debounceMs !== undefined ? options.debounceMs : 5000;
     this.autoExport = options.autoExport !== false;
     this.prettyFormat = options.prettyFormat !== false;
