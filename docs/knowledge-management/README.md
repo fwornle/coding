@@ -128,13 +128,14 @@ ukb
 # Capture architectural decisions
 ukb --interactive
 
-# Share via git
-git add shared-memory*.json
+# Share via git (auto-export creates JSON)
+git add .data/knowledge-export/
 git commit -m "docs: update knowledge base"
 git push
 
 # Team members get updates
 git pull
+# Auto-import loads new knowledge on next session
 vkb restart  # Refresh visualization
 ```
 
@@ -191,11 +192,15 @@ Orchestrated analysis workflows for comprehensive knowledge gathering:
 The system automatically creates domain-specific knowledge bases for multi-project teams:
 
 ```
-/Users/<username>/Agentic/coding/
-├── shared-memory-coding.json     # Cross-team patterns
-├── shared-memory-raas.json       # RaaS domain knowledge
-├── shared-memory-ui.json         # UI team knowledge
-└── shared-memory-resi.json       # Resilience team knowledge
+/Users/<username>/Agentic/coding/.data/
+├── knowledge-export/
+│   ├── coding.json              # Cross-team patterns (git-tracked)
+│   ├── resi.json                # Resilience team knowledge (git-tracked)
+│   ├── ui.json                  # UI team knowledge (git-tracked)
+│   └── raas.json                # RaaS domain knowledge (git-tracked)
+├── knowledge-graph/             # Binary LevelDB (gitignored)
+│   └── [binary files]
+└── knowledge-config.json        # Team configuration (git-tracked)
 ```
 
 **Benefits:**
@@ -207,15 +212,20 @@ The system automatically creates domain-specific knowledge bases for multi-proje
 ### Creating Domain Knowledge Base
 
 ```bash
-# Navigate to domain project directory
-cd /path/to/raas-project
+# Configure team in knowledge-config.json first
+cd /Users/<username>/Agentic/coding
+# Edit .data/knowledge-config.json to add team
 
-# First ukb command automatically creates domain-specific file
-ukb --list-entities
-# Creates: /Users/<username>/Agentic/coding/shared-memory-raas.json
+# Or use graph-sync to import from JSON
+graph-sync import raas
 
 # Add domain entity
 ukb --interactive
+# Auto-exports to: .data/knowledge-export/raas.json
+
+# Commit and share
+git add .data/knowledge-export/raas.json
+git commit -m "docs: add RaaS domain knowledge"
 ```
 
 ---
@@ -349,6 +359,100 @@ The knowledge management system uses a **graph-first storage architecture** that
 - ✅ **Fast**: In-memory graph operations
 - ✅ **Backward compatible**: API matches previous SQLite format
 
+### Git-Tracked JSON Exports (Phase 4 - Current)
+
+**NEW**: As of October 2025, the system supports **bidirectional JSON persistence** for team collaboration via git:
+
+```
+.data/
+├── knowledge-graph/           # LevelDB binary files (gitignored)
+│   ├── CURRENT
+│   ├── LOCK
+│   ├── LOG
+│   └── MANIFEST-*
+├── knowledge-export/          # Git-tracked JSON (for PR review)
+│   ├── coding.json
+│   ├── resi.json
+│   └── ui.json
+└── knowledge-config.json      # Team configuration (git-tracked)
+```
+
+**Key Benefits**:
+- ✅ **Human-readable diffs**: Pretty JSON for PR reviews
+- ✅ **Team collaboration**: Share knowledge via git push/pull
+- ✅ **Version control**: Full git history of knowledge evolution
+- ✅ **Conflict resolution**: Newest-wins automatic merging
+- ✅ **Manual control**: CLI tool for export/import/sync operations
+
+**Storage Strategy**:
+1. **Runtime**: Fast binary LevelDB for performance
+2. **Git tracking**: Pretty JSON exports for collaboration
+3. **Automatic sync**: Auto-export on changes (5s debounce)
+4. **Manual control**: `graph-sync` CLI for operations
+
+**CLI Commands**:
+```bash
+# View sync status
+graph-sync status
+
+# Export team knowledge to JSON
+graph-sync export coding
+
+# Import team knowledge from JSON
+graph-sync import coding
+
+# Full bi-directional sync
+graph-sync sync
+
+# Import all teams on startup (automatic)
+# Export happens auto (debounced 5s after changes)
+```
+
+**Team Configuration** (`.data/knowledge-config.json`):
+```json
+{
+  "version": "1.0.0",
+  "defaultTeam": "coding",
+  "teams": {
+    "coding": {
+      "exportPath": ".data/knowledge-export/coding.json",
+      "description": "Coding project infrastructure and patterns",
+      "enabled": true
+    }
+  },
+  "export": {
+    "format": "pretty-json",
+    "autoExport": true,
+    "debounceMs": 5000
+  },
+  "import": {
+    "autoImportOnStartup": true,
+    "conflictResolution": "newest-wins"
+  }
+}
+```
+
+**Collaboration Workflow**:
+```bash
+# Developer A: Capture new insights
+ukb --interactive
+# Auto-export creates .data/knowledge-export/coding.json
+
+# Commit and push
+git add .data/knowledge-export/
+git commit -m "docs: add API design pattern"
+git push
+
+# Developer B: Get updates
+git pull
+# Auto-import on next coding session loads new knowledge
+```
+
+**Migration from shared-memory-*.json**:
+- Old files: `shared-memory-coding.json` → New: `.data/knowledge-export/coding.json`
+- Automatic migration during Phase 2 implementation
+- Same JSON structure, new location for centralized management
+
 ### Data Flow
 
 ![Knowledge Management Data Flow](../images/graph-storage-data-flow.png)
@@ -401,13 +505,22 @@ GET /api/entities?team=coding
 - Complex joins for relationships
 - MCP Memory dependency
 
-**Phase 3: Graph DB + Qdrant** (Current - October 2025)
+**Phase 3: Graph DB + Qdrant** (October 2025)
 - Native graph database (Graphology + Level) for entities/relations
 - Qdrant for vector search
 - Agent-agnostic architecture
 - No MCP Memory dependency
 - Team isolation via node IDs
 - SQLite retained for analytics only (budget, sessions, cache)
+
+**Phase 4: Git-Tracked JSON Exports** (Current - October 2025)
+- Bidirectional JSON persistence (LevelDB ↔ JSON)
+- Git-tracked exports for team collaboration
+- Pretty JSON format for PR reviews
+- Auto-import on startup, auto-export on changes
+- Manual control via `graph-sync` CLI
+- Conflict resolution (newest-wins)
+- Centralized at `.data/knowledge-export/*.json`
 
 ### Node ID Pattern
 
@@ -470,9 +583,23 @@ This ensures:
 ```
 
 **Storage Responsibilities**:
-- **Graph DB**: All knowledge entities and relations
+- **Graph DB** (`.data/knowledge-graph/`): Runtime binary storage (LevelDB)
+- **JSON Exports** (`.data/knowledge-export/*.json`): Git-tracked team knowledge
 - **Qdrant**: Vector embeddings for semantic search
 - **SQLite**: Analytics only (no knowledge tables)
+
+**Gitignore Configuration**:
+```gitignore
+# Ignore binary database files
+.data/knowledge-graph/
+.data/knowledge.db*
+.data/backups/
+
+# Track JSON exports and config
+!.data/
+!.data/knowledge-export/
+!.data/knowledge-config.json
+```
 
 ---
 
@@ -482,6 +609,7 @@ This ensures:
 
 - **[UKB - Update Knowledge Base](./ukb-update.md)** - Complete UKB documentation with API reference and use cases
 - **[VKB - Visualize Knowledge Base](./vkb-visualize.md)** - Complete VKB documentation with server management and API reference
+- **[graph-sync - Synchronization Tool](./graph-sync.md)** - Bidirectional sync between LevelDB and git-tracked JSON
 - **[Knowledge Workflows](./workflows.md)** - Orchestrated analysis workflows and cross-project learning
 
 ### Integration Documentation

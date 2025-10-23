@@ -108,12 +108,15 @@ PreToolUse hook integration for real-time code quality enforcement:
 
 ### Knowledge Management
 
-Capture, organize, and visualize development insights:
+Capture, organize, and visualize development insights with git-based team collaboration:
 
 - **UKB (Update Knowledge Base)**: Auto git analysis + interactive capture
 - **VKB (Visualize Knowledge Base)**: Web-based graph visualization
-- **Graph Database**: Agent-agnostic persistent knowledge storage (Graphology + Level)
-- **Cross-Project Learning**: Share patterns across multiple projects
+- **Graph Database**: Agent-agnostic persistent storage (Graphology + Level)
+- **Git-Tracked JSON**: Team collaboration via pretty JSON exports
+- **graph-sync CLI**: Manual export/import/status operations
+- **Auto-Sync**: Import on startup, export on changes (5s debounce)
+- **Team Isolation**: Multi-team support with conflict resolution
 - **Domain-Specific**: Automatic domain knowledge bases per team
 
 **Status**: ✅ Production Ready
@@ -153,6 +156,12 @@ ukb --interactive
 vkb
 
 # View at http://localhost:8080
+
+# Manual sync operations
+graph-sync status      # View sync status
+graph-sync export      # Export all teams to JSON
+graph-sync import      # Import all teams from JSON
+graph-sync sync        # Full bidirectional sync
 ```
 
 ### Constraint Monitoring
