@@ -58,16 +58,37 @@ ensure_data_directory_ignored() {
     touch "$gitignore_file"
   fi
 
-  # Check if .data/ is already ignored
-  if ! grep -q "^\.data/" "$gitignore_file" 2>/dev/null; then
-    log "🔧 Adding .data/ to .gitignore (MCP Memory LevelDB runtime data)..."
+  # Check if the granular .data/ patterns are already present
+  if ! grep -q "^\.data/knowledge-graph/" "$gitignore_file" 2>/dev/null; then
+    log "🔧 Adding .data/ patterns to .gitignore (ignore binary DB, track JSON exports)..."
 
-    # Add .data/ pattern to gitignore
+    # Remove old blanket .data/ ignore if present
+    if grep -q "^\.data/$" "$gitignore_file" 2>/dev/null; then
+      # Use sed to remove the old pattern (cross-platform compatible)
+      if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' '/^\.data\/$/d' "$gitignore_file"
+      else
+        sed -i '/^\.data\/$/d' "$gitignore_file"
+      fi
+      log "  Removed old blanket .data/ pattern"
+    fi
+
+    # Add granular .data/ patterns to gitignore
     echo "" >> "$gitignore_file"
     echo "# MCP Memory LevelDB (volatile runtime data)" >> "$gitignore_file"
-    echo ".data/" >> "$gitignore_file"
+    echo "# Ignore binary database files, but track JSON exports" >> "$gitignore_file"
+    echo ".data/knowledge-graph/" >> "$gitignore_file"
+    echo ".data/knowledge.db" >> "$gitignore_file"
+    echo ".data/knowledge.db-shm" >> "$gitignore_file"
+    echo ".data/knowledge.db-wal" >> "$gitignore_file"
+    echo ".data/backups/" >> "$gitignore_file"
+    echo "" >> "$gitignore_file"
+    echo "# Track knowledge exports (git-reviewable JSON)" >> "$gitignore_file"
+    echo "!.data/" >> "$gitignore_file"
+    echo "!.data/knowledge-export/" >> "$gitignore_file"
+    echo "!.data/knowledge-config.json" >> "$gitignore_file"
 
-    log "✅ Added .data/ to .gitignore"
+    log "✅ Added granular .data/ patterns to .gitignore"
   fi
 }
 
