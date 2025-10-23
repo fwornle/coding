@@ -1,0 +1,96 @@
+@startuml cross-project-knowledge-flow
+!include _standard-style.puml
+
+title Cross-Project Knowledge Flow (Dual Capture System)
+
+package "AUTOMATIC: Continuous Learning (Real-Time)" as automatic {
+  rectangle "Live Coding\nSession (LSL)" as session
+  rectangle "StreamingKnowledge\nExtractor" as extractor
+  note right of extractor
+    - Auto-classifies exchanges
+    - Budget-aware ($8.33/month)
+    - Privacy-first (local models)
+    - Zero user effort
+  end note
+}
+
+package "MANUAL: UKB (Deliberate Insights)" as manual {
+  rectangle "Developer\nReflection" as reflection
+  rectangle "ukb --interactive" as ukb
+  note right of ukb
+    - Structured capture
+    - Architectural decisions
+    - Deep insights
+    - Team knowledge sharing
+  end note
+}
+
+database "Central Graph DB\n(coding/.data/knowledge-graph/)" as graphdb {
+  rectangle "LevelDB\n(Binary Storage)" as leveldb
+  rectangle "Graphology\n(In-Memory Graph)" as graphology
+  note bottom of graphdb
+    **Team Isolation**
+    Node ID: ${team}:${entityName}
+
+    Examples:
+    - curriculum:AuthSolution
+    - coding:APIPattern
+    - nano-degree:TestStrategy
+  end note
+}
+
+storage "Git-Tracked\nJSON Exports" as exports {
+  file "coding.json" as coding_json
+  file "curriculum.json" as curriculum_json
+  file "nano-degree.json" as nano_json
+  note bottom of exports
+    - Pretty JSON (human-readable)
+    - Auto-export (5s debounce)
+    - Auto-import on startup
+    - Newest-wins conflict resolution
+  end note
+}
+
+cloud "Team\nCollaboration" as team {
+  actor "Developer A" as dev_a
+  actor "Developer B" as dev_b
+  note right of team
+    Standard git workflow:
+    1. git add .data/knowledge-export/
+    2. git commit -m "docs: update KB"
+    3. git push
+    4. git pull (team gets updates)
+  end note
+}
+
+package "RETRIEVAL: All Projects Access Same Knowledge" as retrieval {
+  rectangle "curriculum-\nalignment" as curr_proj
+  rectangle "nano-degree" as nano_proj
+  rectangle "coding" as coding_proj
+  note bottom of retrieval
+    **Single Database Per Machine**
+    All projects resolve to:
+    coding/.data/knowledge-graph/
+
+    via CODING_TOOLS_PATH env var
+  end note
+}
+
+' Automatic flow
+session -down-> extractor : "auto-extract\n(real-time)"
+extractor -down-> graphdb : "storeEntity()\nteam prefix"
+
+' Manual flow
+reflection -down-> ukb : "interactive\ncapture"
+ukb -down-> graphdb : "storeEntity()\nteam prefix"
+
+' Export flow
+graphdb -down-> exports : "Auto-Export\n(debounced 5s)"
+exports -down-> team : "git push"
+team -down-> exports : "git pull"
+
+' Retrieval flow
+exports -down-> graphdb : "Auto-Import\n(on startup)"
+graphdb -down-> retrieval : "shared\nknowledge"
+
+@enduml

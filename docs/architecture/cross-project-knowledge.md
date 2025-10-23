@@ -6,12 +6,94 @@ The coding project serves as a central knowledge hub that provides cross-project
 
 ## Architecture
 
-### Knowledge Flow
+### Knowledge Flow (Dual Capture System)
+
+![Cross-Project Knowledge Flow](../images/cross-project-knowledge-flow.png)
+
+The system provides **two complementary paths** for knowledge capture:
+
+1. **Automatic (Continuous Learning)**: Real-time extraction from live coding sessions via StreamingKnowledgeExtractor
+2. **Manual (UKB)**: Deliberate, structured capture via interactive CLI tool
+
+Both paths converge at the central graph database, ensuring all knowledge is available across all projects.
+
+### Dual Knowledge Capture System
+
+The system captures knowledge through **TWO complementary approaches**:
+
+#### 1. **Automatic: Continuous Learning (Real-Time)**
+
+**What**: Automatic extraction during live coding sessions
+**When**: As you code, in real-time
+**How**: `StreamingKnowledgeExtractor` monitors LSL transcript
+**Storage**: `GraphDatabaseService.storeEntity()` → central graph DB
+
+**Example Flow**:
+```javascript
+// During your coding session:
+User: "How do I implement authentication?"
+Assistant: [provides solution]
+
+// StreamingKnowledgeExtractor automatically:
+1. Classifies exchange type (solution/pattern/problem)
+2. Extracts key knowledge
+3. Stores to: coding/.data/knowledge-graph/
+   with node ID: "curriculum:AuthenticationSolution"
+4. Auto-exports to: coding/.data/knowledge-export/curriculum.json
 ```
-Project Work → Insights → ukb → Central Graph DB (.data/knowledge-graph/) → git exports → Team
-     ↓                            ↑
-All Projects ←──────────────────┘
+
+**Benefits**:
+- ✅ Zero effort - happens automatically
+- ✅ Captures in-the-moment context
+- ✅ Budget-aware ($8.33/month limit)
+- ✅ Privacy-first (sensitive data → local models)
+
+**See**: [Continuous Learning System Documentation](../knowledge-management/continuous-learning-system.md)
+
+#### 2. **Manual: UKB (Deliberate Insight Capture)**
+
+**What**: Explicit capture of architectural decisions and deep insights
+**When**: End of session, after solving complex problems
+**How**: Interactive CLI tool (`ukb --interactive`)
+**Storage**: Same `GraphDatabaseService.storeEntity()` → central graph DB
+
+**Example Flow**:
+```bash
+# After solving a complex problem:
+ukb --interactive
+
+# Prompts you for:
+- Entity type (Pattern/Solution/Architecture/etc.)
+- Name and description
+- Significance (1-10)
+- Related entities
+- Deep context and rationale
+
+# Stores to same central database
+# Same auto-export mechanism
 ```
+
+**Benefits**:
+- ✅ Deep, structured insights
+- ✅ Architectural decision records
+- ✅ Team-wide knowledge sharing
+- ✅ Deliberate, high-quality capture
+
+**See**: [UKB Documentation](../knowledge-management/ukb-update.md)
+
+#### Why Both Systems?
+
+| Aspect | Continuous Learning | UKB Manual |
+|--------|-------------------|------------|
+| **Capture** | Automatic, real-time | Manual, deliberate |
+| **Quality** | Good, contextual | Excellent, structured |
+| **Effort** | Zero | Moderate |
+| **Use Case** | In-the-moment solutions | Architectural decisions |
+| **Timing** | During coding | After reflection |
+
+**Result**: Comprehensive knowledge base with both breadth (automatic) and depth (manual).
+
+---
 
 ### Key Components
 
@@ -70,9 +152,30 @@ vkb                # SAME database: coding/.data/knowledge-graph/
 
 **Result**: ALL projects share the same knowledge base, isolated by team via node IDs.
 
-### 3. Capturing New Knowledge
+### 3. Capturing New Knowledge (Dual System)
 
-When you discover something valuable:
+#### Automatic Capture (Continuous Learning)
+
+**Happens automatically during every coding session:**
+
+```bash
+# Just code normally - knowledge extraction happens automatically!
+cd /Users/you/Agentic/curriculum-alignment
+coding --claude
+
+# As you interact with Claude:
+# - StreamingKnowledgeExtractor monitors LSL transcript
+# - Classifies exchanges (solution/pattern/problem/insight)
+# - Extracts knowledge in real-time
+# - Stores to central graph DB
+# - Auto-exports to JSON (5s debounce)
+```
+
+**No user action required** - runs in background with budget limits.
+
+#### Manual Capture (UKB)
+
+**For deliberate, structured insights:**
 
 ```bash
 # Automatic capture from git commits
@@ -82,10 +185,15 @@ ukb --auto
 ukb --interactive
 ```
 
-Knowledge is stored in central graph DB with team prefix:
+#### Storage Pattern
+
+**Both systems** store to central graph DB with team prefix:
 
 - Working in curriculum-alignment → stores as `curriculum:EntityName`
 - Working in coding → stores as `coding:EntityName`
+- Working in nano-degree → stores as `nano-degree:EntityName`
+
+**Same database, same export mechanism, different capture methods.**
 
 ### 4. Knowledge Persistence
 
