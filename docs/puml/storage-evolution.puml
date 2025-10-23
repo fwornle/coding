@@ -1,77 +1,82 @@
 @startuml
 !include _standard-style.puml
 
-title Knowledge Storage Evolution
+title Current Knowledge Storage Architecture
 
-!define PHASE_BOX(name, description) rectangle name #FAFAFA {\n  note as N##name\n    description\n  end note\n}
+rectangle "Graph Storage System" as current #E8F5E8 {
+  database "Graphology\n(In-Memory)" as graphology
+  database "Level v10.0.0\n(Persistent)" as level
+  file "shared-memory-*.json\n(Git-Tracked)" as json
 
-rectangle "Phase 1: JSON Storage" as phase1 #FFE8F4 {
-  file "shared-memory.json" as json1
-  note bottom of json1
-    **Limitations:**
-    • Manual persistence
-    • No relationships
-    • Hard to query
-    • File conflicts
+  graphology -down-> level : persist to disk\n(atomic writes)
+  graphology <-right-> json : auto-sync\n(5s debounce)
+
+  note bottom of graphology
+    **In-Memory Graph**
+    • Fast graph operations
+    • Multi-graph support
+    • Rich algorithms
+    • Event-driven updates
+  end note
+
+  note bottom of level
+    **Persistent Storage**
+    • Key-value storage
+    • Atomic operations
+    • File-based
+    • .data/knowledge-graph/
+  end note
+
+  note bottom of json
+    **Git-Tracked Exports**
+    • Auto-export on changes
+    • Auto-import on startup
+    • Team collaboration
+    • .data/knowledge-export/*.json
   end note
 }
-
-rectangle "Phase 2: SQLite + Qdrant" as phase2 #E8F4FD {
-  database "SQLite" as sqlite
-  database "Qdrant" as qdrant
-
-  note bottom
-    **Improvements:**
-    ✓ Relational queries
-    ✓ Vector search
-    ✓ Relationships
-
-    **Limitations:**
-    • Not graph-native
-    • Join complexity
-    • MCP dependency
-  end note
-}
-
-rectangle "Phase 3: Graph Storage (Current)" as phase3 #E8F5E8 {
-  database "Graphology +\nLevel" as graph
-
-  note bottom
-    **Benefits:**
-    ✓ Agent-agnostic
-    ✓ No MCP dependency
-    ✓ Native graph ops
-    ✓ Team isolation
-    ✓ Fast traversals
-    ✓ Backward compatible
-  end note
-}
-
-' Migration paths
-json1 -right-> sqlite : "Migration 1\n(2025-01)"
-sqlite -right-> graph : "Migration 2\n(2025-10)"
 
 ' Components
-rectangle "Migration Tools" as tools #FFF9E6 {
-  component "migrate-to-db.js" as mig1
-  component "GraphMigrationService" as mig2
+package "Core Services" as services #E8F4FD {
+  component "GraphDatabaseService" as graphdb <<core>>
+  component "GraphKnowledgeExporter" as exporter <<sync>>
+  component "GraphKnowledgeImporter" as importer <<sync>>
 }
 
-mig1 .up.> sqlite : creates
-mig2 .up.> graph : creates
+graphdb -down-> graphology : manages
+exporter -down-> json : exports
+importer -down-> json : imports
 
-' Current state
-note right of phase3
-  **Current State**
+note right of services
+  **Service Architecture**
 
-  Storage: Graphology + Level
-  Node ID: ${team}:${entityName}
-  Persistence: .data/knowledge-graph/
-  API: Backward compatible
+  GraphDatabaseService:
+  • Primary graph interface
+  • Event emitter (entity:stored, etc.)
+  • Team-scoped operations
 
-  **No longer using:**
-  ✗ MCP Memory server
-  ✗ SQLite for entities
+  GraphKnowledgeExporter:
+  • Auto-export (default: true)
+  • Debounced (5s after changes)
+  • Event-driven triggers
+
+  GraphKnowledgeImporter:
+  • Auto-import on startup
+  • Newest-wins conflict resolution
+  • Team isolation
+end note
+
+' Current features
+note left of current
+  **Key Features**
+  ✓ Agent-agnostic
+  ✓ No MCP dependency
+  ✓ Native graph operations
+  ✓ Team isolation (team:entity)
+  ✓ Fast graph traversals
+  ✓ Automatic bidirectional sync
+  ✓ Git-tracked collaboration
+  ✓ Backward compatible API
 end note
 
 @enduml

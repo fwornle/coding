@@ -11,7 +11,7 @@
 | Document | Purpose | Audience |
 |----------|---------|----------|
 | **[System Comparison](system-comparison.md)** | **START HERE** - Understand all three knowledge systems | All users |
-| **[Continuous Learning System](continuous-learning-system.md)** | Real-time session learning (NEW) | Developers |
+| **[Continuous Learning System](continuous-learning-system.md)** | Real-time session learning | Developers |
 | **UKB/VKB** (this document) | Manual knowledge capture & visualization | Team leads |
 | **[MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)** | Deep code analysis with 11 agents | Architects |
 

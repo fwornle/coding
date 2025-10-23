@@ -29,20 +29,15 @@ package "Graph Storage Layer" {
   [GraphDatabaseService] <<core>>
 }
 
-package "Legacy Systems (Removed)" {
-  [MCP Memory Server] <<external>> #lightgray
-  note bottom of [MCP Memory Server]
-    REMOVED - Agent lock-in
-    Replaced with graph storage
-  end note
-}
-
 package "Client Access" {
   actor "Claude Code" as claude <<agent>>
   actor "Copilot" as copilot <<agent>>
   actor "Cursor" as cursor <<agent>>
   actor "Any AI Agent" as agent <<agent>>
 }
+
+' Git-tracked JSON exports (MANDATORY bidirectional sync)
+file ".data/knowledge-export/*.json\n(Git-Tracked - MANDATORY)" as json
 
 ' Data flow
 [UKB CLI] -down-> [Knowledge Workflows] : Create/Query
@@ -51,6 +46,7 @@ package "Client Access" {
 
 [GraphDatabaseService] -down-> graphology : In-memory graph
 graphology -down-> level : Persist to disk
+[GraphDatabaseService] <-right-> json : MANDATORY auto-sync\n(5s debounce)
 
 ' Client access
 claude -up-> [UKB CLI] : Command line
@@ -76,6 +72,15 @@ note left of graphology
   ✓ Works with any AI
   ✓ Team isolation
   ✓ Persistent storage
+end note
+
+note right of json
+  **MANDATORY Bidirectional Sync**
+  REQUIRED for team collaboration
+  Auto-export: 5s after changes
+  Auto-import: on startup
+  Cross-project persistence
+  .data/knowledge-export/*.json
 end note
 
 @enduml
