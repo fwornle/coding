@@ -18,6 +18,7 @@ end box
 box "Storage Layer" #FFF9E6
   database "Graphology\n(Memory)" as graph
   database "Level\n(Disk)" as disk
+  participant "shared-memory-*.json\n(Git-Tracked)" as json <<file>>
 end box
 
 ' Entity creation flow
@@ -47,6 +48,25 @@ note right
 end note
 
 graphdb --> dbmgr : entity stored
+deactivate graphdb
+
+' Automatic export (MANDATORY - debounced)
+graphdb -> graphdb : schedule export\n(5s debounce)
+activate graphdb
+note right
+  Event: entity:stored
+  MANDATORY auto-export
+  after 5 second delay
+  (required for git sync)
+end note
+
+graphdb -> json : write JSON\n(.data/knowledge-export/)
+note right
+  MANDATORY automatic export
+  for git-tracked
+  team collaboration
+  (cross-project persistence)
+end note
 deactivate graphdb
 
 dbmgr --> ukb : success
@@ -86,5 +106,35 @@ deactivate dbmgr
 
 vkb --> dev : Entity list
 deactivate vkb
+
+' Manual export (immediate trigger)
+dev -> ukb : ukb export shared-memory-coding.json --team coding
+activate ukb
+note left
+  Manual export triggers
+  immediate sync to JSON
+  (automatic export always
+  happens after 5s delay)
+end note
+
+ukb -> graphdb : exportToJSON(team, filePath)
+activate graphdb
+
+graphdb -> graph : mapNodes/mapEdges(filter by team)
+graph --> graphdb : entities + relations
+
+graphdb -> json : write JSON file
+note right
+  Manual export triggers
+  immediate write to JSON
+  (bypasses 5s debounce)
+  MANDATORY for collaboration
+end note
+
+graphdb --> ukb : export complete
+deactivate graphdb
+
+ukb --> dev : File written
+deactivate ukb
 
 @enduml

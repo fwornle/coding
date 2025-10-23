@@ -56,9 +56,13 @@ database "Storage Layer" as storage #F5F5F5 {
   folder ".specstory/history/\n(Session Logs)" as lsl_logs <<logs>>
 }
 
+' Git-tracked JSON exports (MANDATORY bidirectional sync)
+file ".data/knowledge-export/*.json\n(Git-Tracked - MANDATORY)" as json #F9F9F9
+
 km -down-> storage : all knowledge
 lsl -down-> lsl_logs : sessions
 mcp -down-> graphdb : insights
+graphdb <-down-> json : MANDATORY auto-sync\n(5s debounce)
 
 note right of realtime
   **Real-Time Monitoring**
@@ -81,7 +85,16 @@ note right of graphdb
   • Both auto & manual knowledge
   • Team-scoped (team:entity)
   • Persistent (Level DB)
-  • Auto-saves every 5s
+  • Auto-exports to JSON (5s)
+end note
+
+note right of json
+  **MANDATORY SYNC (Phase 4)**
+  REQUIRED for team collaboration
+  Auto-export: 5s after changes
+  Auto-import: on startup
+  Cross-project persistence
+  Git-tracked by design
 end note
 
 @enduml
