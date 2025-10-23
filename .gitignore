@@ -116,6 +116,9 @@ integrations/browser-access/logs/
 *.sqlite
 *.sqlite3
 
+# MCP Memory LevelDB (volatile runtime data)
+.data/
+
 # Session and conversation logs (commented out to track sessions)
 # .specstory/history/
 
