@@ -1,6 +1,4 @@
 {
-  "displayName": "ReSi",
-  "description": "Reprocessing and Simulation Framework",
   "entities": [
     {
       "name": "CollectiveKnowledge",
@@ -11,13 +9,13 @@
         "Focus: architectural decisions, performance patterns, reusable designs"
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.603Z",
         "last_updated": "2025-06-18T15:33:31.309Z"
       },
-      "id": "mc4flkg6hcc20676x5j"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg1qr4h9s"
     },
     {
       "name": "Normalisa",
@@ -28,13 +26,13 @@
         "Implements advanced pattern matching and transformation pipelines"
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-20T19:15:00.000Z",
         "last_updated": "2025-06-20T19:15:00.000Z"
       },
-      "id": "normalisa_project"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg111zcb4"
     },
     {
       "name": "StreamProcessingPattern",
@@ -47,13 +45,13 @@
         "Essential for real-time analytics and data normalization systems"
       ],
       "significance": 8,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-20T19:15:00.000Z",
         "last_updated": "2025-06-20T19:15:00.000Z"
       },
-      "id": "stream_processing_pattern"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg48yz7n"
     },
     {
       "name": "SchemaEvolutionPattern",
@@ -66,13 +64,13 @@
         "Critical for long-running data processing systems"
       ],
       "significance": 7,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-20T19:15:00.000Z",
         "last_updated": "2025-06-20T19:15:00.000Z"
       },
-      "id": "schema_evolution_pattern"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg3t9jzpm"
     }
   ],
   "relations": [
@@ -80,42 +78,39 @@
       "from": "CollectiveKnowledge",
       "to": "StreamProcessingPattern",
       "relationType": "contains",
-      "id": "ck_contains_stream"
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "SchemaEvolutionPattern",
       "relationType": "contains",
-      "id": "ck_contains_schema"
+      "metadata": {}
     },
     {
       "from": "StreamProcessingPattern",
       "to": "Normalisa",
       "relationType": "implemented in",
-      "id": "stream_impl_normalisa"
+      "metadata": {}
     },
     {
       "from": "SchemaEvolutionPattern",
       "to": "Normalisa",
       "relationType": "implemented in",
-      "id": "schema_impl_normalisa"
+      "metadata": {}
     },
     {
       "from": "Normalisa",
       "to": "CollectiveKnowledge",
       "relationType": "contributed patterns to",
-      "id": "normalisa_contrib_ck"
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
-    "created": "2025-06-20T19:15:00.000Z",
-    "contributors": [
-      "Claude"
-    ],
+    "team": "resi",
+    "exported_at": "2025-10-23T08:22:16.433Z",
     "total_entities": 4,
     "total_relations": 5,
-    "last_sync": 1751866375.776161,
-    "sync_source": "semantic_analysis_agent"
+    "description": "Resi project patterns"
   }
 }

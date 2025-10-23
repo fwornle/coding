@@ -1,0 +1,312 @@
+#!/usr/bin/env node
+/**
+ * graph-sync - Graph Knowledge Synchronization Utility
+ *
+ * CLI tool for exporting/importing knowledge between LevelDB and git-tracked JSON.
+ * Supports team-specific operations and status reporting.
+ *
+ * Usage:
+ *   graph-sync export [team]      - Export team knowledge to JSON
+ *   graph-sync import [team]      - Import team knowledge from JSON
+ *   graph-sync status             - Show sync status for all teams
+ *   graph-sync sync               - Bi-directional sync (import then export)
+ */
+
+import { GraphDatabaseService } from '../src/knowledge-management/GraphDatabaseService.js';
+import { GraphKnowledgeExporter } from '../src/knowledge-management/GraphKnowledgeExporter.js';
+import { GraphKnowledgeImporter } from '../src/knowledge-management/GraphKnowledgeImporter.js';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.join(__dirname, '..');
+
+// ANSI colors for output
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  cyan: '\x1b[36m'
+};
+
+/**
+ * Show help message
+ */
+function showHelp() {
+  console.log(`
+${colors.bright}graph-sync${colors.reset} - Graph Knowledge Synchronization Utility
+
+${colors.bright}USAGE:${colors.reset}
+  graph-sync <command> [options]
+
+${colors.bright}COMMANDS:${colors.reset}
+  ${colors.cyan}export [team]${colors.reset}     Export team knowledge to JSON
+                        If team not specified, exports all teams
+
+  ${colors.cyan}import [team]${colors.reset}     Import team knowledge from JSON
+                        If team not specified, imports all teams
+
+  ${colors.cyan}status${colors.reset}            Show sync status for all teams
+                        Displays entities/relations count and last sync time
+
+  ${colors.cyan}sync${colors.reset}              Bi-directional sync (import then export)
+                        Ensures LevelDB and JSON are in sync
+
+${colors.bright}OPTIONS:${colors.reset}
+  --help, -h            Show this help message
+  --debug               Enable debug logging
+
+${colors.bright}EXAMPLES:${colors.reset}
+  # Show sync status
+  graph-sync status
+
+  # Export specific team
+  graph-sync export coding
+
+  # Export all teams
+  graph-sync export
+
+  # Import specific team
+  graph-sync import coding
+
+  # Full sync
+  graph-sync sync
+
+${colors.bright}FILES:${colors.reset}
+  Config:   .data/knowledge-config.json
+  LevelDB:  .data/knowledge-graph/
+  Exports:  .data/knowledge-export/<team>.json
+`);
+}
+
+/**
+ * Initialize services
+ */
+async function initializeServices() {
+  try {
+    // Initialize graph database
+    const graphService = new GraphDatabaseService({
+      dbPath: path.join(projectRoot, '.data', 'knowledge-graph')
+    });
+
+    await graphService.initialize();
+
+    // Initialize exporter and importer
+    const exporter = new GraphKnowledgeExporter(graphService, {
+      exportDir: path.join(projectRoot, '.data', 'knowledge-export'),
+      configPath: path.join(projectRoot, '.data', 'knowledge-config.json'),
+      autoExport: false // Manual control via CLI
+    });
+
+    const importer = new GraphKnowledgeImporter(graphService, {
+      exportDir: path.join(projectRoot, '.data', 'knowledge-export'),
+      configPath: path.join(projectRoot, '.data', 'knowledge-config.json'),
+      autoImportOnStartup: false // Manual control via CLI
+    });
+
+    await exporter.initialize();
+    await importer.initialize();
+
+    return { graphService, exporter, importer };
+
+  } catch (error) {
+    console.error(`${colors.red}✗ Failed to initialize services:${colors.reset}`, error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Load knowledge configuration
+ */
+async function loadConfig() {
+  const configPath = path.join(projectRoot, '.data', 'knowledge-config.json');
+  try {
+    const content = await fs.readFile(configPath, 'utf8');
+    return JSON.parse(content);
+  } catch (error) {
+    console.error(`${colors.red}✗ Failed to load config:${colors.reset}`, error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Export command
+ */
+async function exportCommand(team, services) {
+  const { exporter } = services;
+
+  if (team) {
+    console.log(`${colors.cyan}Exporting team "${team}"...${colors.reset}`);
+    const outputPath = await exporter.exportTeam(team);
+    console.log(`${colors.green}✓ Export complete${colors.reset}`);
+  } else {
+    console.log(`${colors.cyan}Exporting all teams...${colors.reset}`);
+    const results = await exporter.exportAllTeams();
+
+    for (const [teamName, result] of Object.entries(results)) {
+      if (result.error) {
+        console.log(`  ${colors.red}✗ ${teamName}: ${result.error}${colors.reset}`);
+      } else {
+        console.log(`  ${colors.green}✓ ${teamName}${colors.reset}`);
+      }
+    }
+  }
+}
+
+/**
+ * Import command
+ */
+async function importCommand(team, services) {
+  const { importer } = services;
+
+  if (team) {
+    console.log(`${colors.cyan}Importing team "${team}"...${colors.reset}`);
+    const result = await importer.importTeam(team);
+    console.log(`${colors.green}✓ Import complete: ${result.entitiesImported} entities, ${result.relationsImported} relations${colors.reset}`);
+  } else {
+    console.log(`${colors.cyan}Importing all teams...${colors.reset}`);
+    const results = await importer.importAllTeams();
+
+    for (const [teamName, result] of Object.entries(results)) {
+      if (result.error) {
+        console.log(`  ${colors.red}✗ ${teamName}: ${result.error}${colors.reset}`);
+      } else {
+        console.log(`  ${colors.green}✓ ${teamName}: ${result.entitiesImported} entities, ${result.relationsImported} relations${colors.reset}`);
+      }
+    }
+  }
+}
+
+/**
+ * Status command
+ */
+async function statusCommand(services) {
+  const { graphService, importer } = services;
+  const config = await loadConfig();
+
+  console.log(`\n${colors.bright}Graph Knowledge Sync Status${colors.reset}`);
+  console.log('='.repeat(60));
+
+  // Get import stats
+  const importStats = await importer.getImportStats();
+
+  // Show status for each team
+  for (const [team, teamConfig] of Object.entries(config.teams)) {
+    console.log(`\n${colors.cyan}Team: ${team}${colors.reset} (${teamConfig.description})`);
+
+    const stats = importStats[team];
+
+    if (stats.exists) {
+      console.log(`  Export file: ${colors.green}✓ exists${colors.reset}`);
+      console.log(`  Location:    ${stats.path}`);
+      console.log(`  Entities:    ${stats.entities}`);
+      console.log(`  Relations:   ${stats.relations}`);
+      console.log(`  Last export: ${stats.lastExported || 'unknown'}`);
+    } else {
+      console.log(`  Export file: ${colors.yellow}✗ not found${colors.reset}`);
+      console.log(`  Location:    ${stats.path}`);
+    }
+
+    // Count entities in graph for this team
+    let graphEntities = 0;
+    graphService.graph.forEachNode((nodeId, attrs) => {
+      if (attrs.team === team) graphEntities++;
+    });
+
+    console.log(`  In LevelDB:  ${graphEntities} entities`);
+  }
+
+  // Overall graph stats
+  console.log(`\n${colors.bright}Overall Graph Statistics${colors.reset}`);
+  console.log(`  Total nodes: ${graphService.graph.order}`);
+  console.log(`  Total edges: ${graphService.graph.size}`);
+  console.log('');
+}
+
+/**
+ * Sync command (import then export)
+ */
+async function syncCommand(services) {
+  console.log(`${colors.cyan}Running bi-directional sync...${colors.reset}\n`);
+
+  console.log('Step 1: Import from JSON to LevelDB');
+  await importCommand(null, services);
+
+  console.log('\nStep 2: Export from LevelDB to JSON');
+  await exportCommand(null, services);
+
+  console.log(`\n${colors.green}✓ Sync complete${colors.reset}`);
+}
+
+/**
+ * Main function
+ */
+async function main() {
+  const args = process.argv.slice(2);
+
+  // Show help
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    showHelp();
+    return;
+  }
+
+  const command = args[0];
+  const team = args[1];
+
+  let services = null;
+
+  try {
+    // Initialize services once for all commands
+    services = await initializeServices();
+
+    switch (command) {
+      case 'export':
+        await exportCommand(team, services);
+        break;
+
+      case 'import':
+        await importCommand(team, services);
+        break;
+
+      case 'status':
+        await statusCommand(services);
+        break;
+
+      case 'sync':
+        await syncCommand(services);
+        break;
+
+      default:
+        console.error(`${colors.red}Unknown command: ${command}${colors.reset}`);
+        console.error('Use "graph-sync --help" for usage information');
+        process.exit(1);
+    }
+
+  } catch (error) {
+    console.error(`${colors.red}✗ Error:${colors.reset}`, error.message);
+    if (args.includes('--debug')) {
+      console.error(error.stack);
+    }
+    process.exit(1);
+  } finally {
+    // Proper cleanup: close database and stop auto-persist
+    if (services && services.graphService) {
+      try {
+        await services.graphService.close();
+        console.log('\n✓ Database closed');
+      } catch (error) {
+        console.warn('⚠ Error closing database:', error.message);
+      }
+    }
+  }
+}
+
+// Run
+main().catch((error) => {
+  console.error(`${colors.red}Fatal error:${colors.reset}`, error.message);
+  process.exit(1);
+});

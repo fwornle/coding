@@ -78,8 +78,9 @@ export class GraphDatabaseService extends EventEmitter {
         const dbDir = path.dirname(this.dbPath);
         await fs.mkdir(dbDir, { recursive: true });
 
-        // Open Level database
+        // Create and open Level database
         this.levelDB = new Level(this.dbPath, { valueEncoding: 'json' });
+        await this.levelDB.open();
         console.log(`✓ Level database opened at: ${this.dbPath}`);
 
         // Load existing graph from Level if present

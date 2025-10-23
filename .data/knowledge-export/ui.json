@@ -9,13 +9,13 @@
         "Focus: architectural decisions, performance patterns, reusable designs"
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.603Z",
         "last_updated": "2025-06-18T15:33:31.309Z"
       },
-      "id": "mc4flkg6hcc20676x5j"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg1qr4h9s"
     },
     {
       "name": "ViewportCullingPattern",
@@ -38,7 +38,7 @@
         },
         {
           "type": "performance",
-          "content": "Basic: 200 objects \u2192 ~20-50 visible, <10 FPS \u2192 60 FPS. Advanced: 75-90% reduction in rendered objects",
+          "content": "Basic: 200 objects → ~20-50 visible, <10 FPS → 60 FPS. Advanced: 75-90% reduction in rendered objects",
           "date": "2025-06-19T12:34:22Z"
         },
         {
@@ -58,19 +58,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
         "last_updated": "2025-06-19T12:34:22Z"
       },
-      "quick_reference": {
-        "trigger": "Rendering 200+ 3D objects causing performance issues (basic) or 800+ objects with visual jumping (advanced)",
-        "action": "Basic: camera.position.distanceTo(object.position) < threshold. Advanced: balanced marker-centric culling with anti-jump algorithm",
-        "avoid": "Rendering all objects regardless of visibility, naive culling without performance testing, visual jumping during culling",
-        "check": "Basic: 60 FPS with 200+ objects. Advanced: 75-90% reduction in rendered objects, smooth 60fps with 800+ objects"
-      },
-      "id": "mc4flkg6s51c4g4ep4"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg2tip2ze"
     },
     {
       "name": "ReduxStateManagementPattern",
@@ -113,19 +107,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
         "last_updated": "2025-06-19T12:34:40Z"
       },
-      "quick_reference": {
-        "trigger": "React component with complex state (3+ properties, cross-component sharing, or 20+ components)",
-        "action": "Use Redux Toolkit with createSlice() and typed hooks. For large apps (20+ components): implement MVI architecture with intent layers",
-        "avoid": "useState for complex state, prop drilling, direct state mutation, mixed state management approaches",
-        "check": "Basic: minimal useState usage. Advanced: zero prop drilling, 100% TypeScript coverage, predictable state flow"
-      },
-      "id": "mc4flkg6qoq9ti6a83d"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkgdropbk"
     },
     {
       "name": "Timeline",
@@ -151,13 +139,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
         "last_updated": "2025-06-18T15:33:31.309Z"
       },
-      "id": "mc4flkg66ngb7esal3v"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkgx9w9zz"
     },
     {
       "name": "DynArch",
@@ -207,13 +195,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
         "last_updated": "2025-06-18T15:33:31.309Z"
       },
-      "id": "mc4flkg6rgm4h3nz2k"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg8djycx"
     },
     {
       "name": "StateDrivenAnimationPipelinePattern",
@@ -251,19 +239,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
         "last_updated": "2025-06-19T11:22:19Z"
       },
-      "quick_reference": {
-        "trigger": "Need to coordinate 15+ simultaneous animation components",
-        "action": "Implement standardized lifecycle: initialize \u2192 start \u2192 pause \u2192 stop \u2192 destroy with single requestAnimationFrame loop",
-        "avoid": "Multiple uncoordinated animation loops, missing error handling, lack of graceful cleanup",
-        "check": "Verify 60fps maintenance with complex animations and proper component registration/cleanup"
-      },
-      "id": "mc4flkg62no511cgwee"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg27iv1q9"
     },
     {
       "name": "StrategyBasedModularRoutingPattern",
@@ -301,19 +283,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
         "last_updated": "2025-06-19T11:23:27Z"
       },
-      "quick_reference": {
-        "trigger": "Need multiple routing algorithms for different connection types (50+ connections)",
-        "action": "Implement strategy pattern with runtime registration and extensible architecture",
-        "avoid": "Hard-coded routing logic, single routing algorithm for all cases, performance bottlenecks",
-        "check": "Route calculation <5ms simple routes, <20ms complex avoidance routes"
-      },
-      "id": "mc4flkg6k7ue6mzj7zp"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg3nbxv1o"
     },
     {
       "name": "MVIReduxArchitecturePattern",
@@ -361,19 +337,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-18T15:17:44.017Z",
         "last_updated": "2025-06-19T11:25:14Z"
       },
-      "quick_reference": {
-        "trigger": "React app with 20+ components suffering from state management chaos",
-        "action": "Implement MVI architecture using Redux Toolkit with separate slices and intent layers",
-        "avoid": "Prop drilling, unpredictable state updates, mixed state management approaches",
-        "check": "Zero prop drilling, 100% TypeScript coverage, predictable state flow"
-      },
-      "id": "mc4flkg6bd8nq4vvt3b"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkgqy6won"
     },
     {
       "name": "ReactThreeFiberIntegrationPattern",
@@ -421,19 +391,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-18T15:17:44.017Z",
         "last_updated": "2025-06-19T11:25:29Z"
       },
-      "quick_reference": {
-        "trigger": "Need to integrate Three.js 3D graphics with React component lifecycle",
-        "action": "Use React Three Fiber for declarative 3D scene management with React patterns",
-        "avoid": "Manual Three.js integration, bypassing React lifecycle, imperative 3D code",
-        "check": "Seamless integration of 3D graphics with React's declarative paradigm"
-      },
-      "id": "mc4flkg6oafz4fvgrfo"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg244kv55"
     },
     {
       "name": "ModularComponentArchitecturePattern",
@@ -481,19 +445,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-18T15:17:44.017Z",
         "last_updated": "2025-06-19T11:25:29Z"
       },
-      "quick_reference": {
-        "trigger": "Component organization becoming chaotic in large React applications",
-        "action": "Implement feature-based component organization with clear domain boundaries",
-        "avoid": "Flat component structure, unclear boundaries, circular dependencies",
-        "check": "Zero circular dependencies, logical directory structure, clear domain separation"
-      },
-      "id": "mc4flkg62369u270rnvh"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkgt08ody"
     },
     {
       "name": "CustomHookExtractionPattern",
@@ -541,19 +499,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-18T15:17:44.017Z",
         "last_updated": "2025-06-19T11:25:29Z"
       },
-      "quick_reference": {
-        "trigger": "Duplicated stateful logic across multiple React components",
-        "action": "Extract common logic into reusable custom hooks with TypeScript support",
-        "avoid": "Duplicated component logic, inline complex state management, non-reusable patterns",
-        "check": "DRY principle applied with full TypeScript support and reusable hooks"
-      },
-      "id": "mc4flkg6pp2n80apkv"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg1sjnxhn"
     },
     {
       "name": "ConditionalLoggingPattern",
@@ -591,19 +543,13 @@
         }
       ],
       "significance": 5,
-      "problem": {},
-      "solution": {},
       "metadata": {
         "created_at": "2025-06-16T13:46:12.604Z",
         "last_updated": "2025-06-29T07:05:00Z"
       },
-      "quick_reference": {
-        "trigger": "Need sophisticated logging control with dual-axis filtering (level + category)",
-        "action": "Implement Logger.log(level, category, message) with configurable filtering and output targets",
-        "avoid": "console.log usage, hardcoded logging levels, single-axis filtering",
-        "check": "Zero console.log usage, configurable logging levels, category-based filtering working"
-      },
-      "id": "6f129029-7857-45e7-8e55-a3a1431d291e"
+      "problem": {},
+      "solution": {},
+      "id": "mc4flkg159xya1"
     }
   ],
   "relations": [
@@ -611,157 +557,129 @@
       "from": "ViewportCullingPattern",
       "to": "Timeline",
       "relationType": "implemented in",
-      "id": "mc4flkg63ah3hnbik7m"
+      "metadata": {}
     },
     {
       "from": "ReduxStateManagementPattern",
       "to": "Timeline",
       "relationType": "implemented in",
-      "id": "mc4flkg60ic8xyepcou"
+      "metadata": {}
     },
     {
       "from": "StateDrivenAnimationPipelinePattern",
       "to": "DynArch",
       "relationType": "implemented in",
-      "id": "mc4flkg6p4fmc0tmq4i"
+      "metadata": {}
     },
     {
       "from": "StrategyBasedModularRoutingPattern",
       "to": "DynArch",
       "relationType": "implemented in",
-      "id": "mc4flkg649da5smfe05"
+      "metadata": {}
     },
     {
       "from": "CustomHookExtractionPattern",
       "to": "Timeline",
       "relationType": "implemented in",
-      "id": "mc4flkg63gw6k4c8p4y"
+      "metadata": {}
     },
     {
       "from": "ModularComponentArchitecturePattern",
       "to": "Timeline",
       "relationType": "implemented in",
-      "id": "mc4flkg6ws5vgen3t2c"
+      "metadata": {}
     },
     {
       "from": "MVIReduxArchitecturePattern",
       "to": "Timeline",
       "relationType": "implemented in",
-      "id": "mc4flkg67h3xbg1k5l"
+      "metadata": {}
     },
     {
       "from": "ReactThreeFiberIntegrationPattern",
       "to": "Timeline",
       "relationType": "implemented in",
-      "id": "mc4flkg6bkryix1mh6p"
+      "metadata": {}
     },
     {
       "from": "ViewportCullingPattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_1"
+      "metadata": {}
     },
     {
       "from": "ReduxStateManagementPattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_2"
+      "metadata": {}
     },
     {
       "from": "StateDrivenAnimationPipelinePattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_3"
+      "metadata": {}
     },
     {
       "from": "StrategyBasedModularRoutingPattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_4"
+      "metadata": {}
     },
     {
       "from": "MVIReduxArchitecturePattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_5"
+      "metadata": {}
     },
     {
       "from": "ReactThreeFiberIntegrationPattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_6"
+      "metadata": {}
     },
     {
       "from": "ModularComponentArchitecturePattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_7"
+      "metadata": {}
     },
     {
       "from": "CustomHookExtractionPattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_8"
+      "metadata": {}
     },
     {
-      "id": "1d8f8153-1852-4bec-b5de-44fee34833db",
       "from": "ConditionalLoggingPattern",
       "to": "DynArch",
       "relationType": "originally developed in",
-      "significance": 5,
-      "created": "2025-06-29T07:00:58.776Z",
-      "metadata": {
-        "created_by": "knowledge-api"
-      }
+      "metadata": {}
     },
     {
-      "id": "d9203070-b408-4166-bd7a-f2a34873c7b9",
       "from": "ConditionalLoggingPattern",
       "to": "Timeline",
       "relationType": "implemented in",
-      "significance": 5,
-      "created": "2025-06-29T07:05:32.797Z",
-      "metadata": {
-        "created_by": "knowledge-api"
-      }
+      "metadata": {}
     },
     {
       "from": "ConditionalLoggingPattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes to",
-      "id": "ui_pattern_to_collective_9"
+      "metadata": {}
     },
     {
-      "id": "2072f700-81bd-4a7b-9690-125839737cad",
       "from": "ConditionalLoggingPattern",
       "to": "ReduxStateManagementPattern",
       "relationType": "related_to",
-      "significance": 8,
-      "created": "2025-06-30T12:13:26.058Z",
-      "metadata": {
-        "created_by": "knowledge-api"
-      }
+      "metadata": {}
     }
   ],
   "metadata": {
-    "version": "2.0.0",
-    "created": "2025-06-06T10:00:00Z",
-    "last_updated": "2025-06-30T12:13:26.058Z",
-    "contributors": [
-      "agent-q284340",
-      "q284340"
-    ],
-    "total_entities": 10,
-    "total_relations": 19,
-    "source": "curated_high_value_patterns",
-    "last_mode": "automatic",
-    "schema_version": "2.0.0",
-    "cleanup_performed": "2025-06-18T15:57:54.158Z",
-    "garbage_removal_performed": "2025-06-18T15:57:54.115Z",
+    "version": "1.0.0",
     "team": "ui",
-    "description": "Frontend Web team knowledge",
-    "created_from_migration": "2025-06-20T11:17:47.390Z",
-    "last_sync": 1751866375.7889001,
-    "sync_source": "semantic_analysis_agent"
+    "exported_at": "2025-10-23T08:22:16.433Z",
+    "total_entities": 12,
+    "total_relations": 20,
+    "description": "UI/frontend patterns"
   }
 }
