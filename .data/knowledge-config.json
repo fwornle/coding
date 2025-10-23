@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "defaultTeam": "coding",
+  "teams": {
+    "coding": {
+      "exportPath": ".data/knowledge-export/coding.json",
+      "description": "Coding project infrastructure and patterns",
+      "enabled": true
+    },
+    "resi": {
+      "exportPath": ".data/knowledge-export/resi.json",
+      "description": "Resi project patterns",
+      "enabled": true
+    },
+    "ui": {
+      "exportPath": ".data/knowledge-export/ui.json",
+      "description": "UI/frontend patterns",
+      "enabled": true
+    }
+  },
+  "export": {
+    "format": "pretty-json",
+    "autoExport": true,
+    "debounceMs": 5000,
+    "includeMetadata": true
+  },
+  "import": {
+    "autoImportOnStartup": true,
+    "conflictResolution": "newest-wins"
+  },
+  "multiTeamSupport": {
+    "enabled": true,
+    "customRepositories": {}
+  }
+}

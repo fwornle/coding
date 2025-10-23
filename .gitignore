@@ -117,7 +117,17 @@ integrations/browser-access/logs/
 *.sqlite3
 
 # MCP Memory LevelDB (volatile runtime data)
-.data/
+# Ignore binary database files, but track JSON exports
+.data/knowledge-graph/
+.data/knowledge.db
+.data/knowledge.db-shm
+.data/knowledge.db-wal
+.data/backups/
+
+# Track knowledge exports (git-reviewable JSON)
+!.data/
+!.data/knowledge-export/
+!.data/knowledge-config.json
 
 # Session and conversation logs (commented out to track sessions)
 # .specstory/history/
