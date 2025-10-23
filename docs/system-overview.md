@@ -13,9 +13,9 @@ Coding is an intelligent development infrastructure that:
 - **Accumulates** knowledge that improves over time
 - **Works** seamlessly with Claude Code, GitHub CoPilot, and other AI assistants
 
-![Coding System Architecture](images/coding-system-architecture.png)
+![Complete System Overview](images/complete-system-overview.png)
 
-The complete architecture showing all core systems, knowledge management, MCP integrations, and storage layers.
+*The complete coding system showing all capabilities: real-time monitoring (LSL, Constraints, Trajectory, Status Line), knowledge management (Continuous Learning, UKB/VKB), MCP integrations, LLM providers, and storage architecture.*
 
 ---
 

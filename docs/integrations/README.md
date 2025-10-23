@@ -90,10 +90,21 @@ Each integration component:
 
 ![Integration Architecture](../images/integration-architecture.png)
 
-The core systems (LSL, Trajectory, Constraint Monitoring) communicate with MCP integrations through different protocols:
-- **MCP Protocol**: Semantic Analysis
-- **Direct Call**: Serena AST
-- **PreToolUse Hook**: Constraint Monitor
+The core systems communicate with integrations through different protocols:
+
+**LSL System**:
+- Uses fast LLM providers (Groq/OpenAI) for Layer 4 semantic classification
+- Does NOT use the 11-agent MCP Semantic Analysis server (that's for deep analysis)
+- Classification happens in milliseconds with budget-conscious models
+
+**Trajectory Generation**:
+- Uses MCP Semantic Analysis (11 agents) for deep repository insights
+- Uses Serena AST for code structure analysis
+- Comprehensive architectural pattern extraction
+
+**Constraint Monitoring**:
+- Uses PreToolUse hooks to intercept tool calls before execution
+- MCP Constraint Monitor provides dashboard and API (ports 3030/3031)
 
 ### Communication Protocols
 
