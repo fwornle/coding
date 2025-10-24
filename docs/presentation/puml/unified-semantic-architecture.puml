@@ -1,0 +1,143 @@
+@startuml unified-semantic-architecture
+!include _standard-style.puml
+
+title "Unified Semantic Analysis & Knowledge Management System"
+
+package "AI Coding Assistants" {
+  [Claude Code\n(MCP Tools)] <<external>> as claude
+  [GitHub CoPilot\n(VSCode Extension)] <<external>> as copilot
+}
+
+package "Unified Interface Layer" {
+  [MCP Server\nUnified Commands] <<api>> as mcp
+  [HTTP API Server\nVSCode Integration] <<api>> as http
+}
+
+package "Single Agent System Infrastructure (11 Agents)" {
+  package "Orchestration Agent (1)" {
+    [CoordinatorAgent\n(Orchestrates workflows)] <<agent>> as coordinator
+  }
+  
+  package "Core Analysis Agents (8)" {
+    [GitHistoryAgent\n(Git history analysis)] <<agent>> as githistory
+    [VibeHistoryAgent\n(Conversation analysis)] <<agent>> as vibehistory
+    [SemanticAnalysisAgent\n(Code & pattern analysis)] <<agent>> as semantic
+    [WebSearchAgent\n(Documentation research)] <<agent>> as web
+    [InsightGenerationAgent\n(Generate structured insights)] <<agent>> as insights
+    [ObservationGenerationAgent\n(Create observations)] <<agent>> as observations
+    [QualityAssuranceAgent\n(Validation & QA)] <<agent>> as quality
+    [PersistenceAgent\n(Knowledge storage)] <<agent>> as persistence
+  }
+  
+  package "Infrastructure Agents (2)" {
+    [SynchronizationAgent\n(SINGLE SOURCE OF TRUTH)] <<agent>> as sync
+    [DeduplicationAgent\n(Prevents duplicate insights)] <<agent>> as dedup
+  }
+}
+
+package "Multi-Database Storage" {
+  database "MCP Memory\n(Claude Sessions)" <<storage>> as mcpmem
+  database "Graphology\n(CoPilot Integration)" <<storage>> as graphology
+  database "shared-memory.json\n(Git-tracked persistence)" <<storage>> as sharedmem
+}
+
+package "External Services" {
+  cloud "Custom LLM\n(Primary Provider)" <<external>> as custom
+  cloud "Anthropic Claude\n(Secondary Provider)" <<external>> as anthropic
+  cloud "OpenAI GPT\n(Fallback Provider)" <<external>> as openai
+  cloud "Web Search APIs\n(DuckDuckGo)" <<external>> as websearch
+}
+
+package "Visualization & Monitoring" {
+  [VKB Web Interface\n(Knowledge graph viewer)] <<cli>> as vkb
+  [Progress Logging\n(Agent activity monitor)] <<util>> as logging
+  [System Status\n(Health monitoring)] <<util>> as status
+}
+
+' User connections
+claude --> mcp : "MCP Protocol"
+copilot --> http : "HTTP/WebSocket"
+
+' Interface to agent system
+mcp --> coordinator : "Start workflows"
+http --> coordinator : "API requests"
+
+' Agent system internal communication (Node.js direct calls)
+' Sequential workflow: GH → VH → SA → WS → IG → OG → QA → PA
+coordinator --> githistory : "1. Analyze git history"
+githistory --> vibehistory : "2. Analyze conversations"
+vibehistory --> semantic : "3. Semantic analysis"
+semantic --> web : "4. Research topics"
+web --> insights : "5. Generate insights"
+insights --> observations : "6. Create observations"
+observations --> quality : "7. Quality validation"
+quality --> persistence : "8. Store knowledge"
+
+' Infrastructure agents
+coordinator --> sync : "Ensure consistency"
+persistence --> dedup : "Check duplicates"
+
+' SynchronizationAgent is the single authority
+sync --> mcpmem : "Sync to MCP"
+sync --> graphology : "Sync to Graphology"
+sync --> sharedmem : "Sync to files"
+
+' External service connections
+semantic ..> custom : "Primary LLM"
+semantic ..> anthropic : "Secondary LLM"
+semantic .> openai : "Fallback LLM"
+web ..> websearch : "Documentation Search"
+
+' Visualization and monitoring
+vkb --> sharedmem : "Read unified data"
+vkb ..> graphology : "Live graph data"
+logging ..> coordinator : "Monitor agent activity"
+status ..> coordinator : "Health checks"
+
+note top of sync
+  **CRITICAL**: SynchronizationAgent is the 
+  SINGLE SOURCE OF TRUTH ensuring data 
+  consistency across ALL databases
+end note
+
+note bottom of coordinator
+  **UNIFIED**: Both Claude Code and CoPilot use
+  the SAME 11-agent system for all analysis,
+  ensuring consistent results regardless of AI assistant
+end note
+
+note right of mcp
+  12 MCP Tools:
+  • determine_insights
+  • analyze_code/repository
+  • extract_patterns
+  • create_ukb_entity
+  • execute_workflow
+  • generate_documentation
+  • + 6 more tools
+end note
+
+note right of http
+  VSCode Integration:
+  • @KM commands
+  • REST API endpoints
+  • WebSocket connections
+end note
+
+note right of custom
+  **3-Tier Provider Chain**:
+  • Custom LLM (Primary)
+  • Anthropic Claude (Secondary)
+  • OpenAI GPT (Fallback)
+  • Graceful degradation
+end note
+
+note bottom of githistory
+  **11-Agent Sequential Workflow**:
+  1. GitHistory → 2. VibeHistory → 3. SemanticAnalysis
+  → 4. WebSearch → 5. InsightGeneration → 6. ObservationGeneration
+  → 7. QualityAssurance → 8. Persistence
+  + Infrastructure: Synchronization & Deduplication
+end note
+
+@enduml

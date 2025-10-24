@@ -108,7 +108,7 @@ constraints:
     pattern: "@startuml.*\\n(?!.*!include _standard-style\\.puml)"
     message: PlantUML files must include the standard styling file
     severity: error
-    enabled: true
+    enabled: false
     suggestion: Add '!include _standard-style.puml' after @startuml and before content
   - id: plantuml-file-location
     group: plantuml

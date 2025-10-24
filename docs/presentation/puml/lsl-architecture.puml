@@ -1,0 +1,149 @@
+@startuml lsl-architecture
+!include _standard-style.puml
+
+title LSL System - 4-Layer Monitoring + 5-Layer Classification Architecture
+
+package "4-Layer Monitoring Protection" #FFE6E6 {
+  [System Watchdog (launchd)] as Watchdog <<infra>>
+  [Global Service Coordinator] as GSC <<infra>>
+  [Monitoring Verifier] as Verifier <<infra>>
+  note right of Watchdog : Ultimate failsafe\nMonitors the monitor
+}
+
+package "Claude Code Session" {
+  [Launch Script] as Launch <<external>>
+  [User Interactions] as User <<external>>
+  [Tool Calls & Responses] as Tools <<external>>
+  [Real-time Transcript] as Transcript <<external>>
+}
+
+package "Live Session Logging (LSL)" <<core>> {
+  
+  package "Enhanced Transcript Monitor" {
+    [Transcript Analyzer] as TranscriptAnalyzer <<core>>
+    [Session Transition Detector] as TransitionDetector <<core>>
+    [Working Directory Tracker] as WorkingDir <<core>>
+  }
+  
+  package "ReliableCodingClassifier" #E8F5E8 {
+    component "Five-Layer Decision Engine" as DecisionEngine <<agent>> {
+      [Layer 0: Session Filter] as SessionFilter <<core>>
+      [Layer 1: PathAnalyzer] as PathAnalyzer <<core>>
+      [Layer 2: KeywordMatcher] as KeywordMatcher <<util>>
+      [Layer 3: EmbeddingClassifier] as EmbeddingClassifier <<core>>
+      [Layer 4: SemanticAnalyzer] as SemanticAnalyzer <<agent>>
+    }
+    [Operational Logger] as OpLogger <<util>>
+    [Classifier Orchestrator] as Orchestrator <<core>>
+  }
+  
+  package "Session Management" {
+    [Session Router] as Router <<core>>
+    [PostSessionLogger] as PostLogger <<core>>
+    [Live Logging Coordinator] as Coordinator <<infra>>
+  }
+  
+  package "Storage & Output" {
+    database "Project History\n(.specstory/history/)" as ProjectHistory <<storage>>
+    database "Coding History\n(coding/.specstory/)" as CodingHistory <<storage>>
+    [Status Line Integrator] as StatusLine <<api>>
+  }
+}
+
+package "External APIs" <<infra>> {
+  [Grok API (X.AI)] as GrokAPI <<api>>
+}
+
+package "MCP Integration" <<infra>> {
+  [Constraint Monitor MCP] as ConstraintMCP <<api>>
+}
+
+' 4-Layer Monitoring connections
+Launch --> Verifier : "Mandatory verification\n(blocks if unhealthy)"
+Verifier --> Watchdog : checks
+Verifier --> GSC : checks
+Verifier --> TranscriptAnalyzer : validates
+Watchdog --> GSC : "Monitors & restarts"
+GSC --> TranscriptAnalyzer : "Manages & restarts"
+
+' Main flow connections (protected by 4-layer monitoring)
+Launch --> User : "Only if monitoring healthy"
+User --> Transcript : generates
+Tools --> Transcript : enriches
+Transcript --> TranscriptAnalyzer : monitors
+
+TranscriptAnalyzer --> TransitionDetector
+TransitionDetector --> WorkingDir
+TranscriptAnalyzer --> Orchestrator
+
+' Classification flow
+Orchestrator --> SessionFilter : "0. Bias check\n(<1ms, if neutral)"
+SessionFilter --> OpLogger : logs decision
+
+Orchestrator --> PathAnalyzer : "1. File ops check\n(<1ms)"
+PathAnalyzer --> OpLogger : logs decision
+
+Orchestrator --> KeywordMatcher : "2. Keyword analysis\n(<10ms)"
+KeywordMatcher --> OpLogger : logs decision
+
+Orchestrator --> EmbeddingClassifier : "3. Vector similarity\n(<3ms)"
+EmbeddingClassifier --> OpLogger : logs decision
+
+Orchestrator --> SemanticAnalyzer : "4. Semantic analysis\n(if needed)"
+SemanticAnalyzer --> GrokAPI : direct HTTP call
+SemanticAnalyzer --> OpLogger : logs decision
+
+' Routing decision
+Orchestrator --> Router : classification result
+Router --> PostLogger : route session
+
+' Storage routing
+PostLogger ..> ProjectHistory : "NOT_CODING_\nINFRASTRUCTURE"
+PostLogger ..> CodingHistory : "CODING_\nINFRASTRUCTURE"
+
+' Live updates
+Router --> Coordinator : live updates
+Coordinator --> StatusLine : "→coding indicator"
+StatusLine --> ConstraintMCP : hook integration
+
+' Feedback loop
+OpLogger --> Orchestrator : performance metrics
+
+note right of DecisionEngine
+  **Five-Layer Architecture**
+  • Layer 0: Session Filter (<1ms, conversation bias)
+  • Layer 1: PathAnalyzer (<1ms, file patterns)
+  • Layer 2: KeywordMatcher (<10ms, keyword analysis)
+  • Layer 3: EmbeddingClassifier (<3ms, vector similarity)
+  • Layer 4: SemanticAnalyzer (<10ms, LLM analysis)
+
+  Early exit on high confidence
+  Progressive complexity with fallback
+  Context-aware conversation tracking
+end note
+
+note bottom of GrokAPI
+  **Direct Grok API Integration**
+  • HTTP calls to https://api.x.ai/v1
+  • Model: grok-2-1212
+  • 2s timeout for fast response
+  • No MCP overhead
+end note
+
+note bottom of ConstraintMCP
+  **MCP Server Integration**
+  • Real MCP server with stdio transport
+  • Tools: get_constraint_status, check_constraints
+  • Violation tracking and history
+  • Status line integration hooks
+end note
+
+note left of Router
+  **Smart Routing Logic**
+  • CODING_INFRASTRUCTURE → coding repo
+  • NOT_CODING_INFRASTRUCTURE → project
+  • Dual logging for mixed content
+  • Session transition handling
+end note
+
+@enduml

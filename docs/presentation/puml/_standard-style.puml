@@ -1,0 +1,138 @@
+!theme plain
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 18
+skinparam defaultFontStyle bold
+
+' PRESENTATION MODE: Larger fonts, bolder lines, higher contrast
+' Optimized for landscape presentations (1920x1080 or similar)
+
+' Component styling with high-contrast colors
+skinparam component {
+  BackgroundColor<<api>> #C5E1F9
+  BackgroundColor<<core>> #C8E6C9
+  BackgroundColor<<storage>> #FFF3C4
+  BackgroundColor<<cli>> #FFD6E7
+  BackgroundColor<<util>> #E0E0E0
+  BackgroundColor<<agent>> #B3D9FF
+  BackgroundColor<<infra>> #FFE0B2
+  BackgroundColor<<external>> #EEEEEE
+  FontSize 18
+  FontColor #000000
+  BorderThickness 3
+  BorderColor #333333
+}
+
+' Package styling - larger and bolder
+skinparam package {
+  BackgroundColor #F0F0F0
+  BorderColor #666666
+  BorderThickness 3
+  FontSize 20
+  FontColor #000000
+  FontStyle bold
+}
+
+' Note styling - minimal (avoid clutter in presentations)
+skinparam note {
+  BackgroundColor #FFF9C4
+  BorderColor #F57F17
+  BorderThickness 2
+  FontSize 14
+  FontColor #000000
+}
+
+' Arrow styling - thick and bold for visibility
+skinparam arrow {
+  FontSize 14
+  FontColor #000000
+  FontStyle bold
+  Color #1976D2
+  Thickness 3
+}
+
+' Database styling - high contrast
+skinparam database {
+  BackgroundColor #B3E5FC
+  BorderColor #01579B
+  BorderThickness 3
+  FontSize 18
+  FontColor #000000
+}
+
+' Storage styling - high contrast
+skinparam storage {
+  BackgroundColor #FFF9C4
+  BorderColor #F57F17
+  BorderThickness 3
+  FontSize 18
+  FontColor #000000
+}
+
+' Cloud styling - high contrast
+skinparam cloud {
+  BackgroundColor #E1BEE7
+  BorderColor #6A1B9A
+  BorderThickness 3
+  FontSize 18
+  FontColor #000000
+}
+
+' Actor styling - high contrast
+skinparam actor {
+  BackgroundColor #A5D6A7
+  BorderColor #2E7D32
+  BorderThickness 3
+  FontSize 18
+  FontColor #000000
+}
+
+' Interface styling - high contrast
+skinparam interface {
+  BackgroundColor #FFE0B2
+  BorderColor #E65100
+  BorderThickness 3
+  FontSize 18
+  FontColor #000000
+}
+
+' Rectangle styling for grouping - high contrast
+skinparam rectangle {
+  BackgroundColor #EEEEEE
+  BorderColor #424242
+  BorderThickness 3
+  FontSize 18
+  FontColor #000000
+}
+
+' File styling - high contrast
+skinparam file {
+  BackgroundColor #FFECB3
+  BorderColor #FF6F00
+  BorderThickness 3
+  FontSize 16
+  FontColor #000000
+}
+
+' Sequence diagram styling - presentation optimized
+skinparam sequence {
+  ArrowColor #1976D2
+  ArrowThickness 3
+  ActorBorderColor #000000
+  ActorBorderThickness 3
+  ActorBackgroundColor #E8F5E9
+  LifeLineBorderColor #424242
+  LifeLineBorderThickness 2
+  ParticipantBorderColor #000000
+  ParticipantBorderThickness 3
+  ParticipantBackgroundColor #F5F5F5
+  ParticipantFontSize 18
+  ParticipantFontStyle bold
+}
+
+' Line styles for different connection types - bolder for presentations
+!define SYNC_LINE -[#D32F2F,thickness=4]->
+!define ASYNC_LINE -[#388E3C,thickness=4,dashed]->
+!define DATA_LINE -[#F57C00,thickness=4]->
+!define CONTROL_LINE -[#7B1FA2,thickness=4]->
+!define OPTIONAL_LINE -[#616161,thickness=2,dotted]->

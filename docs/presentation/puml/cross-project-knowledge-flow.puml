@@ -1,0 +1,84 @@
+@startuml cross-project-knowledge-flow
+!include _standard-style.puml
+
+' Presentation overrides - larger fonts and bolder lines
+skinparam defaultFontSize 18
+skinparam defaultFontStyle bold
+skinparam component {
+  BorderThickness 3
+  FontSize 18
+}
+skinparam package {
+  BorderThickness 3
+  FontSize 20
+  FontStyle bold
+}
+skinparam arrow {
+  Thickness 3
+  FontSize 14
+  FontStyle bold
+  Color #1976D2
+}
+skinparam database {
+  BorderThickness 3
+  FontSize 18
+}
+skinparam storage {
+  BorderThickness 3
+  FontSize 18
+}
+skinparam cloud {
+  BorderThickness 3
+  FontSize 18
+}
+skinparam rectangle {
+  BorderThickness 3
+  FontSize 18
+}
+
+title Cross-Project Knowledge Flow
+
+' Left side: Automatic capture
+package "Automatic Capture" as automatic #E8F5E9 {
+  rectangle "Live Coding\nSession" as session
+  rectangle "Streaming\nExtractor" as extractor
+}
+
+' Right side: Manual capture
+package "Manual Capture" as manual #FFF9C4 {
+  rectangle "Developer\nReflection" as reflection
+  rectangle "UKB\nCLI" as ukb
+}
+
+' Center: Central storage
+database "Central Graph DB" as graphdb
+
+storage "JSON Exports" as exports
+
+cloud "Git Team\nCollaboration" as team
+
+' Bottom: Retrieval
+package "All Projects" as retrieval #E1F5FE {
+  rectangle "curriculum" as curr_proj
+  rectangle "nano-degree" as nano_proj
+  rectangle "coding" as coding_proj
+}
+
+' Automatic flow (left path)
+session -down-> extractor
+extractor -down-> graphdb : auto-store
+
+' Manual flow (right path)
+reflection -down-> ukb
+ukb -down-> graphdb : manual-store
+
+' Export and collaboration flow (center)
+graphdb -down-> exports : export
+exports -down-> team : git push/pull
+team -down-> exports : sync
+
+' Retrieval flow (bottom)
+exports -down-> graphdb : import
+graphdb -down-> retrieval : shared\nknowledge
+
+@enduml
