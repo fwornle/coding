@@ -1,32 +1,43 @@
 # VKB - View Knowledge Base Visualization
 
-**Version**: 2.0
-**Last Updated**: 2025-10-19
-**New Features**: Online Knowledge Integration
+**Version**: 3.0 (Phase 4)
+**Last Updated**: 2025-10-24
+**New Architecture**: GraphDB Primary Storage with JSON Git-Tracked Persistence
 
 ## Overview
 
-VKB (View Knowledge Base) is an interactive web-based visualization tool for exploring knowledge graphs from both manual (batch) and auto-learned (online) knowledge sources. It uses D3.js force-directed graphs to visualize entities, relationships, and observations in an intuitive and interactive way.
+VKB (View Knowledge Base) is an interactive web-based visualization tool for exploring knowledge graphs stored in the centralized GraphDB (Graphology + LevelDB). It uses D3.js force-directed graphs to visualize entities, relationships, and observations in an intuitive and interactive way.
 
-## What's New in v2.0
+**Phase 4 Architecture**:
+- **Primary Storage**: GraphDB at `.data/knowledge-graph/` (runtime access)
+- **Git-Tracked Exports**: JSON files at `.data/knowledge-export/*.json` (team collaboration)
+- **Default Mode**: `online` - reads directly from GraphDB
+- **Legacy Support**: `batch` mode for JSON file access (deprecated)
 
-### Multi-Source Knowledge Display
+## What's New in v3.0 (Phase 4)
 
-VKB now supports three distinct data sources:
+### GraphDB-First Architecture
 
-1. **Batch Knowledge** (📘 Manual/UKB)
-   - Manually curated knowledge from `ukb` commands
-   - Stored in `shared-memory-*.json` files
-   - Blue color scheme in visualization
+VKB now reads directly from the centralized GraphDB:
 
-2. **Online Knowledge** (🌐 Auto-learned)
-   - Automatically extracted from Claude conversations
-   - Stored in Qdrant (vectors) + SQLite (metadata)
-   - Green color scheme in visualization
+1. **GraphDB Direct Access** (Default - `online` mode)
+   - Real-time access to graph database
+   - Reads entities from `GraphDB.queryEntities()`
+   - Reads relations from `GraphDB.queryRelations()`
+   - No intermediate JSON files needed for runtime
+   - Team-scoped via node ID pattern: `${team}:${entityName}`
 
-3. **Combined View** (🔄 Both)
-   - Merged view of both batch and online knowledge
-   - Distinguishes sources by color coding
+2. **JSON Export Files** (Git-Tracked Persistence)
+   - Located at `.data/knowledge-export/*.json`
+   - Auto-exported with 5-second debounce from GraphDB
+   - Used for cross-project and cross-team collaboration
+   - Imported back to GraphDB on startup
+   - **NOT used for VKB runtime access**
+
+3. **Legacy Batch Mode** (Deprecated)
+   - Old JSON file-based access
+   - Still supported via `VKB_DATA_SOURCE=batch`
+   - Will be removed in future versions
 
 ### Visual Color Coding
 
@@ -45,17 +56,17 @@ VKB now supports three distinct data sources:
 ### Starting VKB Server
 
 ```bash
-# Default: Batch knowledge only
+# Default: GraphDB direct access (online mode)
 vkb start
 
-# With online knowledge (combined view)
-vkb start --with-online
-
-# Online knowledge only
-vkb start --online-only
+# Legacy JSON file mode (deprecated)
+VKB_DATA_SOURCE=batch vkb start
 
 # Start in foreground for debugging
 vkb fg
+
+# Team-scoped visualization
+KNOWLEDGE_VIEW=coding,ui vkb start
 ```
 
 ### Access the Visualization
@@ -161,50 +172,55 @@ export CODING_KB_PATH=/path/to/knowledge
 
 ## Data Source Modes
 
-### Batch Mode (Default)
+### Online Mode (Default) ✅ RECOMMENDED
 
-**What it shows**: Manually curated knowledge from UKB commands
+**What it shows**: Real-time access to GraphDB
 
-**How it's generated**:
+**How it works**:
+- VKB queries GraphDB directly via `GraphDatabaseService`
+- Reads entities: `GraphDB.queryEntities({ team, limit: 5000 })`
+- Reads relations: `GraphDB.queryRelations({ team, limit: 5000 })`
+- No JSON file dependency for runtime access
+- Data is always current with latest GraphDB state
+
+**Usage**:
 ```bash
-# Create batch knowledge
-ukb "Pattern: Use React hooks for state management"
-
-# View in VKB
+# Default mode - no environment variable needed
 vkb start
+
+# Explicit online mode
+VKB_DATA_SOURCE=online vkb start
 ```
 
-**File**: `memory.json`
-**Color**: Blue nodes
+**Storage**: `.data/knowledge-graph/` (LevelDB + Graphology)
 
-### Online Mode
+### Batch Mode (Legacy) ⚠️ DEPRECATED
 
-**What it shows**: Auto-learned knowledge from Claude conversations
+**What it shows**: Static JSON file contents
 
-**How it's generated**:
-- Automatic extraction during Claude Code sessions
-- Knowledge patterns detected via semantic analysis
-- Stored in Qdrant vector database + SQLite metadata
+**When to use**: Only for debugging or when GraphDB is unavailable
 
-**File**: `memory-online.json`
-**Color**: Green nodes
+**How it works**:
+- Reads from `.data/knowledge-export/*.json` files
+- These files are git-tracked exports from GraphDB
+- Used for cross-project collaboration, NOT runtime access
 
-**View online knowledge**:
+**Usage**:
 ```bash
-vkb start --online-only
+# Legacy mode (not recommended)
+VKB_DATA_SOURCE=batch vkb start
 ```
+
+**Storage**: `.data/knowledge-export/*.json`
 
 ### Combined Mode
 
-**What it shows**: Merged view of both batch and online knowledge
+**What it shows**: Hybrid access (GraphDB + JSON files)
 
-**How to use**:
+**Usage**:
 ```bash
-vkb start --with-online
+VKB_DATA_SOURCE=combined vkb start
 ```
-
-**File**: `memory-combined.json`
-**Visualization**: Color-coded by source (blue for batch, green for online)
 
 ---
 
@@ -449,10 +465,10 @@ Future versions will support:
 - Binary: `/Users/q284340/Agentic/coding/bin/vkb-cli.js`
 - Wrapper: `/Users/q284340/Agentic/coding/knowledge-management/vkb`
 
-**Data Files**:
-- Batch: `/Users/q284340/Agentic/coding/shared-memory-*.json`
-- Online: `/Users/q284340/Agentic/coding/memory-visualizer/dist/memory-online.json`
-- Combined: `/Users/q284340/Agentic/coding/memory-visualizer/dist/memory-combined.json`
+**Data Storage**:
+- GraphDB: `/Users/q284340/Agentic/coding/.data/knowledge-graph/` (PRIMARY)
+- JSON Exports: `/Users/q284340/Agentic/coding/.data/knowledge-export/*.json` (git-tracked)
+- Visualization Cache: `/Users/q284340/Agentic/coding/memory-visualizer/dist/memory*.json` (generated)
 
 **Visualizer**:
 - Directory: `/Users/q284340/Agentic/coding/memory-visualizer/`

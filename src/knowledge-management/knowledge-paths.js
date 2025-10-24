@@ -48,8 +48,8 @@ export function getCodingRepoPath() {
 
   // Verify the path exists (prefer repoPath if it looks valid)
   try {
-    const fs = await import('fs/promises');
-    await fs.access(path.join(repoPath, 'package.json'));
+    const fs = require('fs');
+    fs.accessSync(path.join(repoPath, 'package.json'));
     return repoPath;
   } catch {
     return fallbackPath;

@@ -41,7 +41,8 @@ package "VKB Server Module (lib/vkb-server)" {
 package "External Dependencies" {
   [Python 3\nHTTP Server] as python
   [memory-visualizer\n(React App)] as visualizer
-  [shared-memory.json] as sharedmem
+  [GraphDatabaseService\n(GraphDB)] as graphdb
+  [DatabaseManager\n(SQLite + Qdrant)] as dbmgr
   [knowledge-management/] as km
 }
 
@@ -67,10 +68,11 @@ index --> logging : log messages
 servermgr --> python : spawn/kill process
 servermgr --> fetch : health checks
 
-' Data processing
-dataproc --> sharedmem : read/convert
+' Data processing (Phase 4: GraphDB primary)
+dataproc --> graphdb : query entities/relations\n(online mode - default)
+dataproc --> dbmgr : initialize databases
 dataproc --> km : create symlink
-dataproc --> visualizer : write NDJSON
+dataproc --> visualizer : write memory.json
 
 ' External deps
 cli --> commander : CLI framework
@@ -80,6 +82,7 @@ servermgr --> fetch : HTTP requests
 note right of vkb : Minimal wrapper\n~130 lines\n(was 579 lines)
 note right of index : Core API\nProgrammatic access
 note right of servermgr : Process lifecycle\nPort management
-note right of dataproc : NDJSON conversion\nData preparation
+note right of dataproc : Phase 4: GraphDB primary\nJSON exports for git-tracking\nDefault mode: online
+note right of graphdb : .data/knowledge-graph/\nGraphology + LevelDB\nPRIMARY storage
 
 @enduml

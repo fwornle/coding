@@ -67,7 +67,11 @@ vkb-cli server logs -n 50
 
 - **Automatic port management**: Detects and handles port conflicts
 - **Process management**: Proper PID tracking and cleanup
-- **Data synchronization**: Converts shared-memory.json to NDJSON format
+- **Multi-source data access**: Reads from GraphDB (primary) and JSON exports (git-tracked persistence)
+- **Three data modes**:
+  - `online` (default) - GraphDB direct access
+  - `batch` - Legacy JSON file mode
+  - `combined` - Hybrid mode
 - **Logging**: Structured logging with timestamps
 - **Cross-platform**: Works on macOS, Linux, and Windows (with Python 3)
 
@@ -79,9 +83,31 @@ vkb-cli server logs -n 50
 - Chalk (terminal colors)
 - Node-fetch (HTTP requests)
 
+## Data Architecture (Phase 4)
+
+VKB follows the Phase 4 knowledge management architecture:
+
+- **Primary Runtime Storage**: GraphDB (Graphology + LevelDB) at `.data/knowledge-graph/`
+- **Git-Tracked Persistence**: JSON exports at `.data/knowledge-export/*.json`
+- **Default Mode**: `online` - reads entities and relations directly from GraphDB
+- **Legacy Mode**: `batch` - reads from JSON files (deprecated for runtime use)
+
+### Environment Variables
+
+```bash
+# Data source mode (online is default and recommended)
+export VKB_DATA_SOURCE=online    # GraphDB (default)
+export VKB_DATA_SOURCE=batch     # JSON files (legacy)
+export VKB_DATA_SOURCE=combined  # Hybrid mode
+
+# Team-scoped views
+export KNOWLEDGE_VIEW=coding,ui  # Multi-team visualization
+```
+
 ## Integration
 
 This module is designed to work with:
-- `knowledge-api`: For data access
+- `GraphDatabaseService`: Primary data source (Graphology + LevelDB)
+- `DatabaseManager`: SQLite metadata and optional Qdrant vectors
 - `memory-visualizer`: The React visualization app
 - `ukb-cli`: For knowledge base updates
