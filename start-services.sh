@@ -1,11 +1,30 @@
 #!/bin/bash
 
-# Simple reliable service startup script
-# This replaces the complex startup system
+# Robust service startup script with retry logic and graceful degradation
+# Uses Node.js-based service starter for better error handling and retry mechanisms
 
 set -e
 
-echo "🚀 Starting Coding Services..."
+echo "🚀 Starting Coding Services (Robust Mode)..."
+
+# Get the script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Check if ROBUST_MODE is enabled (default: enabled)
+ROBUST_MODE="${ROBUST_MODE:-true}"
+
+if [ "$ROBUST_MODE" = "true" ]; then
+    echo "✨ Using robust startup mode with retry logic and graceful degradation"
+    echo ""
+
+    # Use the Node.js-based robust service starter
+    exec node "$SCRIPT_DIR/scripts/start-services-robust.js"
+fi
+
+# LEGACY MODE (kept for backward compatibility, disable with ROBUST_MODE=false)
+echo "⚠️  Using LEGACY startup mode (no retry logic)"
+echo "   To enable robust mode, unset ROBUST_MODE or set ROBUST_MODE=true"
+echo ""
 
 # Load environment variables from .env files (for API keys like GROQ_API_KEY)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
