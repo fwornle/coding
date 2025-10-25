@@ -48,28 +48,4 @@ Dashboard -up-> Coordinator : managed by
 TranscriptMon -up-> Coordinator : managed by
 VKB -up-> StartScript : started by
 
-note right of PSM_Registry
-  **Single Source of Truth**
-  - Tracks all processes
-  - Session-aware
-  - Auto-cleanup
-  - File-locked
-end note
-
-note right of Coordinator
-  **Service Lifecycle Manager**
-  - Start/Stop/Restart
-  - Health monitoring
-  - Auto-recovery
-  - Registers with PSM
-end note
-
-note right of Watchdog
-  **Failsafe Monitor**
-  - Runs every 60s (launchd)
-  - Monitors coordinator
-  - Auto-restart if dead
-  - Uses PSM as truth
-end note
-
 @enduml

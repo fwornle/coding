@@ -390,6 +390,17 @@
         "last_updated": "2025-08-03T17:48:10.358Z"
       },
       "id": "mc4flkg1c4nyxs"
+    },
+    {
+      "name": "TestOnlinePattern",
+      "entityType": "Pattern",
+      "observations": [
+        "Online/auto-learned test pattern",
+        "Used for testing online knowledge filtering"
+      ],
+      "source": "auto",
+      "team": "coding",
+      "confidence": 0.9
     }
   ],
   "relations": [

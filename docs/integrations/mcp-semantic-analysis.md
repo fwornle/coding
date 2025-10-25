@@ -12,17 +12,26 @@ The MCP Semantic Analysis Server is a standalone Node.js application that provid
 
 ### 11 Intelligent Agents
 
+**Orchestration (1 agent):**
+11. **CoordinatorAgent** - Orchestrates ALL agents via workflow definitions with step dependencies and data flow
+
+**Analysis Agents (5 agents - No LLM):**
 1. **GitHistoryAgent** - Analyzes git commits and architectural decisions
 2. **VibeHistoryAgent** - Processes conversation files for context
-3. **SemanticAnalysisAgent** - Deep code analysis correlating git and conversations
-4. **WebSearchAgent** - External pattern research and reference gathering
-5. **InsightGenerationAgent** - Generates insights with PlantUML diagrams
+4. **WebSearchAgent** - External pattern research via DuckDuckGo (No LLM)
 6. **ObservationGenerationAgent** - Creates structured UKB-compatible observations
-7. **QualityAssuranceAgent** - Validates outputs with auto-correction
 8. **PersistenceAgent** - Manages knowledge base persistence
-9. **SynchronizationAgent** - Multi-source data synchronization
+
+**LLM-Powered Agents (3 agents):**
+3. **SemanticAnalysisAgent** - Deep code analysis using 3-tier LLM chain
+5. **InsightGenerationAgent** - Generates insights with PlantUML diagrams using LLMs
+7. **QualityAssuranceAgent** - Validates outputs with auto-correction using LLMs
+
+**Infrastructure Agents (2 agents):**
+9. **SynchronizationAgent** - Syncs between Graphology DB, shared-memory.json, and MCP Memory (placeholder)
 10. **DeduplicationAgent** - Semantic duplicate detection and merging
-11. **CoordinatorAgent** - Workflow orchestration and agent coordination
+
+**LLM Provider Chain:** Custom LLM (primary) → Anthropic Claude (secondary) → OpenAI GPT (fallback)
 
 ### 12 MCP Tools
 
@@ -48,7 +57,33 @@ The MCP Semantic Analysis Server is a standalone Node.js application that provid
 The MCP server integrates with Claude Code through the Model Context Protocol:
 
 ```
-Claude Code → MCP Protocol → Semantic Analysis Server → 11 Agents → Analysis Results
+Claude Code → MCP Protocol → Semantic Analysis Server → CoordinatorAgent → 10 Worker Agents → Analysis Results
+```
+
+### Agent Coordination Model
+
+**CRITICAL**: The `CoordinatorAgent` is the **ONLY** component that directly invokes other agents. Agents do NOT call each other directly.
+
+**Workflow Execution:**
+
+1. MCP tool invoked (e.g., `execute_workflow "complete-analysis"`)
+2. Coordinator loads workflow definition with steps and dependencies
+3. For each step:
+   - Resolves dependencies from previous steps
+   - Injects results via templating: `{{step_name.result}}`
+   - Executes agent with prepared parameters
+   - Stores results for dependent steps
+4. Returns final aggregated results
+
+**Example Data Flow:**
+
+```text
+Step 1: GitHistory.analyze() → {{git_results}}
+Step 2: VibeHistory.analyze() → {{vibe_results}}
+Step 3: Semantic.analyze({{git_results}}, {{vibe_results}}) → {{semantic_results}}
+Step 4: WebSearch.research({{semantic_results}}) → {{web_results}}
+Step 5: Insights.generate({{semantic_results}}, {{web_results}}) → {{insights}}
+...
 ```
 
 ### Configuration
@@ -74,8 +109,8 @@ Configured in `~/.config/Claude/claude_desktop_config.json`:
 
 **Within Claude Code session:**
 
-```
-# Analyze current repository
+```json
+// Analyze current repository
 determine_insights {
   "repository": ".",
   "conversationContext": "Current refactoring work",
@@ -112,6 +147,7 @@ For complete documentation, see:
 **[integrations/mcp-server-semantic-analysis/README.md](../../integrations/mcp-server-semantic-analysis/README.md)**
 
 Topics covered:
+
 - Detailed agent descriptions
 - Complete tool reference
 - Configuration options
