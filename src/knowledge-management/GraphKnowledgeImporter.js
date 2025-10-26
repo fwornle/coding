@@ -193,6 +193,7 @@ export class GraphKnowledgeImporter {
       significance: entity.significance,
       problem: entity.problem,
       solution: entity.solution,
+      source: entity.source || 'manual',  // Preserve source field (auto/manual)
       created_at: entity.metadata?.created_at || new Date().toISOString(),
       last_modified: entity.metadata?.last_updated || new Date().toISOString()
     };

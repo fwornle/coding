@@ -46,12 +46,14 @@ case "${1:-start}" in
             shift || true
         fi
         # Handle data source flags
-        DATA_SOURCE_MODE="batch"  # default
-        if [[ "${1:-}" == "--with-online" ]]; then
+        # DEFAULT: Use GraphDB (online mode) - shared-memory files are deprecated
+        DATA_SOURCE_MODE="online"
+        if [[ "${1:-}" == "--with-batch" ]]; then
+            # Legacy batch mode (requires shared-memory-*.json files)
             DATA_SOURCE_MODE="combined"
             shift || true
-        elif [[ "${1:-}" == "--online-only" ]]; then
-            DATA_SOURCE_MODE="online"
+        elif [[ "${1:-}" == "--batch-only" ]]; then
+            DATA_SOURCE_MODE="batch"
             shift || true
         fi
         export VKB_DATA_SOURCE="$DATA_SOURCE_MODE"
@@ -128,18 +130,18 @@ Commands:
 
 Options:
   --with-cache-clear  Clear cache before starting (not implemented)
-  --with-online       Include online-learned knowledge (combined view)
-  --online-only       Show only online-learned knowledge
+  --with-batch        Include batch knowledge from shared-memory files (combined view)
+  --batch-only        Show only batch knowledge (legacy mode)
 
 Data Sources:
-  • Batch (default):  Manual knowledge from shared-memory.json (UKB)
-  • Online:           Auto-learned knowledge from databases
-  • Combined:         Both batch and online knowledge
+  • Online (default): GraphDB knowledge (auto-learned + manual via UKB)
+  • Batch (legacy):   Manual knowledge from shared-memory.json files
+  • Combined:         Both online and batch knowledge
 
 Examples:
-  vkb                      Start with batch knowledge only (default)
-  vkb --with-online        Start with both batch and online knowledge
-  vkb --online-only        Start with online knowledge only
+  vkb                      Start with GraphDB knowledge (default)
+  vkb --with-batch         Start with both GraphDB and legacy batch files
+  vkb --batch-only         Start with batch files only (requires shared-memory-*.json)
   vkb fg                   Start in foreground mode for debugging
   vkb restart              Restart the server
   vkb logs -n 50           Show last 50 log lines

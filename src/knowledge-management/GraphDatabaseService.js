@@ -151,8 +151,8 @@ export class GraphDatabaseService extends EventEmitter {
 
     // Add or update node in graph
     if (this.graph.hasNode(nodeId)) {
-      // Update existing node
-      this.graph.setNodeAttributes(nodeId, attributes);
+      // Update existing node - replaceNodeAttributes is the correct Graphology API
+      this.graph.replaceNodeAttributes(nodeId, attributes);
     } else {
       // Create new node
       this.graph.addNode(nodeId, attributes);

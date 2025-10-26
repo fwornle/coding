@@ -262,6 +262,7 @@ export class DatabaseManager extends EventEmitter {
     try {
       // Dynamic import to avoid loading if not needed
       const { GraphDatabaseService } = await import('../knowledge-management/GraphDatabaseService.js');
+      const { GraphKnowledgeImporter } = await import('../knowledge-management/GraphKnowledgeImporter.js');
 
       // Create graph database instance
       this.graphDB = new GraphDatabaseService({
@@ -274,6 +275,13 @@ export class DatabaseManager extends EventEmitter {
 
       // Initialize the graph database
       await this.graphDB.initialize();
+
+      // Import knowledge from JSON exports on startup (Phase 4 bidirectional sync)
+      const importer = new GraphKnowledgeImporter(this.graphDB, {
+        autoImportOnStartup: true,
+        conflictResolution: 'newest-wins'
+      });
+      await importer.initialize();
 
       this.health.graph = {
         available: true,

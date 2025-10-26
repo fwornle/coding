@@ -294,10 +294,11 @@ class EnhancedTranscriptMonitor {
     }
 
     try {
-      // Initialize database manager
+      // Initialize database manager (without GraphDB to avoid lock conflicts with VKB)
       const databaseManager = new DatabaseManager({
         projectPath: this.config.projectPath,
-        debug: this.debug_enabled
+        debug: this.debug_enabled,
+        graphDb: { enabled: false }  // Disable GraphDB - VKB server owns the GraphDB lock
       });
       await databaseManager.initialize();
 

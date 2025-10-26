@@ -102,8 +102,8 @@ const SERVICE_CONFIGS = {
         // Ignore errors
       }
 
-      // Set data source mode to combined (batch + online)
-      const env = { ...process.env, VKB_DATA_SOURCE: 'combined' };
+      // Use GraphDB as the primary data source (no shared-memory files needed)
+      const env = { ...process.env, VKB_DATA_SOURCE: 'online' };
 
       const child = spawn('node', [
         path.join(CODING_DIR, 'lib/vkb-server/cli.js'),

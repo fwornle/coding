@@ -342,9 +342,11 @@ export class KnowledgeQueryService {
   async getTeams() {
     // Delegate to graph database if available
     if (this.graphDatabase) {
+      console.log('[KnowledgeQueryService] Using GraphDB for teams');
       return await this.graphDatabase.getTeams();
     }
 
+    console.log('[KnowledgeQueryService] GraphDB not available, using SQLite fallback');
     // Fallback to SQLite
     if (!this.databaseManager.health.sqlite.available) {
       throw new Error('SQLite database unavailable');
