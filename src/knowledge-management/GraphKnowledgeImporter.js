@@ -222,11 +222,30 @@ export class GraphKnowledgeImporter {
       throw new Error(`Target entity "${relation.to}" not found`);
     }
 
+    // Check if relation already exists (deduplicate)
+    const fromId = `${team}:${relation.from}`;
+    const toId = `${team}:${relation.to}`;
+    const relationType = relation.relationType || relation.type || 'related-to';
+
+    // Check if edge already exists with same type
+    if (this.graphService.graph.hasDirectedEdge(fromId, toId)) {
+      const existingEdges = this.graphService.graph.directedEdges(fromId, toId);
+      const duplicate = existingEdges.some(edgeId => {
+        const attrs = this.graphService.graph.getEdgeAttributes(edgeId);
+        return attrs.type === relationType;
+      });
+
+      if (duplicate) {
+        // Skip duplicate relation
+        return;
+      }
+    }
+
     // Store relationship
     await this.graphService.storeRelationship(
       relation.from,
       relation.to,
-      relation.relationType || relation.type || 'related-to',
+      relationType,
       {
         team,
         ...relation.metadata

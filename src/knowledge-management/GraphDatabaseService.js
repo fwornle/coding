@@ -370,12 +370,45 @@ export class GraphDatabaseService extends EventEmitter {
 
     // Get all nodes and filter them
     let results = [];
+    const filteredInsightNodeIds = new Set(); // Only insight nodes (not System, not Project)
 
+    // First pass: Get regular entities (non-Project, non-System) that match filters
     this.graph.forEachNode((nodeId, attributes) => {
-      // Apply filters
+      // Apply team filter
       if (team && attributes.team !== team) return;
+
+      const entityType = attributes.entityType;
+      const isSystem = entityType === 'System';
+      const isProject = entityType === 'Project';
+
+      // System nodes are ALWAYS visible (ignore all filters)
+      if (isSystem) {
+        results.push({
+          id: nodeId,
+          entity_name: attributes.name,
+          entity_type: entityType || 'Unknown',
+          observations: attributes.observations || [],
+          extraction_type: attributes.extraction_type || null,
+          classification: attributes.classification || null,
+          confidence: attributes.confidence !== undefined ? attributes.confidence : 1.0,
+          source: attributes.source || 'manual',
+          team: attributes.team,
+          extracted_at: attributes.created_at || attributes.extracted_at,
+          last_modified: attributes.last_modified,
+          session_id: attributes.session_id || null,
+          embedding_id: attributes.embedding_id || null,
+          metadata: attributes.metadata || {}
+        });
+        return;
+      }
+
+      // Project nodes are handled in second pass (only if referenced)
+      if (isProject) return;
+
+      // Apply source filter to regular insight nodes
       if (source && attributes.source !== source) return;
-      if (types && types.length > 0 && !types.includes(attributes.entityType)) return;
+
+      if (types && types.length > 0 && !types.includes(entityType)) return;
       if (minConfidence > 0 && (attributes.confidence === undefined || attributes.confidence < minConfidence)) return;
 
       // Date filtering
@@ -388,9 +421,59 @@ export class GraphDatabaseService extends EventEmitter {
         if (!nameMatch) return;
       }
 
+      // Add to filtered insight nodes set (NOT System nodes)
+      filteredInsightNodeIds.add(nodeId);
+
       // Map to SQL-compatible format
       results.push({
         id: nodeId,
+        entity_name: attributes.name,
+        entity_type: entityType || 'Unknown',
+        observations: attributes.observations || [],
+        extraction_type: attributes.extraction_type || null,
+        classification: attributes.classification || null,
+        confidence: attributes.confidence !== undefined ? attributes.confidence : 1.0,
+        source: attributes.source || 'manual',
+        team: attributes.team,
+        extracted_at: attributes.created_at || attributes.extracted_at,
+        last_modified: attributes.last_modified,
+        session_id: attributes.session_id || null,
+        embedding_id: attributes.embedding_id || null,
+        metadata: attributes.metadata || {}
+      });
+    });
+
+    // Second pass: Add Project nodes that are referenced by filtered INSIGHT nodes (not System nodes)
+    const referencedProjectIds = new Set();
+
+    // ONLY check for Project nodes referenced by insight nodes, NOT by System nodes
+    filteredInsightNodeIds.forEach(nodeId => {
+      // Check outgoing edges
+      this.graph.forEachOutEdge(nodeId, (edgeId, attributes, source, target) => {
+        const targetAttrs = this.graph.getNodeAttributes(target);
+        if (targetAttrs.entityType === 'Project') {
+          referencedProjectIds.add(target);
+        }
+      });
+
+      // Check incoming edges
+      this.graph.forEachInEdge(nodeId, (edgeId, attributes, source, target) => {
+        const sourceAttrs = this.graph.getNodeAttributes(source);
+        if (sourceAttrs.entityType === 'Project') {
+          referencedProjectIds.add(source);
+        }
+      });
+    });
+
+    // Add referenced Project nodes to results
+    referencedProjectIds.forEach(projectId => {
+      const attributes = this.graph.getNodeAttributes(projectId);
+
+      // Apply team filter
+      if (team && attributes.team !== team) return;
+
+      results.push({
+        id: projectId,
         entity_name: attributes.name,
         entity_type: attributes.entityType || 'Unknown',
         observations: attributes.observations || [],
