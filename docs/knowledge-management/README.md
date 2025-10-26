@@ -13,7 +13,7 @@
 | **[System Comparison](system-comparison.md)** | **START HERE** - Understand all three knowledge systems | All users |
 | **[Continuous Learning System](continuous-learning-system.md)** | Real-time session learning | Developers |
 | **UKB/VKB** (this document) | Manual knowledge capture & visualization | Team leads |
-| **[MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)** | Deep code analysis with 11 agents | Architects |
+| **[MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)** | Deep code analysis with 10 agents | Architects |
 
 ---
 
@@ -47,9 +47,9 @@ The coding project provides **three knowledge management systems** that work tog
 
 ### 3. MCP Semantic Analysis (Deep Code Analysis)
 
-**[Documentation](../integrations/mcp-semantic-analysis.md)** - 11-agent deep analysis:
+**[Documentation](../integrations/mcp-semantic-analysis.md)** - 10-agent deep analysis:
 
-- **11 specialized agents** for comprehensive code analysis
+- **10 specialized agents** for comprehensive code analysis
 - **On-demand analysis** via MCP tools
 - **Repository-wide** pattern extraction
 - **Architecture diagrams** with PlantUML
@@ -614,7 +614,7 @@ This ensures:
 
 ### Integration Documentation
 
-- **[MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)** - 11-agent AI-powered analysis system
+- **[MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)** - 10-agent AI-powered analysis system
 - **[VSCode CoPilot](../integrations/vscode-copilot.md)** - VSCode extension with knowledge management
 - **[Browser Access](../integrations/browser-access.md)** - Web research and data extraction
 

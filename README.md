@@ -29,7 +29,7 @@ coding --copilot
 - **📋 Live Session Logging** - Real-time conversation classification and routing
 - **🛡️ Constraint Monitoring** - PreToolUse hook enforcement for code quality
 - **🧠 Knowledge Management** - Capture, visualize, and share development insights
-- **🤖 Multi-Agent Analysis** - 11 specialized AI agents for comprehensive code analysis
+- **🤖 Multi-Agent Analysis** - 10 specialized AI agents for comprehensive code analysis
 - **📊 Status Line System** - Real-time health monitoring and activity indicators
 - **🚀 Trajectory Generation** - Automated project analysis and documentation
 
@@ -67,7 +67,7 @@ coding --copilot
 ### Integration Components
 
 - **[Integrations Overview](docs/integrations/README.md)** - All integration components
-- **[MCP Semantic Analysis](docs/integrations/mcp-semantic-analysis.md)** - 11-agent AI analysis system
+- **[MCP Semantic Analysis](docs/integrations/mcp-semantic-analysis.md)** - 10-agent AI analysis system
 - **[MCP Constraint Monitor](docs/integrations/mcp-constraint-monitor.md)** - Real-time constraint enforcement
 - **[Serena AST Analysis](docs/integrations/serena-ast-analysis.md)** - Structure-aware code search
 - **[Browser Access](docs/integrations/browser-access.md)** - Browser automation (Stagehand)
@@ -123,19 +123,18 @@ Capture, organize, and visualize development insights with git-based team collab
 
 ### Multi-Agent Semantic Analysis
 
-11 specialized agents for comprehensive code analysis:
+10 specialized agents for comprehensive code analysis:
 
-1. **GitHistoryAgent** - Git commits and architectural decisions
-2. **VibeHistoryAgent** - Conversation file processing
-3. **SemanticAnalysisAgent** - Deep code analysis
-4. **WebSearchAgent** - External pattern research
-5. **InsightGenerationAgent** - Insight generation with PlantUML
-6. **ObservationGenerationAgent** - Structured UKB-compatible observations
-7. **QualityAssuranceAgent** - Output validation with auto-correction
-8. **PersistenceAgent** - Knowledge base persistence
-9. **SynchronizationAgent** - Multi-source data synchronization
+1. **CoordinatorAgent** - Workflow orchestration
+2. **GitHistoryAgent** - Git commits and architectural decisions
+3. **VibeHistoryAgent** - Conversation file processing
+4. **SemanticAnalysisAgent** - Deep code analysis (uses LLM)
+5. **WebSearchAgent** - External pattern research
+6. **InsightGenerationAgent** - Insight generation with PlantUML (uses LLM)
+7. **ObservationGenerationAgent** - Structured UKB-compatible observations
+8. **QualityAssuranceAgent** - Output validation with auto-correction (uses LLM)
+9. **PersistenceAgent** - Knowledge base persistence
 10. **DeduplicationAgent** - Semantic duplicate detection
-11. **CoordinatorAgent** - Workflow orchestration
 
 **Status**: ✅ Production Ready
 
@@ -255,7 +254,7 @@ cd integrations/mcp-constraint-monitor && npm test
 ✅ **Live Session Logging** - Real-time classification with 98.3% security
 ✅ **Constraint Monitoring** - 18 active constraints with PreToolUse hooks
 ✅ **Knowledge Management** - UKB/VKB with MCP integration
-✅ **Multi-Agent Analysis** - 11 agents with workflow orchestration
+✅ **Multi-Agent Analysis** - 10 agents with workflow orchestration
 ✅ **Status Line System** - 4-layer health monitoring
 ✅ **Cross-Platform** - macOS, Linux, Windows support
 

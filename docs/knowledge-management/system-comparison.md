@@ -8,7 +8,7 @@
 
 The coding project contains **TWO COMPLEMENTARY knowledge management systems** that work together to provide comprehensive code intelligence and learning capabilities:
 
-1. **MCP Semantic Analysis Server** - Deep code analysis with 11 specialized agents
+1. **MCP Semantic Analysis Server** - Deep code analysis with 10 specialized agents
 2. **Continuous Learning Knowledge System** - Real-time session learning with agent-agnostic architecture
 
 **Important**: These are **NOT parallel implementations** but **complementary systems** designed to work together.
@@ -20,7 +20,7 @@ The coding project contains **TWO COMPLEMENTARY knowledge management systems** t
 | Aspect | MCP Semantic Analysis Server | Continuous Learning System |
 |--------|------------------------------|---------------------------|
 | **Primary Purpose** | Deep code analysis & insight generation | Real-time knowledge extraction from coding sessions |
-| **Agents** | 11 specialized agents | 1 agent (ConceptAbstractionAgent) |
+| **Agents** | 10 specialized agents | 1 agent (ConceptAbstractionAgent) |
 | **Focus** | Repository analysis, git history, patterns | Live coding session learning |
 | **Activation** | On-demand via MCP tools | Automatic during coding sessions |
 | **Integration** | MCP Protocol (Claude Code) | Agent-agnostic (Claude, Copilot, Cursor, etc.) |
@@ -38,21 +38,20 @@ The coding project contains **TWO COMPLEMENTARY knowledge management systems** t
 
 ### What It Does
 
-Provides **deep, on-demand code analysis** through 11 specialized AI agents via the Model Context Protocol.
+Provides **deep, on-demand code analysis** through 10 specialized AI agents via the Model Context Protocol.
 
-### 11 Specialized Agents
+### 10 Specialized Agents
 
-1. **GitHistoryAgent** - Analyzes git commits and architectural decisions from repository history
-2. **VibeHistoryAgent** - Processes conversation files (.vibe, .claude) for contextual understanding
-3. **SemanticAnalysisAgent** - Deep code analysis correlating git history with conversations
-4. **WebSearchAgent** - External pattern research and reference gathering
-5. **InsightGenerationAgent** - Generates insights with PlantUML diagrams
-6. **ObservationGenerationAgent** - Creates structured UKB-compatible observations
-7. **QualityAssuranceAgent** - Validates outputs with auto-correction
-8. **PersistenceAgent** - Manages knowledge base persistence
-9. **SynchronizationAgent** - Multi-source data synchronization
+1. **CoordinatorAgent** - Workflow orchestration and agent coordination
+2. **GitHistoryAgent** - Analyzes git commits and architectural decisions from repository history
+3. **VibeHistoryAgent** - Processes conversation files (.vibe, .claude) for contextual understanding
+4. **SemanticAnalysisAgent** - Deep code analysis correlating git history with conversations (uses LLM)
+5. **WebSearchAgent** - External pattern research and reference gathering
+6. **InsightGenerationAgent** - Generates insights with PlantUML diagrams (uses LLM)
+7. **ObservationGenerationAgent** - Creates structured UKB-compatible observations
+8. **QualityAssuranceAgent** - Validates outputs with auto-correction (uses LLM)
+9. **PersistenceAgent** - Manages knowledge base persistence
 10. **DeduplicationAgent** - Semantic duplicate detection and merging
-11. **CoordinatorAgent** - Workflow orchestration and agent coordination
 
 ### When to Use
 
@@ -204,7 +203,7 @@ The three systems work together in a complementary pipeline:
 ### Architecture Style
 
 **MCP Semantic Analysis**:
-- **Agent-based architecture** (11 specialized agents)
+- **Agent-based architecture** (10 specialized agents)
 - **Coordinator pattern** (CoordinatorAgent orchestrates workflows)
 - **MCP protocol** (Model Context Protocol for communication)
 - **On-demand execution** (triggered by MCP tool calls)
@@ -325,7 +324,7 @@ These systems **do NOT replace each other**. They are designed to coexist:
 
 | System | Purpose | Agents | Storage | Activation |
 |--------|---------|--------|---------|------------|
-| **MCP Semantic Analysis** | Deep code analysis | 11 agents | UKB (Graph DB + JSON) | On-demand (MCP tools) |
+| **MCP Semantic Analysis** | Deep code analysis | 10 agents | UKB (Graph DB + JSON) | On-demand (MCP tools) |
 | **Continuous Learning** | Real-time session learning | 1 agent | Qdrant + SQLite | Automatic (always on) |
 
 **Recommendation**: **Use BOTH systems** for maximum knowledge management capabilities. They complement each other and do not conflict.

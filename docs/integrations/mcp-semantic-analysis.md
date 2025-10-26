@@ -2,7 +2,7 @@
 
 **Component**: [mcp-server-semantic-analysis](../../integrations/mcp-server-semantic-analysis/)
 **Type**: MCP Server (Node.js)
-**Purpose**: AI-powered code analysis with 11 specialized agents
+**Purpose**: AI-powered code analysis with 10 specialized agents and Graphology+LevelDB persistence
 
 ---
 
@@ -10,26 +10,27 @@
 
 The MCP Semantic Analysis Server is a standalone Node.js application that provides comprehensive AI-powered code analysis through the Model Context Protocol.
 
-### 11 Intelligent Agents
+### 10 Intelligent Agents
 
 **Orchestration (1 agent):**
-11. **CoordinatorAgent** - Orchestrates ALL agents via workflow definitions with step dependencies and data flow
+10. **CoordinatorAgent** - Orchestrates ALL agents via workflow definitions with step dependencies, data flow, and GraphDB integration
 
 **Analysis Agents (5 agents - No LLM):**
 1. **GitHistoryAgent** - Analyzes git commits and architectural decisions
 2. **VibeHistoryAgent** - Processes conversation files for context
 4. **WebSearchAgent** - External pattern research via DuckDuckGo (No LLM)
 6. **ObservationGenerationAgent** - Creates structured UKB-compatible observations
-8. **PersistenceAgent** - Manages knowledge base persistence
+8. **PersistenceAgent** - Persists entities to Graphology+LevelDB graph database
 
 **LLM-Powered Agents (3 agents):**
 3. **SemanticAnalysisAgent** - Deep code analysis using 3-tier LLM chain
 5. **InsightGenerationAgent** - Generates insights with PlantUML diagrams using LLMs
 7. **QualityAssuranceAgent** - Validates outputs with auto-correction using LLMs
 
-**Infrastructure Agents (2 agents):**
-9. **SynchronizationAgent** - Syncs between Graphology DB, shared-memory.json, and MCP Memory (placeholder)
-10. **DeduplicationAgent** - Semantic duplicate detection and merging
+**Infrastructure Agents (1 agent):**
+9. **DeduplicationAgent** - Semantic duplicate detection and merging
+
+**Note**: SynchronizationAgent has been removed - GraphDatabaseService handles all persistence automatically via Graphology (in-memory) + LevelDB (persistent storage)
 
 **LLM Provider Chain:** Custom LLM (primary) → Anthropic Claude (secondary) → OpenAI GPT (fallback)
 
@@ -117,7 +118,7 @@ determine_insights {
   "depth": 10
 }
 
-# Execute complete analysis workflow
+# Execute complete analysis workflow (persists to graph DB)
 execute_workflow {
   "workflow_name": "complete-analysis"
 }
@@ -128,6 +129,11 @@ extract_patterns {
   "pattern_types": ["design", "security"]
 }
 ```
+
+**Storage Architecture:**
+- All entities stored to GraphDB: `.data/knowledge-graph/` (Graphology + LevelDB)
+- Auto-export to `shared-memory-coding.json` every 30 seconds
+- Insight `.md` files written to `knowledge-management/insights/`
 
 ---
 

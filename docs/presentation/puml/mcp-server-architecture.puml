@@ -1,0 +1,94 @@
+@startuml mcp-server-architecture
+!include _standard-style.puml
+
+' Presentation-optimized version (landscape, larger fonts, minimal notes)
+
+skinparam defaultFontSize 14
+skinparam titleFontSize 20
+skinparam packageFontSize 16
+skinparam componentFontSize 13
+skinparam noteFontSize 11
+skinparam ArrowThickness 2
+
+title MCP Semantic Analysis Server - 10-Agent Architecture
+
+left to right direction
+
+package "MCP Server" as SERVER {
+  component "MCP\nProtocol" as MCP <<infra>>
+  component "Tool Layer\n(12 Tools)" as TOOLS <<api>>
+
+  package "Coordinator" as COORD_PKG {
+    component "Coordinator\nAgent" as COORDINATOR <<agent>> #FFE6CC
+  }
+
+  package "9 Worker Agents" as AGENTS_PKG {
+    component "Git\nHistory" as GIT <<agent>> #E6F3FF
+    component "Vibe\nHistory" as VIBE <<agent>> #E6F3FF
+    component "Semantic\nAnalysis" as SEMANTIC <<agent>> #FFE6E6
+    component "Web\nSearch" as WEB <<agent>> #E6F3FF
+    component "Insight\nGeneration" as INSIGHT <<agent>> #FFE6E6
+    component "Observation\nGeneration" as OBS <<agent>> #E6F3FF
+    component "Quality\nAssurance" as QA <<agent>> #FFE6E6
+    component "Persistence" as PERSIST <<agent>> #E6F3FF
+    component "Deduplication" as DEDUP <<agent>> #E6F3FF
+  }
+}
+
+package "Storage" as STORAGE_PKG {
+  database "GraphDB\n(Graphology+\nLevelDB)" as GRAPHDB <<storage>> #D4EDDA
+  component "Graph\nExporter" as EXPORTER <<infra>>
+  file "shared-memory-\ncoding.json" as JSON <<storage>>
+}
+
+cloud "LLMs\n(3-tier chain)" as LLMS <<external>> #FFE6E6
+cloud "Git Repo &\nHistory Files" as DATA_SOURCES <<external>> #E6F3FF
+
+' Main flow
+MCP --> TOOLS
+TOOLS --> COORDINATOR
+COORDINATOR --> GIT
+COORDINATOR --> VIBE
+COORDINATOR --> SEMANTIC
+COORDINATOR --> WEB
+COORDINATOR --> INSIGHT
+COORDINATOR --> OBS
+COORDINATOR --> QA
+COORDINATOR --> PERSIST
+COORDINATOR --> DEDUP
+
+' Storage connections
+COORDINATOR ..> GRAPHDB : "Initializes"
+PERSIST --> GRAPHDB : "Stores"
+DEDUP --> GRAPHDB : "Queries"
+GRAPHDB --> EXPORTER : "Auto-persist\n30s"
+EXPORTER --> JSON : "Exports"
+
+' External connections
+GIT --> DATA_SOURCES
+VIBE --> DATA_SOURCES
+SEMANTIC ..> LLMS : "3 agents\nuse LLMs"
+INSIGHT ..> LLMS
+QA ..> LLMS
+
+note top of COORDINATOR
+  **Orchestrates workflow:**
+  All agents coordinated via
+  step definitions & dependencies
+end note
+
+note bottom of GRAPHDB
+  **No MCP Memory**
+  GraphDB handles all persistence
+  Exporter creates JSON snapshots
+end note
+
+legend right
+  |= Color |= Meaning |
+  | <back:#FFE6E6>   </back> | Uses LLMs |
+  | <back:#E6F3FF>   </back> | No LLM |
+  | <back:#FFE6CC>   </back> | Orchestrator |
+  | <back:#D4EDDA>   </back> | Storage |
+endlegend
+
+@enduml
