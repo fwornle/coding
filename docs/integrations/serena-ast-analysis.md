@@ -77,7 +77,7 @@ retrieve_semantic_code {
 
 For complete documentation, see:
 
-**[integrations/serena/README.md](../../integrations/serena/README.md)**
+**[integrations/serena/README.md](https://github.com/oraios/serena/blob/main/README.md)**
 
 Topics covered:
 - Complete tool reference

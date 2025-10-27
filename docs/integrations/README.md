@@ -28,7 +28,7 @@ Each integration component:
 - Knowledge base synchronization
 - Comprehensive semantic analysis workflows
 
-**Documentation**: [mcp-semantic-analysis.md](mcp-semantic-analysis.md) | [Full README](../../integrations/mcp-server-semantic-analysis/README.md)
+**Documentation**: [mcp-semantic-analysis.md](mcp-semantic-analysis.md) | [Full README](https://github.com/fwornle/mcp-server-semantic-analysis/blob/main/README.md)
 
 #### MCP Constraint Monitor
 **Location**: `integrations/mcp-constraint-monitor/`
@@ -40,7 +40,7 @@ Each integration component:
 - Compliance scoring and violation tracking
 - Interactive and automated testing frameworks
 
-**Documentation**: [mcp-constraint-monitor.md](mcp-constraint-monitor.md) | [Full README](../../integrations/mcp-constraint-monitor/README.md)
+**Documentation**: [mcp-constraint-monitor.md](mcp-constraint-monitor.md) | [Full README](https://github.com/fwornle/mcp-constraint-monitor/blob/main/README.md)
 
 ### Code Analysis
 
@@ -54,7 +54,7 @@ Each integration component:
 - Refactoring support with dependency analysis
 - Cross-language analysis support
 
-**Documentation**: [serena-ast-analysis.md](serena-ast-analysis.md) | [Full README](../../integrations/serena/README.md)
+**Documentation**: [serena-ast-analysis.md](serena-ast-analysis.md) | [Full README](https://github.com/oraios/serena/blob/main/README.md)
 
 ### Browser Automation
 

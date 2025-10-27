@@ -152,7 +152,7 @@ node collect-test-results.js  # Extracts evidence from LSL files
 
 For complete documentation, see:
 
-**[integrations/mcp-constraint-monitor/README.md](../../integrations/mcp-constraint-monitor/README.md)**
+**[integrations/mcp-constraint-monitor/README.md](https://github.com/fwornle/mcp-constraint-monitor/blob/main/README.md)**
 
 Topics covered:
 - Complete constraint definitions

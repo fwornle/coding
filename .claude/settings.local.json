@@ -76,7 +76,8 @@
       "Bash(bin/vkb restart:*)",
       "Bash(ps:*)",
       "Bash(git submodule:*)",
-      "mcp__serena__find_referencing_symbols"
+      "mcp__serena__find_referencing_symbols",
+      "Bash(git config:*)"
     ],
     "deny": [],
     "ask": []

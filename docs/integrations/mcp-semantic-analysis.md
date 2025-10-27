@@ -150,7 +150,7 @@ extract_patterns {
 
 For complete documentation, see:
 
-**[integrations/mcp-server-semantic-analysis/README.md](../../integrations/mcp-server-semantic-analysis/README.md)**
+**[integrations/mcp-server-semantic-analysis/README.md](https://github.com/fwornle/mcp-server-semantic-analysis/blob/main/README.md)**
 
 Topics covered:
 
