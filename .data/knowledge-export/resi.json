@@ -36,7 +36,7 @@
     },
     {
       "name": "StreamProcessingPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         "Handle high-volume streaming data with back-pressure and flow control",
         "Implement windowing strategies for time-based aggregations",
@@ -55,7 +55,7 @@
     },
     {
       "name": "SchemaEvolutionPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         "Handle schema changes in streaming data without service disruption",
         "Implement backward/forward compatibility strategies",
@@ -89,19 +89,19 @@
     {
       "from": "StreamProcessingPattern",
       "to": "Normalisa",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "metadata": {}
     },
     {
       "from": "SchemaEvolutionPattern",
       "to": "Normalisa",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "metadata": {}
     },
     {
       "from": "Normalisa",
       "to": "CollectiveKnowledge",
-      "relationType": "contributed patterns to",
+      "relationType": "contributes_to",
       "metadata": {}
     }
   ],

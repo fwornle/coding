@@ -119,7 +119,7 @@ if [[ -d "$CODING_REPO/integrations/serena" ]]; then
 fi
 
 # Clean up node_modules in MCP servers
-for dir in "integrations/browser-access" "integrations/claude-logger-mcp" "integrations/mcp-server-semantic-analysis" "mcp-memory-server"; do
+for dir in "integrations/browser-access" "integrations/claude-logger-mcp" "integrations/mcp-server-semantic-analysis"; do
     if [[ -d "$CODING_REPO/$dir/node_modules" ]]; then
         rm -rf "$CODING_REPO/$dir/node_modules"
         echo "  Removed $dir/node_modules"

@@ -36,7 +36,7 @@
     },
     {
       "name": "KnowledgePersistencePattern",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "rule",
@@ -112,7 +112,7 @@
     },
     {
       "name": "NetworkAwareInstallationPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "rule",
@@ -151,7 +151,7 @@
     },
     {
       "name": "MCPMemoryLoggingIntegrationPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "rule",
@@ -190,7 +190,7 @@
     },
     {
       "name": "VSCodeExtensionBridgePattern",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "rule",
@@ -229,7 +229,7 @@
     },
     {
       "name": "CodingWorkflow",
-      "entityType": "WorkflowPattern",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "checklist",
@@ -273,7 +273,7 @@
     },
     {
       "name": "UkbCli",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         "UKB script had grown too large and complex (3000+ lines), making it difficult to maintain and extend. The monolithic bash script mixed concerns and lacked a stable API for cross-platform knowledge management.",
         "Complete refactoring from bash script to Node.js CLI tool with modular architecture, stable API, and comprehensive documentation. Created ukb-cli package with separated concerns, proper error handling, and enhanced functionality.",
@@ -293,7 +293,7 @@
     },
     {
       "name": "VkbCli",
-      "entityType": "TechnicalPattern",
+      "entityType": "Pattern",
       "observations": [
         "VKB visualization system grew complex with server management, data processing, and web interface coordination challenges. Monolithic bash script lacked proper error handling and cross-platform reliability.",
         "Complete refactoring from bash script to Node.js CLI tool with VKBServer class API, Commander.js interface, and modular data processing. Created vkb-server package with separated concerns and cross-platform compatibility.",
@@ -313,7 +313,7 @@
     },
     {
       "name": "SemanticAnalysisWorkflowIssue",
-      "entityType": "TechnicalIssue",
+      "entityType": "Pattern",
       "observations": [
         "MCP coordinator workflow returns placeholder responses instead of executing full 8-agent pipeline. Server connected but coordinator not fully implemented. Expected outputs (MD, PUML, PNG files, shared-memory updates) not generated."
       ],
@@ -328,7 +328,7 @@
     },
     {
       "name": "SemanticAnalysis8AgentSystemImplementation",
-      "entityType": "SystemImplementation",
+      "entityType": "Pattern",
       "observations": [
         "Successfully implemented the complete 8-agent semantic analysis system. Replaced mock workflow handler with real coordinator execution engine. Implemented agent integration including RepositoryAnalyzer, SemanticAnalyzer, WebSearchAgent, KnowledgeManager, SynchronizationAgent, DeduplicationAgent, DocumentationAgent, and QA validation. System now executes real workflows with step-by-step coordination, quality assurance, and artifact generation. Key achievement: transformed placeholder responses into fully functional multi-agent pipeline."
       ],
@@ -343,7 +343,7 @@
     },
     {
       "name": "ComprehensiveSemanticAnalysis",
-      "entityType": "AnalysisInsight",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "insight",
@@ -369,7 +369,7 @@
     },
     {
       "name": "ConfigurationPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         "Problem: Multi-agent architecture complexity in semantic analysis system",
         "Solution: Modular agent architecture with TypeScript type safety",
@@ -388,7 +388,7 @@
     },
     {
       "name": "DocumentationUpdatesPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "Pattern",
       "observations": [
         "Problem: Multi-agent architecture complexity in semantic analysis system",
         "Solution: Modular agent architecture with TypeScript type safety",
@@ -426,7 +426,7 @@
     {
       "from": "CodingWorkflow",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
@@ -447,7 +447,7 @@
     {
       "from": "Coding",
       "to": "CollectiveKnowledge",
-      "relationType": "contributed patterns to",
+      "relationType": "contributes_to",
       "confidence": 1,
       "metadata": {}
     },
@@ -517,77 +517,77 @@
     {
       "from": "ComprehensiveSemanticAnalysis",
       "to": "CollectiveKnowledge",
-      "relationType": "contributes to",
+      "relationType": "contributes_to",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ComprehensiveSemanticAnalysis",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ConfigurationPattern",
       "to": "CollectiveKnowledge",
-      "relationType": "contributes to",
+      "relationType": "contributes_to",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ConfigurationPattern",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "DocumentationUpdatesPattern",
       "to": "CollectiveKnowledge",
-      "relationType": "contributes to",
+      "relationType": "contributes_to",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "DocumentationUpdatesPattern",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "KnowledgePersistencePattern",
       "to": "UkbCli",
-      "relationType": "enhances",
+      "relationType": "extends",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "KnowledgePersistencePattern",
       "to": "VkbCli",
-      "relationType": "enhances",
+      "relationType": "extends",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "KnowledgePersistencePattern",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "MCPMemoryLoggingIntegrationPattern",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "NetworkAwareInstallationPattern",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
@@ -615,21 +615,21 @@
     {
       "from": "TestOnlinePattern",
       "to": "VSCodeExtensionBridgePattern",
-      "relationType": "similar_to",
+      "relationType": "related_to",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "UkbCli",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "VSCodeExtensionBridgePattern",
       "to": "KnowledgePersistencePattern",
-      "relationType": "enhances",
+      "relationType": "extends",
       "confidence": 1,
       "metadata": {}
     },
@@ -643,21 +643,21 @@
     {
       "from": "VSCodeExtensionBridgePattern",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "VkbCli",
       "to": "Coding",
-      "relationType": "implemented in",
+      "relationType": "implemented_in",
       "confidence": 1,
       "metadata": {}
     },
     {
       "from": "TestOnlinePattern",
       "to": "Coding",
-      "relationType": "belongs_to",
+      "relationType": "contains",
       "confidence": 1,
       "metadata": {}
     }

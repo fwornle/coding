@@ -844,19 +844,6 @@ fi
 
 print_test "MCP servers"
 
-print_check "Memory server (MCP)"
-MCP_MEMORY_SERVER="$CODING_ROOT/lib/mcp-memory-server.js"
-MCP_MEMORY_SERVER_ALT="$CODING_ROOT/mcp-memory-server/index.js"
-if file_exists "$MCP_MEMORY_SERVER"; then
-    print_pass "MCP memory server found"
-elif file_exists "$MCP_MEMORY_SERVER_ALT"; then
-    print_pass "MCP memory server found (alternative location)"
-elif dir_exists "$CODING_ROOT/mcp-memory-server"; then
-    print_pass "MCP memory server directory found"
-else
-    print_warning "MCP memory server not found - will be created when needed"
-fi
-
 print_check "Browser automation server"
 if dir_exists "$CODING_ROOT/integrations/mcp-server-browserbase"; then
     print_pass "Browserbase MCP server found"
