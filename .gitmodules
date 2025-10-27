@@ -4,3 +4,6 @@
 [submodule "integrations/memory-visualizer"]
 	path = integrations/memory-visualizer
 	url = git@github.com:fwornle/memory-visualizer.git
+[submodule "integrations/mcp-server-semantic-analysis"]
+	path = integrations/mcp-server-semantic-analysis
+	url = git@github.com:fwornle/mcp-server-semantic-analysis.git
