@@ -52,6 +52,8 @@ class ClassificationLogger {
 
     this.decisions = [];
     this.windowedLogs = new Map(); // Track logs by time window
+    this.finalizedWindows = new Set(); // Track which windows are finalized
+    this.decisionCountByWindow = new Map(); // Track decision count per window
 
     // Ensure log directory exists
     fs.mkdirSync(this.logDir, { recursive: true });
@@ -60,6 +62,88 @@ class ClassificationLogger {
     // to prevent regenerating status files on restart when no new decisions exist
     const existingDecisions = this.readAllDecisionsFromDisk();
     this.lastFinalizedDecisionCount = existingDecisions.length;
+
+    // Initialize window tracking from existing markdown files
+    this.initializeWindowTracking();
+  }
+
+  /**
+   * Initialize window tracking from existing markdown files on disk
+   * This prevents regenerating already-finalized windows
+   */
+  initializeWindowTracking() {
+    try {
+      // Read local markdown files
+      const localFiles = fs.readdirSync(this.logDir)
+        .filter(f => f.endsWith('.md') && !f.includes('_from-'));
+
+      for (const file of localFiles) {
+        const windowName = file.replace('.md', '');
+
+        // Count decisions in this window from JSONL files
+        const decisionCount = this.countDecisionsInWindow(windowName);
+
+        if (decisionCount > 0) {
+          this.finalizedWindows.add(windowName);
+          this.decisionCountByWindow.set(windowName, decisionCount);
+        }
+      }
+
+      // Read coding markdown files (from-<project> postfix)
+      const codingLogDir = path.join(this.codingRepo, '.specstory', 'logs', 'classification');
+      if (fs.existsSync(codingLogDir)) {
+        const codingFiles = fs.readdirSync(codingLogDir)
+          .filter(f => f.endsWith(`_from-${this.projectName}.md`));
+
+        for (const file of codingFiles) {
+          const windowName = file.replace(`_from-${this.projectName}.md`, '');
+
+          // Count decisions in this window from JSONL files
+          const decisionCount = this.countDecisionsInWindow(windowName);
+
+          if (decisionCount > 0) {
+            this.finalizedWindows.add(windowName);
+            this.decisionCountByWindow.set(windowName, decisionCount);
+          }
+        }
+      }
+
+      console.log(`📊 Initialized tracking for ${this.finalizedWindows.size} existing windows`);
+    } catch (error) {
+      console.warn(`⚠️ Error initializing window tracking: ${error.message}`);
+    }
+  }
+
+  /**
+   * Count decisions in a specific window from JSONL files
+   */
+  countDecisionsInWindow(windowName) {
+    const jsonlFile = path.join(this.logDir, `${windowName}.jsonl`);
+
+    if (!fs.existsSync(jsonlFile)) {
+      return 0;
+    }
+
+    try {
+      const content = fs.readFileSync(jsonlFile, 'utf8');
+      const lines = content.trim().split('\n').filter(line => line.trim());
+
+      let count = 0;
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          if (entry.type === 'classification_decision') {
+            count++;
+          }
+        } catch (e) {
+          // Skip invalid JSON lines
+        }
+      }
+
+      return count;
+    } catch (error) {
+      return 0;
+    }
   }
 
   /**
@@ -222,7 +306,17 @@ class ClassificationLogger {
     }
 
     // Generate separate logs for LOCAL and CODING decisions per window
+    // CRITICAL: Only regenerate windows with NEW decisions
     for (const [fullWindow, windowDecisions] of decisionsByWindow.entries()) {
+      // Check if this window has new decisions
+      const previousCount = this.decisionCountByWindow.get(fullWindow) || 0;
+      const currentCount = windowDecisions.length;
+
+      // Skip if no new decisions in this window
+      if (currentCount === previousCount && this.finalizedWindows.has(fullWindow)) {
+        continue;
+      }
+
       // Split decisions by target
       const localDecisions = windowDecisions.filter(d => !d.classification.isCoding);
       const codingDecisions = windowDecisions.filter(d => d.classification.isCoding);
@@ -247,6 +341,10 @@ class ClassificationLogger {
         fs.writeFileSync(codingFile, codingContent, 'utf8');
         summaryFiles.push(codingFile);
       }
+
+      // Mark window as finalized and update count
+      this.decisionCountByWindow.set(fullWindow, currentCount);
+      this.finalizedWindows.add(fullWindow);
     }
 
     if (summaryFiles.length > 0) {

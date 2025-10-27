@@ -490,20 +490,139 @@ class LSLFileManager extends EventEmitter {
   }
   
   /**
+   * Analyze LSL file to determine if it contains useful information
+   * Returns true if file should be kept, false if it should be removed
+   *
+   * A file is considered worthless ONLY if it contains EXCLUSIVELY:
+   * - "Warmup" messages
+   * - "[Request interrupted by user]" messages
+   */
+  isValueableLSLFile(filePath) {
+    try {
+      if (!fs.existsSync(filePath)) {
+        return false;
+      }
+
+      const content = fs.readFileSync(filePath, 'utf8');
+
+      // Count all exchanges (lines with "### Text Exchange")
+      const exchangeMatches = content.match(/### Text Exchange/g) || [];
+      const totalExchanges = exchangeMatches.length;
+
+      if (totalExchanges === 0) {
+        // No exchanges at all - empty file
+        this.debug(`No exchanges found: ${path.basename(filePath)}`);
+        return false;
+      }
+
+      // Count warmup exchanges
+      const warmupMatches = content.match(/\*\*User Message:\*\* Warmup/gi) || [];
+      const warmupCount = warmupMatches.length;
+
+      // Count interrupted exchanges
+      const interruptedMatches = content.match(/\*\*User Message:\*\* \[Request interrupted by user\]/gi) || [];
+      const interruptedCount = interruptedMatches.length;
+
+      // Calculate worthless exchange count
+      const worthlessCount = warmupCount + interruptedCount;
+
+      // File is worthless ONLY if ALL exchanges are warmup or interrupted
+      if (worthlessCount === totalExchanges && worthlessCount > 0) {
+        this.debug(`All ${totalExchanges} exchanges are worthless (${warmupCount} warmups, ${interruptedCount} interruptions): ${path.basename(filePath)}`);
+        return false;
+      }
+
+      // File has at least one non-worthless exchange - keep it
+      this.debug(`File has ${totalExchanges - worthlessCount}/${totalExchanges} valuable exchanges: ${path.basename(filePath)}`);
+      return true;
+
+    } catch (error) {
+      this.debug(`Error analyzing LSL file ${filePath}: ${error.message}`);
+      return true; // Keep file if we can't analyze it (fail safe)
+    }
+  }
+
+  /**
+   * Clean up low-value LSL files in a directory
+   * Removes files that only contain warmups, interruptions, or no meaningful content
+   */
+  async cleanupLowValueLSLFiles(directory) {
+    try {
+      if (!fs.existsSync(directory)) {
+        return { removed: 0, reason: 'Directory does not exist' };
+      }
+
+      const files = fs.readdirSync(directory)
+        .filter(f => f.endsWith('.md') && f.match(/^\d{4}-\d{2}-\d{2}_\d{4}-\d{4}_/))
+        .map(f => path.join(directory, f));
+
+      let removedCount = 0;
+      const removedFiles = [];
+
+      for (const filePath of files) {
+        if (!this.isValueableLSLFile(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+            removedCount++;
+            removedFiles.push(path.basename(filePath));
+            this.debug(`🗑️  Removed low-value LSL: ${path.basename(filePath)}`);
+          } catch (error) {
+            this.debug(`Failed to remove low-value LSL ${filePath}: ${error.message}`);
+          }
+        }
+      }
+
+      if (removedCount > 0) {
+        console.log(`🧹 Cleaned up ${removedCount} low-value LSL file(s)`);
+        this.emit('lowValueFilesRemoved', {
+          directory,
+          removedCount,
+          removedFiles
+        });
+      }
+
+      return { removed: removedCount, files: removedFiles };
+
+    } catch (error) {
+      this.debug(`Low-value LSL cleanup failed for ${directory}: ${error.message}`);
+      return { removed: 0, error: error.message };
+    }
+  }
+
+  /**
    * Graceful shutdown
    */
   async shutdown() {
     this.debug('Shutting down LSL File Manager...');
-    
+
     this.stopMonitoring();
-    
+
     // Perform final check and rotation for all watched files
     try {
       await this.checkAllWatchedFiles();
     } catch (error) {
       this.debug(`Error during final file check: ${error.message}`);
     }
-    
+
+    // Clean up low-value LSL files before shutdown
+    try {
+      // Get unique directories from watched files
+      const directories = new Set();
+      for (const [filePath] of this.watchedFiles.entries()) {
+        const dir = path.dirname(filePath);
+        if (dir.includes('.specstory/history')) {
+          directories.add(dir);
+        }
+      }
+
+      // Clean up each directory
+      for (const dir of directories) {
+        await this.cleanupLowValueLSLFiles(dir);
+      }
+    } catch (error) {
+      this.debug(`Error during low-value file cleanup: ${error.message}`);
+    }
+
     this.watchedFiles.clear();
     this.emit('shutdown');
     this.debug('LSL File Manager shutdown complete');
