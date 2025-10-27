@@ -53,10 +53,12 @@ if [[ -d "$CODING_REPO/bin" ]]; then
     echo "  Removed bin directory"
 fi
 
-# Remove memory-visualizer (if installed by us)
-if [[ -d "$CODING_REPO/memory-visualizer" ]]; then
-    rm -rf "$CODING_REPO/memory-visualizer"
-    echo "  Removed memory-visualizer"
+# Clean memory-visualizer (git submodule - preserve source)
+if [[ -d "$CODING_REPO/integrations/memory-visualizer" ]]; then
+    echo "  Cleaning memory-visualizer (git submodule)..."
+    rm -rf "$CODING_REPO/integrations/memory-visualizer/node_modules"
+    rm -rf "$CODING_REPO/integrations/memory-visualizer/dist"
+    echo "    Removed build artifacts (source code preserved)"
 fi
 
 # Remove mcp-server-browserbase (if installed by us)
@@ -65,30 +67,29 @@ if [[ -d "$CODING_REPO/integrations/mcp-server-browserbase" ]]; then
     echo "  Removed mcp-server-browserbase"
 fi
 
-# Remove semantic analysis MCP server (Node.js)
+# Clean semantic analysis MCP server (git submodule - preserve source)
 if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis" ]]; then
-    echo "  Removing semantic analysis MCP server..."
-    
+    echo "  Cleaning semantic analysis MCP server (git submodule)..."
+
     # Remove node_modules
     if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis/node_modules" ]]; then
         rm -rf "$CODING_REPO/integrations/mcp-server-semantic-analysis/node_modules"
         echo "    Removed Node.js dependencies"
     fi
-    
+
     # Remove built dist directory
     if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis/dist" ]]; then
         rm -rf "$CODING_REPO/integrations/mcp-server-semantic-analysis/dist"
         echo "    Removed built TypeScript files"
     fi
-    
+
     # Remove logs directory
     if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis/logs" ]]; then
         rm -rf "$CODING_REPO/integrations/mcp-server-semantic-analysis/logs"
         echo "    Removed semantic analysis logs"
     fi
-    
-    # Note: We preserve the source code since it might be a local development environment
-    echo "  Semantic analysis MCP server cleaned (source code preserved)"
+
+    echo "    Git submodule source code preserved"
 fi
 
 # Remove Serena MCP server (Python uv)
@@ -118,8 +119,8 @@ if [[ -d "$CODING_REPO/integrations/serena" ]]; then
     echo "  Serena MCP server cleaned (source code preserved)"
 fi
 
-# Clean up node_modules in MCP servers
-for dir in "integrations/browser-access" "integrations/claude-logger-mcp" "integrations/mcp-server-semantic-analysis"; do
+# Clean up node_modules in MCP servers (non-submodules)
+for dir in "integrations/browser-access"; do
     if [[ -d "$CODING_REPO/$dir/node_modules" ]]; then
         rm -rf "$CODING_REPO/$dir/node_modules"
         echo "  Removed $dir/node_modules"
@@ -129,6 +130,9 @@ for dir in "integrations/browser-access" "integrations/claude-logger-mcp" "integ
         echo "  Removed $dir/dist"
     fi
 done
+
+# Note: memory-visualizer and mcp-server-semantic-analysis are git submodules
+# and have already been cleaned above
 
 # Remove .coding-tools directory
 if [[ -d "$HOME/.coding-tools" ]]; then

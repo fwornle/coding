@@ -30,7 +30,7 @@ INSTALL_LOG="$CODING_REPO/install.log"
 # Repository URLs - will be set based on CN/VPN detection
 MEMORY_VISUALIZER_REPO_SSH=""
 MEMORY_VISUALIZER_REPO_HTTPS=""
-MEMORY_VISUALIZER_DIR="$CODING_REPO/memory-visualizer"
+MEMORY_VISUALIZER_DIR="$CODING_REPO/integrations/memory-visualizer"
 
 BROWSERBASE_REPO_SSH=""
 BROWSERBASE_REPO_HTTPS=""
@@ -373,43 +373,42 @@ handle_non_mirrored_repo_cn() {
     success "All required dependencies are installed"
 }
 
-# Install memory-visualizer
+# Install memory-visualizer (git submodule)
 install_memory_visualizer() {
-    echo -e "\n${CYAN}📊 Installing memory-visualizer...${NC}"
-    
-    if [[ -d "$MEMORY_VISUALIZER_DIR" ]]; then
-        info "Memory visualizer already exists, updating..."
+    echo -e "\n${CYAN}📊 Installing memory-visualizer (git submodule)...${NC}"
+
+    cd "$CODING_REPO"
+
+    if [[ -d "$MEMORY_VISUALIZER_DIR/.git" ]]; then
+        info "Memory visualizer submodule already exists, updating..."
         cd "$MEMORY_VISUALIZER_DIR"
-        
-        # Simple update - no remote manipulation
-        info "Updating from current remote: $(git remote get-url origin 2>/dev/null || echo 'unknown')"
         if timeout 10s git pull origin main 2>/dev/null; then
             success "Memory visualizer updated"
         else
             warning "Could not update memory-visualizer, using existing version"
         fi
     else
-        info "Cloning memory-visualizer repository..."
-        clone_repository "$MEMORY_VISUALIZER_REPO_SSH" "$MEMORY_VISUALIZER_REPO_HTTPS" "$MEMORY_VISUALIZER_DIR"
+        info "Initializing memory-visualizer submodule..."
+        git submodule update --init --recursive integrations/memory-visualizer || error_exit "Failed to initialize memory-visualizer submodule"
     fi
-    
+
     cd "$MEMORY_VISUALIZER_DIR"
-    
+
     # Install dependencies
     info "Installing memory-visualizer dependencies..."
     npm install || error_exit "Failed to install memory-visualizer dependencies"
-    
+
     # Build the visualizer
     info "Building memory-visualizer..."
     npm run build || error_exit "Failed to build memory-visualizer"
-    
+
     # Update vkb script to use local memory-visualizer
     if [[ "$PLATFORM" == "macos" ]]; then
         sed -i '' "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CODING_REPO/knowledge-management/vkb"
     else
         sed -i "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CODING_REPO/knowledge-management/vkb"
     fi
-    
+
     success "Memory visualizer installed successfully"
 }
 
@@ -453,52 +452,50 @@ install_browserbase() {
     cd "$CODING_REPO"
 }
 
-# Install semantic analysis MCP server
+# Install semantic analysis MCP server (git submodule)
 install_semantic_analysis() {
-    echo -e "\n${CYAN}🧠 Installing semantic analysis MCP server...${NC}"
-    
-    # Use dynamically set repository URLs
-    if [[ -d "$SEMANTIC_ANALYSIS_DIR" ]]; then
-        info "mcp-server-semantic-analysis already exists, updating..."
+    echo -e "\n${CYAN}🧠 Installing semantic analysis MCP server (git submodule)...${NC}"
+
+    cd "$CODING_REPO"
+
+    if [[ -d "$SEMANTIC_ANALYSIS_DIR/.git" ]]; then
+        info "mcp-server-semantic-analysis submodule already exists, updating..."
         cd "$SEMANTIC_ANALYSIS_DIR"
-        
-        # Simple update - no remote manipulation
-        info "Updating from current remote: $(git remote get-url origin 2>/dev/null || echo 'unknown')"
         if timeout 10s git pull origin main 2>/dev/null; then
             success "mcp-server-semantic-analysis updated"
         else
             warning "Could not update mcp-server-semantic-analysis, using existing version"
         fi
     else
-        info "Cloning mcp-server-semantic-analysis repository..."
-        clone_repository "$SEMANTIC_ANALYSIS_REPO_SSH" "$SEMANTIC_ANALYSIS_REPO_HTTPS" "$SEMANTIC_ANALYSIS_DIR"
+        info "Initializing mcp-server-semantic-analysis submodule..."
+        git submodule update --init --recursive integrations/mcp-server-semantic-analysis || error_exit "Failed to initialize semantic-analysis submodule"
     fi
-    
+
     # Only proceed with build if we have the repository
     if [[ -d "$SEMANTIC_ANALYSIS_DIR" && -f "$SEMANTIC_ANALYSIS_DIR/package.json" ]]; then
         info "Installing semantic analysis dependencies..."
         cd "$SEMANTIC_ANALYSIS_DIR"
-        
+
         # Check for Node.js
         if ! command -v node &> /dev/null; then
             warning "Node.js not found. Please install Node.js 18+ to use semantic analysis."
             return 1
         fi
-        
+
         # Install dependencies and build
         npm install || warning "Failed to install semantic analysis dependencies"
         npm run build || warning "Failed to build semantic analysis server"
-        
+
         # Make built server executable
         if [[ -f "dist/index.js" ]]; then
             chmod +x dist/index.js
         fi
-        
+
         success "Semantic analysis MCP server installed successfully"
     else
         warning "Semantic analysis repository not available - skipping build"
     fi
-    
+
     cd "$CODING_REPO"
 }
 
@@ -709,22 +706,7 @@ install_mcp_servers() {
     else
         warning "browser-access directory not found, skipping..."
     fi
-    
-    
-    # Install claude-logger MCP server (optional - used for manual logging only)
-    if [[ -d "$CODING_REPO/integrations/claude-logger-mcp" ]]; then
-        info "Installing claude-logger MCP server..."
-        cd "$CODING_REPO/integrations/claude-logger-mcp"
-        npm install || error_exit "Failed to install claude-logger dependencies"
-        if npm run build; then
-            success "Claude-logger MCP server installed"
-        else
-            warning "Claude-logger build failed - continuing without it (automatic logging uses I/O interception)"
-        fi
-    else
-        warning "integrations/claude-logger-mcp directory not found, skipping..."
-    fi
-    
+
     # Install constraint-monitor with professional dashboard
     info "Setting up MCP Constraint Monitor with Professional Dashboard..."
     if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
@@ -1186,13 +1168,7 @@ verify_installation() {
     else
         warning "Browser-access MCP server not built"
     fi
-    
-    if [[ -f "$CODING_REPO/integrations/claude-logger-mcp/dist/index.js" ]]; then
-        success "Claude-logger MCP server is built"
-    else
-        warning "Claude-logger MCP server not built"
-    fi
-    
+
     # Check Constraint Monitor with Professional Dashboard
     if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
         success "MCP Constraint Monitor (standalone) configured"

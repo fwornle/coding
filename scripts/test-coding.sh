@@ -360,29 +360,29 @@ else
     print_fail "vkb command not found"
 fi
 
-print_check "Memory visualizer dependency"
-if dir_exists "$CODING_ROOT/memory-visualizer"; then
-    print_pass "Memory visualizer directory found"
-    
+print_check "Memory visualizer dependency (git submodule)"
+if dir_exists "$CODING_ROOT/integrations/memory-visualizer"; then
+    print_pass "Memory visualizer submodule found"
+
     print_check "Memory visualizer build status"
-    if [ -d "$CODING_ROOT/memory-visualizer/dist" ] || [ -d "$CODING_ROOT/memory-visualizer/build" ]; then
+    if [ -d "$CODING_ROOT/integrations/memory-visualizer/dist" ] || [ -d "$CODING_ROOT/integrations/memory-visualizer/build" ]; then
         print_pass "Memory visualizer appears built"
     else
         print_fail "Memory visualizer not built"
         print_repair "Building memory visualizer..."
-        cd "$CODING_ROOT/memory-visualizer"
+        cd "$CODING_ROOT/integrations/memory-visualizer"
         if [ -f "package.json" ]; then
             npm install && npm run build
             print_fixed "Memory visualizer built"
         fi
     fi
 else
-    print_fail "Memory visualizer directory not found"
-    print_repair "Cloning and building memory visualizer..."
+    print_fail "Memory visualizer submodule not found"
+    print_repair "Initializing memory visualizer submodule..."
     cd "$CODING_ROOT"
-    git clone https://github.com/fwornle/memory-visualizer
-    cd memory-visualizer && npm install && npm run build
-    print_fixed "Memory visualizer installed and built"
+    git submodule update --init --recursive integrations/memory-visualizer
+    cd integrations/memory-visualizer && npm install && npm run build
+    print_fixed "Memory visualizer submodule initialized and built"
 fi
 
 print_test "Multi-Team Knowledge Base Configuration"
