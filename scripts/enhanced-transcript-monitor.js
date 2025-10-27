@@ -688,9 +688,13 @@ class EnhancedTranscriptMonitor {
                   if (targetProject !== null) {
                     // FIX: Use tranche from the FIRST exchange in the set being written
                     const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-                    await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+                    const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+                    if (wasWritten) {
+                      this.currentUserPromptSet = [];
+                    }
+                  } else {
+                    this.currentUserPromptSet = [];
                   }
-                  this.currentUserPromptSet = [];
                 }
                 this.lastTranche = currentTranche;
               } else {
@@ -700,9 +704,13 @@ class EnhancedTranscriptMonitor {
                   if (targetProject !== null) {
                     // FIX: Use tranche from the FIRST exchange in the set being written
                     const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-                    await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+                    const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+                    if (wasWritten) {
+                      this.currentUserPromptSet = [];
+                    }
+                  } else {
+                    this.currentUserPromptSet = [];
                   }
-                  this.currentUserPromptSet = [];
                 }
               }
 
@@ -724,9 +732,13 @@ class EnhancedTranscriptMonitor {
           const targetProject = await this.determineTargetProject(this.currentUserPromptSet);
           console.log(`🎯 Final target project for streaming: ${targetProject}`);
           if (targetProject !== null) {
-            await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, currentTranche);
+            const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, currentTranche);
+            if (wasWritten) {
+              this.currentUserPromptSet = [];
+            }
+          } else {
+            this.currentUserPromptSet = [];
           }
-          this.currentUserPromptSet = [];
         }
       }
       
@@ -1065,44 +1077,8 @@ class EnhancedTranscriptMonitor {
       }
     }
 
-    // NEW: Filter out incomplete exchanges (Option 2 - Prevention)
-    // Incomplete exchanges will be re-checked on next monitoring cycle
-    const complete = unprocessed.filter(ex => {
-      // Consider exchange complete if:
-      // 1. It has a stop_reason (assistant response finished), OR
-      // 2. It's a user-only prompt with no assistant response yet (keep for now)
-      const hasResponse = ex.claudeResponse?.trim() || ex.assistantResponse?.trim() ||
-                         (ex.toolCalls && ex.toolCalls.length > 0);
-
-      if (!hasResponse) {
-        // User prompt with no response yet - keep checking
-        return false;
-      }
-
-      if (ex.isComplete) {
-        // Response is complete
-        return true;
-      }
-
-      // Response exists but not marked complete - wait for completion
-      this.debug(`⏳ Holding incomplete exchange ${ex.id} (has response but no stop_reason)`);
-      return false;
-    });
-
-    const incompleteCount = unprocessed.length - complete.length;
-    if (incompleteCount > 0) {
-      console.log(`⏳ Waiting for ${incompleteCount} incomplete exchange(s) to finish`);
-
-      // Log details for debugging
-      const incomplete = unprocessed.filter(ex => !complete.includes(ex));
-      incomplete.forEach(ex => {
-        const age = Date.now() - new Date(ex.timestamp).getTime();
-        const ageSeconds = Math.floor(age / 1000);
-        console.log(`   - Exchange ${ex.id.substring(0, 8)}: waiting ${ageSeconds}s for completion`);
-      });
-    }
-
-    return complete;
+    // Return all unprocessed exchanges - filtering moved to processUserPromptSetCompletion
+    return unprocessed;
   }
 
   /**
@@ -1500,9 +1476,26 @@ class EnhancedTranscriptMonitor {
 
   /**
    * Process user prompt set completion
+   * @returns {boolean} true if set was written, false if held back due to incomplete exchanges
    */
   async processUserPromptSetCompletion(completedSet, targetProject, tranche) {
-    if (completedSet.length === 0) return;
+    if (completedSet.length === 0) return false;
+
+    // NEW: Check if all exchanges are complete before writing
+    const incompleteExchanges = completedSet.filter(ex => {
+      const hasResponse = ex.claudeResponse?.trim() || ex.assistantResponse?.trim() ||
+                         (ex.toolCalls && ex.toolCalls.length > 0);
+      return hasResponse && !ex.isComplete;  // Has response but not complete
+    });
+
+    if (incompleteExchanges.length > 0) {
+      console.log(`⏳ Holding back prompt set - ${incompleteExchanges.length} exchange(s) still incomplete`);
+      incompleteExchanges.forEach(ex => {
+        const age = Date.now() - new Date(ex.timestamp).getTime();
+        console.log(`   - ${ex.id.substring(0, 8)}: waiting ${Math.floor(age/1000)}s`);
+      });
+      return false;  // Don't write yet, keep accumulating
+    }
 
     // Filter out exchanges with no meaningful content
     const meaningfulExchanges = completedSet.filter(exchange => {
@@ -1523,7 +1516,7 @@ class EnhancedTranscriptMonitor {
     // Only skip if literally no exchanges (should be rare)
     if (meaningfulExchanges.length === 0) {
       this.debug(`Skipping empty user prompt set - no meaningful exchanges`);
-      return;
+      return false;
     }
 
     const sessionFile = this.getSessionFilePath(targetProject, tranche);
@@ -1560,8 +1553,9 @@ class EnhancedTranscriptMonitor {
     // Update comprehensive trajectory instead of individual trajectory files
     // DISABLED: This was causing constant timestamp-only updates with minimal value
     // await this.updateComprehensiveTrajectory(targetProject);
-    
+
     console.log(`📋 Completed user prompt set: ${meaningfulExchanges.length}/${completedSet.length} exchanges → ${path.basename(sessionFile)}`);
+    return true;  // Successfully written
   }
 
   /**
@@ -1897,9 +1891,15 @@ class EnhancedTranscriptMonitor {
             if (targetProject !== null) {
               // FIX: Use tranche from the FIRST exchange in the set being written
               const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-              await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+              const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+              // Only clear if successfully written, otherwise keep accumulating
+              if (wasWritten) {
+                this.currentUserPromptSet = [];
+              }
+            } else {
+              // Skip non-relevant exchanges
+              this.currentUserPromptSet = [];
             }
-            this.currentUserPromptSet = [];
           }
 
           // NO LONGER CREATE EMPTY FILES AT SESSION BOUNDARIES
@@ -1914,7 +1914,14 @@ class EnhancedTranscriptMonitor {
             if (targetProject !== null) {
               // FIX: Use tranche from the FIRST exchange in the set being written
               const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-              await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+              const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+              // Only clear if successfully written
+              if (wasWritten) {
+                this.currentUserPromptSet = [];
+              }
+            } else {
+              // Skip non-relevant exchanges
+              this.currentUserPromptSet = [];
             }
 
             // Note: Redirect detection now handled by conversation-based analysis in status line
@@ -1957,9 +1964,14 @@ class EnhancedTranscriptMonitor {
       const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
       console.log(`🎯 Final target project: ${targetProject}`);
       if (targetProject !== null) {
-        await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, currentTranche);
+        const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, currentTranche);
+        // Only clear if successfully written
+        if (wasWritten) {
+          this.currentUserPromptSet = [];
+        }
+      } else {
+        this.currentUserPromptSet = [];
       }
-      this.currentUserPromptSet = [];
     }
   }
 
@@ -2075,9 +2087,11 @@ class EnhancedTranscriptMonitor {
       if (this.currentUserPromptSet.length > 0) {
         const currentTranche = this.getCurrentTimetranche();
         const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
-        
+
         if (targetProject !== null) {
+          // On shutdown, try to write even if incomplete (we're about to exit anyway)
           await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, currentTranche);
+          // Note: We don't check return value since we're shutting down
         }
       }
       
