@@ -61,10 +61,12 @@ if [[ -d "$CODING_REPO/integrations/memory-visualizer" ]]; then
     echo "    Removed build artifacts (source code preserved)"
 fi
 
-# Remove mcp-server-browserbase (if installed by us)
+# Clean mcp-server-browserbase (git submodule - preserve source)
 if [[ -d "$CODING_REPO/integrations/mcp-server-browserbase" ]]; then
-    rm -rf "$CODING_REPO/integrations/mcp-server-browserbase"
-    echo "  Removed mcp-server-browserbase"
+    echo "  Cleaning mcp-server-browserbase (git submodule)..."
+    rm -rf "$CODING_REPO/integrations/mcp-server-browserbase/node_modules"
+    rm -rf "$CODING_REPO/integrations/mcp-server-browserbase/dist"
+    echo "    Removed build artifacts (source code preserved)"
 fi
 
 # Clean semantic analysis MCP server (git submodule - preserve source)

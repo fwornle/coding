@@ -412,43 +412,36 @@ install_memory_visualizer() {
     success "Memory visualizer installed successfully"
 }
 
-# Install mcp-server-browserbase
+# Install mcp-server-browserbase (git submodule)
 install_browserbase() {
-    echo -e "\n${CYAN}🌐 Installing mcp-server-browserbase...${NC}"
-    
-    # Handle differently based on network location
-    if [[ "$INSIDE_CN" == true ]]; then
-        # Inside CN - use special handling for non-mirrored repo
-        handle_non_mirrored_repo_cn "mcp-server-browserbase" "$BROWSERBASE_REPO_SSH" "$BROWSERBASE_REPO_HTTPS" "$BROWSERBASE_DIR"
-        local clone_result=$?
-    else
-        # Outside CN - normal clone/update
-        if [[ -d "$BROWSERBASE_DIR" ]]; then
-            info "mcp-server-browserbase already exists, updating..."
-            cd "$BROWSERBASE_DIR"
-            if timeout 10s git pull origin main 2>/dev/null; then
-                success "mcp-server-browserbase updated"
-            else
-                warning "Could not update mcp-server-browserbase"
-            fi
-        else
-            info "Cloning mcp-server-browserbase repository..."
-            clone_repository "$BROWSERBASE_REPO_SSH" "$BROWSERBASE_REPO_HTTPS" "$BROWSERBASE_DIR"
-            local clone_result=$?
-        fi
-    fi
-    
-    # Only proceed with build if we have the repository
-    if [[ -d "$BROWSERBASE_DIR" ]]; then
-        info "Installing browserbase dependencies (includes stagehand)..."
+    echo -e "\n${CYAN}🌐 Installing mcp-server-browserbase (git submodule)...${NC}"
+
+    cd "$CODING_REPO"
+
+    if [[ -d "$BROWSERBASE_DIR/.git" ]]; then
+        info "mcp-server-browserbase submodule already exists, updating..."
         cd "$BROWSERBASE_DIR"
-        npm install || warning "Failed to install browserbase dependencies"
-        npm run build || warning "Failed to build browserbase"
-        success "Browserbase with Stagehand installed successfully"
+        if timeout 10s git pull origin main 2>/dev/null; then
+            success "mcp-server-browserbase updated"
+        else
+            warning "Could not update mcp-server-browserbase, using existing version"
+        fi
     else
-        warning "Browserbase repository not available - skipping build"
+        info "Initializing mcp-server-browserbase submodule..."
+        git submodule update --init --recursive integrations/mcp-server-browserbase || error_exit "Failed to initialize browserbase submodule"
     fi
-    
+
+    cd "$BROWSERBASE_DIR"
+
+    # Install dependencies and build
+    info "Installing browserbase dependencies (includes stagehand)..."
+    npm install || error_exit "Failed to install browserbase dependencies"
+
+    info "Building browserbase..."
+    npm run build || error_exit "Failed to build browserbase"
+
+    success "Browserbase with Stagehand installed successfully"
+
     cd "$CODING_REPO"
 }
 

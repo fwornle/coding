@@ -10,3 +10,6 @@
 [submodule "integrations/serena"]
 	path = integrations/serena
 	url = https://github.com/oraios/serena.git
+[submodule "integrations/mcp-server-browserbase"]
+	path = integrations/mcp-server-browserbase
+	url = https://github.com/browserbase/mcp-server-browserbase.git
