@@ -499,12 +499,14 @@ install_semantic_analysis() {
     cd "$CODING_REPO"
 }
 
-# Install Serena MCP server for AST-based code analysis
+# Install Serena MCP server for AST-based code analysis (git submodule)
 install_serena() {
-    echo -e "\n${CYAN}🔍 Installing Serena MCP server for AST-based code analysis...${NC}"
-    
+    echo -e "\n${CYAN}🔍 Installing Serena MCP server (git submodule)...${NC}"
+
     local serena_dir="$CODING_REPO/integrations/serena"
-    
+
+    cd "$CODING_REPO"
+
     # Check if uv is available
     if ! command -v uv >/dev/null 2>&1; then
         warning "uv not found. Serena requires uv for installation."
@@ -512,73 +514,42 @@ install_serena() {
         INSTALLATION_WARNINGS+=("Serena: uv package manager required but not found")
         return 1
     fi
-    
-    # Install or update Serena
-    if [[ -d "$serena_dir" ]]; then
-        info "Serena already exists, updating..."
 
-        if ! cd "$serena_dir"; then
-            error_exit "Failed to change to Serena directory: $serena_dir"
-            return 1
-        fi
-
+    # Install or update Serena submodule
+    if [[ -d "$serena_dir/.git" ]]; then
+        info "Serena submodule already exists, updating..."
+        cd "$serena_dir"
         if timeout 10s git pull origin main 2>/dev/null; then
             success "Serena updated from repository"
         else
             warning "Could not update Serena, using existing version"
         fi
-
-        # Verify pyproject.toml exists before running uv sync
-        if [[ ! -f "pyproject.toml" ]]; then
-            warning "pyproject.toml not found in $serena_dir"
-            INSTALLATION_WARNINGS+=("Serena: pyproject.toml missing")
-            cd "$CODING_REPO"
-            return 1
-        fi
-
-        # Update dependencies
-        info "Updating Serena dependencies..."
-        if uv sync; then
-            success "Serena dependencies updated"
-        else
-            warning "Failed to update Serena dependencies"
-            INSTALLATION_WARNINGS+=("Serena: Failed to update dependencies")
-        fi
     else
-        info "Cloning Serena repository..."
-        
-        # Clone the repository
-        if git clone "https://github.com/oraios/serena" "$serena_dir" 2>/dev/null; then
-            success "Serena repository cloned"
-        else
-            error_exit "Failed to clone Serena repository from https://github.com/oraios/serena"
-            return 1
-        fi
-        
-        # Install dependencies
-        info "Installing Serena dependencies..."
-
-        if ! cd "$serena_dir"; then
-            error_exit "Failed to change to Serena directory: $serena_dir"
-            return 1
-        fi
-
-        # Verify pyproject.toml exists
-        if [[ ! -f "pyproject.toml" ]]; then
-            warning "pyproject.toml not found after clone in $serena_dir"
-            INSTALLATION_WARNINGS+=("Serena: pyproject.toml missing after clone")
-            cd "$CODING_REPO"
-            return 1
-        fi
-
-        if uv sync; then
-            success "Serena dependencies installed"
-        else
-            error_exit "Failed to install Serena dependencies"
-            return 1
-        fi
+        info "Initializing Serena submodule..."
+        git submodule update --init --recursive integrations/serena || error_exit "Failed to initialize Serena submodule"
     fi
-    
+
+    cd "$serena_dir"
+
+    # Verify pyproject.toml exists before running uv sync
+    if [[ ! -f "pyproject.toml" ]]; then
+        warning "pyproject.toml not found in $serena_dir"
+        INSTALLATION_WARNINGS+=("Serena: pyproject.toml missing")
+        cd "$CODING_REPO"
+        return 1
+    fi
+
+    # Install/Update dependencies
+    info "Installing Serena dependencies..."
+    if uv sync; then
+        success "Serena dependencies installed"
+    else
+        warning "Failed to install Serena dependencies"
+        INSTALLATION_WARNINGS+=("Serena: Failed to install dependencies")
+    fi
+
+    cd "$CODING_REPO"
+
     # Verify installation
     if [[ -f "$serena_dir/pyproject.toml" ]]; then
         success "Serena MCP server installed successfully"

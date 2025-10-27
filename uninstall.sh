@@ -92,31 +92,30 @@ if [[ -d "$CODING_REPO/integrations/mcp-server-semantic-analysis" ]]; then
     echo "    Git submodule source code preserved"
 fi
 
-# Remove Serena MCP server (Python uv)
+# Clean Serena MCP server (git submodule - preserve source)
 if [[ -d "$CODING_REPO/integrations/serena" ]]; then
-    echo "  Removing Serena MCP server..."
-    
+    echo "  Cleaning Serena MCP server (git submodule)..."
+
     # Remove .venv directory (uv virtual environment)
     if [[ -d "$CODING_REPO/integrations/serena/.venv" ]]; then
         rm -rf "$CODING_REPO/integrations/serena/.venv"
         echo "    Removed Python virtual environment"
     fi
-    
+
     # Remove __pycache__ directories
     find "$CODING_REPO/integrations/serena" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
     echo "    Removed Python cache files"
-    
+
     # Remove .pyc files
     find "$CODING_REPO/integrations/serena" -name "*.pyc" -type f -exec rm -f {} + 2>/dev/null || true
-    
+
     # Remove uv.lock file
     if [[ -f "$CODING_REPO/integrations/serena/uv.lock" ]]; then
         rm -f "$CODING_REPO/integrations/serena/uv.lock"
         echo "    Removed uv lock file"
     fi
-    
-    # Note: We preserve the source code since it might be a local development environment
-    echo "  Serena MCP server cleaned (source code preserved)"
+
+    echo "    Git submodule source code preserved"
 fi
 
 # Clean up node_modules in MCP servers (non-submodules)
