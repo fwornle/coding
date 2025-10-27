@@ -74,7 +74,8 @@
       "mcp__memory__read_graph",
       "Bash(vkb restart:*)",
       "Bash(bin/vkb restart:*)",
-      "Bash(ps:*)"
+      "Bash(ps:*)",
+      "Bash(git submodule:*)"
     ],
     "deny": [],
     "ask": []

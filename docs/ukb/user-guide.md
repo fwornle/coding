@@ -27,6 +27,10 @@ UKB-CLI follows a layered architecture with clear separation of concerns:
 - **Validation Layer**: Content quality assurance and schema compliance
 - **Integration Layer**: MCP synchronization and visualizer updates
 
+![UKB Processing Workflow](../images/ukb-workflow.png)
+
+The workflow diagram above shows the complete UKB processing flow from input (git analysis or interactive mode) through validation, storage, and integration with external systems.
+
 ### Backward Compatibility
 
 The new UKB-CLI maintains 100% backward compatibility:

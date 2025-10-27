@@ -106,11 +106,13 @@ ukb-cli interactive
 
 **System Architecture**:
 
+![UKB System Architecture](../images/ukb-architecture.png)
+
 The system follows a layered architecture:
 - **CLI Layer**: User interface and command routing
-- **API Layer**: Core business logic
-- **Storage Layer**: Pluggable persistence
-- **Integration Layer**: External system connections
+- **API Layer**: Core business logic (KnowledgeAPI, EntityManager, RelationManager)
+- **Storage Layer**: Pluggable persistence with file-based storage adapter
+- **Integration Layer**: External system connections (MCP, Git)
 
 ## Common Workflows
 

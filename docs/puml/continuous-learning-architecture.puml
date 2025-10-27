@@ -3,6 +3,8 @@
 
 title Continuous Learning Knowledge System - Architecture Overview
 
+top to bottom direction
+
 package "Coding Session Layer" <<external>> {
   [Claude Code] <<cli>>
   [GitHub Copilot] <<cli>>

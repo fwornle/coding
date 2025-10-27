@@ -1,165 +1,111 @@
 @startuml continuous-learning-architecture
 !include _standard-style.puml
 
-title Continuous Learning Knowledge System - Architecture Overview
+title Continuous Learning Knowledge System
 
-package "Coding Session Layer" <<external>> {
-  [Claude Code] <<cli>>
-  [GitHub Copilot] <<cli>>
+skinparam defaultFontSize 16
+skinparam componentFontSize 14
+
+' Row 1: Sessions
+together {
+  [Claude\nCode] <<cli>>
+  [Copilot] <<cli>>
   [Cursor] <<cli>>
-  [Generic Agent] <<cli>>
 }
 
-package "Agent Adapter Layer" <<api>> {
-  [ClaudeAdapter] <<agent>>
-  [CopilotAdapter] <<agent>>
-  [GenericAdapter] <<agent>>
-  interface "AgentAdapter\nInterface" as AdapterAPI
+' Row 2: Adapters
+together {
+  interface "Adapter\nAPI" as API <<api>>
+  [Claude\nAdapter] <<agent>>
+  [Copilot\nAdapter] <<agent>>
+  [Generic\nAdapter] <<agent>>
 }
 
-package "Core Inference Engine" <<core>> {
-  [UnifiedInferenceEngine] <<core>>
-  [BudgetTracker] <<util>>
-  [SensitivityClassifier] <<util>>
-
-  note right of UnifiedInferenceEngine
-    **Multi-Provider Routing**
-    • Groq (fast, cheap)
-    • Anthropic (accurate)
-    • OpenAI (fallback)
-    • Local (privacy)
-
-    **Circuit Breaker**
-    • 5 failures → 1 min timeout
-
-    **Budget Enforcement**
-    • $8.33/month limit
-    • Auto-fallback to local
-  end note
+' Row 3: Core Processing
+together {
+  [Streaming\nExtractor] <<core>>
+  [Knowledge\nRetriever] <<core>>
+  [Concept\nAbstraction] <<agent>>
+  [Temporal\nDecay] <<util>>
 }
 
-package "Knowledge Management" <<core>> {
-  [StreamingKnowledgeExtractor] <<core>>
-  [KnowledgeRetriever] <<core>>
-  [ConceptAbstractionAgent] <<agent>>
-  [TemporalDecayTracker] <<util>>
+' Row 4: Inference & Trajectory
+together {
+  [Unified\nEngine] <<core>>
+  [Budget\nTracker] <<util>>
+  [Sensitivity] <<util>>
+  [Trajectory\nAnalyzer] <<core>>
 }
 
-package "Trajectory Tracking" <<core>> {
-  [RealTimeTrajectoryAnalyzer] <<core>>
-
-  note right of RealTimeTrajectoryAnalyzer
-    **Intent Classification**
-    • learning
-    • debugging
-    • feature-development
-    • refactoring
-
-    **Trajectory States**
-    • exploring
-    • implementing
-    • verifying
-    • blocked
-  end note
+' Row 5: Cache
+together {
+  [Agent\nCache] <<storage>>
+  [File] <<storage>>
+  [HTTP] <<storage>>
+  [MCP] <<storage>>
 }
 
-package "Caching Layer" <<storage>> {
-  [AgentAgnosticCache] <<storage>>
-  [FileBackend] <<storage>>
-  [HTTPBackend] <<storage>>
-  [MCPBackend] <<storage>>
+' Row 6: Storage
+together {
+  database "Qdrant" as Q
+  database "SQLite" as S
+  database "Graph" as G
 }
 
-package "Database Layer" <<storage>> {
-  database "Qdrant\n(Vector Search)" as Qdrant {
-    [knowledge_patterns\n1536-dim]
-    [knowledge_patterns_small\n384-dim]
-    [trajectory_analysis\n384-dim]
-    [session_memory\n384-dim]
-  }
-
-  database "SQLite\n(Analytics)" as SQLite {
-    [budget_events]
-    [knowledge_extractions]
-    [session_metrics]
-    [embedding_cache]
-  }
-
-  note right of Qdrant
-    **Continuous Learning Only**
-    Real-time session knowledge
-    Not used by UKB/VKB
-  end note
-}
-
-package "UKB/VKB Storage" <<storage>> {
-  database "Graph Database\n(Graphology + Level)" as GraphDB {
-    note right
-      **Manual Knowledge Capture**
-      UKB/VKB use this
-      Team isolation
-      Git-tracked exports
-    end note
-  }
-}
-
-package "External Providers" <<infra>> {
-  cloud "Remote LLMs" as Remote {
-    [Groq]
-    [Anthropic]
-    [OpenAI]
-  }
-
-  cloud "Local Models" as Local {
-    [Ollama]
-    [vLLM]
-  }
+' Row 7: Providers
+together {
+  [Groq] <<provider>>
+  [Anthropic] <<provider>>
+  [OpenAI] <<provider>>
+  [Ollama] <<provider>>
+  [vLLM] <<provider>>
 }
 
 ' Connections
-[Claude Code] SYNC_LINE AdapterAPI
-[GitHub Copilot] SYNC_LINE AdapterAPI
-[Cursor] SYNC_LINE AdapterAPI
-[Generic Agent] SYNC_LINE AdapterAPI
+[Claude\nCode] --> API
+[Copilot] --> API
+[Cursor] --> API
 
-AdapterAPI SYNC_LINE [ClaudeAdapter]
-AdapterAPI SYNC_LINE [CopilotAdapter]
-AdapterAPI SYNC_LINE [GenericAdapter]
+API --> [Claude\nAdapter]
+API --> [Copilot\nAdapter]
+API --> [Generic\nAdapter]
 
-[ClaudeAdapter] SYNC_LINE [StreamingKnowledgeExtractor]
-[CopilotAdapter] SYNC_LINE [StreamingKnowledgeExtractor]
-[GenericAdapter] SYNC_LINE [StreamingKnowledgeExtractor]
+[Claude\nAdapter] --> [Streaming\nExtractor]
+[Copilot\nAdapter] --> [Streaming\nExtractor]
+[Generic\nAdapter] --> [Streaming\nExtractor]
 
-[StreamingKnowledgeExtractor] SYNC_LINE [UnifiedInferenceEngine]
-[KnowledgeRetriever] SYNC_LINE [UnifiedInferenceEngine]
-[ConceptAbstractionAgent] SYNC_LINE [UnifiedInferenceEngine]
-[RealTimeTrajectoryAnalyzer] SYNC_LINE [UnifiedInferenceEngine]
+[Streaming\nExtractor] --> [Unified\nEngine]
+[Knowledge\nRetriever] --> [Unified\nEngine]
+[Concept\nAbstraction] --> [Unified\nEngine]
+[Trajectory\nAnalyzer] --> [Unified\nEngine]
 
-[UnifiedInferenceEngine] CONTROL_LINE [BudgetTracker]
-[UnifiedInferenceEngine] CONTROL_LINE [SensitivityClassifier]
-[UnifiedInferenceEngine] DATA_LINE Remote
-[UnifiedInferenceEngine] DATA_LINE Local
+[Unified\nEngine] --> [Budget\nTracker]
+[Unified\nEngine] --> [Sensitivity]
+[Unified\nEngine] --> [Groq]
+[Unified\nEngine] --> [Anthropic]
+[Unified\nEngine] --> [OpenAI]
+[Unified\nEngine] --> [Ollama]
+[Unified\nEngine] --> [vLLM]
 
-[StreamingKnowledgeExtractor] DATA_LINE Qdrant
-[StreamingKnowledgeExtractor] DATA_LINE SQLite
-[KnowledgeRetriever] DATA_LINE Qdrant
-[KnowledgeRetriever] DATA_LINE SQLite
-[ConceptAbstractionAgent] DATA_LINE Qdrant
-[TemporalDecayTracker] DATA_LINE Qdrant
-[TemporalDecayTracker] DATA_LINE SQLite
+[Streaming\nExtractor] ..> Q
+[Streaming\nExtractor] ..> S
+[Knowledge\nRetriever] ..> Q
+[Knowledge\nRetriever] ..> S
+[Concept\nAbstraction] ..> Q
+[Temporal\nDecay] ..> Q
+[Temporal\nDecay] ..> S
 
-[UnifiedInferenceEngine] ASYNC_LINE [AgentAgnosticCache]
-[KnowledgeRetriever] ASYNC_LINE [AgentAgnosticCache]
+[Unified\nEngine] ..> [Agent\nCache]
+[Knowledge\nRetriever] ..> [Agent\nCache]
 
-[AgentAgnosticCache] OPTIONAL_LINE [FileBackend]
-[AgentAgnosticCache] OPTIONAL_LINE [HTTPBackend]
-[AgentAgnosticCache] OPTIONAL_LINE [MCPBackend]
+[Agent\nCache] ..> [File]
+[Agent\nCache] ..> [HTTP]
+[Agent\nCache] ..> [MCP]
 
-[BudgetTracker] DATA_LINE SQLite
-[RealTimeTrajectoryAnalyzer] DATA_LINE Qdrant
-[RealTimeTrajectoryAnalyzer] DATA_LINE SQLite
+[Budget\nTracker] ..> S
+[Trajectory\nAnalyzer] ..> Q
+[Trajectory\nAnalyzer] ..> S
 
-' Optional manual export to Graph DB
-[ConceptAbstractionAgent] OPTIONAL_LINE GraphDB : Manual export\nvia UKB
+[Concept\nAbstraction] ..> G
 
 @enduml

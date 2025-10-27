@@ -244,6 +244,10 @@ ukb-cli interactive
 
 ## Programmatic API
 
+![UKB-CLI Class Diagram](../images/ukb-cli-class-diagram.png)
+
+The class diagram above shows the complete API structure including the KnowledgeAPI main entry point, EntityManager, RelationManager, InsightProcessor, and all supporting services. **Note**: This represents the designed API architecture; the current implementation may differ in some details.
+
 ### KnowledgeAPI Class
 
 Main entry point for programmatic access.

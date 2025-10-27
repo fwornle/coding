@@ -44,6 +44,8 @@ See [System Comparison](system-comparison.md) for detailed comparison and how th
 
 ![Continuous Learning System Architecture](../images/continuous-learning-architecture.png)
 
+*Note: A [presentation-optimized version](../images/continuous-learning-architecture-presentation.png) (horizontal layout) is available for slides.*
+
 The architecture consists of several layers:
 
 - **Coding Session Layer**: Agent-agnostic interface (Claude Code, Copilot, Cursor, etc.)
@@ -52,6 +54,18 @@ The architecture consists of several layers:
 - **Trajectory Tracking**: Intent classification and trajectory state analysis
 - **Caching Layer**: Agent-agnostic cache with file/HTTP/MCP backends
 - **Database Layer**: Dual-database (Qdrant for vectors, SQLite for analytics)
+
+### Operational Dependencies
+
+![Continuous Learning Operational Dependencies](../images/continuous-learning-ops-dependencies.png)
+
+The system relies on the following operational services:
+
+- **Qdrant** (vector database): Semantic search and knowledge retrieval
+- **SQLite** (analytics database): Analytics, budget tracking, and temporal metadata
+- **Groq**: Primary LLM provider for fast, cost-effective inference
+- **OpenRouter**: Multi-model access for fallback and specialized tasks
+- **Ollama**: Local models for sensitive data processing
 
 ---
 

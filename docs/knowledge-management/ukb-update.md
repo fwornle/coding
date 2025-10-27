@@ -10,6 +10,10 @@
 
 UKB-CLI is a modern Node.js-based knowledge management system that captures, analyzes, and organizes technical knowledge across projects. It provides intelligent knowledge capture through automatic git analysis and interactive prompts.
 
+![UKB Fallback Knowledge Capture Workflow](../images/fallback-knowledge-capture.png)
+
+The UKB system provides a manual fallback mechanism for knowledge capture when automated systems are unavailable or insufficient. It supports both automatic git-based analysis and interactive modes for capturing insights.
+
 ### Key Features
 
 - **Cross-Platform**: Pure Node.js with no OS-specific dependencies
