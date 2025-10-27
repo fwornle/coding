@@ -98,11 +98,14 @@ constraints:
   - id: no-evolutionary-names
     group: architecture
     pattern: (?:class|function|const|let|var)\s+\w*(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)\w*
-    message: Evolutionary naming detected - refactor original instead
+    message: "Evolutionary naming detected - refactor original instead. (Whitelisted files are exempt from this rule)"
     severity: error
     enabled: false
     suggestion: Rename to descriptive functional name and refactor the original
     semantic_validation: false
+    whitelist:
+      - scripts/enhanced-transcript-monitor.js
+      - scripts/enhanced-*.js
   - id: plantuml-standard-styling
     group: plantuml
     pattern: "@startuml.*\\n(?!.*!include _standard-style\\.puml)"

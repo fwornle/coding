@@ -1,9 +1,9 @@
 # Classification Decision Log (Foreign/Coding)
 
-**Time Window**: 2025-10-27_0900-1000_g9b30a<br>
+**Time Window**: 2025-10-27_2000-2100_g9b30a<br>
 **Project**: curriculum-alignment<br>
 **Target**: CODING<br>
-**Generated**: 2025-10-27T19:10:18.564Z<br>
+**Generated**: 2025-10-27T19:10:18.602Z<br>
 **Decisions in Window**: 1
 
 ---
@@ -26,27 +26,27 @@
 
 **Decisions**: 1
 
-### Prompt Set: [ps_2025-10-27T08:55:46.871Z](../../../history/2025-10-27_0900-1000_g9b30a_from-curriculum-alignment.md#ps_2025-10-27T08:55:46.871Z)
+### Prompt Set: [ps_2025-10-27T19:04:05.771Z](../../../history/2025-10-27_2000-2100_g9b30a_from-curriculum-alignment.md#ps_2025-10-27T19:04:05.771Z)
 
-**Time Range**: 2025-10-27T08:55:46.871Z → 2025-10-27T08:55:49.583Z<br>
-**LSL File**: [2025-10-27_0900-1000_g9b30a_from-curriculum-alignment.md](../../../history/2025-10-27_0900-1000_g9b30a_from-curriculum-alignment.md#ps_2025-10-27T08:55:46.871Z)<br>
+**Time Range**: 2025-10-27T19:04:05.771Z → 2025-10-27T19:04:07.416Z<br>
+**LSL File**: [2025-10-27_2000-2100_g9b30a_from-curriculum-alignment.md](../../../history/2025-10-27_2000-2100_g9b30a_from-curriculum-alignment.md#ps_2025-10-27T19:04:05.771Z)<br>
 **LSL Lines**: 0-0<br>
 **Target**: 🌍 FOREIGN (coding)<br>
-**Final Classification**: ✅ CODING (confidence: 0.535)
+**Final Classification**: ✅ CODING (confidence: 0.78)
 
 #### Layer-by-Layer Trace
 
 ❌ **Layer 1 (path)**
 - Decision: local
 - Confidence: 0.02
-- Reasoning: Majority (100.0%) of file operations target local project: /knowledge-management/workflows.md
-- Processing Time: 1ms
+- Reasoning: Majority (100.0%) of file operations target local project: /Users/, /Agentic/coding/.specstory/history/2025-10-27_1700-1800_g9b30a.md
+- Processing Time: 0ms
 
 ✅ **Layer 2 (keyword)**
 - Decision: coding
-- Confidence: 0.535
-- Reasoning: Keyword analysis: 1 matches, score: 3/1
-- Processing Time: 0ms
+- Confidence: 0.78
+- Reasoning: Keyword analysis: 5 matches, score: 17/1
+- Processing Time: 1ms
 
 ---
 
