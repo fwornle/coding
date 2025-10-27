@@ -844,32 +844,40 @@ fi
 
 print_test "MCP servers"
 
-print_check "Browser automation server"
+print_check "Browser automation server (git submodule)"
 if dir_exists "$CODING_ROOT/integrations/mcp-server-browserbase"; then
-    print_pass "Browserbase MCP server found"
-    
+    print_pass "Browserbase MCP server submodule found"
+
     print_check "Browserbase dependencies"
-    if [ -d "$CODING_ROOT/integrations/mcp-server-browserbase/browserbase/node_modules" ] && [ -d "$CODING_ROOT/integrations/mcp-server-browserbase/stagehand/node_modules" ]; then
+    if [ -d "$CODING_ROOT/integrations/mcp-server-browserbase/node_modules" ]; then
         print_pass "Browserbase dependencies installed"
     else
         print_repair "Installing browserbase dependencies..."
-        cd "$CODING_ROOT/integrations/mcp-server-browserbase/browserbase" && npm install
-        cd "$CODING_ROOT/integrations/mcp-server-browserbase/stagehand" && npm install
+        cd "$CODING_ROOT/integrations/mcp-server-browserbase" && npm install
         print_fixed "Browserbase dependencies installed"
     fi
+
+    print_check "Browserbase build status"
+    if [ -d "$CODING_ROOT/integrations/mcp-server-browserbase/dist" ]; then
+        print_pass "Browserbase server built"
+    else
+        print_repair "Building browserbase server..."
+        cd "$CODING_ROOT/integrations/mcp-server-browserbase" && npm run build
+        print_fixed "Browserbase server built"
+    fi
 else
-    print_fail "Browserbase MCP server not found"
-    print_repair "Cloning browserbase server..."
-    cd "$CODING_ROOT/integrations"
-    git clone https://github.com/browserbase/mcp-server-browserbase
-    cd mcp-server-browserbase && npm install
-    print_fixed "Browserbase server installed"
+    print_fail "Browserbase MCP server submodule not found"
+    print_repair "Initializing browserbase submodule..."
+    cd "$CODING_ROOT"
+    git submodule update --init --recursive integrations/mcp-server-browserbase
+    cd integrations/mcp-server-browserbase && npm install && npm run build
+    print_fixed "Browserbase submodule initialized and built"
 fi
 
-print_check "Semantic analysis MCP server"
+print_check "Semantic analysis MCP server (git submodule)"
 if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
-    print_pass "Semantic analysis MCP server found"
-    
+    print_pass "Semantic analysis MCP server submodule found"
+
     print_check "Semantic analysis dependencies"
     if [ -d "$CODING_ROOT/integrations/mcp-server-semantic-analysis/node_modules" ]; then
         print_pass "Semantic analysis dependencies installed"
@@ -878,19 +886,19 @@ if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
         cd "$CODING_ROOT/integrations/mcp-server-semantic-analysis" && npm install
         print_fixed "Semantic analysis dependencies installed"
     fi
-    
+
     print_check "Semantic analysis build"
     if [ -d "$CODING_ROOT/integrations/mcp-server-semantic-analysis/dist" ]; then
         print_pass "Semantic analysis server built"
-        
+
         print_check "Semantic analysis server test"
         cd "$CODING_ROOT/integrations/mcp-server-semantic-analysis"
-        
+
         # Set environment variables for test
         export KNOWLEDGE_BASE_PATH="${KNOWLEDGE_BASE_PATH:-$CODING_ROOT/knowledge-management/insights}"
         export CODING_DOCS_PATH="${CODING_DOCS_PATH:-$CODING_ROOT/docs}"
         export CODING_TOOLS_PATH="$CODING_ROOT"
-        
+
         # Test that the server starts and produces expected output
         SERVER_OUTPUT=$(timeout 3 node dist/index.js 2>&1 | head -n 3)
         if echo "$SERVER_OUTPUT" | grep -q "Semantic Analysis MCP server is ready"; then
@@ -898,14 +906,14 @@ if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
         else
             print_warning "Semantic analysis server test failed (may need API keys)"
         fi
-        
+
         print_check "Environment variables for MCP server"
         if [ -d "$KNOWLEDGE_BASE_PATH" ] || mkdir -p "$KNOWLEDGE_BASE_PATH" 2>/dev/null; then
             print_pass "Knowledge base path accessible: $KNOWLEDGE_BASE_PATH"
         else
             print_warning "Knowledge base path not accessible: $KNOWLEDGE_BASE_PATH"
         fi
-        
+
         if [ -d "$CODING_DOCS_PATH" ]; then
             print_pass "Docs path accessible: $CODING_DOCS_PATH"
         else
@@ -917,8 +925,12 @@ if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
         print_fixed "Semantic analysis server built"
     fi
 else
-    print_fail "Semantic analysis MCP server not found"
-    print_info "Should be located at integrations/mcp-server-semantic-analysis"
+    print_fail "Semantic analysis MCP server submodule not found"
+    print_repair "Initializing semantic analysis submodule..."
+    cd "$CODING_ROOT"
+    git submodule update --init --recursive integrations/mcp-server-semantic-analysis
+    cd integrations/mcp-server-semantic-analysis && npm install && npm run build
+    print_fixed "Semantic analysis submodule initialized and built"
 fi
 
 print_check "MCP Constraint Monitor with Professional Dashboard"
@@ -1921,8 +1933,8 @@ DISK_USAGE=$(du -sh "$CODING_ROOT" 2>/dev/null | cut -f1)
 print_info "Coding tools disk usage: $DISK_USAGE"
 
 print_check "Memory visualizer size"
-if dir_exists "$CODING_ROOT/memory-visualizer"; then
-    VISUALIZER_SIZE=$(du -sh "$CODING_ROOT/memory-visualizer" 2>/dev/null | cut -f1)
+if dir_exists "$CODING_ROOT/integrations/memory-visualizer"; then
+    VISUALIZER_SIZE=$(du -sh "$CODING_ROOT/integrations/memory-visualizer" 2>/dev/null | cut -f1)
     print_info "Memory visualizer size: $VISUALIZER_SIZE"
 fi
 
@@ -1931,8 +1943,8 @@ NODE_MODULES_COUNT=0
 if dir_exists "$CODING_ROOT/node_modules"; then
     NODE_MODULES_COUNT=$(ls -1 "$CODING_ROOT/node_modules" 2>/dev/null | wc -l)
 fi
-if dir_exists "$CODING_ROOT/memory-visualizer/node_modules"; then
-    VISUALIZER_MODULES=$(ls -1 "$CODING_ROOT/memory-visualizer/node_modules" 2>/dev/null | wc -l)
+if dir_exists "$CODING_ROOT/integrations/memory-visualizer/node_modules"; then
+    VISUALIZER_MODULES=$(ls -1 "$CODING_ROOT/integrations/memory-visualizer/node_modules" 2>/dev/null | wc -l)
     NODE_MODULES_COUNT=$((NODE_MODULES_COUNT + VISUALIZER_MODULES))
 fi
 print_info "Total node modules installed: $NODE_MODULES_COUNT"

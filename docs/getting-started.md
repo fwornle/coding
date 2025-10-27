@@ -36,8 +36,8 @@ sudo apt install git nodejs npm jq
 ### 30-Second Quick Install
 
 ```bash
-# Clone the repository
-git clone <repository-url> ~/Agentic/coding
+# Clone the repository with submodules
+git clone --recurse-submodules <repository-url> ~/Agentic/coding
 cd ~/Agentic/coding
 
 # Run the installer
@@ -46,6 +46,8 @@ cd ~/Agentic/coding
 # Reload your shell
 source ~/.bashrc  # or ~/.zshrc on macOS
 ```
+
+**Note**: The repository uses git submodules for integration components (memory-visualizer, semantic-analysis, browserbase, serena, constraint-monitor). The `--recurse-submodules` flag ensures all submodules are initialized during clone.
 
 ### What Gets Installed
 
@@ -70,6 +72,35 @@ source ~/.bashrc  # or ~/.zshrc on macOS
    - Live Session Logging (LSL)
    - Constraint enforcement hooks
    - 4-layer health monitoring
+
+### Managing Git Submodules
+
+The repository uses git submodules for integration components. Here's how to manage them:
+
+**Update All Submodules:**
+```bash
+# Update all submodules to latest versions
+git submodule update --remote
+
+# Or update a specific submodule
+git submodule update --remote integrations/memory-visualizer
+```
+
+**Initialize Missing Submodules:**
+```bash
+# If you cloned without --recurse-submodules
+git submodule update --init --recursive
+
+# Or initialize a specific submodule
+git submodule update --init integrations/serena
+```
+
+**Submodule Structure:**
+- `integrations/mcp-constraint-monitor` (Own repo - SSH)
+- `integrations/memory-visualizer` (Own repo - SSH)
+- `integrations/mcp-server-semantic-analysis` (Own repo - SSH)
+- `integrations/serena` (Third-party - HTTPS)
+- `integrations/mcp-server-browserbase` (Third-party - HTTPS)
 
 ---
 
@@ -324,11 +355,11 @@ echo $CODING_REPO
 
 ```bash
 # Check if installed
-ls -la memory-visualizer/
+ls -la integrations/memory-visualizer/
 
-# If missing, clone manually
-git clone https://github.com/fwornle/memory-visualizer
-cd memory-visualizer
+# If missing, initialize submodule
+git submodule update --init --recursive integrations/memory-visualizer
+cd integrations/memory-visualizer
 npm install && npm run build
 
 # Test viewer
@@ -363,7 +394,7 @@ If installation is corrupted:
 
 # Remove all data (WARNING: loses knowledge base)
 rm -rf ~/.coding-tools/
-rm -rf memory-visualizer/
+rm -rf integrations/memory-visualizer/node_modules integrations/memory-visualizer/dist
 rm shared-memory*.json
 
 # Reinstall from scratch

@@ -1145,13 +1145,27 @@ verify_installation() {
         warning "Constraint monitor system not installed"
     fi
     
+    # Check Semantic Analysis MCP server
+    if [[ -f "$CODING_REPO/integrations/mcp-server-semantic-analysis/dist/index.js" ]]; then
+        success "Semantic Analysis MCP server is built"
+    else
+        warning "Semantic Analysis MCP server not built"
+    fi
+
+    # Check Browserbase MCP server
+    if [[ -f "$CODING_REPO/integrations/mcp-server-browserbase/dist/index.js" ]]; then
+        success "Browserbase MCP server is built"
+    else
+        warning "Browserbase MCP server not built"
+    fi
+
     # Check Serena MCP server
     if [[ -f "$CODING_REPO/integrations/serena/pyproject.toml" ]]; then
         success "Serena MCP server is installed"
     else
         warning "Serena MCP server not installed"
     fi
-    
+
     # Check shadcn/ui MCP server
     if [[ -d "$CODING_REPO/integrations/shadcn-mcp" ]]; then
         success "shadcn/ui MCP server is installed"
