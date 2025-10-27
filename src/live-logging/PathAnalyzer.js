@@ -378,29 +378,175 @@ class PathAnalyzer {
 
   /**
    * Check if file path belongs to coding project
+   *
+   * Implements two-step detection:
+   * Step (a): Check if file exists locally when "coding" not mentioned in path
+   * Step (b): If not found locally, search by filename in coding project
+   *
    * @param {string} filePath - File path to check
    * @returns {boolean} True if path belongs to coding project
    */
   isCodingPath(filePath) {
     if (!filePath || !this.codingRepo) return false;
-    
+
     try {
       // Handle special cases
       if (filePath === '.' || filePath === './') {
         return process.cwd().startsWith(this.codingRepo);
       }
-      
+
       // Expand and resolve path
       const expandedPath = this.expandPath(filePath);
       const resolvedPath = path.resolve(expandedPath);
-      
-      // Check if resolved path starts with coding repo
+
+      // If path explicitly includes "coding" in it, check if it starts with coding repo
+      if (filePath.includes('coding/') || filePath.includes('coding\\') || resolvedPath.startsWith(this.codingRepo)) {
+        return resolvedPath.startsWith(this.codingRepo);
+      }
+
+      // Step (a): For relative paths without explicit "coding" prefix,
+      // check if file exists locally (in current project)
+      if (!path.isAbsolute(filePath)) {
+        const localPath = path.resolve(process.cwd(), expandedPath);
+
+        // If file exists locally, it belongs to local project (not coding)
+        if (fs.existsSync(localPath)) {
+          this.log(`File exists locally: ${localPath} - NOT coding project`);
+          return false;
+        }
+
+        // Step (b): If not found locally, search by filename in coding project
+        // This handles cases like "docs/images/viewer.png" which might exist at
+        // "coding/integrations/memory-visualizer/docs/images/viewer.png"
+        const filename = path.basename(filePath);
+        const foundInCoding = this.findFileInCoding(filename, filePath);
+
+        if (foundInCoding) {
+          this.log(`File found in coding project: ${foundInCoding} - IS coding project`);
+          return true;
+        }
+
+        // Not found in either location - treat as local project
+        this.log(`File not found locally or in coding: ${filePath} - defaulting to local project`);
+        return false;
+      }
+
+      // For absolute paths, check if they start with coding repo
       return resolvedPath.startsWith(this.codingRepo);
-      
+
     } catch (error) {
       this.stats.pathResolutionErrors++;
       this.log(`Path resolution error for "${filePath}": ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Search for a file by name and partial path in coding project
+   *
+   * @param {string} filename - Base filename to search for
+   * @param {string} partialPath - Partial path like "docs/images/viewer.png"
+   * @returns {string|null} Full path if found in coding, null otherwise
+   */
+  findFileInCoding(filename, partialPath) {
+    if (!this.codingRepo || !filename) return null;
+
+    try {
+      // Try to match the partial path structure within coding repo
+      // For "docs/images/viewer.png", try common locations:
+      // - coding/docs/images/viewer.png
+      // - coding/*/docs/images/viewer.png (subdirectories)
+
+      const commonLocations = [
+        // Direct match
+        path.join(this.codingRepo, partialPath),
+        // In integrations subdirectory
+        path.join(this.codingRepo, 'integrations', '**', partialPath),
+        // In any subdirectory matching the structure
+        path.join(this.codingRepo, '**', partialPath)
+      ];
+
+      // Check direct paths first (fast)
+      const directPath = path.join(this.codingRepo, partialPath);
+      if (fs.existsSync(directPath)) {
+        return directPath;
+      }
+
+      // Fall back to recursive search by filename (slower but thorough)
+      // Only search if the file is likely to be in coding (e.g., .png, .puml, docs/)
+      if (this.shouldSearchInCoding(partialPath)) {
+        const found = this.recursiveFindFile(this.codingRepo, filename, partialPath);
+        return found;
+      }
+
+      return null;
+    } catch (error) {
+      this.log(`Error searching for file in coding: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Determine if we should search for this file in coding project
+   * Based on file extension and path patterns
+   *
+   * @param {string} filePath - File path to check
+   * @returns {boolean} True if we should search in coding
+   */
+  shouldSearchInCoding(filePath) {
+    // Extensions that are likely coding project assets
+    const codingExtensions = ['.png', '.jpg', '.svg', '.puml', '.md', '.json'];
+    const hasCodeExtension = codingExtensions.some(ext => filePath.endsWith(ext));
+
+    // Path patterns that suggest coding project
+    const codingPatterns = ['docs/', 'images/', 'puml/', 'presentation/', 'scripts/'];
+    const hasCodePattern = codingPatterns.some(pattern => filePath.includes(pattern));
+
+    return hasCodeExtension || hasCodePattern;
+  }
+
+  /**
+   * Recursively search for a file by name in a directory
+   * Limits search depth to avoid performance issues
+   *
+   * @param {string} dir - Directory to search in
+   * @param {string} filename - Filename to find
+   * @param {string} partialPath - Partial path to match against
+   * @param {number} depth - Current search depth
+   * @param {number} maxDepth - Maximum search depth
+   * @returns {string|null} Full path if found, null otherwise
+   */
+  recursiveFindFile(dir, filename, partialPath, depth = 0, maxDepth = 4) {
+    if (depth > maxDepth) return null;
+
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        // Skip node_modules, .git, and other large directories
+        if (entry.name === 'node_modules' || entry.name === '.git' ||
+            entry.name === '.data' || entry.name.startsWith('.')) {
+          continue;
+        }
+
+        const fullPath = path.join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+          // Recurse into subdirectories
+          const found = this.recursiveFindFile(fullPath, filename, partialPath, depth + 1, maxDepth);
+          if (found) return found;
+        } else if (entry.isFile() && entry.name === filename) {
+          // Check if the full path ends with the partial path structure
+          if (fullPath.endsWith(partialPath) || fullPath.includes(partialPath.replace(/\\/g, '/'))) {
+            return fullPath;
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      // Permission errors or other issues - skip this directory
+      return null;
     }
   }
 
