@@ -7,3 +7,6 @@
 [submodule "integrations/mcp-server-semantic-analysis"]
 	path = integrations/mcp-server-semantic-analysis
 	url = git@github.com:fwornle/mcp-server-semantic-analysis.git
+[submodule "integrations/serena"]
+	path = integrations/serena
+	url = https://github.com/oraios/serena.git
