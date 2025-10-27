@@ -61,7 +61,6 @@ claude-code-mcp-processed.json
 install.log
 .activate
 integrations/mcp-server-browserbase/
-integrations/mcp-server-semantic-analysis/
 
 # VSCode extension build artifacts
 integrations/vscode-km-copilot/*.vsix
