@@ -183,10 +183,14 @@ class EnhancedTranscriptMonitor {
     try {
       const projectName = path.basename(this.config.projectPath);
       const userHash = UserHashGenerator.generateHash({ debug: false });
+      const codingRepo = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+
       this.classificationLogger = new ClassificationLogger({
+        projectPath: this.config.projectPath, // CRITICAL: Pass projectPath for correct log directory
         projectName: projectName,
         sessionId: `live-${Date.now()}`,
-        userHash: userHash
+        userHash: userHash,
+        codingRepo: codingRepo // CRITICAL: Pass coding repo for redirected logs
       });
       this.classificationLogger.initializeLogFile();
       this.debug('Classification logger initialized');
@@ -915,7 +919,9 @@ class EnhancedTranscriptMonitor {
           claudeResponse: '',
           toolCalls: [],
           toolResults: [],
-          isUserPrompt: true
+          isUserPrompt: true,
+          isComplete: false,  // NEW: Track completion status
+          stopReason: null    // NEW: Track stop reason
         };
       } else if (message.type === 'assistant' && currentExchange) {
         if (message.message?.content) {
@@ -934,6 +940,12 @@ class EnhancedTranscriptMonitor {
           } else if (typeof message.message.content === 'string') {
             currentExchange.claudeResponse = message.message.content;
           }
+        }
+
+        // NEW: Mark exchange as complete when stop_reason is present
+        if (message.message?.stop_reason !== null && message.message?.stop_reason !== undefined) {
+          currentExchange.isComplete = true;
+          currentExchange.stopReason = message.message.stop_reason;
         }
       } else if (message.type === 'user' && message.message?.content && Array.isArray(message.message.content)) {
         for (const item of message.message.content) {
@@ -1024,6 +1036,13 @@ class EnhancedTranscriptMonitor {
 
   /**
    * Get unprocessed exchanges
+   *
+   * NEW BEHAVIOR: Only returns COMPLETE exchanges (with stop_reason).
+   * Incomplete exchanges are held back and re-checked on next monitoring cycle.
+   * This prevents incomplete exchanges from being written to LSL files and
+   * automatically recovers them when they become complete.
+   *
+   * @returns {Array} Complete, unprocessed exchanges ready to be written
    */
   async getUnprocessedExchanges() {
     if (!this.transcriptPath) return [];
@@ -1032,17 +1051,58 @@ class EnhancedTranscriptMonitor {
     if (messages.length === 0) return [];
 
     const exchanges = await this.extractExchanges(messages);
-    
+
+    // Filter to unprocessed exchanges
+    let unprocessed;
     if (!this.lastProcessedUuid) {
-      return exchanges.slice(-10);
+      unprocessed = exchanges.slice(-10);
+    } else {
+      const lastIndex = exchanges.findIndex(ex => ex.id === this.lastProcessedUuid);
+      if (lastIndex >= 0) {
+        unprocessed = exchanges.slice(lastIndex + 1);
+      } else {
+        unprocessed = exchanges.slice(-10);
+      }
     }
 
-    const lastIndex = exchanges.findIndex(ex => ex.id === this.lastProcessedUuid);
-    if (lastIndex >= 0) {
-      return exchanges.slice(lastIndex + 1);
+    // NEW: Filter out incomplete exchanges (Option 2 - Prevention)
+    // Incomplete exchanges will be re-checked on next monitoring cycle
+    const complete = unprocessed.filter(ex => {
+      // Consider exchange complete if:
+      // 1. It has a stop_reason (assistant response finished), OR
+      // 2. It's a user-only prompt with no assistant response yet (keep for now)
+      const hasResponse = ex.claudeResponse?.trim() || ex.assistantResponse?.trim() ||
+                         (ex.toolCalls && ex.toolCalls.length > 0);
+
+      if (!hasResponse) {
+        // User prompt with no response yet - keep checking
+        return false;
+      }
+
+      if (ex.isComplete) {
+        // Response is complete
+        return true;
+      }
+
+      // Response exists but not marked complete - wait for completion
+      this.debug(`⏳ Holding incomplete exchange ${ex.id} (has response but no stop_reason)`);
+      return false;
+    });
+
+    const incompleteCount = unprocessed.length - complete.length;
+    if (incompleteCount > 0) {
+      console.log(`⏳ Waiting for ${incompleteCount} incomplete exchange(s) to finish`);
+
+      // Log details for debugging
+      const incomplete = unprocessed.filter(ex => !complete.includes(ex));
+      incomplete.forEach(ex => {
+        const age = Date.now() - new Date(ex.timestamp).getTime();
+        const ageSeconds = Math.floor(age / 1000);
+        console.log(`   - Exchange ${ex.id.substring(0, 8)}: waiting ${ageSeconds}s for completion`);
+      });
     }
 
-    return exchanges.slice(-10);
+    return complete;
   }
 
   /**
