@@ -175,6 +175,24 @@ class ClassificationLogger {
   }
 
   /**
+   * Extract the original "Generated" timestamp from an existing classification file
+   */
+  extractExistingTimestamp(filePath) {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const match = content.match(/\*\*Generated\*\*:\s*([^\s<]+)/);
+      return match ? match[1] : null;
+    } catch (error) {
+      console.error(`Error reading existing timestamp from ${filePath}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
    * Generate human-readable summary reports (one per time window)
    */
   generateSummaryReport() {
@@ -212,7 +230,8 @@ class ClassificationLogger {
       // Generate LOCAL classification log (stored locally in project)
       if (localDecisions.length > 0) {
         const localFile = path.join(this.logDir, `${fullWindow}.md`);
-        const localContent = this.generateClassificationMarkdown(fullWindow, localDecisions, 'LOCAL');
+        const existingTimestamp = this.extractExistingTimestamp(localFile);
+        const localContent = this.generateClassificationMarkdown(fullWindow, localDecisions, 'LOCAL', existingTimestamp);
         fs.writeFileSync(localFile, localContent, 'utf8');
         summaryFiles.push(localFile);
       }
@@ -223,7 +242,8 @@ class ClassificationLogger {
         fs.mkdirSync(codingLogDir, { recursive: true });
 
         const codingFile = path.join(codingLogDir, `${fullWindow}_from-${this.projectName}.md`);
-        const codingContent = this.generateClassificationMarkdown(fullWindow, codingDecisions, 'CODING');
+        const existingTimestamp = this.extractExistingTimestamp(codingFile);
+        const codingContent = this.generateClassificationMarkdown(fullWindow, codingDecisions, 'CODING', existingTimestamp);
         fs.writeFileSync(codingFile, codingContent, 'utf8');
         summaryFiles.push(codingFile);
       }
@@ -242,12 +262,12 @@ class ClassificationLogger {
   /**
    * Generate markdown content for classification log
    */
-  generateClassificationMarkdown(fullWindow, windowDecisions, target) {
+  generateClassificationMarkdown(fullWindow, windowDecisions, target, existingTimestamp = null) {
     let markdown = `# Classification Decision Log${target === 'CODING' ? ' (Foreign/Coding)' : ' (Local)'}\n\n`;
     markdown += `**Time Window**: ${fullWindow}<br>\n`;
     markdown += `**Project**: ${this.projectName}<br>\n`;
     markdown += `**Target**: ${target}<br>\n`;
-    markdown += `**Generated**: ${new Date().toISOString()}<br>\n`;
+    markdown += `**Generated**: ${existingTimestamp || new Date().toISOString()}<br>\n`;
     markdown += `**Decisions in Window**: ${windowDecisions.length}\n\n`;
 
     markdown += `---\n\n`;
