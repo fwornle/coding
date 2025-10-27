@@ -1,3 +1,6 @@
 [submodule "integrations/mcp-constraint-monitor"]
 	path = integrations/mcp-constraint-monitor
 	url = git@github.com:fwornle/mcp-constraint-monitor.git
+[submodule "integrations/memory-visualizer"]
+	path = integrations/memory-visualizer
+	url = git@github.com:fwornle/memory-visualizer.git

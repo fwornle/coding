@@ -59,7 +59,6 @@ claude-code-mcp-processed.json
 
 # Installation artifacts
 install.log
-memory-visualizer/
 .activate
 integrations/mcp-server-browserbase/
 integrations/mcp-server-semantic-analysis/
