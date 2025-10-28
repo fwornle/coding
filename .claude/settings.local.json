@@ -77,7 +77,10 @@
       "Bash(ps:*)",
       "Bash(git submodule:*)",
       "mcp__serena__find_referencing_symbols",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(git restore:*)",
+      "Bash(git diff:*)",
+      "Bash(xargs -I {} git restore --source=HEAD {})"
     ],
     "deny": [],
     "ask": []

@@ -3,74 +3,82 @@
 
 title Live Session Logging (LSL) Architecture
 
-top to bottom direction
+left to right direction
 
-package "Claude Code Session" {
-  [Launch Script] as Launch <<external>>
-  [User Interactions] as User <<external>>
-  [Real-time Transcript] as Transcript <<external>>
+' Larger fonts for presentation
+skinparam defaultFontSize 28
+skinparam packageFontSize 30
+skinparam componentFontSize 26
+skinparam arrowThickness 6
+skinparam nodesep 60
+skinparam ranksep 80
+
+package "Session" {
+  [Launch] as Launch <<external>>
+  [User] as User <<external>>
+  [Transcript] as Transcript <<external>>
 }
 
-package "4-Layer Monitoring" #FFE6E6 {
-  [System Watchdog] as Watchdog <<infra>>
-  [Service Coordinator] as GSC <<infra>>
-  [Monitoring Verifier] as Verifier <<infra>>
+package "Monitoring" #FFE6E6 {
+  [Watchdog] as Watchdog <<infra>>
+  [Coordinator] as GSC <<infra>>
+  [Verifier] as Verifier <<infra>>
 }
 
-package "Enhanced Transcript Monitor" {
-  [Transcript Analyzer] as Analyzer <<core>>
-  [Transition Detector] as Detector <<core>>
+package "Monitor" {
+  [Analyzer] as Analyzer <<core>>
+  [Detector] as Detector <<core>>
 }
 
 package "5-Layer Classifier" #E8F5E8 {
-  [Layer 0: Session Filter] as L0 <<core>>
-  [Layer 1: Path Analyzer] as L1 <<core>>
-  [Layer 2: Keyword Matcher] as L2 <<core>>
-  [Layer 3: Embedding] as L3 <<core>>
-  [Layer 4: Semantic] as L4 <<agent>>
+  [L0: Session] as L0 <<core>>
+  [L1: Path] as L1 <<core>>
+  [L2: Keyword] as L2 <<core>>
+  [L3: Embedding] as L3 <<core>>
+  [L4: Semantic] as L4 <<agent>>
   [Orchestrator] as Orchestrator <<core>>
 }
 
-package "Session Router" {
+package "Routing" {
   [Router] as Router <<core>>
   [Logger] as Logger <<core>>
 }
 
 package "Storage" {
-  database "Project\nHistory" as ProjectHistory <<storage>>
-  database "Coding\nHistory" as CodingHistory <<storage>>
+  database "Project" as ProjectHistory <<storage>>
+  database "Coding" as CodingHistory <<storage>>
 }
 
 ' Main flow
-Launch --> Verifier : verify
-Verifier --> Watchdog : check
-Verifier --> GSC : check
-Verifier --> Analyzer : validate
+Launch --> Verifier
+Verifier --> Watchdog
+Verifier --> GSC
+Verifier --> Analyzer
 
-Launch --> User : start
-User --> Transcript : generate
-Transcript --> Analyzer : monitor
+Launch --> User
+User --> Transcript
+Transcript --> Analyzer
 
-Analyzer --> Detector : transitions
-Analyzer --> Orchestrator : classify
+Analyzer --> Detector
+Analyzer --> Orchestrator
 
 ' Classification cascade
-Orchestrator --> L0 : bias check
-L0 --> L1 : file patterns
-L1 --> L2 : keywords
-L2 --> L3 : similarity
-L3 --> L4 : semantic
+Orchestrator --> L0
+L0 --> L1
+L1 --> L2
+L2 --> L3
+L3 --> L4
 
 ' Routing
-Orchestrator --> Router : result
-Router --> Logger : route
+Orchestrator --> Router
+Router --> Logger
 
 ' Storage
-Logger --> ProjectHistory : NOT_CODING
-Logger --> CodingHistory : CODING
+Logger --> ProjectHistory
+Logger --> CodingHistory
 
 ' Monitoring
-Watchdog --> GSC : monitors
-GSC --> Analyzer : manages
+Watchdog --> GSC
+GSC --> Analyzer
 
 @enduml
