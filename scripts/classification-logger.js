@@ -349,10 +349,10 @@ class ClassificationLogger {
 
     if (summaryFiles.length > 0) {
       console.log(`📊 Generated ${summaryFiles.length} summary report(s) by time window`);
-    }
 
-    // Generate overall status file
-    this.generateStatusFile();
+      // Generate overall status file (only if we generated new summaries)
+      this.generateStatusFile();
+    }
 
     return summaryFiles;
   }
