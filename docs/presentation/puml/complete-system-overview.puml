@@ -5,10 +5,10 @@ title Coding Project - Complete System Architecture
 
 left to right direction
 
-skinparam defaultFontSize 16
-skinparam packageFontSize 18
-skinparam componentFontSize 14
-skinparam arrowThickness 2
+skinparam defaultFontSize 24
+skinparam packageFontSize 26
+skinparam componentFontSize 22
+skinparam arrowThickness 6
 
 ' User Interface Layer (positioned left)
 actor "Developer" as dev #FFE6E6
