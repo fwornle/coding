@@ -1,84 +1,74 @@
 @startuml lsl-architecture
 !include _standard-style.puml
 
-title Live Session Logging (LSL) Architecture
+title LSL System - 4-Layer Monitoring + 5-Layer Classification
 
 left to right direction
 
-' Larger fonts for presentation
+' Presentation styling
 skinparam defaultFontSize 28
 skinparam packageFontSize 30
 skinparam componentFontSize 26
 skinparam arrowThickness 6
-skinparam nodesep 60
-skinparam ranksep 80
+skinparam nodesep 70
+skinparam ranksep 90
 
-package "Session" {
+' Top row: Session + Monitoring
+package "Claude Session" {
   [Launch] as Launch <<external>>
-  [User] as User <<external>>
   [Transcript] as Transcript <<external>>
 }
 
-package "Monitoring" #FFE6E6 {
+package "4-Layer\nMonitoring" #FFE6E6 {
   [Watchdog] as Watchdog <<infra>>
-  [Coordinator] as GSC <<infra>>
   [Verifier] as Verifier <<infra>>
 }
 
-package "Monitor" {
+' Middle row: Core processing
+package "Transcript\nMonitor" {
   [Analyzer] as Analyzer <<core>>
-  [Detector] as Detector <<core>>
 }
 
 package "5-Layer Classifier" #E8F5E8 {
-  [L0: Session] as L0 <<core>>
-  [L1: Path] as L1 <<core>>
-  [L2: Keyword] as L2 <<core>>
-  [L3: Embedding] as L3 <<core>>
-  [L4: Semantic] as L4 <<agent>>
-  [Orchestrator] as Orchestrator <<core>>
+  [L0-Session] as L0 <<core>>
+  [L1-Path] as L1 <<core>>
+  [L2-Keyword] as L2 <<core>>
+  [L3-Embedding] as L3 <<core>>
+  [L4-Semantic] as L4 <<agent>>
 }
 
+' Bottom row: Routing + Storage
 package "Routing" {
   [Router] as Router <<core>>
-  [Logger] as Logger <<core>>
 }
 
 package "Storage" {
-  database "Project" as ProjectHistory <<storage>>
-  database "Coding" as CodingHistory <<storage>>
+  database "Project\nHistory" as ProjectHistory <<storage>>
+  database "Coding\nHistory" as CodingHistory <<storage>>
 }
 
-' Main flow
+cloud "Groq API" as GroqAPI <<api>>
+
+' Simplified flow for presentation
 Launch --> Verifier
 Verifier --> Watchdog
-Verifier --> GSC
 Verifier --> Analyzer
 
-Launch --> User
-User --> Transcript
+Launch --> Transcript
 Transcript --> Analyzer
 
-Analyzer --> Detector
-Analyzer --> Orchestrator
-
-' Classification cascade
-Orchestrator --> L0
+Analyzer --> L0
 L0 --> L1
 L1 --> L2
 L2 --> L3
 L3 --> L4
 
-' Routing
-Orchestrator --> Router
-Router --> Logger
+L4 --> GroqAPI
 
-' Storage
-Logger --> ProjectHistory
-Logger --> CodingHistory
+L4 --> Router
+Router --> ProjectHistory
+Router --> CodingHistory
 
-' Monitoring
-Watchdog --> GSC
-GSC --> Analyzer
+Watchdog --> Analyzer
 
 @enduml

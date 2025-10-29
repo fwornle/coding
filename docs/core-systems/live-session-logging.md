@@ -211,10 +211,15 @@ Five-layer classification system that accurately determines content routing with
    - **Benefits**: Handles follow-up prompts ("continue", "looks good") by following conversation momentum
    - **Configuration**: `config/live-logging-config.json` → `session_filter` section
 
-1. **PathAnalyzer (Layer 1)**: File operation pattern matching
+1. **PathAnalyzer (Layer 1)**: File operation pattern matching with artifact detection
+   - **Location**: `src/live-logging/PathAnalyzer.js`
    - Analyzes file paths and operations for direct coding infrastructure detection
+   - **Two-step artifact checking**:
+     - *Step (a)*: For relative paths, checks if artifact exists locally (marks as LOCAL)
+     - *Step (b)*: If not found locally, searches by filename in coding repo (marks as FOREIGN)
+   - Prevents false positives from ambiguous paths like `docs/images/viewer.png`
    - Fastest decision path with <1ms response time
-   - High accuracy for known file patterns and operations
+   - High accuracy for known file patterns and operations with path resolution
 
 2. **KeywordMatcher (Layer 2)**: Fast keyword-based classification
    - Uses intelligent keyword analysis for coding-related term detection
@@ -222,22 +227,29 @@ Five-layer classification system that accurately determines content routing with
    - <10ms response time for obvious cases
 
 3. **EmbeddingClassifier (Layer 3)**: Semantic vector similarity search
+   - **Location**: `src/knowledge-management/EmbeddingGenerator.js`
    - Native JavaScript implementation using Transformers.js (@xenova/transformers)
-   - Model: sentence-transformers/all-MiniLM-L6-v2 (384-dimensional embeddings)
+   - **Model**: `Xenova/all-MiniLM-L6-v2` (sentence-transformers/all-MiniLM-L6-v2)
+   - **Vector size**: 384-dimensional embeddings
    - Qdrant vector database with HNSW indexing for fast similarity search
    - Searches against indexed coding infrastructure repository (183 files)
    - Similarity threshold: 0.65 (configurable)
    - ~50ms response time (10-100x faster than Python subprocess spawning)
    - Returns top 5 similar documents with confidence scores
 
-4. **SemanticAnalyzer (Layer 4)**: LLM-powered deep understanding
+4. **SemanticAnalyzer (Layer 4)**: LLM-powered deep understanding via direct API calls
+   - **Location**: `src/live-logging/SemanticAnalyzer.js`
+   - **API**: Direct HTTP calls to **Groq API** (https://api.groq.com/openai/v1)
+   - **Model**: Fast inference models (llama-3.3-70b, qwen-2.5)
+   - **Not using MCP**: Direct fetch calls for minimal overhead and fastest response
    - Used when embedding classification is inconclusive (isCoding: null)
    - Provides nuanced classification for complex edge cases
    - <10ms response time with performance monitoring and caching
+   - Temperature: 0.1 for consistent classification decisions
 
 **Additional Components**:
 - **ConversationBiasTracker**: Maintains sliding window of recent classifications for context-aware decisions
-- **FastEmbeddingGenerator**: Native JavaScript embedding generation using Transformers.js
+- **EmbeddingGenerator**: Dual-vector embedding generation (384-dim local via Transformers.js, 1536-dim remote via OpenAI)
 - **RepositoryIndexer**: Automatically indexes coding repository content into Qdrant vector database
 - **ChangeDetector**: Monitors repository changes and triggers reindexing when needed
 - **PerformanceMonitor**: Enhanced monitoring with embedding-specific metrics

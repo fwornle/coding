@@ -51,7 +51,7 @@ package "Live Session Logging (LSL)" <<core>> {
 }
 
 package "External APIs" <<infra>> {
-  [Grok API (X.AI)] as GrokAPI <<api>>
+  [Groq API] as GroqAPI <<api>>
 }
 
 package "MCP Integration" <<infra>> {
@@ -90,7 +90,7 @@ Orchestrator --> EmbeddingClassifier : "3. Vector similarity\n(<3ms)"
 EmbeddingClassifier --> OpLogger : logs decision
 
 Orchestrator --> SemanticAnalyzer : "4. Semantic analysis\n(if needed)"
-SemanticAnalyzer --> GrokAPI : direct HTTP call
+SemanticAnalyzer --> GroqAPI : direct HTTP call
 SemanticAnalyzer --> OpLogger : logs decision
 
 ' Routing decision
@@ -122,11 +122,11 @@ note right of DecisionEngine
   Context-aware conversation tracking
 end note
 
-note bottom of GrokAPI
-  **Direct Grok API Integration**
-  • HTTP calls to https://api.x.ai/v1
-  • Model: grok-2-1212
-  • 2s timeout for fast response
+note bottom of GroqAPI
+  **Direct Groq API Integration**
+  • HTTP calls to https://api.groq.com/openai/v1
+  • Fast LLM inference (llama, qwen models)
+  • 10s timeout for reliable response
   • No MCP overhead
 end note
 
