@@ -23,6 +23,7 @@ package "Live Session Logging (LSL)" <<core>> {
     [Transcript Analyzer] as TranscriptAnalyzer <<core>>
     [Session Transition Detector] as TransitionDetector <<core>>
     [Working Directory Tracker] as WorkingDir <<core>>
+    [Configurable Redactor] as Redactor <<security>>
   }
   
   package "ReliableCodingClassifier" #E8F5E8 {
@@ -97,9 +98,12 @@ SemanticAnalyzer --> OpLogger : logs decision
 Orchestrator --> Router : classification result
 Router --> PostLogger : route session
 
+' Redaction (security layer)
+PostLogger --> Redactor : sanitize content
+
 ' Storage routing
-PostLogger ..> ProjectHistory : "NOT_CODING_\nINFRASTRUCTURE"
-PostLogger ..> CodingHistory : "CODING_\nINFRASTRUCTURE"
+Redactor ..> ProjectHistory : "NOT_CODING_\nINFRASTRUCTURE"
+Redactor ..> CodingHistory : "CODING_\nINFRASTRUCTURE"
 
 ' Live updates
 Router --> Coordinator : live updates
@@ -144,6 +148,14 @@ note left of Router
   • NOT_CODING_INFRASTRUCTURE → project
   • Dual logging for mixed content
   • Session transition handling
+end note
+
+note right of Redactor
+  **Security Sanitization**
+  • API keys and tokens
+  • Passwords and secrets
+  • Configurable pattern matching
+  • .specstory/config/redaction-patterns.json
 end note
 
 @enduml
