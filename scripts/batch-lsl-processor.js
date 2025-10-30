@@ -996,6 +996,12 @@ class BatchLSLProcessor {
       const currentHour = now.getHours();
       const deletedFiles = [];
 
+      // SAFETY: Add environment variable to disable cleanup if needed
+      if (process.env.DISABLE_LSL_CLEANUP === 'true') {
+        console.log('⚠️  LSL cleanup is DISABLED (DISABLE_LSL_CLEANUP=true)');
+        return [];
+      }
+
       // Check both local and coding project directories
       const dirsToCheck = [
         path.join(this.projectPath, '.specstory', 'history'),
@@ -1042,11 +1048,28 @@ class BatchLSLProcessor {
 
           const isEmpty = promptSetCount === 1 && hasInterrupted && hasDuration0 && hasNoToolCalls;
 
+          // SAFETY: Verbose logging to debug deletion criteria
+          if (process.env.DEBUG_LSL_CLEANUP === 'true') {
+            console.log(`\n📊 Analyzing: ${filename}`);
+            console.log(`   Prompt sets: ${promptSetCount} (need: 1)`);
+            console.log(`   Has interrupted: ${hasInterrupted} (need: true)`);
+            console.log(`   Has duration 0ms: ${hasDuration0} (need: true)`);
+            console.log(`   Has no tool calls: ${hasNoToolCalls} (need: true)`);
+            console.log(`   Will delete: ${isEmpty}`);
+          }
+
           if (isEmpty) {
+            // SAFETY: Final validation before deletion
+            if (promptSetCount !== 1 || !hasInterrupted || !hasDuration0 || !hasNoToolCalls) {
+              console.error(`❌ CRITICAL: File ${filename} marked for deletion but doesn't meet ALL criteria!`);
+              console.error(`   Prompt sets: ${promptSetCount}, Interrupted: ${hasInterrupted}, Duration0: ${hasDuration0}, NoToolCalls: ${hasNoToolCalls}`);
+              continue; // Skip deletion if any condition fails
+            }
+
             // Delete the LSL file
             fs.unlinkSync(filePath);
             deletedFiles.push(filename);
-            console.log(`🗑️  Deleted empty LSL file: ${filename}`);
+            console.log(`🗑️  Deleted empty LSL file: ${filename} (1 prompt set, interrupted, 0ms, 0 tools)`);
 
             // Also delete corresponding classification log file
             const classificationDir = path.join(
@@ -1723,8 +1746,13 @@ Examples:
     }
 
     // Clean up empty LSL files for closed time windows
-    console.log(`\n🧹 Cleaning up empty LSL files...`);
-    await processor.cleanupEmptyLSLFiles();
+    // SAFETY: Only run cleanup if explicitly enabled
+    if (process.env.ENABLE_LSL_CLEANUP === 'true') {
+      console.log(`\n🧹 Cleaning up empty LSL files...`);
+      await processor.cleanupEmptyLSLFiles();
+    } else {
+      console.log(`\n⚠️  LSL cleanup SKIPPED (set ENABLE_LSL_CLEANUP=true to enable)`);
+    }
 
     process.exit(0);
   } catch (error) {
