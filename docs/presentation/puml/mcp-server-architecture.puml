@@ -71,24 +71,4 @@ SEMANTIC ..> LLMS : "3 agents\nuse LLMs"
 INSIGHT ..> LLMS
 QA ..> LLMS
 
-note top of COORDINATOR
-  **Orchestrates workflow:**
-  All agents coordinated via
-  step definitions & dependencies
-end note
-
-note bottom of GRAPHDB
-  **No MCP Memory**
-  GraphDB handles all persistence
-  Exporter creates JSON snapshots
-end note
-
-legend right
-  |= Color |= Meaning |
-  | <back:#FFE6E6>   </back> | Uses LLMs |
-  | <back:#E6F3FF>   </back> | No LLM |
-  | <back:#FFE6CC>   </back> | Orchestrator |
-  | <back:#D4EDDA>   </back> | Storage |
-endlegend
-
 @enduml
