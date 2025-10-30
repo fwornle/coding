@@ -105,6 +105,71 @@ Each critical service implements self-health checks and can self-restart when ex
 - **Port Health Checks**: Validates API server is responsive on port 6333
 - **Automatic Restart**: Service-level restart capabilities when health checks fail
 
+## Security Redaction System
+
+**Location**: `src/live-logging/ConfigurableRedactor.js`
+
+The LSL system includes a comprehensive security redaction system that automatically sanitizes sensitive information before writing any content to disk. This ensures API keys, passwords, database credentials, and other secrets are never persisted in LSL files.
+
+### ConfigurableRedactor Features
+
+**Comprehensive Pattern Coverage**:
+- **13 Redaction Pattern Types**: Covers all common secret formats
+  - Environment variables (API_KEY=value format)
+  - JSON API keys ("apiKey": "sk-..." format)
+  - sk- prefixed keys (OpenAI, Anthropic)
+  - xai- prefixed keys (XAI/Grok)
+  - Generic API keys (alphanumeric with dashes/underscores)
+  - Bearer tokens (Authorization headers)
+  - JWT tokens (three base64 segments)
+  - MongoDB connection strings
+  - PostgreSQL connection strings
+  - MySQL connection strings
+  - Generic URLs with embedded credentials
+  - Email addresses
+  - Corporate user IDs and company names
+
+**Configurable & Maintainable**:
+- JSON configuration at `.specstory/config/redaction-patterns.json`
+- Each pattern includes: id, name, description, regex pattern, severity level
+- Severity levels: `low`, `medium`, `high`, `critical`
+- Patterns can be enabled/disabled individually
+- Validation against JSON schema ensures configuration correctness
+
+**Dual Application Points**:
+1. **Live System (enhanced-transcript-monitor.js)**:
+   - Redaction during exchange formatting (lines 1617-1695)
+   - Applied to user messages, tool inputs, tool outputs, assistant responses
+   - Happens BEFORE content reaches router/storage
+
+2. **Post-Session System (post-session-logger.js)**:
+   - Redaction before writing LSL files (lines 356-409)
+   - Fallback protection when live logging unavailable
+   - Ensures zero secrets in any LSL output
+
+**Performance Optimized**:
+- Patterns compiled once during initialization
+- Efficient regex matching with minimal overhead
+- Statistics tracking: redactions performed, average processing time
+- Typical overhead: <5ms per exchange
+
+**Example Redaction**:
+```javascript
+// Before redaction
+ANTHROPIC_API_KEY=sk-ant-1234567890abcdef
+"openaiApiKey": "sk-abcdef1234567890"
+
+// After redaction
+ANTHROPIC_API_KEY=<SECRET_REDACTED>
+"openaiApiKey": "<SECRET_REDACTED>"
+```
+
+**Configuration Management**:
+- Automatic creation of default configuration on first run
+- Schema validation prevents configuration errors
+- Graceful error handling with security-first approach
+- Test utilities for pattern validation
+
 ## LSL Components Architecture
 
 ![LSL Components](../images/lsl-components.png)

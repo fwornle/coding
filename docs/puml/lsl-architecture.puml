@@ -152,11 +152,12 @@ note left of Router
 end note
 
 note right of Redactor
-  **Security Sanitization**
-  • API keys and tokens
-  • Passwords and secrets
-  • Configurable pattern matching
-  • .specstory/config/redaction-patterns.json
+  **Security Sanitization (ConfigurableRedactor)**
+  • 13 pattern types: API keys, JWT tokens, DB URLs, emails, etc.
+  • Applied during formatting (live) and pre-write (post-session)
+  • Configurable patterns: .specstory/config/redaction-patterns.json
+  • Severity levels: low, medium, high, critical
+  • Redacts user messages, tool inputs/outputs, assistant responses
 end note
 
 @enduml

@@ -71,9 +71,10 @@ perfmon DATA_LINE embedding : monitors
 perfmon DATA_LINE semantic : monitors
 
 ' File Management relationships
+extract SYNC_LINE redactor : sanitize content
 pathanalyzer SYNC_LINE router : route decision
-router SYNC_LINE redactor : sanitize
-redactor SYNC_LINE filemanager : handle files
+redactor SYNC_LINE router : redacted content
+router SYNC_LINE filemanager : route to storage
 filemanager SYNC_LINE userhash : generate names
 filemanager DATA_LINE localfiles : writes local
 filemanager DATA_LINE codingfiles : writes coding
@@ -103,11 +104,12 @@ note bottom of transcripts
 end note
 
 note right of redactor
-  **Security Sanitization**
-  - Redacts API keys/tokens
-  - Removes passwords/secrets
-  - Pattern-based matching
-  - JSON-configured rules
+  **Security Sanitization (ConfigurableRedactor)**
+  - 13 pattern types: API keys, JWT, DB URLs, emails
+  - Applied during formatting (live) & pre-write (post-session)
+  - Config: .specstory/config/redaction-patterns.json
+  - Severity levels: low, medium, high, critical
+  - Redacts all content types before storage
 end note
 
 @enduml
