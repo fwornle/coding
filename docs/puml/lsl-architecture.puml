@@ -96,14 +96,15 @@ SemanticAnalyzer --> OpLogger : logs decision
 
 ' Routing decision
 Orchestrator --> Router : classification result
+
+' Redaction happens IN the transcript analyzer during formatting
+TranscriptAnalyzer --> Redactor : sanitize all content
+Redactor --> Router : redacted exchanges
+
+' Storage routing (via file manager)
 Router --> PostLogger : route session
-
-' Redaction (security layer)
-PostLogger --> Redactor : sanitize content
-
-' Storage routing
-Redactor ..> ProjectHistory : "NOT_CODING_\nINFRASTRUCTURE"
-Redactor ..> CodingHistory : "CODING_\nINFRASTRUCTURE"
+PostLogger ..> ProjectHistory : "NOT_CODING_\nINFRASTRUCTURE"
+PostLogger ..> CodingHistory : "CODING_\nINFRASTRUCTURE"
 
 ' Live updates
 Router --> Coordinator : live updates

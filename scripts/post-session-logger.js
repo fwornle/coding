@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { AutoInsightTrigger } from './auto-insight-trigger.js';
+import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 
 class PostSessionLogger {
   constructor(projectPath, codingRepo, sessionId) {
@@ -16,6 +17,19 @@ class PostSessionLogger {
     this.codingRepo = codingRepo;
     this.sessionId = sessionId;
     this.sessionFile = path.join(codingRepo, '.mcp-sync', 'current-session.json');
+    this.redactor = null; // Initialized lazily
+  }
+
+  async initializeRedactor() {
+    if (!this.redactor) {
+      const codingPath = this.codingRepo;
+      this.redactor = new ConfigurableRedactor({
+        configPath: path.join(codingPath, '.specstory', 'config', 'redaction-patterns.json'),
+        debug: false
+      });
+      await this.redactor.initialize();
+    }
+    return this.redactor;
   }
 
   getSessionDurationMs() {
@@ -340,21 +354,25 @@ class PostSessionLogger {
   }
 
   async createLogFile(targetRepo, sessionData, content) {
+    // SECURITY: Initialize redactor and redact content before writing
+    const redactor = await this.initializeRedactor();
+    const redactedContent = await redactor.redact(content);
+
     const now = new Date();
     // Use local time instead of UTC
-    const date = now.getFullYear() + '-' + 
-                String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+    const date = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
                 String(now.getDate()).padStart(2, '0');
-    const time = String(now.getHours()).padStart(2, '0') + '-' + 
-                String(now.getMinutes()).padStart(2, '0') + '-' + 
+    const time = String(now.getHours()).padStart(2, '0') + '-' +
+                String(now.getMinutes()).padStart(2, '0') + '-' +
                 String(now.getSeconds()).padStart(2, '0');
     const isRerouted = targetRepo !== sessionData.projectPath;
     const suffix = targetRepo === this.codingRepo ? 'coding-session' : 'project-session';
     const routingMarker = isRerouted ? '-rerouted' : '';
-    
+
     const filename = `${date}_${time}_post-logged-${suffix}${routingMarker}.md`;
     const logPath = path.join(targetRepo, '.specstory', 'history', filename);
-    
+
     // Ensure directory exists
     const historyDir = path.dirname(logPath);
     if (!fs.existsSync(historyDir)) {
@@ -362,20 +380,20 @@ class PostSessionLogger {
     }
 
     const routingStatus = isRerouted ? 'RE-ROUTED' : 'DEFAULT';
-    
+
     const logContent = `# Post-Session Logged Conversation ${isRerouted ? '🔄 [RE-ROUTED]' : '📁 [DEFAULT]'}
 
-**Session ID:** ${sessionData.sessionId}  
-**Started:** ${sessionData.startTime}  
-**Logged:** ${now.toISOString()}  
-**Original Project:** ${sessionData.projectPath}  
-**Target Repository:** ${targetRepo}  
-**Content Classification:** ${targetRepo === this.codingRepo ? 'Coding/Knowledge Management' : 'Project-specific'}  
+**Session ID:** ${sessionData.sessionId}
+**Started:** ${sessionData.startTime}
+**Logged:** ${now.toISOString()}
+**Original Project:** ${sessionData.projectPath}
+**Target Repository:** ${targetRepo}
+**Content Classification:** ${targetRepo === this.codingRepo ? 'Coding/Knowledge Management' : 'Project-specific'}
 **Routing Status:** ${routingStatus} ${isRerouted ? '(Content detected as coding-related)' : '(Content stayed in original project)'}
 
 ---
 
-${content}
+${redactedContent}
 
 ---
 
