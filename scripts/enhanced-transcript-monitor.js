@@ -1226,8 +1226,11 @@ class EnhancedTranscriptMonitor {
           processingTimeMs: layer.duration || 0
         }));
 
+        // Convert timestamp to numeric milliseconds for consistent prompt set IDs
+        const timestamp = exchange.timestamp ? (typeof exchange.timestamp === 'number' ? exchange.timestamp : new Date(exchange.timestamp).getTime()) : Date.now();
+
         const decision = {
-          promptSetId: exchange.uuid || `ps_${exchange.timestamp || new Date().toISOString()}`,
+          promptSetId: exchange.uuid || `ps_${timestamp}`,
           timeRange: {
             start: exchange.timestamp || new Date().toISOString(),
             end: new Date().toISOString()
@@ -1476,10 +1479,23 @@ class EnhancedTranscriptMonitor {
 
   /**
    * Process user prompt set completion
+   * @param {Array} completedSet - Array of exchanges in this prompt set
+   * @param {string} targetProject - Project to write to
+   * @param {Object} tranche - Time window object
+   * @param {string} promptSetId - Optional prompt set ID for anchors (generated if not provided)
    * @returns {boolean} true if set was written, false if held back due to incomplete exchanges
    */
-  async processUserPromptSetCompletion(completedSet, targetProject, tranche) {
+  async processUserPromptSetCompletion(completedSet, targetProject, tranche, promptSetId = null) {
     if (completedSet.length === 0) return false;
+
+    // Generate promptSetId if not provided (using first exchange timestamp as numeric milliseconds)
+    if (!promptSetId) {
+      const firstExchange = completedSet[0];
+      const rawTimestamp = firstExchange.timestamp || Date.now();
+      // Ensure timestamp is numeric milliseconds, not ISO string
+      const timestamp = typeof rawTimestamp === 'number' ? rawTimestamp : new Date(rawTimestamp).getTime();
+      promptSetId = `ps_${timestamp}`;
+    }
 
     // NEW: Check if all exchanges are complete before writing
     const incompleteExchanges = completedSet.filter(ex => {
@@ -1520,12 +1536,33 @@ class EnhancedTranscriptMonitor {
     }
 
     const sessionFile = this.getSessionFilePath(targetProject, tranche);
-    
+
     // Create session file with the actual content (no empty files)
+    // Add prompt set anchor and header for classification log links
     let sessionContent = '';
+
+    // Add prompt set anchor for linking from classification logs
+    sessionContent += `<a name="${promptSetId}"></a>\n`;
+    sessionContent += `## Prompt Set (${promptSetId})\n\n`;
+
+    // Calculate prompt set metadata
+    const firstExchange = meaningfulExchanges[0];
+    const lastExchange = meaningfulExchanges[meaningfulExchanges.length - 1];
+    const startTime = new Date(firstExchange.timestamp || Date.now());
+    const endTime = new Date(lastExchange.timestamp || Date.now());
+    const duration = endTime.getTime() - startTime.getTime();
+    const toolCallCount = meaningfulExchanges.reduce((sum, ex) => sum + (ex.toolCalls?.length || 0), 0);
+
+    sessionContent += `**Time:** ${startTime.toISOString()}\n`;
+    sessionContent += `**Duration:** ${duration}ms\n`;
+    sessionContent += `**Tool Calls:** ${toolCallCount}\n\n`;
+
+    // Add all exchanges in this prompt set
     for (const exchange of meaningfulExchanges) {
       sessionContent += await this.formatExchangeForLogging(exchange, targetProject !== this.config.projectPath);
     }
+
+    sessionContent += `---\n\n`;
     
     if (!fs.existsSync(sessionFile)) {
       // Create file with content immediately
@@ -1584,41 +1621,49 @@ class EnhancedTranscriptMonitor {
    */
   async formatToolCallContent(exchange, toolCall, result, exchangeTime, isRedirected) {
     const toolSuccess = result && !result.is_error;
-    
+
     // Handle both old and new tool call formats
     const toolName = toolCall.function?.name || toolCall.name || 'Unknown Tool';
     const toolArgs = toolCall.function?.arguments || toolCall.input || toolCall.parameters || {};
-    
+
     let content = `### ${toolName} - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-    
+
     // Handle both undefined and empty string cases
-    const userMessage = (exchange.userMessage && exchange.userMessage.trim()) || 
+    const userMessage = (exchange.userMessage && exchange.userMessage.trim()) ||
                        (exchange.humanMessage && exchange.humanMessage.trim());
-    
+
     if (userMessage) {
       // Handle Promise objects that might be from redactSecrets calls
-      const userMessageStr = userMessage && typeof userMessage === 'object' && userMessage.then ? 
-        await userMessage : 
+      const userMessageStr = userMessage && typeof userMessage === 'object' && userMessage.then ?
+        await userMessage :
         (typeof userMessage === 'string' ? userMessage : JSON.stringify(userMessage));
-      content += `**User Request:** ${userMessageStr}\n\n`;
+      // SECURITY: Redact user message
+      content += `**User Request:** ${await redactSecrets(userMessageStr)}\n\n`;
     } else {
       // This is an automatic execution (hook, system-initiated, etc.)
       content += `**System Action:** (Initiated automatically)\n\n`;
     }
-    
+
     content += `**Tool:** ${toolName}\n`;
-    content += `**Input:** \`\`\`json\n${JSON.stringify(toolArgs, null, 2)}\n\`\`\`\n\n`;
-    
+    // SECURITY: Redact tool inputs (may contain API keys, passwords, etc.)
+    content += `**Input:** \`\`\`json\n${await redactSecrets(JSON.stringify(toolArgs, null, 2))}\n\`\`\`\n\n`;
+
     const status = toolSuccess ? '✅ Success' : '❌ Error';
     content += `**Result:** ${status}\n`;
-    
+
+    // SECURITY: Redact tool outputs (may contain secrets in responses)
+    if (result?.content) {
+      const output = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
+      content += `**Output:** \`\`\`\n${await redactSecrets(output.slice(0, 500))}${output.length > 500 ? '\n...[truncated]' : ''}\n\`\`\`\n\n`;
+    }
+
     if (result) {
       const analysis = this.analyzeExchangeContent(exchange);
       if (analysis.categories.length > 0) {
         content += `**AI Analysis:** ${analysis.categories.join(', ')} - routing: ${isRedirected ? 'coding project' : 'local project'}\n`;
       }
     }
-    
+
     content += `\n---\n\n`;
     return content;
   }
@@ -1626,27 +1671,31 @@ class EnhancedTranscriptMonitor {
   /**
    * Format text-only exchange content
    */
-  formatTextOnlyContent(exchange, exchangeTime, isRedirected) {
+  async formatTextOnlyContent(exchange, exchangeTime, isRedirected) {
     let content = `### Text Exchange - ${exchangeTime}${isRedirected ? ' (Redirected)' : ''}\n\n`;
-    
+
     const userMsg = exchange.userMessage || '';
     const assistantResp = exchange.assistantResponse || exchange.claudeResponse || '';
-    
+
     // Ensure userMsg and assistantResp are strings
     const userMsgStr = typeof userMsg === 'string' ? userMsg : JSON.stringify(userMsg);
     const assistantRespStr = typeof assistantResp === 'string' ? assistantResp : JSON.stringify(assistantResp);
-    
+
     // Only show sections that have content
     if (userMsgStr && userMsgStr.trim()) {
-      content += `**User Message:** ${userMsgStr.slice(0, 500)}${userMsgStr.length > 500 ? '...' : ''}\n\n`;
+      // SECURITY: Redact user messages (may contain API keys in examples, etc.)
+      const truncated = userMsgStr.slice(0, 500);
+      content += `**User Message:** ${await redactSecrets(truncated)}${userMsgStr.length > 500 ? '...' : ''}\n\n`;
     }
-    
+
     if (assistantRespStr && assistantRespStr.trim()) {
-      content += `**Assistant Response:** ${assistantRespStr.slice(0, 500)}${assistantRespStr.length > 500 ? '...' : ''}\n\n`;
+      // SECURITY: Redact assistant responses (may echo back secrets from user)
+      const truncated = assistantRespStr.slice(0, 500);
+      content += `**Assistant Response:** ${await redactSecrets(truncated)}${assistantRespStr.length > 500 ? '...' : ''}\n\n`;
     }
-    
+
     content += `**Type:** Text-only exchange (no tool calls)\n\n---\n\n`;
-    
+
     return content;
   }
 
