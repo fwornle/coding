@@ -1,0 +1,114 @@
+@startuml memory-visualizer-components
+!include _standard-style.puml
+
+title Memory Visualizer - Component Structure
+
+' Presentation styling
+skinparam defaultFontSize 28
+skinparam packageFontSize 30
+skinparam componentFontSize 26
+skinparam arrowThickness 6
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam noteFontSize 24
+skinparam legendFontSize 24
+
+package "Memory Visualizer Application" {
+
+  component [App.tsx] as APP <<root>> #FFE6CC
+
+  package "Knowledge Graph\nModule" #E6F3FF {
+    component [KnowledgeGraph] as KG
+    component [GraphVisualization] as GRAPH
+    component [NodeDetails] as DETAILS
+  }
+
+  package "Filtering\nModule" #FFE6E6 {
+    component [TypeFilters] as TYPE_FILTER
+    component [SearchFilter] as SEARCH
+    component [TeamFilter] as TEAM_FILTER
+    component [SourceFilter] as SOURCE_FILTER
+  }
+
+  package "Rendering\nComponents" #E6FFE6 {
+    component [MarkdownViewer] as MARKDOWN
+    component [MermaidDiagram] as MERMAID
+  }
+
+  package "State\nManagement" #FFF4E6 {
+    component [Redux Store] as STORE
+    component [Graph Slice] as SLICE
+  }
+
+  package "API Layer" #F0E6FF {
+    component [DatabaseClient] as CLIENT
+  }
+
+  package "Utilities" #E6E6FF {
+    component [Graph Helpers] as HELPERS
+  }
+}
+
+' Relationships - simplified for clarity
+APP --> KG
+APP --> STORE
+
+KG --> GRAPH
+KG --> DETAILS
+KG --> TYPE_FILTER
+KG --> SEARCH
+KG --> TEAM_FILTER
+KG --> SOURCE_FILTER
+
+GRAPH --> HELPERS
+GRAPH --> STORE
+
+DETAILS --> MARKDOWN
+DETAILS --> MERMAID
+DETAILS --> STORE
+
+TYPE_FILTER --> STORE
+SEARCH --> STORE
+TEAM_FILTER --> STORE
+SOURCE_FILTER --> STORE
+
+STORE --> SLICE
+SLICE --> CLIENT
+CLIENT --> HELPERS
+
+note right of KG
+  **Primary Features:**
+  • Interactive graph
+  • Entity details
+  • Real-time filtering
+  • Multi-team support
+end note
+
+note right of GRAPH
+  **D3.js Features:**
+  • Force-directed layout
+  • Drag to reposition
+  • Zoom/pan controls
+  • Dynamic updates
+end note
+
+note right of CLIENT
+  **Data Sources:**
+  • GraphDB (LevelDB)
+  • memory.json files
+  • Clipboard paste
+  • Drag & drop
+end note
+
+legend bottom
+  |= Module |= Purpose |
+  | <back:#E6F3FF>   </back> | Core Visualization |
+  | <back:#FFE6E6>   </back> | Filtering & Search |
+  | <back:#E6FFE6>   </back> | Content Rendering |
+  | <back:#FFF4E6>   </back> | State Management |
+  | <back:#F0E6FF>   </back> | Data Access |
+  | <back:#E6E6FF>   </back> | Utilities |
+  | <back:#FFE6CC>   </back> | Root Component |
+endlegend
+
+@enduml
