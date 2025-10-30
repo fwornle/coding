@@ -76,15 +76,4 @@ STORE --> SLICE
 SLICE --> CLIENT
 CLIENT --> HELPERS
 
-legend bottom
-  |= Module |= Purpose |
-  | <back:#E6F3FF>   </back> | Core Visualization |
-  | <back:#FFE6E6>   </back> | Filtering & Search |
-  | <back:#E6FFE6>   </back> | Content Rendering |
-  | <back:#FFF4E6>   </back> | State Management |
-  | <back:#F0E6FF>   </back> | Data Access |
-  | <back:#E6E6FF>   </back> | Utilities |
-  | <back:#FFE6CC>   </back> | Root Component |
-endlegend
-
 @enduml
