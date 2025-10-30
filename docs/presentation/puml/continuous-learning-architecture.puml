@@ -1,111 +1,152 @@
 @startuml continuous-learning-architecture
 !include _standard-style.puml
 
+' Presentation-optimized version (landscape, larger fonts, clean layout)
+
+skinparam defaultFontSize 14
+skinparam titleFontSize 20
+skinparam packageFontSize 16
+skinparam componentFontSize 13
+skinparam ArrowThickness 2
+
 title Continuous Learning Knowledge System
 
-skinparam defaultFontSize 16
-skinparam componentFontSize 14
+left to right direction
 
-' Row 1: Sessions
-together {
-  [Claude\nCode] <<cli>>
-  [Copilot] <<cli>>
-  [Cursor] <<cli>>
+package "Coding Sessions" <<external>> {
+  component "Claude\nCode" as CLAUDE <<cli>>
+  component "Copilot" as COPILOT <<cli>>
+  component "Cursor" as CURSOR <<cli>>
+  component "Generic\nAgent" as GENERIC <<cli>>
 }
 
-' Row 2: Adapters
-together {
-  interface "Adapter\nAPI" as API <<api>>
-  [Claude\nAdapter] <<agent>>
-  [Copilot\nAdapter] <<agent>>
-  [Generic\nAdapter] <<agent>>
+package "Agent Adapters" <<api>> {
+  interface "AgentAdapter\nInterface" as ADAPTER_API
+  component "Claude\nAdapter" as CA <<agent>>
+  component "Copilot\nAdapter" as CPA <<agent>>
+  component "Generic\nAdapter" as GA <<agent>>
 }
 
-' Row 3: Core Processing
-together {
-  [Streaming\nExtractor] <<core>>
-  [Knowledge\nRetriever] <<core>>
-  [Concept\nAbstraction] <<agent>>
-  [Temporal\nDecay] <<util>>
+package "Knowledge Management" <<core>> {
+  component "Streaming\nExtractor" as EXTRACTOR <<core>>
+  component "Knowledge\nRetriever" as RETRIEVER <<core>>
+  component "Concept\nAbstraction" as CONCEPT <<agent>>
+  component "Temporal\nDecay" as DECAY <<util>>
 }
 
-' Row 4: Inference & Trajectory
-together {
-  [Unified\nEngine] <<core>>
-  [Budget\nTracker] <<util>>
-  [Sensitivity] <<util>>
-  [Trajectory\nAnalyzer] <<core>>
+package "Core Inference Engine" <<core>> {
+  component "Unified\nInference" as ENGINE <<core>>
+  component "Budget\nTracker" as BUDGET <<util>>
+  component "Sensitivity\nClassifier" as SENS <<util>>
 }
 
-' Row 5: Cache
-together {
-  [Agent\nCache] <<storage>>
-  [File] <<storage>>
-  [HTTP] <<storage>>
-  [MCP] <<storage>>
+package "Trajectory Tracking" <<core>> {
+  component "Trajectory\nAnalyzer" as TRAJ <<core>>
 }
 
-' Row 6: Storage
-together {
-  database "Qdrant" as Q
-  database "SQLite" as S
-  database "Graph" as G
+package "Caching Layer" <<storage>> {
+  component "Agent\nCache" as CACHE <<storage>>
+  component "File\nBackend" as FBACK <<storage>>
+  component "HTTP\nBackend" as HBACK <<storage>>
+  component "MCP\nBackend" as MBACK <<storage>>
 }
 
-' Row 7: Providers
-together {
-  [Groq] <<provider>>
-  [Anthropic] <<provider>>
-  [OpenAI] <<provider>>
-  [Ollama] <<provider>>
-  [vLLM] <<provider>>
+package "Database Layer" <<storage>> {
+  database "Qdrant\n(Vectors)" as QDRANT <<storage>> #D4EDDA
+  database "SQLite\n(Analytics)" as SQLITE <<storage>> #D4EDDA
+  database "Graph\n(UKB/VKB)" as GRAPH <<storage>> #D4EDDA
 }
 
-' Connections
-[Claude\nCode] --> API
-[Copilot] --> API
-[Cursor] --> API
+package "LLM Providers" <<external>> {
+  together {
+    cloud "Remote" as REMOTE {
+      component "Groq" as GROQ <<provider>>
+      component "Anthropic" as ANTHRO <<provider>>
+      component "OpenAI" as OPENAI <<provider>>
+    }
+    cloud "Local" as LOCAL {
+      component "Ollama" as OLLAMA <<provider>>
+      component "vLLM" as VLLM <<provider>>
+    }
+  }
+}
 
-API --> [Claude\nAdapter]
-API --> [Copilot\nAdapter]
-API --> [Generic\nAdapter]
+' AGGRESSIVE horizontal landscape layout - everything in one row left to right
+' Force strict left-to-right flow with minimal vertical spread
+CLAUDE -[hidden]right-> ADAPTER_API
+ADAPTER_API -[hidden]right-> CA
+CA -[hidden]right-> EXTRACTOR
+EXTRACTOR -[hidden]right-> ENGINE
+ENGINE -[hidden]right-> BUDGET
+BUDGET -[hidden]right-> QDRANT
+QDRANT -[hidden]right-> SQLITE
+SQLITE -[hidden]right-> GRAPH
+GRAPH -[hidden]right-> CACHE
+CACHE -[hidden]right-> FBACK
+FBACK -[hidden]right-> HBACK
+HBACK -[hidden]right-> MBACK
+MBACK -[hidden]right-> GROQ
+GROQ -[hidden]right-> ANTHRO
+ANTHRO -[hidden]right-> OPENAI
+OPENAI -[hidden]right-> OLLAMA
+OLLAMA -[hidden]right-> VLLM
 
-[Claude\nAdapter] --> [Streaming\nExtractor]
-[Copilot\nAdapter] --> [Streaming\nExtractor]
-[Generic\nAdapter] --> [Streaming\nExtractor]
+' Align other components at same horizontal level
+COPILOT -[hidden]down-> ADAPTER_API
+CPA -[hidden]down-> CA
+RETRIEVER -[hidden]down-> EXTRACTOR
+TRAJ -[hidden]down-> ENGINE
+SENS -[hidden]down-> BUDGET
 
-[Streaming\nExtractor] --> [Unified\nEngine]
-[Knowledge\nRetriever] --> [Unified\nEngine]
-[Concept\nAbstraction] --> [Unified\nEngine]
-[Trajectory\nAnalyzer] --> [Unified\nEngine]
+' Session → Adapters
+CLAUDE --> ADAPTER_API
+COPILOT --> ADAPTER_API
+CURSOR --> ADAPTER_API
+GENERIC --> ADAPTER_API
 
-[Unified\nEngine] --> [Budget\nTracker]
-[Unified\nEngine] --> [Sensitivity]
-[Unified\nEngine] --> [Groq]
-[Unified\nEngine] --> [Anthropic]
-[Unified\nEngine] --> [OpenAI]
-[Unified\nEngine] --> [Ollama]
-[Unified\nEngine] --> [vLLM]
+' Adapters → Agents
+ADAPTER_API --> CA
+ADAPTER_API --> CPA
+ADAPTER_API --> GA
 
-[Streaming\nExtractor] ..> Q
-[Streaming\nExtractor] ..> S
-[Knowledge\nRetriever] ..> Q
-[Knowledge\nRetriever] ..> S
-[Concept\nAbstraction] ..> Q
-[Temporal\nDecay] ..> Q
-[Temporal\nDecay] ..> S
+' Adapters → Knowledge
+CA --> EXTRACTOR
+CPA --> EXTRACTOR
+GA --> EXTRACTOR
 
-[Unified\nEngine] ..> [Agent\nCache]
-[Knowledge\nRetriever] ..> [Agent\nCache]
+' Knowledge → Inference
+EXTRACTOR --> ENGINE
+RETRIEVER --> ENGINE
+CONCEPT --> ENGINE
+TRAJ --> ENGINE
 
-[Agent\nCache] ..> [File]
-[Agent\nCache] ..> [HTTP]
-[Agent\nCache] ..> [MCP]
+' Inference → Utils & Providers
+ENGINE --> BUDGET
+ENGINE --> SENS
+ENGINE --> GROQ
+ENGINE --> ANTHRO
+ENGINE --> OPENAI
+ENGINE --> OLLAMA
+ENGINE --> VLLM
 
-[Budget\nTracker] ..> S
-[Trajectory\nAnalyzer] ..> Q
-[Trajectory\nAnalyzer] ..> S
+' Knowledge → Databases
+EXTRACTOR ..> QDRANT
+EXTRACTOR ..> SQLITE
+RETRIEVER ..> QDRANT
+RETRIEVER ..> SQLITE
+CONCEPT ..> QDRANT
+CONCEPT ..> GRAPH
+DECAY ..> QDRANT
+DECAY ..> SQLITE
+BUDGET ..> SQLITE
+TRAJ ..> QDRANT
+TRAJ ..> SQLITE
 
-[Concept\nAbstraction] ..> G
+' Cache connections
+ENGINE ..> CACHE
+RETRIEVER ..> CACHE
+CACHE ..> FBACK
+CACHE ..> HBACK
+CACHE ..> MBACK
 
 @enduml
