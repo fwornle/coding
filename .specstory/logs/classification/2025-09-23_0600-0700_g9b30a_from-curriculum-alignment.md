@@ -1,0 +1,140 @@
+# Classification Decision Log (Foreign/Coding)
+
+**Time Window**: 2025-09-23_0600-0700_g9b30a<br>
+**Project**: curriculum-alignment<br>
+**Target**: CODING<br>
+**Generated**: 2025-10-30T06:15:35.463Z<br>
+**Decisions in Window**: 4
+
+---
+
+## Statistics
+
+- **Total Prompt Sets**: 4
+- **Classified as CODING**: 4 (100%)
+- **Classified as LOCAL**: 0 (0%)
+- **[Layer 0 (Session Filter) Decisions](#layer-0-session-filter)**: 0
+- **[Layer 1 (Path) Decisions](#layer-1-path)**: 0
+- **[Layer 2 (Keyword) Decisions](#layer-2-keyword)**: 2
+- **[Layer 3 (Embedding) Decisions](#layer-3-embedding)**: 2
+- **[Layer 4 (Semantic) Decisions](#layer-4-semantic)**: 0
+- **Average Processing Time**: 236ms
+
+---
+
+## Layer 2: Keyword
+
+**Decisions**: 2
+
+### Prompt Set: [ps_1758601825304](../../../history/2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md#ps_1758601825304)
+
+**Time Range**: 1758601825304 → 1758602095255<br>
+**LSL File**: [2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md](../../../history/2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md#ps_1758601825304)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.5525)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/q284340/Agentic/curriculum-alignment/.spec-workflow/specs/curriculum-alignment/tasks.md, /Users/q284340/Agentic/curriculum-alignment/src/services/cost-tracking.service.ts, /Users/q284340/Agentic/curriculum-alignment/src/types/errors.ts, /Users/q284340/Agentic/curriculum-alignment/src/utils/error-handler.ts
+- Processing Time: 0ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.5525
+- Reasoning: Keyword analysis: 1 matches, score: 4/1
+- Processing Time: 1ms
+
+---
+
+### Prompt Set: [ps_1758601825304](../../../history/2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md#ps_1758601825304)
+
+**Time Range**: 1758601825304 → 1758602095255<br>
+**LSL File**: [2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md](../../../history/2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md#ps_1758601825304)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.5525)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/q284340/Agentic/curriculum-alignment/.spec-workflow/specs/curriculum-alignment/tasks.md, /Users/q284340/Agentic/curriculum-alignment/src/services/cost-tracking.service.ts, /Users/q284340/Agentic/curriculum-alignment/src/types/errors.ts, /Users/q284340/Agentic/curriculum-alignment/src/utils/error-handler.ts
+- Processing Time: 0ms
+
+✅ **Layer 2 (keyword)**
+- Decision: coding
+- Confidence: 0.5525
+- Reasoning: Keyword analysis: 1 matches, score: 4/1
+- Processing Time: 2ms
+
+---
+
+## Layer 3: Embedding
+
+**Decisions**: 2
+
+### Prompt Set: [ps_1758602147687](../../../history/2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md#ps_1758602147687)
+
+**Time Range**: 1758602147687 → 1758602374674<br>
+**LSL File**: [2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md](../../../history/2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md#ps_1758602147687)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.725898425)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/q284340/Agentic/curriculum-alignment/.spec-workflow/specs/curriculum-alignment/tasks.md, /Users/q284340/Agentic/curriculum-alignment/src/services/storage.service.ts, /Users/q284340/Agentic/curriculum-alignment/src/services/websocket.service.ts
+- Processing Time: 0ms
+
+❌ **Layer 2 (keyword)**
+- Decision: local
+- Confidence: 0.1
+- Reasoning: Keyword analysis: 0 matches, score: 0/1
+- Processing Time: 1ms
+
+✅ **Layer 3 (embedding)**
+- Decision: coding
+- Confidence: 0.725898425
+- Reasoning: Semantic similarity favors coding (coding_lsl=0.712, nano_degree=0.683, curriculum_alignment=0.668, coding_infrastructure=0.636)
+- Processing Time: 531ms
+
+---
+
+### Prompt Set: [ps_1758602147687](../../../history/2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md#ps_1758602147687)
+
+**Time Range**: 1758602147687 → 1758602374674<br>
+**LSL File**: [2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md](../../../history/2025-09-23_0600-0700_g9b30a_from-curriculum-alignment.md#ps_1758602147687)<br>
+**LSL Lines**: 0-0<br>
+**Target**: 🌍 FOREIGN (coding)<br>
+**Final Classification**: ✅ CODING (confidence: 0.725898425)
+
+#### Layer-by-Layer Trace
+
+❌ **Layer 1 (path)**
+- Decision: local
+- Confidence: 0.02
+- Reasoning: Majority of write operations target local project: /Users/q284340/Agentic/curriculum-alignment/.spec-workflow/specs/curriculum-alignment/tasks.md, /Users/q284340/Agentic/curriculum-alignment/src/services/storage.service.ts, /Users/q284340/Agentic/curriculum-alignment/src/services/websocket.service.ts
+- Processing Time: 0ms
+
+❌ **Layer 2 (keyword)**
+- Decision: local
+- Confidence: 0.1
+- Reasoning: Keyword analysis: 0 matches, score: 0/1
+- Processing Time: 1ms
+
+✅ **Layer 3 (embedding)**
+- Decision: coding
+- Confidence: 0.725898425
+- Reasoning: Semantic similarity favors coding (coding_lsl=0.712, nano_degree=0.683, curriculum_alignment=0.668, coding_infrastructure=0.636)
+- Processing Time: 406ms
+
+---
+
