@@ -322,13 +322,32 @@ class PathAnalyzer {
     }
     
     // Extract direct file paths (simple regex for absolute paths)
-    const absolutePathRegex = /([\/~][^\s<>"'|;&]*(?:\.[\w]+)?)/g;
+    // Use negative lookbehind to avoid matching slashes in the middle of relative paths
+    const absolutePathRegex = /(?<![a-zA-Z0-9_-])([\/~][^\s<>"'|;&]*(?:\.[\w]+)?)/g;
     let pathMatch;
     while ((pathMatch = absolutePathRegex.exec(text)) !== null) {
       const path = pathMatch[1].trim();
       // Only include paths that look like real file paths
       if (path.length > 2 && !path.includes(' ') && (path.includes('/') || path.startsWith('~'))) {
         operations.add(path);
+      }
+    }
+
+    // Extract relative file paths from plain text
+    // Match patterns like "src/file.js", "docs/images/pic.png", "integrations/module/file.ts"
+    // This is crucial for detecting when user references files that exist in coding repo but not locally
+    const relativePathRegex = /\b([a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_.-]+)+(?:\.[a-zA-Z0-9]+)?)\b/g;
+    let relPathMatch;
+    while ((relPathMatch = relativePathRegex.exec(text)) !== null) {
+      const relPath = relPathMatch[1].trim();
+      // Only include paths that:
+      // 1. Have at least one slash (are actually paths, not just filenames)
+      // 2. Don't look like URLs (no protocol)
+      // 3. Have a reasonable length (avoid false positives)
+      // 4. Don't start with common TLDs (likely URL fragments)
+      const commonTLDs = /^(com|org|net|edu|gov|io|co|dev|app|xyz)\//;
+      if (relPath.includes('/') && !relPath.includes('://') && relPath.length > 3 && !commonTLDs.test(relPath)) {
+        operations.add(relPath);
       }
     }
   }
@@ -454,17 +473,9 @@ class PathAnalyzer {
     try {
       // Try to match the partial path structure within coding repo
       // For "docs/images/viewer.png", try common locations:
-      // - coding/docs/images/viewer.png
-      // - coding/*/docs/images/viewer.png (subdirectories)
-
-      const commonLocations = [
-        // Direct match
-        path.join(this.codingRepo, partialPath),
-        // In integrations subdirectory
-        path.join(this.codingRepo, 'integrations', '**', partialPath),
-        // In any subdirectory matching the structure
-        path.join(this.codingRepo, '**', partialPath)
-      ];
+      // - coding/docs/images/viewer.png (direct match - tried first)
+      // - coding/integrations/*/docs/images/viewer.png (in integrations subdirectory)
+      // - coding/**/docs/images/viewer.png (recursive search as fallback)
 
       // Check direct paths first (fast)
       const directPath = path.join(this.codingRepo, partialPath);
