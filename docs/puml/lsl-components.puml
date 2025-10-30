@@ -1,4 +1,4 @@
-@startuml LSL Components
+@startuml lsl-components
 !include _standard-style.puml
 
 title Live Session Logging System Components
@@ -6,6 +6,7 @@ title Live Session Logging System Components
 package "Enhanced Transcript Monitor" {
   component [Transcript Path\nRefresh] as tpr <<util>>
   component [Exchange\nExtraction] as extract <<core>>
+  component [Configurable\nRedactor] as redactor <<security>>
   component [Health File\nGeneration] as health <<util>>
   component [Session Boundary\nDetection] as session <<util>>
 }
@@ -71,7 +72,8 @@ perfmon DATA_LINE semantic : monitors
 
 ' File Management relationships
 pathanalyzer SYNC_LINE router : route decision
-router SYNC_LINE filemanager : handle files
+router SYNC_LINE redactor : sanitize
+redactor SYNC_LINE filemanager : handle files
 filemanager SYNC_LINE userhash : generate names
 filemanager DATA_LINE localfiles : writes local
 filemanager DATA_LINE codingfiles : writes coding
@@ -98,6 +100,14 @@ note bottom of transcripts
   - Periodic path refresh (60s)
   - Streaming processing
   - Exchange-level granularity
+end note
+
+note right of redactor
+  **Security Sanitization**
+  - Redacts API keys/tokens
+  - Removes passwords/secrets
+  - Pattern-based matching
+  - JSON-configured rules
 end note
 
 @enduml
