@@ -618,7 +618,7 @@ class ClassificationLogger {
       if (layer0Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer0Coding) {
-          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -656,7 +656,7 @@ class ClassificationLogger {
       if (layer1Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer1Coding) {
-          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -694,7 +694,7 @@ class ClassificationLogger {
       if (layer2Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer2Coding) {
-          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -732,7 +732,7 @@ class ClassificationLogger {
       if (layer3Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer3Coding) {
-          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -770,7 +770,7 @@ class ClassificationLogger {
       if (layer4Coding.length > 0) {
         markdown += `#### Redirected (CODING)\n\n`;
         for (const { window, codingCount } of layer4Coding) {
-          const summaryFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+          const summaryFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
           markdown += `- **[${window}](${summaryFile})** - ${codingCount} coding decisions\n`;
         }
         markdown += `\n`;
@@ -803,7 +803,7 @@ class ClassificationLogger {
       // Create appropriate links for CODING and LOCAL
       const links = [];
       if (codingCount > 0) {
-        const codingFile = `../../../../coding/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
+        const codingFile = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
         links.push(`[CODING: ${codingCount}](${codingFile})`);
       }
       if (localCount > 0) {
