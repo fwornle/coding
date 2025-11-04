@@ -1,0 +1,12 @@
+{
+  "team": "ReSi",
+  "description": "Research Signals team focused on signal detection, pattern analysis, and research insights",
+  "lowerOntologyPath": "src/ontology/lower/resi-ontology.json",
+  "confidenceThreshold": 0.7,
+  "validationMode": "lenient",
+  "strictValidation": false,
+  "classification": {
+    "preferHeuristics": true,
+    "heuristicThreshold": 0.8
+  }
+}

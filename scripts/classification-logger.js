@@ -176,6 +176,13 @@ class ClassificationLogger {
           logVersion: '1.0.0'
         };
         fs.writeFileSync(logFile, JSON.stringify(header) + '\n', 'utf8');
+
+        // CRITICAL FIX: Set file modification time to window timestamp
+        const windowDate = new Date(timestamp);
+        fs.utimesSync(logFile, windowDate, windowDate);
+
+        console.log(`📊 Created JSONL log: ${path.basename(logFile)}`);
+        console.log(`   Window timestamp: ${windowDate.toISOString()}`);
       }
 
       this.windowedLogs.set(fullWindow, logFile);
@@ -277,6 +284,29 @@ class ClassificationLogger {
   }
 
   /**
+   * Parse window timestamp from fullWindow string
+   * Format: YYYY-MM-DD_HHMM-HHMM_userhash
+   * Returns: Date object representing the start of the time window
+   */
+  parseWindowTimestamp(fullWindow) {
+    // Extract date and start time: "2025-11-04_1400-1500_g9b30a" -> "2025-11-04" + "1400"
+    const match = fullWindow.match(/^(\d{4}-\d{2}-\d{2})_(\d{4})-\d{4}/);
+
+    if (!match) {
+      console.warn(`⚠️  Failed to parse window timestamp from: ${fullWindow}`);
+      return new Date();  // Fallback to current time
+    }
+
+    const [, date, startTime] = match;
+    const hour = startTime.substring(0, 2);
+    const minute = startTime.substring(2, 4);
+
+    // Construct ISO timestamp for the window start
+    const isoString = `${date}T${hour}:${minute}:00.000Z`;
+    return new Date(isoString);
+  }
+
+  /**
    * Generate human-readable summary reports (one per time window)
    */
   generateSummaryReport() {
@@ -321,12 +351,31 @@ class ClassificationLogger {
       const localDecisions = windowDecisions.filter(d => !d.classification.isCoding);
       const codingDecisions = windowDecisions.filter(d => d.classification.isCoding);
 
+      // CRITICAL FIX: Parse window timestamp from fullWindow string
+      // Format: YYYY-MM-DD_HHMM-HHMM_userhash
+      const windowTimestamp = this.parseWindowTimestamp(fullWindow);
+
       // Generate LOCAL classification log (stored locally in project)
       if (localDecisions.length > 0) {
         const localFile = path.join(this.logDir, `${fullWindow}.md`);
-        const existingTimestamp = this.extractExistingTimestamp(localFile);
-        const localContent = this.generateClassificationMarkdown(fullWindow, localDecisions, 'LOCAL', existingTimestamp);
+
+        // CRITICAL FIX: ALWAYS use windowTimestamp, never preserve existing wrong timestamps
+        // Previous bug: extractExistingTimestamp() would read wrong timestamps and preserve them
+        const localContent = this.generateClassificationMarkdown(fullWindow, localDecisions, 'LOCAL', windowTimestamp.toISOString());
+
+        // TRACING: Log file creation
+        console.log(`📊 Creating LOCAL classification log: ${path.basename(localFile)}`);
+        console.log(`   Window timestamp: ${windowTimestamp.toISOString()}`);
+
         fs.writeFileSync(localFile, localContent, 'utf8');
+
+        // CRITICAL FIX: Set file modification time to window timestamp
+        fs.utimesSync(localFile, windowTimestamp, windowTimestamp);
+
+        // Verify timestamp
+        const stats = fs.statSync(localFile);
+        console.log(`   File mtime: ${stats.mtime.toISOString()}`);
+
         summaryFiles.push(localFile);
       }
 
@@ -336,9 +385,23 @@ class ClassificationLogger {
         fs.mkdirSync(codingLogDir, { recursive: true });
 
         const codingFile = path.join(codingLogDir, `${fullWindow}_from-${this.projectName}.md`);
-        const existingTimestamp = this.extractExistingTimestamp(codingFile);
-        const codingContent = this.generateClassificationMarkdown(fullWindow, codingDecisions, 'CODING', existingTimestamp);
+
+        // CRITICAL FIX: ALWAYS use windowTimestamp, never preserve existing wrong timestamps
+        const codingContent = this.generateClassificationMarkdown(fullWindow, codingDecisions, 'CODING', windowTimestamp.toISOString());
+
+        // TRACING: Log file creation
+        console.log(`📊 Creating CODING classification log: ${path.basename(codingFile)}`);
+        console.log(`   Window timestamp: ${windowTimestamp.toISOString()}`);
+
         fs.writeFileSync(codingFile, codingContent, 'utf8');
+
+        // CRITICAL FIX: Set file modification time to window timestamp
+        fs.utimesSync(codingFile, windowTimestamp, windowTimestamp);
+
+        // Verify timestamp
+        const stats = fs.statSync(codingFile);
+        console.log(`   File mtime: ${stats.mtime.toISOString()}`);
+
         summaryFiles.push(codingFile);
       }
 
@@ -360,12 +423,15 @@ class ClassificationLogger {
   /**
    * Generate markdown content for classification log
    */
-  generateClassificationMarkdown(fullWindow, windowDecisions, target, existingTimestamp = null) {
+  generateClassificationMarkdown(fullWindow, windowDecisions, target, timestampISO) {
     let markdown = `# Classification Decision Log${target === 'CODING' ? ' (Foreign/Coding)' : ' (Local)'}\n\n`;
     markdown += `**Time Window**: ${fullWindow}<br>\n`;
     markdown += `**Project**: ${this.projectName}<br>\n`;
     markdown += `**Target**: ${target}<br>\n`;
-    markdown += `**Generated**: ${existingTimestamp || new Date().toISOString()}<br>\n`;
+
+    // CRITICAL FIX: Always use the passed timestamp (which should be window timestamp)
+    markdown += `**Generated**: ${timestampISO}<br>\n`;
+
     markdown += `**Decisions in Window**: ${windowDecisions.length}\n\n`;
 
     markdown += `---\n\n`;

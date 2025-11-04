@@ -1024,13 +1024,27 @@ class BatchLSLProcessor {
           const fileDate = new Date(date);
           const fileHour = parseInt(startTime.substring(0, 2));
 
-          // Only process files from closed time windows (not current hour)
+          // IMMUTABILITY PROTECTION: Only delete files from very recent sessions
+          // Default: only process files from closed time windows in the last 24 hours
+          // This respects the "window closed --> don't touch" principle for historical records
+          const maxAgeHours = parseInt(process.env.LSL_CLEANUP_MAX_AGE_HOURS || '24', 10);
+          const fileAgeMs = now - fileDate;
+          const fileAgeHours = fileAgeMs / (1000 * 60 * 60);
+
           const isCurrentWindow =
             fileDate.toDateString() === now.toDateString() &&
             fileHour === currentHour;
 
           if (isCurrentWindow) {
             continue; // Skip current time window
+          }
+
+          // CRITICAL: Respect immutability - don't touch historical records beyond max age
+          if (fileAgeHours > maxAgeHours) {
+            if (process.env.DEBUG_LSL_CLEANUP === 'true') {
+              console.log(`⏭️  Skipping ${filename} - beyond immutability period (${Math.round(fileAgeHours)}h > ${maxAgeHours}h)`);
+            }
+            continue;
           }
 
           // Read and check if file is empty (only void prompt sets)

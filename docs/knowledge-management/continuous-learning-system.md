@@ -869,36 +869,3 @@ const system = new KnowledgeLearningSystem({
   }
 });
 ```
-
----
-
-## Production Checklist
-
-- [ ] Configure budget limits appropriate for usage
-- [ ] Set up Qdrant with persistent storage
-- [ ] Enable database backups (SQLite + Qdrant snapshots)
-- [ ] Configure sensitivity topics for your domain
-- [ ] Set up monitoring (see ops documentation)
-- [ ] Test failover scenarios (Qdrant down, budget exceeded)
-- [ ] Document custom configuration for your team
-- [ ] Set up alerting for budget thresholds
-- [ ] Configure log rotation
-- [ ] Test disaster recovery procedures
-
----
-
-## Next Steps
-
-1. Read the [Operations Guide](../operations/knowledge-system-ops.md) for production deployment
-2. Review [API Examples](./api-examples.md) for advanced use cases
-3. Check [Performance Benchmarks](../../tests/performance/) for expected performance
-4. Join our [Discord](https://discord.gg/example) for support
-
----
-
-## Support
-
-- **Documentation**: https://docs.example.com
-- **Issues**: https://github.com/example/issues
-- **Discord**: https://discord.gg/example
-- **Email**: support@example.com

@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "name": "TestUpperOntology",
+  "version": "1.0.0",
+  "type": "upper",
+  "description": "Test upper ontology for unit tests",
+  "entities": {
+    "TestEntity": {
+      "description": "A test entity class",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Entity name"
+        },
+        "value": {
+          "type": "number",
+          "description": "Entity value"
+        },
+        "category": {
+          "type": "string",
+          "description": "Entity category",
+          "enum": ["type-a", "type-b", "type-c"]
+        },
+        "tags": {
+          "type": "array",
+          "description": "Entity tags",
+          "items": "string"
+        }
+      },
+      "requiredProperties": ["name"],
+      "examples": [
+        "TestEntity with name='Example' and value=42"
+      ]
+    },
+    "ParentEntity": {
+      "description": "Parent entity for testing inheritance",
+      "properties": {
+        "parentProperty": {
+          "type": "string",
+          "description": "Property from parent"
+        },
+        "sharedProperty": {
+          "type": "string",
+          "description": "Property that can be overridden"
+        }
+      }
+    }
+  },
+  "relationships": {
+    "testToParent": {
+      "type": "references",
+      "sourceEntityClass": "TestEntity",
+      "targetEntityClass": "ParentEntity",
+      "description": "Test entity references parent"
+    }
+  }
+}

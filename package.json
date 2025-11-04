@@ -8,7 +8,9 @@
     "coding": "./bin/coding"
   },
   "scripts": {
-    "test": "jest",
+    "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --coverage",
     "lint": "eslint lib/",
     "install-deps": "npm install",
     "setup": "./install.sh",
@@ -42,9 +44,14 @@
     "openai": "^6.3.0"
   },
   "devDependencies": {
+    "@types/ajv": "^0.0.5",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.10.0",
     "eslint": "^8.55.0",
     "jest": "^29.7.0",
-    "shadcn": "^3.4.2"
+    "shadcn": "^3.4.2",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=16.0.0"

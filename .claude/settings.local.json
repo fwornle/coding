@@ -80,7 +80,13 @@
       "Bash(git config:*)",
       "Bash(git restore:*)",
       "Bash(git diff:*)",
-      "Bash(xargs -I {} git restore --source=HEAD {})"
+      "Bash(xargs -I {} git restore --source=HEAD {})",
+      "WebFetch(domain:claude.ai)",
+      "mcp__constraint-monitor__get_constraint_status",
+      "Bash(for coll in ontology-coding ontology-raas ontology-resi ontology-agentic ontology-ui)",
+      "Bash(do echo -n \"$coll: \")",
+      "Bash(done)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": []

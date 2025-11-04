@@ -1,0 +1,12 @@
+{
+  "team": "UI",
+  "description": "UI team focused on user interfaces, frontend components, UX patterns, and accessibility",
+  "lowerOntologyPath": "src/ontology/lower/ui-ontology.json",
+  "confidenceThreshold": 0.7,
+  "validationMode": "lenient",
+  "strictValidation": false,
+  "classification": {
+    "preferHeuristics": true,
+    "heuristicThreshold": 0.8
+  }
+}

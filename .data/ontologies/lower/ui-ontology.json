@@ -1,0 +1,691 @@
+{
+  "name": "UI Multi-Agent Curriculum Ontology",
+  "version": "1.0.0",
+  "type": "lower",
+  "team": "ui",
+  "extendsOntology": "upper",
+  "description": "Lower ontology for the Multi-Agent Curriculum Alignment System (MACAS), covering curriculum analysis, multi-agent workflows, AWS serverless infrastructure, and academic data processing",
+  "entities": {
+    "AgentInstance": {
+      "description": "A specialized agent in the MACAS multi-agent system",
+      "extendsEntity": "ModelComponent",
+      "properties": {
+        "agentName": {
+          "type": "string",
+          "description": "Agent identifier",
+          "enum": ["Coordinator", "WebSearch", "Browser", "DocumentProcessing", "AccreditationExpert", "QA", "SemanticSearch", "ChatInterface"]
+        },
+        "agentRole": {
+          "type": "string",
+          "description": "Agent's specialized role"
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "Agent capabilities and functions"
+        },
+        "llmModel": {
+          "type": "string",
+          "description": "LLM model used by agent (configurable)"
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "Required services or other agents"
+        }
+      },
+      "requiredProperties": ["agentName", "agentRole", "capabilities"],
+      "examples": [
+        "Coordinator Agent (workflow orchestration, multi-agent coordination)",
+        "Browser Agent (Stagehand/MCP, TimeEdit extraction, web automation)"
+      ]
+    },
+    "WorkflowOrchestration": {
+      "description": "Multi-agent workflow coordination and execution",
+      "extendsEntity": "ExecutionContext",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "Workflow identifier"
+        },
+        "orchestrator": {
+          "type": "reference",
+          "description": "Coordinator agent managing workflow",
+          "targetEntityClass": "AgentInstance"
+        },
+        "participatingAgents": {
+          "type": "array",
+          "description": "Agents involved in workflow"
+        },
+        "executionPattern": {
+          "type": "string",
+          "description": "Workflow execution pattern",
+          "enum": ["sequential", "parallel", "conditional", "event_driven"]
+        },
+        "stateManagement": {
+          "type": "string",
+          "description": "State management approach",
+          "enum": ["aws_step_functions", "redux", "local_state"]
+        }
+      },
+      "requiredProperties": ["workflowId", "participatingAgents", "executionPattern"],
+      "examples": [
+        "Curriculum Analysis Workflow (Coordinator → WebSearch → Browser → DocumentProcessing → AccreditationExpert → QA)",
+        "Peer Comparison Workflow (WebSearch → Browser → SemanticSearch → AccreditationExpert)"
+      ]
+    },
+    "AWSLambdaFunction": {
+      "description": "AWS Lambda serverless function",
+      "extendsEntity": "ExecutionContext",
+      "properties": {
+        "functionName": {
+          "type": "string",
+          "description": "Lambda function name"
+        },
+        "runtime": {
+          "type": "string",
+          "description": "Lambda runtime",
+          "enum": ["nodejs20.x", "python3.11", "python3.12"]
+        },
+        "handler": {
+          "type": "string",
+          "description": "Handler function path"
+        },
+        "memoryMB": {
+          "type": "number",
+          "description": "Allocated memory in MB"
+        },
+        "timeoutSeconds": {
+          "type": "number",
+          "description": "Execution timeout in seconds"
+        },
+        "triggerType": {
+          "type": "string",
+          "description": "Trigger mechanism",
+          "enum": ["api_gateway", "step_functions", "eventbridge", "s3_event"]
+        },
+        "environment": {
+          "type": "object",
+          "description": "Environment variables and secrets"
+        }
+      },
+      "requiredProperties": ["functionName", "runtime", "handler", "triggerType"],
+      "examples": [
+        "CurriculumAnalyzer (Python 3.11, 2048MB, Step Functions trigger)",
+        "DocumentProcessor (Node.js 20.x, 1024MB, S3 event trigger)"
+      ]
+    },
+    "AWSStepFunction": {
+      "description": "AWS Step Functions workflow orchestration",
+      "extendsEntity": "ExecutionContext",
+      "properties": {
+        "stateMachineName": {
+          "type": "string",
+          "description": "State machine identifier"
+        },
+        "definition": {
+          "type": "object",
+          "description": "ASL (Amazon States Language) definition"
+        },
+        "states": {
+          "type": "array",
+          "description": "Workflow states (Task, Choice, Parallel, Map, etc.)"
+        },
+        "lambdaIntegrations": {
+          "type": "array",
+          "description": "Lambda functions invoked by workflow"
+        },
+        "errorHandling": {
+          "type": "object",
+          "description": "Retry and catch configurations"
+        }
+      },
+      "requiredProperties": ["stateMachineName", "definition", "states"],
+      "examples": [
+        "CurriculumAlignmentWorkflow (sequential: collect → analyze → compare → report)",
+        "PeerComparisonWorkflow (parallel: multi-university analysis)"
+      ]
+    },
+    "APIGatewayEndpoint": {
+      "description": "AWS API Gateway REST API endpoint",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "endpointPath": {
+          "type": "string",
+          "description": "API path (e.g., /api/curriculum/analyze)"
+        },
+        "httpMethod": {
+          "type": "string",
+          "description": "HTTP method",
+          "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        },
+        "integration": {
+          "type": "reference",
+          "description": "Backend Lambda function",
+          "targetEntityClass": "AWSLambdaFunction"
+        },
+        "authentication": {
+          "type": "string",
+          "description": "Authentication mechanism",
+          "enum": ["none", "api_key", "cognito", "iam"]
+        },
+        "cors": {
+          "type": "boolean",
+          "description": "CORS enabled"
+        },
+        "throttling": {
+          "type": "object",
+          "description": "Rate limiting configuration"
+        }
+      },
+      "requiredProperties": ["endpointPath", "httpMethod", "integration"],
+      "examples": [
+        "/api/curriculum/analyze (POST, Lambda integration, Cognito auth)",
+        "/api/documents/upload (POST, S3 direct, API key auth)"
+      ]
+    },
+    "EventBridgeRule": {
+      "description": "AWS EventBridge event-driven rule",
+      "extendsEntity": "ExecutionContext",
+      "properties": {
+        "ruleName": {
+          "type": "string",
+          "description": "EventBridge rule identifier"
+        },
+        "eventPattern": {
+          "type": "object",
+          "description": "Event matching pattern (JSON)"
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Cron or rate expression for scheduled rules"
+        },
+        "targets": {
+          "type": "array",
+          "description": "Target services (Lambda, Step Functions, SNS, etc.)"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether rule is active"
+        }
+      },
+      "requiredProperties": ["ruleName", "targets"],
+      "examples": [
+        "DocumentUploadedRule (S3 event pattern, triggers DocumentProcessor)",
+        "DailySyncRule (cron: 0 6 * * *, triggers SyncWorkflow)"
+      ]
+    },
+    "S3Bucket": {
+      "description": "AWS S3 bucket for file storage",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "bucketName": {
+          "type": "string",
+          "description": "S3 bucket name"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "Bucket usage",
+          "enum": ["document_upload", "report_export", "static_assets", "backup"]
+        },
+        "versioning": {
+          "type": "boolean",
+          "description": "Object versioning enabled"
+        },
+        "encryption": {
+          "type": "string",
+          "description": "Encryption method",
+          "enum": ["none", "AES256", "aws_kms"]
+        },
+        "lifecyclePolicy": {
+          "type": "object",
+          "description": "Object lifecycle rules"
+        }
+      },
+      "requiredProperties": ["bucketName", "purpose"],
+      "examples": [
+        "curriculum-documents-upload (document_upload, AES256 encryption)",
+        "analysis-reports-export (report_export, versioning enabled)"
+      ]
+    },
+    "CloudFrontDistribution": {
+      "description": "AWS CloudFront CDN distribution",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "distributionId": {
+          "type": "string",
+          "description": "CloudFront distribution identifier"
+        },
+        "originType": {
+          "type": "string",
+          "description": "Origin source",
+          "enum": ["s3", "custom_origin", "api_gateway"]
+        },
+        "cachePolicy": {
+          "type": "string",
+          "description": "Caching policy name"
+        },
+        "customDomain": {
+          "type": "string",
+          "description": "Custom domain name (optional)"
+        },
+        "sslCertificate": {
+          "type": "string",
+          "description": "ACM certificate ARN"
+        }
+      },
+      "requiredProperties": ["distributionId", "originType"],
+      "examples": [
+        "Frontend Distribution (S3 origin, React app, custom domain)",
+        "API Distribution (API Gateway origin, caching enabled)"
+      ]
+    },
+    "PostgreSQLSchema": {
+      "description": "PostgreSQL database schema (Supabase/Neon)",
+      "extendsEntity": "DataRepresentation",
+      "properties": {
+        "schemaName": {
+          "type": "string",
+          "description": "Database schema name"
+        },
+        "tables": {
+          "type": "array",
+          "description": "Schema tables"
+        },
+        "provider": {
+          "type": "string",
+          "description": "PostgreSQL provider",
+          "enum": ["Supabase", "Neon", "RDS", "self_hosted"]
+        },
+        "migrations": {
+          "type": "array",
+          "description": "Database migration files"
+        },
+        "relationships": {
+          "type": "array",
+          "description": "Foreign key relationships"
+        }
+      },
+      "requiredProperties": ["schemaName", "tables", "provider"],
+      "examples": [
+        "public schema (users, programs, courses, curricula tables, Supabase)",
+        "analytics schema (usage_metrics, reports tables, Neon)"
+      ]
+    },
+    "QdrantCollection": {
+      "description": "Qdrant vector database collection for semantic search",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "collectionName": {
+          "type": "string",
+          "description": "Collection identifier"
+        },
+        "vectorSize": {
+          "type": "number",
+          "description": "Vector dimensionality"
+        },
+        "distance": {
+          "type": "string",
+          "description": "Distance metric",
+          "enum": ["Cosine", "Euclidean", "Dot"]
+        },
+        "embeddingModel": {
+          "type": "string",
+          "description": "Model used for embeddings (configurable, e.g., Grok for cost efficiency)"
+        },
+        "payloadSchema": {
+          "type": "object",
+          "description": "Indexed payload fields"
+        },
+        "pointCount": {
+          "type": "number",
+          "description": "Number of indexed points"
+        }
+      },
+      "requiredProperties": ["collectionName", "vectorSize", "distance"],
+      "examples": [
+        "curriculum_content (1536-dim, Cosine, Grok embeddings)",
+        "peer_universities (768-dim, Cosine, multi-language support)"
+      ]
+    },
+    "ReactComponent": {
+      "description": "React UI component",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "componentName": {
+          "type": "string",
+          "description": "Component identifier"
+        },
+        "componentType": {
+          "type": "string",
+          "description": "Component category",
+          "enum": ["page", "container", "presentational", "layout", "utility"]
+        },
+        "props": {
+          "type": "object",
+          "description": "Component props interface"
+        },
+        "stateManagement": {
+          "type": "string",
+          "description": "State management approach",
+          "enum": ["local_state", "redux", "context", "none"]
+        },
+        "styling": {
+          "type": "string",
+          "description": "Styling approach",
+          "enum": ["tailwind", "css_modules", "styled_components", "inline"]
+        }
+      },
+      "requiredProperties": ["componentName", "componentType"],
+      "examples": [
+        "CurriculumDashboard (page, Redux state, Tailwind styling)",
+        "GapAnalysisReport (container, Redux state, Tailwind styling)"
+      ]
+    },
+    "ReduxState": {
+      "description": "Redux state slice for state management",
+      "extendsEntity": "DataRepresentation",
+      "properties": {
+        "sliceName": {
+          "type": "string",
+          "description": "State slice identifier"
+        },
+        "initialState": {
+          "type": "object",
+          "description": "Initial state structure"
+        },
+        "actions": {
+          "type": "array",
+          "description": "Redux actions"
+        },
+        "selectors": {
+          "type": "array",
+          "description": "State selector functions"
+        },
+        "middleware": {
+          "type": "array",
+          "description": "Redux middleware (thunk, saga, etc.)"
+        }
+      },
+      "requiredProperties": ["sliceName", "initialState", "actions"],
+      "examples": [
+        "curriculum slice (courses, programs, selected state)",
+        "analysis slice (gap reports, peer comparisons, loading states)"
+      ]
+    },
+    "TailwindStyle": {
+      "description": "Tailwind CSS styling configuration",
+      "extendsEntity": "ConfigurationData",
+      "properties": {
+        "configFile": {
+          "type": "string",
+          "description": "Tailwind config file path (tailwind.config.js)"
+        },
+        "theme": {
+          "type": "object",
+          "description": "Custom theme configuration (CEU brand colors, fonts)"
+        },
+        "plugins": {
+          "type": "array",
+          "description": "Tailwind plugins"
+        },
+        "utilityClasses": {
+          "type": "array",
+          "description": "Custom utility classes"
+        },
+        "responsiveDesign": {
+          "type": "boolean",
+          "description": "Responsive breakpoints configured"
+        }
+      },
+      "requiredProperties": ["configFile", "theme"],
+      "examples": [
+        "CEU Brand Theme (institutional colors, typography, professional spacing)",
+        "Responsive Layout (mobile-first, tablet, desktop, foldable breakpoints)"
+      ]
+    },
+    "DocumentParser": {
+      "description": "Document processing component for Excel/Word/PDF",
+      "extendsEntity": "ModelComponent",
+      "properties": {
+        "parserName": {
+          "type": "string",
+          "description": "Parser identifier"
+        },
+        "supportedFormats": {
+          "type": "array",
+          "description": "Supported file formats",
+          "enum": ["xlsx", "xls", "docx", "doc", "pdf"]
+        },
+        "extractionCapabilities": {
+          "type": "array",
+          "description": "Data extraction capabilities (tables, text, images, metadata)"
+        },
+        "outputFormat": {
+          "type": "string",
+          "description": "Structured output format",
+          "enum": ["json", "xml", "markdown", "csv"]
+        },
+        "llmEnhancement": {
+          "type": "boolean",
+          "description": "Whether LLM is used for content understanding"
+        }
+      },
+      "requiredProperties": ["parserName", "supportedFormats", "extractionCapabilities"],
+      "examples": [
+        "Excel Parser (xlsx/xls, table extraction, JSON output)",
+        "Word Parser (docx/doc, text + structure extraction, markdown output)"
+      ]
+    },
+    "CurriculumEntity": {
+      "description": "Academic curriculum entity (course, program, outcome)",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "entityType": {
+          "type": "string",
+          "description": "Curriculum entity type",
+          "enum": ["course", "program", "learning_outcome", "module", "assessment"]
+        },
+        "entityId": {
+          "type": "string",
+          "description": "Unique identifier"
+        },
+        "title": {
+          "type": "string",
+          "description": "Entity title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional metadata (credits, duration, prerequisites, etc.)"
+        },
+        "source": {
+          "type": "string",
+          "description": "Data source",
+          "enum": ["TimeEdit", "Excel", "Word", "PDF", "web_scraping"]
+        }
+      },
+      "requiredProperties": ["entityType", "entityId", "title"],
+      "examples": [
+        "Course: Data Structures (CS101, 3 credits, TimeEdit source)",
+        "Learning Outcome: Analyze algorithm complexity (course CS101, Bloom's taxonomy)"
+      ]
+    },
+    "SemanticSearchQuery": {
+      "description": "Semantic search query for curriculum analysis",
+      "extendsEntity": "AnalysisArtifact",
+      "properties": {
+        "queryText": {
+          "type": "string",
+          "description": "Natural language query"
+        },
+        "queryVector": {
+          "type": "array",
+          "description": "Embedding vector for query"
+        },
+        "filters": {
+          "type": "object",
+          "description": "Metadata filters (program, year, language, etc.)"
+        },
+        "topK": {
+          "type": "number",
+          "description": "Number of results to return"
+        },
+        "similarityThreshold": {
+          "type": "number",
+          "description": "Minimum similarity score (0-1)"
+        },
+        "results": {
+          "type": "array",
+          "description": "Search results with similarity scores"
+        }
+      },
+      "requiredProperties": ["queryText", "queryVector", "topK"],
+      "examples": [
+        "Find courses covering 'machine learning algorithms' (topK=10, threshold=0.7)",
+        "Identify peer university programs similar to 'Data Science MSc' (topK=5)"
+      ]
+    },
+    "GapAnalysisReport": {
+      "description": "Curriculum gap analysis report",
+      "extendsEntity": "AnalysisArtifact",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "description": "Report identifier"
+        },
+        "analysisType": {
+          "type": "string",
+          "description": "Analysis type",
+          "enum": ["internal_gaps", "peer_comparison", "accreditation_alignment"]
+        },
+        "targetProgram": {
+          "type": "reference",
+          "description": "Program being analyzed",
+          "targetEntityClass": "CurriculumEntity"
+        },
+        "gaps": {
+          "type": "array",
+          "description": "Identified gaps or misalignments"
+        },
+        "recommendations": {
+          "type": "array",
+          "description": "Recommended actions"
+        },
+        "peerComparisons": {
+          "type": "array",
+          "description": "Peer university comparisons"
+        },
+        "exportFormats": {
+          "type": "array",
+          "description": "Available export formats",
+          "enum": ["excel", "word", "pdf", "json"]
+        }
+      },
+      "requiredProperties": ["reportId", "analysisType", "gaps"],
+      "examples": [
+        "Internal Gap Report (CS MSc, missing AI ethics content, recommendation: add course)",
+        "Peer Comparison Report (CEU Data Science vs MIT, 3 content gaps, 2 strengths)"
+      ]
+    },
+    "LLMConfiguration": {
+      "description": "LLM model configuration for agent tasks",
+      "extendsEntity": "ConfigurationData",
+      "properties": {
+        "agentName": {
+          "type": "string",
+          "description": "Agent using this configuration"
+        },
+        "modelProvider": {
+          "type": "string",
+          "description": "LLM provider",
+          "enum": ["OpenAI", "Anthropic", "Groq", "Google", "custom"]
+        },
+        "modelName": {
+          "type": "string",
+          "description": "Specific model identifier"
+        },
+        "temperature": {
+          "type": "number",
+          "description": "Sampling temperature (0-1)"
+        },
+        "maxTokens": {
+          "type": "number",
+          "description": "Maximum output tokens"
+        },
+        "costPerRequest": {
+          "type": "number",
+          "description": "Estimated cost per API call"
+        },
+        "fallbackModel": {
+          "type": "string",
+          "description": "Fallback model if primary fails"
+        }
+      },
+      "requiredProperties": ["agentName", "modelProvider", "modelName"],
+      "examples": [
+        "ChatInterface Agent (OpenAI, gpt-4o, temp=0.7, fallback=gpt-4o-mini)",
+        "SemanticSearch Agent (Groq, fast model for embeddings, cost-optimized)"
+      ]
+    }
+  },
+  "relationships": {
+    "orchestrates": {
+      "description": "Workflow orchestration manages agent instances",
+      "sourceEntityClass": "WorkflowOrchestration",
+      "targetEntityClass": "AgentInstance",
+      "properties": {
+        "executionOrder": "number"
+      }
+    },
+    "triggers": {
+      "description": "API Gateway endpoint triggers Lambda function",
+      "sourceEntityClass": "APIGatewayEndpoint",
+      "targetEntityClass": "AWSLambdaFunction",
+      "properties": {
+        "integration_type": "string"
+      }
+    },
+    "invokes": {
+      "description": "Step Function invokes Lambda functions",
+      "sourceEntityClass": "AWSStepFunction",
+      "targetEntityClass": "AWSLambdaFunction",
+      "properties": {
+        "state_name": "string"
+      }
+    },
+    "stores_in": {
+      "description": "Document parser stores results in S3 bucket",
+      "sourceEntityClass": "DocumentParser",
+      "targetEntityClass": "S3Bucket",
+      "properties": {
+        "file_path": "string"
+      }
+    },
+    "queries": {
+      "description": "Agent instance queries Qdrant collection",
+      "sourceEntityClass": "AgentInstance",
+      "targetEntityClass": "QdrantCollection",
+      "properties": {
+        "query_type": "string"
+      }
+    },
+    "analyzes": {
+      "description": "Agent instance analyzes curriculum entity",
+      "sourceEntityClass": "AgentInstance",
+      "targetEntityClass": "CurriculumEntity",
+      "properties": {
+        "analysis_type": "string"
+      }
+    },
+    "renders": {
+      "description": "React component renders gap analysis report",
+      "sourceEntityClass": "ReactComponent",
+      "targetEntityClass": "GapAnalysisReport",
+      "properties": {
+        "display_mode": "string"
+      }
+    }
+  }
+}

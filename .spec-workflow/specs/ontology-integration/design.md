@@ -98,18 +98,22 @@ interface ValidationOptions {
 ```
 
 #### OntologyClassifier
-**Purpose**: Classify knowledge extractions using LLM and ontology context
+**Purpose**: Classify knowledge extractions using 5-layer analysis system (modeled after LSL classification)
 
 **Responsibilities**:
-- Build classification prompt with ontology context
-- Call UnifiedInferenceEngine for classification
-- Apply heuristic fallback for known patterns
+- Layer 0: Track team context from conversation history
+- Layer 1: Analyze file/artifact patterns for team ownership
+- Layer 2: Perform enhanced keyword matching with multi-match requirement
+- Layer 3: Use semantic embeddings for ontology similarity
+- Layer 4: Call UnifiedInferenceEngine for complex cases
+- Early exit optimization (stop at first high-confidence layer)
 - Handle mixed/flexible team scope
-- Return confidence scores
+- Return confidence scores with layer attribution
 
 **Key Methods**:
 ```typescript
 class OntologyClassifier {
+  // Main classification with 5-layer pipeline
   async classify(
     knowledge: Knowledge,
     options: ClassificationOptions
@@ -119,20 +123,61 @@ class OntologyClassifier {
     knowledgeBatch: Knowledge[]
   ): Promise<OntologyClassification[]>
 
+  // Layer 0: Team Context Filter
+  private checkTeamContext(
+    knowledge: Knowledge,
+    conversationHistory: ClassificationHistory[]
+  ): LayerResult | null
+
+  // Layer 1: Entity Pattern Analyzer
+  private analyzeEntityPatterns(
+    knowledge: Knowledge
+  ): LayerResult | null
+
+  // Layer 2: Enhanced Keyword Matcher
+  private matchKeywords(
+    knowledge: Knowledge,
+    team?: string
+  ): LayerResult | null
+
+  // Layer 3: Semantic Embedding Classifier
+  private async classifyByEmbedding(
+    knowledge: Knowledge,
+    team?: string
+  ): Promise<LayerResult | null>
+
+  // Layer 4: LLM Semantic Analyzer
+  private async classifyWithLLM(
+    knowledge: Knowledge,
+    team?: string
+  ): Promise<LayerResult | null>
+
+  // Helpers
   private buildClassificationPrompt(
     knowledge: Knowledge,
     entityClasses: string[]
   ): string
 
-  private applyHeuristicFallback(
-    knowledge: Knowledge
-  ): OntologyClassification | null
+  private aggregateLayerResults(
+    layerResults: LayerResult[]
+  ): OntologyClassification
 }
 
 interface ClassificationOptions {
-  team?: string; // 'ReSi' | 'RaaS' | 'mixed'
-  confidenceThreshold?: number;
-  useHeuristicFallback?: boolean;
+  team?: string; // 'ReSi' | 'RaaS' | 'Coding' | 'Agentic' | 'UI' | 'mixed'
+  confidenceThreshold?: number; // Default: 0.6
+  earlyExitThreshold?: number; // Default: 0.85
+  enabledLayers?: number[]; // Default: [0, 1, 2, 3, 4]
+}
+
+interface LayerResult {
+  layer: number; // 0-4
+  layerName: string;
+  entityClass: string | null;
+  team?: string;
+  confidence: number;
+  processingTime: number;
+  evidence?: string; // Explanation of decision
 }
 ```
 
@@ -173,7 +218,435 @@ class OntologyQueryEngine {
 
 ---
 
-## 3. Data Model Design
+## 3. Multi-Layer Heuristic Classification System
+
+### 3.1 Overview
+
+The heuristic classification system uses a **5-layer architecture** modeled after the proven LSL (Live Session Logging) classification system to prevent false positives from keyword overlap between teams.
+
+**Key Principles**:
+- **Progressive Complexity**: Layers ordered from fastest/cheapest to slowest/most expensive
+- **Early Exit Optimization**: Stop at first high-confidence result (≥0.85)
+- **Multi-Evidence Aggregation**: Combine evidence from multiple layers when no single layer is confident
+- **False Positive Prevention**: Multiple layers of verification prevent keyword-only misclassification
+
+**Performance Target**: <100ms for 90% of classifications
+
+### 3.2 Layer 0: Team Context Filter (Conversation Bias Tracking)
+
+**Purpose**: Track team classification patterns over recent conversation history to handle follow-up questions.
+
+**Implementation**:
+```typescript
+class TeamContextFilter {
+  private classificationHistory: ClassificationHistory[] = [];
+  private readonly windowSize = 5; // Track last 5 classifications
+
+  checkTeamContext(
+    knowledge: Knowledge,
+    neutralityThreshold: number = 0.5
+  ): LayerResult | null {
+    // Calculate team bias from recent history
+    const teamBias = this.calculateTeamBias();
+
+    // Check if knowledge is neutral (weak signals from other layers)
+    if (!this.isNeutralKnowledge(knowledge, neutralityThreshold)) {
+      return null; // Not neutral, skip context filter
+    }
+
+    // Apply bias if strong enough
+    if (teamBias.strength >= 0.65) {
+      return {
+        layer: 0,
+        layerName: 'TeamContextFilter',
+        entityClass: teamBias.suggestedEntity,
+        team: teamBias.team,
+        confidence: teamBias.strength * 0.8, // Discounted for contextual nature
+        processingTime: performance.now() - start,
+        evidence: `Recent conversation focused on ${teamBias.team} (${teamBias.occurrences} of ${this.windowSize} exchanges)`
+      };
+    }
+
+    return null;
+  }
+
+  private calculateTeamBias(): TeamBias {
+    const teamCounts = new Map<string, number>();
+    let totalWeight = 0;
+
+    // Apply temporal decay (more recent = higher weight)
+    this.classificationHistory.forEach((hist, index) => {
+      const age = this.classificationHistory.length - index;
+      const weight = Math.exp(-age * 0.2); // Exponential decay
+      teamCounts.set(hist.team, (teamCounts.get(hist.team) || 0) + weight);
+      totalWeight += weight;
+    });
+
+    // Find dominant team
+    let maxTeam = '';
+    let maxCount = 0;
+    teamCounts.forEach((count, team) => {
+      if (count > maxCount) {
+        maxTeam = team;
+        maxCount = count;
+      }
+    });
+
+    return {
+      team: maxTeam,
+      strength: maxCount / totalWeight,
+      occurrences: teamCounts.get(maxTeam) || 0
+    };
+  }
+}
+```
+
+**Response Time**: <1ms
+**Benefits**: Handles follow-up questions like "more details about that" or "similar pattern"
+
+### 3.3 Layer 1: Entity Pattern Analyzer (File/Artifact Detection)
+
+**Purpose**: Analyze referenced files, paths, and artifacts to determine team ownership.
+
+**Implementation**:
+```typescript
+class EntityPatternAnalyzer {
+  private readonly teamPatterns: Map<string, ArtifactPattern[]>;
+
+  analyzeEntityPatterns(knowledge: Knowledge): LayerResult | null {
+    const start = performance.now();
+
+    // Extract file paths and artifact references from knowledge content
+    const artifacts = this.extractArtifacts(knowledge.content);
+
+    for (const artifact of artifacts) {
+      // Step (a): Check if artifact exists in specific team repository
+      const localMatch = this.checkLocalArtifact(artifact);
+      if (localMatch) {
+        return {
+          layer: 1,
+          layerName: 'EntityPatternAnalyzer',
+          entityClass: localMatch.entityClass,
+          team: localMatch.team,
+          confidence: 0.9, // High confidence for direct artifact match
+          processingTime: performance.now() - start,
+          evidence: `Referenced artifact '${artifact}' belongs to ${localMatch.team} team`
+        };
+      }
+
+      // Step (b): Search for artifact pattern indicating team ownership
+      const patternMatch = this.matchArtifactPattern(artifact);
+      if (patternMatch) {
+        return {
+          layer: 1,
+          layerName: 'EntityPatternAnalyzer',
+          entityClass: patternMatch.entityClass,
+          team: patternMatch.team,
+          confidence: 0.75, // Medium-high confidence for pattern match
+          processingTime: performance.now() - start,
+          evidence: `Artifact pattern '${artifact}' matches ${patternMatch.team} conventions`
+        };
+      }
+    }
+
+    return null; // No artifact evidence found
+  }
+
+  private extractArtifacts(content: string): string[] {
+    // Extract file paths, URLs, module names, etc.
+    const patterns = [
+      /[a-z-]+\/[a-z-]+\/[a-zA-Z0-9_\-\/]+\.(ts|js|cpp|java|tsx|jsx)/g, // File paths
+      /@[a-z-]+\/[a-z-]+/g, // npm packages
+      /[A-Z][a-zA-Z]+Service/g, // Service class names
+    ];
+
+    const artifacts = new Set<string>();
+    patterns.forEach(pattern => {
+      const matches = content.match(pattern) || [];
+      matches.forEach(match => artifacts.add(match));
+    });
+
+    return Array.from(artifacts);
+  }
+
+  private checkLocalArtifact(artifact: string): ArtifactMatch | null {
+    // Check if artifact exists in team-specific directories
+    const teamDirs = {
+      'Coding': ['src/ontology', 'src/knowledge-management', 'scripts'],
+      'RaaS': ['raas-service', 'orchestration-engine'],
+      'ReSi': ['virtual-target', 'embedded-functions'],
+      'Agentic': ['agent-frameworks', 'rag-systems'],
+      'UI': ['curriculum-alignment', 'aws-lambda']
+    };
+
+    for (const [team, dirs] of Object.entries(teamDirs)) {
+      if (dirs.some(dir => artifact.startsWith(dir))) {
+        return { team, entityClass: this.inferEntityClass(artifact, team), confidence: 0.9 };
+      }
+    }
+
+    return null;
+  }
+}
+```
+
+**Response Time**: <1ms
+**Accuracy**: High (>90%) for knowledge with clear file/artifact references
+
+### 3.4 Layer 2: Enhanced Keyword Matcher
+
+**Purpose**: Fast keyword-based classification with multi-match requirement to prevent false positives.
+
+**Enhancements over existing implementation**:
+1. **Require multiple keyword matches** from same team (not just one)
+2. **Confidence scoring** based on number of matches:
+   - Single keyword: 0.4-0.6 (low confidence)
+   - Multiple keywords from same team: 0.6-0.8 (medium)
+   - Multiple + required keywords: 0.8-0.95 (high)
+3. **Context weighting**: Keywords in specific contexts (e.g., near "using", "implementing") weighted higher
+
+**Implementation**:
+```typescript
+class EnhancedKeywordMatcher {
+  matchKeywords(knowledge: Knowledge, team?: string): LayerResult | null {
+    const start = performance.now();
+    const content = knowledge.content.toLowerCase();
+
+    // Get team-specific keyword patterns
+    const teams = team ? [team] : ['RaaS', 'ReSi', 'Coding', 'Agentic', 'UI'];
+    const teamScores = new Map<string, KeywordScore>();
+
+    teams.forEach(t => {
+      const patterns = this.getTeamPatterns(t);
+      const score = this.scoreKeywords(content, patterns);
+      if (score.totalMatches > 0) {
+        teamScores.set(t, score);
+      }
+    });
+
+    // Find team with highest score
+    let bestTeam = '';
+    let bestScore: KeywordScore | null = null;
+    teamScores.forEach((score, t) => {
+      if (!bestScore || score.confidence > bestScore.confidence) {
+        bestTeam = t;
+        bestScore = score;
+      }
+    });
+
+    // Only return if confidence threshold met AND multiple matches
+    if (bestScore && bestScore.totalMatches >= 2 && bestScore.confidence >= 0.5) {
+      return {
+        layer: 2,
+        layerName: 'KeywordMatcher',
+        entityClass: bestScore.suggestedEntity,
+        team: bestTeam,
+        confidence: bestScore.confidence,
+        processingTime: performance.now() - start,
+        evidence: `Matched ${bestScore.totalMatches} keywords for ${bestTeam}: ${bestScore.matchedKeywords.join(', ')}`
+      };
+    }
+
+    return null; // Insufficient keyword evidence
+  }
+
+  private scoreKeywords(content: string, patterns: HeuristicPattern[]): KeywordScore {
+    let totalMatches = 0;
+    let confidence = 0;
+    const matchedKeywords: string[] = [];
+    const matchedRequired: string[] = [];
+
+    patterns.forEach(pattern => {
+      // Check required keywords (all must be present)
+      if (pattern.requiredKeywords) {
+        const requiredPresent = pattern.requiredKeywords.every(kw => content.includes(kw));
+        if (!requiredPresent) return; // Skip this pattern
+        matchedRequired.push(...pattern.requiredKeywords);
+      }
+
+      // Check exclude keywords (none should be present)
+      if (pattern.excludeKeywords) {
+        const excludePresent = pattern.excludeKeywords.some(kw => content.includes(kw));
+        if (excludePresent) return; // Skip this pattern
+      }
+
+      // Count keyword matches
+      pattern.keywords.forEach(keyword => {
+        if (content.includes(keyword)) {
+          totalMatches++;
+          matchedKeywords.push(keyword);
+        }
+      });
+    });
+
+    // Calculate confidence based on matches
+    if (totalMatches === 0) {
+      confidence = 0;
+    } else if (totalMatches === 1) {
+      confidence = 0.5; // Single match = low confidence
+    } else if (totalMatches >= 2 && matchedRequired.length === 0) {
+      confidence = 0.65; // Multiple matches but no required = medium
+    } else if (totalMatches >= 2 && matchedRequired.length > 0) {
+      confidence = 0.85; // Multiple + required = high confidence
+    }
+
+    // Apply keyword boost (up to maxConfidence)
+    confidence = Math.min(confidence + (totalMatches * 0.05), 0.95);
+
+    return {
+      totalMatches,
+      confidence,
+      matchedKeywords: [...new Set(matchedKeywords)],
+      matchedRequired: [...new Set(matchedRequired)]
+    };
+  }
+}
+```
+
+**Response Time**: <10ms
+**Critical Change**: No longer the sole decision maker (prevents false positives)
+
+### 3.5 Layer 3: Semantic Embedding Classifier
+
+**Purpose**: Use vector embeddings to compare knowledge against team-specific ontology content for semantic similarity.
+
+**Implementation**:
+```typescript
+class SemanticEmbeddingClassifier {
+  private embeddingGenerator: EmbeddingGenerator; // Transformers.js (384-dim)
+  private vectorDb: QdrantClient; // Qdrant vector database
+
+  async classifyByEmbedding(
+    knowledge: Knowledge,
+    team?: string
+  ): Promise<LayerResult | null> {
+    const start = performance.now();
+
+    // Generate embedding for knowledge content
+    const embedding = await this.embeddingGenerator.generateEmbedding(knowledge.content);
+
+    // Search team-specific ontology collections
+    const teams = team ? [team] : ['RaaS', 'ReSi', 'Coding', 'Agentic', 'UI'];
+    const searchResults: EmbeddingMatch[] = [];
+
+    for (const t of teams) {
+      const collectionName = `ontology-${t.toLowerCase()}`;
+      const results = await this.vectorDb.search(collectionName, {
+        vector: embedding,
+        limit: 5,
+        scoreThreshold: 0.65 // Similarity threshold
+      });
+
+      results.forEach(result => {
+        searchResults.push({
+          team: t,
+          entityClass: result.payload.entityClass,
+          similarity: result.score,
+          matchedContent: result.payload.content
+        });
+      });
+    }
+
+    // Find best match
+    if (searchResults.length === 0) {
+      return null; // No semantic match found
+    }
+
+    const bestMatch = searchResults.sort((a, b) => b.similarity - a.similarity)[0];
+
+    // Check if significantly better than second-best (disambiguation)
+    const secondBest = searchResults[1];
+    const significantlyBetter = !secondBest || (bestMatch.similarity - secondBest.similarity > 0.1);
+
+    return {
+      layer: 3,
+      layerName: 'SemanticEmbeddingClassifier',
+      entityClass: bestMatch.entityClass,
+      team: bestMatch.team,
+      confidence: significantlyBetter ? bestMatch.similarity : bestMatch.similarity * 0.9,
+      processingTime: performance.now() - start,
+      evidence: `Semantic similarity ${bestMatch.similarity.toFixed(2)} to ${bestMatch.team} ontology (${bestMatch.entityClass})`
+    };
+  }
+}
+```
+
+**Response Time**: ~50ms
+**Accuracy**: High (>85%) for semantic team classification
+**Example**: "How do I configure caching strategy?" → RaaS CachingStrategy (0.78 similarity)
+
+### 3.6 Layer 4: LLM Semantic Analyzer
+
+**Purpose**: Deep understanding for complex/ambiguous cases using LLM (already implemented in OntologyClassifier).
+
+**Usage**: Escalates to Layer 4 only when Layers 0-3 are inconclusive (no result or low confidence <0.75).
+
+**Response Time**: Variable (<500ms with fast inference models)
+**Accuracy**: Highest (>90%) but most expensive
+
+### 3.7 Classification Pipeline
+
+**Processing Flow**:
+```typescript
+async classify(knowledge: Knowledge, options: ClassificationOptions): Promise<OntologyClassification> {
+  const layerResults: LayerResult[] = [];
+  const earlyExitThreshold = options.earlyExitThreshold || 0.85;
+
+  // Layer 0: Team Context Filter
+  const contextResult = this.checkTeamContext(knowledge, this.classificationHistory);
+  if (contextResult && contextResult.confidence >= earlyExitThreshold) {
+    return this.finalizeClassification(contextResult);
+  }
+  if (contextResult) layerResults.push(contextResult);
+
+  // Layer 1: Entity Pattern Analyzer
+  const patternResult = this.analyzeEntityPatterns(knowledge);
+  if (patternResult && patternResult.confidence >= earlyExitThreshold) {
+    return this.finalizeClassification(patternResult);
+  }
+  if (patternResult) layerResults.push(patternResult);
+
+  // Layer 2: Enhanced Keyword Matcher
+  const keywordResult = this.matchKeywords(knowledge, options.team);
+  if (keywordResult && keywordResult.confidence >= earlyExitThreshold) {
+    return this.finalizeClassification(keywordResult);
+  }
+  if (keywordResult) layerResults.push(keywordResult);
+
+  // Layer 3: Semantic Embedding Classifier
+  const embeddingResult = await this.classifyByEmbedding(knowledge, options.team);
+  if (embeddingResult && embeddingResult.confidence >= earlyExitThreshold) {
+    return this.finalizeClassification(embeddingResult);
+  }
+  if (embeddingResult) layerResults.push(embeddingResult);
+
+  // Layer 4: LLM Semantic Analyzer (fallback)
+  if (layerResults.length === 0 || this.maxConfidence(layerResults) < 0.75) {
+    const llmResult = await this.classifyWithLLM(knowledge, options.team);
+    if (llmResult) {
+      return this.finalizeClassification(llmResult);
+    }
+  }
+
+  // Aggregate results from multiple layers
+  if (layerResults.length > 0) {
+    return this.aggregateLayerResults(layerResults);
+  }
+
+  // No classification possible
+  return null;
+}
+```
+
+**Performance Optimization**:
+- **Early Exit**: 90% of classifications exit at Layers 0-2 (<10ms)
+- **Layer Skipping**: Can disable expensive layers for performance-critical paths
+- **Caching**: Embedding results cached for repeated content
+- **Batch Processing**: Multiple knowledge items processed together when possible
+
+---
+
+## 4. Data Model Design
 
 ### 3.1 Ontology File Schema
 

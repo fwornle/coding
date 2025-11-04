@@ -1,0 +1,12 @@
+{
+  "team": "Coding",
+  "description": "Coding team focused on development tools, LSL system, knowledge management, and transcript processing",
+  "lowerOntologyPath": "src/ontology/lower/coding-ontology.json",
+  "confidenceThreshold": 0.75,
+  "validationMode": "strict",
+  "strictValidation": true,
+  "classification": {
+    "preferHeuristics": true,
+    "heuristicThreshold": 0.85
+  }
+}

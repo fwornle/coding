@@ -1,0 +1,12 @@
+{
+  "team": "RaaS",
+  "description": "Research as a Service team focused on research methodologies, academic processes, and knowledge synthesis",
+  "lowerOntologyPath": "src/ontology/lower/raas-ontology.json",
+  "confidenceThreshold": 0.7,
+  "validationMode": "lenient",
+  "strictValidation": false,
+  "classification": {
+    "preferHeuristics": true,
+    "heuristicThreshold": 0.8
+  }
+}
