@@ -1,0 +1,70 @@
+@startuml knowledge-extraction-ontology
+!include _standard-style.puml
+
+actor "Coding Session" as Session
+participant "StreamingKnowledgeExtractor" as Extractor
+participant "OntologyClassifier" as Classifier
+participant "OntologyManager" as Manager
+participant "UnifiedInferenceEngine" as LLM
+participant "OntologyValidator" as Validator
+participant "GraphDatabaseService" as GraphDB
+
+Session -> Extractor: processExchange(exchange)
+activate Extractor
+
+Extractor -> Extractor: extractKnowledge(exchange)
+note right: Existing extraction logic\n(unchanged)
+
+alt Ontology Enabled
+  Extractor -> Manager: getAllEntityClasses(team)
+  activate Manager
+  Manager --> Extractor: entityClasses[]
+  deactivate Manager
+
+  Extractor -> Classifier: classify(knowledge, options)
+  activate Classifier
+
+  Classifier -> Classifier: buildClassificationPrompt()
+
+  Classifier -> LLM: infer(prompt, schema)
+  activate LLM
+  LLM --> Classifier: classification
+  deactivate LLM
+
+  alt LLM classification confidence low
+    Classifier -> Classifier: applyHeuristicFallback()
+    note right: Pattern matching\nfor known types
+  end
+
+  Classifier --> Extractor: OntologyClassification
+  deactivate Classifier
+
+  alt Confidence >= threshold
+    Extractor -> Extractor: Add ontology metadata\nto knowledge object
+
+    opt Validation Enabled
+      Extractor -> Manager: resolveEntity(entityClass, team)
+      activate Manager
+      Manager --> Extractor: EntityDefinition
+      deactivate Manager
+
+      Extractor -> Validator: validate(knowledge, entityClass, options)
+      activate Validator
+      Validator --> Extractor: ValidationResult
+      deactivate Validator
+
+      Extractor -> Extractor: Add validation results\nto ontology metadata
+    end
+  end
+end
+
+Extractor -> GraphDB: storeKnowledge(knowledge)
+activate GraphDB
+GraphDB -> GraphDB: Index ontology\nmetadata
+GraphDB --> Extractor: success
+deactivate GraphDB
+
+Extractor --> Session: success
+deactivate Extractor
+
+@enduml
