@@ -1,0 +1,55 @@
+@startuml trajectory-system-architecture
+!include _standard-style.puml
+
+' Presentation-optimized version (compact, large fonts, thick lines, essential blocks only)
+
+skinparam defaultFontSize 18
+skinparam titleFontSize 24
+skinparam packageFontSize 20
+skinparam componentFontSize 17
+skinparam ArrowThickness 3
+skinparam nodesep 80
+skinparam ranksep 100
+skinparam PackagePadding 20
+
+title Trajectory Generation System v3.0
+
+left to right direction
+
+package "Input Sources" {
+  [LSL Sessions] as LSL
+  [Repository\nAnalysis] as Repo
+  [Project Data] as Data
+}
+
+package "Analysis Engine" {
+  [Semantic\nAnalysis] as Semantic
+  [Pattern\nRecognition] as Patterns
+}
+
+package "Report Generation" {
+  [Trajectory\nGenerator] as Generator
+}
+
+package "Outputs" {
+  [Trajectory\nReport] as Report
+  [Documentation] as Docs
+}
+
+' === HORIZONTAL LAYOUT ===
+LSL -[hidden]right-> Semantic
+Patterns -[hidden]right-> Generator
+Generator -[hidden]right-> Report
+
+' Flow connections
+LSL --> Semantic
+Repo --> Semantic
+Data --> Semantic
+
+Semantic --> Patterns
+Patterns --> Generator
+
+Generator --> Report
+Generator --> Docs
+
+@enduml

@@ -1,0 +1,46 @@
+@startuml ontology-query
+!include _standard-style.puml
+
+actor "Developer" as Dev
+participant "KnowledgeRetriever" as Retriever
+participant "OntologyQueryEngine" as QueryEngine
+participant "GraphDatabaseService" as GraphDB
+participant "VectorDatabase" as VectorDB
+
+Dev -> Retriever: retrieveByOntology(query)
+activate Retriever
+
+Retriever -> QueryEngine: findByEntityClass(entityClass, team)
+activate QueryEngine
+
+QueryEngine -> GraphDB: queryByOntologyClass(entityClass, team)
+activate GraphDB
+GraphDB -> GraphDB: Filter nodes by\nontology attributes
+GraphDB --> QueryEngine: knowledgeIds[]
+deactivate GraphDB
+
+loop For each knowledge ID
+  QueryEngine -> GraphDB: getNode(id)
+  activate GraphDB
+  GraphDB --> QueryEngine: Knowledge
+  deactivate GraphDB
+end
+
+opt Additional Property Filters
+  QueryEngine -> QueryEngine: Filter by ontology\nproperties
+end
+
+opt Semantic Ranking
+  QueryEngine -> VectorDB: semanticSearch(query.text, knowledgeIds)
+  activate VectorDB
+  VectorDB --> QueryEngine: rankedResults[]
+  deactivate VectorDB
+end
+
+QueryEngine --> Retriever: Knowledge[]
+deactivate QueryEngine
+
+Retriever --> Dev: Knowledge[]
+deactivate Retriever
+
+@enduml

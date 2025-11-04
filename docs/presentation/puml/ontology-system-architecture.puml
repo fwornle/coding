@@ -1,0 +1,32 @@
+@startuml ontology-system-architecture
+!include _standard-style.puml
+
+package "Knowledge Management" {
+  [StreamingKnowledgeExtractor] as Extractor
+  [GraphDatabaseService] as GraphDB
+  [KnowledgeRetriever] as Retriever
+}
+
+package "Ontology System" <<new>> {
+  [OntologyManager] as Manager
+  [OntologyValidator] as Validator
+  [OntologyClassifier] as Classifier
+  [OntologyQueryEngine] as QueryEngine
+}
+
+package "LLM Services" {
+  [UnifiedInferenceEngine] as LLM
+}
+
+[Ontology Files\n(JSON)] as Files
+
+Extractor --> Manager : uses
+Extractor --> Classifier : classify knowledge
+Manager --> Files : load/parse
+Manager --> Validator : validate
+Classifier --> LLM : classify with context
+Classifier --> Manager : get ontology definitions
+QueryEngine --> GraphDB : query by ontology
+Retriever --> QueryEngine : ontology-based retrieval
+
+@enduml

@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/ontology-integration/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-11-04T05:58:25.788Z",
+      "trigger": "initial",
+      "approvalId": "approval_1762235905783_6931j60oe",
+      "approvalTitle": "Updated Tasks: 31 Tasks Including 3 Completed Ontology Creations"
+    }
+  ]
+}
