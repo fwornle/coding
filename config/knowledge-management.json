@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Knowledge Management System Configuration",
+  "database": {
+    "type": "graphology-level",
+    "path": ".data/knowledge-graph",
+    "options": {
+      "multi": true,
+      "valueEncoding": "json"
+    }
+  },
+  "embeddings": {
+    "local": {
+      "enabled": true,
+      "model": "Xenova/all-MiniLM-L6-v2",
+      "vectorSize": 384
+    },
+    "remote": {
+      "enabled": false,
+      "model": "text-embedding-3-small",
+      "vectorSize": 1536,
+      "apiKey": ""
+    },
+    "cache": {
+      "enabled": true,
+      "ttl": 3600000,
+      "maxEntries": 10000
+    }
+  },
+  "streaming": {
+    "bufferSize": 10,
+    "debounceMs": 2000,
+    "minExchangeLength": 50,
+    "batchSize": 5
+  },
+  "ontology": {
+    "enabled": true,
+    "upperOntologyPath": "src/ontology/upper-ontology.json",
+    "team": "mixed",
+    "confidenceThreshold": 0.7,
+    "validation": {
+      "enabled": true,
+      "mode": "lenient",
+      "failOnError": false,
+      "allowUnknownProperties": true
+    },
+    "classification": {
+      "batchSize": 10,
+      "useHeuristicFallback": true,
+      "heuristicThreshold": 0.85,
+      "enableLayer0": true,
+      "enableLayer1": true,
+      "enableLayer2": true,
+      "enableLayer3": true,
+      "enableLayer4": true,
+      "earlyExitThreshold": 0.85
+    },
+    "caching": {
+      "enabled": true,
+      "ttl": 3600000,
+      "maxSize": 5000
+    }
+  },
+  "inference": {
+    "provider": "groq",
+    "model": "llama-3.1-70b-versatile",
+    "budget": {
+      "dailyBudget": 5.0,
+      "monthlyBudget": 100.0,
+      "trackBudget": true
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "name": "TestLowerOntology",
+  "version": "1.0.0",
+  "type": "lower",
+  "team": "TestTeam",
+  "extendsOntology": "test/fixtures/ontologies/test-upper.json",
+  "description": "Test lower ontology for unit tests",
+  "entities": {
+    "ExtendedEntity": {
+      "description": "Entity extending TestEntity",
+      "extendsEntity": "TestEntity",
+      "properties": {
+        "extraProperty": {
+          "type": "string",
+          "description": "Additional property in lower ontology"
+        },
+        "value": {
+          "type": "number",
+          "description": "Overridden value with different constraints"
+        }
+      },
+      "examples": [
+        "ExtendedEntity with name='Extended' and value=150"
+      ]
+    },
+    "LowerOnlyEntity": {
+      "description": "Entity only in lower ontology",
+      "properties": {
+        "lowerProp": {
+          "type": "boolean",
+          "description": "Property unique to lower ontology"
+        }
+      }
+    }
+  },
+  "relationships": {
+    "extendedToLower": {
+      "type": "uses",
+      "sourceEntityClass": "ExtendedEntity",
+      "targetEntityClass": "LowerOnlyEntity",
+      "description": "Extended entity uses lower-only entity"
+    }
+  }
+}

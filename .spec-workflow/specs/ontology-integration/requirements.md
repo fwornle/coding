@@ -973,10 +973,97 @@ The ui lower ontology defines 18 entity classes extending the upper ontology:
 - System SHALL require minimum confidence threshold (configurable, default 0.6)
 - System SHALL log low-confidence classifications for review
 
-#### FR-2.3: Fallback Strategy
-- System SHALL fall back to heuristic classification if LLM unavailable
+#### FR-2.3: Multi-Layer Heuristic Classification
+**Priority**: CRITICAL (Prevents false positives from keyword-only matching)
+
+The heuristic classification system SHALL use a multi-layer approach modeled after the proven LSL 5-layer classification system to prevent false positives from keyword overlap between teams.
+
+**Classification Layers**:
+
+**Layer 0: Team Context Filter (Conversation Bias Tracking)**
+- Maintain sliding window of recent classifications (default: 5 exchanges)
+- Calculate conversation bias (team-specific vs cross-team) with temporal decay
+- Apply only to neutral/ambiguous knowledge without strong team signals
+- Activation requires:
+  - Bias strength ≥ 0.65
+  - Neutral knowledge indicators (Layer 1 confidence < 0.5, Layer 2 score < 0.3, Layer 3 diff < 0.15)
+- Confidence: bias strength × 0.8 (discounted for contextual nature)
+- Response time: <1ms
+- Benefits: Handles follow-up knowledge ("more details about...", "similar pattern") by following conversation momentum
+
+**Layer 1: Entity Pattern Analyzer (File/Artifact Detection)**
+- Analyze referenced files, paths, and artifacts in knowledge text
+- Two-step artifact checking:
+  - Step (a): Check if referenced artifacts belong to specific team repositories/directories
+  - Step (b): Search for artifact patterns that indicate team ownership
+- Examples:
+  - "src/ontology/*.ts" → Coding team
+  - "raas-service/*.java" → RaaS team
+  - "virtual-target/*.cpp" → ReSi team
+  - "curriculum-alignment/*.tsx" → UI team
+- Response time: <1ms
+- High accuracy for knowledge with clear file/artifact references
+- Early exit if strong team signal detected
+
+**Layer 2: Keyword Matcher (Enhanced with Context)**
+- Fast keyword-based classification (existing implementation)
+- Enhanced to require MULTIPLE keyword matches from same team, not single matches
+- Keyword confidence scoring:
+  - Single keyword match: Low confidence (0.4-0.6)
+  - Multiple keyword matches from same team: Medium confidence (0.6-0.8)
+  - Multiple keywords + required keywords present: High confidence (0.8-0.95)
+- Response time: <10ms
+- Should NOT be sole decision maker (prevents false positives)
+
+**Layer 3: Semantic Embedding Classifier (Team-Specific Ontology Similarity)**
+- Generate 384-dim embeddings for knowledge text using Transformers.js
+- Compare against team-specific ontology content embeddings:
+  - Each team's ontology entities/properties indexed in Qdrant
+  - Separate collections per team ontology
+  - Search returns top-5 matches with similarity scores
+- Similarity threshold: 0.65 (configurable)
+- Response time: ~50ms
+- High accuracy for semantic team classification
+- Example: "How do I configure caching strategy?" → matches RaaS ontology (CachingStrategy entity) with 0.78 similarity
+
+**Layer 4: LLM Semantic Analyzer (Deep Understanding)**
+- LLM-powered classification using UnifiedInferenceEngine (existing)
+- Used only when Layers 0-3 are inconclusive
+- Provides team context + ontology class descriptions
+- Temperature: 0.3 for deterministic classification
+- Response time: variable (<500ms with fast inference models)
+- Final arbiter for complex/ambiguous cases
+
+**Layer Processing Order**:
+1. Layer 0 (Session Filter) checks conversation bias
+2. Layer 1 (Entity Pattern) checks artifact references
+3. Layer 2 (Keyword Matcher) performs keyword analysis
+4. Layer 3 (Embedding Classifier) performs semantic similarity
+5. Layer 4 (LLM Analyzer) provides final classification if needed
+
+**Early Exit Optimization**:
+- If any layer achieves confidence ≥ 0.85, skip remaining layers
+- Track which layer made final decision for analytics
+- Performance target: <100ms total for 90% of classifications
+
+**Confidence Aggregation**:
+- Single layer high confidence (≥0.85): Use that classification
+- Multiple layers agree: Average confidence with weight boost
+- Multiple layers disagree: Use highest confidence if ≥0.75, otherwise escalate to Layer 4
+
+**False Positive Prevention Examples**:
+- ❌ OLD (keyword-only): "kubernetes cluster" → RaaS (even if asked in Agentic team context)
+- ✅ NEW (multi-layer):
+  - Layer 0: Recent classifications show Agentic team bias (0.7)
+  - Layer 1: No artifact references found
+  - Layer 2: Keywords match RaaS (0.6) but below threshold
+  - Layer 3: Embedding similarity matches Agentic AgentFramework (0.72) > RaaS KubernetesCluster (0.58)
+  - Result: Classified as Agentic with confidence 0.72
+
+#### FR-2.4: Fallback Strategy
+- System SHALL use Layers 0-2 if embedding/LLM unavailable
 - System SHALL fall back to generic types if budget exceeded
-- System SHALL mark fallback classifications with source metadata
+- System SHALL mark fallback classifications with source metadata and layer used
 
 ---
 

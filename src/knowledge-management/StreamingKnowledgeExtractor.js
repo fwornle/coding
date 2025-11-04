@@ -45,6 +45,7 @@
  */
 
 import { KnowledgeExtractor, KNOWLEDGE_TYPES, CONFIDENCE_THRESHOLDS } from './KnowledgeExtractor.js';
+import { createOntologySystem } from '../ontology/index.js';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -64,6 +65,13 @@ export class StreamingKnowledgeExtractor extends KnowledgeExtractor {
 
     // Streaming-specific dependencies
     this.trajectoryAnalyzer = config.trajectoryAnalyzer;
+
+    // Ontology system (initialized lazily when enabled)
+    this.ontologySystem = null;
+    this.ontologyManager = null;
+    this.ontologyClassifier = null;
+    this.ontologyEnabled = config.ontology?.enabled || false;
+    this.ontologyConfig = config.ontology || null;
 
     // Session state
     this.currentSession = null;
@@ -90,8 +98,68 @@ export class StreamingKnowledgeExtractor extends KnowledgeExtractor {
       exchangesStreamed: 0,
       immediateExtractions: 0,
       debouncedSkips: 0,
-      queueOverflows: 0
+      queueOverflows: 0,
+      ontology: {
+        classificationsAttempted: 0,
+        classificationsSuccessful: 0,
+        layer0Exits: 0,
+        layer1Exits: 0,
+        layer2Exits: 0,
+        layer3Exits: 0,
+        layer4Calls: 0,
+        avgClassificationTime: 0
+      }
     };
+  }
+
+  /**
+   * Initialize extractor (ensures dependencies are ready, including ontology system)
+   */
+  async initialize() {
+    // Call parent initialize first
+    await super.initialize();
+
+    // Initialize ontology system if enabled
+    if (this.ontologyEnabled && this.ontologyConfig) {
+      try {
+        console.log('[StreamingKnowledgeExtractor] Initializing ontology system...');
+
+        // Create and initialize the complete ontology system
+        this.ontologySystem = await createOntologySystem(
+          this.ontologyConfig,
+          this.inferenceEngine
+        );
+
+        // Store references to components for easy access
+        this.ontologyManager = this.ontologySystem.manager;
+        this.ontologyClassifier = this.ontologySystem.classifier;
+
+        console.log('[StreamingKnowledgeExtractor] Ontology system initialized successfully');
+        this.emit('ontology-initialized', {
+          config: this.ontologyConfig,
+          upperOntology: this.ontologyConfig.upperOntologyPath,
+          lowerOntology: this.ontologyConfig.lowerOntologyPath,
+          team: this.ontologyConfig.team
+        });
+      } catch (error) {
+        // Graceful degradation: log error but don't fail initialization
+        console.error('[StreamingKnowledgeExtractor] Failed to initialize ontology system:', error);
+        console.warn('[StreamingKnowledgeExtractor] Continuing without ontology classification');
+
+        this.ontologyEnabled = false;
+        this.ontologySystem = null;
+        this.ontologyManager = null;
+        this.ontologyClassifier = null;
+
+        this.emit('ontology-initialization-failed', {
+          error: error.message,
+          stack: error.stack
+        });
+      }
+    } else if (this.ontologyEnabled && !this.ontologyConfig) {
+      console.warn('[StreamingKnowledgeExtractor] Ontology enabled but no config provided');
+      this.ontologyEnabled = false;
+    }
   }
 
   /**
@@ -330,6 +398,70 @@ export class StreamingKnowledgeExtractor extends KnowledgeExtractor {
           reasoning: classification.reasoning
         }
       };
+
+      // Ontology classification if enabled
+      if (this.ontologyEnabled && this.ontologyClassifier) {
+        try {
+          const startTime = Date.now();
+          this.streamingStats.ontology.classificationsAttempted++;
+
+          // Classify knowledge using ontology system
+          const ontologyClassification = await this.ontologyClassifier.classify(
+            knowledgeText,
+            {
+              team: this.ontologyConfig.team,
+              minConfidence: this.ontologyConfig.confidenceThreshold || 0.7,
+              useHeuristics: this.ontologyConfig.classification?.useHeuristicFallback !== false,
+              useLLM: this.ontologyConfig.classification?.enableLayer4 !== false
+            }
+          );
+
+          if (ontologyClassification) {
+            // Add ontology metadata to knowledge item
+            knowledgeItem.ontology = {
+              entityClass: ontologyClassification.entityClass,
+              confidence: ontologyClassification.confidence,
+              team: ontologyClassification.team,
+              method: ontologyClassification.method,
+              layer: ontologyClassification.layer,
+              properties: ontologyClassification.properties || {}
+            };
+
+            // Track layer statistics
+            if (ontologyClassification.layer !== undefined) {
+              const layerKey = `layer${ontologyClassification.layer}Exits`;
+              if (this.streamingStats.ontology[layerKey] !== undefined) {
+                this.streamingStats.ontology[layerKey]++;
+              }
+            }
+
+            // Track LLM calls (Layer 4)
+            if (ontologyClassification.method === 'llm' || ontologyClassification.layer === 4) {
+              this.streamingStats.ontology.layer4Calls++;
+            }
+
+            this.streamingStats.ontology.classificationsSuccessful++;
+
+            console.log(
+              `[StreamingKnowledgeExtractor] Ontology: ${ontologyClassification.entityClass} ` +
+              `(${ontologyClassification.confidence.toFixed(2)}, ${ontologyClassification.method}, ` +
+              `layer ${ontologyClassification.layer})`
+            );
+          }
+
+          // Update average classification time
+          const classificationTime = Date.now() - startTime;
+          const totalTime = this.streamingStats.ontology.avgClassificationTime *
+                           (this.streamingStats.ontology.classificationsAttempted - 1) +
+                           classificationTime;
+          this.streamingStats.ontology.avgClassificationTime =
+            totalTime / this.streamingStats.ontology.classificationsAttempted;
+
+        } catch (error) {
+          console.error('[StreamingKnowledgeExtractor] Ontology classification failed:', error);
+          // Continue without ontology metadata - graceful degradation
+        }
+      }
 
       // Store in database
       await this.storeKnowledge(knowledgeItem, {
@@ -712,7 +844,17 @@ Respond in JSON format:
       exchangesStreamed: 0,
       immediateExtractions: 0,
       debouncedSkips: 0,
-      queueOverflows: 0
+      queueOverflows: 0,
+      ontology: {
+        classificationsAttempted: 0,
+        classificationsSuccessful: 0,
+        layer0Exits: 0,
+        layer1Exits: 0,
+        layer2Exits: 0,
+        layer3Exits: 0,
+        layer4Calls: 0,
+        avgClassificationTime: 0
+      }
     };
   }
 }

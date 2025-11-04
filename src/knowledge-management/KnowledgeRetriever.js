@@ -41,6 +41,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { OntologyQueryEngine } from '../ontology/OntologyQueryEngine.js';
 
 // Knowledge freshness categories (from KnowledgeDecayTracker)
 const FRESHNESS_CATEGORIES = {
@@ -72,6 +73,11 @@ export class KnowledgeRetriever extends EventEmitter {
     if (!this.databaseManager || !this.embeddingGenerator) {
       throw new Error('KnowledgeRetriever requires databaseManager and embeddingGenerator');
     }
+
+    // Optional ontology support
+    this.ontologyQueryEngine = config.ontologyQueryEngine || null;
+    this.graphDatabase = config.graphDatabase || null;
+    this.ontologyEnabled = !!this.ontologyQueryEngine;
 
     // Retrieval configuration
     this.defaultLimit = config.defaultLimit || 10;
@@ -455,6 +461,96 @@ export class KnowledgeRetriever extends EventEmitter {
       return results;
     } catch (error) {
       console.error('[KnowledgeRetriever] Similarity search failed:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Retrieve knowledge by ontology entity class
+   *
+   * @param {string} entityClass - Ontology entity class to retrieve
+   * @param {object} options - Retrieval options
+   * @param {string} [options.team] - Team scope (optional)
+   * @param {number} [options.minConfidence=0.7] - Minimum ontology confidence
+   * @param {number} [options.limit=10] - Maximum results
+   * @param {string} [options.sortBy='ontology.confidence'] - Sort field
+   * @param {string} [options.sortOrder='DESC'] - Sort order
+   * @returns {Promise<Array>} Knowledge items with ontology metadata
+   */
+  async retrieveByOntology(entityClass, options = {}) {
+    if (!this.ontologyEnabled) {
+      console.warn('[KnowledgeRetriever] Ontology retrieval not available - ontologyQueryEngine not configured');
+      return [];
+    }
+
+    try {
+      const {
+        team = null,
+        minConfidence = 0.7,
+        limit = this.defaultLimit,
+        sortBy = 'ontology.confidence',
+        sortOrder = 'DESC'
+      } = options;
+
+      // Use GraphDatabaseService queryByOntologyClass method
+      if (this.graphDatabase && this.graphDatabase.queryByOntologyClass) {
+        const results = await this.graphDatabase.queryByOntologyClass({
+          entityClass,
+          team,
+          minConfidence,
+          limit,
+          sortBy,
+          sortOrder
+        });
+
+        // Map to standard retrieval format
+        return results.map(result => ({
+          id: result.id,
+          knowledge: {
+            type: result.entity_type,
+            text: result.observations ? result.observations.join(' ') : '',
+            confidence: result.confidence,
+            metadata: result.metadata
+          },
+          score: result.ontology.confidence,
+          metadata: {
+            ...result,
+            ontology: result.ontology
+          },
+          reasoning: `Retrieved by ontology class: ${entityClass} (confidence: ${result.ontology.confidence.toFixed(2)}, method: ${result.ontology.method})`
+        }));
+      }
+
+      // Fallback to OntologyQueryEngine if available
+      if (this.ontologyQueryEngine) {
+        const queryResult = await this.ontologyQueryEngine.findByEntityClass(
+          entityClass,
+          team,
+          {
+            limit,
+            offset: 0,
+            sortBy: 'ontology.confidence',
+            sortOrder: sortOrder.toLowerCase()
+          }
+        );
+
+        return queryResult.results.map(item => ({
+          id: item.id,
+          knowledge: {
+            type: item.ontology?.entityClass || 'Unknown',
+            text: item.content,
+            confidence: item.ontology?.confidence || 0,
+            metadata: item.metadata || {}
+          },
+          score: item.ontology?.confidence || 0,
+          metadata: item,
+          reasoning: `Retrieved by ontology class: ${entityClass}`
+        }));
+      }
+
+      return [];
+    } catch (error) {
+      console.error('[KnowledgeRetriever] Ontology retrieval failed:', error);
       return [];
     }
   }

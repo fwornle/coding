@@ -1380,9 +1380,25 @@ class EnhancedTranscriptMonitor {
       if (!fs.existsSync(sessionFile)) {
       const currentProjectName = path.basename(this.config.projectPath);
       const isRedirected = targetProject !== this.config.projectPath;
-      
+
+      // CRITICAL FIX: Use session's actual timestamp from tranche, NOT current time!
+      // This preserves historical accuracy when regenerating files
+      const sessionTimestamp = new Date(tranche.originalTimestamp);
+      const currentTime = new Date();
+
+      // IMMUTABILITY PROTECTION: Warn if regenerating historical files
+      const timeDiffHours = (currentTime - sessionTimestamp) / (1000 * 60 * 60);
+      if (timeDiffHours > 1) {
+        console.warn(`⚠️  REGENERATING HISTORICAL FILE: ${path.basename(sessionFile)}`);
+        console.warn(`   Session time: ${sessionTimestamp.toISOString()}`);
+        console.warn(`   Current time: ${currentTime.toISOString()}`);
+        console.warn(`   Age: ${timeDiffHours.toFixed(1)} hours old`);
+        console.warn(`   This should ONLY happen during intentional reprocessing!`);
+        this.logHealthError(`Regenerated historical file: ${path.basename(sessionFile)} (${timeDiffHours.toFixed(1)}h old)`);
+      }
+
       const sessionHeader = `# WORK SESSION (${tranche.timeString})${isRedirected ? ` - From ${currentProjectName}` : ''}\n\n` +
-        `**Generated:** ${new Date().toISOString()}\n` +
+        `**Generated:** ${sessionTimestamp.toISOString()}\n` +
         `**Work Period:** ${tranche.timeString}\n` +
         `**Focus:** ${isRedirected ? `Coding activities from ${currentProjectName}` : 'Live session logging'}\n` +
         `**Duration:** ~60 minutes\n` +
@@ -1390,22 +1406,44 @@ class EnhancedTranscriptMonitor {
         `\n---\n\n## Session Overview\n\n` +
         `This session captures ${isRedirected ? 'coding-related activities redirected from ' + currentProjectName : 'real-time tool interactions and exchanges'}.\n\n` +
         `---\n\n## Key Activities\n\n`;
-      
+
+        // TRACING: Log file creation with timestamp details
+        console.log(`📝 Creating LSL file: ${path.basename(sessionFile)}`);
+        console.log(`   Session timestamp: ${sessionTimestamp.toISOString()}`);
+        console.log(`   Tranche: ${tranche.timeString} (${tranche.date})`);
+        console.log(`   Redirected: ${isRedirected}`);
+
         // Write header + initial content in one operation
         fs.writeFileSync(sessionFile, sessionHeader + initialContent);
-        
-        // CRITICAL FIX: Verify file was actually created
+
+        // CRITICAL FIX: Set file modification time to session time (not current time)
+        // This preserves historical accuracy in the filesystem timestamps
+        fs.utimesSync(sessionFile, sessionTimestamp, sessionTimestamp);
+
+        // CRITICAL FIX: Verify file was actually created with correct timestamps
         if (fs.existsSync(sessionFile)) {
-          console.log(`📝 Created ${isRedirected ? 'redirected' : 'new'} session with content: ${path.basename(sessionFile)}`);
-          
+          const stats = fs.statSync(sessionFile);
+          console.log(`✅ File created successfully: ${path.basename(sessionFile)}`);
+          console.log(`   File mtime: ${stats.mtime.toISOString()}`);
+          console.log(`   Content "Generated" field: ${sessionTimestamp.toISOString()}`);
+
+          // Verify timestamps match
+          const mtimeDiff = Math.abs(stats.mtime.getTime() - sessionTimestamp.getTime());
+          if (mtimeDiff > 1000) {  // Allow 1 second tolerance
+            console.warn(`⚠️  WARNING: File mtime doesn't match session timestamp!`);
+            console.warn(`   Expected: ${sessionTimestamp.toISOString()}`);
+            console.warn(`   Actual:   ${stats.mtime.toISOString()}`);
+            console.warn(`   Diff:     ${mtimeDiff}ms`);
+          }
+
           // Add to file manager for size monitoring and rotation
           this.fileManager.watchFile(sessionFile, {
             projectPath: targetProject,
             tranche: tranche,
             isRedirected: isRedirected,
-            startTime: new Date()
+            startTime: sessionTimestamp  // Use session time, not current time
           });
-          
+
         } else {
           throw new Error(`Failed to create session file: ${sessionFile}`);
         }
@@ -2329,34 +2367,52 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
     console.log('🔄 Starting historical transcript reprocessing...');
     console.log(`📁 Target project: ${targetProject}`);
     
+    // CRITICAL FIX: NEVER delete existing LSL files from CLOSED sessions!
+    // LSL files are immutable historical records once the session window closes.
+    // The "window closed --> don't touch" principle must be respected.
+    //
+    // PREVIOUS BUGGY BEHAVIOR (now disabled):
+    // - Deleted ALL files matching patterns regardless of whether session was closed
+    // - Changed timestamps on historical records (INVALID!)
+    // - Violated immutability principle for completed sessions
+    //
+    // If you need to regenerate specific files, manually delete them first
+    // (and ONLY if the session is still open/current).
+
+    console.log('⚠️  SKIPPING deletion of existing LSL files - they are immutable historical records!');
+    console.log('   LSL files from closed sessions must NEVER be modified or deleted.');
+    console.log('   To regenerate specific files, manually delete them first (only if session still open).');
+
+    /* DISABLED - DANGEROUS CODE THAT VIOLATED IMMUTABILITY:
     // Clear existing session files for clean regeneration
     const historyDir = path.join(targetProject, '.specstory', 'history');
     if (fs.existsSync(historyDir)) {
-      const sessionFiles = fs.readdirSync(historyDir).filter(file => 
+      const sessionFiles = fs.readdirSync(historyDir).filter(file =>
         file.includes('-session') && file.endsWith('.md')
       );
-      
+
       console.log(`🗑️ Removing ${sessionFiles.length} existing session files for clean regeneration...`);
       for (const file of sessionFiles) {
         fs.unlinkSync(path.join(historyDir, file));
       }
     }
-    
+
     // Also clear redirected session files in coding project if different
     const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
     if (targetProject !== codingPath) {
       const codingHistoryDir = path.join(codingPath, '.specstory', 'history');
       if (fs.existsSync(codingHistoryDir)) {
-        const redirectedFiles = fs.readdirSync(codingHistoryDir).filter(file => 
+        const redirectedFiles = fs.readdirSync(codingHistoryDir).filter(file =>
           file.includes('from-' + path.basename(targetProject)) && file.endsWith('.md')
         );
-        
+
         console.log(`🗑️ Removing ${redirectedFiles.length} redirected session files in coding project...`);
         for (const file of redirectedFiles) {
           fs.unlinkSync(path.join(codingHistoryDir, file));
         }
       }
     }
+    */
     
     // Reset processing state to reprocess everything
     monitor.lastProcessedUuid = null;

@@ -570,6 +570,115 @@ export class GraphDatabaseService extends EventEmitter {
   }
 
   /**
+   * Query entities by ontology classification
+   *
+   * @param {Object} options - Query options
+   * @param {string} options.entityClass - Ontology entity class to filter by
+   * @param {string} [options.team] - Team scope (optional, searches all teams if not provided)
+   * @param {number} [options.minConfidence=0] - Minimum ontology confidence (0-1)
+   * @param {number} [options.limit=1000] - Maximum results to return
+   * @param {number} [options.offset=0] - Results offset for pagination
+   * @param {string} [options.sortBy='ontology.confidence'] - Sort field (ontology.confidence, last_modified, entity_name)
+   * @param {string} [options.sortOrder='DESC'] - Sort order (ASC or DESC)
+   * @returns {Promise<Array<Object>>} Entities matching ontology criteria
+   */
+  async queryByOntologyClass(options = {}) {
+    const {
+      entityClass,
+      team = null,
+      minConfidence = 0,
+      limit = 1000,
+      offset = 0,
+      sortBy = 'ontology.confidence',
+      sortOrder = 'DESC'
+    } = options;
+
+    if (!entityClass) {
+      throw new Error('entityClass parameter is required');
+    }
+
+    // Get all nodes and filter by ontology classification
+    let results = [];
+
+    this.graph.forEachNode((nodeId, attributes) => {
+      // Skip nodes without ontology classification
+      if (!attributes.ontology || !attributes.ontology.entityClass) {
+        return;
+      }
+
+      // Filter by entity class
+      if (attributes.ontology.entityClass !== entityClass) {
+        return;
+      }
+
+      // Filter by team if specified
+      if (team && attributes.team !== team) {
+        return;
+      }
+
+      // Filter by minimum confidence
+      const ontologyConfidence = attributes.ontology.confidence || 0;
+      if (ontologyConfidence < minConfidence) {
+        return;
+      }
+
+      // Map to result format with ontology metadata
+      results.push({
+        id: nodeId,
+        entity_name: attributes.name,
+        entity_type: attributes.entityType || 'Unknown',
+        observations: attributes.observations || [],
+        confidence: attributes.confidence !== undefined ? attributes.confidence : 1.0,
+        source: attributes.source || 'manual',
+        team: attributes.team,
+        extracted_at: attributes.created_at || attributes.extracted_at,
+        last_modified: attributes.last_modified,
+        session_id: attributes.session_id || null,
+        metadata: attributes.metadata || {},
+        // Ontology-specific fields
+        ontology: {
+          entityClass: attributes.ontology.entityClass,
+          confidence: ontologyConfidence,
+          team: attributes.ontology.team,
+          method: attributes.ontology.method,
+          layer: attributes.ontology.layer,
+          properties: attributes.ontology.properties || {}
+        }
+      });
+    });
+
+    // Sort results
+    const validSortFields = {
+      'ontology.confidence': (a) => a.ontology.confidence,
+      'last_modified': (a) => a.last_modified,
+      'entity_name': (a) => a.entity_name,
+      'confidence': (a) => a.confidence
+    };
+
+    const sortFn = validSortFields[sortBy] || validSortFields['ontology.confidence'];
+    const safeSortOrder = sortOrder.toUpperCase() === 'ASC' ? 1 : -1;
+
+    results.sort((a, b) => {
+      const aVal = sortFn(a);
+      const bVal = sortFn(b);
+
+      // Handle null/undefined values
+      if (aVal === null || aVal === undefined) return safeSortOrder;
+      if (bVal === null || bVal === undefined) return -safeSortOrder;
+
+      // Compare values
+      if (aVal < bVal) return -safeSortOrder;
+      if (aVal > bVal) return safeSortOrder;
+      return 0;
+    });
+
+    // Apply pagination
+    const paginatedResults = results.slice(offset, offset + limit);
+
+    return paginatedResults;
+  }
+
+  /**
    * Get list of all teams
    *
    * @returns {Promise<Array<string>>} Sorted array of unique team names

@@ -1,0 +1,238 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://coding.local/schemas/ontology.json",
+  "title": "Ontology Definition Schema",
+  "description": "JSON Schema for validating ontology files (upper and lower ontologies)",
+  "type": "object",
+  "required": ["name", "version", "type", "entities"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Ontology name",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "Ontology version (semver)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "type": {
+      "type": "string",
+      "description": "Ontology type",
+      "enum": ["upper", "lower"]
+    },
+    "team": {
+      "type": "string",
+      "description": "Team identifier (required for lower ontologies)"
+    },
+    "extendsOntology": {
+      "type": "string",
+      "description": "Upper ontology this extends (for lower ontologies)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Ontology description"
+    },
+    "entities": {
+      "type": "object",
+      "description": "Entity class definitions",
+      "patternProperties": {
+        "^[A-Z][a-zA-Z0-9]*$": {
+          "$ref": "#/definitions/EntityDefinition"
+        }
+      },
+      "additionalProperties": false
+    },
+    "relationships": {
+      "type": "object",
+      "description": "Relationship definitions",
+      "patternProperties": {
+        "^[a-z][a-zA-Z0-9_]*$": {
+          "$ref": "#/definitions/RelationshipDefinition"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "lower"
+          }
+        }
+      },
+      "then": {
+        "required": ["team", "extendsOntology"]
+      }
+    }
+  ],
+  "definitions": {
+    "EntityDefinition": {
+      "type": "object",
+      "required": ["description", "properties"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Entity description",
+          "minLength": 1
+        },
+        "extendsEntity": {
+          "type": "string",
+          "description": "Upper ontology entity this extends"
+        },
+        "properties": {
+          "type": "object",
+          "description": "Entity properties",
+          "patternProperties": {
+            "^[a-z][a-zA-Z0-9]*$": {
+              "$ref": "#/definitions/PropertyDefinition"
+            }
+          },
+          "additionalProperties": false
+        },
+        "requiredProperties": {
+          "type": "array",
+          "description": "Required property names",
+          "items": {
+            "type": "string"
+          }
+        },
+        "examples": {
+          "type": "array",
+          "description": "Example instances",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "PropertyDefinition": {
+      "type": "object",
+      "required": ["type", "description"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Property data type",
+          "enum": ["string", "number", "boolean", "object", "array", "reference"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Property description",
+          "minLength": 1
+        },
+        "enum": {
+          "type": "array",
+          "description": "Allowed values for enum types",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regex pattern for string validation"
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value/length"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value/length"
+        },
+        "default": {
+          "description": "Default value"
+        },
+        "items": {
+          "description": "Array item type",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/PropertyDefinition"
+            }
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "description": "Nested object properties",
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/definitions/PropertyDefinition"
+            }
+          }
+        },
+        "targetEntityClass": {
+          "type": "string",
+          "description": "Target entity class for references"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Units for numeric values"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "reference"
+              }
+            }
+          },
+          "then": {
+            "required": ["targetEntityClass"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "array"
+              }
+            }
+          },
+          "then": {
+            "required": ["items"]
+          }
+        }
+      ]
+    },
+    "RelationshipDefinition": {
+      "type": "object",
+      "required": ["description", "sourceEntityClass", "targetEntityClass"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Relationship description",
+          "minLength": 1
+        },
+        "sourceEntityClass": {
+          "type": "string",
+          "description": "Source entity class"
+        },
+        "targetEntityClass": {
+          "type": "string",
+          "description": "Target entity class"
+        },
+        "cardinality": {
+          "type": "string",
+          "description": "Relationship cardinality",
+          "enum": ["one-to-one", "one-to-many", "many-to-one", "many-to-many"]
+        },
+        "properties": {
+          "type": "object",
+          "description": "Relationship properties",
+          "patternProperties": {
+            ".*": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "team": "Agentic",
+  "description": "Agentic team focused on AI agent systems, autonomous workflows, and agent orchestration",
+  "lowerOntologyPath": "src/ontology/lower/agentic-ontology.json",
+  "confidenceThreshold": 0.7,
+  "validationMode": "lenient",
+  "strictValidation": false,
+  "classification": {
+    "preferHeuristics": true,
+    "heuristicThreshold": 0.8
+  }
+}
