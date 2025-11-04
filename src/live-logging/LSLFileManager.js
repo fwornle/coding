@@ -13,6 +13,7 @@ import path from 'path';
 import { createGzip } from 'zlib';
 import { pipeline } from 'stream/promises';
 import { EventEmitter } from 'events';
+import { execSync } from 'child_process';
 
 class LSLFileManager extends EventEmitter {
   constructor(options = {}) {
@@ -543,8 +544,36 @@ class LSLFileManager extends EventEmitter {
   }
 
   /**
+   * Check if a file is tracked by git
+   * @param {string} filePath - Absolute path to the file
+   * @returns {boolean} - True if file is tracked by git, false otherwise
+   */
+  isGitTracked(filePath) {
+    try {
+      // Get the directory containing the file
+      const fileDir = path.dirname(filePath);
+      const fileName = path.basename(filePath);
+
+      // Run git ls-files to check if file is tracked
+      // This command returns the file name if tracked, empty if not
+      const result = execSync(`git ls-files "${fileName}"`, {
+        cwd: fileDir,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe']  // Suppress stderr
+      }).trim();
+
+      return result.length > 0;
+    } catch (error) {
+      // If git command fails (not a git repo, etc.), assume file is not tracked
+      this.debug(`Git check failed for ${filePath}: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
    * Clean up low-value LSL files in a directory
    * Removes files that only contain warmups, interruptions, or no meaningful content
+   * SAFETY: Only removes files that are NOT tracked by git
    */
   async cleanupLowValueLSLFiles(directory) {
     try {
@@ -559,8 +588,19 @@ class LSLFileManager extends EventEmitter {
       let removedCount = 0;
       const removedFiles = [];
 
+      let skippedGitTracked = 0;
+      const skippedFiles = [];
+
       for (const filePath of files) {
         if (!this.isValueableLSLFile(filePath)) {
+          // SAFETY CHECK: Never delete git-tracked files
+          if (this.isGitTracked(filePath)) {
+            skippedGitTracked++;
+            skippedFiles.push(path.basename(filePath));
+            this.debug(`⚠️  Skipped git-tracked low-value LSL: ${path.basename(filePath)}`);
+            continue;
+          }
+
           try {
             fs.unlinkSync(filePath);
             removedCount++;
@@ -572,6 +612,15 @@ class LSLFileManager extends EventEmitter {
         }
       }
 
+      if (skippedGitTracked > 0) {
+        console.log(`⚠️  Skipped ${skippedGitTracked} git-tracked low-value LSL file(s) - manual cleanup required`);
+        this.emit('gitTrackedFilesSkipped', {
+          directory,
+          skippedCount: skippedGitTracked,
+          skippedFiles
+        });
+      }
+
       if (removedCount > 0) {
         console.log(`🧹 Cleaned up ${removedCount} low-value LSL file(s)`);
         this.emit('lowValueFilesRemoved', {
@@ -581,11 +630,16 @@ class LSLFileManager extends EventEmitter {
         });
       }
 
-      return { removed: removedCount, files: removedFiles };
+      return {
+        removed: removedCount,
+        files: removedFiles,
+        skipped: skippedGitTracked,
+        skippedFiles
+      };
 
     } catch (error) {
       this.debug(`Low-value LSL cleanup failed for ${directory}: ${error.message}`);
-      return { removed: 0, error: error.message };
+      return { removed: 0, skipped: 0, error: error.message };
     }
   }
 

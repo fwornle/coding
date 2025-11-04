@@ -20,6 +20,7 @@ import {
   OntologyValidationError,
 } from './types.js';
 import { OntologyManager, ResolvedEntityDefinition } from './OntologyManager.js';
+import { ontologyMetrics } from './metrics.js';
 
 /**
  * OntologyValidator - Validates entity instances against ontology schemas
@@ -35,6 +36,11 @@ export class OntologyValidator {
     entityData: Record<string, any>,
     options: ValidationOptions
   ): ValidationResult {
+    ontologyMetrics.incrementCounter('ontology_validation_total', {
+      mode: options.mode,
+      team: options.team || 'all'
+    });
+
     // Disabled mode - skip validation
     if (options.mode === 'disabled') {
       return { valid: true, errors: [], warnings: [] };
@@ -107,6 +113,20 @@ export class OntologyValidator {
     }
 
     const valid = errors.length === 0;
+
+    // Record metrics
+    if (valid) {
+      ontologyMetrics.incrementCounter('ontology_validation_success', {
+        mode: options.mode,
+        team: options.team || 'all'
+      });
+    } else {
+      ontologyMetrics.incrementCounter('ontology_validation_failure', {
+        mode: options.mode,
+        team: options.team || 'all'
+      });
+    }
+
     return { valid, errors, warnings };
   }
 

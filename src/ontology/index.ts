@@ -43,13 +43,14 @@ export * from './OntologyManager.js';
 export * from './OntologyValidator.js';
 export * from './OntologyClassifier.js';
 export * from './heuristics/index.js';
+export * from './metrics.js';
 
 import { OntologyConfig } from './types.js';
 import { OntologyManager } from './OntologyManager.js';
 import { OntologyValidator } from './OntologyValidator.js';
 import { OntologyClassifier } from './OntologyClassifier.js';
 import { createHeuristicClassifier } from './heuristics/index.js';
-import { UnifiedInferenceEngine } from '../llm/unified-inference-engine.js';
+import type { UnifiedInferenceEngine } from './types.js';
 
 /**
  * Complete ontology system instance

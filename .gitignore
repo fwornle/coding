@@ -68,7 +68,7 @@ integrations/vscode-km-copilot/*.vsix
 *.pid
 
 # Shared memory (if you want to keep it local)
-shared-memory.json
+shared-memory*.json
 
 # CoPilot fallback service runtime data
 .coding-tools/

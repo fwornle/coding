@@ -24,6 +24,7 @@ import {
   OntologyLoadError,
   EntityResolutionError,
 } from './types.js';
+import { ontologyMetrics } from './metrics.js';
 
 /**
  * Resolved entity definition with merged properties from upper + lower ontologies
@@ -119,9 +120,13 @@ export class OntologyManager {
         const age = Date.now() - cached.loadedAt;
         const ttl = this.config.caching.ttl || 3600000; // 1 hour default
         if (age < ttl) {
+          ontologyMetrics.incrementCounter('ontology_cache_hits', { type: expectedType });
           return cached.ontology;
         }
       }
+
+      // Cache miss
+      ontologyMetrics.incrementCounter('ontology_cache_misses', { type: expectedType });
 
       // Load from file
       const content = await fs.readFile(filePath, 'utf-8');
@@ -162,6 +167,9 @@ export class OntologyManager {
             .sort((a, b) => a[1].loadedAt - b[1].loadedAt)[0][0];
           this.ontologyCache.delete(oldestKey);
         }
+
+        // Update cache size metric
+        ontologyMetrics.setGauge('ontology_cache_size', this.ontologyCache.size);
       }
 
       return ontology;

@@ -14,6 +14,7 @@
 
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { LayerResult, EmbeddingMatch } from '../types.js';
+// @ts-expect-error - EmbeddingGenerator is a JS class without type declarations
 import type { EmbeddingGenerator } from '../../knowledge-management/EmbeddingGenerator.js';
 
 /**
