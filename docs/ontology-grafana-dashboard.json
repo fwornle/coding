@@ -1,0 +1,284 @@
+{
+  "dashboard": {
+    "title": "Ontology Integration System",
+    "tags": ["ontology", "classification", "validation"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "title": "Classification Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ontology_classification_success[5m]) / rate(ontology_classification_total[5m]) * 100",
+            "legendFormat": "Success Rate %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percent",
+            "label": "Success Rate",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "title": "Classification Latency (p50, p95, p99)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(ontology_classification_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(ontology_classification_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(ontology_classification_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Latency"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "gridPos": {"x": 0, "y": 8, "w": 8, "h": 6},
+        "title": "Classification Rate (requests/sec)",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "rate(ontology_classification_total[5m])",
+            "refId": "A"
+          }
+        ],
+        "format": "reqps",
+        "valueName": "current"
+      },
+      {
+        "id": 4,
+        "gridPos": {"x": 8, "y": 8, "w": 8, "h": 6},
+        "title": "Average Confidence Score",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "rate(ontology_classification_confidence_sum[5m]) / rate(ontology_classification_confidence_count[5m])",
+            "refId": "A"
+          }
+        ],
+        "format": "percentunit",
+        "valueName": "current",
+        "thresholds": "0.5,0.7",
+        "colors": ["red", "yellow", "green"]
+      },
+      {
+        "id": 5,
+        "gridPos": {"x": 16, "y": 8, "w": 8, "h": 6},
+        "title": "Cache Hit Rate",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "rate(ontology_cache_hits[5m]) / (rate(ontology_cache_hits[5m]) + rate(ontology_cache_misses[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "format": "percent",
+        "valueName": "current",
+        "thresholds": "50,70",
+        "colors": ["red", "yellow", "green"]
+      },
+      {
+        "id": 6,
+        "gridPos": {"x": 0, "y": 14, "w": 12, "h": 8},
+        "title": "Classification Method Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (method) (rate(ontology_classification_success[5m]))",
+            "legendFormat": "{{ method }}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "gridPos": {"x": 12, "y": 14, "w": 12, "h": 8},
+        "title": "Validation Success Rate by Mode",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ontology_validation_success{mode=\"strict\"}[5m]) / rate(ontology_validation_total{mode=\"strict\"}[5m]) * 100",
+            "legendFormat": "Strict",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(ontology_validation_success{mode=\"lenient\"}[5m]) / rate(ontology_validation_total{mode=\"lenient\"}[5m]) * 100",
+            "legendFormat": "Lenient",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percent",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "gridPos": {"x": 0, "y": 22, "w": 12, "h": 8},
+        "title": "LLM Token Usage Rate (tokens/hour)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "(rate(ontology_llm_tokens_prompt[1h]) + rate(ontology_llm_tokens_completion[1h])) * 3600",
+            "legendFormat": "Total Tokens/Hour",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(ontology_llm_tokens_prompt[1h]) * 3600",
+            "legendFormat": "Prompt Tokens/Hour",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(ontology_llm_tokens_completion[1h]) * 3600",
+            "legendFormat": "Completion Tokens/Hour",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Tokens/Hour"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "gridPos": {"x": 12, "y": 22, "w": 12, "h": 8},
+        "title": "LLM Call Latency (p50, p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(ontology_llm_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(ontology_llm_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Latency"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "gridPos": {"x": 0, "y": 30, "w": 24, "h": 10},
+        "title": "Classification Rate by Team",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ontology_classification_total{team=\"RaaS\"}[5m])",
+            "legendFormat": "RaaS",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(ontology_classification_total{team=\"ReSi\"}[5m])",
+            "legendFormat": "ReSi",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(ontology_classification_total{team=\"Coding\"}[5m])",
+            "legendFormat": "Coding",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(ontology_classification_total{team=\"Agentic\"}[5m])",
+            "legendFormat": "Agentic",
+            "refId": "D"
+          },
+          {
+            "expr": "rate(ontology_classification_total{team=\"UI\"}[5m])",
+            "legendFormat": "UI",
+            "refId": "E"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "reqps",
+            "label": "Requests/Sec"
+          }
+        ],
+        "stack": true
+      },
+      {
+        "id": 11,
+        "gridPos": {"x": 0, "y": 40, "w": 8, "h": 6},
+        "title": "Total Classifications (Last Hour)",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "sum(increase(ontology_classification_total[1h]))",
+            "refId": "A"
+          }
+        ],
+        "format": "short",
+        "valueName": "current"
+      },
+      {
+        "id": 12,
+        "gridPos": {"x": 8, "y": 40, "w": 8, "h": 6},
+        "title": "Total LLM Calls (Last Hour)",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "sum(increase(ontology_llm_calls_total[1h]))",
+            "refId": "A"
+          }
+        ],
+        "format": "short",
+        "valueName": "current"
+      },
+      {
+        "id": 13,
+        "gridPos": {"x": 16, "y": 40, "w": 8, "h": 6},
+        "title": "Current Cache Size",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "ontology_cache_size",
+            "refId": "A"
+          }
+        ],
+        "format": "short",
+        "valueName": "current"
+      }
+    ],
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  },
+  "overwrite": false
+}

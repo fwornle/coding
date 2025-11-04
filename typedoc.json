@@ -1,0 +1,46 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/ontology/index.ts",
+    "src/ontology/types.ts",
+    "src/ontology/OntologyManager.ts",
+    "src/ontology/OntologyValidator.ts",
+    "src/ontology/OntologyClassifier.ts",
+    "src/ontology/OntologyQueryEngine.ts",
+    "src/ontology/heuristics/index.ts"
+  ],
+  "out": "docs/api",
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeInternal": true,
+  "readme": "docs/ontology-api-overview.md",
+  "name": "Ontology Integration System API",
+  "includeVersion": true,
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Function",
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Enum",
+    "Variable"
+  ],
+  "categorizeByGroup": true,
+  "defaultCategory": "Core",
+  "categoryOrder": [
+    "Core",
+    "Configuration",
+    "Validation",
+    "Classification",
+    "Querying",
+    "Heuristics",
+    "Types",
+    "*"
+  ],
+  "plugin": [],
+  "navigationLinks": {
+    "User Guide": "https://github.com/agent-agnostic-coding-tools/docs/ontology-integration-guide.md",
+    "Requirements": "../../.spec-workflow/specs/ontology-integration/requirements.md",
+    "Design": "../../.spec-workflow/specs/ontology-integration/design.md"
+  }
+}

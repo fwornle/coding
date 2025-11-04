@@ -20,6 +20,7 @@ import {
 import { OntologyManager } from './OntologyManager.js';
 import { OntologyValidator } from './OntologyValidator.js';
 import { HeuristicClassifier } from './heuristics/HeuristicClassifier.js';
+import { ontologyMetrics, startTimer } from './metrics.js';
 
 /**
  * OntologyClassifier - Main classifier combining LLM and heuristics
@@ -45,6 +46,9 @@ export class OntologyClassifier {
     text: string,
     options: ClassificationOptions = {}
   ): Promise<OntologyClassification | null> {
+    const timer = startTimer('ontology_classification_duration_seconds', { team: options.team || 'all' });
+    ontologyMetrics.incrementCounter('ontology_classification_total', { team: options.team || 'all' });
+
     const {
       team,
       mixedTeamScope = false,
@@ -108,15 +112,30 @@ export class OntologyClassifier {
 
     // Check minimum confidence threshold
     if (!bestClassification || bestClassification.confidence < minConfidence) {
+      ontologyMetrics.incrementCounter('ontology_classification_failure', { team: options.team || 'all' });
+      timer.stop();
       return null;
     }
 
-    return this.finalizeClassification(
+    // Record success and confidence
+    ontologyMetrics.incrementCounter('ontology_classification_success', {
+      team: options.team || 'all',
+      method: bestClassification.method
+    });
+    ontologyMetrics.observeHistogram('ontology_classification_confidence', bestClassification.confidence, {
+      team: options.team || 'all',
+      method: bestClassification.method
+    });
+
+    const result = await this.finalizeClassification(
       bestClassification,
       text,
       validate,
       validationOptions
     );
+
+    timer.stop();
+    return result;
   }
 
   /**
@@ -127,6 +146,9 @@ export class OntologyClassifier {
     team?: string,
     llmBudget: number = 1000
   ): Promise<OntologyClassification | null> {
+    const llmTimer = startTimer('ontology_llm_duration_seconds', { team: team || 'all' });
+    ontologyMetrics.incrementCounter('ontology_llm_calls_total', { team: team || 'all' });
+
     try {
       // Get available entity classes for context
       const entityClasses = this.ontologyManager.getAllEntityClasses(team);
@@ -146,15 +168,23 @@ export class OntologyClassifier {
         temperature: 0.3, // Lower temperature for more deterministic classification
       });
 
+      // Track token usage
+      if (response.usage) {
+        ontologyMetrics.incrementCounter('ontology_llm_tokens_prompt', { team: team || 'all' }, response.usage.promptTokens);
+        ontologyMetrics.incrementCounter('ontology_llm_tokens_completion', { team: team || 'all' }, response.usage.completionTokens);
+      }
+
       // Parse LLM response
       const classification = this.parseLLMResponse(
         response.content,
         team || 'upper'
       );
 
+      llmTimer.stop();
       return classification;
     } catch (error) {
       console.error('LLM classification failed:', error);
+      llmTimer.stop();
       return null;
     }
   }
