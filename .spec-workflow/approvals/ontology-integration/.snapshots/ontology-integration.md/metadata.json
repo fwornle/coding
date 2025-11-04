@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/ontology-integration/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-11-03T17:33:57.127Z",
+      "trigger": "initial",
+      "approvalId": "approval_1762191237117_8tfkcu4dj",
+      "approvalTitle": "Requirements: Ontology-Based Knowledge Management"
+    }
+  ]
+}

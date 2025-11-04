@@ -1,0 +1,48 @@
+@startuml ontology-resolution
+!include _standard-style.puml
+
+participant "OntologyClassifier" as Classifier
+participant "OntologyManager" as Manager
+participant "File System" as FS
+
+Classifier -> Manager: resolveEntity("VirtualTarget", "ReSi")
+activate Manager
+
+Manager -> Manager: Check cache
+alt Cache hit
+  Manager --> Classifier: Cached EntityDefinition
+else Cache miss
+  Manager -> FS: readFile(upperOntologyPath)
+  activate FS
+  FS --> Manager: upperOntologyJSON
+  deactivate FS
+
+  Manager -> Manager: Parse upper ontology
+
+  Manager -> FS: readFile(lowerOntologyPath)
+  activate FS
+  FS --> Manager: lowerOntologyJSON
+  deactivate FS
+
+  Manager -> Manager: Parse lower ontology
+
+  Manager -> Manager: Find "VirtualTarget"\nin lower ontology
+  note right: Lower ontology may extend\nupper ontology entities
+
+  alt Entity in lower ontology
+    Manager -> Manager: Get base entity\nfrom upper ontology
+    note right: If "extendsEntity" specified
+
+    Manager -> Manager: Merge properties:\nbase + lower overrides
+
+    Manager -> Manager: Cache merged definition
+  else Entity only in upper
+    Manager -> Manager: Return upper definition
+  end
+
+  Manager --> Classifier: Merged EntityDefinition
+end
+
+deactivate Manager
+
+@enduml

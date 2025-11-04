@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/ontology-integration/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-11-04T05:58:25.035Z",
+      "trigger": "initial",
+      "approvalId": "approval_1762235905020_moxg5wir1",
+      "approvalTitle": "Updated Design: 5 Teams with Heuristics and Configurations"
+    }
+  ]
+}

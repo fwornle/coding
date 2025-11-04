@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/ontology-integration/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-11-04T05:58:24.258Z",
+      "trigger": "initial",
+      "approvalId": "approval_1762235904252_k14klixxm",
+      "approvalTitle": "Extended Requirements: 5 Teams (RaaS, ReSi, Coding, Agentic, UI)"
+    }
+  ]
+}
