@@ -23,6 +23,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { execSync } from 'child_process';
 
 // Import consolidated modules
 import ReliableCodingClassifier from '../src/live-logging/ReliableCodingClassifier.js';
@@ -1024,10 +1025,13 @@ class BatchLSLProcessor {
           const fileDate = new Date(date);
           const fileHour = parseInt(startTime.substring(0, 2));
 
-          // IMMUTABILITY PROTECTION: Only delete files from very recent sessions
-          // Default: only process files from closed time windows in the last 24 hours
-          // This respects the "window closed --> don't touch" principle for historical records
-          const maxAgeHours = parseInt(process.env.LSL_CLEANUP_MAX_AGE_HOURS || '24', 10);
+          // CRITICAL: Check if file has been committed to git
+          // LSL files that are tracked by git are IMMUTABLE HISTORICAL RECORDS
+          // Only delete files that are:
+          // 1. NOT in git (untracked/modified working tree files)
+          // 2. From a closed time window (not current hour)
+          // 3. Meet all emptiness criteria
+
           const fileAgeMs = now - fileDate;
           const fileAgeHours = fileAgeMs / (1000 * 60 * 60);
 
@@ -1036,15 +1040,49 @@ class BatchLSLProcessor {
             fileHour === currentHour;
 
           if (isCurrentWindow) {
+            if (process.env.DEBUG_LSL_CLEANUP === 'true') {
+              console.log(`⏭️  Skipping ${filename} - current time window (immutable)`);
+            }
             continue; // Skip current time window
           }
 
-          // CRITICAL: Respect immutability - don't touch historical records beyond max age
-          if (fileAgeHours > maxAgeHours) {
-            if (process.env.DEBUG_LSL_CLEANUP === 'true') {
-              console.log(`⏭️  Skipping ${filename} - beyond immutability period (${Math.round(fileAgeHours)}h > ${maxAgeHours}h)`);
+          // IMMUTABILITY PROTECTION: Check if file is COMMITTED (HEAD) in git
+          // Files that exist in the committed history are immutable and MUST NOT be deleted
+          // This allows cleanup of:
+          // 1. Untracked files (never committed)
+          // 2. Modified files (committed but changed - batch regeneration scenario)
+          try {
+            // Check if file exists in HEAD commit (not just working tree)
+            execSync(`git cat-file -e HEAD:"${path.relative(dir, filePath)}"`, {
+              cwd: dir,
+              encoding: 'utf8',
+              stdio: ['pipe', 'pipe', 'pipe']
+            });
+
+            // If we get here, file exists in HEAD commit
+            // Check if file has been modified (working tree differs from HEAD)
+            try {
+              execSync(`git diff --quiet HEAD -- "${filePath}"`, {
+                cwd: dir,
+                stdio: ['pipe', 'pipe', 'pipe']
+              });
+              // No diff = file unchanged from HEAD = immutable historical record
+              if (process.env.DEBUG_LSL_CLEANUP === 'true') {
+                console.log(`🛡️  Skipping ${filename} - unchanged in git (immutable historical record)`);
+              }
+              continue;
+            } catch (diffError) {
+              // File has been modified - could be from batch regeneration
+              // Allow cleanup if it meets empty criteria (supports batch regeneration cleanup)
+              if (process.env.DEBUG_LSL_CLEANUP === 'true') {
+                console.log(`🔍  Checking ${filename} for cleanup (modified/regenerated, age: ${Math.round(fileAgeHours)}h)`);
+              }
             }
-            continue;
+          } catch (error) {
+            // File does NOT exist in HEAD - it's untracked or deleted
+            if (process.env.DEBUG_LSL_CLEANUP === 'true') {
+              console.log(`🔍  Checking ${filename} for cleanup (not in git HEAD, age: ${Math.round(fileAgeHours)}h)`);
+            }
           }
 
           // Read and check if file is empty (only void prompt sets)
