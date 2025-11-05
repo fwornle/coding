@@ -92,32 +92,32 @@ This guide provides a safe, phased approach to deploying the Ontology Integratio
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│                   Phased Rollout Strategy                    │
+│                   Phased Rollout Strategy                   │
 ├─────────────────────────────────────────────────────────────┤
-│                                                              │
+│                                                             │
 │  Phase 1: Deploy Infrastructure (Week 1)                    │
-│  ┌────────────────────────────────────────┐                │
+│  ┌─────────────────────────────────────────┐                │
 │  │ • Deploy code with ontology disabled    │                │
-│  │ • Verify existing functionality intact  │                │
+│  │ • Verify existing functionality intact  │                │ 
 │  │ • Validate ontology files load          │                │
 │  │ • Run smoke tests                       │                │
-│  └────────────────────────────────────────┘                │
-│                       ↓                                      │
-│  Phase 2: Pilot Team (Weeks 2-4)                           │
-│  ┌────────────────────────────────────────┐                │
+│  └─────────────────────────────────────────┘                │
+│                       ↓                                     │
+│  Phase 2: Pilot Team (Weeks 2-4)                            │
+│  ┌─────────────────────────────────────────┐                │
 │  │ • Enable for ReSi team only             │                │
 │  │ • Monitor classification accuracy       │                │
 │  │ • Tune heuristics and confidence        │                │
 │  │ • Collect feedback from team            │                │
-│  └────────────────────────────────────────┘                │
-│                       ↓                                      │
-│  Phase 3: Full Rollout (Weeks 5-7)                         │
-│  ┌────────────────────────────────────────┐                │
+│  └─────────────────────────────────────────┘                │
+│                       ↓                                     │
+│  Phase 3: Full Rollout (Weeks 5-7)                          │
+│  ┌─────────────────────────────────────────┐                │
 │  │ Week 5: Enable RaaS team                │                │
 │  │ Week 6: Enable Coding, Agentic, UI      │                │
 │  │ Week 7: Monitor all teams, full rollout │                │
-│  └────────────────────────────────────────┘                │
-│                                                              │
+│  └─────────────────────────────────────────┘                │
+│                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 

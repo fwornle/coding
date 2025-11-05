@@ -1,0 +1,51 @@
+@startuml knowledge-architecture
+!include _standard-style.puml
+
+skinparam defaultFontSize 18
+skinparam titleFontSize 28
+skinparam packageFontSize 20
+skinparam componentFontSize 18
+skinparam ArrowThickness 3
+skinparam dpi 150
+
+title Knowledge Management
+
+left to right direction
+
+package "Sources" {
+  component "Sessions" as LIVE
+  component "Manual" as MANUAL
+}
+
+package "Processing" {
+  component "Monitor" as MONITOR
+  component "Extractor" as EXTRACTOR
+  component "Classifier" as ONTOLOGY
+}
+
+package "Storage" {
+  database "GraphDB" as GRAPHDB
+  database "Qdrant" as QDRANT
+  database "SQLite" as SQLITE
+}
+
+package "Access" {
+  component "VKB" as VKB
+  component "Retriever" as RETRIEVER
+}
+
+LIVE --> MONITOR
+MONITOR --> EXTRACTOR
+EXTRACTOR --> ONTOLOGY
+ONTOLOGY --> GRAPHDB
+EXTRACTOR --> QDRANT
+EXTRACTOR --> SQLITE
+
+MANUAL --> GRAPHDB
+
+GRAPHDB --> VKB
+GRAPHDB --> RETRIEVER
+QDRANT --> RETRIEVER
+SQLITE --> RETRIEVER
+
+@enduml

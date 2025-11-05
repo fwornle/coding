@@ -1,79 +1,118 @@
 @startuml system-architecture
 !include _standard-style.puml
 
-title Knowledge Management System Architecture
+title Knowledge Management System Architecture v2.0\nGraphDB + Ontology Integration
 
 package "Knowledge Capture Layer" {
-  [Git Repository] as git
-  [Conversation Logs] as logs
+  [Claude Transcripts] as transcripts
+  [Enhanced Transcript\nMonitor] as monitor
+  [Streaming Knowledge\nExtractor] as extractor
   [UKB Command] as ukb
-  [UKB-CLI (Node.js)] as ukbcli
-  [Knowledge API] as kapi
-  [Commit Analysis] as analysis
-  [Semantic Analysis] as semantic
+  [UKB Database Writer] as writer
+}
+
+package "Ontology Classification Layer" {
+  [Ontology Manager] as ontomgr
+  [Ontology Classifier\n(5-Layer Pipeline)] as classifier
+  [Upper Ontology\n(cluster-reprocessing)] as upper
+  [Lower Ontologies\n(team-specific)] as lower
+
+  note right of classifier
+    **5-Layer Hybrid Pipeline:**
+    • Layer 0: Team Context Filter
+    • Layer 1: Pattern Analyzer
+    • Layer 2: Keyword Matcher
+    • Layer 3: Semantic Embeddings
+    • Layer 4: LLM Analyzer (fallback)
+  end note
 }
 
 package "Data Storage Layer" {
-  database [shared-memory.json] as storage
-  database [MCP Memory Server] as mcpmem
-  note right of mcpmem
-    • In-memory graph database
-    • Session persistence
-    • Cross-session continuity
+  database "Graph Database\n(Graphology + LevelDB)" as graphdb {
+    [Entities]
+    [Relations]
+    [Ontology Metadata]
+  }
+
+  database "Qdrant\n(Vector DB)" as qdrant {
+    [Fast Collection\n(384d)]
+    [Accurate Collection\n(1536d)]
+  }
+
+  database "SQLite" as sqlite {
+    [Extraction Metadata]
+    [Session History]
+  }
+
+  note right of graphdb
+    **Central Knowledge Store:**
+    • Graphology: In-memory graph
+    • LevelDB: Persistent storage
+    • Ontology per entity
+    • Team-scoped isolation
+    • Auto-persist (1s interval)
   end note
 }
 
 package "Visualization Layer" {
   [VKB Command] as vkb
   [VKB-CLI (Node.js)] as vkbcli
-  [VKB Server Manager] as vkbserver
+  [VKB Server] as vkbserver
   [HTTP Server] as server
-  [Memory Visualizer] as visualizer
+  [Knowledge Visualizer\n(Ontology-aware)] as visualizer
   [Web Browser] as browser
 }
 
 package "AI Agent Integration" {
   [Claude Code] as claude
-  [GitHub Copilot] as copilot
-  [MCP Server Interface] as mcp
+  [Knowledge Retriever\n(Ontology-aware)] as retriever
 }
 
-git --> analysis : Commit data
-logs --> semantic : Conversation data
-analysis --> ukbcli : Extracted insights
-semantic --> ukbcli : Pattern insights
-ukb --> ukbcli : Delegates to
-ukbcli --> kapi : Uses API
-kapi --> storage : Knowledge graph updates
-storage <--> mcpmem : Sync operations
+' === Online Learning Flow ===
+transcripts --> monitor : File changes
+monitor --> extractor : New exchanges
+extractor --> classifier : Knowledge text
+classifier --> ontomgr : Entity class lookup
+ontomgr --> upper : Upper ontology
+ontomgr --> lower : Team ontology
+classifier --> graphdb : Entity + Ontology
+extractor --> qdrant : Dual embeddings
+extractor --> sqlite : Metadata
 
-storage --> vkbcli : Read memory data
+' === Manual Learning Flow ===
+claude --> ukb : Manual capture
+ukb --> writer : Entity/Relation
+writer --> graphdb : Direct writes
+
+' === Visualization Flow ===
 vkb --> vkbcli : Delegates to
 vkbcli --> vkbserver : Server management
-vkbserver --> server : Start/manage server
-server --> visualizer : Serve graph data
-visualizer --> browser : Interactive visualization
+vkbserver --> server : Start/manage
+server --> graphdb : Query entities
+server --> visualizer : Serve data
+visualizer --> browser : Interactive viz
 
-claude --> mcp : MCP tools
-copilot --> storage : Direct access
-mcp <--> mcpmem : Memory operations
-claude --> ukb : Trigger knowledge capture
-copilot --> ukb : Trigger knowledge capture
-claude --> logs : Generate conversations
-copilot --> logs : Generate conversations
+' === Retrieval Flow ===
+claude --> retriever : Knowledge queries
+retriever --> graphdb : Ontology queries
+retriever --> qdrant : Semantic search
+retriever --> sqlite : Metadata filter
 
-note bottom of storage
-  **File-based Storage:**
-  • Git-tracked JSON format
-  • Team collaboration ready
-  • Version controlled
+note bottom of graphdb
+  **Unified Storage (v2.0):**
+  • Single source of truth
+  • No JSON intermediates
+  • Online + Manual same DB
+  • Optional JSON export
 end note
 
 note bottom of visualizer
-  **Interactive Visualization:**
+  **Ontology-aware Visualization:**
+  • Entity class coloring
+  • Confidence indicators
+  • Classification method
+  • Team filtering
   • D3.js force-directed graph
-  • Color-coded entity types
-  • Real-time updates
 end note
 
 @enduml

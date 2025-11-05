@@ -279,24 +279,24 @@ Examples help classification accuracy:
 The system uses a **5-layer hybrid approach**:
 
 ```text
-┌─────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────┐
 │                 Classification Pipeline              │
-├─────────────────────────────────────────────────────┤
+├──────────────────────────────────────────────────────┤
 │                                                      │
-│  Layer 0: Team Context Filter                       │
-│           ↓ (if neutral, <1ms)                      │
-│  Layer 1: Entity Pattern Analyzer                   │
-│           ↓ (file/artifact detection, <1ms)         │
-│  Layer 2: Enhanced Keyword Matcher                  │
-│           ↓ (multi-keyword required, <10ms)         │
+│  Layer 0: Team Context Filter                        │
+│           ↓ (if neutral, <1ms)                       │
+│  Layer 1: Entity Pattern Analyzer                    │
+│           ↓ (file/artifact detection, <1ms)          │
+│  Layer 2: Enhanced Keyword Matcher                   │
+│           ↓ (multi-keyword required, <10ms)          │
 │  Layer 3: Semantic Embedding Classifier              │
-│           ↓ (vector similarity, ~50ms)              │
-│  Layer 4: LLM Classification (if enabled)           │
-│           ↓ (fallback, ~500ms)                      │
+│           ↓ (vector similarity, ~50ms)               │
+│  Layer 4: LLM Classification (if enabled)            │
+│           ↓ (fallback, ~500ms)                       │
 │                                                      │
 │  Early Exit: Return immediately if confidence ≥0.85  │
 │                                                      │
-└─────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────┘
 ```
 
 **Performance**: 90% of classifications complete in <100ms using Layers 0-2.

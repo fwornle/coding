@@ -1,4 +1,4 @@
-@startuml Knowledge Management Architecture
+@startuml Knowledge Management Architecture v2.0
 !include _standard-style.puml
 
 !define RECTANGLE class
@@ -18,96 +18,113 @@ skinparam cloud {
     BorderColor Orange
 }
 
-title Knowledge Management System Architecture
+title Knowledge Management System Architecture v2.0\nGraphDB + Ontology Integration
 
-rectangle "Project Development" as PROJECT {
+rectangle "Knowledge Sources" as SOURCES {
+    [Live Sessions\n(Transcripts)]
     [Git Commits]
-    [Conversation Logs]  
-    [Manual Insights]
+    [Manual Input\n(UKB)]
     [File Changes]
 }
 
-rectangle "Insight Capture Layer" as CAPTURE {
-    [ukb --auto] as AUTO
-    [ukb --interactive] as INTERACTIVE
-    
-    note right of AUTO : Analyzes commits\nExtracts patterns\nIdentifies optimizations
-    
-    note right of INTERACTIVE : Captures thought processes\nDocuments decisions\nRecords learnings
+rectangle "Online Learning" as ONLINE {
+    [Enhanced Transcript\nMonitor] as MONITOR
+    [Streaming Knowledge\nExtractor] as EXTRACTOR
+    [Ontology Classifier\n(5-Layer Pipeline)] as ONTOLOGY
+
+    note right of MONITOR : Watches transcript files\nTriggers real-time extraction\nDebounced processing
+
+    note right of ONTOLOGY : Layer 0: Team Context\nLayer 1: Pattern Analysis\nLayer 2: Keyword Matching\nLayer 3: Embeddings\nLayer 4: LLM (fallback)
 }
 
-cloud "Temporary Storage" as TEMP {
-    [Insight JSON Files]
-    [MCP Operation Files]
-    [Sync Instructions]
+rectangle "Manual Learning" as MANUAL {
+    [UKB Command] as UKB
+    [UKB Database Writer] as WRITER
+
+    note right of UKB : Direct database writes\nNo JSON intermediates\nImmediate persistence
 }
 
-rectangle "MCP Memory Layer" as MCP_LAYER {
-    database "MCP Memory Server" as MCP {
-        [Knowledge Graph]
-        [Entity Relations]
-        [Session State]
+rectangle "Unified Persistent Storage" as STORAGE {
+    rectangle "Graph Database\n(Graphology + LevelDB)" as GRAPHDB {
+        [Entities + Ontology]
+        [Relationships]
+        [Team Isolation]
     }
-    
-    [Claude Code] as CLAUDE
-    
-    note right of CLAUDE : Executes MCP operations\nManages entity lifecycle\nBuilds knowledge graph
-}
 
-database "Persistent Storage" as STORAGE {
-    [shared-memory.json]
-    [Git Repository]
-    [Version History]
+    rectangle "Qdrant\n(Vector DB)" as QDRANT {
+        [384d Embeddings\n(Fast)]
+        [1536d Embeddings\n(Accurate)]
+    }
+
+    rectangle "SQLite\n(Metadata)" as SQLITE {
+        [Extraction Records]
+        [Session History]
+        [Timestamps]
+    }
 }
 
 rectangle "Knowledge Access" as ACCESS {
-    [vkb Visualizer]
-    [Web Interface]
-    [Cross-Session Continuity]
+    [VKB Visualizer\n(online mode)] as VKB
+    [Knowledge Retriever\n(Ontology-aware)] as RETRIEVER
+    [Graph Query Engine] as QUERY
+    [Export to JSON\n(optional)] as EXPORT
 }
 
-' Data Flow Connections
-PROJECT --> CAPTURE : Development\nActivity
-CAPTURE --> TEMP : Generate\nInsights
-TEMP --> MCP_LAYER : MCP\nOperations
-MCP_LAYER --> STORAGE : Bidirectional\nSync
-STORAGE --> ACCESS : Knowledge\nVisualization
+' === Online Learning Flow ===
+[Live Sessions\n(Transcripts)] --> MONITOR : File changes
+MONITOR --> EXTRACTOR : New exchanges
+EXTRACTOR --> ONTOLOGY : Knowledge text
+ONTOLOGY --> GRAPHDB : Entity + Ontology\nmetadata
+EXTRACTOR --> QDRANT : Dual embeddings\n(384d + 1536d)
+EXTRACTOR --> SQLITE : Metadata
 
-' Bidirectional arrows for sync
-MCP_LAYER <--> STORAGE : Sync\nOperations
+' === Manual Learning Flow ===
+[Manual Input\n(UKB)] --> UKB : CLI commands
+UKB --> WRITER : Entity/Relation\nobjects
+WRITER --> GRAPHDB : Direct writes
 
-' Internal connections
-[Git Commits] --> AUTO
-[Conversation Logs] --> AUTO  
-[Manual Insights] --> INTERACTIVE
-[File Changes] --> AUTO
+' === Access Layer ===
+GRAPHDB --> VKB : Query entities\nwith ontology
+GRAPHDB --> RETRIEVER : Ontology-aware\nretrieval
+GRAPHDB --> QUERY : Graph traversal
+GRAPHDB --> EXPORT : Team export\nto JSON
 
-AUTO --> [Insight JSON Files]
-INTERACTIVE --> [Insight JSON Files]
-[Insight JSON Files] --> [MCP Operation Files]
+QDRANT --> RETRIEVER : Semantic\nsearch
+SQLITE --> RETRIEVER : Metadata\nfiltering
 
-CLAUDE --> MCP : mcp__memory__*\noperations
-MCP --> CLAUDE : Knowledge\nretrieval
+VKB --> [Web Browser] : Interactive\nvisualization
 
-[shared-memory.json] --> [Git Repository]
-[shared-memory.json] --> [vkb Visualizer]
-
-note right of MCP
-  Runtime knowledge graph
-  Session-persistent storage
-  Cross-component communication
+note right of GRAPHDB
+  **Central Knowledge Store**
+  • Graphology: In-memory graph
+  • LevelDB: Persistent storage
+  • Ontology metadata per entity
+  • Team-scoped (coding, RaaS, etc.)
+  • Auto-persist (1s interval)
 end note
 
-note right of STORAGE
-  Git-tracked persistence
-  Team knowledge sharing
-  Version-controlled evolution
+note right of ONTOLOGY
+  **5-Layer Hybrid Classification**
+  • Early exit on high confidence
+  • Heuristics: >10,000/sec
+  • LLM: <500ms p95
+  • Confidence scoring
+  • Method tracking (layer 0-4)
 end note
 
-note bottom of CAPTURE
-  Two modes:
-  • Auto: Pattern extraction
-  • Interactive: Deep insights
+note bottom of STORAGE
+  **Unified Architecture (v2.0)**
+  • Single source of truth: GraphDB
+  • No JSON intermediates
+  • Online + Manual = same DB
+  • Optional JSON export for backups
+end note
+
+note bottom of ACCESS
+  **VKB Modes**
+  • Default: --online (GraphDB)
+  • Legacy: --with-batch (JSON files)
+  • Distinguishes online vs manual
 end note
 
 @enduml

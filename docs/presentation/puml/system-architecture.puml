@@ -1,0 +1,52 @@
+@startuml system-architecture
+!include _standard-style.puml
+
+skinparam defaultFontSize 18
+skinparam titleFontSize 28
+skinparam packageFontSize 20
+skinparam componentFontSize 18
+skinparam ArrowThickness 3
+skinparam dpi 150
+
+title System Architecture
+
+left to right direction
+
+package "Capture" {
+  component "Transcripts" as TRANS
+  component "Monitor" as MONITOR
+  component "Extractor" as EXTRACTOR
+}
+
+package "Classification" {
+  component "Ontology\nClassifier" as CLASSIFIER
+  component "Ontology\nManager" as ONTOMGR
+}
+
+package "Storage" {
+  database "GraphDB" as GRAPHDB
+  database "Qdrant" as QDRANT
+  database "SQLite" as SQLITE
+}
+
+package "Access" {
+  component "VKB" as VKB
+  component "Retriever" as RETRIEVER
+  component "Claude" as CLAUDE
+}
+
+TRANS --> MONITOR
+MONITOR --> EXTRACTOR
+EXTRACTOR --> CLASSIFIER
+CLASSIFIER --> ONTOMGR
+CLASSIFIER --> GRAPHDB
+EXTRACTOR --> QDRANT
+EXTRACTOR --> SQLITE
+
+CLAUDE --> GRAPHDB
+GRAPHDB --> VKB
+GRAPHDB --> RETRIEVER
+QDRANT --> RETRIEVER
+SQLITE --> RETRIEVER
+
+@enduml
