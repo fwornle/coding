@@ -62,11 +62,18 @@ class GlobalServiceCoordinator extends EventEmitter {
     // NOTE: enhanced-transcript-monitor is started by bin/coding, not by this coordinator
     // NOTE: MCP services are started by claude-mcp via bin/coding, not by this coordinator
     this.serviceDefinitions = {
+      'constraint-api': {
+        type: 'global',
+        script: 'scripts/api-service.js',
+        healthCheck: 'port:3031',
+        priority: 1,
+        restartable: true
+      },
       'constraint-dashboard': {
         type: 'global',
         script: 'scripts/dashboard-service.js',
         healthCheck: 'port:3030',
-        priority: 1,
+        priority: 2,
         restartable: true
       }
     };

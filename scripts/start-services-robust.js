@@ -127,10 +127,10 @@ const SERVICE_CONFIGS = {
   constraintMonitor: {
     name: 'Constraint Monitor',
     required: false, // OPTIONAL - degrade gracefully
-    maxRetries: 2, // Fewer retries since it's optional
+    maxRetries: 2,
     timeout: 30000,
     startFn: async () => {
-      console.log('[ConstraintMonitor] Starting constraint monitor...');
+      console.log('[ConstraintMonitor] Starting Docker containers...');
 
       // Check if Docker is running
       try {
@@ -139,7 +139,7 @@ const SERVICE_CONFIGS = {
         throw new Error('Docker not running - required for Constraint Monitor');
       }
 
-      // Start docker-compose services
+      // Start docker-compose services (Redis + Qdrant)
       const constraintDir = path.join(CODING_DIR, 'integrations', 'mcp-constraint-monitor');
 
       if (!fs.existsSync(constraintDir)) {
@@ -155,19 +155,33 @@ const SERVICE_CONFIGS = {
         throw new Error(`Docker compose failed: ${error.message}`);
       }
 
-      return { service: 'constraint-monitor', mode: 'docker-compose' };
+      console.log('[ConstraintMonitor] Docker containers started successfully');
+      console.log('[ConstraintMonitor] Web services (API + Dashboard) managed by Global Service Coordinator');
+
+      return {
+        service: 'constraint-monitor-docker',
+        mode: 'docker-compose',
+        containers: ['redis', 'qdrant']
+      };
     },
     healthCheckFn: async () => {
-      // Check if Qdrant and Redis containers are running
+      // Check Docker containers only - web services checked by coordinator
       try {
         const { stdout } = await execAsync(
           'docker ps --filter "name=constraint-monitor" --format "{{.Names}}" | wc -l',
           { timeout: 5000 }
         );
 
-        const count = parseInt(stdout.trim(), 10);
-        return count >= 2; // Should have at least Qdrant and Redis
+        const containerCount = parseInt(stdout.trim(), 10);
+        if (containerCount < 2) {
+          console.log('[ConstraintMonitor] Health check failed: insufficient Docker containers');
+          return false;
+        }
+
+        console.log('[ConstraintMonitor] Docker containers healthy');
+        return true;
       } catch (error) {
+        console.log('[ConstraintMonitor] Health check error:', error.message);
         return false;
       }
     }
