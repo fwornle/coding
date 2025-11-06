@@ -675,6 +675,196 @@ class StatusLineHealthMonitor {
   }
 
   /**
+   * Get Database (GraphDB + LevelDB) health status
+   */
+  async getDatabaseHealth() {
+    try {
+      const graphDbPath = path.join(this.codingRepoPath, '.data', 'knowledge-graph');
+      const sqlitePath = path.join(this.codingRepoPath, '.data', 'knowledge.db');
+
+      let healthIssues = [];
+      let healthStatus = 'healthy';
+
+      // Check if GraphDB directory exists
+      if (!fs.existsSync(graphDbPath)) {
+        healthIssues.push('GraphDB missing');
+        healthStatus = 'unhealthy';
+      } else {
+        // Check for LevelDB files
+        const levelDbFiles = ['CURRENT', 'LOCK', 'LOG', 'MANIFEST'];
+        const missingFiles = levelDbFiles.filter(file => !fs.existsSync(path.join(graphDbPath, file)));
+
+        if (missingFiles.length > 0) {
+          healthIssues.push('LevelDB incomplete');
+          healthStatus = 'warning';
+        }
+
+        // Check LOCK file to see if database is in use
+        try {
+          const lockPath = path.join(graphDbPath, 'LOCK');
+          if (fs.existsSync(lockPath)) {
+            const lockStats = fs.statSync(lockPath);
+            const lockAge = Date.now() - lockStats.mtime.getTime();
+
+            // If LOCK file is older than 1 hour but database should be active, it might be stale
+            if (lockAge > 3600000) {
+              healthIssues.push('Stale lock');
+              if (healthStatus === 'healthy') healthStatus = 'warning';
+            }
+          }
+        } catch (lockError) {
+          // Ignore lock check errors
+        }
+      }
+
+      // Check SQLite database
+      if (!fs.existsSync(sqlitePath)) {
+        healthIssues.push('SQLite missing');
+        if (healthStatus === 'healthy') healthStatus = 'warning';
+      }
+
+      // Try to get actual database status via ukb command
+      try {
+        const { stdout } = await execAsync(`node "${path.join(this.codingRepoPath, 'bin/ukb')}" status --team coding 2>&1`, {
+          timeout: 3000,
+          encoding: 'utf8'
+        });
+
+        // Parse output for database health indicators
+        if (stdout.includes('Level DB unavailable') || stdout.includes('running in-memory only')) {
+          healthIssues.push('LevelDB unavailable');
+          healthStatus = 'unhealthy';
+        }
+
+        if (stdout.includes('Graph DB:     ✗')) {
+          healthIssues.push('GraphDB down');
+          healthStatus = 'unhealthy';
+        }
+      } catch (ukbError) {
+        // UKB command failed - database likely has issues
+        if (!healthIssues.length) {
+          healthIssues.push('UKB unreachable');
+          healthStatus = 'warning';
+        }
+      }
+
+      // Determine icon and details
+      let icon, details;
+      if (healthStatus === 'healthy') {
+        icon = '✅';
+        details = 'GraphDB + SQLite OK';
+      } else if (healthStatus === 'warning') {
+        icon = '🟡';
+        details = healthIssues.join(', ');
+      } else {
+        icon = '🔴';
+        details = healthIssues.join(', ');
+      }
+
+      return {
+        status: healthStatus,
+        icon: icon,
+        details: details
+      };
+
+    } catch (error) {
+      this.log(`Database health check error: ${error.message}`, 'DEBUG');
+      return {
+        status: 'unknown',
+        icon: '❓',
+        details: 'Health check failed'
+      };
+    }
+  }
+
+  /**
+   * Get VKB Server health status
+   */
+  async getVKBServerHealth() {
+    try {
+      const vkbPort = 8080;
+      const distPath = path.join(this.codingRepoPath, 'integrations', 'memory-visualizer', 'dist', 'index.html');
+
+      let healthIssues = [];
+      let healthStatus = 'healthy';
+
+      // Check if dist/index.html exists
+      if (!fs.existsSync(distPath)) {
+        healthIssues.push('React app not built');
+        healthStatus = 'unhealthy';
+      }
+
+      // Check if VKB server is listening on port 8080
+      try {
+        const portCheck = await execAsync(`lsof -i :${vkbPort} -sTCP:LISTEN | grep -q LISTEN && echo "listening" || echo "not_listening"`, {
+          timeout: 2000,
+          encoding: 'utf8'
+        });
+
+        if (!portCheck.stdout.includes('listening')) {
+          healthIssues.push('Port 8080 down');
+          healthStatus = 'unhealthy';
+        } else {
+          // Port is listening - check if it responds
+          try {
+            const response = await Promise.race([
+              execAsync(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${vkbPort}/ --max-time 2`),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+            ]);
+
+            const statusCode = parseInt(response.stdout.trim());
+            if (statusCode >= 200 && statusCode < 400) {
+              // Server responding correctly
+              if (healthStatus === 'healthy') {
+                healthIssues = []; // Clear any issues if server is actually working
+              }
+            } else if (statusCode === 404 && fs.existsSync(distPath)) {
+              healthIssues.push('404 despite dist exists');
+              healthStatus = 'warning';
+            } else if (statusCode >= 500) {
+              healthIssues.push('Server error');
+              healthStatus = 'unhealthy';
+            }
+          } catch (curlError) {
+            healthIssues.push('No response');
+            healthStatus = 'unhealthy';
+          }
+        }
+      } catch (portError) {
+        healthIssues.push('Port check failed');
+        healthStatus = 'warning';
+      }
+
+      // Determine icon and details
+      let icon, details;
+      if (healthStatus === 'healthy') {
+        icon = '✅';
+        details = 'VKB :8080 OK';
+      } else if (healthStatus === 'warning') {
+        icon = '🟡';
+        details = healthIssues.join(', ');
+      } else {
+        icon = '🔴';
+        details = healthIssues.join(', ');
+      }
+
+      return {
+        status: healthStatus,
+        icon: icon,
+        details: details
+      };
+
+    } catch (error) {
+      this.log(`VKB server health check error: ${error.message}`, 'DEBUG');
+      return {
+        status: 'unknown',
+        icon: '❓',
+        details: 'Health check failed'
+      };
+    }
+  }
+
+  /**
    * Auto-heal constraint monitor service when issues are detected
    */
   async autoHealConstraintMonitor(healthStatus) {
@@ -842,7 +1032,7 @@ class StatusLineHealthMonitor {
   /**
    * Format status line display
    */
-  formatStatusLine(gcmHealth, sessionHealth, constraintHealth) {
+  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth) {
     let statusLine = '';
 
     // Global Coding Monitor with reason code if not healthy
@@ -857,7 +1047,7 @@ class StatusLineHealthMonitor {
     // Filter out dormant sessions to avoid clutter
     const sessionEntries = Object.entries(sessionHealth)
       .filter(([, health]) => health.status !== 'dormant');
-    
+
     if (sessionEntries.length > 0) {
       const sessionStatuses = sessionEntries
         .map(([projectName, health]) => {
@@ -872,10 +1062,26 @@ class StatusLineHealthMonitor {
         .join(' ');
       statusLine += ` [Sessions: ${sessionStatuses}]`;
     }
-    
+
     // Constraint Monitor
     statusLine += ` [Guards:${constraintHealth.icon}]`;
-    
+
+    // Database Health (GraphDB + LevelDB + SQLite)
+    if (databaseHealth.icon === '🟡' || databaseHealth.icon === '🔴') {
+      const reason = this.getShortReason(databaseHealth.details || databaseHealth.status);
+      statusLine += ` [DB:${databaseHealth.icon}(${reason})]`;
+    } else {
+      statusLine += ` [DB:${databaseHealth.icon}]`;
+    }
+
+    // VKB Server Health
+    if (vkbHealth.icon === '🟡' || vkbHealth.icon === '🔴') {
+      const reason = this.getShortReason(vkbHealth.details || vkbHealth.status);
+      statusLine += ` [VKB:${vkbHealth.icon}(${reason})]`;
+    } else {
+      statusLine += ` [VKB:${vkbHealth.icon}]`;
+    }
+
     return statusLine;
   }
 
@@ -884,26 +1090,28 @@ class StatusLineHealthMonitor {
    */
   async updateStatusLine() {
     try {
-      // Gather health data from all components
-      const [gcmHealth, sessionHealth, constraintHealth] = await Promise.all([
+      // Gather health data from all components (including new database and VKB checks)
+      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth] = await Promise.all([
         this.getGlobalCodingMonitorHealth(),
         this.getProjectSessionsHealth(),
-        this.getConstraintMonitorHealth()
+        this.getConstraintMonitorHealth(),
+        this.getDatabaseHealth(),
+        this.getVKBServerHealth()
       ]);
 
       // Format status line
-      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth);
-      
+      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth);
+
       // Only update if changed to avoid unnecessary updates
       if (statusLine !== this.lastStatus) {
         this.lastStatus = statusLine;
-        
+
         // Write to status file for Claude Code integration
         const statusFile = path.join(this.codingRepoPath, '.logs', 'statusline-health-status.txt');
         fs.writeFileSync(statusFile, statusLine);
-        
+
         this.log(`Status updated: ${statusLine}`);
-        
+
         // Emit status for any listeners
         if (this.isDebug) {
           console.log('\n' + '='.repeat(80));
@@ -917,10 +1125,12 @@ class StatusLineHealthMonitor {
             console.log(`    ${project}: ${health.status} - ${health.details}`);
           }
           console.log(`  Constraints: ${constraintHealth.status} - ${constraintHealth.details}`);
+          console.log(`  Database: ${databaseHealth.status} - ${databaseHealth.details}`);
+          console.log(`  VKB: ${vkbHealth.status} - ${vkbHealth.details}`);
           console.log('='.repeat(80) + '\n');
         }
       }
-      
+
     } catch (error) {
       this.log(`Error updating status line: ${error.message}`, 'ERROR');
     }
