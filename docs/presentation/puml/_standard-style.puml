@@ -1,9 +1,14 @@
 !theme plain
 skinparam backgroundColor white
 skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+skinparam defaultFontSize 18
 
-' Component styling with professional colors
+' PRESENTATION MODE STYLE SHEET
+' This is the standard style for presentation diagrams (PPT-optimized)
+' Location: /Users/q284340/Agentic/coding/docs/presentation/puml/_standard-style.puml
+' Differences from regular style: 18pt fonts (vs 12pt), 3-4pt lines (vs 2pt), horizontal layout
+'
+' Component styling with professional colors - PRESENTATION MODE (thicker, larger fonts)
 skinparam component {
   BackgroundColor<<api>> #E8F4FD
   BackgroundColor<<core>> #E8F5E8
@@ -13,76 +18,104 @@ skinparam component {
   BackgroundColor<<agent>> #E6F3FF
   BackgroundColor<<infra>> #FFF2E6
   BackgroundColor<<external>> #F5F5F5
-  FontSize 12
+  FontSize 18
   FontColor #000000
+  BorderThickness 3
 }
 
 ' Package styling
 skinparam package {
   BackgroundColor #FAFAFA
   BorderColor #CCCCCC
-  FontSize 14
+  FontSize 20
   FontColor #333333
   FontStyle bold
+  BorderThickness 3
 }
 
-' Note styling
-skinparam note {
-  BackgroundColor #FFFACD
-  BorderColor #DDD
-  FontSize 10
-  FontColor #333333
-}
-
-' Arrow styling with distinct colors
+' Arrow styling with distinct colors - THICKER for presentations
 skinparam arrow {
-  FontSize 10
+  FontSize 16
   FontColor #666666
   Color #4A90E2
+  Thickness 3
 }
 
 ' Database styling
 skinparam database {
   BackgroundColor #E1F5FE
   BorderColor #0277BD
+  FontSize 18
+  BorderThickness 3
 }
 
 ' Cloud styling
 skinparam cloud {
   BackgroundColor #F3E5F5
   BorderColor #7B1FA2
+  FontSize 18
+  BorderThickness 3
 }
 
 ' Actor styling
 skinparam actor {
   BackgroundColor #C8E6C9
   BorderColor #388E3C
+  FontSize 18
+  BorderThickness 3
 }
 
 ' Interface styling
 skinparam interface {
   BackgroundColor #FFF3E0
   BorderColor #F57C00
+  FontSize 18
+  BorderThickness 3
 }
 
 ' Rectangle styling for grouping
 skinparam rectangle {
   BackgroundColor #F9F9F9
   BorderColor #BDBDBD
+  FontSize 18
+  BorderThickness 3
 }
 
-' Sequence diagram styling
+' Sequence diagram styling - PRESENTATION MODE
 skinparam sequence {
   ArrowColor #4A90E2
+  ArrowThickness 3
   ActorBorderColor #333333
+  ActorBorderThickness 3
   LifeLineBorderColor #666666
+  LifeLineBorderThickness 2
   ParticipantBorderColor #333333
+  ParticipantBorderThickness 3
   ParticipantBackgroundColor #F5F5F5
+  ParticipantFontSize 18
+  ActorFontSize 18
 }
 
-' Line styles for different connection types
-!define SYNC_LINE -[#E53935,thickness=2]->
-!define ASYNC_LINE -[#43A047,thickness=2,dashed]->
-!define DATA_LINE -[#FF9800,thickness=2]->
-!define CONTROL_LINE -[#9C27B0,thickness=2]->
-!define OPTIONAL_LINE -[#757575,thickness=1,dotted]->
+' Class diagram styling
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  BorderThickness 3
+  FontSize 18
+  AttributeFontSize 16
+}
+
+' Line styles for different connection types - THICKER
+!define SYNC_LINE -[#E53935,thickness=4]->
+!define ASYNC_LINE -[#43A047,thickness=4,dashed]->
+!define DATA_LINE -[#FF9800,thickness=4]->
+!define CONTROL_LINE -[#9C27B0,thickness=4]->
+!define OPTIONAL_LINE -[#757575,thickness=2,dotted]->
+
+' Presentation mode specific settings
+skinparam defaultTextAlignment center
+skinparam wrapWidth 200
+skinparam maxMessageSize 150
+
+' Horizontal layout preference for presentations
+!pragma layout horizontal

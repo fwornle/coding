@@ -3,6 +3,10 @@ skinparam backgroundColor white
 skinparam defaultFontName Arial
 skinparam defaultFontSize 12
 
+' Layout recommendation: prefer vertical layouts to avoid excessive width
+' This prevents users from needing to zoom and scroll horizontally
+' Vertical scrolling is acceptable and preferred over horizontal scrolling
+
 ' Component styling with professional colors
 skinparam component {
   BackgroundColor<<api>> #E8F4FD
