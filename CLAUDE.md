@@ -49,6 +49,35 @@ This file provides essential guidance to Claude Code across all projects with gl
 
 ---
 
+## 🚨 CRITICAL: MANDATORY DOCUMENTATION-STYLE SKILL USAGE
+
+**ABSOLUTE RULE**: When working with PlantUML, Mermaid, or any documentation diagrams, you MUST invoke the `documentation-style` skill FIRST.
+
+### When to Use
+ALWAYS invoke the `documentation-style` skill when:
+- Creating or modifying PlantUML (.puml) files
+- Generating PNG files from PlantUML diagrams
+- Working with Mermaid diagrams
+- Creating or updating any documentation artifacts
+- User mentions: diagrams, PlantUML, PUML, PNG, visualization, architecture diagrams
+
+### How to Invoke
+Before any diagram work, execute:
+```
+Use Skill tool with command: "documentation-style"
+```
+
+### Why This Matters
+- Enforces strict naming conventions (lowercase + hyphens only)
+- Prevents incremental naming violations (no v2, v3, etc.)
+- Ensures proper PlantUML validation workflow
+- Applies correct style sheets automatically
+- Prevents ASCII/line art in documentation
+
+**ENFORCEMENT**: Any diagram work without first invoking this skill is a CRITICAL ERROR.
+
+---
+
 ## 🚨 GLOBAL: MANDATORY VERIFICATION RULE
 
 **CRITICAL**: NEVER CLAIM SUCCESS OR COMPLETION WITHOUT VERIFICATION
