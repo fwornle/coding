@@ -34,7 +34,7 @@ package "Data Storage Layer" {
     [Ontology Metadata]
   }
 
-  database "Qdrant\n(Vector DB)" as qdrant {
+  database "Qdrant\n(Docker Vector DB)" as qdrant {
     [Fast Collection\n(384d)]
     [Accurate Collection\n(1536d)]
   }

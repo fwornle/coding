@@ -8,7 +8,7 @@ participant "Coding Agent\n(Claude/Copilot)" as Agent
 participant "KnowledgeRetriever" as Retriever
 participant "EmbeddingGenerator" as EmbedGen
 participant "DatabaseManager" as DB
-participant "Qdrant\n(Vector DB)" as Qdrant
+participant "Qdrant\n(Docker Vector DB)" as Qdrant
 participant "TemporalDecay\nTracker" as Decay
 participant "AgentAgnostic\nCache" as Cache
 

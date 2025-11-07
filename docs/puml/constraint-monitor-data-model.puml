@@ -4,7 +4,7 @@
 
 title Constraint Monitor Data Model & Storage
 
-package "Qdrant (Vector Database)" as qdrant_pkg {
+package "Qdrant (Docker Vector Database)" as qdrant_pkg {
   entity "constraint_events" {
     --
     id : UUID <<PK>>

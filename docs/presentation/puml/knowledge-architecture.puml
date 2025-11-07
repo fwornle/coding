@@ -25,7 +25,7 @@ package "Processing" {
 
 package "Storage" {
   database "GraphDB" as GRAPHDB
-  database "Qdrant" as QDRANT
+  database "Qdrant\n(Docker)" as QDRANT
   database "SQLite" as SQLITE
 }
 

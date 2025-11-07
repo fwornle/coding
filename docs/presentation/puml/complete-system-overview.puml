@@ -57,7 +57,7 @@ constraints -down-> mcp_constraint : violations
 ' Storage Layer
 database "Storage Layer" as storage #F5F5F5 {
   database "Graph DB\n(Primary Knowledge)\n.data/knowledge-graph/" as graphdb <<primary>>
-  database "Qdrant\n(Vector Search)" as qdrant <<search>>
+  database "Qdrant\n(Docker Vector Search)" as qdrant <<search>>
   database "SQLite\n(Analytics Only)\n.data/knowledge.db" as sqlite <<analytics>>
   folder ".specstory/history/\n(Session Logs)" as lsl_logs <<logs>>
 }

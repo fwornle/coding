@@ -7,7 +7,7 @@ actor "Administrator" as Admin
 participant "simple-reindex.js" as Indexer
 database "Coding\nRepository" as Repo
 participant "FastEmbeddingGenerator.js\n(@xenova/transformers)" as EmbedGen
-database "Qdrant\nVector DB" as Qdrant
+database "Qdrant\n(Docker Vector DB)" as Qdrant
 
 Admin ->> Indexer: node scripts/simple-reindex.js
 activate Indexer

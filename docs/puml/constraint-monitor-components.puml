@@ -23,8 +23,8 @@ package "Analysis Layer" as analysis {
 }
 
 package "Storage Layer" as storage {
-  component [QdrantDatabase] as qdrant {
-    note right : <3ms queries\nHNSW + quantization
+  component [Qdrant Docker Database] as qdrant {
+    note right : <3ms queries\nHNSW + quantization\nRuns in Docker container
   }
 
   component [DuckDBAnalytics] as duckdb {

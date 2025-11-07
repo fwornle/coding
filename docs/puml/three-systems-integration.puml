@@ -8,7 +8,7 @@ package "1. CONTINUOUS LEARNING\n(Automatic Real-Time)" as learning #E8F5E8 {
   [KnowledgeRetriever] <<core>>
 
   database "Graph DB\n(Entities)" as learning_graph <<storage>>
-  database "Qdrant\n(Vectors)" as qdrant <<storage>>
+  database "Qdrant\n(Docker Vectors)" as qdrant <<storage>>
   database "SQLite\n(Analytics)" as sqlite <<storage>>
 
   note right of learning

@@ -22,7 +22,7 @@ package "Embedding System Components" {
 }
 
 package "Storage & External Services" {
-  database "Qdrant Vector DB" as qdrant {
+  database "Qdrant Vector DB\n(Docker)" as qdrant {
     component [coding_infrastructure\nCollection] <<storage>>
   }
   

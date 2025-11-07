@@ -52,7 +52,7 @@ package "Caching Layer" <<storage>> {
 }
 
 package "Database Layer" <<storage>> {
-  database "Qdrant\n(Vectors)" as QDRANT <<storage>> #D4EDDA
+  database "Qdrant\n(Docker Vectors)" as QDRANT <<storage>> #D4EDDA
   database "SQLite\n(Analytics)" as SQLITE <<storage>> #D4EDDA
   database "Graph\n(UKB/VKB)" as GRAPH <<storage>> #D4EDDA
 }

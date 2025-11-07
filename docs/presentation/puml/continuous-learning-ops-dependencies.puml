@@ -19,7 +19,7 @@ rectangle "Continuous Learning System" #E8F5E8 {
   [Database Manager] <<core>>
 }
 
-database "Qdrant\n(Vector DB)" as qdrant <<storage>>
+database "Qdrant\n(Docker Vector DB)" as qdrant <<storage>>
 database "SQLite\n(Analytics)" as sqlite <<storage>>
 
 cloud "External LLM Providers" as llm #F0F0F0 {

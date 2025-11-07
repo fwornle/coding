@@ -9,7 +9,7 @@ participant "Layer 0:\nSession Filter" as Session
 participant "Layer 1:\nPathAnalyzer" as Path
 participant "Layer 2:\nKeywordMatcher" as Keyword
 participant "Layer 3:\nEmbeddingClassifier" as Embedding
-database "Qdrant\nVector DB\n(183 files)" as Qdrant
+database "Qdrant\n(Docker Vector DB)\n(183 files)" as Qdrant
 participant "Layer 4:\nSemanticAnalyzer" as Semantic
 participant "ClassificationLogger" as Logger
 
