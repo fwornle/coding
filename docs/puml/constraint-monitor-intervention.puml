@@ -10,7 +10,7 @@ participant "Pre-Hook" as prehook
 box "Constraint Monitor" #LightBlue
   participant "HTTP API" as api
   participant "Constraint Detector" as detector
-  participant "Qdrant DB" as qdrant
+  participant "Qdrant DB\n(Docker)" as qdrant
   participant "Live Guide Rails" as rails
 end box
 participant "WebSocket Dashboard" as dashboard

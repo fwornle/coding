@@ -13,7 +13,7 @@ rectangle "Live Coding Session" as session #E8F5E8 {
 }
 
 rectangle "Knowledge Captured" as captured #E8F4FD {
-  database "Qdrant\n(Vectors)" as qdrant
+  database "Qdrant\n(Docker Vectors)" as qdrant
   database "SQLite\n(Analytics)" as sqlite
 
   note bottom

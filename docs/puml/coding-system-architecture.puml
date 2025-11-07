@@ -34,7 +34,7 @@ package "MCP Integrations" as mcp #E0E7FF {
 ' Storage Layer
 package "Storage Layer" as storage #F5F5F5 {
   database "Graph Database\n(Graphology + Level)\n.data/knowledge-graph/" as graphdb <<storage>>
-  database "Qdrant\n(Vector Search)" as qdrant <<storage>>
+  database "Qdrant\n(Docker Vector Search)" as qdrant <<storage>>
   database "SQLite\n(Analytics)\n.data/knowledge.db" as sqlite <<storage>>
 }
 

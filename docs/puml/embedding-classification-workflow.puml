@@ -9,7 +9,7 @@ participant "PathAnalyzer\n(Layer 1)" as path
 participant "KeywordMatcher\n(Layer 2)" as keyword  
 participant "EmbeddingClassifier\n(Layer 3)" as embedding
 participant "EmbeddingGenerator" as generator
-participant "Qdrant DB" as qdrant
+participant "Qdrant DB\n(Docker)" as qdrant
 participant "SemanticAnalyzer\n(Layer 4)" as semantic
 
 User -> classifier : classify(exchange, options)

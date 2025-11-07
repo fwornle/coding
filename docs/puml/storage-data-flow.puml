@@ -11,7 +11,7 @@ database "LevelGraph" as levelgraph {
   [Relations]
 }
 
-database "Qdrant" as qdrant {
+database "Qdrant\n(Docker)" as qdrant {
   [Embeddings]
 }
 

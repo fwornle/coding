@@ -73,7 +73,7 @@ package "Caching Layer" <<storage>> {
 }
 
 package "Database Layer" <<storage>> {
-  database "Qdrant\n(Vector Search)" as Qdrant {
+  database "Qdrant\n(Docker Vector Search)" as Qdrant {
     [knowledge_patterns\n1536-dim]
     [knowledge_patterns_small\n384-dim]
     [trajectory_analysis\n384-dim]

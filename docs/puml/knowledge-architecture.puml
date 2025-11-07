@@ -51,7 +51,7 @@ rectangle "Unified Persistent Storage" as STORAGE {
         [Team Isolation]
     }
 
-    rectangle "Qdrant\n(Vector DB)" as QDRANT {
+    rectangle "Qdrant (Docker)\n(Docker Vector DB)" as QDRANT {
         [384d Embeddings\n(Fast)]
         [1536d Embeddings\n(Accurate)]
     }
