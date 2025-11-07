@@ -83,6 +83,47 @@ if [ -f "$CODING_REPO/.env.ports" ]; then
   set +a
 fi
 
+# Ensure Docker is running (required for Qdrant vector search)
+ensure_docker_running() {
+  if docker info >/dev/null 2>&1; then
+    log "✅ Docker is already running"
+    return 0
+  fi
+
+  log "🐳 Docker not running - attempting to start Docker Desktop..."
+
+  # Try to start Docker Desktop on macOS
+  if [ -f "/Applications/Docker.app/Contents/MacOS/Docker" ]; then
+    log "   Starting Docker Desktop..."
+    open -a "Docker" 2>/dev/null
+
+    log "⏳ Waiting for Docker to start (max 60 seconds)..."
+    for i in {1..60}; do
+      if docker info >/dev/null 2>&1; then
+        log "✅ Docker started successfully after ${i} seconds"
+        return 0
+      fi
+      sleep 1
+    done
+
+    log "❌ Docker failed to start after 60 seconds"
+    log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
+    log "💡 Please start Docker Desktop manually for full functionality"
+    return 1
+  else
+    log "❌ Docker Desktop not found at /Applications/Docker.app"
+    log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
+    log "💡 Install Docker Desktop: https://www.docker.com/products/docker-desktop"
+    return 1
+  fi
+}
+
+# Check and start Docker before starting services
+if ! ensure_docker_running; then
+  log "⚠️ WARNING: Continuing in DEGRADED mode without Docker/Qdrant"
+  log "   Knowledge base will work but without semantic search capabilities"
+fi
+
 # Start all services using simple startup script BEFORE monitoring verification
 # Services need to be running for the monitoring verifier to check them
 log "Starting coding services for Claude..."
