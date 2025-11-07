@@ -95,7 +95,7 @@ export class GraphKnowledgeImporter {
         await fs.access(inputPath);
       } catch (error) {
         console.warn(`⚠ No export file found for team "${team}" at ${inputPath}`);
-        return { entitiesImported: 0, relationsImported: 0 };
+        return { entitiesImported: 0, entitiesSkipped: 0, relationsImported: 0, relationsSkipped: 0 };
       }
 
       // Read JSON file
@@ -109,10 +109,15 @@ export class GraphKnowledgeImporter {
 
       // Import entities
       let entitiesImported = 0;
+      let entitiesSkipped = 0;
       for (const entity of data.entities || []) {
         try {
-          await this._importEntity(entity, team);
-          entitiesImported++;
+          const result = await this._importEntity(entity, team);
+          if (result.imported) {
+            entitiesImported++;
+          } else {
+            entitiesSkipped++;
+          }
         } catch (error) {
           console.warn(`Failed to import entity "${entity.name}":`, error.message);
         }
@@ -120,18 +125,23 @@ export class GraphKnowledgeImporter {
 
       // Import relationships
       let relationsImported = 0;
+      let relationsSkipped = 0;
       for (const relation of data.relations || []) {
         try {
-          await this._importRelation(relation, team);
-          relationsImported++;
+          const result = await this._importRelation(relation, team);
+          if (result.imported) {
+            relationsImported++;
+          } else {
+            relationsSkipped++;
+          }
         } catch (error) {
           console.warn(`Failed to import relation "${relation.from}" → "${relation.to}":`, error.message);
         }
       }
 
-      console.log(`✓ Imported team "${team}": ${entitiesImported} entities, ${relationsImported} relations from ${inputPath}`);
+      console.log(`✓ Imported team "${team}": ${entitiesImported} entities (${entitiesSkipped} skipped), ${relationsImported} relations (${relationsSkipped} skipped) from ${inputPath}`);
 
-      return { entitiesImported, relationsImported };
+      return { entitiesImported, entitiesSkipped, relationsImported, relationsSkipped };
 
     } catch (error) {
       console.error(`Import failed for team "${team}":`, error.message);
@@ -167,7 +177,7 @@ export class GraphKnowledgeImporter {
    *
    * @param {Object} entity - Entity to import
    * @param {string} team - Team scope
-   * @returns {Promise<void>}
+   * @returns {Promise<{imported: boolean, reason?: string}>}
    * @private
    */
   async _importEntity(entity, team) {
@@ -181,8 +191,18 @@ export class GraphKnowledgeImporter {
 
       if (existingDate > importDate) {
         // Skip import - existing is newer
-        return;
+        console.log(`  ⏭ Skipping "${entity.name}" - DB version (${existingDate.toISOString()}) is newer than JSON (${importDate.toISOString()})`);
+        return { imported: false, reason: 'db-newer' };
+      } else if (existingDate.getTime() === importDate.getTime()) {
+        // Same timestamp - skip to avoid unnecessary writes
+        console.log(`  ⏭ Skipping "${entity.name}" - same timestamp (${existingDate.toISOString()})`);
+        return { imported: false, reason: 'same-timestamp' };
+      } else {
+        // JSON is newer - log update
+        console.log(`  ⬆️  Updating "${entity.name}" - JSON version (${importDate.toISOString()}) is newer than DB (${existingDate.toISOString()})`);
       }
+    } else if (!existing) {
+      console.log(`  ➕ Adding new entity "${entity.name}"`);
     }
 
     // Prepare entity for storage
@@ -200,6 +220,7 @@ export class GraphKnowledgeImporter {
 
     // Store in graph database
     await this.graphService.storeEntity(entityData, { team });
+    return { imported: true };
   }
 
   /**
@@ -207,7 +228,7 @@ export class GraphKnowledgeImporter {
    *
    * @param {Object} relation - Relationship to import
    * @param {string} team - Team scope
-   * @returns {Promise<void>}
+   * @returns {Promise<{imported: boolean, reason?: string}>}
    * @private
    */
   async _importRelation(relation, team) {
@@ -237,11 +258,13 @@ export class GraphKnowledgeImporter {
 
       if (duplicate) {
         // Skip duplicate relation
-        return;
+        console.log(`  ⏭ Skipping relation "${relation.from}" → "${relation.to}" (${relationType}) - already exists`);
+        return { imported: false, reason: 'duplicate' };
       }
     }
 
     // Store relationship
+    console.log(`  ➕ Adding relation "${relation.from}" → "${relation.to}" (${relationType})`);
     await this.graphService.storeRelationship(
       relation.from,
       relation.to,
@@ -251,6 +274,7 @@ export class GraphKnowledgeImporter {
         ...relation.metadata
       }
     );
+    return { imported: true };
   }
 
   /**

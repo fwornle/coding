@@ -57,6 +57,10 @@ export class GraphDatabaseService extends EventEmitter {
     this.persistIntervalMs = this.config.persistIntervalMs || 1000;
     this.persistTimer = null;
     this.isDirty = false;
+
+    // JSON export settings (for keeping shared-memory JSONs in sync)
+    this.autoExportJSON = this.config.autoExportJSON !== false;
+    this.jsonExportDir = this.config.jsonExportDir || path.join(path.dirname(this.dbPath), 'knowledge-export');
   }
 
   /**
@@ -164,6 +168,7 @@ export class GraphDatabaseService extends EventEmitter {
     // Persist to Level immediately if not auto-persisting
     if (!this.autoPersist && this.levelDB) {
       await this._persistGraphToLevel();
+      await this._exportAllTeamsToJSON();
     }
 
     // Emit event for monitoring/logging
@@ -232,6 +237,7 @@ export class GraphDatabaseService extends EventEmitter {
     // Persist to Level immediately if not auto-persisting
     if (!this.autoPersist && this.levelDB) {
       await this._persistGraphToLevel();
+      await this._exportAllTeamsToJSON();
     }
 
     // Emit event for monitoring/logging
@@ -1162,6 +1168,39 @@ export class GraphDatabaseService extends EventEmitter {
   }
 
   /**
+   * Export all teams to JSON files (internal method)
+   * Ensures JSON files stay in sync with LevelDB
+   *
+   * @private
+   */
+  async _exportAllTeamsToJSON() {
+    if (!this.autoExportJSON) {
+      return;
+    }
+
+    try {
+      // Ensure export directory exists
+      await fs.mkdir(this.jsonExportDir, { recursive: true });
+
+      // Get all teams in the graph
+      const teams = new Set();
+      this.graph.forEachNode((nodeId, attributes) => {
+        if (attributes.team) {
+          teams.add(attributes.team);
+        }
+      });
+
+      // Export each team to its own JSON file
+      for (const team of teams) {
+        const exportPath = path.join(this.jsonExportDir, `${team}.json`);
+        await this.exportToJSON(team, exportPath);
+      }
+    } catch (error) {
+      console.error('[GraphDB] Auto-export to JSON failed:', error.message);
+    }
+  }
+
+  /**
    * Start auto-persist timer (internal method)
    *
    * @private
@@ -1175,6 +1214,8 @@ export class GraphDatabaseService extends EventEmitter {
       if (this.isDirty && this.levelDB) {
         try {
           await this._persistGraphToLevel();
+          // Also export to JSON to keep files in sync
+          await this._exportAllTeamsToJSON();
         } catch (error) {
           console.error('Auto-persist failed:', error.message);
         }

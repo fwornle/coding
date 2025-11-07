@@ -93,7 +93,7 @@ ensure_docker_running() {
   log "🐳 Docker not running - attempting to start Docker Desktop..."
 
   # Try to start Docker Desktop on macOS
-  if [ -f "/Applications/Docker.app/Contents/MacOS/Docker" ]; then
+  if [ -d "/Applications/Docker.app" ]; then
     log "   Starting Docker Desktop..."
     open -a "Docker" 2>/dev/null
 
