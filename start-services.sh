@@ -331,6 +331,62 @@ fi
 # Log startup
 echo "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ") - Live Logging System started: Transcript Monitor PID $TRANSCRIPT_PID, Coordinator PID $LIVE_LOGGING_PID" >> logs/live-logging.log
 
+# Start Knowledge Base Qdrant (for vector search and semantic retrieval)
+echo "🟢 Starting Knowledge Base Qdrant (port 6334)..."
+cd "$CODING_DIR"
+
+QDRANT_KB_STATUS="⚠️ DEGRADED"
+
+if check_docker; then
+    # Check if knowledge-base-qdrant container already running
+    if docker ps --filter "name=knowledge-base-qdrant" --format "{{.Names}}" | grep -q "knowledge-base-qdrant"; then
+        echo "✅ Knowledge Base Qdrant already running"
+        QDRANT_KB_STATUS="✅ OPERATIONAL"
+        QDRANT_KB_PID=$(docker inspect -f '{{.State.Pid}}' knowledge-base-qdrant)
+    else
+        echo "   Creating knowledge-base-qdrant container..."
+        # Create data directory if it doesn't exist
+        mkdir -p "$CODING_DIR/.data/qdrant"
+
+        # Start knowledge base Qdrant container (separate from constraint monitor)
+        if docker run -d --name knowledge-base-qdrant \
+            -p 6334:6333 \
+            -v "$CODING_DIR/.data/qdrant:/qdrant/storage" \
+            qdrant/qdrant:latest >/dev/null 2>&1; then
+
+            echo "   ⏳ Waiting for Qdrant to be ready..."
+            sleep 3
+
+            # Wait for Qdrant health check
+            for i in {1..10}; do
+                if curl -f http://localhost:6334/health >/dev/null 2>&1; then
+                    echo "✅ Knowledge Base Qdrant started successfully on port 6334"
+                    QDRANT_KB_STATUS="✅ OPERATIONAL"
+                    QDRANT_KB_PID=$(docker inspect -f '{{.State.Pid}}' knowledge-base-qdrant)
+                    break
+                elif [ $i -eq 10 ]; then
+                    echo "⚠️ Qdrant container started but health check failing"
+                    QDRANT_KB_STATUS="⚠️ UNHEALTHY"
+                else
+                    sleep 1
+                fi
+            done
+        else
+            echo "⚠️ Failed to start Knowledge Base Qdrant container"
+            QDRANT_KB_STATUS="⚠️ DEGRADED"
+        fi
+    fi
+
+    # Register with Process State Manager if started successfully
+    if [ "$QDRANT_KB_STATUS" = "✅ OPERATIONAL" ] && [ -n "$QDRANT_KB_PID" ]; then
+        node scripts/psm-register.js knowledge-base-qdrant $QDRANT_KB_PID global docker-qdrant 2>/dev/null || true
+    fi
+else
+    echo "⚠️ Docker not running - Knowledge Base Qdrant unavailable"
+    echo "   Vector search and semantic retrieval will be disabled"
+    QDRANT_KB_STATUS="⚠️ DEGRADED"
+fi
+
 # Start VKB Server (with GraphDB knowledge)
 echo "🟢 Starting VKB Server (port 8080) with GraphDB..."
 cd "$CODING_DIR"
@@ -453,6 +509,11 @@ echo ""
 echo "🛡️ CONSTRAINT MONITOR: $CONSTRAINT_MONITOR_STATUS"
 if [ -n "$CONSTRAINT_MONITOR_WARNING" ]; then
     echo "   ⚠️ $CONSTRAINT_MONITOR_WARNING"
+fi
+echo ""
+echo "📊 KNOWLEDGE BASE QDRANT: $QDRANT_KB_STATUS"
+if [ "$QDRANT_KB_STATUS" != "✅ OPERATIONAL" ]; then
+    echo "   ⚠️ Vector search and semantic retrieval disabled"
 fi
 echo ""
 echo "📊 Process State: node scripts/process-state-manager.js status"

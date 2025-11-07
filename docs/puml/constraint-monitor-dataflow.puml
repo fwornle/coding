@@ -12,7 +12,7 @@ participant "Constraint Monitor" as monitor
 participant "Event Processor" as processor
 participant "Groq Engine" as groq
 participant "Constraint Detector" as detector
-participant "Qdrant DB" as qdrant
+participant "Qdrant DB\n(Docker)" as qdrant
 participant "Live Guide Rails" as rails
 participant "DuckDB" as duckdb
 
