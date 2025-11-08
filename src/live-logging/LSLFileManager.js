@@ -506,35 +506,46 @@ class LSLFileManager extends EventEmitter {
 
       const content = fs.readFileSync(filePath, 'utf8');
 
-      // Count all exchanges (lines with "### Text Exchange")
-      const exchangeMatches = content.match(/### Text Exchange/g) || [];
-      const totalExchanges = exchangeMatches.length;
+      // UPDATED DETECTION LOGIC FOR NEW LSL FORMAT:
+      // Files can have MANY duplicate prompt sets but all are void/meaningless
+      // We need to check if ALL prompt sets are interrupted (not just count exchanges)
 
-      if (totalExchanges === 0) {
-        // No exchanges at all - empty file
-        this.debug(`No exchanges found: ${path.basename(filePath)}`);
+      // Count all prompt sets (the parent structure)
+      const promptSetMatches = content.match(/## Prompt Set/g) || [];
+      const promptSetCount = promptSetMatches.length;
+
+      if (promptSetCount === 0) {
+        // No prompt sets at all - empty file
+        this.debug(`No prompt sets found: ${path.basename(filePath)}`);
         return false;
       }
 
-      // Count warmup exchanges
-      const warmupMatches = content.match(/\*\*User Message:\*\* Warmup/gi) || [];
-      const warmupCount = warmupMatches.length;
+      // Count all user messages
+      const allUserMessages = (content.match(/\*\*User Message:\*\*/g) || []).length;
 
-      // Count interrupted exchanges
-      const interruptedMatches = content.match(/\*\*User Message:\*\* \[Request interrupted by user\]/gi) || [];
-      const interruptedCount = interruptedMatches.length;
+      // Count interrupted user messages
+      const interruptedMessages = (content.match(/\*\*User Message:\*\* \[Request interrupted/g) || []).length;
 
-      // Calculate worthless exchange count
-      const worthlessCount = warmupCount + interruptedCount;
+      // Count warmup messages
+      const warmupMessages = (content.match(/\*\*User Message:\*\* Warmup/gi) || []).length;
 
-      // File is worthless ONLY if ALL exchanges are warmup or interrupted
-      if (worthlessCount === totalExchanges && worthlessCount > 0) {
-        this.debug(`All ${totalExchanges} exchanges are worthless (${warmupCount} warmups, ${interruptedCount} interruptions): ${path.basename(filePath)}`);
+      // Calculate real exchanges (non-interrupted, non-warmup)
+      const worthlessMessages = interruptedMessages + warmupMessages;
+      const realExchanges = allUserMessages - worthlessMessages;
+
+      // File is worthless if it has NO real exchanges
+      if (realExchanges === 0 && allUserMessages > 0) {
+        this.debug(`All ${allUserMessages} messages are worthless (${warmupMessages} warmups, ${interruptedMessages} interruptions, ${promptSetCount} prompt sets): ${path.basename(filePath)}`);
         return false;
       }
 
-      // File has at least one non-worthless exchange - keep it
-      this.debug(`File has ${totalExchanges - worthlessCount}/${totalExchanges} valuable exchanges: ${path.basename(filePath)}`);
+      if (allUserMessages === 0) {
+        this.debug(`No user messages found in ${promptSetCount} prompt sets: ${path.basename(filePath)}`);
+        return false;
+      }
+
+      // File has at least one real exchange - keep it
+      this.debug(`File has ${realExchanges}/${allUserMessages} valuable exchanges across ${promptSetCount} prompt sets: ${path.basename(filePath)}`);
       return true;
 
     } catch (error) {
