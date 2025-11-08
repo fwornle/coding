@@ -31,7 +31,7 @@
         "enabled": true,
         "severity": "error",
         "check_type": "http_health",
-        "endpoint": "http://localhost:6333/health",
+        "endpoint": "http://localhost:6333/readyz",
         "timeout_ms": 2000,
         "description": "Check Qdrant vector database availability - CRITICAL for semantic search",
         "auto_heal": true,

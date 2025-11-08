@@ -486,15 +486,15 @@ class HealthVerifier extends EventEmitter {
     const passed = checks.filter(c => c.status === 'passed');
     const violations = checks.filter(c => c.status !== 'passed');
 
-    // Count by severity
+    // Count by severity (only for violations, not all checks)
     const bySeverity = {
-      info: checks.filter(c => c.severity === 'info').length,
-      warning: checks.filter(c => c.severity === 'warning').length,
-      error: checks.filter(c => c.severity === 'error').length,
-      critical: checks.filter(c => c.severity === 'critical').length
+      info: violations.filter(c => c.severity === 'info').length,
+      warning: violations.filter(c => c.severity === 'warning').length,
+      error: violations.filter(c => c.severity === 'error').length,
+      critical: violations.filter(c => c.severity === 'critical').length
     };
 
-    // Determine overall status
+    // Determine overall status (based on actual violations)
     let overallStatus = 'healthy';
     if (bySeverity.critical > 0) {
       overallStatus = 'unhealthy';

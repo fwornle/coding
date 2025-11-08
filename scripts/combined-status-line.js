@@ -51,11 +51,12 @@ class CombinedStatusLine {
       const liveLogTarget = await this.getCurrentLiveLogTarget();
       const redirectStatus = await this.getRedirectStatus();
       const globalHealthStatus = await this.getGlobalHealthStatus();
+      const healthVerifierStatus = await this.getHealthVerifierStatus();
 
       // Robust transcript monitor health check and auto-restart
       await this.ensureTranscriptMonitorRunning();
 
-      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus);
+      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus);
 
       this.statusCache = status;
       this.lastUpdate = now;
@@ -387,6 +388,27 @@ class CombinedStatusLine {
         extractionState: 'error',
         error: error.message
       };
+    }
+  }
+
+  async getHealthVerifierStatus() {
+    try {
+      const statusPath = join(rootDir, '.health/verification-status.json');
+      if (!existsSync(statusPath)) {
+        return { status: 'offline' };
+      }
+
+      const statusData = JSON.parse(readFileSync(statusPath, 'utf8'));
+      const age = Date.now() - new Date(statusData.lastUpdate).getTime();
+
+      // Stale if > 2 minutes old (verifier runs every 60s)
+      if (age > 120000) {
+        return { status: 'stale', ...statusData };
+      }
+
+      return { status: 'operational', ...statusData };
+    } catch (error) {
+      return { status: 'error', error: error.message };
     }
   }
 
@@ -1007,7 +1029,7 @@ class CombinedStatusLine {
     }
   }
 
-  async buildCombinedStatus(constraint, semantic, knowledge, liveLogTarget, redirectStatus, globalHealth) {
+  async buildCombinedStatus(constraint, semantic, knowledge, liveLogTarget, redirectStatus, globalHealth, healthVerifier) {
     const parts = [];
     let overallColor = 'green';
 
@@ -1135,6 +1157,34 @@ class CombinedStatusLine {
     } else {
       parts.push('[📚❌]'); // Offline (no space - red cross is wide enough)
       if (overallColor === 'green') overallColor = 'yellow';
+    }
+
+    // Health Verifier Status (Magnifying glass for health checks)
+    if (healthVerifier && healthVerifier.status === 'operational') {
+      const overallStatus = healthVerifier.overallStatus || 'healthy';
+      const violationCount = healthVerifier.violationCount || 0;
+      const criticalCount = healthVerifier.criticalCount || 0;
+
+      if (criticalCount > 0) {
+        parts.push(`[🔍❌${criticalCount}]`); // Critical issues
+        overallColor = 'red';
+      } else if (violationCount > 0) {
+        parts.push(`[🔍⚠️${violationCount}]`); // Warning issues
+        if (overallColor === 'green') overallColor = 'yellow';
+      } else if (overallStatus === 'healthy') {
+        parts.push('[🔍✅]'); // All checks passed
+      } else {
+        parts.push('[🔍🟡]'); // Degraded but no specific violations
+        if (overallColor === 'green') overallColor = 'yellow';
+      }
+    } else if (healthVerifier && healthVerifier.status === 'stale') {
+      parts.push('[🔍⏰]'); // Stale data
+      if (overallColor === 'green') overallColor = 'yellow';
+    } else if (healthVerifier && healthVerifier.status === 'error') {
+      parts.push('[🔍❌]'); // Error reading status
+      if (overallColor === 'green') overallColor = 'yellow';
+    } else {
+      parts.push('[🔍💤]'); // Offline/not running
     }
 
     // Add redirect indicator if active (compact)
