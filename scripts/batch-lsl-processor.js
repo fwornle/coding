@@ -1088,40 +1088,63 @@ class BatchLSLProcessor {
           // Read and check if file is empty (only void prompt sets)
           const content = fs.readFileSync(filePath, 'utf8');
 
-          // Check for indicators of void/empty files:
-          // 1. Only one prompt set
-          // 2. Contains "[Request interrupted by user]"
-          // 3. Duration: 0ms
-          // 4. No tool calls (Tool Calls: 0)
-          const promptSetCount = (content.match(/## Prompt Set \d+/g) || []).length;
-          const hasInterrupted = content.includes('[Request interrupted by user]');
-          const hasDuration0 = content.includes('**Duration:** 0ms');
-          const hasNoToolCalls = content.includes('**Tool Calls:** 0');
+          // UPDATED DETECTION LOGIC FOR NEW LSL FORMAT:
+          // Files can have MANY duplicate prompt sets but all are void/meaningless
+          // Detection criteria:
+          // 1. ALL prompt sets contain "[Request interrupted by user"
+          // 2. ALL prompt sets have "Duration: 0ms"
+          // 3. ALL prompt sets have "Tool Calls: 0"
+          // 4. No actual content besides the repeated void exchanges
 
-          const isEmpty = promptSetCount === 1 && hasInterrupted && hasDuration0 && hasNoToolCalls;
+          const promptSetMatches = content.match(/## Prompt Set.*?(?=(?:## Prompt Set|---\n\n---\n\n$|$))/gs) || [];
+          const promptSetCount = promptSetMatches.length;
+
+          if (promptSetCount === 0) {
+            if (process.env.DEBUG_LSL_CLEANUP === 'true') {
+              console.log(`⏭️  Skipping ${filename} - no prompt sets found`);
+            }
+            continue;
+          }
+
+          // Check if ALL prompt sets are void/meaningless
+          const allSetsInterrupted = promptSetMatches.every(ps =>
+            ps.includes('[Request interrupted by user')
+          );
+          const allSetsDuration0 = promptSetMatches.every(ps => ps.includes('**Duration:** 0ms'));
+          const allSetsNoTools = promptSetMatches.every(ps => ps.includes('**Tool Calls:** 0'));
+
+          // Additional check: File should ONLY contain header + repeated void exchanges (no real content)
+          // Count user messages, then subtract interrupted ones to find real exchanges
+          const allUserMessages = (content.match(/\*\*User Message:\*\*/g) || []).length;
+          const interruptedMessages = (content.match(/\*\*User Message:\*\* \[Request interrupted/g) || []).length;
+          const realExchanges = allUserMessages - interruptedMessages;
+          const hasRealContent = realExchanges > 0;
+
+          const isEmpty = allSetsInterrupted && allSetsDuration0 && allSetsNoTools && !hasRealContent;
 
           // SAFETY: Verbose logging to debug deletion criteria
           if (process.env.DEBUG_LSL_CLEANUP === 'true') {
             console.log(`\n📊 Analyzing: ${filename}`);
-            console.log(`   Prompt sets: ${promptSetCount} (need: 1)`);
-            console.log(`   Has interrupted: ${hasInterrupted} (need: true)`);
-            console.log(`   Has duration 0ms: ${hasDuration0} (need: true)`);
-            console.log(`   Has no tool calls: ${hasNoToolCalls} (need: true)`);
+            console.log(`   Prompt sets: ${promptSetCount}`);
+            console.log(`   All sets interrupted: ${allSetsInterrupted} (need: true)`);
+            console.log(`   All sets duration 0ms: ${allSetsDuration0} (need: true)`);
+            console.log(`   All sets no tool calls: ${allSetsNoTools} (need: true)`);
+            console.log(`   Has real content: ${hasRealContent} (need: false)`);
             console.log(`   Will delete: ${isEmpty}`);
           }
 
           if (isEmpty) {
             // SAFETY: Final validation before deletion
-            if (promptSetCount !== 1 || !hasInterrupted || !hasDuration0 || !hasNoToolCalls) {
+            if (!allSetsInterrupted || !allSetsDuration0 || !allSetsNoTools || hasRealContent) {
               console.error(`❌ CRITICAL: File ${filename} marked for deletion but doesn't meet ALL criteria!`);
-              console.error(`   Prompt sets: ${promptSetCount}, Interrupted: ${hasInterrupted}, Duration0: ${hasDuration0}, NoToolCalls: ${hasNoToolCalls}`);
+              console.error(`   All interrupted: ${allSetsInterrupted}, All duration0: ${allSetsDuration0}, All no tools: ${allSetsNoTools}, Has real content: ${hasRealContent}`);
               continue; // Skip deletion if any condition fails
             }
 
             // Delete the LSL file
             fs.unlinkSync(filePath);
             deletedFiles.push(filename);
-            console.log(`🗑️  Deleted empty LSL file: ${filename} (1 prompt set, interrupted, 0ms, 0 tools)`);
+            console.log(`🗑️  Deleted empty LSL file: ${filename} (${promptSetCount} void prompt sets, all interrupted/0ms/0 tools)`);
 
             // Also delete corresponding classification log file
             const classificationDir = path.join(
@@ -1798,12 +1821,12 @@ Examples:
     }
 
     // Clean up empty LSL files for closed time windows
-    // SAFETY: Only run cleanup if explicitly enabled
-    if (process.env.ENABLE_LSL_CLEANUP === 'true') {
+    // ENABLED BY DEFAULT - can be disabled with DISABLE_LSL_CLEANUP=true
+    if (process.env.DISABLE_LSL_CLEANUP !== 'true') {
       console.log(`\n🧹 Cleaning up empty LSL files...`);
       await processor.cleanupEmptyLSLFiles();
     } else {
-      console.log(`\n⚠️  LSL cleanup SKIPPED (set ENABLE_LSL_CLEANUP=true to enable)`);
+      console.log(`\n⚠️  LSL cleanup DISABLED (DISABLE_LSL_CLEANUP=true)`);
     }
 
     process.exit(0);
