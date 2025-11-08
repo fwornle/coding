@@ -25,6 +25,7 @@ import {
   createHttpHealthCheck,
   createPidHealthCheck,
   isPortListening,
+  isProcessRunning,
   sleep
 } from '../lib/service-starter.js';
 
@@ -86,7 +87,7 @@ const SERVICE_CONFIGS = {
 
   vkbServer: {
     name: 'VKB Server',
-    required: false, // OPTIONAL - degrade gracefully
+    required: true, // REQUIRED - must start successfully
     maxRetries: 3,
     timeout: 30000, // VKB can take longer to start
     startFn: async () => {
@@ -105,6 +106,14 @@ const SERVICE_CONFIGS = {
       // Use GraphDB as the primary data source (no shared-memory files needed)
       const env = { ...process.env, VKB_DATA_SOURCE: 'online' };
 
+      // Create log file path
+      const logPath = path.join(CODING_DIR, 'vkb-server.log');
+
+      console.log(`[VKB] Logging to: ${logPath}`);
+
+      // Open log file and get file descriptor
+      const logFd = fs.openSync(logPath, 'a');
+
       const child = spawn('node', [
         path.join(CODING_DIR, 'lib/vkb-server/cli.js'),
         'server',
@@ -112,14 +121,27 @@ const SERVICE_CONFIGS = {
         '--foreground'
       ], {
         detached: true,
-        stdio: ['ignore', 'ignore', 'ignore'],
+        stdio: ['ignore', logFd, logFd], // Use file descriptor for stdout and stderr
         cwd: CODING_DIR,
         env: env
       });
 
       child.unref();
 
-      return { pid: child.pid, port: 8080, service: 'vkb-server' };
+      // Close our copy of the file descriptor (child process has its own)
+      fs.close(logFd, (err) => {
+        if (err) console.log('[VKB] Warning: Failed to close log fd:', err.message);
+      });
+
+      // Brief wait for process to start
+      await sleep(500);
+
+      // Check if process is still running
+      if (!isProcessRunning(child.pid)) {
+        throw new Error(`VKB server process died immediately. Check ${logPath} for errors.`);
+      }
+
+      return { pid: child.pid, port: 8080, service: 'vkb-server', logPath };
     },
     healthCheckFn: createHttpHealthCheck(8080, '/health')
   },

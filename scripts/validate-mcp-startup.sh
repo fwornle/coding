@@ -61,20 +61,25 @@ echo -e "${YELLOW}⏳ Waiting for services to start (timeout: ${TIMEOUT}s)...${N
 
 start_time=$(date +%s)
 all_ready=false
+check_count=0
 
 while [ $(($(date +%s) - start_time)) -lt $TIMEOUT ]; do
-    echo -e "\n${BLUE}📊 Service Status Check:${NC}"
-    
+    elapsed=$(($(date +%s) - start_time))
+    remaining=$((TIMEOUT - elapsed))
+    check_count=$((check_count + 1))
+
+    echo -e "\n${BLUE}📊 Service Status Check #${check_count} (${remaining}s remaining)${NC}"
+
     services_ok=0
     total_services=2
-    
+
     # Check VKB Server (port 8080)
     vkb_port_ok=false
     if check_port 8080 "VKB Server"; then
         vkb_port_ok=true
         ((services_ok++))
     fi
-    
+
     # Check VKB Health Endpoint (but don't fail if health check has issues)
     if [ "$vkb_port_ok" = true ]; then
         if check_health "http://localhost:8080/health" "VKB Server"; then
@@ -86,19 +91,25 @@ while [ $(($(date +%s) - start_time)) -lt $TIMEOUT ]; do
             # Still count as partially working since the port is listening
         fi
     fi
-    
+
     # MCP servers run via stdio, not as separate processes
     # We can only verify they're configured correctly, not running independently
     echo -e "${YELLOW}⚠️  MCP servers run via stdio (not as separate processes)${NC}"
-    
+
     # We only really need VKB server port to be listening for basic functionality
     # Health endpoint failures are non-critical if port is responding
     if [ "$vkb_port_ok" = true ]; then
         all_ready=true
         break
     fi
-    
-    echo -e "${YELLOW}⏳ $services_ok/$total_services services ready, waiting...${NC}"
+
+    # Show progress and helpful information
+    if [ $check_count -eq 1 ]; then
+        echo -e "${BLUE}💡 Waiting for VKB Server to bind to port 8080...${NC}"
+        echo -e "${BLUE}   Check ${CODING_DIR:-/Users/q284340/Agentic/coding}/vkb-server.log for startup errors${NC}"
+    fi
+
+    echo -e "${YELLOW}⏳ $services_ok/$total_services services ready, retrying in ${RETRY_INTERVAL}s... (${remaining}s left)${NC}"
     sleep $RETRY_INTERVAL
 done
 

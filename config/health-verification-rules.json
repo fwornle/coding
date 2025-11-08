@@ -1,0 +1,217 @@
+{
+  "version": "1.0.0",
+  "description": "Health verification rules for Layer 3 monitoring and auto-healing",
+  "verification": {
+    "interval_seconds": 60,
+    "report_retention_days": 7,
+    "max_report_history": 1000
+  },
+  "rules": {
+    "databases": {
+      "leveldb_lock_check": {
+        "enabled": true,
+        "severity": "critical",
+        "check_type": "lock_status",
+        "description": "Detect Level DB locks by unregistered processes",
+        "auto_heal": true,
+        "auto_heal_action": "kill_lock_holder",
+        "max_heal_attempts": 3,
+        "heal_backoff_seconds": 10
+      },
+      "leveldb_accessibility": {
+        "enabled": true,
+        "severity": "critical",
+        "check_type": "database_open",
+        "timeout_seconds": 5,
+        "description": "Verify Level DB can be opened",
+        "auto_heal": true,
+        "auto_heal_action": "restart_graph_database"
+      },
+      "qdrant_availability": {
+        "enabled": true,
+        "severity": "error",
+        "check_type": "http_health",
+        "endpoint": "http://localhost:6333/health",
+        "timeout_ms": 2000,
+        "description": "Check Qdrant vector database availability - CRITICAL for semantic search",
+        "auto_heal": true,
+        "auto_heal_action": "start_qdrant",
+        "recommendation": "Start Qdrant: docker-compose up -d qdrant"
+      },
+      "graph_integrity": {
+        "enabled": true,
+        "severity": "error",
+        "check_type": "data_validation",
+        "min_nodes": 0,
+        "max_nodes": 1000000,
+        "description": "Validate graph database integrity",
+        "auto_heal": false
+      }
+    },
+    "services": {
+      "vkb_server": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "http_health",
+        "endpoint": "http://localhost:8080/health",
+        "timeout_ms": 3000,
+        "description": "VKB visualization server availability",
+        "auto_heal": true,
+        "auto_heal_action": "restart_vkb_server",
+        "expected_status": "optional"
+      },
+      "constraint_monitor": {
+        "enabled": true,
+        "severity": "error",
+        "check_type": "port_listening",
+        "port": 3031,
+        "timeout_ms": 3000,
+        "description": "Constraint monitor API availability",
+        "auto_heal": true,
+        "auto_heal_action": "restart_constraint_monitor"
+      },
+      "dashboard_server": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "port_listening",
+        "port": 3030,
+        "timeout_ms": 3000,
+        "description": "Dashboard server availability",
+        "auto_heal": true,
+        "auto_heal_action": "restart_dashboard_server"
+      }
+    },
+    "processes": {
+      "stale_pids": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "pid_alive",
+        "description": "Detect processes in registry that are no longer running",
+        "auto_heal": true,
+        "auto_heal_action": "cleanup_dead_processes"
+      },
+      "process_uptime": {
+        "enabled": true,
+        "severity": "info",
+        "check_type": "uptime_threshold",
+        "min_uptime_seconds": 30,
+        "description": "Verify processes are stable (minimum uptime)",
+        "auto_heal": false
+      },
+      "high_cpu_usage": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "resource_usage",
+        "max_cpu_percent": 80,
+        "duration_seconds": 60,
+        "description": "Detect processes consuming excessive CPU",
+        "auto_heal": false,
+        "recommendation": "Investigate high CPU process or restart if stuck"
+      },
+      "high_memory_usage": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "resource_usage",
+        "max_memory_mb": 1000,
+        "description": "Detect processes consuming excessive memory",
+        "auto_heal": false,
+        "recommendation": "Restart memory-intensive process or investigate leak"
+      },
+      "zombie_processes": {
+        "enabled": true,
+        "severity": "error",
+        "check_type": "zombie_detection",
+        "description": "Detect zombie/defunct processes",
+        "auto_heal": true,
+        "auto_heal_action": "cleanup_zombies"
+      }
+    },
+    "files": {
+      "health_file_freshness": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "file_age",
+        "max_age_seconds": 120,
+        "path_pattern": ".health/*.json",
+        "description": "Health files should be updated regularly",
+        "auto_heal": false,
+        "recommendation": "Check if health monitors are running"
+      },
+      "log_file_size": {
+        "enabled": true,
+        "severity": "info",
+        "check_type": "file_size",
+        "max_size_mb": 100,
+        "path_pattern": ".logs/*.log",
+        "description": "Log files should be rotated when large",
+        "auto_heal": false,
+        "recommendation": "Implement log rotation or clean old logs"
+      },
+      "disk_space": {
+        "enabled": true,
+        "severity": "critical",
+        "check_type": "disk_usage",
+        "paths": [".data", ".logs", ".health"],
+        "min_free_gb": 1,
+        "description": "Ensure sufficient disk space for operations",
+        "auto_heal": false,
+        "recommendation": "Clear old logs, exports, or expand storage"
+      }
+    }
+  },
+  "severity_definitions": {
+    "info": {
+      "level": 0,
+      "description": "Informational - no action needed",
+      "alert": false
+    },
+    "warning": {
+      "level": 1,
+      "description": "Warning - may require attention",
+      "alert": false
+    },
+    "error": {
+      "level": 2,
+      "description": "Error - requires action",
+      "alert": true
+    },
+    "critical": {
+      "level": 3,
+      "description": "Critical - immediate action required",
+      "alert": true
+    }
+  },
+  "auto_healing": {
+    "enabled": true,
+    "max_concurrent_actions": 3,
+    "action_timeout_seconds": 30,
+    "retry_config": {
+      "max_attempts": 3,
+      "backoff_multiplier": 2,
+      "initial_delay_seconds": 5
+    },
+    "cooldown_config": {
+      "same_action_cooldown_seconds": 300,
+      "max_actions_per_hour": 10
+    },
+    "safety": {
+      "prevent_cascade_restarts": true,
+      "require_verification": true,
+      "escalate_after_failures": 3
+    }
+  },
+  "reporting": {
+    "report_path": ".health/verification-report.json",
+    "status_path": ".health/verification-status.json",
+    "history_path": ".health/verification-history",
+    "log_path": ".logs/health-verifier.log",
+    "include_details": true,
+    "include_recommendations": true
+  },
+  "alert_thresholds": {
+    "overall_status_alert": ["degraded", "unhealthy"],
+    "violation_count_warning": 3,
+    "violation_count_error": 1,
+    "critical_violations_alert": 1
+  }
+}
