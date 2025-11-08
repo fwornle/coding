@@ -49,9 +49,6 @@ export class GraphDatabaseService extends EventEmitter {
     // Level database instance
     this.levelDB = null;
 
-    // Flag for graceful degradation
-    this.inMemoryOnly = false;
-
     // Persistence settings
     this.autoPersist = this.config.autoPersist !== false;
     this.persistIntervalMs = this.config.persistIntervalMs || 1000;
@@ -79,37 +76,79 @@ export class GraphDatabaseService extends EventEmitter {
       this.graph = new Graph({ multi: true });
       console.log('✓ Graphology graph instance created');
 
-      // Try to open Level database
+      // Pre-flight check: Detect database locks before attempting to open
+      const lockPath = path.join(this.dbPath, 'LOCK');
       try {
-        // Ensure directory exists
-        const dbDir = path.dirname(this.dbPath);
-        await fs.mkdir(dbDir, { recursive: true });
+        await fs.access(lockPath);
+        // Lock file exists - check who owns it
+        const { spawn } = await import('child_process');
+        const lsof = spawn('lsof', [lockPath]);
 
-        // Create and open Level database
-        this.levelDB = new Level(this.dbPath, { valueEncoding: 'json' });
-        await this.levelDB.open();
-        console.log(`✓ Level database opened at: ${this.dbPath}`);
+        let output = '';
+        lsof.stdout.on('data', (data) => {
+          output += data.toString();
+        });
 
-        // Load existing graph from Level if present
-        await this._loadGraphFromLevel();
+        await new Promise((resolve) => {
+          lsof.on('close', () => resolve());
+        });
 
-        // Start auto-persist if enabled
-        if (this.autoPersist) {
-          this._startAutoPersist();
+        if (output.trim()) {
+          const lines = output.split('\n').filter(line => line.trim());
+          if (lines.length > 1) {
+            const match = lines[1].match(/\s+(\d+)\s+/);
+            if (match) {
+              const lockHolderPid = match[1];
+              throw new Error(
+                `Level DB is locked by another process (PID: ${lockHolderPid}).\n` +
+                `This is likely the VKB server. To fix:\n` +
+                `  1. Stop VKB server: vkb server stop\n` +
+                `  2. Or kill the process: kill ${lockHolderPid}\n` +
+                `  3. Then retry your command`
+              );
+            }
+          }
         }
+      } catch (preflightError) {
+        // If it's our lock detection error, re-throw it
+        if (preflightError.message.includes('Level DB is locked')) {
+          throw preflightError;
+        }
+        // Otherwise, lock file doesn't exist or lsof failed - proceed normally
+      }
 
-      } catch (levelError) {
-        console.warn('⚠ Level DB unavailable, running in-memory only mode:', levelError.message);
-        console.warn('  Data will not persist across restarts');
-        this.inMemoryOnly = true;
-        this.levelDB = null;
+      // Ensure directory exists
+      const dbDir = path.dirname(this.dbPath);
+      await fs.mkdir(dbDir, { recursive: true });
+
+      // Create and open Level database - NO FALLBACK, FAIL-FAST
+      this.levelDB = new Level(this.dbPath, { valueEncoding: 'json' });
+      await this.levelDB.open();
+      console.log(`✓ Level database opened at: ${this.dbPath}`);
+
+      // Load existing graph from Level if present
+      await this._loadGraphFromLevel();
+
+      // Start auto-persist if enabled
+      if (this.autoPersist) {
+        this._startAutoPersist();
       }
 
       this.emit('ready');
       console.log(`✓ Graph database initialized (${this.graph.order} nodes, ${this.graph.size} edges)`);
 
     } catch (error) {
-      throw new Error(`Failed to initialize graph database: ${error.message}`);
+      // Enhance error message for common issues
+      let errorMessage = error.message;
+      if (error.message.includes('Resource temporarily unavailable') ||
+          error.message.includes('EBUSY') ||
+          error.message.includes('IO error: lock')) {
+        errorMessage =
+          `Level DB initialization failed: Database is locked.\n` +
+          `Check for running VKB server or other processes using the database.\n` +
+          `Original error: ${error.message}`;
+      }
+      throw new Error(`Failed to initialize graph database: ${errorMessage}`);
     }
   }
 
@@ -1028,7 +1067,7 @@ export class GraphDatabaseService extends EventEmitter {
         edges: this.graph ? this.graph.size : 0
       },
       persistence: {
-        type: this.inMemoryOnly ? 'memory-only' : 'level',
+        type: 'level',
         path: this.dbPath,
         autoPersist: this.autoPersist,
         isDirty: this.isDirty
@@ -1046,9 +1085,10 @@ export class GraphDatabaseService extends EventEmitter {
         health.persistence.levelError = error.message;
         health.status = 'degraded';
       }
-    } else if (this.inMemoryOnly) {
-      health.status = 'degraded';
-      health.persistence.warning = 'Running in memory-only mode - data will not persist';
+    } else {
+      // Should never happen after successful initialization with fail-fast
+      health.status = 'error';
+      health.persistence.error = 'Level DB not initialized - system in invalid state';
     }
 
     return health;
@@ -1089,8 +1129,8 @@ export class GraphDatabaseService extends EventEmitter {
    * @returns {Promise<void>}
    */
   async _persistGraphToLevel() {
-    if (!this.levelDB || this.inMemoryOnly) {
-      return; // Skip if Level unavailable
+    if (!this.levelDB) {
+      return; // Skip if Level not initialized (shouldn't happen with fail-fast)
     }
 
     try {
@@ -1130,8 +1170,8 @@ export class GraphDatabaseService extends EventEmitter {
    * @returns {Promise<void>}
    */
   async _loadGraphFromLevel() {
-    if (!this.levelDB || this.inMemoryOnly) {
-      return; // Skip if Level unavailable
+    if (!this.levelDB) {
+      return; // Skip if Level not initialized (shouldn't happen with fail-fast)
     }
 
     try {

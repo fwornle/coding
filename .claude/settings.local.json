@@ -87,7 +87,10 @@
       "Bash(do echo -n \"$coll: \")",
       "Bash(done)",
       "Bash(npm test:*)",
-      "Bash(docker info:*)"
+      "Bash(docker info:*)",
+      "Bash(bash /Users/q284340/Agentic/coding/bin/ukb:*)",
+      "Bash(bin/ukb:*)",
+      "Bash(bin/vkb:*)"
     ],
     "deny": [],
     "ask": []
