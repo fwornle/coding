@@ -387,6 +387,137 @@ node scripts/global-lsl-coordinator.js status
 - **Recovery Time**: <5 seconds for auto-recovery
 - **StatusLine Update**: Real-time (sub-second updates)
 
+## Database Health Monitoring
+
+### Database Lock Detection
+
+The Process State Manager now includes comprehensive database health monitoring to prevent silent failures:
+
+**Features:**
+- **Pre-flight Lock Detection**: Checks for Level DB locks before opening database
+- **Lock Owner Identification**: Uses `lsof` to identify which process holds database locks
+- **Actionable Error Messages**: Provides clear instructions for resolving lock conflicts
+- **Qdrant Health Checks**: Monitors vector database availability
+
+**Implementation** (ProcessStateManager.checkDatabaseHealth):
+```javascript
+{
+  levelDB: {
+    available: boolean,
+    locked: boolean,
+    lockedBy: number | null  // PID of lock holder
+  },
+  qdrant: {
+    available: boolean
+  }
+}
+```
+
+**Lock Conflict Resolution:**
+When Level DB is locked by an unregistered process, the system:
+1. Detects the lock during health checks
+2. Identifies the PID of the lock holder
+3. Reports the issue with severity level (critical)
+4. Provides actionable remediation steps
+
+### VKB Server Registration
+
+The VKB (Visualize Knowledge Base) server now automatically registers with the Process State Manager:
+
+**Registration Points:**
+- **On Start**: Registers as global service with metadata (port, URL, log file)
+- **On Stop**: Unregisters from PSM to maintain clean registry
+
+**Benefits:**
+- Health monitoring system can track VKB server status
+- Database lock detection can identify VKB as lock holder
+- Prevents coordination conflicts between VKB and UKB commands
+
+### Fail-Fast Architecture
+
+Replaced silent degradation anti-pattern with explicit error handling:
+
+**Before** (Silent Degradation):
+```javascript
+try {
+  await this.levelDB.open();
+} catch (error) {
+  console.warn('Running in-memory only mode');  // ❌ Data loss!
+  this.inMemoryOnly = true;
+}
+```
+
+**After** (Fail-Fast):
+```javascript
+// Pre-flight check for locks
+const lockPath = path.join(this.dbPath, 'LOCK');
+if (await lockFileExists(lockPath)) {
+  const pid = await getLockHolderPid(lockPath);
+  throw new Error(`Level DB locked by PID ${pid}. Stop VKB server first.`);
+}
+
+// NO fallback - database MUST be available
+await this.levelDB.open();  // Throws on failure
+```
+
+**Impact:**
+- ✅ No silent data loss
+- ✅ Clear error messages with actionable steps
+- ✅ ONE source of truth (Level DB only, no in-memory fallback)
+- ✅ Adheres to CLAUDE.md "no fallback patterns" rule
+
+### Implementation Status
+
+**Currently Implemented (Layer 4):**
+- ✅ Process State Manager with PID tracking
+- ✅ Service registration (global, per-project, per-session)
+- ✅ Database health monitoring with lock detection
+- ✅ VKB server PSM integration
+- ✅ Fail-fast database initialization
+- ✅ Individual session transcript monitoring
+- ✅ Combined status line with health metrics
+
+**Partially Implemented:**
+- ⚠️ Auto-recovery (some scenarios covered, not all)
+- ⚠️ Multi-project coordination (basic registry, no active coordination)
+
+**Not Yet Implemented:**
+- ❌ Layer 1: Watchdog (global service monitoring and recovery)
+- ❌ Layer 2: Coordinator (active multi-project coordination)
+- ❌ Layer 3: Verifier (comprehensive health verification)
+- ❌ Proactive health remediation
+
+**Note**: The 4-layer architecture diagram represents the design vision, not current implementation. Most functionality currently operates at Layer 4 (process monitoring and database health checks).
+
+## Troubleshooting
+
+### "Level DB is locked by another process"
+
+**Cause**: VKB server or another process has exclusive lock on `.data/knowledge-graph/LOCK`
+
+**Resolution**:
+1. Check what's holding the lock: `lsof .data/knowledge-graph/LOCK`
+2. Stop VKB server: `vkb server stop`
+3. Or kill the process: `kill <PID>`
+4. Retry your command
+
+**Prevention**: The health monitoring system now detects this automatically and reports it in `ProcessStateManager.getHealthStatus()`.
+
+### Database Unavailable Errors
+
+With fail-fast architecture, these errors are now explicit instead of silent:
+
+**Error Message**:
+```
+Failed to initialize graph database: Level DB is locked by another process (PID: 12345).
+This is likely the VKB server. To fix:
+  1. Stop VKB server: vkb server stop
+  2. Or kill the process: kill 12345
+  3. Then retry your command
+```
+
+**What Changed**: System no longer silently degrades to in-memory mode, preventing data loss.
+
 ## Future Enhancements
 
 ### Planned Features

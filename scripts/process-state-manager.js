@@ -386,6 +386,62 @@ class ProcessStateManager {
   }
 
   /**
+   * Check database health and lock status
+   */
+  async checkDatabaseHealth() {
+    const health = {
+      levelDB: { available: true, locked: false, lockedBy: null },
+      qdrant: { available: false }
+    };
+
+    // Check Level DB lock
+    const levelDBLockPath = path.join(this.codingRoot, '.data/knowledge-graph/LOCK');
+    try {
+      await fs.access(levelDBLockPath);
+      // Lock file exists - check who owns it
+      const { spawn } = await import('child_process');
+      const lsof = spawn('lsof', [levelDBLockPath]);
+
+      let output = '';
+      lsof.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      await new Promise((resolve) => {
+        lsof.on('close', () => resolve());
+      });
+
+      if (output.trim()) {
+        const lines = output.split('\n').filter(line => line.trim());
+        if (lines.length > 1) {
+          // Parse lsof output: COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+          const match = lines[1].match(/\s+(\d+)\s+/);
+          if (match) {
+            health.levelDB.locked = true;
+            health.levelDB.lockedBy = parseInt(match[1]);
+          }
+        }
+      }
+    } catch {
+      // Lock file doesn't exist - database is available
+      health.levelDB.locked = false;
+    }
+
+    // Check Qdrant availability
+    try {
+      const response = await fetch('http://localhost:6333/health', {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000)
+      });
+      health.qdrant.available = response.ok;
+    } catch {
+      health.qdrant.available = false;
+    }
+
+    return health;
+  }
+
+  /**
    * Get health status report
    */
   async getHealthStatus() {
@@ -395,12 +451,16 @@ class ProcessStateManager {
         healthy: 0,
         unhealthy: 0,
         total: 0,
+        databases: null,
         details: {
           global: [],
           projects: {},
           sessions: {}
         }
       };
+
+      // Check database health
+      status.databases = await this.checkDatabaseHealth();
 
       // Check global services
       for (const [name, service] of Object.entries(registry.services.global)) {
@@ -457,6 +517,65 @@ class ProcessStateManager {
             uptime: Date.now() - service.startTime
           });
         }
+      }
+
+      // Validate database availability
+      status.databaseIssues = [];
+
+      // Check if Level DB lock is held by unregistered process
+      if (status.databases.levelDB.locked && status.databases.levelDB.lockedBy) {
+        const lockHolderPid = status.databases.levelDB.lockedBy;
+        let isRegistered = false;
+
+        // Check if lock holder is a registered service
+        for (const service of Object.values(registry.services.global)) {
+          if (service.pid === lockHolderPid) {
+            isRegistered = true;
+            break;
+          }
+        }
+
+        if (!isRegistered) {
+          for (const services of Object.values(registry.services.projects)) {
+            for (const service of Object.values(services)) {
+              if (service.pid === lockHolderPid) {
+                isRegistered = true;
+                break;
+              }
+            }
+            if (isRegistered) break;
+          }
+        }
+
+        if (!isRegistered) {
+          for (const session of Object.values(registry.sessions)) {
+            for (const service of Object.values(session.services)) {
+              if (service.pid === lockHolderPid) {
+                isRegistered = true;
+                break;
+              }
+            }
+            if (isRegistered) break;
+          }
+        }
+
+        if (!isRegistered) {
+          status.databaseIssues.push({
+            type: 'leveldb_lock',
+            severity: 'critical',
+            message: `Level DB locked by unregistered process (PID: ${lockHolderPid})`,
+            pid: lockHolderPid
+          });
+        }
+      }
+
+      // Check Qdrant availability
+      if (!status.databases.qdrant.available) {
+        status.databaseIssues.push({
+          type: 'qdrant_unavailable',
+          severity: 'warning',
+          message: 'Qdrant vector database is not available (http://localhost:6333/health failed)'
+        });
       }
 
       return status;

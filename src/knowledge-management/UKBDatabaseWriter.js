@@ -95,6 +95,8 @@ export class UKBDatabaseWriter {
 
     const relationData = {
       id,
+      fromEntityName: relation.from,  // Pass entity names for GraphDatabase
+      toEntityName: relation.to,
       fromEntityId: fromId,
       toEntityId: toId,
       relationType: relation.type || 'related_to',
