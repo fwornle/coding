@@ -90,7 +90,8 @@
       "Bash(docker info:*)",
       "Bash(bash /Users/q284340/Agentic/coding/bin/ukb:*)",
       "Bash(bin/ukb:*)",
-      "Bash(bin/vkb:*)"
+      "Bash(bin/vkb:*)",
+      "Bash(SYSTEM_HEALTH_API_PORT=3033 pnpm api:*)"
     ],
     "deny": [],
     "ask": []

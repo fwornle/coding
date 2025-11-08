@@ -1,0 +1,60 @@
+import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+
+interface HealthStatusState {
+  overallStatus: 'healthy' | 'degraded' | 'unhealthy' | 'offline'
+  violationCount: number
+  criticalCount: number
+  lastUpdate: string | null
+  autoHealingActive: boolean
+  status: 'operational' | 'stale' | 'error' | 'offline'
+  ageMs: number
+  loading: boolean
+  error: string | null
+}
+
+const initialState: HealthStatusState = {
+  overallStatus: 'offline',
+  violationCount: 0,
+  criticalCount: 0,
+  lastUpdate: null,
+  autoHealingActive: false,
+  status: 'offline',
+  ageMs: 0,
+  loading: false,
+  error: null,
+}
+
+const healthStatusSlice = createSlice({
+  name: 'healthStatus',
+  initialState,
+  reducers: {
+    fetchHealthStatusStart(state) {
+      state.loading = true
+      state.error = null
+    },
+    fetchHealthStatusSuccess(state, action: PayloadAction<Omit<HealthStatusState, 'loading' | 'error'>>) {
+      state.overallStatus = action.payload.overallStatus
+      state.violationCount = action.payload.violationCount
+      state.criticalCount = action.payload.criticalCount
+      state.lastUpdate = action.payload.lastUpdate
+      state.autoHealingActive = action.payload.autoHealingActive
+      state.status = action.payload.status
+      state.ageMs = action.payload.ageMs
+      state.loading = false
+      state.error = null
+    },
+    fetchHealthStatusFailure(state, action: PayloadAction<string>) {
+      state.loading = false
+      state.error = action.payload
+      state.status = 'error'
+    },
+  },
+})
+
+export const {
+  fetchHealthStatusStart,
+  fetchHealthStatusSuccess,
+  fetchHealthStatusFailure,
+} = healthStatusSlice.actions
+
+export default healthStatusSlice.reducer

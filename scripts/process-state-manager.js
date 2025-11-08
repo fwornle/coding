@@ -429,7 +429,7 @@ class ProcessStateManager {
 
     // Check Qdrant availability
     try {
-      const response = await fetch('http://localhost:6333/health', {
+      const response = await fetch('http://localhost:6333/readyz', {
         method: 'GET',
         signal: AbortSignal.timeout(2000)
       });
@@ -574,7 +574,7 @@ class ProcessStateManager {
         status.databaseIssues.push({
           type: 'qdrant_unavailable',
           severity: 'warning',
-          message: 'Qdrant vector database is not available (http://localhost:6333/health failed)'
+          message: 'Qdrant vector database is not available (http://localhost:6333/readyz failed)'
         });
       }
 

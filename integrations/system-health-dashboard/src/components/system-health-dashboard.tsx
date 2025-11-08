@@ -1,0 +1,344 @@
+'use client'
+
+import React from 'react'
+import { useAppSelector, useAppDispatch } from '@/store'
+import { triggerVerificationStart } from '@/store/slices/autoHealingSlice'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Activity,
+  Database,
+  Server,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  RefreshCw,
+  Zap,
+  ExternalLink
+} from 'lucide-react'
+import HealthStatusCard from './health-status-card'
+import ViolationsTable from './violations-table'
+import SystemChecksTable from './system-checks-table'
+
+export default function SystemHealthDashboard() {
+  const dispatch = useAppDispatch()
+  const healthStatus = useAppSelector((state) => state.healthStatus)
+  const healthReport = useAppSelector((state) => state.healthReport)
+  const autoHealing = useAppSelector((state) => state.autoHealing)
+
+  const handleTriggerVerification = () => {
+    dispatch(triggerVerificationStart())
+  }
+
+  const getStatusIcon = () => {
+    switch (healthStatus.overallStatus) {
+      case 'healthy':
+        return <CheckCircle2 className="h-8 w-8 text-green-500" />
+      case 'degraded':
+        return <AlertTriangle className="h-8 w-8 text-yellow-500" />
+      case 'unhealthy':
+        return <XCircle className="h-8 w-8 text-red-500" />
+      default:
+        return <Clock className="h-8 w-8 text-gray-400" />
+    }
+  }
+
+  const getStatusColor = () => {
+    switch (healthStatus.overallStatus) {
+      case 'healthy':
+        return 'bg-green-50 border-green-200'
+      case 'degraded':
+        return 'bg-yellow-50 border-yellow-200'
+      case 'unhealthy':
+        return 'bg-red-50 border-red-200'
+      default:
+        return 'bg-gray-50 border-gray-200'
+    }
+  }
+
+  const formatAge = (ageMs: number) => {
+    const seconds = Math.floor(ageMs / 1000)
+    if (seconds < 60) return `${seconds}s ago`
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    return `${hours}h ago`
+  }
+
+  // Map check status to UI status
+  const mapCheckStatus = (check: any): 'operational' | 'warning' | 'error' | 'offline' => {
+    if (check.status === 'passed') return 'operational'
+    if (check.status === 'warning') return 'warning'
+    if (check.status === 'failed' || check.status === 'error') return 'error'
+    return 'offline'
+  }
+
+  // Get checks by category
+  const getChecksByCategory = (category: string) => {
+    if (!healthReport.report?.checks) return []
+    return healthReport.report.checks.filter((check: any) => check.category === category)
+  }
+
+  // Build database items from real data
+  const getDatabaseItems = () => {
+    const checks = getChecksByCategory('databases')
+    const items = []
+
+    // LevelDB check
+    const leveldbCheck = checks.find((c: any) => c.check === 'leveldb_lock_check')
+    if (leveldbCheck) {
+      items.push({
+        name: 'LevelDB',
+        status: mapCheckStatus(leveldbCheck),
+        description: 'Graph database',
+        tooltip: leveldbCheck.message + (leveldbCheck.recommendation ? ` - ${leveldbCheck.recommendation}` : '')
+      })
+    }
+
+    // Qdrant check
+    const qdrantCheck = checks.find((c: any) => c.check === 'qdrant_availability')
+    if (qdrantCheck) {
+      items.push({
+        name: 'Qdrant',
+        status: mapCheckStatus(qdrantCheck),
+        description: 'Vector database',
+        tooltip: qdrantCheck.message + (qdrantCheck.recommendation ? ` - ${qdrantCheck.recommendation}` : '')
+      })
+    }
+
+    return items
+  }
+
+  // Build service items from real data
+  const getServiceItems = () => {
+    const checks = getChecksByCategory('services')
+    const items = []
+
+    // VKB Server
+    const vkbCheck = checks.find((c: any) => c.check === 'vkb_server')
+    if (vkbCheck) {
+      items.push({
+        name: 'VKB Server',
+        status: mapCheckStatus(vkbCheck),
+        description: 'Port 8080',
+        tooltip: vkbCheck.message + (vkbCheck.recommendation ? ` - ${vkbCheck.recommendation}` : '')
+      })
+    }
+
+    // Constraint Monitor
+    const constraintCheck = checks.find((c: any) => c.check === 'constraint_monitor')
+    if (constraintCheck) {
+      items.push({
+        name: 'Constraint Monitor',
+        status: mapCheckStatus(constraintCheck),
+        description: 'Port 3031',
+        tooltip: constraintCheck.message + (constraintCheck.recommendation ? ` - ${constraintCheck.recommendation}` : '')
+      })
+    }
+
+    // Dashboard
+    const dashboardCheck = checks.find((c: any) => c.check === 'dashboard_server')
+    if (dashboardCheck) {
+      items.push({
+        name: 'Dashboard',
+        status: mapCheckStatus(dashboardCheck),
+        description: 'Port 3030',
+        tooltip: dashboardCheck.message + (dashboardCheck.recommendation ? ` - ${dashboardCheck.recommendation}` : '')
+      })
+    }
+
+    return items
+  }
+
+  // Build process items from real data
+  const getProcessItems = () => {
+    const checks = getChecksByCategory('processes')
+    const items = []
+
+    // Stale PIDs check
+    const stalePidsCheck = checks.find((c: any) => c.check === 'stale_pids')
+    if (stalePidsCheck) {
+      items.push({
+        name: 'Stale PIDs',
+        status: mapCheckStatus(stalePidsCheck),
+        description: 'Cleaned automatically',
+        tooltip: stalePidsCheck.message + (stalePidsCheck.recommendation ? ` - ${stalePidsCheck.recommendation}` : '')
+      })
+    }
+
+    // Process Registry (infer from presence of process checks)
+    if (checks.length > 0) {
+      items.unshift({
+        name: 'Process Registry',
+        status: 'operational' as const,
+        description: 'PSM tracking',
+        tooltip: 'Process State Manager (PSM) is operational. Process lifecycle tracking and health monitoring are active.'
+      })
+    }
+
+    return items
+  }
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">System Health Dashboard</h1>
+          <p className="text-muted-foreground">
+            Real-time monitoring of databases, services, and processes
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTriggerVerification}
+            disabled={autoHealing.triggeringVerification}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${autoHealing.triggeringVerification ? 'animate-spin' : ''}`} />
+            Run Verification
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href="http://localhost:3030" target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Constraint Dashboard
+            </a>
+          </Button>
+        </div>
+      </div>
+
+      {/* Overall Status Card */}
+      <Card className={`${getStatusColor()} border-2`}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {getStatusIcon()}
+              <div>
+                <CardTitle className="text-2xl">
+                  {healthStatus.overallStatus.charAt(0).toUpperCase() + healthStatus.overallStatus.slice(1)}
+                </CardTitle>
+                <CardDescription>
+                  {healthStatus.lastUpdate ? (
+                    <>Last verified {formatAge(healthStatus.ageMs)}</>
+                  ) : (
+                    'Waiting for first verification...'
+                  )}
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              {autoHealing.enabled && (
+                <Badge variant="outline" className="h-fit">
+                  <Zap className="h-3 w-3 mr-1" />
+                  Auto-Healing Active
+                </Badge>
+              )}
+              {healthStatus.status === 'stale' && (
+                <Badge variant="destructive" className="h-fit">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Stale Data
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-3xl font-bold">{healthStatus.violationCount}</div>
+              <div className="text-sm text-muted-foreground">Total Violations</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-red-500">{healthStatus.criticalCount}</div>
+              <div className="text-sm text-muted-foreground">Critical Issues</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-500">
+                {healthReport.report ? healthReport.report.summary.passed : 0}
+              </div>
+              <div className="text-sm text-muted-foreground">Checks Passed</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Error Display */}
+      {healthStatus.error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{healthStatus.error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Health Status Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <HealthStatusCard
+          title="Databases"
+          icon={<Database className="h-5 w-5" />}
+          items={getDatabaseItems()}
+        />
+        <HealthStatusCard
+          title="Services"
+          icon={<Server className="h-5 w-5" />}
+          items={getServiceItems()}
+        />
+        <HealthStatusCard
+          title="Processes"
+          icon={<Activity className="h-5 w-5" />}
+          items={getProcessItems()}
+        />
+      </div>
+
+      <Separator />
+
+      {/* Violations Table */}
+      {healthReport.report && healthReport.report.violations.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold">Active Violations</h2>
+            <p className="text-muted-foreground">Issues detected during health verification</p>
+          </div>
+          <ViolationsTable violations={healthReport.report.violations} />
+        </div>
+      )}
+
+      {/* System Checks Table */}
+      {healthReport.report && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold">All Health Checks</h2>
+            <p className="text-muted-foreground">
+              {healthReport.report.summary.total_checks} checks performed
+            </p>
+          </div>
+          <SystemChecksTable checks={healthReport.report.checks} />
+        </div>
+      )}
+
+      {/* Recommendations */}
+      {healthReport.report && healthReport.report.recommendations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recommendations</CardTitle>
+            <CardDescription>Suggested actions to improve system health</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {healthReport.report.recommendations.map((rec, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-500" />
+                  <span className="text-sm">{rec}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
