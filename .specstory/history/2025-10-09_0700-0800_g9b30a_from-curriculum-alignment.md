@@ -4,7 +4,7 @@
 **Type:** Coding/Development
 **Time Range:** 2025-10-09T05:45:56.902Z - 2025-10-09T06:12:20.625Z
 **Prompt Sets:** 2
-**Classification:** Keyword analysis: 8 matches, score: 27/1
+**Classification:** Majority (63.2%) of file operations target coding repo: integrations/mcp-constraint-monitor, /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/test-all-constraints-comprehensive.js, /Users/q284340/Agentic/coding/.specstory/history, integrations/mcp-constraint-monitor/scripts/test-all-violations.js, integrations/mcp-constraint-monitor/test-all-constraints-comprehensive.js, integrations/mcp-constraint-monitor/collect-test-results.js, usr/bin/env, transcript/LSL, src/hooks/real-time-constraint-hook.js, Users/q284340/Agentic/coding/.specstory/history, tmp/debug.js, tmp/legacy.js
 
 ---
 

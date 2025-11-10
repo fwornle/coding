@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-11_1700-1800
 **Type:** Coding/Development
-**Time Range:** 2025-10-11T15:16:31.397Z - 2025-10-30T06:09:29.518Z
+**Time Range:** 2025-10-11T15:16:31.397Z - 2025-11-10T06:35:10.792Z
 **Prompt Sets:** 2
-**Classification:** Keyword analysis: 6 matches, score: 20/1
+**Classification:** Majority (70.4%) of file operations target coding repo: dev/null, specstory/history/*.md, /Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-11_1700-1800_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/, ~60, project/repo, specstory/history, coding/.specstory/history, newer/same, Users/q284340/Agentic/coding/.specstory/history, Users/q284340/Agentic/coding/.specstory/history/2025-10-11_1700-1800_g9b30a_from-curriculum-alignment.md, specstory/history/2025-10-11_1700-1800_g9b30a.md, Users/q284340/Agentic/curriculum-alignment, Agentic/coding/.specstory/history, coding/bin/coding, information/prompts, files/functions
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1760195791397)
 
 **Time:** 2025-10-11T15:16:31.397Z
-**Duration:** 1608778121ms
+**Duration:** 2560719395ms
 **Tool Calls:** 6
 
 ### User
@@ -621,7 +621,7 @@ The most recent work focused on **constraint monitoring system issues** with the
 ## Prompt Set 2 (ps_1760195875880)
 
 **Time:** 2025-10-11T15:17:55.880Z
-**Duration:** 1608693638ms
+**Duration:** 2560634912ms
 **Tool Calls:** 55
 
 ### User

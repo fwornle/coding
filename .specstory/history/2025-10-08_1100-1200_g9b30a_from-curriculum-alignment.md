@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-08_1100-1200
 **Type:** Coding/Development
-**Time Range:** 2025-10-08T09:35:23.751Z - 2025-10-30T06:09:26.202Z
+**Time Range:** 2025-10-08T09:35:23.751Z - 2025-11-10T06:35:07.253Z
 **Prompt Sets:** 1
-**Classification:** Keyword analysis: 4 matches, score: 13/1
+**Classification:** Majority (67.9%) of file operations target coding repo: 3031/api/violations?constraint_id=no-console-log, integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js, RealTimeConstraintEnforcer/constructor, RealTimeConstraintEnforcer/checkConstraintsDirectly, RealTimeConstraintEnforcer/enforcePromptConstraints, RealTimeConstraintEnforcer/enforceToolConstraints, RealTimeConstraintEnforcer/findConstraintConfig, RealTimeConstraintEnforcer/formatViolationMessage, RealTimeConstraintEnforcer/getProjectName, RealTimeConstraintEnforcer/loadConfig, RealTimeConstraintEnforcer/logViolationsToStorage, RealTimeConstraintEnforcer/shouldBlockViolation, integrations/mcp-constraint-monitor/src/hooks/real-time-constraint-hook.js, Write/Edit, config/load-constraints.js, engines/constraint-engine.js, utils/config-manager.js, integrations/mcp-constraint-monitor/src/engines/constraint-engine.js, ConstraintEngine/constructor, ConstraintEngine/checkConstraints, ConstraintEngine/getFileWatcherStatus, ConstraintEngine/getViolationHistory, ConstraintEngine/initialize, ConstraintEngine/loadConstraintsFromConfig, ConstraintEngine/reloadConfiguration, ConstraintEngine/startFileWatcher, ConstraintEngine/stopFileWatcher, ConstraintEngine/updateConstraints, docs/images/constraint-testing-architecture.png, docs/puml/constraint-testing-architecture.puml, integrations/mcp-constraint-monitor/comprehensive-constraint-test-report.md, integrations/mcp-constraint-monitor/node_modules/zod/src/v4/core/tests/locales/tr.test.ts, integrations/mcp-constraint-monitor/node_modules/zod/src/v4/core/tests/locales/en.test.ts, integrations/mcp-constraint-monitor/node_modules/zod/src/v4/core/tests/locales/be.test.ts, integrations/mcp-constraint-monitor/node_modules/zod/src/v4/core/tests/locales/ru.test.ts, integrations/mcp-constraint-monitor/node_modules/zod/src/v4/core/tests/index.test.ts, integrations/mcp-constraint-monitor/node_modules/zod/src/v4/mini/tests/computed.test.ts, integrations/mcp-constraint-monitor/node_modules/zod/src/v4/mini/tests/index.test.ts
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1759916123751)
 
 **Time:** 2025-10-08T09:35:23.751Z
-**Duration:** 1888442451ms
+**Duration:** 2840383502ms
 **Tool Calls:** 17
 
 ### User

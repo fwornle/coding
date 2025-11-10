@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-12_1500-1600
 **Type:** Coding/Development
-**Time Range:** 2025-10-12T13:06:16.909Z - 2025-10-30T06:09:45.051Z
+**Time Range:** 2025-10-12T13:06:16.909Z - 2025-11-10T06:35:11.739Z
 **Prompt Sets:** 1
-**Classification:** Keyword analysis: 11 matches, score: 37/1
+**Classification:** Majority (72.7%) of file operations target coding repo: /Users/q284340/Agentic/coding/.logs/monitoring-verification-report.json, /Users/q284340/Agentic/coding/live-state.json, /Users/q284340/Agentic/coding, Users/q284340/Agentic/coding, scripts/monitoring-verifier.js, /Users/q284340/Agentic/coding/bin/coding, Users/q284340/Agentic/coding/bin/coding, scripts/system-monitor-watchdog.js, /Users/q284340/Agentic/coding/.global-service-registry.json, Users/q284340/Agentic/curriculum-alignment, /Users/q284340/Agentic/coding/integrations/mcp-server-semantic-analysis, /Users/q284340/Agentic/coding,, /Users/q284340/Agentic/coding/.logs/system-watchdog.log, /Users/q284340/Agentic/coding/scripts/global-service-coordinator.js, /Users/q284340/Agentic/coding/scripts/system-monitor-watchdog.js, /Users/q284340/Agentic/coding/scripts/system-monitor-watchdog.js\, coding/bin/coding, Users/q284340/Agentic/curriculum-alignment/.constraint-monitor.yaml, claude/local, anthropic-ai/claude-code, Users/q284340/Agentic/coding/integrations/mcp-server-semantic-analysis, Users/q284340/Agentic/coding/.logs/monitoring-verification-report.json, MonitoringVerifier/verifySystemWatchdog, scripts/system-watchdog.js, MonitoringVerifier/constructor, Users/q284340/Agentic/coding/.logs/system-watchdog.log, Users/q284340/Agentic/coding/.global-service-registry.json, scripts/dashboard-service.js, Users/q284340/Agentic/coding/scripts/global-service-coordinator.js, scripts/global-service-coordinator.js, Users/q284340/Agentic/coding/scripts/system-monitor-watchdog.js, path/to/project
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1760274376909)
 
 **Time:** 2025-10-12T13:06:16.909Z
-**Duration:** 1530208142ms
+**Duration:** 2482134830ms
 **Tool Calls:** 25
 
 ### User

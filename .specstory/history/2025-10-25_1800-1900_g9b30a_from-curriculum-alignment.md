@@ -2,7 +2,7 @@
 
 **Session:** 2025-10-25_1800-1900
 **Type:** Coding/Development
-**Time Range:** 2025-10-25T16:39:22.195Z - 2025-10-30T06:09:30.153Z
+**Time Range:** 2025-10-25T16:39:22.195Z - 2025-11-10T06:35:11.387Z
 **Prompt Sets:** 2
 **Classification:** Majority of write operations target coding repo: /Users/q284340/Agentic/coding/docs/presentation/puml/lsl-architecture.puml
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1761410362195)
 
 **Time:** 2025-10-25T16:39:22.195Z
-**Duration:** 394207958ms
+**Duration:** 1346149192ms
 **Tool Calls:** 5
 
 ### User
@@ -373,7 +373,7 @@ The presentation version is now much cleaner and easier to read at a glance, wit
 ## Prompt Set 2 (ps_1761411472163)
 
 **Time:** 2025-10-25T16:57:52.163Z
-**Duration:** 393097990ms
+**Duration:** 1345039224ms
 **Tool Calls:** 5
 
 ### User

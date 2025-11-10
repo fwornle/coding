@@ -2,7 +2,7 @@
 
 **Session:** 2025-10-12_1200-1300
 **Type:** Coding/Development
-**Time Range:** 2025-10-12T10:03:17.590Z - 2025-10-30T06:09:27.686Z
+**Time Range:** 2025-10-12T10:03:17.590Z - 2025-11-10T06:35:08.585Z
 **Prompt Sets:** 2
 **Classification:** Majority of write operations target coding repo: /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/docs/semantic-constraint-detection.md
 
@@ -144,7 +144,7 @@ no changes added to commit (use "git add" and/or "git commit -a")
 ## Prompt Set 2 (ps_1760263613890)
 
 **Time:** 2025-10-12T10:06:53.890Z
-**Duration:** 1540953796ms
+**Duration:** 2492894695ms
 **Tool Calls:** 5
 
 ### User

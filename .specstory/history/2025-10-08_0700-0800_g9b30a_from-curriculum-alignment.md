@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-08_0700-0800
 **Type:** Coding/Development
-**Time Range:** 2025-10-08T05:59:49.670Z - 2025-10-30T06:09:26.202Z
+**Time Range:** 2025-10-08T05:59:49.670Z - 2025-11-10T06:35:07.253Z
 **Prompt Sets:** 1
-**Classification:** Keyword analysis: 7 matches, score: 23/1
+**Classification:** Majority (87.0%) of file operations target coding repo: integrations/mcp-constraint-monitor, /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/mcp-constraint-monitor.json, /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/constraints.yaml, 3031/api/constraints?grouped=true", integrations/mcp-constraint-monitor/src/status/constraint-status-line.js, /Users/q284340/Agentic/coding, /Users/q284340/Agentic/coding/scripts/combined-status-line.js, Users/q284340/Agentic/coding, Users/q284340/Agentic/coding/scripts/combined-status-line.js, 3031/api/violations?limit=30", /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/constraint-analytics.db, rules/constraints, integrations/mcp-constraint-monitor/mcp-constraint-monitor.json, integrations/mcp-constraint-monitor/.mcp.json, integrations/mcp-constraint-monitor/node_modules/pkce-challenge/dist/index.node.js, integrations/mcp-constraint-monitor/node_modules/pkce-challenge/dist/index.browser.js, integrations/mcp-constraint-monitor/node_modules/pkce-challenge/package.json, integrations/mcp-constraint-monitor/node_modules/queue-microtask/index.js, integrations/mcp-constraint-monitor/node_modules/queue-microtask/package.json, integrations/mcp-constraint-monitor/node_modules/is-plain-obj/index.js, integrations/mcp-constraint-monitor/node_modules/is-plain-obj/package.json, integrations/mcp-constraint-monitor/node_modules/yoctocolors-cjs/index.js, integrations/mcp-constraint-monitor/node_modules/yoctocolors-cjs/package.json, integrations/mcp-constraint-monitor/node_modules/callsites/index.js, integrations/mcp-constraint-monitor/node_modules/callsites/package.json, integrations/mcp-constraint-monitor/node_modules/stringify-object/index.js, integrations/mcp-constraint-monitor/node_modules/stringify-object/package.json, integrations/mcp-constraint-monitor/node_modules/triple-beam/config/npm.js, integrations/mcp-constraint-monitor/node_modules/triple-beam/config/index.js, integrations/mcp-constraint-monitor/node_modules/triple-beam/config/cli.js, integrations/mcp-constraint-monitor/node_modules/triple-beam/config/syslog.js, integrations/mcp-constraint-monitor/node_modules/triple-beam/index.js, Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/constraint-analytics.db, integrations/mcp-constraint-monitor/src/status/status-generator.js, docs/puml, docs/images, docs/images/filename.png, ConstraintStatusLine/constructor, ConstraintStatusLine/buildStatusDisplay, ConstraintStatusLine/buildTooltip, ConstraintStatusLine/capitalizeFirst, ConstraintStatusLine/fetchFromService, ConstraintStatusLine/generateStatus, ConstraintStatusLine/getClickAction, ConstraintStatusLine/getComplianceLabel, ConstraintStatusLine/getCurrentProject, ConstraintStatusLine/getErrorStatus, ConstraintStatusLine/getRecentViolationsFromData, ConstraintStatusLine/getRiskIcon, ConstraintStatusLine/getScoreBar, ConstraintStatusLine/getServiceEndpoint, ConstraintStatusLine/getStatusColor, ConstraintStatusLine/getStatusData, ConstraintStatusLine/getTrajectoryIcon, ConstraintStatusLine/getTrajectoryText, ConstraintStatusLine/loadConfig, ConstraintStatusLine/loadLocalData, ConstraintStatusLine/transformConstraintDataToStatus, ConstraintStatusLine/truncateText, config/status-line.json, default/cached, api/violations, api/constraints, Users/q284340/Agentic/nano-degree, integrations/mcp-constraint-monitor/src/hooks/real-time-constraint-hook.js, integrations/mcp-constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js, integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1759903189670)
 
 **Time:** 2025-10-08T05:59:49.670Z
-**Duration:** 1901376532ms
+**Duration:** 2853317583ms
 **Tool Calls:** 24
 
 ### User

@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-17_0700-0800
 **Type:** Coding/Development
-**Time Range:** 2025-10-17T05:15:30.034Z - 2025-10-30T06:09:26.836Z
+**Time Range:** 2025-10-17T05:15:30.034Z - 2025-11-10T06:35:08.170Z
 **Prompt Sets:** 2
-**Classification:** Majority (86.2%) of file operations target coding repo: /Users/q284340/Agentic/coding, /Users/q284340/Agentic/coding/scripts/batch-lsl-processor.js, Users/q284340/Agentic/curriculum-alignment, Users/q284340/Agentic/coding, Users/q284340/Agentic/coding/scripts/batch-lsl-processor.js, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1400-1500_g9b30a_from-nano-degree.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1400-1500_g9b30a_from-nano-degree.md, dev/null, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_*.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_*.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1600-1700_g9b30a_from-nano-degree.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1600-1700_g9b30a_from-nano-degree.md, /Users/q284340/Agentic/coding/.specstory/logs/classification, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0600-0700_g9b30a_from-curriculum-alignment.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0600-0700_g9b30a.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0700-0800_g9b30a_from-curriculum-alignment.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0700-0800_g9b30a.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0800-0900_g9b30a_from-curriculum-alignment.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0800-0900_g9b30a.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0900-1000_g9b30a_from-curriculum-alignment.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0900-1000_g9b30a.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1400-1500_g9b30a_from-nano-degree.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1500-1600_g9b30a_from-nano-degree.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1600-1700_g9b30a_from-nano-degree.md:0, /Users/q284340/Agentic/coding/.specstory/history/
+**Classification:** Majority (92.5%) of file operations target coding repo: /Users/q284340/Agentic/coding, /Users/q284340/Agentic/coding/scripts/batch-lsl-processor.js, Users/q284340/Agentic/curriculum-alignment, Users/q284340/Agentic/coding, Users/q284340/Agentic/coding/scripts/batch-lsl-processor.js, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1400-1500_g9b30a_from-nano-degree.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1400-1500_g9b30a_from-nano-degree.md, dev/null, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_*.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_*.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1600-1700_g9b30a_from-nano-degree.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1600-1700_g9b30a_from-nano-degree.md, /Users/q284340/Agentic/coding/.specstory/logs/classification, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0600-0700_g9b30a_from-curriculum-alignment.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0600-0700_g9b30a.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0700-0800_g9b30a_from-curriculum-alignment.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0700-0800_g9b30a.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0800-0900_g9b30a_from-curriculum-alignment.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0800-0900_g9b30a.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0900-1000_g9b30a_from-curriculum-alignment.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0900-1000_g9b30a.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1400-1500_g9b30a_from-nano-degree.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1500-1600_g9b30a_from-nano-degree.md:0, /Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1600-1700_g9b30a_from-nano-degree.md:0, /Users/q284340/Agentic/coding/.specstory/history/, Users/q284340/Agentic/coding/.specstory/logs/classification, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0600-0700_g9b30a_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0600-0700_g9b30a.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0700-0800_g9b30a_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0700-0800_g9b30a.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0800-0900_g9b30a_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0800-0900_g9b30a.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0900-1000_g9b30a_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_0900-1000_g9b30a.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-15_1500-1600_g9b30a_from-nano-degree.md, Coding/Development, Users/q284340/Agentic/coding/.specstory/history
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1760678130034)
 
 **Time:** 2025-10-17T05:15:30.034Z
-**Duration:** 1126436802ms
+**Duration:** 2078378136ms
 **Tool Calls:** 8
 
 ### User
@@ -429,7 +429,7 @@ Both the **conversation bias filter** and **sl command filter** are confirmed wo
 ## Prompt Set 2 (ps_1760678477797)
 
 **Time:** 2025-10-17T05:21:17.797Z
-**Duration:** 1126089039ms
+**Duration:** 2078030373ms
 **Tool Calls:** 18
 
 ### User

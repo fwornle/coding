@@ -4,7 +4,7 @@
 **Type:** Coding/Development
 **Time Range:** 2025-10-18T09:17:03.923Z - 2025-10-18T09:17:26.213Z
 **Prompt Sets:** 1
-**Classification:** Keyword analysis: 6 matches, score: 21/1
+**Classification:** Majority (70.8%) of file operations target coding repo: Users/q284340/Agentic/curriculum-alignment/.specstory/history/*.md, dev/null, /Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-18_1100-1200_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding), /Users/q284340/Agentic/coding/.specstory/history/, ~60, specstory/history, coding/.specstory/history, Users/q284340/Agentic/coding, Users/q284340/Agentic/nano-degree, Users/q284340/Agentic/coding/.specstory/history, Users/q284340/Agentic/curriculum-alignment/.specstory/history/2025-10-18_1100-1200_g9b30a.md, Users/q284340/Agentic/curriculum-alignment, Users/q284340/Agentic/coding/.specstory/history/2025-10-18_1100-1200_g9b30a_from-curriculum-alignment.md, Edit/Write
 
 ---
 

@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-19_1400-1500
 **Type:** Coding/Development
-**Time Range:** 2025-10-19T12:33:42.152Z - 2025-10-30T06:09:27.652Z
+**Time Range:** 2025-10-19T12:33:42.152Z - 2025-11-10T06:35:08.554Z
 **Prompt Sets:** 1
-**Classification:** Keyword analysis: 6 matches, score: 21/1
+**Classification:** Majority (70.8%) of file operations target coding repo: specstory/history/*.md, dev/null, /Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-18_1100-1200_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding), /Users/q284340/Agentic/coding/.specstory/history/, ~60, specstory/history, coding/.specstory/history, Users/q284340/Agentic/coding, Users/q284340/Agentic/nano-degree, Users/q284340/Agentic/coding/.specstory/history, specstory/history/2025-10-18_1100-1200_g9b30a.md, Users/q284340/Agentic/curriculum-alignment, Users/q284340/Agentic/coding/.specstory/history/2025-10-18_1100-1200_g9b30a_from-curriculum-alignment.md, Edit/Write
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1760877222152)
 
 **Time:** 2025-10-19T12:33:42.152Z
-**Duration:** 927345500ms
+**Duration:** 1879286402ms
 **Tool Calls:** 5
 
 ### User

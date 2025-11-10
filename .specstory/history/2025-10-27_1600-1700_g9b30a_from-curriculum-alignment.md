@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-27_1600-1700
 **Type:** Coding/Development
-**Time Range:** 2025-10-27T15:10:33.325Z - 2025-10-30T06:09:27.426Z
+**Time Range:** 2025-10-27T15:10:33.325Z - 2025-11-10T06:35:08.426Z
 **Prompt Sets:** 5
-**Classification:** Keyword analysis: 5 matches, score: 17/1
+**Classification:** Majority (87.0%) of file operations target coding repo: /Users/q284340/Agentic/coding, Users/q284340/Agentic/coding, dev/null, Users/q284340/Agentic/curriculum-alignment, /Users/q284340/Agentic/coding/.specstory/history/2025-10-26_1300-1400_g9b30a_from-curriculum-alignment.md, Users/q284340/Agentic/curriculum-alignment/.specstory/history/2025-10-26_1300-1400_g9b30a.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-26_1300-1400_g9b30a_from-curriculum-alignment.md, "\.specstory", "from-curriculum-alignment", /Users/q284340/Agentic/coding/integrations/memory-visualizer/docs/images/viewer.png, docs/images/viewer.png, Users/q284340/Agentic/coding/integrations/memory-visualizer/docs/images/viewer.png, specstory/history/2025-10-24_1400-1500_g9b30a.md, specstory/history/2025-10-24_1500-1600_g9b30a.md, specstory/history/2025-10-25_2200-2300_g9b30a.md, specstory/history/2025-10-27_0700-0800_g9b30a.md, specstory/logs/classification/classification-status_g9b30a_from-curriculum-alignment.md, specstory/history/2025-10-26_1300-1400_g9b30a_from-curriculum-alignment.md, specstory/history/2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md, specstory/logs/classification/2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1761577833325)
 
 **Time:** 2025-10-27T15:10:33.325Z
-**Duration:** 226734101ms
+**Duration:** 1178675100ms
 **Tool Calls:** 5
 
 ### User
@@ -182,7 +182,7 @@ The key insight: When paths don't include explicit "coding" prefix, I must searc
 ## Prompt Set 2 (ps_1761578056923)
 
 **Time:** 2025-10-27T15:14:16.923Z
-**Duration:** 226510503ms
+**Duration:** 1178451502ms
 **Tool Calls:** 23
 
 ### User
@@ -2037,7 +2037,7 @@ The fix will prevent future misclassifications like the one we manually correcte
 ## Prompt Set 3 (ps_1761579105258)
 
 **Time:** 2025-10-27T15:31:45.258Z
-**Duration:** 225462168ms
+**Duration:** 1177403167ms
 **Tool Calls:** 25
 
 ### User
@@ -3756,7 +3756,7 @@ All fixes are now in place and will automatically apply to future LSL sessions!
 ## Prompt Set 4 (ps_1761580306985)
 
 **Time:** 2025-10-27T15:51:46.985Z
-**Duration:** 224260441ms
+**Duration:** 1176201440ms
 **Tool Calls:** 1
 
 ### User
@@ -3890,7 +3890,7 @@ Will automatically clean these up when the LSL window closes.
 ## Prompt Set 5 (ps_1761580466241)
 
 **Time:** 2025-10-27T15:54:26.241Z
-**Duration:** 224101185ms
+**Duration:** 1176042185ms
 **Tool Calls:** 9
 
 ### User

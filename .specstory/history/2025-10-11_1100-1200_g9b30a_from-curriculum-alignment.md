@@ -2,7 +2,7 @@
 
 **Session:** 2025-10-11_1100-1200
 **Type:** Coding/Development
-**Time Range:** 2025-10-11T09:18:54.464Z - 2025-10-30T06:09:26.203Z
+**Time Range:** 2025-10-11T09:18:54.464Z - 2025-11-10T06:35:07.254Z
 **Prompt Sets:** 1
 **Classification:** Majority of write operations target coding repo: /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/hooks/real-time-constraint-hook.js, /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/docs/CLAUDE-CODE-HOOK-FORMAT.md, /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js, /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/ROOT-CAUSE-ANALYSIS.md, /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/test/integration-test.js, /Users/q284340/Agentic/coding/integrations/mcp-constraint-monitor/IMPROVEMENTS-COMPLETED.md
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1760174334464)
 
 **Time:** 2025-10-11T09:18:54.464Z
-**Duration:** 1630231739ms
+**Duration:** 2582172790ms
 **Tool Calls:** 16
 
 ### User

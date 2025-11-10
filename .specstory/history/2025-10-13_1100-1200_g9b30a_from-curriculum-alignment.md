@@ -2,17 +2,291 @@
 
 **Session:** 2025-10-13_1100-1200
 **Type:** Coding/Development
-**Time Range:** 2025-10-13T09:47:23.986Z - 2025-10-30T06:09:27.869Z
-**Prompt Sets:** 1
-**Classification:** Majority of write operations target coding repo: /Users/q284340/Agentic/coding/docs/constraint-monitoring-validation.md
+**Time Range:** 2025-10-13T09:41:55.736Z - 2025-11-10T06:35:08.905Z
+**Prompt Sets:** 2
+**Classification:** Semantic similarity favors coding (coding_lsl=0.765, curriculum_alignment=0.747, nano_degree=0.723, coding_infrastructure=0.696)
+
+---
+
+<a name="ps_1760348515736"></a>
+## Prompt Set 1 (ps_1760348515736)
+
+**Time:** 2025-10-13T09:41:55.736Z
+**Duration:** 2407993169ms
+**Tool Calls:** 1
+
+### User
+
+does this rule...\
+ Pattern now catches: something-v2.js, v2-something.js, file-enhanced.js, backup-file\
+... also catches when a function (not just the filename) is a parallel version?
+
+### Assistant
+
+
+
+### Assistant
+
+I need to check the actual constraint rule configuration to see if it applies to function names or just filenames.
+
+### Assistant
+
+**Tool:** Read
+**Input:** ```json
+{
+  "file_path": "/Users/q284340/Agentic/curriculum-alignment/.constraint-monitor.yaml"
+}
+```
+
+### User
+
+**Result:** ✅ Success
+
+     1→constraint_groups:
+     2→  - id: code_quality
+     3→    name: Code Quality Standards
+     4→    description: Basic code quality and best practices
+     5→    icon: 🔧
+     6→    color: "#4CAF50"
+     7→  - id: security
+     8→    name: Security Requirements
+     9→    description: Security-focused constraints and vulnerability prevention
+    10→    icon: 🔒
+    11→    color: "#F44336"
+    12→  - id: architecture
+    13→    name: Architecture Guidelines
+    14→    description: Development practices and architectural standards
+    15→    icon: 🏗️
+    16→    color: "#2196F3"
+    17→  - id: plantuml
+    18→    name: PlantUML Standards
+    19→    description: Diagram creation and PlantUML workflow standards
+    20→    icon: 📊
+    21→    color: "#9C27B0"
+    22→  - id: documentation
+    23→    name: Documentation Standards
+    24→    description: Documentation format and organization requirements
+    25→    icon: 📚
+    26→    color: "#FF9800"
+    27→  - id: framework_specific
+    28→    name: Framework-Specific Rules
+    29→    description: Framework and library specific constraints (can be enabled per project)
+    30→    icon: ⚛️
+    31→    color: "#607D8B"
+    32→constraints:
+    33→  - id: no-console-log
+    34→    group: code_quality
+    35→    pattern: console\.log
+    36→    message: Use Logger.log() instead of console.log for better log management
+    37→    severity: warning
+    38→    enabled: true
+    39→    suggestion: "Replace with: Logger.log('info', 'category', message)"
+    40→  - id: no-var-declarations
+    41→    group: code_quality
+    42→    pattern: \bvar\s+
+    43→    message: Use 'let' or 'const' instead of 'var'
+    44→    severity: warning
+    45→    enabled: true
+    46→    suggestion: Use 'let' for mutable variables, 'const' for immutable
+    47→  - id: proper-error-handling
+    48→    group: code_quality
+    49→    pattern: catch\s*\([^)]*\)\s*\{\s*\}
+    50→    message: Empty catch blocks should be avoided
+    51→    severity: error
+    52→    enabled: true
+    53→    suggestion: Add proper error handling or at minimum log the error
+    54→  - id: proper-function-naming
+    55→    group: code_quality
+    56→    pattern: function\s+[a-z]
+    57→    message: Function names should start with a verb (camelCase)
+    58→    severity: info
+    59→    enabled: true
+    60→    suggestion: "Use descriptive verb-based names: getUserData(), processResults()"
+    61→  - id: no-magic-numbers
+    62→    group: code_quality
+    63→    pattern: \b\d{2,}\b(?!\s*(px|%|em|rem|vh|vw))
+    64→    message: Magic numbers detected - consider using named constants
+    65→    severity: info
+    66→    enabled: true
+    67→    suggestion: "Define meaningful constants: const MAX_RETRIES = 3"
+    68→  - id: no-hardcoded-secrets
+    69→    group: security
+    70→    pattern: (?i)(api[\w]?key|password|secret|token)\s*[=:]\s*['"][^'"]{8,}['"]
+    71→    message: Potential hardcoded secret detected
+    72→    severity: critical
+    73→    enabled: true
+    74→    suggestion: Use environment variables or secure key management
+    75→    semantic_validation: true
+    76→    exceptions:
+    77→      - path: test/**
+    78→      - path: docs/**
+    79→      - path: "**/*.test.js"
+    80→      - path: "**/*.spec.js"
+    81→  - id: no-eval-usage
+    82→    group: security
+    83→    pattern: \beval\s*\(
+    84→    message: eval() usage detected - security risk
+    85→    severity: critical
+    86→    enabled: true
+    87→    suggestion: Avoid eval() - use safer alternatives for dynamic code execution
+    88→  - id: no-parallel-files
+    89→    group: architecture
+    90→    pattern: "[._-](v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental)(?:[._-]|$)"
+    91→    message: "CRITICAL: No parallel versions allowed - edit the original file directly"
+    92→    severity: critical
+    93→    enabled: true
+    94→    suggestion: Debug and fix the original file instead of creating parallel versions
+    95→  - id: debug-not-speculate
+    96→    group: architecture
+    97→    pattern: (maybe|probably|might be|could be|seems like|appears to be).*(?:error|issue|problem|bug)
+    98→    message: Always debug and verify - never speculate about issues
+    99→    severity: error
+   100→    enabled: true
+   101→    suggestion: Use debugging tools and verification commands to identify root causes
+   102→    semantic_validation: true
+   103→  - id: no-evolutionary-names
+   104→    group: architecture
+   105→    pattern: (?:class|function|const|let|var)\s+\w*(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)\w*
+   106→    message: Evolutionary naming detected - refactor original instead
+   107→    severity: error
+   108→    enabled: true
+   109→    suggestion: Rename to descriptive functional name and refactor the original
+   110→    semantic_validation: true
+   111→  - id: plantuml-standard-styling
+   112→    group: plantuml
+   113→    pattern: "@startuml.*\\n(?!.*!include _standard-style\\.puml)"
+   114→    message: PlantUML files must include the standard styling file
+   115→    severity: error
+   116→    enabled: true
+   117→    suggestion: Add '!include _standard-style.puml' after @startuml and before content
+   118→  - id: plantuml-file-location
+   119→    group: plantuml
+   120→    pattern: "!include.*\\.puml"
+   121→    message: PlantUML files should be stored in docs/puml/ directory
+   122→    severity: warning
+   123→    enabled: true
+   124→    suggestion: Move .puml files to docs/puml/ and update !include paths
+   125→  - id: plantuml-diagram-workflow
+   126→    group: plantuml
+   127→    pattern: (?i)(architecture|diagram|flow|sequence).*(?:diagram|chart)
+   128→    message: "Diagrams should follow PlantUML workflow: .puml files in docs/puml/, PNG files in docs/images/"
+   129→    severity: info
+   130→    enabled: true
+   131→    suggestion: 1. Create .puml file in docs/puml/ with !include _standard-style.puml 2. Generate PNG with plantuml -tpng 3.
+   132→      Store PNG in docs/images/ 4. Reference PNG in markdown
+   133→  - id: plantuml-readability-guidelines
+   134→    group: plantuml
+   135→    pattern: (?i)(too wide|barely readable|restructure.*readability)
+   136→    message: PlantUML diagrams should prioritize readability with vertical layouts and logical grouping
+   137→    severity: info
+   138→    enabled: true
+   139→    suggestion: Use 'skinparam direction top to bottom layout' and group related components in rectangles or packages
+   140→  - id: plantuml-file-organization
+   141→    group: plantuml
+   142→    pattern: \.puml$
+   143→    message: "PlantUML files should follow naming convention: component-purpose.puml"
+   144→    severity: info
+   145→    enabled: true
+   146→    suggestion: Use descriptive names like workflow-sequence.puml, architecture-overview.puml
+   147→  - id: image-reference-pattern
+   148→    group: documentation
+   149→    pattern: "!\\[.*\\]\\((?!docs/images/).*\\.(png|jpg|jpeg|svg)\\)"
+   150→    message: Diagram images should be stored in docs/images/ and referenced with relative paths
+   151→    severity: warning
+   152→    enabled: true
+   153→    suggestion: "Move images to docs/images/ and update markdown references: ![Description](docs/images/filename.png)"
+   154→  - id: documentation-filename-format
+   155→    group: documentation
+   156→    pattern: "[A-Z][a-z]+[A-Z].*\\.md$"
+   157→    message: "Documentation files should use kebab-case naming: feature-name.md"
+   158→    severity: info
+   159→    enabled: true
+   160→    suggestion: "Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md"
+   161→  - id: update-main-readme
+   162→    group: documentation
+   163→    pattern: (?i)readme.*(?:update|modify|change).*(?:structure|format|content)
+   164→    message: Main README updates should maintain consistent structure and TOC
+   165→    severity: info
+   166→    enabled: true
+   167→    suggestion: "Follow established README sections: Purpose, Features, Installation, Usage, Architecture"
+   168→  - id: react-hooks-deps
+   169→    group: framework_specific
+   170→    pattern: useEffect\([^,]*,\s*\[\]
+   171→    message: useEffect with empty deps array - verify if this is intentional
+   172→    severity: info
+   173→    enabled: false
+   174→    suggestion: Ensure useEffect dependencies are correct to avoid bugs
+   175→  - id: react-state-complexity
+   176→    group: framework_specific
+   177→    pattern: useState\([^)]*\{[^}]*\}[^)]*\)
+   178→    message: Complex object in useState - consider useReducer or separate states
+   179→    severity: warning
+   180→    enabled: false
+   181→    suggestion: Use useReducer for complex state or separate into multiple useState calls
+   182→settings:
+   183→  compliance:
+   184→    excellent_threshold: 9
+   185→    good_threshold: 7
+   186→    warning_threshold: 5
+   187→  risk_levels:
+   188→    critical_violations_for_high_risk: 1
+   189→    error_violations_for_medium_risk: 3
+   190→    warning_violations_for_low_risk: 10
+   191→  monitoring:
+   192→    cache_timeout: 5000
+   193→    max_history: 1000
+   194→    auto_cleanup: true
+   195→  groups:
+   196→    show_empty_groups: false
+   197→    collapse_disabled_groups: true
+   198→    sort_by_severity: true
+   199→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.
+</system-reminder>
+
+
+### Assistant
+
+
+
+### Assistant
+
+No, that specific rule (`no-parallel-files` at line 88-94) only catches **filenames** with version indicators.
+
+However, there **IS** a separate rule that catches function/class names: **`no-evolutionary-names`** (line 103-110):
+
+```yaml
+- id: no-evolutionary-names
+  group: architecture
+  pattern: (?:class|function|const|let|var)\s+\w*(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)\w*
+  message: Evolutionary naming detected - refactor original instead
+  severity: error
+  enabled: true
+```
+
+This rule catches:
+- `function calculateTotalV2()`
+- `class UserHandlerEnhanced`
+- `const processDataImproved`
+- `let fetchBetterResults`
+
+**Key differences:**
+| Rule | Scope | Severity | Pattern |
+|------|-------|----------|---------|
+| `no-parallel-files` | Filenames with delimiters | critical | `file-v2.js`, `utils_enhanced.js` |
+| `no-evolutionary-names` | Code declarations | error | `functionV2()`, `ClassEnhanced` |
+
+Both are enabled and working together to prevent parallel versions at both the file and code declaration level.
 
 ---
 
 <a name="ps_1760348843986"></a>
-## Prompt Set 1 (ps_1760348843986)
+## Prompt Set 2 (ps_1760348843986)
 
 **Time:** 2025-10-13T09:47:23.986Z
-**Duration:** 1455723883ms
+**Duration:** 2407664919ms
 **Tool Calls:** 20
 
 ### User

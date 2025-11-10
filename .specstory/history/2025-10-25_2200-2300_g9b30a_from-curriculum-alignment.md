@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-25_2200-2300
 **Type:** Coding/Development
-**Time Range:** 2025-10-25T20:50:54.499Z - 2025-10-30T06:09:30.212Z
+**Time Range:** 2025-10-25T20:50:54.499Z - 2025-11-10T06:35:11.454Z
 **Prompt Sets:** 2
-**Classification:** Keyword analysis: 9 matches, score: 29/1
+**Classification:** Majority (65.5%) of file operations target coding repo: specstory/history/*.md, /Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, dev/null, /Users/q284340/Agentic/coding/.specstory/history/2025-10-25_2200-2300_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding), /Users/q284340/Agentic/coding/.specstory/history/, ~60, specstory/history, coding/.specstory/history, Users/q284340/Agentic/coding, Users/q284340/Agentic/nano-degree, Users/q284340/Agentic/coding/.specstory/history, specstory/history/2025-10-25_2200-2300_g9b30a.md, Users/q284340/Agentic/curriculum-alignment, Users/q284340/Agentic/coding/.specstory/history/2025-10-25_2200-2300_g9b30a_from-curriculum-alignment.md, Agentic/coding/docs/presentation/puml/unified-semantic-architecture.puml, Agentic/coding/integrations/mcp-server-semantic-analysis/ARCHITECTURE-ANALYSIS.md, before/after
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1761425454499)
 
 **Time:** 2025-10-25T20:50:54.499Z
-**Duration:** 379115713ms
+**Duration:** 1331056955ms
 **Tool Calls:** 5
 
 ### User
@@ -312,7 +312,7 @@ The session logs show mostly text exchanges with no tool executions, suggesting 
 ## Prompt Set 2 (ps_1761425535637)
 
 **Time:** 2025-10-25T20:52:15.637Z
-**Duration:** 379034575ms
+**Duration:** 1330975817ms
 **Tool Calls:** 36
 
 ### User

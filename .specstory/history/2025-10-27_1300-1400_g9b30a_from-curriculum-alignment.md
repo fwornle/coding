@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-27_1300-1400
 **Type:** Coding/Development
-**Time Range:** 2025-10-27T12:14:57.493Z - 2025-10-30T06:09:27.426Z
+**Time Range:** 2025-10-27T12:14:57.493Z - 2025-11-10T06:35:08.425Z
 **Prompt Sets:** 2
-**Classification:** Keyword analysis: 4 matches, score: 15/1
+**Classification:** Majority (61.0%) of file operations target coding repo: "\.specstory/history/", Users/q284340/Agentic/curriculum-alignment, specstory/history/", Users/q284340/Agentic/curriculum-alignment/.specstory/history/2025-10-2*.md, docs/, Users/q284340/Agentic/curriculum-alignment/.specstory/history, docs/images/complete-system-overview\, docs/presentation\, docs/puml", Users/q284340/Agentic/curriculum-alignment/.specstory/history/2025-10-*.md, dev/null, ~60, Users/q284340/Agentic/curriculum-alignment/.specstory/history/2025-10-27_1200-1300_g9b30a.md, coding/docs, updated/corrected, docs/images/complete-system-overview.png, specstory/history/2025-10-24_0700-0800_g9b30a.md, specstory/history/2025-10-24_1400-1500_g9b30a.md, specstory/history/2025-10-24_1500-1600_g9b30a.md, specstory/history/2025-10-25_2200-2300_g9b30a.md, specstory/history/2025-10-26_1300-1400_g9b30a.md, specstory/history/2025-10-27_0700-0800_g9b30a.md, specstory/history/2025-10-27_1000-1100_g9b30a.md, specstory/history/2025-10-27_1200-1300_g9b30a.md, docs/images/viewer.png
 
 ---
 
@@ -400,7 +400,7 @@ Whenever you read a file, you should consider whether it would be considered mal
 ## Prompt Set 2 (ps_1761567653129)
 
 **Time:** 2025-10-27T12:20:53.129Z
-**Duration:** 236914297ms
+**Duration:** 1188855296ms
 **Tool Calls:** 17
 
 ### User

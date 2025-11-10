@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1760454184141)
 
 **Time:** 2025-10-14T15:03:04.141Z
-**Duration:** 1350383728ms
+**Duration:** 2302324765ms
 **Tool Calls:** 7
 
 ### User
@@ -763,7 +763,7 @@ Perfect! PSM correctly detected the REAL running coordinator (PID 37197) as **He
 ## Prompt Set 3 (ps_1760454916780)
 
 **Time:** 2025-10-14T15:15:16.780Z
-**Duration:** 1349651090ms
+**Duration:** 2301592126ms
 **Tool Calls:** 31
 
 ### User
@@ -3164,7 +3164,7 @@ The critical overlap issue is **RESOLVED**. The coordinator and PSM are now work
 ## Prompt Set 4 (ps_1760455916581)
 
 **Time:** 2025-10-14T15:31:56.581Z
-**Duration:** 1348651289ms
+**Duration:** 2300592325ms
 **Tool Calls:** 22
 
 ### User

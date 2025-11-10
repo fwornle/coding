@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-12_1300-1400
 **Type:** Coding/Development
-**Time Range:** 2025-10-12T11:43:02.445Z - 2025-10-30T06:09:30.329Z
+**Time Range:** 2025-10-12T11:43:02.445Z - 2025-11-10T06:35:11.610Z
 **Prompt Sets:** 2
-**Classification:** Keyword analysis: 8 matches, score: 28/1
+**Classification:** Majority (75.7%) of file operations target coding repo: dev/null, specstory/history/*.md, /Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-12_1300-1400_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-12_1200-1300_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-11_1800-1900_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-11_1600-1700_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/, ~60, /Users/q284340/Agentic/coding/.specstory/history/2025-10-11_1700-1800_g9b30a_from-curriculum-alignment.md, project/repo, specstory/history, coding/.specstory/history, newer/same, Users/q284340/Agentic/coding/.specstory/history, fwornle/curriculum-alignment.git, specstory/history/2025-10-12_1300-1400_g9b30a.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-12_1300-1400_g9b30a_from-curriculum-alignment.md, Users/q284340/Agentic/curriculum-alignment, specstory/history/2025-10-12_1200-1300_g9b30a.md, specstory/history/2025-10-12_1000-1100_g9b30a.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-12_1200-1300_g9b30a_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-11_1800-1900_g9b30a_from-curriculum-alignment.md, constraints/guardrails, plantumls/pngs, Users/q284340/Agentic/coding/.specstory/history/2025-10-11_1700-1800_g9b30a_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-11_1600-1700_g9b30a_from-curriculum-alignment.md
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1760269382445)
 
 **Time:** 2025-10-12T11:43:02.445Z
-**Duration:** 1535187884ms
+**Duration:** 2487129165ms
 **Tool Calls:** 13
 
 ### User
@@ -633,7 +633,7 @@ The work has been iterative with context handoffs between sessions, focusing on 
 ## Prompt Set 2 (ps_1760269521621)
 
 **Time:** 2025-10-12T11:45:21.621Z
-**Duration:** 1535048708ms
+**Duration:** 2486989989ms
 **Tool Calls:** 13
 
 ### User

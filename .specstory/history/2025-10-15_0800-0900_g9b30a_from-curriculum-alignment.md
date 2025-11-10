@@ -2,7 +2,7 @@
 
 **Session:** 2025-10-15_0800-0900
 **Type:** Coding/Development
-**Time Range:** 2025-10-15T06:02:13.424Z - 2025-10-30T06:09:26.834Z
+**Time Range:** 2025-10-15T06:02:13.424Z - 2025-11-10T06:35:08.163Z
 **Prompt Sets:** 8
 **Classification:** Majority of write operations target coding repo: /Users/q284340/Agentic/coding/scripts/index-project-embeddings.js
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1760508133424)
 
 **Time:** 2025-10-15T06:02:13.424Z
-**Duration:** 1296433410ms
+**Duration:** 2248374738ms
 **Tool Calls:** 13
 
 ### User
@@ -635,7 +635,7 @@ Perfect! Found the issue. Let me trace the complete flow:
 ## Prompt Set 3 (ps_1760509084215)
 
 **Time:** 2025-10-15T06:18:04.215Z
-**Duration:** 1295482619ms
+**Duration:** 2247423947ms
 **Tool Calls:** 26
 
 ### User
@@ -4206,7 +4206,7 @@ Shell cwd was reset to /Users/q284340/Agentic/curriculum-alignment
 ## Prompt Set 5 (ps_1760509921325)
 
 **Time:** 2025-10-15T06:32:01.325Z
-**Duration:** 1294645509ms
+**Duration:** 2246586838ms
 **Tool Calls:** 25
 
 ### User
@@ -6616,7 +6616,7 @@ Toggle the `no-evolutionary-names` rule in the dashboard at http://localhost:303
 ## Prompt Set 6 (ps_1760510728147)
 
 **Time:** 2025-10-15T06:45:28.147Z
-**Duration:** 1293838687ms
+**Duration:** 2245780016ms
 **Tool Calls:** 6
 
 ### User
@@ -6863,7 +6863,7 @@ Note: I re-enabled `no-evolutionary-names` in both YAML files after making the c
 ## Prompt Set 7 (ps_1760511007868)
 
 **Time:** 2025-10-15T06:50:07.868Z
-**Duration:** 1293558966ms
+**Duration:** 2245500295ms
 **Tool Calls:** 6
 
 ### User
@@ -7323,7 +7323,7 @@ If you want to add smart error-based refresh (only reload when the API is unresp
 ## Prompt Set 8 (ps_1760511340555)
 
 **Time:** 2025-10-15T06:55:40.555Z
-**Duration:** 1293226279ms
+**Duration:** 2245167608ms
 **Tool Calls:** 10
 
 ### User

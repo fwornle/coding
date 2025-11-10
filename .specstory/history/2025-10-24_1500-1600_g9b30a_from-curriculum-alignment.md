@@ -2,9 +2,9 @@
 
 **Session:** 2025-10-24_1500-1600
 **Type:** Coding/Development
-**Time Range:** 2025-10-24T13:16:44.727Z - 2025-10-30T06:09:30.153Z
+**Time Range:** 2025-10-24T13:16:44.727Z - 2025-11-10T06:35:11.387Z
 **Prompt Sets:** 2
-**Classification:** Keyword analysis: 7 matches, score: 25/1
+**Classification:** Majority (77.4%) of file operations target coding repo: specstory/history/*.md, dev/null, /Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, Users/q284340/Agentic/coding/.specstory/history/*_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-24_1400-1500_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding/.specstory/history/2025-10-24_1000-1100_g9b30a_from-curriculum-alignment.md, /Users/q284340/Agentic/coding), /Users/q284340/Agentic/coding/.specstory/history/, ~60, /Users/q284340/Agentic/coding/docs/puml/unified-semantic-architecture.puml, specstory/history, coding/.specstory/history, Users/q284340/Agentic/coding, Users/q284340/Agentic/nano-degree, Users/q284340/Agentic/coding/.specstory/history, Users/q284340/Agentic/curriculum-alignment, Users/q284340/Agentic/coding/.specstory/history/2025-10-24_1400-1500_g9b30a_from-curriculum-alignment.md, specstory/history/2025-10-24_1400-1500_g9b30a.md, docs/images/unified-semantic-architecture.png, Users/q284340/Agentic/coding/docs/puml/unified-semantic-architecture.puml, docs/images/continuous-learning-architecture.png, specstory/history/2025-10-24_0700-0800_g9b30a.md, Users/q284340/Agentic/coding/.specstory/history/2025-10-24_1000-1100_g9b30a_from-curriculum-alignment.md, coding/docs/images/lsl-architecture.png
 
 ---
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1761311804727)
 
 **Time:** 2025-10-24T13:16:44.727Z
-**Duration:** 492765426ms
+**Duration:** 1444706660ms
 **Tool Calls:** 9
 
 ### User
@@ -432,7 +432,7 @@ I'm now ready to continue with any tasks you have. The sessions show we've been 
 ## Prompt Set 2 (ps_1761312193177)
 
 **Time:** 2025-10-24T13:23:13.177Z
-**Duration:** 492376976ms
+**Duration:** 1444318210ms
 **Tool Calls:** 9
 
 ### User

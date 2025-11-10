@@ -2,7 +2,7 @@
 
 **Session:** 2025-10-25_1900-2000
 **Type:** Coding/Development
-**Time Range:** 2025-10-25T17:06:51.946Z - 2025-10-30T06:09:30.153Z
+**Time Range:** 2025-10-25T17:06:51.946Z - 2025-11-10T06:35:11.387Z
 **Prompt Sets:** 1
 **Classification:** Majority of write operations target coding repo: /Users/q284340/Agentic/coding/integrations/mcp-server-semantic-analysis/README.md, /Users/q284340/Agentic/coding/integrations/mcp-server-semantic-analysis/ARCHITECTURE-ANALYSIS.md, /Users/q284340/Agentic/coding/docs/integrations/mcp-semantic-analysis.md, /Users/q284340/Agentic/coding/docs/presentation/puml/unified-semantic-architecture.puml
 
@@ -12,7 +12,7 @@
 ## Prompt Set 1 (ps_1761412011946)
 
 **Time:** 2025-10-25T17:06:51.946Z
-**Duration:** 392558207ms
+**Duration:** 1344499441ms
 **Tool Calls:** 38
 
 ### User
