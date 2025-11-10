@@ -28,6 +28,7 @@ import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import LSLFileManager from '../src/live-logging/LSLFileManager.js';
 import ClassificationLogger from './classification-logger.js';
+import ProcessStateManager from './process-state-manager.js';
 
 // Knowledge management dependencies
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
@@ -99,6 +100,10 @@ class EnhancedTranscriptMonitor {
     
     // Store options for methods to access
     this.options = config;
+
+    // Initialize Process State Manager for preventing multiple instances
+    this.processStateManager = new ProcessStateManager();
+    this.serviceRegistered = false;
 
     this.transcriptPath = this.findCurrentTranscript();
 
@@ -2083,10 +2088,48 @@ class EnhancedTranscriptMonitor {
   /**
    * Start monitoring
    */
-  start() {
+  async start() {
     if (!this.transcriptPath) {
       console.log('❌ No current transcript file found. Make sure Claude Code is running.');
       return;
+    }
+
+    // CRITICAL: Check for existing instances and register this service
+    const projectPath = this.config.projectPath;
+    const serviceName = 'enhanced-transcript-monitor';
+
+    // Initialize PSM if not already done
+    if (!this.processStateManager.initialized) {
+      await this.processStateManager.initialize();
+    }
+
+    // Check if another instance is already running for this project
+    const existingService = await this.processStateManager.getService(serviceName, 'per-project', projectPath);
+    if (existingService && this.processStateManager.isProcessAlive(existingService.pid)) {
+      console.error(`❌ Another instance of ${serviceName} is already running for project ${path.basename(projectPath)}`);
+      console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}`);
+      console.error(`   To fix: Kill the existing instance with: kill ${existingService.pid}`);
+      process.exit(1);
+    }
+
+    // Register this service instance
+    try {
+      await this.processStateManager.registerService({
+        name: serviceName,
+        type: 'per-project',
+        projectPath: projectPath,
+        pid: process.pid,
+        script: 'enhanced-transcript-monitor.js',
+        metadata: {
+          transcriptPath: this.transcriptPath,
+          mode: this.config.mode
+        }
+      });
+      this.serviceRegistered = true;
+      console.log(`✅ Service registered (PID: ${process.pid})`);
+    } catch (error) {
+      console.error(`❌ Failed to register service: ${error.message}`);
+      process.exit(1);
     }
 
     console.log(`🚀 Starting enhanced transcript monitor`);
@@ -2220,6 +2263,17 @@ class EnhancedTranscriptMonitor {
     if (this.fileManager) {
       await this.fileManager.shutdown();
       this.debug('📁 LSL File Manager shut down gracefully');
+    }
+
+    // Unregister service from Process State Manager
+    if (this.serviceRegistered) {
+      try {
+        await this.processStateManager.unregisterService('enhanced-transcript-monitor', 'per-project', this.config.projectPath);
+        this.serviceRegistered = false;
+        this.debug('✅ Service unregistered from Process State Manager');
+      } catch (error) {
+        this.debug(`Failed to unregister service: ${error.message}`);
+      }
     }
 
     this.cleanupHealthFile();
