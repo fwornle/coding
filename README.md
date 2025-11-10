@@ -31,6 +31,7 @@ coding --copilot
 - **🧠 Knowledge Management** - Capture, visualize, and share development insights
 - **🤖 Multi-Agent Analysis** - 10 specialized AI agents for comprehensive code analysis
 - **📊 Status Line System** - Real-time health monitoring and activity indicators
+- **🏥 Pre-Prompt Health Verification** - Automatic system health checks on every Claude prompt (self-healing)
 - **🚀 Trajectory Generation** - Automated project analysis and documentation
 
 ### Integration Support
@@ -55,6 +56,7 @@ coding --copilot
 - **[Live Session Logging](docs/core-systems/live-session-logging.md)** - Real-time conversation classification (98.3% security effectiveness)
 - **[Constraint Monitoring](docs/core-systems/constraint-monitoring.md)** - Real-time code quality enforcement (18 active constraints)
 - **[Status Line System](docs/core-systems/status-line.md)** - Visual health monitoring and activity indicators
+- **[Health Verification System](integrations/system-health-dashboard/README.md)** - Pre-prompt health checks with self-monitoring and auto-healing
 - **[Trajectory Generation](docs/core-systems/trajectory-generation.md)** - Automated project analysis
 
 ### Knowledge Management

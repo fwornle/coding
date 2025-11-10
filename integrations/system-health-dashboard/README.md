@@ -12,14 +12,17 @@ Real-time monitoring dashboard for system-level health checks including database
 
 ## Features
 
+- **Pre-Prompt Health Verification**: Automatic health check on every Claude prompt (via UserPromptSubmit hook)
+- **Self-Monitoring**: Health API server monitors itself and auto-heals if down
 - Real-time health monitoring (5s refresh)
 - Database health (LevelDB, Qdrant)
-- Service availability (VKB, Constraint Monitor, Dashboard)
+- Service availability (VKB, Constraint Monitor, Dashboard, Health API)
 - Process health (stale PIDs, zombies)
 - Auto-healing status and history
 - Manual verification trigger
 - Detailed violation reports
 - System recommendations
+- Staleness detection (triggers verification if data >5 minutes old)
 
 ## Quick Start
 
@@ -107,6 +110,44 @@ This dashboard consumes data from:
 - `scripts/health-verifier.js` - Health verification engine
 - `.health/verification-status.json` - Quick status file
 - `.health/verification-report.json` - Detailed report
+
+### Pre-Prompt Health Hook
+
+A UserPromptSubmit hook (`scripts/health-prompt-hook.js`) runs before every Claude prompt to ensure system health:
+
+**Behavior:**
+- Checks if verification data is stale (>5 minutes)
+- Triggers async verification if needed (non-blocking)
+- Provides health context to Claude in every response
+- Blocks only critical failures (prevents work when system is broken)
+
+**Configuration:**
+The hook is configured in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /path/to/coding/scripts/health-prompt-hook.js",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Self-Monitoring:**
+The health verification system now monitors its own API server at `http://localhost:3033/api/health` and auto-heals if it goes down:
+- Check rule: `config/health-verification-rules.json` → `services.health_dashboard_api`
+- Auto-heal action: `scripts/health-remediation-actions.js` → `restartHealthAPI()`
+
+This ensures the health system itself is resilient and failsafe.
 
 ## Development
 

@@ -327,6 +327,21 @@ class HealthVerifier extends EventEmitter {
       });
     }
 
+    // Check Health Dashboard API (self-monitoring)
+    if (serviceRules.health_dashboard_api.enabled) {
+      const healthAPICheck = await this.checkHTTPHealth(
+        'health_dashboard_api',
+        serviceRules.health_dashboard_api.endpoint,
+        serviceRules.health_dashboard_api.timeout_ms
+      );
+      checks.push({
+        ...healthAPICheck,
+        auto_heal: serviceRules.health_dashboard_api.auto_heal,
+        auto_heal_action: serviceRules.health_dashboard_api.auto_heal_action,
+        severity: serviceRules.health_dashboard_api.severity
+      });
+    }
+
     return checks;
   }
 

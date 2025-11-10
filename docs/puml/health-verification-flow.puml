@@ -1,0 +1,58 @@
+@startuml
+!include _standard-style.puml
+
+title Health Verification Pre-Prompt Flow
+
+actor User
+participant "Claude Code" as Claude
+participant "UserPromptSubmit\nHook" as Hook
+participant "health-prompt-hook.js" as HealthHook
+participant "verification-status.json" as StatusFile
+participant "health-verifier.js" as Verifier
+participant "Services\n(VKB, API, etc.)" as Services
+
+User -> Claude: Types prompt
+activate Claude
+
+Claude -> Hook: Trigger hook
+activate Hook
+
+Hook -> HealthHook: Execute hook script
+activate HealthHook
+
+HealthHook -> StatusFile: Read status file
+activate StatusFile
+StatusFile --> HealthHook: Return status + file age
+deactivate StatusFile
+
+alt Data is fresh (<5 minutes)
+    HealthHook -> HealthHook: Calculate age in seconds
+    HealthHook --> Hook: Return health context\n✅ "All systems operational (23s ago)"
+else Data is stale (>5 minutes)
+    HealthHook -> Verifier: Spawn async verification\n(non-blocking, detached)
+    activate Verifier
+    HealthHook --> Hook: Return context\n🔄 "Verification triggered (data stale)"
+
+    Verifier -> Services: Check all services
+    activate Services
+    Services --> Verifier: Health results
+    deactivate Services
+
+    Verifier -> Verifier: Auto-heal failures\nif needed
+
+    Verifier -> StatusFile: Update status
+    activate StatusFile
+    deactivate StatusFile
+    deactivate Verifier
+end
+
+deactivate HealthHook
+
+Hook --> Claude: Add context to prompt
+deactivate Hook
+
+Claude -> Claude: Process prompt with\nhealth context
+Claude --> User: Response with health info
+deactivate Claude
+
+@enduml

@@ -124,6 +124,9 @@ export class HealthRemediationActions {
         case 'restart_dashboard_server':
           result = await this.restartDashboardServer(issueDetails);
           break;
+        case 'restart_health_api':
+          result = await this.restartHealthAPI(issueDetails);
+          break;
         case 'start_qdrant':
           result = await this.startQdrant(issueDetails);
           break;
@@ -351,6 +354,49 @@ export class HealthRemediationActions {
       return {
         success: response.ok,
         message: response.ok ? 'Dashboard server restarted' : 'Failed to verify restart'
+      };
+
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  async restartHealthAPI(details) {
+    try {
+      this.log('Restarting System Health API server...');
+
+      // Find and kill existing process
+      try {
+        const { stdout } = await execAsync('lsof -ti:3033');
+        const pid = parseInt(stdout.trim());
+        if (pid) {
+          process.kill(pid, 'SIGTERM');
+          await this.sleep(1000);
+        }
+      } catch (error) {
+        // Port not in use, that's fine
+      }
+
+      // Start health API server (from system-health-dashboard)
+      const healthDashboardDir = join(this.codingRoot, 'integrations/system-health-dashboard');
+      const cmd = `cd ${healthDashboardDir} && npm run api > /dev/null 2>&1 &`;
+
+      await execAsync(cmd, {
+        shell: '/bin/bash',
+        timeout: 5000
+      });
+
+      await this.sleep(2000);
+
+      // Verify it's running
+      const response = await fetch('http://localhost:3033/api/health', {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000)
+      });
+
+      return {
+        success: response.ok,
+        message: response.ok ? 'Health API server restarted' : 'Failed to verify restart'
       };
 
     } catch (error) {
