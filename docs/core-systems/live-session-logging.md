@@ -342,11 +342,13 @@ The Classification Logger provides comprehensive tracking and analysis of all cl
 - **JSONL Format**: Machine-readable logs (`.jsonl`) for programmatic analysis and auditing
 - **Markdown Reports**: Human-readable summaries with clickable navigation to LSL files
 - **Overall Status File**: Aggregated statistics across all classification sessions organized by layer
+- **Detailed Session Breakdown**: Individual prompt set links with direct navigation to LSL and classification details
 - **Performance Metrics**: Tracks processing time for each layer and overall classification
 - **Confidence Tracking**: Records confidence scores for quality monitoring and tuning
 - **Git-Trackable**: Classification logs are version-controlled for historical analysis
 - **Clickable Navigation**: Prompt set headings link directly to LSL files with anchors
 - **Evidence-Based**: Each decision includes detailed reasoning and layer-by-layer analysis
+- **Pending LSL Handling**: Correctly generates links even for LSL files not yet created
 
 **Log File Organization**:
 ```
@@ -408,6 +410,22 @@ Each classification markdown report includes:
 2. **Statistics**: Aggregate counts with clickable layer section links
 3. **Layer Sections**: Organized by which layer made the final decision
 4. **Prompt Set Details**: Individual decisions with full evidence chain
+
+**Classification Status File** (`classification-status_<userhash>.md`):
+
+The status file provides a comprehensive overview with these sections:
+1. **Overall Statistics**: Aggregate CODING vs LOCAL counts and percentages
+2. **Classification Method Distribution**: Decisions by layer with clickable links
+3. **Classification Categories**: Sessions grouped by layer (0-4) that made the final decision
+4. **All Session Windows**: Chronological list of all sessions
+5. **Detailed Session Breakdown** (NEW in v1.1): Individual prompt set links for direct navigation
+
+The Detailed Session Breakdown section includes clickable links to every prompt set:
+- First link points to the prompt set in the LSL file with anchor (`#ps_...`)
+- Second link points to classification details (`#prompt-set-ps_...`)
+- Shows which classification layer made the decision
+- Organized by time window with separate CODING/LOCAL subsections
+- Handles "pending" LSL files correctly by generating proper window-based filenames
 
 **Example: LOCAL Classification Report** (`2025-10-06_1100-1200_g9b30a.md`):
 ```markdown
