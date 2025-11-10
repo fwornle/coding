@@ -896,7 +896,10 @@ class ClassificationLogger {
         markdown += `#### CODING Decisions (${codingDecisions.length})\n\n`;
         for (const decision of codingDecisions) {
           const promptSetId = decision.promptSetId;
-          const lslFileName = decision.lslFile ? path.basename(decision.lslFile) : `${window}_from-${this.projectName}.md`;
+          // Handle "pending" LSL files - use proper window-based filename
+          const lslFileName = (decision.lslFile && decision.lslFile !== 'pending')
+            ? path.basename(decision.lslFile)
+            : `${window}_from-${this.projectName}.md`;
           const lslFilePath = `file://${this.codingRepo}/.specstory/history/${lslFileName}`;
           const classificationFilePath = `file://${this.codingRepo}/.specstory/logs/classification/${window}_from-${this.projectName}.md`;
 
@@ -911,7 +914,10 @@ class ClassificationLogger {
         markdown += `#### LOCAL Decisions (${localDecisions.length})\n\n`;
         for (const decision of localDecisions) {
           const promptSetId = decision.promptSetId;
-          const lslFileName = decision.lslFile ? path.basename(decision.lslFile) : `${window}.md`;
+          // Handle "pending" LSL files - use proper window-based filename
+          const lslFileName = (decision.lslFile && decision.lslFile !== 'pending')
+            ? path.basename(decision.lslFile)
+            : `${window}.md`;
           const lslFilePath = `../../../history/${lslFileName}`;
           const classificationFilePath = `${window}.md`;
 
