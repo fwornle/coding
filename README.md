@@ -274,7 +274,9 @@ This is a personal development toolkit. For issues or suggestions:
 
 ## 📄 License
 
-Copyright © 2024. All rights reserved.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Copyright © 2025 Frank Wornle
 
 ---
 
