@@ -242,8 +242,8 @@ check_component_dependencies() {
     
     # Check test infrastructure
     local test_files=(
-        "tests/integration/final-system-security-validation.js"
-        "tests/security/enhanced-redaction-validation.test.js"
+        "tests/integration/full-system-validation.test.js"
+        "tests/security/lsl-security-validation.test.js"
         "tests/performance/lsl-benchmarks.test.js"
     )
     
@@ -549,8 +549,8 @@ test_enhanced_lsl() {
     
     # Test 6: Security validation (if available)
     print_test "Security validation system"
-    if [[ -f "$CODING_REPO/tests/security/enhanced-redaction-validation.test.js" ]]; then
-        if run_command "timeout 30s node '$CODING_REPO/tests/security/enhanced-redaction-validation.test.js'" "Security validation test"; then
+    if [[ -f "$CODING_REPO/tests/security/lsl-security-validation.test.js" ]]; then
+        if run_command "timeout 30s node '$CODING_REPO/tests/security/lsl-security-validation.test.js'" "Security validation test"; then
             lsl_tests_passed=$((lsl_tests_passed + 1))
         fi
     else
@@ -613,7 +613,7 @@ integrate_with_coding_launcher() {
       exec node "$SCRIPT_DIR/../scripts/live-logging-coordinator.js" --status\
       ;;\
     --lsl-validate)\
-      exec node "$SCRIPT_DIR/../tests/integration/final-system-security-validation.js"\
+      exec node "$SCRIPT_DIR/../tests/integration/full-system-validation.test.js"\
       ;;' "$CODING_REPO/bin/coding"
     
     success "coding launcher integration completed"
@@ -642,8 +642,8 @@ run_security_validation() {
 # Run enhanced redaction validation
 run_enhanced_redaction_validation() {
     info "Running enhanced redaction security validation..."
-    
-    local test_script="$CODING_REPO/tests/security/enhanced-redaction-validation.test.js"
+
+    local test_script="$CODING_REPO/tests/security/lsl-security-validation.test.js"
     
     if [[ -f "$test_script" ]]; then
         if timeout 60s node "$test_script" > "$TEMP_DIR/redaction-validation.log" 2>&1; then
@@ -669,8 +669,8 @@ run_enhanced_redaction_validation() {
 # Run final system security validation
 run_final_system_security_validation() {
     info "Running final system security validation..."
-    
-    local test_script="$CODING_REPO/tests/integration/final-system-security-validation.js"
+
+    local test_script="$CODING_REPO/tests/integration/full-system-validation.test.js"
     
     if [[ -f "$test_script" ]]; then
         if timeout 120s node "$test_script" > "$TEMP_DIR/system-security-validation.log" 2>&1; then

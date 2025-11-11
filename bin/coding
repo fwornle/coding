@@ -103,8 +103,9 @@ while [[ $# -gt 0 ]]; do
       exec node "$SCRIPT_DIR/../scripts/live-logging-coordinator.js" --status
       ;;
     --lsl-validate)
-      exec node "$SCRIPT_DIR/../tests/integration/final-system-security-validation.js"
-      ;;    --help|-h)
+      exec node "$SCRIPT_DIR/../tests/integration/full-system-validation.test.js"
+      ;;
+    --help|-h)
       show_help
       exit 0
       ;;
