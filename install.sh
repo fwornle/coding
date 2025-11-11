@@ -555,6 +555,77 @@ install_serena() {
     cd "$CODING_REPO"
 }
 
+# Install MCP Constraint Monitor with Professional Dashboard (git submodule)
+install_constraint_monitor() {
+    echo -e "\n${CYAN}🚦 Installing MCP Constraint Monitor with Professional Dashboard (git submodule)...${NC}"
+
+    cd "$CODING_REPO"
+
+    local constraint_monitor_dir="$CODING_REPO/integrations/mcp-constraint-monitor"
+
+    # Initialize or update submodule
+    if [[ -d "$constraint_monitor_dir/.git" ]]; then
+        info "mcp-constraint-monitor submodule already exists, updating..."
+        cd "$constraint_monitor_dir"
+        if timeout 10s git pull origin main 2>/dev/null; then
+            success "mcp-constraint-monitor updated"
+        else
+            warning "Could not update mcp-constraint-monitor, using existing version"
+        fi
+    else
+        info "Initializing mcp-constraint-monitor submodule..."
+        git submodule update --init --recursive integrations/mcp-constraint-monitor || {
+            warning "Failed to initialize mcp-constraint-monitor submodule"
+            info "You can manually clone: git clone https://github.com/fwornle/mcp-constraint-monitor.git integrations/mcp-constraint-monitor"
+            INSTALLATION_WARNINGS+=("mcp-constraint-monitor: Failed to initialize submodule")
+            return 1
+        }
+    fi
+
+    # Install constraint monitor dependencies
+    if [[ -d "$constraint_monitor_dir" && -f "$constraint_monitor_dir/package.json" ]]; then
+        cd "$constraint_monitor_dir"
+
+        # Run the constraint monitor's own install script (skip hooks - we handle those in main install)
+        if [[ -f "install.sh" ]]; then
+            info "Running constraint monitor installation (dependencies only)..."
+            bash install.sh --skip-hooks || warning "Constraint monitor installation had issues"
+        else
+            # Fallback to manual installation if install.sh doesn't exist
+            info "Installing constraint monitor dependencies..."
+            npm install || warning "Failed to install constraint monitor dependencies"
+        fi
+
+        # Install professional dashboard dependencies
+        if [[ -d "dashboard" ]]; then
+            info "Installing professional dashboard dependencies..."
+            cd dashboard
+
+            # Prefer pnpm if available (Next.js works better with pnpm)
+            if command -v pnpm >/dev/null 2>&1; then
+                pnpm install || npm install || warning "Failed to install dashboard dependencies"
+            else
+                npm install || warning "Failed to install dashboard dependencies"
+            fi
+
+            cd ..
+            success "Professional Dashboard dependencies installed"
+            info "Dashboard runs on port 3030 with shadcn/ui components"
+        else
+            warning "Dashboard directory not found in constraint monitor"
+        fi
+
+        success "MCP Constraint Monitor with Professional Dashboard installed"
+        info "Global monitoring supports multi-project constraint tracking"
+        info "Hooks will be configured in the main installation process"
+    else
+        warning "Constraint monitor package.json not found"
+        INSTALLATION_WARNINGS+=("mcp-constraint-monitor: Missing package.json")
+    fi
+
+    cd "$CODING_REPO"
+}
+
 # Install shadcn/ui MCP server for professional dashboard components
 install_shadcn_mcp() {
     echo -e "\n${CYAN}🎨 Installing shadcn/ui MCP server for professional dashboard components...${NC}"
@@ -669,39 +740,6 @@ install_mcp_servers() {
         success "Browser-access MCP server installed"
     else
         warning "browser-access directory not found, skipping..."
-    fi
-
-    # Install constraint-monitor with professional dashboard
-    info "Setting up MCP Constraint Monitor with Professional Dashboard..."
-    if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
-        cd "$CODING_REPO/integrations/mcp-constraint-monitor"
-
-        # Run the constraint monitor's own install script (skip hooks - we handle those in main install)
-        if [[ -f "install.sh" ]]; then
-            info "Running constraint monitor installation (dependencies only)..."
-            bash install.sh --skip-hooks || warning "Constraint monitor installation had issues"
-        else
-            # Fallback to manual installation if install.sh doesn't exist
-            info "Installing constraint monitor dependencies..."
-            npm install || warning "Failed to install constraint monitor dependencies"
-
-            # Install dashboard dependencies
-            if [[ -d "dashboard" ]]; then
-                info "Installing professional dashboard dependencies..."
-                cd dashboard
-                pnpm install || npm install || warning "Failed to install dashboard dependencies"
-                cd ..
-            fi
-        fi
-
-        success "MCP Constraint Monitor with Professional Dashboard installed"
-        info "Professional Dashboard runs on port 3030 with shadcn/ui components"
-        info "Global monitoring supports multi-project constraint tracking"
-        info "Hooks will be configured in the main installation process"
-    else
-        info "MCP Constraint Monitor will be installed automatically when services start"
-        info "Repository: https://github.com/fwornle/mcp-server-constraint-monitor"
-        info "Includes professional dashboard with real-time violations timeline"
     fi
 }
 
@@ -1121,7 +1159,7 @@ verify_installation() {
     # Check Constraint Monitor with Professional Dashboard
     if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor" ]]; then
         success "MCP Constraint Monitor (standalone) configured"
-        if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor/dashboard-new" ]]; then
+        if [[ -d "$CODING_REPO/integrations/mcp-constraint-monitor/dashboard" ]]; then
             success "Professional Dashboard (port 3030) installed"
         else
             warning "Professional Dashboard not found"
@@ -1570,6 +1608,7 @@ main() {
     install_browserbase
     install_semantic_analysis
     install_serena
+    install_constraint_monitor
     install_shadcn_mcp
     install_mcp_servers
     create_command_wrappers

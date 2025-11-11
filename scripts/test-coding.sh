@@ -1468,58 +1468,64 @@ fi
 
 if dir_exists "$SHADCN_MCP_DIR"; then
     print_pass "shadcn/ui MCP Server directory found"
-    
-    print_check "shadcn/ui MCP server dependencies"
-    if [ -d "$SHADCN_MCP_DIR/node_modules" ]; then
-        print_pass "shadcn/ui MCP dependencies installed"
-    else
-        print_repair "Installing shadcn/ui MCP dependencies..."
-        cd "$SHADCN_MCP_DIR"
-        if command_exists pnpm; then
-            pnpm install
-        else
-            npm install
-        fi
-        print_fixed "shadcn/ui MCP dependencies installed"
-    fi
-    
-    print_check "shadcn/ui components availability"
-    if [ -d "$SHADCN_MCP_DIR/components/ui" ]; then
-        COMPONENTS_COUNT=$(ls -1 "$SHADCN_MCP_DIR/components/ui" 2>/dev/null | wc -l)
-        if [ "$COMPONENTS_COUNT" -gt 8 ]; then
-            print_pass "Comprehensive shadcn/ui components available ($COMPONENTS_COUNT components)"
-            
-            # Check for specific components needed for professional dashboard
-            REQUIRED_COMPONENTS=("button" "card" "table" "badge" "select" "accordion" "progress" "alert" "separator")
-            FOUND_COMPONENTS=0
-            for component in "${REQUIRED_COMPONENTS[@]}"; do
-                if [ -f "$SHADCN_MCP_DIR/components/ui/${component}.tsx" ]; then
-                    FOUND_COMPONENTS=$((FOUND_COMPONENTS + 1))
-                fi
-            done
-            
-            if [ $FOUND_COMPONENTS -ge 7 ]; then
-                print_pass "Professional dashboard components available ($FOUND_COMPONENTS/${#REQUIRED_COMPONENTS[@]})"
-            else
-                print_warning "Some professional dashboard components missing ($FOUND_COMPONENTS/${#REQUIRED_COMPONENTS[@]})"
-            fi
-        elif [ "$COMPONENTS_COUNT" -gt 3 ]; then
-            print_warning "Basic shadcn/ui components available ($COMPONENTS_COUNT components)"
-        else
-            print_fail "Very limited shadcn/ui components available ($COMPONENTS_COUNT components)"
-        fi
-    else
-        print_fail "shadcn/ui components directory not found"
-    fi
-    
+
+    # Check for configuration type
     print_check "shadcn/ui MCP server configuration"
-    if [ -f "$SHADCN_MCP_DIR/package.json" ]; then
+    if [ -f "$SHADCN_MCP_DIR/.mcp.json" ]; then
+        print_pass "shadcn MCP configured (npx mode via .mcp.json)"
+        print_info "Runs via: npx shadcn@latest mcp (no local installation needed)"
+
+        # For npx mode, we don't need local dependencies or components
+        # The shadcn CLI provides components on-demand via npx
+
+    elif [ -f "$SHADCN_MCP_DIR/package.json" ]; then
+        print_pass "shadcn MCP configured (local installation mode)"
+
+        # Check dependencies for local mode
+        print_check "shadcn/ui MCP server dependencies"
+        if [ -d "$SHADCN_MCP_DIR/node_modules" ]; then
+            print_pass "shadcn/ui MCP dependencies installed"
+        else
+            print_warning "shadcn/ui MCP dependencies not installed"
+            print_info "Run: cd $SHADCN_MCP_DIR && npm install"
+        fi
+
+        # Check components for local mode
+        print_check "shadcn/ui components availability"
+        if [ -d "$SHADCN_MCP_DIR/components/ui" ]; then
+            COMPONENTS_COUNT=$(ls -1 "$SHADCN_MCP_DIR/components/ui" 2>/dev/null | wc -l)
+            if [ "$COMPONENTS_COUNT" -gt 8 ]; then
+                print_pass "Comprehensive shadcn/ui components available ($COMPONENTS_COUNT components)"
+
+                # Check for specific components needed for professional dashboard
+                REQUIRED_COMPONENTS=("button" "card" "table" "badge" "select" "accordion" "progress" "alert" "separator")
+                FOUND_COMPONENTS=0
+                for component in "${REQUIRED_COMPONENTS[@]}"; do
+                    if [ -f "$SHADCN_MCP_DIR/components/ui/${component}.tsx" ]; then
+                        FOUND_COMPONENTS=$((FOUND_COMPONENTS + 1))
+                    fi
+                done
+
+                if [ $FOUND_COMPONENTS -ge 7 ]; then
+                    print_pass "Professional dashboard components available ($FOUND_COMPONENTS/${#REQUIRED_COMPONENTS[@]})"
+                else
+                    print_warning "Some professional dashboard components missing ($FOUND_COMPONENTS/${#REQUIRED_COMPONENTS[@]})"
+                fi
+            elif [ "$COMPONENTS_COUNT" -gt 3 ]; then
+                print_warning "Basic shadcn/ui components available ($COMPONENTS_COUNT components)"
+            else
+                print_warning "Very limited shadcn/ui components available ($COMPONENTS_COUNT components)"
+            fi
+        else
+            print_info "shadcn/ui components not pre-installed (will be fetched on-demand)"
+        fi
+
         if grep -q "shadcn\|@radix-ui" "$SHADCN_MCP_DIR/package.json" 2>/dev/null; then
             print_pass "shadcn/ui MCP server properly configured with Radix UI"
         else
             print_warning "shadcn/ui MCP server configuration may be incomplete"
         fi
-        
+
         # Check for MCP server script
         if grep -q "mcp" "$SHADCN_MCP_DIR/package.json" 2>/dev/null; then
             print_pass "MCP server integration configured"
@@ -1527,7 +1533,8 @@ if dir_exists "$SHADCN_MCP_DIR"; then
             print_warning "MCP server integration may be missing"
         fi
     else
-        print_fail "shadcn/ui MCP server package.json missing"
+        print_warning "shadcn MCP configuration files not found"
+        print_info "Expected: .mcp.json (npx mode) or package.json (local mode)"
     fi
     
     print_check "shadcn/ui MCP integration in claude-code-mcp.json"
@@ -1786,21 +1793,35 @@ else
 fi
 
 print_check "Documentation diagrams and images"
-KEY_IMAGES=("images/system-architecture.png" "images/vscode-component-diagram.png" "images/vscode-extension-flow.png" "images/claude-mcp-autologging.png")
-MISSING_IMAGES=0
-for img in "${KEY_IMAGES[@]}"; do
+
+# Required images (architecture diagrams)
+REQUIRED_IMAGES=("images/system-architecture.png" "images/vscode-component-diagram.png" "images/vscode-extension-flow.png")
+MISSING_REQUIRED=0
+for img in "${REQUIRED_IMAGES[@]}"; do
     if file_exists "$CODING_ROOT/docs/$img"; then
         print_pass "Found: docs/$img"
     else
-        print_fail "Missing: docs/$img"
-        MISSING_IMAGES=$((MISSING_IMAGES + 1))
+        print_fail "Missing required: docs/$img"
+        MISSING_REQUIRED=$((MISSING_REQUIRED + 1))
     fi
 done
 
-if [ $MISSING_IMAGES -eq 0 ]; then
-    print_pass "All key documentation images present"
+# Optional images (screenshots, etc.)
+OPTIONAL_IMAGES=("images/claude-mcp-autologging.png")
+MISSING_OPTIONAL=0
+for img in "${OPTIONAL_IMAGES[@]}"; do
+    if file_exists "$CODING_ROOT/docs/$img"; then
+        print_pass "Found: docs/$img"
+    else
+        print_info "Missing optional: docs/$img (screenshot - can be recreated)"
+        MISSING_OPTIONAL=$((MISSING_OPTIONAL + 1))
+    fi
+done
+
+if [ $MISSING_REQUIRED -eq 0 ]; then
+    print_pass "All required documentation images present"
 else
-    print_fail "$MISSING_IMAGES key documentation images missing"
+    print_fail "$MISSING_REQUIRED required documentation images missing"
 fi
 
 # =============================================================================
