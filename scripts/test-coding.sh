@@ -338,15 +338,12 @@ print_check "UKB test pattern creation"
 # Try auto mode instead of interactive for testing
 if ukb --auto >/dev/null 2>&1; then
     print_pass "UKB auto mode functional"
-elif file_exists "$CODING_ROOT/shared-memory.json" && [ -s "$CODING_ROOT/shared-memory.json" ]; then
-    print_pass "UKB working (knowledge base exists with data)"
+elif [ -d "$CODING_ROOT/.data/knowledge-graph" ]; then
+    print_pass "UKB working (GraphDB knowledge base initialized)"
 else
-    print_warning "UKB interactive test skipped - try manually: ukb --interactive"
-    print_repair "Checking UKB dependencies..."
-    if [ ! -f "$CODING_ROOT/shared-memory.json" ]; then
-        echo '{"entities":[],"relations":[],"metadata":{"version":"1.0.0"}}' > "$CODING_ROOT/shared-memory.json"
-        print_fixed "Created shared-memory.json"
-    fi
+    print_warning "UKB test skipped - GraphDB not initialized"
+    print_info "Knowledge is managed via GraphDB at .data/knowledge-graph/"
+    print_info "Try manually: ukb --interactive"
 fi
 
 print_test "VKB (View Knowledge Base) tool"
@@ -390,45 +387,42 @@ print_test "Multi-Team Knowledge Base Configuration"
 print_check "Team environment variable"
 if [ -n "$CODING_TEAM" ]; then
     print_pass "CODING_TEAM set to: $CODING_TEAM"
-    
-    print_check "Team-specific knowledge base file"
-    TEAM_FILE="$CODING_ROOT/shared-memory-${CODING_TEAM}.json"
+
+    print_check "Team-specific knowledge export file"
+    TEAM_FILE="$CODING_ROOT/.data/knowledge-export/${CODING_TEAM}.json"
     if file_exists "$TEAM_FILE"; then
-        print_pass "Team knowledge file exists: shared-memory-${CODING_TEAM}.json"
+        print_pass "Team knowledge export exists: .data/knowledge-export/${CODING_TEAM}.json"
         if [ -s "$TEAM_FILE" ]; then
             TEAM_ENTITIES=$(jq '.entities | length' "$TEAM_FILE" 2>/dev/null || echo "0")
-            print_info "Team knowledge file contains $TEAM_ENTITIES entities"
+            print_info "Team knowledge export contains $TEAM_ENTITIES entities"
         fi
     else
-        print_warning "Team knowledge file not found: shared-memory-${CODING_TEAM}.json"
-        print_info "Will be created when team adds first entity"
+        print_info "Team knowledge export not found: .data/knowledge-export/${CODING_TEAM}.json"
+        print_info "Will be exported from GraphDB when team adds first entity"
     fi
 else
     print_info "CODING_TEAM not set - using individual developer mode"
 fi
 
-print_check "Cross-team coding knowledge base"
-CODING_FILE="$CODING_ROOT/shared-memory-coding.json"
+print_check "Cross-team coding knowledge export"
+CODING_FILE="$CODING_ROOT/.data/knowledge-export/coding.json"
 if file_exists "$CODING_FILE"; then
-    print_pass "Cross-team coding knowledge file exists"
+    print_pass "Cross-team coding knowledge export exists"
     if [ -s "$CODING_FILE" ]; then
         CODING_ENTITIES=$(jq '.entities | length' "$CODING_FILE" 2>/dev/null || echo "0")
-        print_info "Coding knowledge file contains $CODING_ENTITIES entities"
+        print_info "Coding knowledge export contains $CODING_ENTITIES entities"
     fi
 else
-    print_warning "Cross-team coding knowledge file not found"
-    print_info "Migration may be needed if using team setup"
+    print_info "Cross-team coding knowledge export not found"
+    print_info "Knowledge is managed in GraphDB at .data/knowledge-graph/"
 fi
 
-print_check "Migration script availability"
-MIGRATION_SCRIPT="$CODING_ROOT/scripts/migrate-to-multi-team.js"
-if file_exists "$MIGRATION_SCRIPT"; then
-    print_pass "Multi-team migration script available"
-    if file_exists "$CODING_ROOT/shared-memory.json" && [ ! -f "$CODING_FILE" ]; then
-        print_info "Consider running: node scripts/migrate-to-multi-team.js"
-    fi
+print_check "GraphDB directory"
+if [ -d "$CODING_ROOT/.data/knowledge-graph" ]; then
+    print_pass "GraphDB directory exists at .data/knowledge-graph/"
 else
-    print_fail "Migration script not found"
+    print_info "GraphDB directory not yet created (normal for new installations)"
+    print_info "Will be created when first entity is added"
 fi
 
 print_check "Team-aware UKB functionality"
@@ -1702,12 +1696,13 @@ if command_exists vkb; then
     
     # Test VKB can prepare data
     cd "$CODING_ROOT"
-    if [ -f "shared-memory.json" ]; then
+    if [ -d ".data/knowledge-graph" ] || [ -d ".data/knowledge-export" ]; then
         # Try a quick start/stop test
         timeout 15 bash -c 'vkb start >/dev/null 2>&1; sleep 5; vkb stop >/dev/null 2>&1' 2>/dev/null || true
         print_pass "VKB start/stop test completed"
     else
-        print_warning "VKB data preparation test skipped (no shared-memory.json)"
+        print_info "VKB data preparation test skipped (no knowledge data yet)"
+        print_info "Knowledge will be available in GraphDB at .data/knowledge-graph/"
     fi
 else
     print_fail "VKB command not available for testing"
@@ -1817,71 +1812,63 @@ print_section "PHASE 8: End-to-End Integration Testing"
 print_test "Full system integration"
 
 print_check "Knowledge base state"
-# Check for team-specific or context-specific shared-memory files
-TEAM_KB_FILES=$(find "$CODING_ROOT" -maxdepth 1 -name "shared-memory-*.json" 2>/dev/null)
-LEGACY_KB="$CODING_ROOT/shared-memory.json"
+# Check for GraphDB and knowledge export files
+GRAPHDB_DIR="$CODING_ROOT/.data/knowledge-graph"
+EXPORT_DIR="$CODING_ROOT/.data/knowledge-export"
 
-if [ -n "$TEAM_KB_FILES" ]; then
-    print_pass "Context-specific knowledge base files found:"
-    for file in $TEAM_KB_FILES; do
-        BASENAME=$(basename "$file")
-        ENTITY_COUNT=$(jq '.entities | length' "$file" 2>/dev/null || echo "0")
-        RELATION_COUNT=$(jq '.relations | length' "$file" 2>/dev/null || echo "0")
-        print_info "  $BASENAME - Entities: $ENTITY_COUNT, Relations: $RELATION_COUNT"
-    done
-elif file_exists "$LEGACY_KB"; then
-    print_pass "shared-memory.json exists (legacy single-file mode)"
-    
-    ENTITY_COUNT=$(jq '.entities | length' "$LEGACY_KB" 2>/dev/null || echo "0")
-    RELATION_COUNT=$(jq '.relations | length' "$LEGACY_KB" 2>/dev/null || echo "0")
-    print_info "Entities: $ENTITY_COUNT, Relations: $RELATION_COUNT"
-    
-    if [ "$ENTITY_COUNT" -gt 0 ]; then
-        print_pass "Knowledge base contains data"
-    else
-        print_info "Knowledge base is empty (normal for new installations)"
+if [ -d "$GRAPHDB_DIR" ]; then
+    print_pass "GraphDB directory exists at .data/knowledge-graph/"
+
+    # Check for export files
+    if [ -d "$EXPORT_DIR" ]; then
+        EXPORT_FILES=$(find "$EXPORT_DIR" -maxdepth 1 -name "*.json" 2>/dev/null)
+        if [ -n "$EXPORT_FILES" ]; then
+            print_pass "Knowledge export files found:"
+            for file in $EXPORT_FILES; do
+                BASENAME=$(basename "$file")
+                ENTITY_COUNT=$(jq '.entities | length' "$file" 2>/dev/null || echo "0")
+                RELATION_COUNT=$(jq '.relations | length' "$file" 2>/dev/null || echo "0")
+                print_info "  $BASENAME - Entities: $ENTITY_COUNT, Relations: $RELATION_COUNT"
+            done
+        else
+            print_info "No export files yet in .data/knowledge-export/ (normal for new installations)"
+        fi
     fi
+elif [ -d "$EXPORT_DIR" ]; then
+    print_info "Export directory exists but GraphDB not initialized"
+    print_info "GraphDB will be created when first entity is added"
 else
-    print_info "No knowledge base files found (normal for new installations)"
-    print_info "Knowledge bases will be created when teams/contexts add their first entity"
+    print_info "No knowledge data found (normal for new installations)"
+    print_info "GraphDB will be created at .data/knowledge-graph/ when teams add their first entity"
 fi
 
 print_check "Git integration"
 cd "$CODING_ROOT"
-# Check for any knowledge base files (legacy or team-specific)
+# Check for knowledge export files in .data/knowledge-export/
+EXPORT_DIR=".data/knowledge-export"
 KB_FILES_FOUND=false
-KB_GIT_STATUS=""
 
-# Check team-specific files
-for kb_file in shared-memory-*.json; do
-    if [ -f "$kb_file" ]; then
-        KB_FILES_FOUND=true
-        if git status --porcelain | grep -q "$kb_file"; then
-            KB_GIT_STATUS="has_changes"
-            print_pass "$kb_file is tracked by git and has changes"
-        elif git ls-files --error-unmatch "$kb_file" >/dev/null 2>&1; then
-            print_pass "$kb_file is tracked by git"
-        else
-            print_repair "Adding $kb_file to git..."
-            git add "$kb_file"
-            print_fixed "$kb_file added to git"
+if [ -d "$EXPORT_DIR" ]; then
+    # Check export files
+    for kb_file in "$EXPORT_DIR"/*.json; do
+        if [ -f "$kb_file" ]; then
+            KB_FILES_FOUND=true
+            RELATIVE_PATH="${kb_file#$CODING_ROOT/}"
+            if git status --porcelain | grep -q "$RELATIVE_PATH"; then
+                print_pass "$RELATIVE_PATH is tracked by git and has changes"
+            elif git ls-files --error-unmatch "$kb_file" >/dev/null 2>&1; then
+                print_pass "$RELATIVE_PATH is tracked by git"
+            else
+                print_info "$RELATIVE_PATH exists but not tracked"
+                print_info "Knowledge exports are auto-generated from GraphDB"
+            fi
         fi
-    fi
-done
+    done
+fi
 
-# Check legacy shared-memory.json if no team files found
-if [ "$KB_FILES_FOUND" = false ] && [ -f "shared-memory.json" ]; then
-    if git status --porcelain | grep -q "shared-memory.json"; then
-        print_pass "shared-memory.json is tracked by git and has changes"
-    elif git ls-files --error-unmatch shared-memory.json >/dev/null 2>&1; then
-        print_pass "shared-memory.json is tracked by git"
-    else
-        print_repair "Adding shared-memory.json to git..."
-        git add shared-memory.json
-        print_fixed "shared-memory.json added to git"
-    fi
-else
-    print_info "Knowledge base files will be added to git when created"
+if [ "$KB_FILES_FOUND" = false ]; then
+    print_info "No knowledge export files yet (normal for new installations)"
+    print_info "Export files at .data/knowledge-export/ will be tracked in git when created"
 fi
 
 # Test UKB with actual pattern creation

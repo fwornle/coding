@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Configuration
 CLAUDE_REPO="${CODING_TOOLS_PATH:-/Users/q284340/Agentic/coding}"
-SHARED_MEMORY="$CLAUDE_REPO/shared-memory.json"
+KNOWLEDGE_EXPORT_DIR="$CLAUDE_REPO/.data/knowledge-export"
 VERIFICATION_REPORT="/tmp/pattern-verification-$(date +%Y%m%d_%H%M%S).md"
 
 # Colors

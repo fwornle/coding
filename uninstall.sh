@@ -17,7 +17,7 @@ echo -e "${YELLOW}🗑️  Coding Tools System - Uninstaller${NC}"
 echo -e "${YELLOW}=========================================${NC}"
 echo ""
 echo -e "${RED}⚠️  WARNING: This will remove installed components${NC}"
-echo -e "${GREEN}✅ Your knowledge data (shared-memory*.json) will be preserved${NC}"
+echo -e "${GREEN}✅ Your knowledge data (.data/knowledge-graph/ and .data/knowledge-export/) will be preserved${NC}"
 echo ""
 read -p "Continue with uninstall? (y/N) " -n 1 -r
 echo
@@ -253,15 +253,20 @@ echo "    docker stop qdrant-container"
 
 echo -e "\n${GREEN}✅ Uninstall completed!${NC}"
 echo -e "${GREEN}📊 Your knowledge data preservation status:${NC}"
-echo "   $CODING_REPO/shared-memory.json (if exists) - PRESERVED"
 
-# List team-specific knowledge files
-TEAM_FILES=$(find "$CODING_REPO" -name "shared-memory-*.json" 2>/dev/null || true)
-if [[ -n "$TEAM_FILES" ]]; then
-    echo -e "${GREEN}📊 Team-specific knowledge files preserved:${NC}"
-    echo "$TEAM_FILES" | while read -r file; do
-        [[ -n "$file" ]] && echo "   $(basename "$file")"
-    done
+# Check for GraphDB and knowledge exports
+if [[ -d "$CODING_REPO/.data/knowledge-graph" ]]; then
+    echo "   $CODING_REPO/.data/knowledge-graph/ - PRESERVED (GraphDB)"
+fi
+
+if [[ -d "$CODING_REPO/.data/knowledge-export" ]]; then
+    EXPORT_FILES=$(find "$CODING_REPO/.data/knowledge-export" -name "*.json" 2>/dev/null || true)
+    if [[ -n "$EXPORT_FILES" ]]; then
+        echo -e "${GREEN}📊 Knowledge export files preserved:${NC}"
+        echo "$EXPORT_FILES" | while read -r file; do
+            [[ -n "$file" ]] && echo "   $(basename "$file")"
+        done
+    fi
 fi
 
 if [[ -d "$CODING_REPO/.data" ]]; then

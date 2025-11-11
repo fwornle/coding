@@ -98,12 +98,19 @@ echo "6. Repository Checks:"
 echo -n "   CODING_REPO environment: "
 if [[ -n "$CODING_REPO" ]]; then
     echo "✓ $CODING_REPO"
-    
-    echo -n "   shared-memory.json: "
-    if [[ -f "$CODING_REPO/shared-memory.json" ]]; then
+
+    echo -n "   GraphDB (.data/knowledge-graph/): "
+    if [[ -d "$CODING_REPO/.data/knowledge-graph" ]]; then
         echo "✓ Found"
     else
-        echo "✗ Not found at $CODING_REPO/shared-memory.json"
+        echo "✗ Not found at $CODING_REPO/.data/knowledge-graph/"
+    fi
+
+    echo -n "   Knowledge exports (.data/knowledge-export/): "
+    if [[ -d "$CODING_REPO/.data/knowledge-export" ]]; then
+        echo "✓ Found"
+    else
+        echo "✗ Not found at $CODING_REPO/.data/knowledge-export/"
     fi
     
     echo -n "   memory-visualizer dir: "

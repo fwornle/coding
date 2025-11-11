@@ -976,32 +976,17 @@ setup_project_level_mcp_config() {
     fi
 }
 
-# Initialize shared memory
+# Initialize shared memory - DEPRECATED (v2.0+)
+# Knowledge is now managed by GraphDB (Graphology + LevelDB) with exports to .data/knowledge-export/
+# This function is kept for backward compatibility but does nothing
 initialize_shared_memory() {
-    echo -e "\n${CYAN}📝 Initializing shared memory...${NC}"
-    
-    if [[ ! -f "$CODING_REPO/shared-memory.json" ]]; then
-        info "Creating initial shared-memory.json..."
-        cat > "$CODING_REPO/shared-memory.json" << 'EOF'
-{
-  "entities": [],
-  "relations": [],
-  "metadata": {
-    "version": "1.0.0",
-    "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-    "contributors": [],
-    "total_entities": 0,
-    "total_relations": 0
-  }
-}
-EOF
-        success "Shared memory initialized"
-    else
-        info "Shared memory already exists"
-    fi
-    
-    # Ensure proper permissions
-    chmod 644 "$CODING_REPO/shared-memory.json"
+    echo -e "\n${CYAN}📝 Initializing knowledge management...${NC}"
+
+    # The initialize-knowledge-system.js script already initializes GraphDB
+    # and creates .data/knowledge-export/*.json files
+    info "Knowledge management is handled by GraphDB (see .data/knowledge-graph/)"
+    info "Team-specific exports available at .data/knowledge-export/*.json"
+    success "Knowledge management system ready"
 }
 
 # Create example configuration files
@@ -1035,7 +1020,7 @@ OPENAI_API_KEY=your-openai-api-key
 # CODING_REPO=/path/to/coding/repo (legacy, now uses CODING_TOOLS_PATH)
 # MEMORY_VISUALIZER_DIR=/path/to/memory-visualizer
 
-# Knowledge Base path - where shared-memory-*.json files are located
+# Knowledge Base path - where .data/knowledge-graph/ and .data/knowledge-export/ are located
 # Default: same directory as the coding project
 # Can be set to a different path for centralized knowledge management
 CODING_KB_PATH=/path/to/coding/repo
@@ -1063,7 +1048,7 @@ LOCAL_CDP_URL=ws://localhost:9222
 # Project path - automatically set by installer
 CLAUDE_PROJECT_PATH=$CODING_REPO
 
-# Knowledge Base path - where shared-memory-*.json files are located
+# Knowledge Base path - where .data/knowledge-graph/ and .data/knowledge-export/ are located
 # Default: same directory as the coding project
 CODING_KB_PATH=$CODING_REPO
 
@@ -1080,7 +1065,7 @@ EOF
         if ! grep -q "CODING_KB_PATH" "$CODING_REPO/.env"; then
             info "Adding CODING_KB_PATH to existing .env file..."
             echo "" >> "$CODING_REPO/.env"
-            echo "# Knowledge Base path - where shared-memory-*.json files are located" >> "$CODING_REPO/.env"
+            echo "# Knowledge Base path - where .data/knowledge-graph/ and .data/knowledge-export/ are located" >> "$CODING_REPO/.env"
             echo "# Default: same directory as the coding project" >> "$CODING_REPO/.env"
             echo "CODING_KB_PATH=$CODING_REPO" >> "$CODING_REPO/.env"
         fi
@@ -1247,10 +1232,11 @@ configure_team_setup() {
     echo "# Modify this variable to change team scope (e.g., \"resi raas\" for multiple teams)" >> "$SHELL_RC"
     echo "export CODING_TEAM=\"$CODING_TEAM\"" >> "$SHELL_RC"
     success "Team configuration added to $SHELL_RC"
-    
-    info "Your configuration will use these knowledge files:"
-    echo "  • shared-memory-coding.json (general coding patterns)"
-    echo "  • shared-memory-ui.json (UI/frontend specific knowledge)"
+
+    info "Your configuration will use these knowledge exports:"
+    echo "  • .data/knowledge-export/coding.json (general coding patterns)"
+    echo "  • .data/knowledge-export/ui.json (UI/frontend specific knowledge)"
+    info "Knowledge is managed by GraphDB at .data/knowledge-graph/ (auto-persisted)"
 }
 
 # Install PlantUML for diagram generation

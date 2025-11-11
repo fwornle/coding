@@ -16,12 +16,12 @@ else
 fi
 
 # Export for Claude Code to know where the knowledge base is
-export CODING_KNOWLEDGE_BASE="$CODING_REPO_DIR/shared-memory.json"
+export CODING_KNOWLEDGE_BASE="$CODING_REPO_DIR/.data/knowledge-graph"
+export CODING_KNOWLEDGE_EXPORT="$CODING_REPO_DIR/.data/knowledge-export"
 export CODING_TOOLS_PATH="$CODING_REPO_DIR"
 
 # Path to the MCP config file
 MCP_CONFIG="$CODING_REPO_DIR/claude-code-mcp-processed.json"
-SHARED_MEMORY="$CODING_REPO_DIR/shared-memory.json"
 
 # Check if the MCP config file exists
 if [[ ! -f "$MCP_CONFIG" ]]; then
@@ -60,10 +60,11 @@ if [[ -f "$SHARED_MEMORY" ]]; then
    - ✅ ALWAYS use Redux patterns
 
 3. **Knowledge Management Rules:**
-   - ❌ NEVER edit shared-memory.json directly
+   - ❌ NEVER edit GraphDB files (.data/knowledge-graph/) directly
    - ✅ ALWAYS use: ukb --interactive or ukb --auto
    - ✅ Use vkb to visualize knowledge graph
    - ✅ ukb is in PATH and works from anywhere
+   - 📊 Knowledge stored in GraphDB, exported to .data/knowledge-export/*.json
 
 4. **Verify logging is working:**
    - Check if today's session is being logged
