@@ -28,6 +28,7 @@ import {
   isProcessRunning,
   sleep
 } from '../lib/service-starter.js';
+import ProcessStateManager from './process-state-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +37,7 @@ const SCRIPT_DIR = __dirname;
 const CODING_DIR = path.resolve(SCRIPT_DIR, '..');
 
 const execAsync = promisify(exec);
+const psm = new ProcessStateManager();
 
 // Service configurations
 const SERVICE_CONFIGS = {
@@ -46,6 +48,13 @@ const SERVICE_CONFIGS = {
     timeout: 20000,
     startFn: async () => {
       console.log('[TranscriptMonitor] Starting enhanced transcript monitor...');
+
+      // Check if already running globally (parallel session detection)
+      const isRunning = await psm.isServiceRunning('transcript-monitor', 'global');
+      if (isRunning) {
+        console.log('[TranscriptMonitor] Already running globally - using existing instance');
+        return { pid: 'already-running', service: 'transcript-monitor', skipRegistration: true };
+      }
 
       const child = spawn('node', [
         path.join(SCRIPT_DIR, 'enhanced-transcript-monitor.js')
@@ -59,7 +68,10 @@ const SERVICE_CONFIGS = {
 
       return { pid: child.pid, service: 'transcript-monitor' };
     },
-    healthCheckFn: createPidHealthCheck()
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      return createPidHealthCheck()(result);
+    }
   },
 
   liveLoggingCoordinator: {
@@ -69,6 +81,13 @@ const SERVICE_CONFIGS = {
     timeout: 20000,
     startFn: async () => {
       console.log('[LiveLogging] Starting live logging coordinator...');
+
+      // Check if already running globally (parallel session detection)
+      const isRunning = await psm.isServiceRunning('live-logging-coordinator', 'global');
+      if (isRunning) {
+        console.log('[LiveLogging] Already running globally - using existing instance');
+        return { pid: 'already-running', service: 'live-logging-coordinator', skipRegistration: true };
+      }
 
       const child = spawn('node', [
         path.join(SCRIPT_DIR, 'live-logging-coordinator.js')
@@ -82,7 +101,10 @@ const SERVICE_CONFIGS = {
 
       return { pid: child.pid, service: 'live-logging-coordinator' };
     },
-    healthCheckFn: createPidHealthCheck()
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      return createPidHealthCheck()(result);
+    }
   },
 
   vkbServer: {
@@ -92,6 +114,19 @@ const SERVICE_CONFIGS = {
     timeout: 30000, // VKB can take longer to start
     startFn: async () => {
       console.log('[VKB] Starting VKB server on port 8080...');
+
+      // Check if already running globally (parallel session detection)
+      const isRunning = await psm.isServiceRunning('vkb-server', 'global');
+      if (isRunning) {
+        console.log('[VKB] Already running globally - using existing instance');
+        // Check if port is listening
+        if (await isPortListening(8080)) {
+          return { pid: 'already-running', port: 8080, service: 'vkb-server', skipRegistration: true };
+        } else {
+          console.log('[VKB] Warning: PSM shows running but port 8080 not listening - cleaning up PSM entry');
+          // PSM will clean this up automatically on next status check
+        }
+      }
 
       // Kill any existing process on port 8080
       try {
@@ -143,7 +178,10 @@ const SERVICE_CONFIGS = {
 
       return { pid: child.pid, port: 8080, service: 'vkb-server', logPath };
     },
-    healthCheckFn: createHttpHealthCheck(8080, '/health')
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      return createHttpHealthCheck(8080, '/health')(result);
+    }
   },
 
   constraintMonitor: {
@@ -207,8 +245,167 @@ const SERVICE_CONFIGS = {
         return false;
       }
     }
+  },
+
+  healthVerifier: {
+    name: 'Health Verifier',
+    required: false, // OPTIONAL - Layer 3 monitoring
+    maxRetries: 2,
+    timeout: 15000,
+    startFn: async () => {
+      console.log('[HealthVerifier] Starting health verification daemon...');
+
+      // Check if already running globally (parallel session detection)
+      const isRunning = await psm.isServiceRunning('health-verifier', 'global');
+      if (isRunning) {
+        console.log('[HealthVerifier] Already running globally - skipping startup');
+        return { pid: 'already-running', service: 'health-verifier', skipRegistration: true };
+      }
+
+      const child = spawn('node', [
+        path.join(SCRIPT_DIR, 'health-verifier.js'),
+        'start'
+      ], {
+        detached: true,
+        stdio: ['ignore', 'ignore', 'ignore'],
+        cwd: CODING_DIR
+      });
+
+      child.unref();
+
+      // Brief wait for process to start
+      await sleep(500);
+
+      // Check if process is still running
+      if (!isProcessRunning(child.pid)) {
+        throw new Error('Health verifier process died immediately');
+      }
+
+      return { pid: child.pid, service: 'health-verifier' };
+    },
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      return createPidHealthCheck()(result);
+    }
+  },
+
+  statuslineHealthMonitor: {
+    name: 'StatusLine Health Monitor',
+    required: false, // OPTIONAL - status line monitoring
+    maxRetries: 2,
+    timeout: 15000,
+    startFn: async () => {
+      console.log('[StatusLineHealth] Starting statusline health monitor...');
+
+      // Check if already running globally (parallel session detection)
+      const isRunning = await psm.isServiceRunning('statusline-health-monitor', 'global');
+      if (isRunning) {
+        console.log('[StatusLineHealth] Already running globally - skipping startup');
+        return { pid: 'already-running', service: 'statusline-health-monitor', skipRegistration: true };
+      }
+
+      const child = spawn('node', [
+        path.join(SCRIPT_DIR, 'statusline-health-monitor.js'),
+        '--daemon',
+        '--auto-heal'
+      ], {
+        detached: true,
+        stdio: ['ignore', 'ignore', 'ignore'],
+        cwd: CODING_DIR
+      });
+
+      child.unref();
+
+      // Brief wait for process to start
+      await sleep(500);
+
+      // Check if process is still running
+      if (!isProcessRunning(child.pid)) {
+        throw new Error('StatusLine health monitor process died immediately');
+      }
+
+      return { pid: child.pid, service: 'statusline-health-monitor' };
+    },
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      return createPidHealthCheck()(result);
+    }
   }
 };
+
+/**
+ * Register service with PSM after successful start
+ */
+async function registerWithPSM(result, scriptPath) {
+  if (result.skipRegistration || result.pid === 'already-running') {
+    return; // Service already registered or using existing instance
+  }
+
+  if (!result.pid || !result.service) {
+    console.log(`[PSM] Warning: Cannot register service - missing pid or service name`);
+    return;
+  }
+
+  try {
+    await psm.registerService({
+      name: result.service,
+      pid: result.pid,
+      type: 'global',
+      script: scriptPath
+    });
+    console.log(`[PSM] Registered ${result.service} (PID: ${result.pid})`);
+  } catch (error) {
+    console.log(`[PSM] Warning: Failed to register ${result.service}: ${error.message}`);
+  }
+}
+
+/**
+ * Create .services-running.json status file for status line
+ */
+async function createServicesStatusFile(results) {
+  const statusFile = path.join(CODING_DIR, '.services-running.json');
+
+  const servicesRunning = results.successful
+    .filter(r => r.status === 'success')
+    .map(r => r.serviceName.toLowerCase().replace(/\s+/g, '-'));
+
+  const status = {
+    timestamp: new Date().toISOString(),
+    services: servicesRunning,
+    services_running: servicesRunning.length,
+    constraint_monitor: {
+      status: results.successful.some(r => r.serviceName === 'Constraint Monitor')
+        ? '✅ FULLY OPERATIONAL'
+        : '⚠️ DEGRADED MODE',
+      dashboard_port: 3030,
+      api_port: 3031,
+      health: results.successful.some(r => r.serviceName === 'Constraint Monitor')
+        ? 'healthy'
+        : 'degraded',
+      last_check: new Date().toISOString()
+    },
+    semantic_analysis: {
+      status: '✅ OPERATIONAL',
+      health: 'healthy'
+    },
+    vkb_server: {
+      status: results.successful.some(r => r.serviceName === 'VKB Server')
+        ? '✅ OPERATIONAL'
+        : '⚠️ DEGRADED',
+      port: 8080,
+      health: results.successful.some(r => r.serviceName === 'VKB Server')
+        ? 'healthy'
+        : 'degraded'
+    },
+    transcript_monitor: {
+      status: '✅ OPERATIONAL',
+      health: 'healthy'
+    }
+  };
+
+  fs.writeFileSync(statusFile, JSON.stringify(status, null, 2));
+  console.log(`[Status] Created ${statusFile}`);
+}
 
 /**
  * Main startup function
@@ -244,6 +441,7 @@ async function startAllServices() {
       }
     );
     results.successful.push(transcriptResult);
+    await registerWithPSM(transcriptResult, 'scripts/enhanced-transcript-monitor.js');
   } catch (error) {
     results.failed.push({
       serviceName: SERVICE_CONFIGS.transcriptMonitor.name,
@@ -264,6 +462,7 @@ async function startAllServices() {
       }
     );
     results.successful.push(coordinatorResult);
+    await registerWithPSM(coordinatorResult, 'scripts/live-logging-coordinator.js');
   } catch (error) {
     results.failed.push({
       serviceName: SERVICE_CONFIGS.liveLoggingCoordinator.name,
@@ -291,6 +490,7 @@ async function startAllServices() {
 
   if (vkbResult.status === 'success') {
     results.successful.push(vkbResult);
+    await registerWithPSM(vkbResult, 'lib/vkb-server/cli.js');
   } else {
     results.degraded.push(vkbResult);
   }
@@ -311,8 +511,51 @@ async function startAllServices() {
 
   if (constraintResult.status === 'success') {
     results.successful.push(constraintResult);
+    // No PSM registration for Docker-based service
   } else {
     results.degraded.push(constraintResult);
+  }
+
+  console.log('');
+
+  // 4. OPTIONAL: Health Verifier
+  const healthVerifierResult = await startServiceWithRetry(
+    SERVICE_CONFIGS.healthVerifier.name,
+    SERVICE_CONFIGS.healthVerifier.startFn,
+    SERVICE_CONFIGS.healthVerifier.healthCheckFn,
+    {
+      required: SERVICE_CONFIGS.healthVerifier.required,
+      maxRetries: SERVICE_CONFIGS.healthVerifier.maxRetries,
+      timeout: SERVICE_CONFIGS.healthVerifier.timeout
+    }
+  );
+
+  if (healthVerifierResult.status === 'success') {
+    results.successful.push(healthVerifierResult);
+    await registerWithPSM(healthVerifierResult, 'scripts/health-verifier.js');
+  } else {
+    results.degraded.push(healthVerifierResult);
+  }
+
+  console.log('');
+
+  // 5. OPTIONAL: StatusLine Health Monitor
+  const statuslineHealthResult = await startServiceWithRetry(
+    SERVICE_CONFIGS.statuslineHealthMonitor.name,
+    SERVICE_CONFIGS.statuslineHealthMonitor.startFn,
+    SERVICE_CONFIGS.statuslineHealthMonitor.healthCheckFn,
+    {
+      required: SERVICE_CONFIGS.statuslineHealthMonitor.required,
+      maxRetries: SERVICE_CONFIGS.statuslineHealthMonitor.maxRetries,
+      timeout: SERVICE_CONFIGS.statuslineHealthMonitor.timeout
+    }
+  );
+
+  if (statuslineHealthResult.status === 'success') {
+    results.successful.push(statuslineHealthResult);
+    await registerWithPSM(statuslineHealthResult, 'scripts/statusline-health-monitor.js');
+  } else {
+    results.degraded.push(statuslineHealthResult);
   }
 
   console.log('');
@@ -346,6 +589,15 @@ async function startAllServices() {
     console.log('═══════════════════════════════════════════════════════════════════════');
     process.exit(1);
   }
+
+  // Create .services-running.json status file for status line
+  try {
+    await createServicesStatusFile(results);
+  } catch (error) {
+    console.log(`⚠️  Warning: Failed to create services status file: ${error.message}`);
+  }
+
+  console.log('');
 
   // Success
   const mode = results.degraded.length > 0 ? 'DEGRADED' : 'FULL';
