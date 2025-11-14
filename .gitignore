@@ -83,6 +83,9 @@ semantic-analysis.log
 
 # MCP Constraint Monitor now standalone - no local ignore patterns needed
 
+# Browserbase MCP server (cloned from public repo, not a submodule)
+integrations/mcp-server-browserbase/
+
 # Live logging runtime data
 .mcp-sync/
 .transcript-monitor-health

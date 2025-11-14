@@ -412,14 +412,14 @@ install_memory_visualizer() {
     success "Memory visualizer installed successfully"
 }
 
-# Install mcp-server-browserbase (git submodule)
+# Install mcp-server-browserbase (regular git clone)
 install_browserbase() {
-    echo -e "\n${CYAN}🌐 Installing mcp-server-browserbase (git submodule)...${NC}"
+    echo -e "\n${CYAN}🌐 Installing mcp-server-browserbase (public repo)...${NC}"
 
     cd "$CODING_REPO"
 
     if [[ -d "$BROWSERBASE_DIR/.git" ]]; then
-        info "mcp-server-browserbase submodule already exists, updating..."
+        info "mcp-server-browserbase already exists, updating..."
         cd "$BROWSERBASE_DIR"
         if timeout 10s git pull origin main 2>/dev/null; then
             success "mcp-server-browserbase updated"
@@ -427,8 +427,14 @@ install_browserbase() {
             warning "Could not update mcp-server-browserbase, using existing version"
         fi
     else
-        info "Initializing mcp-server-browserbase submodule..."
-        git submodule update --init --recursive integrations/mcp-server-browserbase || error_exit "Failed to initialize browserbase submodule"
+        info "Cloning mcp-server-browserbase from GitHub..."
+        if git clone "$BROWSERBASE_HTTPS" "$BROWSERBASE_DIR" 2>/dev/null; then
+            success "mcp-server-browserbase cloned successfully"
+        else
+            # Try SSH if HTTPS fails
+            warning "HTTPS clone failed, trying SSH..."
+            git clone "$BROWSERBASE_SSH" "$BROWSERBASE_DIR" || error_exit "Failed to clone browserbase repository"
+        fi
     fi
 
     cd "$BROWSERBASE_DIR"
@@ -1263,13 +1269,17 @@ configure_team_setup() {
     echo ""
     info "   Example: export CODING_TEAM=\"resi raas\" for multiple teams"
     info "   Example: export CODING_TEAM=\"myteam\" for a custom team"
-    
-    # Add to shell environment
-    echo "" >> "$SHELL_RC"
-    echo "# Coding Tools - Team Configuration" >> "$SHELL_RC"
-    echo "# Modify this variable to change team scope (e.g., \"resi raas\" for multiple teams)" >> "$SHELL_RC"
-    echo "export CODING_TEAM=\"$CODING_TEAM\"" >> "$SHELL_RC"
-    success "Team configuration added to $SHELL_RC"
+
+    # Add to shell environment (only if not already configured)
+    if grep -q "export CODING_TEAM=" "$SHELL_RC" 2>/dev/null; then
+        info "CODING_TEAM already configured in $SHELL_RC"
+    else
+        echo "" >> "$SHELL_RC"
+        echo "# Coding Tools - Team Configuration" >> "$SHELL_RC"
+        echo "# Modify this variable to change team scope (e.g., \"resi raas\" for multiple teams)" >> "$SHELL_RC"
+        echo "export CODING_TEAM=\"$CODING_TEAM\"" >> "$SHELL_RC"
+        success "Team configuration added to $SHELL_RC"
+    fi
 
     info "Your configuration will use these knowledge exports:"
     echo "  • .data/knowledge-export/coding.json (general coding patterns)"
