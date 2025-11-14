@@ -81,12 +81,12 @@
         "auto_heal_action": "restart_dashboard_server"
       },
       "health_dashboard_api": {
-        "enabled": true,
+        "enabled": false,
         "severity": "error",
         "check_type": "http_health",
         "endpoint": "http://localhost:3033/api/health",
         "timeout_ms": 3000,
-        "description": "System Health Dashboard API server (self-monitoring)",
+        "description": "System Health Dashboard API server (self-monitoring) - NOT DEPLOYED YET",
         "auto_heal": true,
         "auto_heal_action": "restart_health_api",
         "expected_status": "critical"
