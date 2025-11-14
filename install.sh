@@ -1715,6 +1715,8 @@ install_constraint_monitor_hooks() {
     local settings_file="$HOME/.claude/settings.json"
     local pre_hook_cmd="node $CODING_REPO/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
     local post_hook_cmd="node $CODING_REPO/scripts/tool-interaction-hook-wrapper.js"
+    local prompt_hook_cmd="node $CODING_REPO/scripts/health-prompt-hook.js"
+    local status_line_cmd="node $CODING_REPO/scripts/combined-status-line-wrapper.js"
 
     # Create .claude directory if it doesn't exist
     mkdir -p "$HOME/.claude"
@@ -1750,11 +1752,26 @@ install_constraint_monitor_hooks() {
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$prompt_hook_cmd",
+            "timeout": 5
+          }
+        ]
+      }
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "$status_line_cmd"
   }
 }
 EOF
-            success "Created new settings file with both constraint and LSL hooks"
+            success "Created new settings file with hooks and status line"
             return 0
         else
             warning "Cannot merge hooks without jq - please install jq and run installer again"
@@ -1776,61 +1793,79 @@ EOF
     # Use jq to add or update hooks
     local temp_file=$(mktemp)
 
-    # Check if hooks already exist
-    local pre_exists=$(jq -e '.hooks.PreToolUse[]? | select(.hooks[]?.command | contains("pre-tool-hook-wrapper.js"))' "$settings_file" 2>/dev/null && echo "yes" || echo "no")
-    local post_exists=$(jq -e '.hooks.PostToolUse[]? | select(.hooks[]?.command | contains("tool-interaction-hook-wrapper.js"))' "$settings_file" 2>/dev/null && echo "yes" || echo "no")
+    # Check if EXACT hooks already exist with correct paths
+    local pre_exists=$(jq -e --arg cmd "$pre_hook_cmd" '.hooks.PreToolUse[]? | select(.hooks[]?.command == $cmd)' "$settings_file" 2>/dev/null && echo "yes" || echo "no")
+    local post_exists=$(jq -e --arg cmd "$post_hook_cmd" '.hooks.PostToolUse[]? | select(.hooks[]?.command == $cmd)' "$settings_file" 2>/dev/null && echo "yes" || echo "no")
 
     if [[ "$pre_exists" == "yes" ]] && [[ "$post_exists" == "yes" ]]; then
-        info "Both PreToolUse and PostToolUse hooks already installed"
+        info "Both PreToolUse and PostToolUse hooks already installed with correct paths"
         return 0
     fi
 
-    # Add both PreToolUse and PostToolUse hooks configuration
-    jq --arg pre_cmd "$pre_hook_cmd" --arg post_cmd "$post_hook_cmd" '
-        .hooks.PreToolUse =
-        if .hooks.PreToolUse then
-            .hooks.PreToolUse + [{
-                "matcher": "*",
-                "hooks": [{
-                    "type": "command",
-                    "command": $pre_cmd
-                }]
+    # IMPORTANT: Remove any old hook entries (duplicates or wrong paths) before adding new ones
+    # This ensures clean state and prevents accumulation of stale hooks
+    jq --arg pre_cmd "$pre_hook_cmd" --arg post_cmd "$post_hook_cmd" --arg prompt_cmd "$prompt_hook_cmd" --arg status_line_cmd "$status_line_cmd" '
+        # Remove ALL existing PreToolUse hooks that match the wrapper script (regardless of path)
+        .hooks.PreToolUse = (
+            if .hooks.PreToolUse then
+                [.hooks.PreToolUse[] | select(.hooks[]?.command | contains("pre-tool-hook-wrapper.js") | not)]
+            else
+                []
+            end
+        ) |
+        # Remove ALL existing PostToolUse hooks that match the wrapper script (regardless of path)
+        .hooks.PostToolUse = (
+            if .hooks.PostToolUse then
+                [.hooks.PostToolUse[] | select(.hooks[]?.command | contains("tool-interaction-hook-wrapper.js") | not)]
+            else
+                []
+            end
+        ) |
+        # Remove ALL existing UserPromptSubmit hooks that match health-prompt-hook (regardless of path)
+        .hooks.UserPromptSubmit = (
+            if .hooks.UserPromptSubmit then
+                [.hooks.UserPromptSubmit[] | select(.hooks[]?.command | contains("health-prompt-hook.js") | not)]
+            else
+                []
+            end
+        ) |
+        # Add the new hooks with correct paths (only ONE instance of each)
+        .hooks.PreToolUse += [{
+            "matcher": "*",
+            "hooks": [{
+                "type": "command",
+                "command": $pre_cmd
             }]
-        else
-            [{
-                "matcher": "*",
-                "hooks": [{
-                    "type": "command",
-                    "command": $pre_cmd
-                }]
+        }] |
+        .hooks.PostToolUse += [{
+            "matcher": "*",
+            "hooks": [{
+                "type": "command",
+                "command": $post_cmd
             }]
-        end |
-        .hooks.PostToolUse =
-        if .hooks.PostToolUse then
-            .hooks.PostToolUse + [{
-                "matcher": "*",
-                "hooks": [{
-                    "type": "command",
-                    "command": $post_cmd
-                }]
+        }] |
+        .hooks.UserPromptSubmit += [{
+            "hooks": [{
+                "type": "command",
+                "command": $prompt_cmd,
+                "timeout": 5
             }]
-        else
-            [{
-                "matcher": "*",
-                "hooks": [{
-                    "type": "command",
-                    "command": $post_cmd
-                }]
-            }]
-        end
+        }] |
+        # Set up status line (replaces any existing statusLine)
+        .statusLine = {
+            "type": "command",
+            "command": $status_line_cmd
+        }
     ' "$settings_file" > "$temp_file"
 
     # Validate JSON
     if jq empty "$temp_file" 2>/dev/null; then
         mv "$temp_file" "$settings_file"
-        success "Hooks installed to ~/.claude/settings.json"
+        success "Hooks and status line installed to ~/.claude/settings.json"
         info "  - PreToolUse: Constraint monitoring (blocks violations)"
         info "  - PostToolUse: LSL logging (captures interactions)"
+        info "  - UserPromptSubmit: System health verification"
+        info "  - StatusLine: Real-time system status display"
     else
         rm -f "$temp_file"
         warning "Failed to update settings file - JSON validation failed"
