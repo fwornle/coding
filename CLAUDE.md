@@ -1,177 +1,79 @@
-# CLAUDE.md - Consolidated Development Guidelines
+# CLAUDE.md - Coding Project Guidelines
 
-This file provides essential guidance to Claude Code across all projects with global rules and project-specific configurations.
-
----
-
-## 🚨🚨🚨 CRITICAL GLOBAL RULE: NO PARALLEL VERSIONS EVER 🚨🚨🚨
-
-**This rule applies to ALL projects and must NEVER be violated.**
-
-### ❌ NEVER CREATE FILES OR FUNCTIONS WITH EVOLUTIONARY NAMES:
-- `v2`, `v3`, `v4`, `v5` (version suffixes)
-- `enhanced`, `improved`, `better`, `new`, `advanced`, `pro`
-- `simplified`, `simple`, `basic`, `lite` 
-- `fixed`, `patched`, `updated`, `revised`, `modified`
-- `temp`, `temporary`, `backup`, `copy`, `duplicate`, `clone`
-- `alt`, `alternative`, `variant`
-- `final`, `draft`, `test`, `experimental`
-
-### ✅ ALWAYS DO THIS INSTEAD:
-1. **Edit the original file directly**
-2. **Debug and trace to find the root cause**
-3. **Fix the underlying problem, not create workarounds**
-4. **Refactor existing code rather than duplicating it**
-
-### Why This Rule is Critical:
-- Prevents technical debt and code bloat
-- Forces proper problem analysis and solutions
-- Maintains clean, maintainable codebases  
-- Eliminates confusion about which version to use
-- Ensures single source of truth
-
-### Enforcement Protocol:
-1. **Immediate removal** of any parallel versions detected
-2. **Root cause analysis** of why the original failed
-3. **Fix the original** using proper debugging techniques
-4. **Add this rule to every project's CLAUDE.md**
-
-**Remember: If you're tempted to create a parallel version, you haven't understood the root problem yet. Keep debugging until you can fix the original.**
-
-### ❌ NEVER USE FALLBACK PATTERNS FOR UNCLEAR DATA SOURCES:
-- Don't use `data?.violations || violations` patterns
-- Don't silently fall back between different data sources
-- **Always have ONE clear source of truth**
-- **Throw errors when data is inconsistent or missing**
-- **Make data flow explicit and predictable**
-
-**Why**: Fallbacks hide bugs and create confusion about which data source is canonical.
+Essential guidance for Claude Code working in the coding infrastructure project.
 
 ---
 
-## 🚨 CRITICAL: MANDATORY DOCUMENTATION-STYLE SKILL USAGE
+## 🚨 MANDATORY: SKILLS USAGE
 
-**ABSOLUTE RULE**: When working with PlantUML, Mermaid, or any documentation diagrams, you MUST invoke the `documentation-style` skill FIRST.
+### Documentation-Style Skill
 
-### When to Use
-ALWAYS invoke the `documentation-style` skill when:
+**ALWAYS invoke the `documentation-style` skill when:**
 - Creating or modifying PlantUML (.puml) files
 - Generating PNG files from PlantUML diagrams
 - Working with Mermaid diagrams
-- Creating or updating any documentation artifacts
+- Creating or updating documentation artifacts
 - User mentions: diagrams, PlantUML, PUML, PNG, visualization, architecture diagrams
 
-### How to Invoke
-Before any diagram work, execute:
+**How to Invoke:**
 ```
 Use Skill tool with command: "documentation-style"
 ```
 
-### Why This Matters
-- Enforces strict naming conventions (lowercase + hyphens only)
-- Prevents incremental naming violations (no v2, v3, etc.)
-- Ensures proper PlantUML validation workflow
-- Applies correct style sheets automatically
-- Prevents ASCII/line art in documentation
-
-**ENFORCEMENT**: Any diagram work without first invoking this skill is a CRITICAL ERROR.
+**Why:** Enforces naming conventions, prevents incremental naming violations, ensures proper validation workflow, and applies correct style sheets.
 
 ---
 
-## 🚨 GLOBAL: MANDATORY VERIFICATION RULE
+## 📋 PROJECT CONFIGURATION
 
-**CRITICAL**: NEVER CLAIM SUCCESS OR COMPLETION WITHOUT VERIFICATION
+### Location & Purpose
+- **Path**: `/Users/q284340/Agentic/coding`
+- **Purpose**: Development environment with MCP services, knowledge management, and LSL system
 
-**ABSOLUTE RULE**: Before stating ANY result, completion, or success:
-1. **ALWAYS run verification commands** to check the actual state
-2. **ALWAYS show proof** with actual command output  
-3. **NEVER assume or guess** - only report what you can verify
-4. **If verification shows failure**, report the failure accurately
-
-**WHY THIS MATTERS**: False success claims waste time and break user trust. ALWAYS verify before reporting.
-
----
-
-## 📋 PROJECT CONFIGURATIONS
-
-### 🔧 Project: coding (Main Development Hub)
-
-**Location**: `/Users/q284340/Agentic/coding`  
-**Purpose**: Primary development environment with MCP services, knowledge management, and LSL system
-
-#### Startup & Services
-- **Command**: `claude-mcp` (NEVER just `claude`) - always start claude via 'coding'
+### Startup & Services
+- **Command**: `claude-mcp` or `coding --claude` (starts all services)
 - **Services**: VKB Server (port 8080), Semantic Analysis, Graph Database
-- **Automatic startup**: `coding` or `coding --claude` starts all services
+- **Never use**: Just `claude` - always start via 'coding' infrastructure
 
-#### Knowledge Management
-- **Graph Database**: Agent-agnostic persistent storage (Graphology + Level)
+### Knowledge Management
+- **Graph Database**: Graphology + Level persistent storage
 - **Commands**: `ukb` (update), `vkb` (visualize)
-- **Storage**: `.data/knowledge-graph/` (persistent graph storage)
+- **Storage**: `.data/knowledge-graph/`
 
-#### Session Logging (LSL System)
+### Session Logging (LSL)
 - **Primary**: Live Session Logging with enhanced transcript monitor
-- **Secondary**: Post-session logging as fallback
-- **Location**: `.specstory/history/` (markdown files)
+- **Location**: `.specstory/history/`
 - **Format**: `YYYY-MM-DD_HHMM-HHMM-<user-hash>[_from-<project>].md`
 
-#### Critical Architecture
+### Technical Standards
+- **TypeScript**: Mandatory with strict type checking
 - **Working Directory**: Always start in top-level project directory
 - **File Interference**: Avoid `.mcp-sync/` for importable modules
-- **Timeout Guidelines**: Use shorter timeouts (5-10s) for most operations
-
----
-
-
-#### Architecture Standards
-- **TypeScript**: Mandatory with strict type checking
-- **Accessibility**: WCAG 2.1 AA compliance
-- **Performance**: Bundle size budgets, Core Web Vitals monitoring
 - **API Design**: Never modify working APIs for TypeScript; fix types instead
 
-#### Specialized Agents
-- **test-runner**: Memory-efficient quality checks
-- **ui-tester**: Frontend testing with Playwright
-- **code-change-critic**: Post-implementation review
-
-#### Claude Configuration
-- **MCP Priority**: Use Serena MCP ONLY for understanding code (reading, searching, analysis)
-- **File Operations**: NEVER use Serena for editing - use standard Edit/Write/MultiEdit tools instead
-- **Memory Storage**: `.serena/memories/` for context persistence
+### MCP & Tools
+- **Serena MCP**: ONLY for reading/searching/analyzing code
+- **File Operations**: Use standard Edit/Write tools, NEVER Serena for editing
+- **Memory**: `.serena/memories/` for context persistence
 
 ---
 
-## 🔧 GLOBAL DEVELOPMENT STANDARDS
+## 🎯 DEVELOPMENT PRACTICES
 
-### Git & Version Control
-- **Commit Messages**: Descriptive with clear context
-- **Frequency**: Commit after small increments/milestones  
-- **Branch Strategy**: Follow project-specific guidelines
+### Quality & Verification
+- Always verify results with actual command output
+- Never assume success - check and report actual state
+- Follow quality gates before considering work complete
 
-### Error Handling & Debugging
-1. **Environment Check**: Variables, Docker setup, service status
-2. **Systematic Debugging**: Step-by-step analysis
-3. **Root Cause Focus**: Fix underlying issues, not symptoms
-4. **Documentation**: Record architectural decisions and findings
+### Session Continuity
+- Maintain context via LSL system (started via coding/bin/coding)
+- Use `/sl` command to read session history for continuity
 
----
-
-## 📊 USAGE GUIDELINES BY PROJECT
-
-| Project | Primary Tools | Key Commands | Focus Area |
-|---------|---------------|--------------|------------|
-| coding | Graph Database, VKB, UKB | `claude-mcp`, `ukb`, `vkb` | Knowledge & Infrastructure |
+### Git & Commits
+- Descriptive commit messages with clear context
+- Commit after small increments/milestones
+- Follow project-specific branch strategies
 
 ---
 
-## 🚨 CRITICAL SUCCESS FACTORS
-
-1. **Always verify results** with actual command output
-2. **Never create parallel versions** - fix originals instead  
-3. **Use project-specific tools** and workflows appropriately
-4. **Follow quality gates** before considering work complete
-5. **Maintain cross-session continuity** via the live session logging system (LSL, started via coding/bin/coding)
-
----
-
-*This rule is non-negotiable and applies to every single Claude development session across all projects.*
+**Note**: Code quality constraints (parallel versions, naming patterns, etc.) are enforced by the constraint monitoring system.

@@ -94,7 +94,8 @@
       "Bash(SYSTEM_HEALTH_API_PORT=3033 pnpm api:*)",
       "mcp__serena__initial_instructions",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
