@@ -38,6 +38,12 @@ async function main() {
         // Check health status staleness
         const healthStatus = checkHealthStatus();
 
+        // If services aren't available, exit gracefully (running outside coding environment)
+        if (!healthStatus.servicesAvailable) {
+            // No output needed - just allow Claude to continue normally
+            process.exit(0);
+        }
+
         // If stale, trigger async verification (don't wait for it)
         if (healthStatus.isStale) {
             triggerAsyncVerification();
@@ -65,11 +71,24 @@ async function main() {
  * Check current health status and staleness
  */
 function checkHealthStatus() {
+    // Check if health verifier exists (indicates we're in coding environment)
+    if (!existsSync(VERIFIER_SCRIPT)) {
+        return {
+            exists: false,
+            isStale: false,
+            shouldBlock: false,
+            servicesAvailable: false,
+            message: 'Health services not available (running outside coding environment)',
+            ageMs: null
+        };
+    }
+
     if (!existsSync(STATUS_FILE)) {
         return {
             exists: false,
             isStale: true,
             shouldBlock: false,
+            servicesAvailable: true,
             message: 'Health verification pending (first run)',
             ageMs: null
         };
@@ -89,6 +108,7 @@ function checkHealthStatus() {
         exists: true,
         isStale,
         shouldBlock,
+        servicesAvailable: true,
         status,
         ageMs,
         message: isStale
@@ -101,17 +121,26 @@ function checkHealthStatus() {
  * Trigger async health verification (non-blocking)
  */
 function triggerAsyncVerification() {
-    const child = spawn('node', [VERIFIER_SCRIPT, '--auto-heal'], {
-        detached: true,
-        stdio: 'ignore',
-        cwd: codingRoot,
-        env: {
-            ...process.env,
-            CODING_TOOLS_PATH: codingRoot
-        }
-    });
+    // Only trigger if verifier script exists
+    if (!existsSync(VERIFIER_SCRIPT)) {
+        return;
+    }
 
-    child.unref(); // Allow parent to exit without waiting
+    try {
+        const child = spawn('node', [VERIFIER_SCRIPT, '--auto-heal'], {
+            detached: true,
+            stdio: 'ignore',
+            cwd: codingRoot,
+            env: {
+                ...process.env,
+                CODING_TOOLS_PATH: codingRoot
+            }
+        });
+
+        child.unref(); // Allow parent to exit without waiting
+    } catch (error) {
+        // Fail silently - we're in a degraded environment
+    }
 }
 
 /**

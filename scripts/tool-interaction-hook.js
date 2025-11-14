@@ -5,13 +5,14 @@
  * This script is called after each tool execution to capture interactions for live logging
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 // Read tool interaction data from stdin or process arguments
 async function processToolInteraction() {
   try {
     let interactionData;
-    
+
     // Try to read from stdin first
     if (process.stdin.isTTY === false) {
       const chunks = [];
@@ -23,39 +24,49 @@ async function processToolInteraction() {
         interactionData = JSON.parse(input);
       }
     }
-    
+
     // If no stdin data, try process arguments
     if (!interactionData && process.argv.length > 2) {
       const jsonArg = process.argv[2];
       interactionData = JSON.parse(jsonArg);
     }
-    
+
     if (!interactionData) {
       // Gracefully handle missing data - this is normal for many tool calls
       process.exit(0);
     }
-    
-    // Import and call the hook function
+
+    // Check if we're in a coding environment with required services
     const codingRepo = process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
-    const { captureToolInteraction } = await import(`${codingRepo}/.mcp-sync/tool-interaction-hook.js`);
-    
+    const hookFilePath = join(codingRepo, '.mcp-sync/tool-interaction-hook.js');
+
+    // Fail gracefully if hook file doesn't exist (running outside coding environment)
+    if (!existsSync(hookFilePath)) {
+      // Not an error - just means we're running plain Claude without coding services
+      process.exit(0);
+    }
+
+    // Import and call the hook function
+    const { captureToolInteraction } = await import(hookFilePath);
+
     await captureToolInteraction(
       interactionData.toolCall || { name: interactionData.tool, args: interactionData.args },
       interactionData.result || interactionData.output,
-      { 
+      {
         timestamp: Date.now(),
         source: 'claude-code-hook',
         workingDirectory: process.cwd(),
         sessionId: interactionData.sessionId || 'unknown'
       }
     );
-    
+
     console.log('Tool interaction captured successfully');
     process.exit(0);
-    
+
   } catch (error) {
-    console.error('Error processing tool interaction:', error);
-    process.exit(1);
+    // Fail open - don't block Claude on hook errors
+    // console.error('Tool interaction hook error:', error.message);
+    process.exit(0);
   }
 }
 

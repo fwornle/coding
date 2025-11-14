@@ -44,7 +44,6 @@ class MonitoringVerifier {
     this.logPath = path.join(this.codingRepoPath, '.logs', 'monitoring-verifier.log');
     this.systemWatchdogScript = path.join(this.codingRepoPath, 'scripts', 'system-monitor-watchdog.js');
     this.coordinatorScript = path.join(this.codingRepoPath, 'scripts', 'global-service-coordinator.js');
-    this.registryPath = path.join(this.codingRepoPath, '.global-service-registry.json');
 
     this.results = {
       systemWatchdog: { status: 'pending', details: null },
@@ -409,17 +408,18 @@ class MonitoringVerifier {
    */
   async verifyRecoveryTest() {
     this.log('🔍 STEP 5: Verifying Recovery Mechanisms...');
-    
+
     try {
-      // For now, just verify that the recovery infrastructure exists
+      // Verify that the recovery infrastructure scripts exist
+      // Note: .global-service-registry.json is not checked because the coordinator
+      // now uses Process State Manager (PSM) for persistence instead
       const recoveryComponents = [
         this.systemWatchdogScript,
-        this.coordinatorScript,
-        this.registryPath
+        this.coordinatorScript
       ];
-      
+
       const missingComponents = recoveryComponents.filter(component => !fs.existsSync(component));
-      
+
       if (missingComponents.length === 0) {
         this.results.recoveryTest = {
           status: 'success',
