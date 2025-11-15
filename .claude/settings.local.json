@@ -95,7 +95,8 @@
       "mcp__serena__initial_instructions",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm view:*)"
     ],
     "deny": [],
     "ask": []
