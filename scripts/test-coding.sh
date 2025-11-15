@@ -504,11 +504,12 @@ else
     print_warning "SQLite database not initialized"
     print_repair "Initializing knowledge databases..."
     cd "$CODING_ROOT"
-    if node scripts/init-databases.js --skip-qdrant 2>&1 | grep -q "Database Initialization Complete"; then
-        print_fixed "Knowledge databases initialized (SQLite only)"
+    # Use the same script as install.sh for consistency
+    if node scripts/initialize-knowledge-system.js --project-path "$CODING_ROOT" 2>&1 | grep -qE "(Knowledge Management System initialized|initialization complete)"; then
+        print_fixed "Knowledge databases initialized"
     else
         print_warning "Database initialization may need manual setup"
-        print_info "Run: npm run db:init:skip-qdrant"
+        print_info "Run: node scripts/initialize-knowledge-system.js --project-path $CODING_ROOT"
     fi
 fi
 
@@ -984,18 +985,23 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
         fi
         
         print_check "Professional Dashboard port configuration"
-        if grep -q "PORT=3030" "$DASHBOARD_DIR/package.json" 2>/dev/null; then
-            print_pass "Professional Dashboard configured for port 3030 (conflicts avoided)"
-        elif grep -q "PORT=3030" "$DASHBOARD_DIR/.env" 2>/dev/null; then
-            print_pass "Professional Dashboard port 3030 configured via .env"
-        elif [ -f "$DASHBOARD_DIR/package.json" ] && grep -q "next dev" "$DASHBOARD_DIR/package.json"; then
-            # Check if package.json has port configured in scripts
-            if grep -q "3030" "$DASHBOARD_DIR/package.json"; then
-                print_pass "Professional Dashboard configured for port 3030"
+        # Check centralized port configuration
+        if [ -f "$CODING_ROOT/.env.ports" ]; then
+            DASHBOARD_PORT=$(grep "^CONSTRAINT_DASHBOARD_PORT=" "$CODING_ROOT/.env.ports" | cut -d'=' -f2)
+            if [ -n "$DASHBOARD_PORT" ]; then
+                print_pass "Dashboard port configured in .env.ports: $DASHBOARD_PORT"
+                # Verify package.json uses the port variable
+                if grep -q "CONSTRAINT_DASHBOARD_PORT" "$DASHBOARD_DIR/package.json" 2>/dev/null; then
+                    print_pass "Dashboard package.json correctly uses centralized port configuration"
+                else
+                    print_warning "Dashboard package.json doesn't reference CONSTRAINT_DASHBOARD_PORT"
+                fi
             else
-                print_warning "Professional Dashboard may use default port 3000 (potential conflicts)"
-                print_info "Update package.json scripts to include PORT=3030 for Next.js"
+                print_warning "CONSTRAINT_DASHBOARD_PORT not set in .env.ports"
             fi
+        else
+            print_warning ".env.ports file missing - centralized port configuration unavailable"
+            print_info "Create .env.ports with CONSTRAINT_DASHBOARD_PORT=3030"
         fi
         
         print_check "shadcn/ui components integration"
