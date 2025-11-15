@@ -45,8 +45,19 @@ child.on('error', (error) => {
   process.exit(1);
 });
 
-child.on('exit', (code) => {
+child.on('exit', async (code) => {
   console.log(`[Dashboard Service] Exited with code ${code}`);
+
+  // Unregister from PSM on exit
+  try {
+    const ProcessStateManager = (await import('./process-state-manager.js')).default;
+    const psm = new ProcessStateManager();
+    await psm.initialize();
+    await psm.unregisterService('constraint-dashboard-child', 'global');
+  } catch (error) {
+    // Ignore cleanup errors
+  }
+
   process.exit(code || 0);
 });
 
@@ -62,3 +73,29 @@ process.on('SIGINT', () => {
 });
 
 console.log(`[Dashboard Service] Started (PID: ${child.pid})`);
+
+// Register child process with PSM
+(async () => {
+  try {
+    const ProcessStateManager = (await import('./process-state-manager.js')).default;
+    const psm = new ProcessStateManager();
+    await psm.initialize();
+
+    await psm.registerService({
+      name: 'constraint-dashboard-child',
+      pid: child.pid,
+      type: 'global',
+      script: 'npm run dev (Next.js)',
+      metadata: {
+        parentWrapper: process.pid,
+        port: PORT,
+        service: 'constraint-monitor-dashboard'
+      }
+    });
+
+    console.log(`[Dashboard Service] Registered child with PSM (PID: ${child.pid})`);
+  } catch (error) {
+    console.error(`[Dashboard Service] Failed to register with PSM: ${error.message}`);
+    // Continue anyway - not critical
+  }
+})();
