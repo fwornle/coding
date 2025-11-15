@@ -18,7 +18,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { getKnowledgeExportPath, getKnowledgeConfigPath } from './knowledge-paths.js';
+import { getKnowledgeExportPath, getKnowledgeConfigPath, getCodingRepoPath } from './knowledge-paths.js';
 
 export class GraphKnowledgeExporter {
   /**
@@ -126,8 +126,9 @@ export class GraphKnowledgeExporter {
         throw new Error(`Team "${team}" not found in knowledge-config.json`);
       }
 
-      // Determine output path
-      const outputPath = options.outputPath || path.join(process.cwd(), teamConfig.exportPath);
+      // Determine output path (resolve relative to coding repo root, not process.cwd())
+      const codingRepo = getCodingRepoPath();
+      const outputPath = options.outputPath || path.join(codingRepo, teamConfig.exportPath);
 
       // Extract entities and relationships for this team
       const { entities, relations } = await this._extractTeamData(team);
