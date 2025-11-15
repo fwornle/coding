@@ -167,7 +167,8 @@ start_transcript_monitoring() {
     # Fallback: direct monitor startup (backward compatibility)
     pkill -f "enhanced-transcript-monitor.js.*$(basename "$project_dir")" 2>/dev/null || true
     cd "$project_dir"
-    nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" > transcript-monitor.log 2>&1 &
+    # CRITICAL: Pass project_dir as argument to prevent fallback to process.cwd()
+    nohup node "$coding_repo/scripts/enhanced-transcript-monitor.js" "$project_dir" > transcript-monitor.log 2>&1 &
     local new_pid=$!
 
     sleep 1
