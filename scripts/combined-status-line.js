@@ -997,30 +997,66 @@ class CombinedStatusLine {
     try {
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
       const monitorScript = join(codingPath, 'scripts', 'enhanced-transcript-monitor.js');
-      
+
       if (!existsSync(monitorScript)) {
         return; // Script not found, skip auto-start
       }
-      
+
+      // Determine project path - MUST be explicit
+      const projectPath = process.env.TRANSCRIPT_SOURCE_PROJECT;
+      if (!projectPath) {
+        if (process.env.DEBUG_STATUS) {
+          console.error('DEBUG: Cannot start transcript monitor - no TRANSCRIPT_SOURCE_PROJECT set');
+        }
+        return; // Don't start without explicit project path
+      }
+
       const { spawn } = await import('child_process');
-      
+
       // Start monitor in background with proper environment
       const env = {
         ...process.env,
         CODING_TOOLS_PATH: codingPath,
-        TRANSCRIPT_SOURCE_PROJECT: process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd()
+        TRANSCRIPT_SOURCE_PROJECT: projectPath
       };
-      
-      const monitor = spawn('node', [monitorScript], {
+
+      // CRITICAL: Pass project path as argument, not just environment
+      const monitor = spawn('node', [monitorScript, projectPath], {
         detached: true,
         stdio: 'ignore',
         env
       });
-      
+
       monitor.unref(); // Allow parent to exit without waiting
-      
+
       if (process.env.DEBUG_STATUS) {
         console.error('DEBUG: Started integrated transcript monitor with PID:', monitor.pid);
+      }
+
+      // CRITICAL: Register spawned process with PSM
+      try {
+        const ProcessStateManager = (await import('./process-state-manager.js')).default;
+        const psm = new ProcessStateManager();
+        await psm.initialize();
+
+        await psm.registerService({
+          name: 'enhanced-transcript-monitor',
+          pid: monitor.pid,
+          type: 'per-project',
+          script: 'enhanced-transcript-monitor.js',
+          projectPath: projectPath,
+          metadata: {
+            spawnedBy: 'combined-status-line',
+            autoStarted: true
+          }
+        });
+
+        if (process.env.DEBUG_STATUS) {
+          console.error('DEBUG: Registered monitor with PSM');
+        }
+      } catch (psmError) {
+        console.error('Failed to register monitor with PSM:', psmError.message);
+        // Continue anyway - process is running even if registration failed
       }
     } catch (error) {
       if (process.env.DEBUG_STATUS) {
