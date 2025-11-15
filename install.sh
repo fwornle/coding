@@ -439,9 +439,27 @@ install_browserbase() {
 
     cd "$BROWSERBASE_DIR"
 
-    # Install dependencies and build
+    # Install dependencies (skip postinstall scripts to avoid mcpvals build issues)
     info "Installing browserbase dependencies (includes stagehand)..."
-    npm install || error_exit "Failed to install browserbase dependencies"
+    npm install --ignore-scripts || error_exit "Failed to install browserbase dependencies"
+
+    # Fix TypeScript compatibility with newer MCP SDK (@modelcontextprotocol/sdk v1.22+)
+    # The McpServer constructor API changed from single object to two parameters
+    info "Fixing TypeScript compatibility..."
+    if grep -q "description:" src/index.ts 2>/dev/null; then
+        cat > /tmp/fix-mcp-server.js << 'EOF'
+const fs = require('fs');
+const content = fs.readFileSync('src/index.ts', 'utf8');
+// Replace old single-param constructor with new two-param form
+const fixed = content.replace(
+  /const server = new McpServer\(\{\s*name: "([^"]+)",\s*version: "([^"]+)",\s*description:\s*"[^"]*",\s*capabilities: \{/s,
+  'const server = new McpServer(\n    {\n      name: "$1",\n      version: "$2",\n    },\n    {\n      capabilities: {'
+);
+fs.writeFileSync('src/index.ts', fixed, 'utf8');
+EOF
+        node /tmp/fix-mcp-server.js || warning "Could not auto-fix TypeScript compatibility"
+        rm -f /tmp/fix-mcp-server.js
+    fi
 
     info "Building browserbase..."
     npm run build || error_exit "Failed to build browserbase"
