@@ -23,7 +23,7 @@ The status line system integrates with the real-time trajectory analysis system 
 ```
 Claude Code → Wrapper → Main Script → Service APIs → Status Display
      ↓           ↓          ↓            ↓             ↓
-  5s Timer → Env Setup → Aggregator → Data Sources → [GCM✅] [C🟢 CA🟢] [🛡️ 85% 🔍 EX] [🧠API✅]
+  5s Timer → Env Setup → Aggregator → Data Sources → [GCM✅] [C🟢 CA🟢] [🛡️ 85% 🔍 EX] [🏥✅] [🧠API✅]
 ```
 
 **Current Project Highlighting**: The status line automatically underlines the abbreviation of the current active project (determined by `TRANSCRIPT_SOURCE_PROJECT` or working directory) to provide visual context about which project you're currently working in.
@@ -192,6 +192,27 @@ When a project session shows yellow (🟡) or red (🔴) status, a short reason 
 **Checks**: API connectivity, response times, credit limits
 **Output**: `[🧠API✅]`, `[🧠API⚠️]`, or `[🧠API❌]`
 
+#### Health Verifier (🏥)
+**File**: `scripts/health-verifier.js`
+**API**: System Health Dashboard at `http://localhost:3032` (frontend) and `http://localhost:3033` (API)
+**Purpose**: Automatic system health verification with auto-healing capabilities
+**Output**: `[🏥✅]`, `[🏥⚠️{count}]`, `[🏥❌{count}]`, `[🏥🟡]`, `[🏥⏰]`, or `[🏥💤]`
+
+**Health States**:
+- `[🏥✅]` - All health checks passed (healthy system)
+- `[🏥⚠️{count}]` - Warning-level violations detected (count shows number of issues)
+- `[🏥❌{count}]` - Critical issues detected (count shows number of critical failures)
+- `[🏥🟡]` - System degraded but no specific violations
+- `[🏥⏰]` - Health data is stale (>5 minutes old)
+- `[🏥💤]` - Health verifier offline or not running
+
+**Monitoring Coverage**:
+- **Databases**: LevelDB locks, Qdrant availability, graph integrity
+- **Services**: VKB server, constraint monitor, dashboard server, health API (self-monitoring)
+- **Processes**: Stale PIDs, zombie processes, resource usage
+
+**Auto-Healing**: Automatically restarts failed services when violations are detected (see [Health Verification System](health-verification.md) for details)
+
 ## Status States and Transitions
 
 ### Health States
@@ -209,6 +230,7 @@ When a project session shows yellow (🟡) or red (🔴) status, a short reason 
 | GCM | ✅ | ⚠️ | ❌ |
 | Sessions | <u>C</u>🟢 CA🟢 | <u>C</u>🟡 CA🟢 | <u>C</u>🔴 CA🔴 |
 | Constraint | 85% 🔍 EX | ⚠️ violations | ❌ offline |
+| Health | 🏥✅ | 🏥⚠️2 | 🏥❌5 |
 | Semantic | API✅ | API⚠️ | API❌ |
 
 *Note: Underline indicates current active project*

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#10b981" stroke="#059669" stroke-width="2"/>
+
+  <!-- Medical cross -->
+  <rect x="43" y="25" width="14" height="50" fill="white" rx="2"/>
+  <rect x="25" y="43" width="50" height="14" fill="white" rx="2"/>
+
+  <!-- Pulse/heartbeat line overlay -->
+  <path d="M 15 50 L 30 50 L 35 40 L 40 60 L 45 50 L 85 50"
+        stroke="white"
+        stroke-width="3"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        opacity="0.6"/>
+
+  <!-- Small check mark in corner for "healthy" status -->
+  <circle cx="75" cy="25" r="10" fill="#22c55e" stroke="white" stroke-width="1.5"/>
+  <path d="M 70 25 L 73 28 L 80 21"
+        stroke="white"
+        stroke-width="2.5"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>

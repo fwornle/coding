@@ -1236,32 +1236,32 @@ class CombinedStatusLine {
       if (overallColor === 'green') overallColor = 'yellow';
     }
 
-    // Health Verifier Status (Magnifying glass for health checks)
+    // Health Verifier Status (Hospital/medical icon for health monitoring)
     if (healthVerifier && healthVerifier.status === 'operational') {
       const overallStatus = healthVerifier.overallStatus || 'healthy';
       const violationCount = healthVerifier.violationCount || 0;
       const criticalCount = healthVerifier.criticalCount || 0;
 
       if (criticalCount > 0) {
-        parts.push(`[🔍❌${criticalCount}]`); // Critical issues
+        parts.push(`[🏥❌${criticalCount}]`); // Critical issues
         overallColor = 'red';
       } else if (violationCount > 0) {
-        parts.push(`[🔍⚠️${violationCount}]`); // Warning issues
+        parts.push(`[🏥⚠️${violationCount}]`); // Warning issues
         if (overallColor === 'green') overallColor = 'yellow';
       } else if (overallStatus === 'healthy') {
-        parts.push('[🔍✅]'); // All checks passed
+        parts.push('[🏥✅]'); // All checks passed
       } else {
-        parts.push('[🔍🟡]'); // Degraded but no specific violations
+        parts.push('[🏥🟡]'); // Degraded but no specific violations
         if (overallColor === 'green') overallColor = 'yellow';
       }
     } else if (healthVerifier && healthVerifier.status === 'stale') {
-      parts.push('[🔍⏰]'); // Stale data
+      parts.push('[🏥⏰]'); // Stale data
       if (overallColor === 'green') overallColor = 'yellow';
     } else if (healthVerifier && healthVerifier.status === 'error') {
-      parts.push('[🔍❌]'); // Error reading status
+      parts.push('[🏥❌]'); // Error reading status
       if (overallColor === 'green') overallColor = 'yellow';
     } else {
-      parts.push('[🔍💤]'); // Offline/not running
+      parts.push('[🏥💤]'); // Offline/not running
     }
 
     // Add redirect indicator if active (compact)

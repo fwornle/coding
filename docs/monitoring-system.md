@@ -8,6 +8,60 @@
 
 The monitoring system provides unified process tracking, health monitoring, and automatic recovery for all coding project services. All process state is managed through the **Process State Manager (PSM)** as the single source of truth.
 
+## System Health Dashboard
+
+The System Health Dashboard provides real-time visual monitoring of all system components through a web interface accessible at `http://localhost:3032`.
+
+![System Health Dashboard](images/health-monitor.png)
+
+**Dashboard Overview** (shown above):
+
+**Overall Status Panel** (Green):
+- **Status**: Healthy - All critical systems operational
+- **Last Verified**: 12m ago - Recent health check completion
+- **0 Total Violations** - No health check failures detected
+- **0 Critical Issues** - No blocking problems
+- **6 Checks Passed** - All monitored components healthy
+- **Auto-Healing Active** ⚡ - Automatic service restart enabled
+- **Stale Data** 🔴 - Data is >5 minutes old (verification recommended)
+
+**Monitored Components**:
+
+1. **Databases** (2/2 Healthy):
+   - **LevelDB** (Graph database) - OK
+   - **Qdrant** (Vector database) - OK
+
+2. **Services** (3/3 Healthy):
+   - **VKB Server** (Port 8080) - Knowledge visualization server healthy
+   - **Constraint Monitor** (Port 3031) - Code quality monitoring operational
+   - **Dashboard** (Port 3030) - Constraint dashboard serving
+
+3. **Processes** (2/2 Healthy):
+   - **Process Registry** - PSM tracking operational
+   - **Stale PIDs** - No orphaned processes detected
+
+**Detailed Health Checks Table**:
+- `leveldb_lock_check` - Level DB locked by registered process (PID: 87197)
+- `qdrant_availability` - Qdrant vector database available
+- `vkb_server` - VKB server is healthy
+- `constraint_monitor` - Constraint monitor is healthy
+- `dashboard_server` - Dashboard server is healthy
+- `stale_pids` - No stale PIDs detected
+
+All checks performed 12 minutes ago, showing consistent healthy state across all monitored components.
+
+**Dashboard Features**:
+- Real-time monitoring with 5-second refresh via WebSocket
+- Manual "Run Verification" button for immediate health check
+- Direct link to Constraint Dashboard
+- Color-coded status indicators (green = healthy, yellow = warning, red = critical)
+- Detailed check results with timestamps
+- Auto-healing status tracking
+
+**Access**: The dashboard is automatically started with the coding environment and is available at:
+- Frontend: `http://localhost:3032`
+- API: `http://localhost:3033`
+
 ## Architecture
 
 ![Monitoring Architecture](images/monitoring-architecture.png)
