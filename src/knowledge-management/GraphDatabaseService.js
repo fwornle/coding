@@ -207,10 +207,10 @@ export class GraphDatabaseService extends EventEmitter {
     // Persist to Level immediately if not auto-persisting
     if (!this.autoPersist && this.levelDB) {
       await this._persistGraphToLevel();
-      await this._exportAllTeamsToJSON();
+      // NOTE: JSON export is handled by GraphKnowledgeExporter via events
     }
 
-    // Emit event for monitoring/logging
+    // Emit event for monitoring/logging (GraphKnowledgeExporter listens to this)
     this.emit('entity:stored', { team: options.team, entity: attributes, nodeId });
 
     return nodeId;
@@ -276,10 +276,10 @@ export class GraphDatabaseService extends EventEmitter {
     // Persist to Level immediately if not auto-persisting
     if (!this.autoPersist && this.levelDB) {
       await this._persistGraphToLevel();
-      await this._exportAllTeamsToJSON();
+      // NOTE: JSON export is handled by GraphKnowledgeExporter via events
     }
 
-    // Emit event for monitoring/logging
+    // Emit event for monitoring/logging (GraphKnowledgeExporter listens to this)
     this.emit('relationship:stored', { from: fromId, to: toId, type, metadata });
   }
 
@@ -1254,8 +1254,9 @@ export class GraphDatabaseService extends EventEmitter {
       if (this.isDirty && this.levelDB) {
         try {
           await this._persistGraphToLevel();
-          // Also export to JSON to keep files in sync
-          await this._exportAllTeamsToJSON();
+          // NOTE: JSON export is handled by GraphKnowledgeExporter
+          // which listens to entity:stored events and exports with proper debouncing.
+          // DO NOT export to JSON here to avoid race conditions during initialization.
         } catch (error) {
           console.error('Auto-persist failed:', error.message);
         }
