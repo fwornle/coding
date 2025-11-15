@@ -406,6 +406,40 @@ cd "$CODING_DIR/integrations/mcp-server-semantic-analysis"
 echo "ℹ️  Semantic Analysis MCP Server configured for stdio transport"
 SEMANTIC_PID="stdio"
 
+# Start System Health Dashboard API
+echo "🟢 Starting System Health Dashboard API (port 3033)..."
+cd "$CODING_DIR/integrations/system-health-dashboard"
+
+# Check if dependencies are installed
+if [ ! -d "node_modules" ]; then
+    echo "   📦 Installing System Health Dashboard dependencies..."
+    npm install --silent 2>/dev/null || pnpm install --silent 2>/dev/null || {
+        echo "   ⚠️ Failed to install dependencies - System Health Dashboard will be unavailable"
+        HEALTH_API_PID="not-installed"
+    }
+fi
+
+if [ "$HEALTH_API_PID" != "not-installed" ]; then
+    # Load port configuration from .env.ports
+    if [ -f "$CODING_DIR/.env.ports" ]; then
+        export $(grep '^SYSTEM_HEALTH_' "$CODING_DIR/.env.ports" | sed 's/#.*//' | xargs)
+    fi
+
+    # Start the API server in background
+    SYSTEM_HEALTH_API_PORT=${SYSTEM_HEALTH_API_PORT:-3033} nohup npm run api > "$CODING_DIR/logs/system-health-api.log" 2>&1 &
+    HEALTH_API_PID=$!
+
+    # Register with Process State Manager
+    cd "$CODING_DIR"
+    node scripts/psm-register.js system-health-api $HEALTH_API_PID global integrations/system-health-dashboard/server.js 2>/dev/null || true
+
+    echo "   System Health API PID: $HEALTH_API_PID"
+else
+    echo "   ⚠️ System Health Dashboard not available"
+fi
+
+cd "$CODING_DIR"
+
 # Wait for services to start
 echo "⏳ Waiting for services to start..."
 sleep 5
@@ -465,6 +499,19 @@ else
     echo "❌ Semantic Analysis MCP Server NOT configured"
 fi
 
+# Check System Health API
+if [ "$HEALTH_API_PID" = "not-installed" ]; then
+    echo "⚠️  System Health API not installed"
+elif [ "$HEALTH_API_PID" = "already-running" ]; then
+    echo "✅ System Health API running (pre-existing)"
+    services_running=$((services_running + 1))
+elif check_port 3033; then
+    echo "✅ System Health API running on port 3033"
+    services_running=$((services_running + 1))
+else
+    echo "❌ System Health API NOT running on port 3033"
+fi
+
 # Check Constraint Monitor web services (if status is FULLY OPERATIONAL)
 if [ "$CONSTRAINT_MONITOR_STATUS" = "✅ FULLY OPERATIONAL" ]; then
     if check_port 3030; then
@@ -493,9 +540,9 @@ echo "📊 SERVICES STATUS SUMMARY"
 echo "═══════════════════════════════════════════════════════════════════════"
 echo ""
 # Calculate expected service count based on constraint monitor status
-expected_services=4
+expected_services=5  # Core 4 + System Health API
 if [ "$CONSTRAINT_MONITOR_STATUS" = "✅ FULLY OPERATIONAL" ]; then
-    expected_services=6  # Core 4 + Dashboard + API
+    expected_services=7  # Core 4 + System Health API + Constraint Dashboard + Constraint API
 fi
 
 if [ $services_running -ge $expected_services ]; then
@@ -517,7 +564,7 @@ if [ "$QDRANT_KB_STATUS" != "✅ OPERATIONAL" ]; then
 fi
 echo ""
 echo "📊 Process State: node scripts/process-state-manager.js status"
-echo "📝 Logs: live-logging.log, vkb-server.log, semantic-analysis.log"
+echo "📝 Logs: live-logging.log, vkb-server.log, logs/system-health-api.log"
 echo "═══════════════════════════════════════════════════════════════════════"
 echo ""
 echo "🎉 Startup complete!"

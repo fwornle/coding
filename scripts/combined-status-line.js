@@ -344,12 +344,16 @@ class CombinedStatusLine {
       }
 
       const services = JSON.parse(readFileSync(servicesPath, 'utf8'));
-      const hasSemanticAnalysis = services.services.includes('semantic-analysis');
 
-      if (hasSemanticAnalysis && services.services_running >= 2) {
+      // Check semantic_analysis object (not in services array because it uses stdio transport)
+      const semanticAnalysis = services.semantic_analysis;
+
+      if (semanticAnalysis && semanticAnalysis.health === 'healthy') {
         return { status: 'operational' };
-      } else {
+      } else if (semanticAnalysis) {
         return { status: 'degraded' };
+      } else {
+        return { status: 'offline' };
       }
     } catch (error) {
       return { status: 'offline', error: error.message };
