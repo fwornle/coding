@@ -17,6 +17,11 @@ import fs from 'fs';
 import path from 'path';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
+import { fileURLToPath } from 'url';
+
+// Import ProcessStateManager for robust duplicate prevention
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const { default: ProcessStateManager } = await import(path.join(__dirname, 'process-state-manager.js'));
 
 const execAsync = promisify(exec);
 
@@ -27,9 +32,12 @@ class GlobalLSLCoordinator {
     this.registryPath = path.join(this.codingRepoPath, '.global-lsl-registry.json');
     this.healthCheckInterval = options.healthCheckInterval || 30000; // 30 seconds
     this.maxMonitorAge = options.maxMonitorAge || 3600000; // 1 hour max stale
-    
+
     this.registry = this.loadRegistry();
     this.healthTimer = null;
+
+    // Initialize process state manager for duplicate prevention
+    this.processStateManager = new ProcessStateManager({ codingRoot: this.codingRepoPath });
   }
 
   /**
@@ -274,35 +282,80 @@ class GlobalLSLCoordinator {
   }
 
   /**
-   * Start continuous health monitoring
+   * Start continuous health monitoring with duplicate prevention
    */
-  startHealthMonitoring() {
+  async startHealthMonitoring() {
+    // Initialize process state manager
+    await this.processStateManager.initialize();
+
+    // Clean up dead PIDs before checking for duplicates
+    const cleanupStats = await this.processStateManager.cleanupDeadProcesses();
+    if (cleanupStats.total > 0) {
+      this.log(`🧹 Cleaned up ${cleanupStats.total} dead process(es) from registry`);
+    }
+
+    // Check for existing coordinator instance
+    const serviceName = 'global-lsl-coordinator';
+    const existingService = await this.processStateManager.getService(serviceName, 'global');
+    if (existingService && this.processStateManager.isProcessAlive(existingService.pid)) {
+      console.error(`❌ Another instance of ${serviceName} is already running`);
+      console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}`);
+      console.error(`   To fix: Kill the existing instance with: kill ${existingService.pid}`);
+      process.exit(1);
+    }
+
+    // Register this coordinator instance
+    try {
+      await this.processStateManager.registerService({
+        name: serviceName,
+        type: 'global',
+        pid: process.pid,
+        script: 'global-lsl-coordinator.js',
+        metadata: {
+          mode: 'monitor',
+          healthCheckInterval: this.healthCheckInterval
+        }
+      });
+      this.log(`✅ Coordinator registered (PID: ${process.pid})`);
+    } catch (error) {
+      console.error(`❌ Failed to register coordinator: ${error.message}`);
+      process.exit(1);
+    }
+
     if (this.healthTimer) {
       clearInterval(this.healthTimer);
     }
-    
+
     // Update coordinator PID in registry to reflect current process
     this.registry.coordinator.pid = process.pid;
     this.registry.coordinator.startTime = Date.now();
     this.saveRegistry();
-    
+
     this.healthTimer = setInterval(() => {
       this.performHealthCheck().catch(error => {
         console.error(`Health check failed: ${error.message}`);
       });
     }, this.healthCheckInterval);
-    
+
     this.log(`Started global health monitoring (interval: ${this.healthCheckInterval}ms)`);
   }
 
   /**
-   * Stop health monitoring
+   * Stop health monitoring and unregister service
    */
-  stopHealthMonitoring() {
+  async stopHealthMonitoring() {
     if (this.healthTimer) {
       clearInterval(this.healthTimer);
       this.healthTimer = null;
       this.log('Stopped global health monitoring');
+    }
+
+    // Unregister coordinator service
+    try {
+      await this.processStateManager.unregisterService('global-lsl-coordinator', 'global');
+      this.log('✅ Coordinator unregistered');
+    } catch (error) {
+      this.log(`⚠️ Failed to unregister coordinator: ${error.message}`);
     }
   }
 
@@ -395,9 +448,16 @@ async function main() {
       break;
       
     case 'monitor':
-      coordinator.startHealthMonitoring();
+      await coordinator.startHealthMonitoring();
       console.log('Global LSL Coordinator monitoring started. Press Ctrl+C to stop.');
-      
+
+      // Handle shutdown gracefully
+      process.on('SIGINT', async () => {
+        console.log('\nShutting down coordinator...');
+        await coordinator.stopHealthMonitoring();
+        process.exit(0);
+      });
+
       // Keep alive
       setInterval(() => {}, 1000);
       break;

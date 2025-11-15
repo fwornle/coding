@@ -848,21 +848,23 @@ class EnhancedTranscriptMonitor {
   // Timezone utilities are now imported from timezone-utils.js
 
   /**
-   * Use robust project path detection like status line - check both coding repo and current directory
+   * Get project path with strict validation - NO fallback to process.cwd()
+   * This prevents LSL files from being written to wrong directories when scripts run from test installations
    */
   getProjectPath() {
     const __dirname = path.dirname(new URL(import.meta.url).pathname);
     const rootDir = process.env.CODING_REPO || path.join(__dirname, '..');
-    
-    // Check target project first (like status line does), then coding repo, then current directory
+
+    // Check ONLY explicitly configured paths - NEVER use process.cwd()
+    // Priority: 1) TRANSCRIPT_SOURCE_PROJECT env var, 2) config.projectPath, 3) CODING_REPO
     const checkPaths = [
       process.env.TRANSCRIPT_SOURCE_PROJECT, // Source project to monitor transcripts from (e.g., nano-degree)
-      rootDir,                           // Coding repo 
-      process.cwd()                      // Current working directory
+      this.config.projectPath,               // Explicitly configured project path
+      rootDir                                // Coding repo
     ].filter(Boolean); // Remove null/undefined values
-    
+
     if (this.debug_enabled) console.error(`Checking project paths: ${JSON.stringify(checkPaths)}`);
-    
+
     // Look for .specstory directory to confirm it's a valid project
     for (const checkPath of checkPaths) {
       const specstoryDir = path.join(checkPath, '.specstory');
@@ -871,10 +873,14 @@ class EnhancedTranscriptMonitor {
         return checkPath;
       }
     }
-    
-    // Fallback: prefer current directory since that's where user is working  
-    if (this.debug_enabled) console.error(`No .specstory found, using fallback: ${process.cwd()}`);
-    return process.cwd();
+
+    // CRITICAL: Fail fast if no valid project found - DO NOT fall back to process.cwd()
+    const errorMsg = `CRITICAL: No valid project path found with .specstory directory.\n` +
+      `Checked paths: ${JSON.stringify(checkPaths)}\n` +
+      `This prevents LSL files from being written to wrong directories.\n` +
+      `Set TRANSCRIPT_SOURCE_PROJECT or ensure CODING_REPO points to a valid project.`;
+    console.error(errorMsg);
+    throw new Error('No valid project path found');
   }
 
   /**
@@ -2101,6 +2107,13 @@ class EnhancedTranscriptMonitor {
     // Initialize PSM if not already done
     if (!this.processStateManager.initialized) {
       await this.processStateManager.initialize();
+    }
+
+    // Clean up dead PIDs before checking for duplicates
+    // This prevents stale registry entries from blocking new registrations
+    const cleanupStats = await this.processStateManager.cleanupDeadProcesses();
+    if (cleanupStats.total > 0) {
+      console.log(`🧹 Cleaned up ${cleanupStats.total} dead process(es) from registry`);
     }
 
     // Check if another instance is already running for this project
