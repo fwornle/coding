@@ -89,11 +89,11 @@ class EnhancedTranscriptMonitor {
     
     this.config = {
       checkInterval: config.checkInterval || 2000, // More frequent for prompt detection
-      projectPath: config.projectPath || this.getProjectPath(),
+      projectPath: config.projectPath || this.getProjectPath(config),
       debug: this.debug_enabled,
       sessionDuration: config.sessionDuration || 7200000, // 2 hours (generous for debugging)
       timezone: config.timezone || getTimezone(), // Use central timezone config
-      healthFile: this.getCentralizedHealthFile(config.projectPath || this.getProjectPath()),
+      healthFile: this.getCentralizedHealthFile(config.projectPath || this.getProjectPath(config)),
       mode: config.mode || 'all', // Processing mode: 'all' or 'foreign'
       ...config
     };
@@ -851,7 +851,7 @@ class EnhancedTranscriptMonitor {
    * Get project path with strict validation - NO fallback to process.cwd()
    * This prevents LSL files from being written to wrong directories when scripts run from test installations
    */
-  getProjectPath() {
+  getProjectPath(config = {}) {
     const __dirname = path.dirname(new URL(import.meta.url).pathname);
     const rootDir = process.env.CODING_REPO || path.join(__dirname, '..');
 
@@ -859,7 +859,7 @@ class EnhancedTranscriptMonitor {
     // Priority: 1) TRANSCRIPT_SOURCE_PROJECT env var, 2) config.projectPath, 3) CODING_REPO
     const checkPaths = [
       process.env.TRANSCRIPT_SOURCE_PROJECT, // Source project to monitor transcripts from (e.g., nano-degree)
-      this.config.projectPath,               // Explicitly configured project path
+      config.projectPath,                    // Explicitly configured project path (passed as parameter)
       rootDir                                // Coding repo
     ].filter(Boolean); // Remove null/undefined values
 
