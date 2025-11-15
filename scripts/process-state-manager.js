@@ -268,6 +268,69 @@ class ProcessStateManager {
   }
 
   /**
+   * Clean up dead PIDs from the registry
+   * This prevents stale entries from blocking new service registrations
+   *
+   * @returns {Promise<Object>} Statistics about cleanup: { globalCleaned, projectsCleaned, sessionsCleaned, total }
+   */
+  async cleanupDeadProcesses() {
+    return this.withLock(async () => {
+      const registry = await this.readRegistry();
+      let globalCleaned = 0;
+      let projectsCleaned = 0;
+      let sessionsCleaned = 0;
+
+      // Clean up global services with dead PIDs
+      for (const [serviceName, serviceRecord] of Object.entries(registry.services.global)) {
+        if (!this.isProcessAlive(serviceRecord.pid)) {
+          delete registry.services.global[serviceName];
+          globalCleaned++;
+        }
+      }
+
+      // Clean up per-project services with dead PIDs
+      for (const [projectPath, projectServices] of Object.entries(registry.services.projects)) {
+        for (const [serviceName, serviceRecord] of Object.entries(projectServices)) {
+          if (!this.isProcessAlive(serviceRecord.pid)) {
+            delete projectServices[serviceName];
+            projectsCleaned++;
+          }
+        }
+        // Remove empty project entries
+        if (Object.keys(projectServices).length === 0) {
+          delete registry.services.projects[projectPath];
+        }
+      }
+
+      // Clean up per-session services with dead PIDs
+      for (const [sessionId, session] of Object.entries(registry.sessions)) {
+        for (const [serviceName, serviceRecord] of Object.entries(session.services || {})) {
+          if (!this.isProcessAlive(serviceRecord.pid)) {
+            delete session.services[serviceName];
+            sessionsCleaned++;
+          }
+        }
+        // Remove empty sessions
+        if (Object.keys(session.services || {}).length === 0) {
+          delete registry.sessions[sessionId];
+        }
+      }
+
+      const total = globalCleaned + projectsCleaned + sessionsCleaned;
+      if (total > 0) {
+        await this.writeRegistry(registry);
+      }
+
+      return {
+        globalCleaned,
+        projectsCleaned,
+        sessionsCleaned,
+        total
+      };
+    });
+  }
+
+  /**
    * Register a session
    */
   async registerSession(sessionId, metadata = {}) {
