@@ -18,7 +18,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { getKnowledgeExportPath, getKnowledgeConfigPath } from './knowledge-paths.js';
+import { getKnowledgeExportPath, getKnowledgeConfigPath, getCodingRepoPath } from './knowledge-paths.js';
 
 export class GraphKnowledgeImporter {
   /**
@@ -87,8 +87,9 @@ export class GraphKnowledgeImporter {
         throw new Error(`Team "${team}" not found in knowledge-config.json`);
       }
 
-      // Determine input path
-      const inputPath = options.inputPath || path.join(process.cwd(), teamConfig.exportPath);
+      // Determine input path (resolve relative to coding repo root, not process.cwd())
+      const codingRepo = getCodingRepoPath();
+      const inputPath = options.inputPath || path.join(codingRepo, teamConfig.exportPath);
 
       // Check if file exists
       try {
@@ -344,9 +345,10 @@ export class GraphKnowledgeImporter {
   async getImportStats() {
     const config = await this._loadConfig();
     const stats = {};
+    const codingRepo = getCodingRepoPath();
 
     for (const [team, teamConfig] of Object.entries(config.teams)) {
-      const exportPath = path.join(process.cwd(), teamConfig.exportPath);
+      const exportPath = path.join(codingRepo, teamConfig.exportPath);
 
       try {
         // Check if file exists
