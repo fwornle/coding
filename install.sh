@@ -42,6 +42,7 @@ INSIDE_CN=false
 PROXY_WORKING=false
 INSTALLATION_WARNINGS=()
 INSTALLATION_FAILURES=()
+SANDBOX_MODE=false
 
 # Repository URLs by network location
 # Only memory-visualizer has a CN mirror, others always use public repos
@@ -69,25 +70,100 @@ detect_platform() {
     case "$(uname -s)" in
         Darwin*)
             PLATFORM="macos"
-            SHELL_RC="$HOME/.zshrc"
             ;;
         Linux*)
             PLATFORM="linux"
-            SHELL_RC="$HOME/.bashrc"
             ;;
         MINGW*|CYGWIN*|MSYS*)
             PLATFORM="windows"
-            SHELL_RC="$HOME/.bashrc"
             ;;
         *)
             echo -e "${RED}Unsupported platform: $(uname -s)${NC}"
             exit 1
             ;;
     esac
-    
-    # Check for alternative shell configs
-    if [[ -f "$HOME/.bash_profile" ]] && [[ ! -f "$SHELL_RC" ]]; then
-        SHELL_RC="$HOME/.bash_profile"
+
+    # Detect actual shell in use (prefer accuracy over platform defaults)
+    if [[ -n "$SHELL" ]]; then
+        case "$SHELL" in
+            */zsh)
+                SHELL_RC="$HOME/.zshrc"
+                ;;
+            */bash)
+                # Check which bash config exists and is used
+                if [[ -f "$HOME/.bash_profile" ]]; then
+                    SHELL_RC="$HOME/.bash_profile"
+                elif [[ -f "$HOME/.bashrc" ]]; then
+                    SHELL_RC="$HOME/.bashrc"
+                else
+                    SHELL_RC="$HOME/.bash_profile"  # Create if needed
+                fi
+                ;;
+            *)
+                # Fallback to platform default
+                if [[ "$PLATFORM" == "macos" ]]; then
+                    SHELL_RC="$HOME/.zshrc"
+                else
+                    SHELL_RC="$HOME/.bashrc"
+                fi
+                ;;
+        esac
+    else
+        # No $SHELL set, use platform default
+        if [[ "$PLATFORM" == "macos" ]]; then
+            SHELL_RC="$HOME/.zshrc"
+        else
+            SHELL_RC="$HOME/.bashrc"
+        fi
+    fi
+}
+
+# Detect if we should run in sandbox mode
+detect_sandbox_mode() {
+    # Check if CODING_REPO is already set and points to a valid coding installation
+    if [[ -n "$CODING_REPO" ]] && [[ -d "$CODING_REPO" ]] && [[ -f "$CODING_REPO/bin/coding" ]]; then
+        local current_install="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+        # If CODING_REPO points to a different installation, use sandbox mode
+        if [[ "$CODING_REPO" != "$current_install" ]]; then
+            SANDBOX_MODE=true
+
+            echo ""
+            echo -e "${YELLOW}╔══════════════════════════════════════════════════════════════════════╗${NC}"
+            echo -e "${YELLOW}║                                                                      ║${NC}"
+            echo -e "${YELLOW}║                      ${RED}SANDBOX MODE DETECTED${YELLOW}                          ║${NC}"
+            echo -e "${YELLOW}║                                                                      ║${NC}"
+            echo -e "${YELLOW}╚══════════════════════════════════════════════════════════════════════╝${NC}"
+            echo ""
+            echo -e "${CYAN}A coding installation is already configured at:${NC}"
+            echo -e "  ${GREEN}$CODING_REPO${NC}"
+            echo ""
+            echo -e "${CYAN}You are attempting to install to:${NC}"
+            echo -e "  ${BLUE}$current_install${NC}"
+            echo ""
+            echo -e "${YELLOW}Installing in SANDBOX MODE to prevent conflicts.${NC}"
+            echo ""
+            echo -e "${CYAN}Sandbox mode will:${NC}"
+            echo -e "  ${GREEN}✓${NC} NOT modify global shell configs (.zshrc, .bash_profile)"
+            echo -e "  ${GREEN}✓${NC} Create local .activate file for manual sourcing"
+            echo -e "  ${GREEN}✓${NC} Allow testing install.sh without pollution"
+            echo ""
+            echo -e "${CYAN}To use this installation after install completes:${NC}"
+            echo -e "  ${BLUE}source $current_install/.activate${NC}"
+            echo ""
+
+            read -p "$(echo -e ${YELLOW}Continue with sandbox installation? [y/N]: ${NC})" response
+            case "$response" in
+                [yY][eE][sS]|[yY])
+                    info "Proceeding with sandbox installation..."
+                    echo ""
+                    ;;
+                *)
+                    info "Installation cancelled by user"
+                    exit 0
+                    ;;
+            esac
+        fi
     fi
 }
 
@@ -847,9 +923,27 @@ EOF
         fi
     done
     
-    # Check if already configured
+    # SANDBOX MODE: Only create local .activate file
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        cat > "$CODING_REPO/.activate" << EOF
+# Coding Tools - Sandbox Activation
+# Source this file to activate this installation in your current shell:
+#   source $CODING_REPO/.activate
+
+export CODING_REPO="$CODING_REPO"
+export PATH="$CODING_REPO/bin:\$PATH"
+EOF
+        chmod +x "$CODING_REPO/.activate"
+
+        warning "SANDBOX MODE: Global shell configs NOT modified"
+        info "To activate this installation:"
+        info "  source $CODING_REPO/.activate"
+        return
+    fi
+
+    # NORMAL MODE: Modify shell config (ONLY ONE FILE based on detected shell)
     if grep -q "CODING_REPO.*$CODING_REPO" "$SHELL_RC" 2>/dev/null && grep -q "PATH.*$CODING_REPO/bin" "$SHELL_RC" 2>/dev/null; then
-        info "Shell already configured with correct paths"
+        info "Shell already configured with correct paths in $SHELL_RC"
     else
         # Remove any existing Claude configurations to prevent duplicates
         if [[ -f "$SHELL_RC.bak" ]]; then
@@ -857,8 +951,8 @@ EOF
         fi
         # Remove existing Claude sections
         sed -i.bak '/# Claude Knowledge Management System/,/^$/d' "$SHELL_RC" 2>/dev/null || true
-        
-        # Add configuration
+
+        # Add configuration to SINGLE shell config file
         {
             echo ""
             echo "# Claude Knowledge Management System"
@@ -866,21 +960,8 @@ EOF
             echo "$claude_path_export"
             echo ""
         } >> "$SHELL_RC"
-    fi
-    
-    # Also update .bash_profile on macOS since it's commonly used
-    if [[ "$PLATFORM" == "macos" ]] && [[ -f "$HOME/.bash_profile" ]]; then
-        if ! grep -q "CODING_REPO.*$CODING_REPO" "$HOME/.bash_profile" 2>/dev/null || ! grep -q "PATH.*$CODING_REPO/bin" "$HOME/.bash_profile" 2>/dev/null; then
-            # Remove existing Claude sections from .bash_profile too
-            sed -i.bak '/# Claude Knowledge Management System/,/^$/d' "$HOME/.bash_profile" 2>/dev/null || true
-            {
-                echo ""
-                echo "# Claude Knowledge Management System"
-                echo "$claude_repo_export"
-                echo "$claude_path_export"
-                echo ""
-            } >> "$HOME/.bash_profile"
-        fi
+
+        success "Configuration added to $SHELL_RC"
     fi
     
     # Create a cleanup script for the current shell session
@@ -1616,16 +1697,22 @@ main() {
     echo -e "${PURPLE}🚀 Agent-Agnostic Coding Tools - Universal Installer${NC}"
     echo -e "${PURPLE}=====================================================${NC}"
     echo ""
-    
+
     # Initialize log
     echo "Installation started at $(date)" > "$INSTALL_LOG"
     log "Platform: $(uname -s)"
     log "Coding repo: $CODING_REPO"
-    
+
     # Detect platform
     detect_platform
     info "Detected platform: $PLATFORM"
     info "Shell config file: $SHELL_RC"
+
+    # Detect if sandbox mode should be used
+    detect_sandbox_mode
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        log "Running in SANDBOX MODE"
+    fi
     
     # Run installation steps
     check_dependencies
