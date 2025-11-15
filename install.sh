@@ -24,6 +24,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Installation configuration
+# Save original CODING_REPO before overwriting (for sandbox detection)
+ORIGINAL_CODING_REPO="${CODING_REPO:-}"
 CODING_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_LOG="$CODING_REPO/install.log"
 
@@ -120,12 +122,12 @@ detect_platform() {
 
 # Detect if we should run in sandbox mode
 detect_sandbox_mode() {
-    # Check if CODING_REPO is already set and points to a valid coding installation
-    if [[ -n "$CODING_REPO" ]] && [[ -d "$CODING_REPO" ]] && [[ -f "$CODING_REPO/bin/coding" ]]; then
+    # Check if ORIGINAL_CODING_REPO is already set and points to a valid coding installation
+    if [[ -n "$ORIGINAL_CODING_REPO" ]] && [[ -d "$ORIGINAL_CODING_REPO" ]] && [[ -f "$ORIGINAL_CODING_REPO/bin/coding" ]]; then
         local current_install="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-        # If CODING_REPO points to a different installation, use sandbox mode
-        if [[ "$CODING_REPO" != "$current_install" ]]; then
+        # If ORIGINAL_CODING_REPO points to a different installation, use sandbox mode
+        if [[ "$ORIGINAL_CODING_REPO" != "$current_install" ]]; then
             SANDBOX_MODE=true
 
             echo ""
@@ -136,7 +138,7 @@ detect_sandbox_mode() {
             echo -e "${YELLOW}╚══════════════════════════════════════════════════════════════════════╝${NC}"
             echo ""
             echo -e "${CYAN}A coding installation is already configured at:${NC}"
-            echo -e "  ${GREEN}$CODING_REPO${NC}"
+            echo -e "  ${GREEN}$ORIGINAL_CODING_REPO${NC}"
             echo ""
             echo -e "${CYAN}You are attempting to install to:${NC}"
             echo -e "  ${BLUE}$current_install${NC}"
