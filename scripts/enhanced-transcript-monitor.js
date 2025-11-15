@@ -2544,9 +2544,34 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
 
 // CLI interface
 async function main() {
+  // CRITICAL DEBUGGING: Log spawn source with full stack trace
+  const spawnLogFile = join(codingRoot, '.logs', 'monitor-spawn-debug.log');
+  try {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      pid: process.pid,
+      ppid: process.ppid,
+      argv: process.argv,
+      cwd: process.cwd(),
+      env: {
+        TRANSCRIPT_SOURCE_PROJECT: process.env.TRANSCRIPT_SOURCE_PROJECT,
+        CODING_REPO: process.env.CODING_REPO,
+        CODING_TOOLS_PATH: process.env.CODING_TOOLS_PATH,
+        PROJECT_PATH: process.env.PROJECT_PATH
+      },
+      // Capture stack trace to see what called spawn()
+      spawnStack: new Error('SPAWN TRACE').stack
+    };
+
+    fs.appendFileSync(spawnLogFile, '\n=== MONITOR SPAWN ===\n' + JSON.stringify(logEntry, null, 2) + '\n');
+    console.error('🔍 SPAWN DEBUG: Logged to', spawnLogFile);
+  } catch (logError) {
+    console.error('Failed to log spawn debug:', logError.message);
+  }
+
   try {
     const args = process.argv.slice(2);
-    
+
     // Check for reprocessing mode
     if (args.includes('--reprocess') || args.includes('--batch')) {
       const projectArg = args.find(arg => arg.startsWith('--project='));
