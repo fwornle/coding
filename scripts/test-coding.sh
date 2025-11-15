@@ -255,6 +255,19 @@ else
     print_fail "Not in a git repository"
 fi
 
+# Detect and handle sandbox mode
+SANDBOX_MODE=false
+if [[ -f "$CODING_ROOT/.activate" ]]; then
+    # Check if CODING_REPO points to a different installation
+    if [[ -n "$CODING_REPO" ]] && [[ "$CODING_REPO" != "$CODING_ROOT" ]]; then
+        SANDBOX_MODE=true
+        print_info "Sandbox mode detected - sourcing .activate file"
+        print_info "  Primary installation: $CODING_REPO"
+        print_info "  Sandbox installation: $CODING_ROOT"
+        source "$CODING_ROOT/.activate"
+    fi
+fi
+
 # Check environment variables
 print_test "Environment variables"
 
@@ -262,11 +275,16 @@ print_check "CODING_TOOLS_PATH variable"
 if [ -n "$CODING_TOOLS_PATH" ]; then
     print_pass "CODING_TOOLS_PATH set to: $CODING_TOOLS_PATH"
 else
-    print_fail "CODING_TOOLS_PATH not set"
-    print_repair "Setting up environment variables..."
-    export CODING_TOOLS_PATH="$CODING_ROOT"
-    echo "export CODING_TOOLS_PATH=\"$CODING_ROOT\"" >> ~/.bashrc
-    print_fixed "CODING_TOOLS_PATH set to $CODING_ROOT"
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        print_warning "CODING_TOOLS_PATH not set (expected in sandbox mode)"
+        print_info "Sandbox installations use .activate file instead of global env vars"
+    else
+        print_fail "CODING_TOOLS_PATH not set"
+        print_repair "Setting up environment variables..."
+        export CODING_TOOLS_PATH="$CODING_ROOT"
+        echo "export CODING_TOOLS_PATH=\"$CODING_ROOT\"" >> ~/.bashrc
+        print_fixed "CODING_TOOLS_PATH set to $CODING_ROOT"
+    fi
 fi
 
 print_check "CODING_REPO variable"
@@ -299,11 +317,16 @@ print_check "PATH includes coding tools"
 if echo "$PATH" | grep -q "$CODING_ROOT"; then
     print_pass "Coding tools in PATH"
 else
-    print_fail "Coding tools not in PATH"
-    print_repair "Adding coding tools to PATH..."
-    export PATH="$CODING_ROOT/bin:$CODING_ROOT/knowledge-management:$PATH"
-    echo "export PATH=\"$CODING_ROOT/bin:$CODING_ROOT/knowledge-management:\$PATH\"" >> ~/.bashrc
-    print_fixed "Added coding tools to PATH"
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        print_warning "Coding tools not in PATH (expected in sandbox mode)"
+        print_info "Sandbox installations use .activate file instead of modifying ~/.bashrc"
+    else
+        print_fail "Coding tools not in PATH"
+        print_repair "Adding coding tools to PATH..."
+        export PATH="$CODING_ROOT/bin:$CODING_ROOT/knowledge-management:$PATH"
+        echo "export PATH=\"$CODING_ROOT/bin:$CODING_ROOT/knowledge-management:\$PATH\"" >> ~/.bashrc
+        print_fixed "Added coding tools to PATH"
+    fi
 fi
 
 # =============================================================================
