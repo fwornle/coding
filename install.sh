@@ -402,6 +402,10 @@ install_memory_visualizer() {
     info "Building memory-visualizer..."
     npm run build || error_exit "Failed to build memory-visualizer"
 
+    # Update browserslist database to suppress warnings
+    info "Updating browserslist database..."
+    npx update-browserslist-db@latest 2>/dev/null || warning "Could not update browserslist database"
+
     # Update vkb script to use local memory-visualizer
     if [[ "$PLATFORM" == "macos" ]]; then
         sed -i '' "s|VISUALIZER_DIR=.*|VISUALIZER_DIR=\"$MEMORY_VISUALIZER_DIR\"|" "$CODING_REPO/knowledge-management/vkb"
