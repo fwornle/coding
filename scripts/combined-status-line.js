@@ -1372,46 +1372,10 @@ class CombinedStatusLine {
     return lines.join('\n');
   }
 
-  /**
-   * Robust transcript monitor health check and auto-restart mechanism
-   * Runs every 300ms via status line updates to ensure transcript monitor is always running
-   */
-  async ensureTranscriptMonitorRunning() {
-    try {
-      // Check if transcript monitor process is running  
-      const { exec } = await import('child_process');
-      const util = await import('util');
-      const execAsync = util.promisify(exec);
-      
-      try {
-        const { stdout } = await execAsync('ps aux | grep -v grep | grep enhanced-transcript-monitor');
-        if (stdout.trim().length > 0) {
-          // Transcript monitor is running
-          return;
-        }
-      } catch (error) {
-        // ps command failed or no process found
-      }
-      
-      // Transcript monitor is not running - restart it
-      const targetProject = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
-      const codingPath = process.env.CODING_TOOLS_PATH || '/Users/q284340/Agentic/coding';
-      
-      // Start transcript monitor in background
-      const startCommand = `cd "${targetProject}" && TRANSCRIPT_DEBUG=false node "${codingPath}/scripts/enhanced-transcript-monitor.js" > logs/transcript-monitor.log 2>&1 &`;
-      
-      await execAsync(startCommand);
-      
-      if (process.env.DEBUG_STATUS) {
-        console.error('🔄 Auto-restarted transcript monitor');
-      }
-      
-    } catch (error) {
-      if (process.env.DEBUG_STATUS) {
-        console.error('❌ Failed to restart transcript monitor:', error.message);
-      }
-    }
-  }
+  // REMOVED: Duplicate buggy ensureTranscriptMonitorRunning() method
+  // The correct version is at line 962 which properly passes project path
+  // This duplicate was spawning monitors WITHOUT project path arguments,
+  // causing orphaned processes to create files in wrong directories
 
   getErrorStatus(error) {
     return {
