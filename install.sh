@@ -1057,9 +1057,16 @@ except Exception as e:
 # Setup user-level MCP configuration for cross-project use
 setup_user_level_mcp_config() {
     local temp_file="$1"
-    
+
+    # SANDBOX MODE: Skip global config modifications
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        warning "SANDBOX MODE: Skipping user-level MCP configuration (~/.claude.json)"
+        info "To use MCP servers, manually source: $CODING_REPO/claude-code-mcp-processed.json"
+        return 0
+    fi
+
     echo -e "\n${CYAN}📋 Setting up user-level MCP configuration (cross-project)...${NC}"
-    
+
     # Read existing user configuration if it exists
     local user_config="$HOME/.claude.json"
     local user_config_backup=""
@@ -1375,8 +1382,11 @@ configure_team_setup() {
     info "   Example: export CODING_TEAM=\"resi raas\" for multiple teams"
     info "   Example: export CODING_TEAM=\"myteam\" for a custom team"
 
-    # Add to shell environment (only if not already configured)
-    if grep -q "export CODING_TEAM=" "$SHELL_RC" 2>/dev/null; then
+    # Add to shell environment (only if not already configured and NOT in sandbox mode)
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        warning "SANDBOX MODE: Skipping CODING_TEAM configuration in $SHELL_RC"
+        info "To use CODING_TEAM, export it manually: export CODING_TEAM=\"coding ui\""
+    elif grep -q "export CODING_TEAM=" "$SHELL_RC" 2>/dev/null; then
         info "CODING_TEAM already configured in $SHELL_RC"
     else
         echo "" >> "$SHELL_RC"
@@ -1611,15 +1621,22 @@ initialize_knowledge_databases() {
 # Create unified launcher
 setup_unified_launcher() {
     info "Setting up unified launcher..."
-    
+
+    # SANDBOX MODE: Skip global launcher installation
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        warning "SANDBOX MODE: Skipping unified launcher installation (~/.bin)"
+        info "To use 'coding' command, add to PATH: export PATH=\"$CODING_REPO/bin:\$PATH\""
+        return 0
+    fi
+
     local bin_dir="$HOME/bin"
     mkdir -p "$bin_dir"
-    
+
     # Create symlink to coding
     if [ -f "$CODING_REPO/bin/coding" ]; then
         ln -sf "$CODING_REPO/bin/coding" "$bin_dir/coding"
         success "✓ coding launcher created in $bin_dir"
-        
+
         # Add to PATH if not already there
         if [[ ":$PATH:" != *":$bin_dir:"* ]]; then
             info "Adding $bin_dir to PATH in $SHELL_RC"
@@ -1832,6 +1849,14 @@ install_enhanced_lsl() {
 # Install constraint monitor hooks and LSL logging hooks
 install_constraint_monitor_hooks() {
     echo -e "\n${CYAN}🔗 Installing Hooks (Constraints + LSL)...${NC}"
+
+    # SANDBOX MODE: Skip global hooks installation
+    if [[ "$SANDBOX_MODE" == "true" ]]; then
+        warning "SANDBOX MODE: Skipping global hooks installation (~/.claude/settings.json)"
+        info "Hooks will NOT be active in sandbox mode"
+        info "To use hooks, install from the primary coding installation"
+        return 0
+    fi
 
     local settings_file="$HOME/.claude/settings.json"
     local pre_hook_cmd="node $CODING_REPO/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
