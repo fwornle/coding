@@ -159,11 +159,36 @@ class GlobalLSLCoordinator {
 
         child.unref(); // Allow parent to exit
 
-        // Verify monitor started successfully
+        // Verify monitor started successfully and register with PSM
         setTimeout(async () => {
           try {
             process.kill(child.pid, 0); // Test if process exists
             this.log(`Monitor started for ${path.basename(projectPath)} (PID: ${child.pid})`);
+
+            // CRITICAL: Register spawned monitor with PSM
+            try {
+              const ProcessStateManager = (await import('./process-state-manager.js')).default;
+              const psm = new ProcessStateManager();
+              await psm.initialize();
+
+              await psm.registerService({
+                name: 'enhanced-transcript-monitor',
+                pid: child.pid,
+                type: 'per-project',
+                script: 'enhanced-transcript-monitor.js',
+                projectPath: projectPath,
+                metadata: {
+                  spawnedBy: 'global-lsl-coordinator',
+                  monitorScript: monitorScript
+                }
+              });
+
+              this.log(`Monitor registered with PSM (PID: ${child.pid})`);
+            } catch (psmError) {
+              this.log(`Failed to register monitor with PSM: ${psmError.message}`);
+              // Continue anyway - monitor is running
+            }
+
             resolve(child.pid);
           } catch (error) {
             this.log(`Monitor failed to start for ${path.basename(projectPath)}: ${error.message}`);
@@ -224,21 +249,32 @@ class GlobalLSLCoordinator {
    * Clean up stale monitor process
    */
   async cleanupStaleMonitor(projectInfo) {
-    const { monitorPid } = projectInfo;
-    
+    const { monitorPid, projectPath } = projectInfo;
+
     if (monitorPid) {
       try {
         process.kill(monitorPid, 'SIGTERM');
         this.log(`Cleaned up stale monitor PID ${monitorPid}`);
-        
+
         // Wait for graceful shutdown
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         // Force kill if still running
         try {
           process.kill(monitorPid, 'SIGKILL');
         } catch (error) {
           // Process already gone, that's fine
+        }
+
+        // CRITICAL: Unregister from PSM
+        try {
+          const ProcessStateManager = (await import('./process-state-manager.js')).default;
+          const psm = new ProcessStateManager();
+          await psm.initialize();
+          await psm.unregisterService('enhanced-transcript-monitor', 'per-project', projectPath);
+          this.log(`Monitor unregistered from PSM (PID: ${monitorPid})`);
+        } catch (psmError) {
+          this.log(`Failed to unregister monitor from PSM: ${psmError.message}`);
         }
       } catch (error) {
         // Process already gone, that's fine
