@@ -961,10 +961,47 @@ class CombinedStatusLine {
 
   async ensureTranscriptMonitorRunning() {
     try {
+      // CRITICAL FIX: Check PSM FIRST to prevent duplicate spawns
+      const projectPath = process.env.TRANSCRIPT_SOURCE_PROJECT;
+      if (!projectPath) {
+        return; // Can't check without project path
+      }
+
+      // Check if monitor is already registered in PSM
+      try {
+        const ProcessStateManager = (await import('./process-state-manager.js')).default;
+        const psm = new ProcessStateManager();
+        await psm.initialize();
+
+        const existingMonitor = await psm.getService('enhanced-transcript-monitor', 'per-project', { projectPath });
+
+        if (existingMonitor) {
+          // Check if registered PID is still alive
+          try {
+            process.kill(existingMonitor.pid, 0); // Test if process exists
+            if (process.env.DEBUG_STATUS) {
+              console.error('DEBUG: Transcript monitor already running (PID:', existingMonitor.pid, ')');
+            }
+            return; // Monitor is running, don't spawn another
+          } catch (err) {
+            // PID is dead, unregister it
+            if (process.env.DEBUG_STATUS) {
+              console.error('DEBUG: Registered monitor PID', existingMonitor.pid, 'is dead, cleaning up...');
+            }
+            await psm.unregisterService('enhanced-transcript-monitor', 'per-project', { projectPath });
+          }
+        }
+      } catch (psmError) {
+        if (process.env.DEBUG_STATUS) {
+          console.error('DEBUG: PSM check failed:', psmError.message);
+        }
+        // Fall through to health file check
+      }
+
       // Check if integrated transcript monitor is running by looking for health file
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
       const healthFile = join(codingPath, '.transcript-monitor-health');
-      
+
       if (!existsSync(healthFile)) {
         // Monitor not running, start it in background
         if (process.env.DEBUG_STATUS) {
@@ -973,12 +1010,12 @@ class CombinedStatusLine {
         await this.startTranscriptMonitor();
         return;
       }
-      
+
       // Check if health file is recent (within last 10 seconds)
       const stats = fs.statSync(healthFile);
       const now = Date.now();
       const age = now - stats.mtime.getTime();
-      
+
       if (age > 10000) {
         // Health file is stale, restart monitor
         if (process.env.DEBUG_STATUS) {
