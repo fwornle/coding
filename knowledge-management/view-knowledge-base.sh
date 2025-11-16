@@ -1,1 +1,4 @@
-../bin/vkb
+#!/bin/bash
+# View Knowledge Base wrapper
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/../bin/vkb" "$@"
