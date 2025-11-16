@@ -14,13 +14,15 @@ Real-time monitoring dashboard for system-level health checks including database
 
 - **Pre-Prompt Health Verification**: Automatic health check on every Claude prompt (via UserPromptSubmit hook)
 - **Self-Monitoring**: Health API server monitors itself and auto-heals if down
-- Real-time health monitoring (5s refresh)
+- **Click-to-Restart Services**: One-click service restart buttons in the dashboard (NEW!)
+- **Fast Health Detection**: 15-second verification interval for quick issue detection (improved from 60s)
+- Real-time health monitoring (5s dashboard refresh)
 - Database health (LevelDB, Qdrant)
 - Service availability (VKB, Constraint Monitor, Dashboard, Health API)
 - Process health (stale PIDs, zombies)
 - Auto-healing status and history
 - Manual verification trigger
-- Detailed violation reports
+- Detailed violation reports with actionable restart buttons
 - System recommendations
 - Staleness detection (triggers verification if data >5 minutes old)
 
@@ -81,6 +83,52 @@ Returns detailed health verification report with all checks and violations
 
 ### POST `/api/health-verifier/verify`
 Triggers a manual health verification run
+
+### POST `/api/health-verifier/restart-service`
+Restarts a failed service with one click from the dashboard
+
+**Request Body:**
+```json
+{
+  "serviceName": "vkb_server",
+  "action": "restart"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Service restart initiated: vkb_server",
+  "data": {
+    "service": "vkb_server",
+    "action": "restart",
+    "triggered_at": "2025-11-16T06:47:00.000Z",
+    "note": "Health verification will run automatically to confirm service status"
+  }
+}
+```
+
+**Supported Services:**
+- `vkb_server` - VKB visualization server (port 8080)
+- `constraint_monitor` - Constraint monitor dashboard (port 3031)
+- `dashboard_server` - System health dashboard (port 3030)
+
+**Features:**
+- ✅ **One-Click Restart**: Click the "Restart" button on any service error in the violations table
+- ✅ **Visual Feedback**: Spinning icon during restart, success/error messages
+- ✅ **Auto-Verification**: Health check runs automatically after restart (15s interval)
+- ✅ **Tooltips**: Hover over restart button for detailed information
+- ✅ **Smart Display**: Restart button only appears for service errors, not for warnings or database issues
+
+**UI Behavior:**
+1. Service violation appears in the "Active Violations" table
+2. "Restart" button displayed in the "Actions" column (only for service errors)
+3. Click button → service restarts in background
+4. Button shows "Restarting..." with spinning icon
+5. Success/error message appears below the issue description
+6. Health verification runs automatically to update status
+7. If successful, violation disappears within 15-30 seconds
 
 ## Redux Store Structure
 
@@ -164,3 +212,23 @@ The dashboard follows the same architecture patterns as the Constraint Monitor D
 - Constraint Monitor Dashboard: http://localhost:3030
 - System Health Dashboard: http://localhost:3032
 - System Health API: http://localhost:3033
+
+## Accessing Dashboards
+
+### Via Browser
+Navigate directly to the dashboard URLs listed above to view the health status and use the click-to-restart functionality.
+
+### Via Status Line
+The Claude Code status line displays health status emojis (✅/⚠️/❌) for quick visibility:
+- The status line is **display-only** and does not support click events
+- To access dashboards, you must manually navigate to the URLs above
+- This is a limitation of Claude Code's status line system
+
+**Status Line Indicators:**
+- 📦🗄️✅ - All databases healthy
+- 🔍📊✅ - All services operational
+- ⚙️✅ - All processes healthy
+- ⚠️ - Warnings detected (1+ violations)
+- ❌ - Errors detected (requires attention)
+
+For detailed violation information and one-click restart capabilities, visit the System Health Dashboard at http://localhost:3032

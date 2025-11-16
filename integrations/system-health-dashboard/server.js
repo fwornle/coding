@@ -12,7 +12,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_REPO || join(__dirname, '../..');
@@ -90,6 +90,7 @@ class SystemHealthAPIServer {
         this.app.get('/api/health-verifier/status', this.handleGetHealthStatus.bind(this));
         this.app.get('/api/health-verifier/report', this.handleGetHealthReport.bind(this));
         this.app.post('/api/health-verifier/verify', this.handleTriggerVerification.bind(this));
+        this.app.post('/api/health-verifier/restart-service', this.handleRestartService.bind(this));
 
         // Error handling
         this.app.use(this.handleError.bind(this));
@@ -217,6 +218,82 @@ class SystemHealthAPIServer {
                 status: 'error',
                 message: 'Failed to trigger health verification',
                 error: error.message
+            });
+        }
+    }
+
+    /**
+     * Restart a service based on its check name
+     */
+    async handleRestartService(req, res) {
+        try {
+            const { serviceName, action } = req.body;
+
+            if (!serviceName) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Service name is required'
+                });
+            }
+
+            console.log(`🔄 Restart request received for service: ${serviceName}, action: ${action}`);
+
+            // Map service check names to restart commands
+            const restartCommands = {
+                vkb_server: `cd "${codingRoot}" && bin/vkb restart`,
+                constraint_monitor: `cd "${codingRoot}/integrations/mcp-constraint-monitor" && npm run restart`,
+                dashboard_server: `cd "${codingRoot}/integrations/system-health-dashboard" && npm run restart`,
+            };
+
+            const command = restartCommands[serviceName];
+
+            if (!command) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: `Unknown service: ${serviceName}`,
+                    availableServices: Object.keys(restartCommands)
+                });
+            }
+
+            // Execute restart command in background (non-blocking)
+            console.log(`📝 Executing restart command: ${command}`);
+            const restartProcess = spawn('/bin/bash', ['-c', command], {
+                cwd: codingRoot,
+                detached: true,
+                stdio: 'ignore'
+            });
+            restartProcess.unref();
+
+            // Schedule health verification to run after service has time to start
+            setTimeout(() => {
+                const verifierScript = join(codingRoot, 'scripts/health-verifier.js');
+                if (existsSync(verifierScript)) {
+                    const verifyProcess = spawn('node', [verifierScript, 'verify'], {
+                        cwd: codingRoot,
+                        detached: true,
+                        stdio: 'ignore'
+                    });
+                    verifyProcess.unref();
+                }
+            }, 2000);
+
+            res.json({
+                status: 'success',
+                message: `Service restart initiated: ${serviceName}`,
+                data: {
+                    service: serviceName,
+                    action: action || 'restart',
+                    triggered_at: new Date().toISOString(),
+                    note: 'Health verification will run automatically to confirm service status'
+                }
+            });
+        } catch (error) {
+            console.error('Failed to restart service:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to restart service',
+                error: error.message,
+                details: error.stack
             });
         }
     }
