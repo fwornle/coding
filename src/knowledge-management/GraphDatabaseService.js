@@ -80,6 +80,11 @@ export class GraphDatabaseService extends EventEmitter {
       const lockPath = path.join(this.dbPath, 'LOCK');
       try {
         await fs.access(lockPath);
+        // Skip lsof check on Windows
+        if (process.platform === 'win32') {
+          console.log('[GraphDB] Skipping lock check on Windows');
+          throw new Error('SKIP');
+        }
         // Lock file exists - check who owns it
         const { spawn } = await import('child_process');
         const lsof = spawn('lsof', [lockPath]);
