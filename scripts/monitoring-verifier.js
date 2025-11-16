@@ -573,6 +573,6 @@ runIfMain(import.meta.url, () => {
     console.error(`Monitoring verifier error: ${error.message}`);
     process.exit(1);
   });
-}
+});
 
 export default MonitoringVerifier;

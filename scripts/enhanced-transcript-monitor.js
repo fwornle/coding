@@ -2607,6 +2607,6 @@ async function main() {
 // Run if called directly
 runIfMain(import.meta.url, () => {
   main().catch(console.error);
-}
+});
 
 export default EnhancedTranscriptMonitor;

@@ -523,6 +523,6 @@ runIfMain(import.meta.url, () => {
     console.error('Error:', error.message);
     process.exit(1);
   });
-}
+});
 
 export default GlobalLSLCoordinator;

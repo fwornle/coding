@@ -368,6 +368,6 @@ runIfMain(import.meta.url, () => {
 
     process.on('SIGINT', () => shutdown('SIGINT'));
     process.on('SIGTERM', () => shutdown('SIGTERM'));
-}
+});
 
 export { SystemHealthAPIServer };

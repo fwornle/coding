@@ -645,6 +645,6 @@ runIfMain(import.meta.url, () => {
     console.error(`Global Service Coordinator error: ${error.message}`);
     process.exit(1);
   });
-}
+});
 
 export default GlobalServiceCoordinator;
