@@ -263,6 +263,7 @@ export class DatabaseManager extends EventEmitter {
       // Dynamic import to avoid loading if not needed
       const { GraphDatabaseService } = await import('../knowledge-management/GraphDatabaseService.js');
       const { GraphKnowledgeImporter } = await import('../knowledge-management/GraphKnowledgeImporter.js');
+      const { GraphKnowledgeExporter } = await import('../knowledge-management/GraphKnowledgeExporter.js');
 
       // Create graph database instance
       this.graphDB = new GraphDatabaseService({
@@ -282,6 +283,14 @@ export class DatabaseManager extends EventEmitter {
         conflictResolution: 'newest-wins'
       });
       await importer.initialize();
+
+      // CRITICAL: Initialize exporter to keep JSON, LevelDB, and Graphology in sync
+      // This is NOT optional - all three storage layers must remain synchronized
+      this.graphExporter = new GraphKnowledgeExporter(this.graphDB, {
+        autoExport: true,
+        debounceMs: 5000
+      });
+      await this.graphExporter.initialize();
 
       this.health.graph = {
         available: true,

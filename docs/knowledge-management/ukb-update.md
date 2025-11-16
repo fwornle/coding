@@ -332,7 +332,7 @@ cd /path/to/raas-project
 # First ukb command stores knowledge in GraphDB
 ukb --list-entities
 # Stores in: .data/knowledge-graph/ (LevelDB)
-# Optional export to: .data/knowledge-export/raas.json (backward compatibility)
+# Auto-exports to: .data/knowledge-export/raas.json (git-tracked sync)
 
 # Add domain entity using piped input
 echo "StreamProcessingPipeline
@@ -370,17 +370,18 @@ UKB uses a **database-first architecture** with fail-fast semantics:
 1. **In-Memory**: Graphology graph database (nodes + edges)
 2. **Persistence**: LevelDB at `.data/knowledge-graph/`
 3. **Auto-Persist**: Changes saved every 1000ms
-4. **Optional Export**: Team-based JSON files for backward compatibility
+4. **Git-Tracked Export**: Automatic JSON export for team collaboration
 
 **Benefits**:
 - 🚀 **Fast**: In-memory graph operations
 - 💾 **Durable**: LevelDB persistence survives restarts
 - 🔒 **ACID**: Atomic operations with fail-fast on errors
-- 🔄 **Backward Compatible**: Optional JSON exports
+- 🔄 **Synchronized**: All three layers (Graphology, LevelDB, JSON) stay in sync
+- 🤝 **Team Collaboration**: Git-tracked JSON files for PR reviews
 
-### Optional JSON Export
+### Automatic JSON Export
 
-For backward compatibility, UKB can export to JSON:
+**CRITICAL**: JSON export is NOT optional - it automatically keeps all storage layers synchronized:
 
 ```bash
 # Manual export to JSON
@@ -390,12 +391,17 @@ ukb export .data/knowledge-export/coding.json --team coding
 ukb import shared-memory-old.json
 ```
 
-**Auto-Export** (optional, configured in `.data/knowledge-config.json`):
-- Debounced writes (5-second delay)
+**Auto-Export** (automatically enabled on initialization):
+- Event-driven: Triggers on entity/relationship changes
+- Debounced writes (5-second delay to minimize I/O)
 - Team-based files: `.data/knowledge-export/{team}.json`
-- Matches legacy `shared-memory-*.json` format
+- Git-tracked for team collaboration and PR reviews
 
-**Note**: JSON files are exports, NOT the primary storage. The database is the source of truth.
+**Synchronization Architecture**:
+- **Primary**: Graphology (in-memory) + LevelDB (persistent)
+- **Export**: Automatic JSON export keeps all three synchronized
+- **Guarantee**: Every entity/relationship update triggers export after debounce
+- **Purpose**: Git-based team collaboration, PR reviews, backup
 
 ## Migration from Legacy UKB
 
@@ -415,7 +421,8 @@ The system automatically imports legacy `shared-memory-*.json` files on first ru
 - **Commands**: All `ukb` commands work identically
 - **Data Format**: Entity/relation schema unchanged
 - **Workflows**: Existing team workflows unaffected
-- **Exports**: Optional JSON exports for legacy tools
+- **Git Integration**: JSON files still git-tracked for team collaboration
+- **Exports**: Automatic JSON export maintains backward compatibility
 
 #### Verification Steps
 
