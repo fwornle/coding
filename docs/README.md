@@ -9,10 +9,10 @@ Central documentation for the unified semantic analysis & knowledge management s
 - **[System Overview](system-overview.md)** - What coding provides and core capabilities
 
 ### Core Systems
-- **[Live Session Logging (LSL)](core-systems/live-session-logging.md)** - Real-time conversation classification and routing
-- **[Constraint Monitoring](core-systems/constraint-monitoring.md)** - Real-time code quality enforcement
-- **[Trajectory Generation](core-systems/trajectory-generation.md)** - Automated project analysis and documentation
-- **[Status Line System](core-systems/status-line.md)** - Visual system status and activity indicators
+- **[Live Session Logging (LSL)](lsl/README.md)** - Real-time conversation classification and routing
+- **[Constraint Monitoring](constraints/README.md)** - Real-time code quality enforcement
+- **[Trajectory Generation](trajectories/README.md)** - Automated project analysis and documentation
+- **[Status Line System](health-system/README.md)** - Visual system status and activity indicators
 
 ### Integrations
 - **[Integration Overview](integrations/README.md)** - How external components integrate
@@ -30,8 +30,8 @@ Central documentation for the unified semantic analysis & knowledge management s
 
 ### Architecture
 - **[Architecture Overview](architecture/README.md)** - System architecture, principles, and patterns
-- **[4-Layer Monitoring](core-systems/status-line.md#architecture)** - Health monitoring architecture
-- **[LSL Classification](core-systems/live-session-logging.md#reliablecodingclassifier)** - Classification and routing system
+- **[4-Layer Monitoring](health-system/README.md#architecture)** - Health monitoring architecture
+- **[LSL Classification](lsl/README.md#reliablecodingclassifier)** - Classification and routing system
 
 ### Reference
 - **[API Keys Setup](reference/api-keys-setup.md)** - LLM provider configuration
@@ -58,7 +58,7 @@ Each integration component is self-contained with its own comprehensive document
 
 **Understanding the System?** Read [System Overview](system-overview.md)
 
-**Working with LSL?** See [Live Session Logging](core-systems/live-session-logging.md)
+**Working with LSL?** See [Live Session Logging](lsl/README.md)
 
 **Setting up Integrations?** Check [Integration Overview](integrations/README.md)
 

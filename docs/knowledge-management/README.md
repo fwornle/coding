@@ -1,627 +1,382 @@
-# Knowledge Management
+# Knowledge Management - Two Complementary Approaches
 
-**Purpose**: Comprehensive knowledge management through **three complementary systems**.
+Comprehensive knowledge capture and retrieval through dual systems: manual/batch knowledge curation (UKB) and real-time session learning (Continuous Learning).
 
----
+## What It Does
 
-## 🚀 Quick Navigation
+The Knowledge Management system provides **two complementary approaches** for capturing and leveraging development insights:
 
-**New to knowledge management?** Start here:
+- **Manual/Batch Approach (UKB)** - User-initiated knowledge capture for team sharing and architectural insights
+- **Online Approach (Continuous Learning)** - Real-time session learning with semantic search and retrieval
+- **Unified Visualization (VKB)** - Web-based visualization for knowledge from both sources
+- **Ontology Classification** - Automatic categorization into 5 entity classes
 
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[System Comparison](system-comparison.md)** | **START HERE** - Understand all three knowledge systems | All users |
-| **[Continuous Learning System](continuous-learning-system.md)** | Real-time session learning | Developers |
-| **UKB/VKB** (this document) | Manual knowledge capture & visualization | Team leads |
-| **[MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)** | Deep code analysis with 10 agents | Architects |
+**Critical**: These are **NOT parallel systems** - they serve different purposes and work together:
+- **UKB**: Manual curation, team collaboration, git-tracked sharing
+- **Continuous Learning**: Real-time session learning, semantic retrieval, budget-aware
 
----
+## Architecture
 
-## Three Complementary Knowledge Systems
+### Two Complementary Systems
 
-The coding project provides **three knowledge management systems** that work together:
+![Knowledge Management Architecture](../images/knowledge-management-architecture.png)
 
-### 1. UKB/VKB (Manual Knowledge Capture)
+**System 1: Manual/Batch (UKB - Update Knowledge Base)**
+- **Trigger**: Manual `ukb` command
+- **Input**: Git commits or interactive prompts
+- **Processing**: Pattern detection, significance scoring, ontology classification
+- **Storage**: GraphDB (Graphology + LevelDB + JSON export)
+- **Purpose**: Team sharing, architectural documentation, curated insights
+- **Collaboration**: Git-tracked JSON exports for PR reviews
 
-**This Document** - Manual knowledge capture and visualization:
+**System 2: Online (Continuous Learning)**
+- **Trigger**: Automatic during Claude Code sessions
+- **Input**: Live Session Logs (LSL) real-time exchanges
+- **Processing**: Embedding generation, semantic analysis, temporal decay
+- **Storage**: Qdrant (vectors) + SQLite (analytics)
+- **Purpose**: Session learning, semantic retrieval, cross-session continuity
+- **Privacy**: Local models for sensitive data
 
-- **UKB**: Command-line tool for capturing and updating knowledge
-- **VKB**: Web-based visualization server for exploring knowledge graphs
-- **Graph Database Storage**: Agent-agnostic persistent storage (Graphology + Level)
-- **Multi-Project Support**: Domain-specific knowledge bases with team isolation
+**Visualization: VKB (Visualize Knowledge Base)**
+- **Web UI**: http://localhost:8080
+- **Displays**: Knowledge from both UKB (GraphDB) and Continuous Learning (Qdrant)
+- **Features**: Graph visualization, search, entity relationships
 
-**When to use**: Manual capture of architectural decisions, team-wide knowledge sharing
+## Manual/Batch Approach (UKB)
 
-**Storage Architecture**: See [Graph Storage Architecture](#graph-storage-architecture) below.
+![UKB Architecture](../images/ukb-architecture.png)
 
-### 2. Continuous Learning System (Automatic Real-Time)
+### What It Is
 
-**[Documentation](continuous-learning-system.md)** - Automatic real-time learning:
+UKB is a **command-line tool** for deliberate knowledge capture through git analysis or interactive prompts.
 
-- **Automatic extraction** from live coding sessions
-- **Budget-conscious** ($8.33/month limit)
-- **Privacy-first** (sensitive data → local models)
-- **Agent-agnostic** (Claude/Copilot/Cursor)
+**Primary Use Cases**:
+- Documenting architectural decisions
+- Capturing bug fix patterns
+- Recording lessons learned
+- Creating team knowledge base
+- Post-mortem analysis
 
-**When to use**: Real-time learning, budget control, privacy-critical work
+### How It Works
 
-### 3. MCP Semantic Analysis (Deep Code Analysis)
-
-**[Documentation](../integrations/mcp-semantic-analysis.md)** - 10-agent deep analysis:
-
-- **10 specialized agents** for comprehensive code analysis
-- **On-demand analysis** via MCP tools
-- **Repository-wide** pattern extraction
-- **Architecture diagrams** with PlantUML
-
-**When to use**: Full repository analysis, architecture review, pattern extraction
-
----
-
-## How the Three Systems Work Together
-
-![Three Knowledge Management Systems Integration](../images/three-systems-integration.png)
-
-The three systems form a complementary knowledge management pipeline:
-
-1. **Continuous Learning** extracts knowledge automatically during coding sessions
-2. **MCP Semantic Analysis** provides deep repository analysis when needed
-3. **UKB/VKB** stores manual insights and analysis results in the graph database
-
-**Data Flow** (as of 2025-10-22):
-- Continuous Learning → Graph DB + Qdrant (entities/relations + vector search)
-- MCP Semantic Analysis → UKB/VKB (deep insights and patterns)
-- UKB/VKB → Graph Database (persistent storage)
-- SQLite → Analytics only (budget tracking, session metrics)
-
-**See [System Comparison](system-comparison.md) for detailed comparison.**
-
----
-
-## What This Document Covers (UKB/VKB)
-
-This document focuses on the **UKB/VKB system** for manual knowledge capture and visualization.
-
-### Core Capabilities
-
-- **Knowledge Capture** - Interactive and automated insight extraction
-- **Graph Visualization** - Interactive web-based knowledge graph explorer
-- **Cross-Project Learning** - Share patterns across multiple projects
-- **Semantic Search** - Find relevant knowledge quickly
-- **Git Integration** - Automatic knowledge updates from commits
-
----
-
-## Quick Start
-
-### Basic Usage
-
+**1. Git Analysis Mode** (Default):
 ```bash
-# Update knowledge base (auto-analyzes recent git commits)
-ukb
-
-# Interactive deep insight capture
-ukb --interactive
-
-# Start visualization server
-vkb
-
-# View knowledge graph at http://localhost:8080
-```
-
-### Common Workflows
-
-**Daily Development:**
-```bash
-# Morning - view accumulated knowledge
-vkb
-
-# Throughout day - normal development
-git commit -m "implement feature"
-
-# End of day - capture insights
 ukb
 ```
 
-**Team Knowledge Sharing:**
+Process flow:
+1. Analyzes recent git commits for patterns
+2. Incremental processing to avoid duplicate work
+3. Automatic pattern detection with significance scoring
+4. Categorizes commits (feature, fix, refactor, etc.)
+5. Stores in GraphDB with ontology classification
+6. Auto-exports to JSON for git tracking
+
+**2. Interactive Mode** (Structured Capture):
 ```bash
-# Capture architectural decisions
 ukb --interactive
-
-# Share via git (auto-export creates JSON)
-git add .data/knowledge-export/
-git commit -m "docs: update knowledge base"
-git push
-
-# Team members get updates
-git pull
-# Auto-import loads new knowledge on next session
-vkb restart  # Refresh visualization
 ```
 
----
+Process flow:
+1. Prompts for problem description
+2. Prompts for solution approach
+3. Prompts for rationale and learnings
+4. Prompts for applicability and technologies
+5. Validates URLs and technology names
+6. Stores with significance score (1-10)
+7. Applies ontology classification
 
-## Knowledge Management Components
+### Storage Architecture
 
-### [UKB - Update Knowledge Base](./ukb-update.md)
-
-Command-line tool for capturing development insights:
-
-- **Auto Mode**: Analyzes recent git commits for patterns
-- **Interactive Mode**: Guided prompts for structured insight capture
-- **Search**: Find relevant knowledge by keyword
-- **Management**: Add, remove, rename entities and relations
-
-**Key Features:**
-- Cross-platform Node.js implementation
-- Git history analysis with pattern detection
-- Structured problem-solution-rationale capture
-- Real-time validation and quality assurance
-- Graph database persistence for agent-agnostic access
-
-### [VKB - Visualize Knowledge Base](./vkb-visualize.md)
-
-Web-based knowledge graph visualization server:
-
-- **Interactive Visualization**: Explore knowledge graphs in browser
-- **Server Management**: Start, stop, restart with automatic recovery
-- **Real-time Updates**: Refresh data without restart
-- **Health Monitoring**: Automatic health checks and status reporting
-- **Programmatic API**: Control server from Node.js code
-
-**Key Features:**
-- Cross-platform server management
-- Process lifecycle control with PID tracking
-- Port conflict resolution
-- Comprehensive logging and diagnostics
-- Browser integration (auto-open on start)
-
-### [Knowledge Workflows](./workflows.md)
-
-Orchestrated analysis workflows for comprehensive knowledge gathering:
-
-- **Repository Analysis**: Comprehensive codebase analysis
-- **Conversation Analysis**: Extract insights from discussions
-- **Technology Research**: Automated research on technologies
-- **Cross-Project Learning**: Share knowledge across projects
-
----
-
-## Domain-Specific Knowledge Bases
-
-The system automatically creates domain-specific knowledge bases for multi-project teams:
-
+**GraphDB (Graphology + LevelDB)**:
 ```
-/Users/<username>/Agentic/coding/.data/
-├── knowledge-export/
-│   ├── coding.json              # Cross-team patterns (git-tracked)
-│   ├── resi.json                # Resilience team knowledge (git-tracked)
-│   ├── ui.json                  # UI team knowledge (git-tracked)
-│   └── raas.json                # RaaS domain knowledge (git-tracked)
-├── knowledge-graph/             # Binary LevelDB (gitignored)
-│   └── [binary files]
-└── knowledge-config.json        # Team configuration (git-tracked)
-```
-
-**Benefits:**
-- Domain isolation - specialized knowledge per team
-- Cross-project patterns - shared architectural patterns
-- Team-specific expertise - domain expert knowledge repositories
-- Onboarding efficiency - domain-specific guidance for new members
-
-### Creating Domain Knowledge Base
-
-```bash
-# Configure team in knowledge-config.json first
-cd /Users/<username>/Agentic/coding
-# Edit .data/knowledge-config.json to add team
-
-# Or use graph-sync to import from JSON
-graph-sync import raas
-
-# Add domain entity
-ukb --interactive
-# Auto-exports to: .data/knowledge-export/raas.json
-
-# Commit and share
-git add .data/knowledge-export/raas.json
-git commit -m "docs: add RaaS domain knowledge"
-```
-
----
-
-## Knowledge Types
-
-### Entity Types
-
-- **Pattern**: Reusable solutions and approaches
-- **Solution**: Specific problem fixes
-- **Architecture**: System design insights
-- **Tool**: Technology and framework usage
-- **Workflow**: Process and methodology insights
-- **Problem**: Challenges and issues encountered
-
-### Relation Types
-
-- **implements**: Pattern implements architecture
-- **solves**: Solution solves problem
-- **uses**: Component uses tool
-- **depends_on**: Dependency relationship
-- **related_to**: General relationship
-- **improves**: Enhancement relationship
-
----
-
-## Integration with Coding Workflows
-
-### Claude Code Integration
-
-```javascript
-// MCP tools available in Claude Code
-const tools = [
-  'mcp__memory__create_entities',      // Create knowledge entities
-  'mcp__memory__search_nodes',         // Search knowledge graph
-  'mcp__semantic-analysis__analyze_repository',  // Analyze codebase
-  'mcp__semantic-analysis__analyze_conversation' // Extract insights
-];
-```
-
-### VSCode CoPilot Integration
-
-```bash
-# Start CoPilot with knowledge management
-coding --copilot
-
-# HTTP endpoints
-POST /api/knowledge/update      # Update knowledge base
-GET  /api/knowledge/search      # Search knowledge
-GET  /api/knowledge/stats       # Get statistics
-POST /api/semantic/analyze-repository  # Analyze code
-```
-
-### Direct CLI Fallback
-
-```bash
-# Direct knowledge management
-ukb --interactive              # Capture knowledge
-ukb --auto                    # Analyze git commits
-vkb                          # View knowledge graph
-```
-
----
-
-## Data Structure
-
-### Entity Structure
-
-```json
-{
-  "id": "unique-identifier",
-  "name": "EntityName",
-  "entityType": "Pattern|Solution|Architecture|Tool",
-  "significance": 8,
-  "observations": [
-    {
-      "type": "insight",
-      "content": "Key learning or observation",
-      "date": "ISO-8601 timestamp"
-    }
-  ],
-  "metadata": {
-    "technologies": ["React", "Node.js"],
-    "files": ["src/component.js"],
-    "references": ["https://docs.example.com"]
-  }
-}
-```
-
-### Relation Structure
-
-```json
-{
-  "id": "unique-identifier",
-  "from": "SourceEntityName",
-  "to": "TargetEntityName",
-  "relationType": "implements|solves|uses",
-  "significance": 7,
-  "created": "ISO-8601 timestamp"
-}
-```
-
----
-
-## Graph Storage Architecture
-
-The knowledge management system uses a **graph-first storage architecture** that is agent-agnostic and works with any AI coding assistant (Claude Code, Copilot, Cursor, etc.).
-
-### Storage Components
-
-![Graph Storage Architecture](../images/graph-storage-architecture.png)
-
-**Primary Storage**: **Graphology + Level**
-
-1. **Graphology** (In-Memory Graph)
-   - Fast graph operations and traversals
-   - Multi-graph support (multiple edges between nodes)
-   - Rich graph algorithms ecosystem
-   - Native JavaScript implementation
-
-2. **Level v10.0.0** (Persistent Storage)
-   - Key-value persistence layer
-   - Atomic operations
-   - File-based storage in `.data/knowledge-graph/`
-   - Automatic persistence of graph state
-
-**Key Benefits**:
-- ✅ **Agent-agnostic**: No dependency on Claude Code or MCP Memory
-- ✅ **Team isolation**: Node ID pattern `${team}:${entityName}`
-- ✅ **Persistent**: Automatic file-based persistence
-- ✅ **Fast**: In-memory graph operations
-- ✅ **Backward compatible**: API matches previous SQLite format
-
-### Git-Tracked JSON Exports (Phase 4 - Current)
-
-**NEW**: As of October 2025, the system supports **bidirectional JSON persistence** for team collaboration via git:
-
-```
-.data/
-├── knowledge-graph/           # LevelDB binary files (gitignored)
-│   ├── CURRENT
-│   ├── LOCK
-│   ├── LOG
-│   └── MANIFEST-*
-├── knowledge-export/          # Git-tracked JSON (for PR review)
-│   ├── coding.json
-│   ├── resi.json
-│   └── ui.json
-└── knowledge-config.json      # Team configuration (git-tracked)
-```
-
-**Key Benefits**:
-- ✅ **Human-readable diffs**: Pretty JSON for PR reviews
-- ✅ **Team collaboration**: Share knowledge via git push/pull
-- ✅ **Version control**: Full git history of knowledge evolution
-- ✅ **Conflict resolution**: Newest-wins automatic merging
-- ✅ **Manual control**: CLI tool for export/import/sync operations
-
-**Storage Strategy**:
-1. **Runtime**: Fast binary LevelDB for performance
-2. **Git tracking**: Pretty JSON exports for collaboration
-3. **Automatic sync**: Auto-export on changes (5s debounce)
-4. **Manual control**: `graph-sync` CLI for operations
-
-**CLI Commands**:
-```bash
-# View sync status
-graph-sync status
-
-# Export team knowledge to JSON
-graph-sync export coding
-
-# Import team knowledge from JSON
-graph-sync import coding
-
-# Full bi-directional sync
-graph-sync sync
-
-# Import all teams on startup (automatic)
-# Export happens auto (debounced 5s after changes)
-```
-
-**Team Configuration** (`.data/knowledge-config.json`):
-```json
-{
-  "version": "1.0.0",
-  "defaultTeam": "coding",
-  "teams": {
-    "coding": {
-      "exportPath": ".data/knowledge-export/coding.json",
-      "description": "Coding project infrastructure and patterns",
-      "enabled": true
-    }
-  },
-  "export": {
-    "format": "pretty-json",
-    "autoExport": true,
-    "debounceMs": 5000
-  },
-  "import": {
-    "autoImportOnStartup": true,
-    "conflictResolution": "newest-wins"
-  }
-}
-```
-
-**Collaboration Workflow**:
-```bash
-# Developer A: Capture new insights
-ukb --interactive
-# Auto-export creates .data/knowledge-export/coding.json
-
-# Commit and push
-git add .data/knowledge-export/
-git commit -m "docs: add API design pattern"
-git push
-
-# Developer B: Get updates
-git pull
-# Auto-import on next coding session loads new knowledge
-```
-
-**Migration from shared-memory-*.json**:
-- Old files: `shared-memory-coding.json` → New: `.data/knowledge-export/coding.json`
-- Automatic migration during Phase 2 implementation
-- Same JSON structure, new location for centralized management
-
-### Data Flow
-
-![Knowledge Management Data Flow](../images/graph-storage-data-flow.png)
-
-**Entity Creation**:
-```typescript
-// UKB command
-ukb add "Pattern" "API Design Pattern"
-
-// Flows to DatabaseManager
-→ GraphDatabaseService.storeEntity(entity, {team: 'coding'})
-
-// Creates graph node
-→ graphology.addNode('coding:APIDesignPattern', {
-    name: 'API Design Pattern',
-    entityType: 'Pattern',
-    observations: [...],
-    team: 'coding',
-    source: 'manual'
-  })
-
-// Persists to disk
-→ level.put('coding:APIDesignPattern', nodeData)
-```
-
-**Entity Query**:
-```typescript
-// VKB HTTP API
-GET /api/entities?team=coding
-
-// Fast in-memory graph traversal
-→ graphology.filterNodes(node => node.startsWith('coding:'))
-
-// Returns SQLite-compatible format
-→ JSON response with entity_name, entity_type, observations, etc.
-```
-
-### Storage Evolution
-
-![Storage Evolution](../images/storage-evolution.png)
-
-**Phase 1: JSON Storage** (2024)
-- Manual `shared-memory.json` files
-- Limited querying capability
-- No relationship modeling
-
-**Phase 2: SQLite + Qdrant** (Early 2025 - DEPRECATED)
-- Relational database for entities
-- Vector search with Qdrant
-- Complex joins for relationships
-- MCP Memory dependency
-
-**Phase 3: Graph DB + Qdrant** (October 2025)
-- Native graph database (Graphology + Level) for entities/relations
-- Qdrant for vector search
-- Agent-agnostic architecture
-- No MCP Memory dependency
-- Team isolation via node IDs
-- SQLite retained for analytics only (budget, sessions, cache)
-
-**Phase 4: Git-Tracked JSON Exports** (Current - October 2025)
-- Bidirectional JSON persistence (LevelDB ↔ JSON)
-- Git-tracked exports for team collaboration
-- Pretty JSON format for PR reviews
-- Auto-import on startup, auto-export on changes
-- Manual control via `graph-sync` CLI
-- Conflict resolution (newest-wins)
-- Centralized at `.data/knowledge-export/*.json`
-
-### Node ID Pattern
-
-All graph nodes use a **team-scoped ID pattern**:
-
-```
-${team}:${entityName}
-```
-
-**Examples**:
-- `coding:ReactHooksPattern`
-- `project-x:AuthenticationSolution`
-- `data-team:ETLPipeline`
-
-This provides:
-- **Team isolation**: Each team's knowledge is separate
-- **No conflicts**: Different teams can have entities with same names
-- **Multi-team support**: Single graph database serves all teams
-- **Fast filtering**: Prefix-based team queries
-
-### API Compatibility
-
-The GraphDatabaseService maintains **backward compatibility** with the previous SQLite API:
-
-**Entity Format** (SQLite-compatible):
-```json
-{
-  "id": "auto-generated-uuid",
-  "entity_name": "Pattern Name",
-  "entity_type": "Pattern",
-  "team": "coding",
-  "observations": ["observation 1", "observation 2"],
-  "confidence": 0.9,
-  "source": "manual",
-  "metadata": {}
-}
-```
-
-This ensures:
-- ✅ VKB frontend works without changes
-- ✅ Existing tools and scripts continue to function
-- ✅ Gradual migration path from SQLite
-
-### Configuration
-
-**Current Configuration** (as of 2025-10-22):
-
-```javascript
-// DatabaseManager configuration
-{
-  sqlite: {
-    path: '.data/knowledge.db',
-    enabled: true  // Analytics only: budget_events, session_metrics, embedding_cache
-  },
-  qdrant: {
-    enabled: true  // Vector search
-  },
-  graphDbPath: '.data/knowledge-graph'  // Primary knowledge storage
-}
-```
-
-**Storage Responsibilities**:
-- **Graph DB** (`.data/knowledge-graph/`): Runtime binary storage (LevelDB)
-- **JSON Exports** (`.data/knowledge-export/*.json`): Git-tracked team knowledge
-- **Qdrant**: Vector embeddings for semantic search
-- **SQLite**: Analytics only (no knowledge tables)
-
-**Gitignore Configuration**:
-```gitignore
-# Ignore binary database files
 .data/knowledge-graph/
-.data/knowledge.db*
-.data/backups/
+  Level database files (persistent storage)
 
-# Track JSON exports and config
-!.data/
-!.data/knowledge-export/
-!.data/knowledge-config.json
+.data/knowledge-export/
+  coding.json (git-tracked export)
+  curriculum-alignment.json
+  nano-degree.json
 ```
 
----
+**Automatic JSON Export** (REQUIRED, not optional):
+- Event-driven: Triggers on entity/relationship changes
+- Debounced: 5-second delay to minimize I/O
+- Team-based files for each project
+- Git-tracked for team collaboration and PR reviews
+- Keeps all three layers in sync (Graphology, LevelDB, JSON)
 
-## Full Documentation
+### Ontology Classification (4-Layer Pipeline)
 
-### Detailed Guides
+**Classification Layers**:
+1. **Heuristic Patterns** - Fast pattern matching (>10,000/sec)
+2. **Keyword Matching** - Domain-specific keyword detection
+3. **Semantic Similarity** - Embedding-based classification (~1,000/sec)
+4. **LLM Analysis** - Fallback for ambiguous cases (<500ms)
 
-- **[UKB - Update Knowledge Base](./ukb-update.md)** - Complete UKB documentation with API reference and use cases
-- **[VKB - Visualize Knowledge Base](./vkb-visualize.md)** - Complete VKB documentation with server management and API reference
-- **[graph-sync - Synchronization Tool](./graph-sync.md)** - Bidirectional sync between LevelDB and git-tracked JSON
-- **[Knowledge Workflows](./workflows.md)** - Orchestrated analysis workflows and cross-project learning
+**Entity Classes**:
+- `ImplementationPattern` - Code patterns and best practices
+- `ArchitecturalDecision` - System design choices
+- `TechnicalSolution` - Problem-solving approaches
+- `WorkflowPattern` - Development process patterns
+- `ConfigurationPattern` - Setup and configuration knowledge
 
-### Integration Documentation
+### Usage Examples
 
-- **[MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md)** - 10-agent AI-powered analysis system
-- **[VSCode CoPilot](../integrations/vscode-copilot.md)** - VSCode extension with knowledge management
-- **[Browser Access](../integrations/browser-access.md)** - Web research and data extraction
+**End of Sprint Knowledge Capture**:
+```bash
+# Automatic git analysis
+ukb
 
----
+# Review what was captured
+ukb --list-entities
+```
+
+**Document Architectural Decision**:
+```bash
+# Interactive mode with guided prompts
+ukb --interactive
+
+# Prompts guide you through:
+# - Problem description
+# - Solution approach
+# - Rationale
+# - Learnings
+# - Applicability
+# - Technologies
+# - References (with URL validation)
+```
+
+**Search and Query**:
+```bash
+# Search by keyword
+ukb search "authentication pattern"
+
+# List by entity type
+ukb --list-entities --type ArchitecturalDecision
+
+# Show specific entity
+ukb entity show "ReactHookPattern" --verbose
+```
+
+## Online Approach (Continuous Learning)
+
+![Knowledge Capture Flow](../images/knowledge-capture-flow.png)
+
+### What It Is
+
+The Continuous Learning system **automatically learns** from your coding sessions in real-time, extracting knowledge from LSL exchanges without manual intervention.
+
+**Primary Use Cases**:
+- Real-time knowledge extraction during development
+- Semantic search for relevant past insights
+- Cross-session learning and continuity
+- Pattern recognition across projects
+- Budget-aware LLM usage tracking
+
+### How It Works
+
+**Automatic Operation** (No User Action Required):
+
+1. **Session Monitoring**: Enhanced Transcript Monitor captures LSL exchanges
+2. **Knowledge Extraction**: StreamingKnowledgeExtractor identifies valuable insights
+3. **Embedding Generation**: Creates 384-dim (fast) or 1536-dim (accurate) vectors
+4. **Storage**: Saves to Qdrant (vectors) + SQLite (metadata)
+5. **Semantic Retrieval**: Available for future session queries
+6. **Temporal Decay**: Knowledge ages over time, recent insights prioritized
+
+**Processing Pipeline**:
+```
+LSL Exchange → Significance Detection → Knowledge Extraction →
+Embedding Generation → Vector Storage (Qdrant) → Metadata Storage (SQLite) →
+Available for Semantic Search
+```
+
+### Storage Architecture
+
+**Qdrant (Vector Database)**:
+```
+Collections:
+  knowledge_patterns (1536-dim)       # High-quality embeddings
+  knowledge_patterns_small (384-dim)  # Fast local embeddings
+  trajectory_analysis (384-dim)       # Session trajectory data
+  session_memory (384-dim)            # Short-term session context
+```
+
+**SQLite (Analytics Database)**:
+```
+.cache/knowledge.db
+  Tables:
+    budget_events          # LLM cost tracking
+    knowledge_extractions  # Extracted insights metadata
+    session_metrics        # Performance and usage stats
+    embedding_cache        # Cached embeddings for efficiency
+```
+
+### System Components
+
+**UnifiedInferenceEngine**:
+- Multi-provider LLM routing (Groq → OpenRouter → Local)
+- Budget tracking ($8.33/month enforcement)
+- Circuit breaker for provider failover
+- Privacy-aware routing (sensitive data to local models)
+
+**StreamingKnowledgeExtractor**:
+- Real-time extraction from LSL exchanges
+- Buffering for batch processing
+- Significance filtering
+- Context-aware extraction
+
+**EmbeddingGenerator**:
+- Dual-vector support: 384-dim (fast) and 1536-dim (accurate)
+- Native JavaScript (Transformers.js) for local embeddings
+- OpenAI API for high-quality embeddings
+- Caching for efficiency
+
+**KnowledgeRetriever**:
+- Semantic search via vector similarity
+- Temporal decay (recent knowledge prioritized)
+- Cross-session retrieval
+- Context-aware ranking
+
+**DatabaseManager**:
+- Coordinates Qdrant (vectors) + SQLite (analytics)
+- Health monitoring and status reporting
+- Automatic initialization
+- Connection pooling
+
+### Budget Management
+
+**Cost Tracking**:
+- Hard limit: $8.33/month
+- Per-request cost calculation
+- Budget alerts at 80% threshold
+- Automatic fallback to local models when limit reached
+
+### Privacy-First Architecture
+
+**5-Layer Sensitivity Classification**:
+1. API keys and secrets
+2. Personal identifiable information (PII)
+3. Business-sensitive data
+4. Internal infrastructure details
+5. Public/safe data
+
+**Routing Logic**:
+- Sensitive data → Local models (free, private)
+- Safe data → Remote models (fast, accurate)
+- Budget-aware fallback chain
+
+## Visualization (VKB)
+
+![VKB Architecture](../images/vkb-cli-architecture.png)
+
+### What It Is
+
+VKB (Visualize Knowledge Base) is a **web-based visualization tool** that displays knowledge from **both** UKB and Continuous Learning systems.
+
+**Start VKB**:
+```bash
+cd /Users/q284340/Agentic/coding
+vkb
+
+# Opens browser at http://localhost:8080
+```
+
+### Features
+
+**Graph Visualization**:
+- Interactive force-directed graph
+- Nodes: Entities from GraphDB or Qdrant
+- Edges: Relationships between entities
+- Color-coding by entity type
+- Zoom, pan, and filter controls
+
+**Knowledge Sources**:
+- **UKB (GraphDB)**: Manual insights, git-analyzed patterns, team knowledge
+- **Continuous Learning (Qdrant)**: Session-learned insights, embedded knowledge
+
+**Search and Filter**:
+- Full-text search across entities
+- Filter by entity type
+- Filter by significance score
+- Filter by source (UKB vs Continuous Learning)
+- Date range filtering
+
+**Entity Details**:
+- View complete entity information
+- See relationships and connections
+- Access source code references
+- Review observations and learnings
+
+## Comparison: UKB vs Continuous Learning
+
+| Aspect | UKB (Manual/Batch) | Continuous Learning (Online) |
+|--------|-------------------|------------------------------|
+| **Trigger** | Manual `ukb` command | Automatic during sessions |
+| **Input** | Git commits or prompts | LSL real-time exchanges |
+| **Storage** | GraphDB (Graphology + LevelDB) | Qdrant (vectors) + SQLite |
+| **Purpose** | Team sharing, curation | Session learning, retrieval |
+| **Classification** | 4-layer ontology pipeline | Embedding similarity |
+| **Collaboration** | Git-tracked JSON exports | Local, private |
+| **Use Case** | Architectural docs, team knowledge | Cross-session continuity |
+| **Visualization** | VKB (http://localhost:8080) | VKB (http://localhost:8080) |
+| **Entities** | Named, curated | Embedded, automatic |
+| **Search** | Name-based, type-based | Semantic similarity |
+
+**When to Use UKB**:
+- Documenting important architectural decisions
+- Creating team knowledge base
+- Post-sprint knowledge capture
+- Recording bug fix patterns
+- Manual curation for specific insights
+
+**When to Use Continuous Learning**:
+- Automatic session learning (always on)
+- Semantic search during development
+- Cross-session continuity
+- No manual intervention needed
+- Private, local-first learning
+
+## Key Files
+
+**UKB (Manual/Batch)**:
+- `lib/knowledge-api/` - UKB core implementation
+- `bin/ukb` - Command-line interface
+- `.data/knowledge-graph/` - GraphDB storage (Graphology + LevelDB)
+- `.data/knowledge-export/` - Git-tracked JSON exports
+- `lib/ontology-classifier/` - 4-layer classification pipeline
+
+**Continuous Learning (Online)**:
+- `src/live-logging/StreamingKnowledgeExtractor.js` - Real-time extraction
+- `src/knowledge-management/EmbeddingGenerator.js` - Vector embeddings
+- `src/databases/DatabaseManager.js` - Qdrant + SQLite coordination
+- `src/inference/UnifiedInferenceEngine.js` - Multi-provider LLM routing
+- `.cache/knowledge.db` - SQLite analytics database
+
+**VKB (Visualization)**:
+- `bin/vkb` - Start VKB server
+- `integrations/vkb-visualizer/` - Web UI implementation
+- Port 8080 - VKB web interface
+
+**Configuration**:
+- `config/knowledge-system.json` - Continuous Learning configuration
+- `config/live-logging-config.json` - LSL and extraction settings
+
+## Integration
+
+**Related Systems**:
+- [LSL](../lsl/) - Provides real-time data for Continuous Learning
+- [Health System](../health-system/) - Monitors knowledge system health
+- [Ontology](./ontology.md) - 4-layer classification system documentation
+- [Trajectories](../trajectories/) - Uses knowledge for trajectory analysis
+
+**Related Tools**:
+- [MCP Semantic Analysis](../integrations/mcp-semantic-analysis.md) - Deep code analysis (separate from knowledge management)
 
 ## See Also
 
-- [System Overview](../system-overview.md#knowledge-management)
-- [Getting Started](../getting-started.md)
-- [Integration Overview](../integrations/README.md)
+- [UKB User Guide](./ukb-update.md) - Comprehensive UKB documentation
+- [Continuous Learning System](./continuous-learning-system.md) - Full Continuous Learning docs
+- [System Comparison](./system-comparison.md) - Detailed comparison of both approaches
+- [VKB Visualization](./vkb-visualize.md) - VKB usage guide

@@ -648,9 +648,9 @@ Check:
 
 - [Agent Adapter API Reference](integrations/api-reference.md)
 - [Architecture Overview](architecture/README.md)
-- [Live Session Logging](core-systems/live-session-logging.md)
-- [Constraint Monitoring](core-systems/constraint-monitoring.md)
-- [Status Line System](core-systems/status-line.md)
+- [Live Session Logging](lsl/README.md)
+- [Constraint Monitoring](constraints/README.md)
+- [Status Line System](health-system/README.md)
 
 ---
 

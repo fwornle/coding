@@ -166,6 +166,6 @@ Topics covered:
 
 ## See Also
 
-- [Constraint Monitoring System](../core-systems/constraint-monitoring.md)
+- [Constraint Monitoring System](../constraints/README.md)
 - [System Overview](../system-overview.md#constraint-monitoring)
 - [Integration Overview](README.md)

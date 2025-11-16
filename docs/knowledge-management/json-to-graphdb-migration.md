@@ -416,7 +416,7 @@ await db.close();
 
 ### Q6: How does the ontology classification work?
 
-**A**: See [Ontology Integration Guide](../ontology-integration-guide.md) for details. Short version:
+**A**: See [Ontology Integration Guide](./ontology.md) for details. Short version:
 - 5-layer pipeline with early exit
 - Heuristics (>10,000/sec) for common patterns
 - LLM fallback (<500ms) for ambiguous cases
@@ -439,8 +439,8 @@ await db.close();
 
 ### Documentation
 - **Architecture Diagrams**: `docs/images/knowledge-architecture.png`, `docs/images/system-architecture.png`
-- **Ontology Guide**: `docs/ontology-integration-guide.md`
-- **API Reference**: `docs/ontology-api-overview.md`
+- **Ontology Guide**: `docs/knowledge-management/ontology.md`
+- **API Reference**: `docs/knowledge-management/ontology.md`
 - **Migration Guide**: This document
 
 ### Troubleshooting

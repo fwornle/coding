@@ -26,13 +26,12 @@ coding --copilot
 
 ### Core Capabilities
 
+- **🏥 Health System** - Real-time monitoring, auto-healing, and status line indicators
 - **📋 Live Session Logging** - Real-time conversation classification and routing
 - **🛡️ Constraint Monitoring** - PreToolUse hook enforcement for code quality
 - **🧠 Knowledge Management** - Capture, visualize, and share development insights
+- **📈 Trajectory Generation** - Automated project analysis and documentation
 - **🤖 Multi-Agent Analysis** - 10 specialized AI agents for comprehensive code analysis
-- **📊 Status Line System** - Real-time health monitoring and activity indicators
-- **🏥 Pre-Prompt Health Verification** - Automatic system health checks on every Claude prompt (self-healing)
-- **🚀 Trajectory Generation** - Automated project analysis and documentation
 
 ### Integration Support
 
@@ -44,41 +43,57 @@ coding --copilot
 
 ## 📚 Documentation
 
-### Getting Started
-
-- **[Installation & Setup](docs/getting-started.md)** - Complete installation guide with configuration
-- **[Provider Configuration](docs/provider-configuration.md)** - LLM provider setup (Groq, Anthropic, OpenAI, Gemini, Local)
-- **[System Overview](docs/system-overview.md)** - High-level architecture and capabilities
-- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
-
 ### Core Systems
 
-- **[Live Session Logging](docs/core-systems/live-session-logging.md)** - Real-time conversation classification (98.3% security effectiveness)
-- **[Constraint Monitoring](docs/core-systems/constraint-monitoring.md)** - Real-time code quality enforcement (18 active constraints)
-- **[Status Line System](docs/core-systems/status-line.md)** - Visual health monitoring and activity indicators
-- **[Health Verification System](integrations/system-health-dashboard/README.md)** - Pre-prompt health checks with self-monitoring and auto-healing
-- **[Trajectory Generation](docs/core-systems/trajectory-generation.md)** - Automated project analysis
+#### [🏥 Health System](docs/health-system/)
+Automatic health monitoring and self-healing with real-time dashboard
+- Pre-prompt health verification
+- Auto-healing failed services
+- Dashboard at `http://localhost:3030`
+- 4-layer monitoring architecture
+- **[📊 Status Line System](docs/health-system/status-line.md)** - Real-time indicators in Claude Code status bar
 
-### Knowledge Management
+#### [📋 Live Session Logging (LSL)](docs/lsl/)
+Real-time conversation classification and routing with security redaction
+- 5-layer classification system
+- Multi-project support with foreign session tracking
+- 98.3% security effectiveness
+- Zero data loss architecture
 
-- **[Knowledge Management Overview](docs/knowledge-management/README.md)** - UKB, VKB, and workflows
-- **[UKB - Update Knowledge Base](docs/knowledge-management/ukb-update.md)** - Capture development insights
-- **[VKB - Visualize Knowledge Base](docs/knowledge-management/vkb-visualize.md)** - Interactive graph visualization
-- **[Workflows](docs/knowledge-management/workflows.md)** - Orchestrated analysis workflows
+#### [📈 Trajectories](docs/trajectories/)
+Real-time development state tracking and comprehensive project analysis
+- AI-powered activity classification (exploring, implementing, verifying, etc.)
+- Status line integration
+- Automated project capability documentation
+
+#### [🛡️ Constraints](docs/constraints/)
+Real-time code quality enforcement through PreToolUse hooks
+- 18 active constraints (security, architecture, code quality, PlantUML, documentation)
+- Severity-based enforcement (CRITICAL/ERROR blocks, WARNING/INFO allows)
+- Dashboard monitoring at `http://localhost:3030`
+- Compliance scoring (0-10 scale)
+
+#### [🧠 Knowledge Management](docs/knowledge-management/)
+**Two Complementary Approaches** for knowledge capture and retrieval:
+- **Manual/Batch (UKB)**: Git analysis and interactive capture for team sharing
+- **Online (Continuous Learning)**: Real-time session learning with semantic search
+- **Visualization (VKB)**: Web-based graph visualization at `http://localhost:8080`
+- **Ontology Classification**: 4-layer classification pipeline
 
 ### Integration Components
 
-- **[Integrations Overview](docs/integrations/README.md)** - All integration components
-- **[MCP Semantic Analysis](docs/integrations/mcp-semantic-analysis.md)** - 10-agent AI analysis system
-- **[MCP Constraint Monitor](docs/integrations/mcp-constraint-monitor.md)** - Real-time constraint enforcement
-- **[Serena AST Analysis](docs/integrations/serena-ast-analysis.md)** - Structure-aware code search
-- **[Browser Access](docs/integrations/browser-access.md)** - Browser automation (Stagehand)
-- **[VSCode CoPilot](docs/integrations/vscode-copilot.md)** - Enhanced GitHub CoPilot
+- **[System Health Dashboard](integrations/system-health-dashboard/)** - Real-time health visualization
+- **[MCP Constraint Monitor](integrations/mcp-constraint-monitor/)** - PreToolUse hook enforcement
+- **[MCP Semantic Analysis](integrations/mcp-semantic-analysis/)** - 10-agent AI analysis system
+- **[VKB Visualizer](integrations/vkb-visualizer/)** - Knowledge graph visualization
+- **[Serena MCP](integrations/mcp-serena/)** - Structure-aware code search
+- **[All Integrations](integrations/)** - Complete integration list
 
-### Architecture
+### Getting Started
 
-- **[Architecture Overview](docs/architecture/README.md)** - System architecture and design patterns
-- **[Reference Documentation](docs/reference/README.md)** - API keys, troubleshooting, advanced topics
+- **[Installation & Setup](docs/getting-started.md)** - Complete installation guide
+- **[Provider Configuration](docs/provider-configuration.md)** - LLM provider setup
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 
 ---
 
@@ -253,11 +268,12 @@ cd integrations/mcp-constraint-monitor && npm test
 
 ### Current Status
 
+✅ **Health System** - 4-layer monitoring with auto-healing
 ✅ **Live Session Logging** - Real-time classification with 98.3% security
 ✅ **Constraint Monitoring** - 18 active constraints with PreToolUse hooks
 ✅ **Knowledge Management** - UKB/VKB with MCP integration
 ✅ **Multi-Agent Analysis** - 10 agents with workflow orchestration
-✅ **Status Line System** - 4-layer health monitoring
+✅ **Status Line System** - Real-time indicators in Claude Code status bar
 ✅ **Cross-Platform** - macOS, Linux, Windows support
 
 ---

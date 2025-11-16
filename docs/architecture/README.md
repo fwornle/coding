@@ -10,7 +10,7 @@ This section contains architectural documentation for developers who need to und
 
 > **Note**: Most system architecture is already covered in other sections:
 > - [System Overview](../system-overview.md) - High-level architecture
-> - [Core Systems](../core-systems/) - Individual system architectures
+> - [Core Systems](../) - Individual system architectures
 > - [Integrations](../integrations/) - Integration component architectures
 
 ---
@@ -21,10 +21,10 @@ This section contains architectural documentation for developers who need to und
 
 Already documented in other sections:
 
-- **[4-Layer Monitoring](../core-systems/status-line.md#architecture)** - System health monitoring architecture
-- **[LSL Classification](../core-systems/live-session-logging.md#architecture)** - Conversation classification and routing
-- **[Constraint Monitoring](../core-systems/constraint-monitoring.md#architecture)** - Real-time constraint enforcement
-- **[Trajectory Generation](../core-systems/trajectory-generation.md#architecture)** - Project analysis system
+- **[4-Layer Monitoring](../health-system/README.md#architecture)** - System health monitoring architecture
+- **[LSL Classification](../lsl/README.md#architecture)** - Conversation classification and routing
+- **[Constraint Monitoring](../constraints/README.md#architecture)** - Real-time constraint enforcement
+- **[Trajectory Generation](../trajectories/README.md#architecture)** - Project analysis system
 
 ### Legacy Architecture Docs
 
@@ -197,6 +197,6 @@ All diagrams have corresponding PlantUML sources in `docs/puml/`.
 ## See Also
 
 - [System Overview](../system-overview.md) - High-level system architecture
-- [Core Systems](../core-systems/) - Individual system documentation
+- [Core Systems](../) - Individual system documentation
 - [Integrations](../integrations/) - Integration component architectures
 - [Getting Started](../getting-started.md) - Installation and configuration
