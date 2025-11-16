@@ -10,7 +10,10 @@
         "sources": {
           "type": "array",
           "description": "Data sources (sensors, interfaces)",
-          "items": "string"
+          "items": {
+            "type": "string",
+            "description": "Data source identifier"
+          }
         },
         "containerFormat": {
           "type": "string",
@@ -106,7 +109,11 @@
         "rpuComponents": {
           "type": "array",
           "description": "Array of RPUs in compound workflow",
-          "items": "reference"
+          "items": {
+            "type": "reference",
+            "description": "Reference to RPU entity",
+            "targetEntityClass": "RPU"
+          }
         },
         "dagDefinition": {
           "type": "object",
@@ -137,11 +144,19 @@
         },
         "intervalSets": {
           "type": "array",
-          "description": "Time intervals for evaluation"
+          "description": "Time intervals for evaluation",
+          "items": {
+            "type": "object",
+            "description": "Time interval set"
+          }
         },
         "kpiDefinitions": {
           "type": "array",
-          "description": "KPI metric definitions"
+          "description": "KPI metric definitions",
+          "items": {
+            "type": "object",
+            "description": "KPI definition"
+          }
         }
       },
       "requiredProperties": ["kpiDockerImage", "evaluationScript"],
@@ -247,11 +262,19 @@
         },
         "orchestratedFunctions": {
           "type": "array",
-          "description": "Functions managed by orchestrator"
+          "description": "Functions managed by orchestrator",
+          "items": {
+            "type": "string",
+            "description": "Function identifier"
+          }
         },
         "executionOrder": {
           "type": "array",
-          "description": "Function execution sequence"
+          "description": "Function execution sequence",
+          "items": {
+            "type": "string",
+            "description": "Function name in execution order"
+          }
         },
         "timingConstraints": {
           "type": "object",
@@ -278,11 +301,19 @@
         },
         "inputSignals": {
           "type": "array",
-          "description": "Required input signals"
+          "description": "Required input signals",
+          "items": {
+            "type": "string",
+            "description": "Signal name"
+          }
         },
         "outputSignals": {
           "type": "array",
-          "description": "Produced output signals"
+          "description": "Produced output signals",
+          "items": {
+            "type": "string",
+            "description": "Signal name"
+          }
         }
       },
       "requiredProperties": ["functionName", "functionType"],
@@ -494,7 +525,11 @@
       "properties": {
         "intervals": {
           "type": "array",
-          "description": "Array of time intervals"
+          "description": "Array of time intervals",
+          "items": {
+            "type": "object",
+            "description": "Time interval"
+          }
         },
         "selectionCriteria": {
           "type": "string",
@@ -613,7 +648,11 @@
         },
         "transformations": {
           "type": "array",
-          "description": "Applied transformations"
+          "description": "Applied transformations",
+          "items": {
+            "type": "string",
+            "description": "Transformation name"
+          }
         },
         "unfragmented": {
           "type": "boolean",
@@ -631,11 +670,19 @@
       "properties": {
         "nodes": {
           "type": "array",
-          "description": "DAG nodes (RPUs)"
+          "description": "DAG nodes (RPUs)",
+          "items": {
+            "type": "object",
+            "description": "DAG node"
+          }
         },
         "edges": {
           "type": "array",
-          "description": "DAG edges (dependencies)"
+          "description": "DAG edges (dependencies)",
+          "items": {
+            "type": "object",
+            "description": "DAG edge"
+          }
         },
         "executionStrategy": {
           "type": "string",
