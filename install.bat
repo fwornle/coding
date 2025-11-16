@@ -328,17 +328,53 @@ cd /d "%CODING_REPO%"
 REM Create bin directory
 mkdir "%CODING_REPO%\bin" 2>nul
 
-REM Create ukb.bat wrapper
-echo @echo off > "%CODING_REPO%\bin\ukb.bat"
-echo bash "%CODING_REPO%\knowledge-management\ukb" %%* >> "%CODING_REPO%\bin\ukb.bat"
+REM Create ukb.bat wrapper (self-detecting)
+(
+    echo @echo off
+    echo setlocal
+    echo.
+    echo REM Get the directory where this batch file is located
+    echo set "SCRIPT_DIR=%%~dp0"
+    echo REM Remove trailing backslash
+    echo set "SCRIPT_DIR=%%SCRIPT_DIR:~0,-1%%"
+    echo REM Get parent directory ^(coding repo root^)
+    echo for %%%%I in ^("%%SCRIPT_DIR%%\..") do set "CODING_REPO=%%%%~fI"
+    echo.
+    echo bash "%%CODING_REPO%%\knowledge-management\ukb" %%*
+) > "%CODING_REPO%\bin\ukb.bat"
 
-REM Create vkb.bat wrapper
-echo @echo off > "%CODING_REPO%\bin\vkb.bat"
-echo bash "%CODING_REPO%\knowledge-management\vkb" %%* >> "%CODING_REPO%\bin\vkb.bat"
+REM Create vkb.bat wrapper (self-detecting)
+(
+    echo @echo off
+    echo setlocal
+    echo.
+    echo REM Get the directory where this batch file is located
+    echo set "SCRIPT_DIR=%%~dp0"
+    echo REM Remove trailing backslash
+    echo set "SCRIPT_DIR=%%SCRIPT_DIR:~0,-1%%"
+    echo REM Get parent directory ^(coding repo root^)
+    echo for %%%%I in ^("%%SCRIPT_DIR%%\..") do set "CODING_REPO=%%%%~fI"
+    echo.
+    echo bash "%%CODING_REPO%%\knowledge-management\vkb" %%*
+) > "%CODING_REPO%\bin\vkb.bat"
 
-REM Create coding.bat wrapper
-echo @echo off > "%CODING_REPO%\bin\coding.bat"
-echo bash "%CODING_REPO%\bin\coding" %%* >> "%CODING_REPO%\bin\coding.bat"
+REM Create coding.bat wrapper (self-detecting)
+(
+    echo @echo off
+    echo setlocal
+    echo.
+    echo REM Get the directory where this batch file is located
+    echo set "SCRIPT_DIR=%%~dp0"
+    echo REM Remove trailing backslash
+    echo set "SCRIPT_DIR=%%SCRIPT_DIR:~0,-1%%"
+    echo REM Get parent directory ^(coding repo root^)
+    echo for %%%%I in ^("%%SCRIPT_DIR%%\..") do set "CODING_REPO=%%%%~fI"
+    echo.
+    echo REM Export for the bash script
+    echo set "CODING_REPO=%%CODING_REPO%%"
+    echo.
+    echo bash "%%CODING_REPO%%\bin\coding" %%*
+) > "%CODING_REPO%\bin\coding.bat"
 
 echo %GREEN%[OK]%NC% Batch wrappers created in bin/
 echo.
@@ -395,15 +431,38 @@ if not exist "%CODING_REPO%\knowledge-management\ukb" (
 echo.
 
 REM ============================================================================
-REM 11. CONFIGURE GIT BASH ENVIRONMENT
+REM 11. CONFIGURE ENVIRONMENT
 REM ============================================================================
 
-echo %BLUE%[11/12] Configuring Git Bash environment...%NC%
+echo %BLUE%[11/12] Configuring environment...%NC%
+echo.
+
+REM ===== 11a. Configure Windows PATH =====
+echo Configuring Windows PATH...
+
+REM Check if bin directory is already in PATH
+echo %PATH% | findstr /C:"%CODING_REPO%\bin" >nul 2>nul
+if %errorlevel% neq 0 (
+    echo Adding %CODING_REPO%\bin to Windows PATH...
+    setx PATH "%PATH%;%CODING_REPO%\bin" >nul 2>nul
+    if %errorlevel% equ 0 (
+        echo %GREEN%[OK]%NC% Added to Windows PATH
+        echo %YELLOW%NOTE:%NC% You may need to restart your terminal for PATH changes to take effect
+    ) else (
+        echo %YELLOW%WARNING:%NC% Failed to automatically add to PATH
+        echo Please add manually: %CODING_REPO%\bin
+    )
+) else (
+    echo %GREEN%[OK]%NC% Already in Windows PATH
+)
+echo.
+
+REM ===== 11b. Configure Git Bash Environment =====
+echo Configuring Git Bash environment...
 
 REM Create configuration snippet
 set BASH_CONFIG_FILE=%USERPROFILE%\.bash_profile
 
-echo Checking for ~/.bash_profile...
 if exist "%BASH_CONFIG_FILE%" (
     findstr /C:"CODING_REPO" "%BASH_CONFIG_FILE%" >nul 2>nul
     if %errorlevel% neq 0 (
@@ -430,10 +489,158 @@ if exist "%BASH_CONFIG_FILE%" (
 echo.
 
 REM ============================================================================
-REM 12. INITIALIZE KNOWLEDGE DATABASES
+REM 12. CREATE CLAUDE CODE SETTINGS
 REM ============================================================================
 
-echo %BLUE%[12/12] Initializing knowledge databases and log directories...%NC%
+echo %BLUE%[12/13] Creating Claude Code settings...%NC%
+cd /d "%CODING_REPO%"
+
+REM Create .claude directory if needed
+mkdir "%CODING_REPO%\.claude" 2>nul
+
+REM Create settings.local.json with Windows-compatible paths
+echo Creating .claude/settings.local.json...
+(
+    echo {
+    echo   "permissions": {
+    echo     "allow": [
+    echo       "Bash(npm run api:*)",
+    echo       "mcp__serena__find_symbol",
+    echo       "mcp__serena__search_for_pattern",
+    echo       "Bash(TRANSCRIPT_DEBUG=true node scripts/enhanced-transcript-monitor.js --test)",
+    echo       "Bash(node:*)",
+    echo       "Bash(plantuml:*)",
+    echo       "mcp__serena__check_onboarding_performed",
+    echo       "Bash(bin/coding:*)",
+    echo       "Bash(cp:*)",
+    echo       "mcp__serena__find_file",
+    echo       "mcp__serena__replace_symbol_body",
+    echo       "mcp__serena__activate_project",
+    echo       "mcp__serena__get_symbols_overview",
+    echo       "Bash(cat:*)",
+    echo       "Bash(timeout:*)",
+    echo       "Bash(watch:*)",
+    echo       "mcp__serena__list_dir",
+    echo       "mcp__serena__insert_after_symbol",
+    echo       "Bash(find:*)",
+    echo       "Bash(CODING_REPO=%CODING_REPO% node %CODING_REPO%\\scripts\\combined-status-line.js)",
+    echo       "Bash(kill:*)",
+    echo       "Bash(pkill:*)",
+    echo       "Bash(grep:*)",
+    echo       "Bash(lsof:*)",
+    echo       "Bash(curl:*)",
+    echo       "Bash(PORT=3030 npm run dev)",
+    echo       "mcp__serena__insert_before_symbol",
+    echo       "mcp__constraint-monitor__check_constraints",
+    echo       "Bash(npm start)",
+    echo       "Bash(git rm:*)",
+    echo       "Bash(npm run:*)",
+    echo       "Bash(chmod:*)",
+    echo       "Bash(./test-individual-constraints.sh:*)",
+    echo       "Bash(docker stop:*)",
+    echo       "Bash(docker rm:*)",
+    echo       "Bash(docker-compose up:*)",
+    echo       "Bash(docker logs:*)",
+    echo       "Bash(docker restart:*)",
+    echo       "Bash(PORT=3031 npm run api)",
+    echo       "Bash(git checkout:*)",
+    echo       "Bash(xargs kill:*)",
+    echo       "mcp__mcp-git-ingest__git_directory_structure",
+    echo       "mcp__mcp-git-ingest__git_read_important_files",
+    echo       "WebSearch",
+    echo       "Bash(git remote get-url:*)",
+    echo       "Bash(basename:*)",
+    echo       "mcp__spec-workflow__spec-workflow-guide",
+    echo       "mcp__spec-workflow__approvals",
+    echo       "Bash(PORT=3030 npm run dashboard)",
+    echo       "Bash(sort:*)",
+    echo       "mcp__serena__think_about_task_adherence",
+    echo       "Bash(awk:*)",
+    echo       "Bash(PORT=3031 node src/dashboard-server.js)",
+    echo       "mcp__serena__onboarding",
+    echo       "mcp__serena__write_memory",
+    echo       "Bash(jq:*)",
+    echo       "mcp__serena__think_about_collected_information",
+    echo       "mcp__serena__get_current_config",
+    echo       "Bash(npm install:*)",
+    echo       "Read(//C:/Users/%USERNAME%/.claude/**)",
+    echo       "WebFetch(domain:console.groq.com)",
+    echo       "Read(//private/tmp/**)",
+    echo       "Bash(./collect-test-results.js)",
+    echo       "WebFetch(domain:github.com)",
+    echo       "Bash(sqlite3 .data/knowledge.db \"SELECT source, COUNT(*) as count FROM knowledge_extractions GROUP BY source\")",
+    echo       "Bash(sqlite3 .data/knowledge.db \"PRAGMA table_info(knowledge_extractions)\")",
+    echo       "mcp__memory__read_graph",
+    echo       "Bash(vkb restart:*)",
+    echo       "Bash(bin/vkb restart:*)",
+    echo       "Bash(ps:*)",
+    echo       "Bash(git submodule:*)",
+    echo       "mcp__serena__find_referencing_symbols",
+    echo       "Bash(git config:*)",
+    echo       "Bash(git restore:*)",
+    echo       "Bash(git diff:*)",
+    echo       "Bash(xargs -I {} git restore --source=HEAD {})",
+    echo       "WebFetch(domain:claude.ai)",
+    echo       "mcp__constraint-monitor__get_constraint_status",
+    echo       "Bash(for coll in ontology-coding ontology-raas ontology-resi ontology-agentic ontology-ui)",
+    echo       "Bash(do echo -n \"$coll: \")",
+    echo       "Bash(done)",
+    echo       "Bash(npm test:*)",
+    echo       "Bash(docker info:*)",
+    echo       "Bash(bash %CODING_REPO%\\bin\\ukb:*)",
+    echo       "Bash(bin/ukb:*)",
+    echo       "Bash(bin/vkb:*)",
+    echo       "Bash(SYSTEM_HEALTH_API_PORT=3033 pnpm api:*)",
+    echo       "mcp__serena__initial_instructions",
+    echo       "Bash(git add:*)",
+    echo       "Bash(git commit:*)",
+    echo       "Bash(rm:*)",
+    echo       "Bash(npm view:*)",
+    echo       "Bash(while read name)",
+    echo       "Bash(do [ ! -f \"docs/presentation/images/$name.png\" ])",
+    echo       "Bash(echo:*)",
+    echo       "Bash(git fetch:*)"
+    echo     ],
+    echo     "deny": [],
+    echo     "ask": []
+    echo   },
+    echo   "hooks": {
+    echo     "UserPromptSubmit": [
+    echo       {
+    echo         "hooks": [
+    echo           {
+    echo             "type": "command",
+    echo             "command": "node %CODING_REPO%\\integrations\\mcp-constraint-monitor\\src\\hooks\\pre-prompt-hook-wrapper.js"
+    echo           }
+    echo         ]
+    echo       }
+    echo     ],
+    echo     "PreToolUse": [
+    echo       {
+    echo         "hooks": [
+    echo           {
+    echo             "type": "command",
+    echo             "command": "node %CODING_REPO%\\integrations\\mcp-constraint-monitor\\src\\hooks\\pre-tool-hook-wrapper.js"
+    echo           }
+    echo         ]
+    echo       }
+    echo     ]
+    echo   },
+    echo   "statusLine": {
+    echo     "type": "command",
+    echo     "command": "CODING_REPO=%CODING_REPO% node %CODING_REPO%\\scripts\\combined-status-line.js"
+    echo   }
+    echo }
+) > "%CODING_REPO%\.claude\settings.local.json"
+
+echo %GREEN%[OK]%NC% Claude Code settings created
+echo.
+
+REM ============================================================================
+REM 13. INITIALIZE KNOWLEDGE DATABASES
+REM ============================================================================
+
+echo %BLUE%[13/13] Initializing knowledge databases and log directories...%NC%
 
 REM Create .data directory
 mkdir "%CODING_REPO%\.data" 2>nul
@@ -475,21 +682,13 @@ echo ===========================================================================
 echo %GREEN%Installation completed successfully!%NC%
 echo ============================================================================
 echo.
-echo %YELLOW%IMPORTANT: Complete the following steps:%NC%
+echo %YELLOW%NEXT STEPS:%NC%
 echo.
-echo %BLUE%Step 1: Add to Windows PATH (for CMD/PowerShell)%NC%
-echo   1. Press Win+X and select "System"
-echo   2. Click "Advanced system settings"
-echo   3. Click "Environment Variables"
-echo   4. Under "User variables", select "Path" and click "Edit"
-echo   5. Click "New" and add: %CODING_REPO%\bin
-echo   6. Click "OK" to save
+echo %BLUE%Step 1: Restart Your Terminal%NC%
+echo   - Windows PATH has been automatically configured
+echo   - Close and reopen your terminal (CMD/PowerShell/Git Bash) for changes to take effect
 echo.
-echo %BLUE%Step 2: Git Bash Configuration%NC%
-echo   - Git Bash is already configured via ~/.bash_profile
-echo   - Restart Git Bash or run: source ~/.bash_profile
-echo.
-echo %BLUE%Step 3: Configure API Keys (Optional)%NC%
+echo %BLUE%Step 2: Configure API Keys (Optional)%NC%
 echo   - Edit %CODING_REPO%\.env
 echo   - Add your API keys for AI services you plan to use
 echo.
