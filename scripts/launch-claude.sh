@@ -6,6 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODING_REPO="$(dirname "$SCRIPT_DIR")"
+export CODING_REPO
 
 # Source agent-common setup functions
 source "$SCRIPT_DIR/agent-common-setup.sh"

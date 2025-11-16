@@ -175,6 +175,7 @@ fi
 # Set environment variables
 export CODING_AGENT="$AGENT"
 export CODING_TOOLS_PATH="$SCRIPT_DIR/.."
+export CODING_REPO="$SCRIPT_DIR/.."
 export CODING_PROJECT_DIR="$PROJECT_DIR"
 
 # Launch appropriate agent
