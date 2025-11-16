@@ -21,7 +21,9 @@ The UKB system provides a manual fallback mechanism for knowledge capture when a
 - **Interactive Mode**: Guided prompts with real-time validation
 - **Quality Assurance**: Content filtering and URL validation
 - **Agent Integration**: Programmatic API for coding agents
-- **MCP Synchronization**: Automatic memory graph updates
+- **Ontology Classification**: 4-layer hybrid pipeline for automatic entity classification
+- **Semantic Analysis Integration**: MCP semantic-analysis server for significance determination
+- **Graph Database Storage**: Graphology + LevelDB for fast, persistent knowledge graphs
 
 ---
 
@@ -206,7 +208,7 @@ const { KnowledgeManager } = require('ukb-cli');
 
 // Initialize knowledge manager
 const manager = new KnowledgeManager({
-  knowledgeBasePath: './knowledge-graph (GraphDB)',
+  knowledgeBasePath: '.data/knowledge-graph',
   mcpIntegration: true
 });
 
@@ -327,9 +329,10 @@ When working in a project directory, UKB automatically creates domain-specific k
 # Navigate to domain project
 cd /path/to/raas-project
 
-# First ukb command creates domain-specific file
+# First ukb command stores knowledge in GraphDB
 ukb --list-entities
-# Creates: /Users/<username>/Agentic/coding/shared-memory-raas.json
+# Stores in: .data/knowledge-graph/ (LevelDB)
+# Optional export to: .data/knowledge-export/raas.json (backward compatibility)
 
 # Add domain entity using piped input
 echo "StreamProcessingPipeline
@@ -343,12 +346,11 @@ Implemented using Apache Kafka + Apache Flink" | ukb --add-entity
 ### Cross-Domain Pattern Discovery
 
 ```bash
-# Search across all team knowledge bases
-cd /Users/<username>/Agentic/coding
-grep -l "MicroserviceArchitecture" team-specific JSON exports
+# Search across all team knowledge bases using GraphDB
+ukb search "MicroserviceArchitecture" --all-teams
 
 # Extract domain-specific implementations
-ukb --print --team raas | jq '.entities[] | select(.name | contains("Microservice"))'
+ukb --list-entities --team raas --type ArchitecturePattern
 
 # Create cross-domain pattern in shared knowledge
 cd /any/project
@@ -358,38 +360,74 @@ ukb entity add -n "CrossDomainMicroservicePattern" -t "ArchitecturePattern" -s 1
 
 ---
 
+## Storage Architecture
+
+### Primary Storage: GraphDB + LevelDB
+
+UKB uses a **database-first architecture** with fail-fast semantics:
+
+**Storage Layers**:
+1. **In-Memory**: Graphology graph database (nodes + edges)
+2. **Persistence**: LevelDB at `.data/knowledge-graph/`
+3. **Auto-Persist**: Changes saved every 1000ms
+4. **Optional Export**: Team-based JSON files for backward compatibility
+
+**Benefits**:
+- 🚀 **Fast**: In-memory graph operations
+- 💾 **Durable**: LevelDB persistence survives restarts
+- 🔒 **ACID**: Atomic operations with fail-fast on errors
+- 🔄 **Backward Compatible**: Optional JSON exports
+
+### Optional JSON Export
+
+For backward compatibility, UKB can export to JSON:
+
+```bash
+# Manual export to JSON
+ukb export .data/knowledge-export/coding.json --team coding
+
+# Import from legacy JSON
+ukb import shared-memory-old.json
+```
+
+**Auto-Export** (optional, configured in `.data/knowledge-config.json`):
+- Debounced writes (5-second delay)
+- Team-based files: `.data/knowledge-export/{team}.json`
+- Matches legacy `shared-memory-*.json` format
+
+**Note**: JSON files are exports, NOT the primary storage. The database is the source of truth.
+
 ## Migration from Legacy UKB
 
 ### Automatic Migration
 
-All existing `ukb` commands continue to work unchanged. The system automatically delegates to the new Node.js implementation while maintaining full compatibility.
+The system automatically imports legacy `shared-memory-*.json` files on first run:
 
 #### What Changed
 
-- **Internal Architecture**: Bash → Node.js modular design
-- **Performance**: 3x faster processing, 50% memory reduction
-- **Features**: Enhanced validation, custom naming, batch operations
-- **API**: Stable programmatic interface for agent integration
+- **Storage**: JSON files → GraphDB + LevelDB
+- **Location**: Root directory → `.data/knowledge-graph/`
+- **Performance**: 3x faster queries, 50% less memory
+- **API**: New database-first programmatic interface
 
 #### What Stayed the Same
 
-- **Commands**: All existing commands work identically
-- **Data Format**: knowledge-graph (GraphDB) format unchanged
+- **Commands**: All `ukb` commands work identically
+- **Data Format**: Entity/relation schema unchanged
 - **Workflows**: Existing team workflows unaffected
-- **Git Integration**: Same git-based knowledge sharing
+- **Exports**: Optional JSON exports for legacy tools
 
 #### Verification Steps
 
 ```bash
-# Verify migration success
-ukb --validate
+# Check database status
+ukb status
 
-# Check performance improvement
-time ukb --list-entities
+# Verify entities migrated
+ukb --list-entities
 
-# Test new features
-ukb --add-entity "TestPattern" --type TransferablePattern
-ukb --remove-entity "TestPattern"
+# Test graph operations
+ukb search "pattern" --team coding
 ```
 
 ---
@@ -431,6 +469,102 @@ ukb --analyze-git --auto-commit --webhook-url "https://api.example.com"
 # Custom agent integration
 UKB_API_MODE=true ukb --capture --stdin < insight.json
 ```
+
+### Ontology Classification
+
+UKB automatically classifies knowledge entities using a 4-layer hybrid pipeline:
+
+**Classification Layers:**
+1. **Heuristic Patterns** - Fast pattern matching (>10,000/sec)
+2. **Keyword Matching** - Domain-specific keyword detection
+3. **Semantic Similarity** - Embedding-based classification (~1,000/sec)
+4. **LLM Analysis** - Fallback for ambiguous cases (<500ms)
+
+**Entity Classes:**
+- `ImplementationPattern` - Code patterns and best practices
+- `ArchitecturalDecision` - System design choices
+- `TechnicalSolution` - Problem-solving approaches
+- `WorkflowPattern` - Development process patterns
+- `ConfigurationPattern` - Setup and configuration knowledge
+
+**Usage Example:**
+```javascript
+// Entities are automatically classified during capture
+const result = await manager.captureInsight({
+  name: "React Custom Hooks Pattern",
+  problem: "Duplicated stateful logic across components",
+  solution: "Extract logic into reusable custom hooks"
+});
+
+// Result includes ontology metadata
+console.log(result.ontology);
+// {
+//   entityClass: "ImplementationPattern",
+//   confidence: 0.92,
+//   team: "coding",
+//   method: "heuristic",  // or "keyword", "semantic", "llm"
+//   layer: 1
+// }
+```
+
+**Querying by Ontology:**
+```bash
+# Query entities by ontology class
+ukb query --ontology-class ImplementationPattern --min-confidence 0.8
+
+# List all architectural decisions
+ukb query --ontology-class ArchitecturalDecision --team coding
+```
+
+For detailed ontology documentation, see [Migration Guide - Ontology Integration](./json-to-graphdb-migration.md#ontology-integration-new-in-v20).
+
+### Semantic Analysis Integration
+
+UKB integrates with the MCP semantic-analysis server to determine significance scores and extract deep insights from code and conversations.
+
+**Significance Determination:**
+
+When UKB processes knowledge (git commits, insights), it can use semantic analysis to:
+- Calculate significance scores (1-10) based on code impact
+- Extract architectural patterns from code
+- Identify transferable knowledge across projects
+- Generate context-aware observations
+
+**How It Works:**
+```javascript
+import { KnowledgeManager } from 'ukb-cli';
+
+const manager = new KnowledgeManager({
+  semanticAnalysis: {
+    enabled: true,
+    mcp: true  // Use MCP semantic-analysis server
+  }
+});
+
+// Automatic significance scoring via semantic analysis
+const insights = await manager.analyzeGitHistory({
+  depth: 20,
+  useSemanticAnalysis: true  // Enables MCP integration
+});
+
+// Each insight includes AI-determined significance
+insights.forEach(insight => {
+  console.log(`${insight.name}: Significance ${insight.significance}/10`);
+});
+```
+
+**MCP Tools Used:**
+- `determine_insights` - Extract insights from content
+- `analyze_code` - Code pattern and quality analysis
+- `extract_patterns` - Identify reusable design patterns
+
+**Benefits:**
+- **Accurate Significance Scores**: AI-powered analysis vs. simple heuristics
+- **Pattern Recognition**: Identifies recurring architectural patterns
+- **Context-Aware**: Understands code impact and transferability
+- **Cross-Project Learning**: Applies insights from similar patterns
+
+For complete semantic analysis documentation, see [MCP Semantic Analysis Integration](../integrations/mcp-semantic-analysis.md).
 
 ---
 

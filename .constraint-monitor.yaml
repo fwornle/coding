@@ -106,6 +106,13 @@ constraints:
     whitelist:
       - scripts/enhanced-transcript-monitor.js
       - scripts/enhanced-*.js
+  - id: no-backup-files
+    group: architecture
+    pattern: \.(backup|bak|old|orig|tmp)(-\d{8}(-\d{6})?)?$
+    message: "CRITICAL: Backup files prohibited in development - use git for versioning"
+    severity: critical
+    enabled: true
+    suggestion: "Remove backup files and commit changes to git instead. Use 'git diff' to compare versions."
   - id: plantuml-standard-styling
     group: plantuml
     pattern: "@startuml.*\\n(?!.*!include _standard-style\\.puml)"
@@ -181,6 +188,9 @@ constraints:
     severity: error
     enabled: true
     suggestion: "STOP: Invoke the documentation-style skill first: Use Skill tool with parameter skill='documentation-style' to load proper workflow and standards"
+    whitelist:
+      - "*.puml"
+      - ".constraint-monitor.yaml"
   - id: react-hooks-deps
     group: framework_specific
     pattern: useEffect\([^,]*,\s*\[\]

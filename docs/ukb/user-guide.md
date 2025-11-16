@@ -56,7 +56,7 @@ The new UKB-CLI maintains 100% backward compatibility:
 ### 🎯 **Agent Integration**
 - **Programmatic API**: Direct integration for coding agents
 - **Real-time Capture**: Live session insight extraction
-- **MCP Synchronization**: Automatic memory graph updates
+- **GraphDB Storage**: Automatic persistence with Graphology + LevelDB
 - **Cross-Agent Support**: Works with Claude, CoPilot, and others
 
 ## Quick Start
@@ -197,8 +197,8 @@ const { KnowledgeManager } = require('ukb-cli');
 
 // Initialize knowledge manager
 const manager = new KnowledgeManager({
-  knowledgeBasePath: './shared-memory.json',
-  mcpIntegration: true
+  knowledgeBasePath: '.data/knowledge-graph',
+  graphDB: true
 });
 
 // Capture structured insight
@@ -240,9 +240,10 @@ const entities = await manager.getEntitiesByType("TransferablePattern");
 
 #### What Stayed the Same
 - **Commands**: All existing commands work identically
-- **Data Format**: shared-memory.json format unchanged
+- **Data Format**: Entity/relation schema unchanged (now in GraphDB)
 - **Workflows**: Existing team workflows unaffected
 - **Git Integration**: Same git-based knowledge sharing
+- **JSON Export**: Optional export to .data/knowledge-export/ for compatibility
 
 #### Verification Steps
 ```bash

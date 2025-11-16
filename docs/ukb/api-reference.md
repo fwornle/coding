@@ -42,11 +42,11 @@ ukb-cli status
 **Output:**
 ```
 Knowledge base status:
-Storage: ./shared-memory.json
+Storage: .data/knowledge-graph (GraphDB + LevelDB)
 Entities: 234
 Relations: 567
 Last Updated: 2024-06-19T10:30:00Z
-Version: 1.0.0
+Version: 2.0.0
 ```
 
 ### `ukb-cli entity`
@@ -606,9 +606,9 @@ interface Configuration {
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `KNOWLEDGE_API_STORAGE_PATH` | Storage file path | `./shared-memory.json` |
+| `KNOWLEDGE_API_STORAGE_PATH` | GraphDB storage path | `.data/knowledge-graph` |
 | `KNOWLEDGE_API_LOG_LEVEL` | Logging level | `info` |
-| `KNOWLEDGE_API_MCP_ENABLED` | Enable MCP integration | `true` |
+| `KNOWLEDGE_API_GRAPHDB_ENABLED` | Enable GraphDB storage | `true` |
 | `KNOWLEDGE_API_SIGNIFICANCE_THRESHOLD` | Default significance | `7` |
 
 ## Data Types
