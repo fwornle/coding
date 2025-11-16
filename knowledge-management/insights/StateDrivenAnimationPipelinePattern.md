@@ -44,7 +44,7 @@ Implement a hierarchical animation pipeline with standardized lifecycle manageme
 
 ## Architecture Overview
 
-![DynArch Architecture](./images/architecture.png)
+![DynArch Architecture](images/architecture.png)
 
 The pattern consists of four key layers:
 

@@ -281,7 +281,7 @@ Code examples extracted from session analysis
 
 ## Diagrams
 
-## Command Pattern Implementation - Workflow\n\n![Command Pattern Workflow - Workflow](./images/commandpatternworkflow-workflow.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml commandpatternimplementation-workflow
+## Command Pattern Implementation - Workflow\n\n![Command Pattern Workflow - Workflow](images/commandpatternworkflow-workflow.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml commandpatternimplementation-workflow
 !include ../../../docs/puml/_standard-style.puml
 
 title Command Pattern Implementation - Workflow
@@ -487,7 +487,7 @@ stop
 
 note right : Technologies: JavaScript, MCP, Claude
 
-@enduml\n```\n</details>\n\n![Command Pattern Implementation - Workflow (Mermaid)](./images/commandpatternimplementation-workflow-mermaid.png)\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\nflowchart TD
+@enduml\n```\n</details>\n\n\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\nflowchart TD
     A[# Auto-logged Claude Code Session
 
 **Session ID:** 2025-06-12_07-27-20_claude-code  
@@ -680,7 +680,7 @@ Let me manually create the log for our current session first, then we can fix th
     style A fill:#ffcccc
     style D fill:#ccffcc
     style F fill:#ccccff
-\n```\n</details>\n\n## Command Pattern Implementation - Pattern\n\n![Command Pattern Workflow - Pattern](./images/commandpatternworkflow-pattern.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml commandpatternimplementation-pattern
+\n```\n</details>\n\n## Command Pattern Implementation - Pattern\n\n![Command Pattern Workflow - Pattern](images/commandpatternworkflow-pattern.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml commandpatternimplementation-pattern
 !include ../../../docs/puml/_standard-style.puml
 
 title Command Pattern Implementation - Design Patterns
@@ -695,7 +695,7 @@ package "Command" {
 
 note top : Technologies: JavaScript, MCP, Claude
 
-@enduml\n```\n</details>\n\n![Command Pattern Implementation - Pattern (Mermaid)](./images/commandpatternimplementation-pattern-mermaid.png)\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\nclassDiagram
+@enduml\n```\n</details>\n\n\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\nclassDiagram
     class CommandPatternImplementation {
         implement()\n        execute()\n        configure()
     }
@@ -705,7 +705,7 @@ note top : Technologies: JavaScript, MCP, Claude
         implement()\n        execute()\n        configure()
     }
     
-\n```\n</details>\n\n## Command Pattern Implementation - Integration\n\n![Command Pattern Workflow - Integration](./images/commandpatternworkflow-integration.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml commandpatternimplementation-integration
+\n```\n</details>\n\n## Command Pattern Implementation - Integration\n\n![Command Pattern Workflow - Integration](images/commandpatternworkflow-integration.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml commandpatternimplementation-integration
 !include ../../../docs/puml/_standard-style.puml
 
 title Command Pattern Implementation - Technology Integration
@@ -716,7 +716,7 @@ JavaScript --> MCP : integrates\nMCP --> Claude : integrates
 
 note top : Technologies: JavaScript, MCP, Claude
 
-@enduml\n```\n</details>\n\n![Command Pattern Implementation - Integration (Mermaid)](./images/commandpatternimplementation-integration-mermaid.png)\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\ngraph LR
+@enduml\n```\n</details>\n\n\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\ngraph LR
     JavaScript[JavaScript]\n    MCP[MCP]\n    Claude[Claude]
     
     JavaScript --> MCP\n    MCP --> Claude

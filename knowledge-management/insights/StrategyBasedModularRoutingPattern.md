@@ -40,7 +40,7 @@ Complex geometric routing systems often face challenges with:
 
 Implement a Strategy and Factory pattern-based routing system that separates routing algorithms into modular strategies. This pattern provides extensible routing capabilities through pluggable handlers while maintaining clean separation of concerns between geometric calculations and routing logic.
 
-![DynArch Architecture](./images/architecture.png)
+![DynArch Architecture](images/architecture.png)
 
 ## Core Architecture
 

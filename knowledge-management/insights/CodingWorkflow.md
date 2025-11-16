@@ -184,7 +184,7 @@ vkb --with-cache-clear       # Start server with cache clearing for debugging
 
 ## Development Workflow Sequence
 
-![CodingWorkflow Sequence Diagram](./images/coding-workflow-sequence.png)
+![CodingWorkflow Sequence Diagram](images/coding-workflow-sequence.png)
 
 The sequence diagram above illustrates the complete development workflow from session start through knowledge capture and sharing. Key phases include:
 
@@ -195,7 +195,7 @@ The sequence diagram above illustrates the complete development workflow from se
 
 ## Knowledge Management Architecture
 
-![Knowledge Management Architecture](./images/knowledge-architecture.png)
+![Knowledge Management Architecture](images/knowledge-architecture.png)
 
 The architecture diagram shows the three-layer knowledge management system:
 
