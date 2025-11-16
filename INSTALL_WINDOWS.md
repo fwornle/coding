@@ -39,18 +39,19 @@ The script will:
 - Configure Git Bash environment
 - Initialize knowledge databases
 
-### Step 2: Add to Windows PATH (Required for CMD/PowerShell)
+### Step 2: Restart Your Terminal
 
-To use the `coding`, `ukb`, and `vkb` commands from CMD or PowerShell:
+The installer automatically adds the `bin` directory to your Windows PATH. To activate the changes:
 
+1. **Close and reopen your terminal** (CMD, PowerShell, or Git Bash)
+2. The `coding`, `ukb`, and `vkb` commands should now be available
+
+**Note**: If the automatic PATH setup failed, you can add it manually:
 1. Press `Win+X` and select "System"
-2. Click "Advanced system settings"
-3. Click "Environment Variables"
-4. Under "User variables", select "Path" and click "Edit"
-5. Click "New" and add: `C:\Users\YourUsername\coding\bin`
-6. Click "OK" to save all dialogs
-
-**Note**: Replace `C:\Users\YourUsername\coding` with your actual installation path.
+2. Click "Advanced system settings" → "Environment Variables"
+3. Under "User variables", edit "Path" → Click "New"
+4. Add: `C:\Users\YourUsername\coding\bin` (replace with your actual path)
+5. Click "OK" and restart your terminal
 
 ### Step 3: Verify Installation
 
@@ -81,6 +82,8 @@ Windows requires two sets of command wrappers:
 
 - **Bash wrappers** (in `knowledge-management/` and `bin/`): Used by Git Bash
 - **Batch wrappers** (in `bin/*.bat`): Used by CMD/PowerShell
+  - These are self-detecting and automatically find the installation directory
+  - No manual environment variable configuration needed
 
 ### 2. Path Handling
 
@@ -259,8 +262,9 @@ The `install.bat` script provides core installation functionality but differs fr
 | Memory visualizer | ✓ | ✓ |
 | MCP servers | ✓ | ✓ (if present) |
 | .env creation | ✓ | ✓ |
-| Command wrappers | ✓ | ✓ |
-| Shell configuration | ✓ | ✓ (Git Bash only) |
+| Command wrappers | ✓ | ✓ (self-detecting) |
+| PATH configuration | ✓ | ✓ (automated) |
+| Shell configuration | ✓ | ✓ (Git Bash) |
 | Knowledge DB init | ✓ | ✓ |
 | VSCode extension | ✓ | ✗ (manual) |
 | MCP config | ✓ | ✗ (manual) |

@@ -22,8 +22,9 @@
 *.bak
 *.backup
 
-# Local configuration
+# Local configuration (includes .claude/settings.local.json with platform-specific paths)
 *.local
+.claude/settings.local.json
 
 # Cache directories
 .cache/

@@ -1757,6 +1757,7 @@ main() {
     setup_mcp_config
     setup_vscode_extension
     install_enhanced_lsl
+    create_project_local_settings
     install_constraint_monitor_hooks
     verify_installation
     
@@ -1844,6 +1845,158 @@ install_enhanced_lsl() {
     else
         warning "Enhanced LSL deployment script not found or not executable"
     fi
+}
+
+# Create project-local settings for the coding repo itself
+create_project_local_settings() {
+    echo -e "\n${CYAN}📝 Creating Project-Local Settings...${NC}"
+
+    local project_settings_dir="$CODING_REPO/.claude"
+    local project_settings_file="$project_settings_dir/settings.local.json"
+
+    # Create .claude directory if needed
+    mkdir -p "$project_settings_dir"
+
+    # Create settings.local.json with platform-specific paths
+    cat > "$project_settings_file" << 'EOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run api:*)",
+      "mcp__serena__find_symbol",
+      "mcp__serena__search_for_pattern",
+      "Bash(TRANSCRIPT_DEBUG=true node scripts/enhanced-transcript-monitor.js --test)",
+      "Bash(node:*)",
+      "Bash(plantuml:*)",
+      "mcp__serena__check_onboarding_performed",
+      "Bash(bin/coding:*)",
+      "Bash(cp:*)",
+      "mcp__serena__find_file",
+      "mcp__serena__replace_symbol_body",
+      "mcp__serena__activate_project",
+      "mcp__serena__get_symbols_overview",
+      "Bash(cat:*)",
+      "Bash(timeout:*)",
+      "Bash(watch:*)",
+      "mcp__serena__list_dir",
+      "mcp__serena__insert_after_symbol",
+      "Bash(find:*)",
+      "Bash(CODING_REPO=CODING_REPO_PLACEHOLDER node CODING_REPO_PLACEHOLDER/scripts/combined-status-line.js)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Bash(grep:*)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)",
+      "Bash(PORT=3030 npm run dev)",
+      "mcp__serena__insert_before_symbol",
+      "mcp__constraint-monitor__check_constraints",
+      "Bash(npm start)",
+      "Bash(git rm:*)",
+      "Bash(npm run:*)",
+      "Bash(chmod:*)",
+      "Bash(./test-individual-constraints.sh:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker restart:*)",
+      "Bash(PORT=3031 npm run api)",
+      "Bash(git checkout:*)",
+      "Bash(xargs kill:*)",
+      "mcp__mcp-git-ingest__git_directory_structure",
+      "mcp__mcp-git-ingest__git_read_important_files",
+      "WebSearch",
+      "Bash(git remote get-url:*)",
+      "Bash(basename:*)",
+      "mcp__spec-workflow__spec-workflow-guide",
+      "mcp__spec-workflow__approvals",
+      "Bash(PORT=3030 npm run dashboard)",
+      "Bash(sort:*)",
+      "mcp__serena__think_about_task_adherence",
+      "Bash(awk:*)",
+      "Bash(PORT=3031 node src/dashboard-server.js)",
+      "mcp__serena__onboarding",
+      "mcp__serena__write_memory",
+      "Bash(jq:*)",
+      "mcp__serena__think_about_collected_information",
+      "mcp__serena__get_current_config",
+      "Bash(npm install:*)",
+      "Read(//USER_HOME_PLACEHOLDER/.claude/**)",
+      "WebFetch(domain:console.groq.com)",
+      "Read(//private/tmp/**)",
+      "Bash(./collect-test-results.js)",
+      "WebFetch(domain:github.com)",
+      "Bash(sqlite3 .data/knowledge.db \"SELECT source, COUNT(*) as count FROM knowledge_extractions GROUP BY source\")",
+      "Bash(sqlite3 .data/knowledge.db \"PRAGMA table_info(knowledge_extractions)\")",
+      "mcp__memory__read_graph",
+      "Bash(vkb restart:*)",
+      "Bash(bin/vkb restart:*)",
+      "Bash(ps:*)",
+      "Bash(git submodule:*)",
+      "mcp__serena__find_referencing_symbols",
+      "Bash(git config:*)",
+      "Bash(git restore:*)",
+      "Bash(git diff:*)",
+      "Bash(xargs -I {} git restore --source=HEAD {})",
+      "WebFetch(domain:claude.ai)",
+      "mcp__constraint-monitor__get_constraint_status",
+      "Bash(for coll in ontology-coding ontology-raas ontology-resi ontology-agentic ontology-ui)",
+      "Bash(do echo -n \"$coll: \")",
+      "Bash(done)",
+      "Bash(npm test:*)",
+      "Bash(docker info:*)",
+      "Bash(bash CODING_REPO_PLACEHOLDER/bin/ukb:*)",
+      "Bash(bin/ukb:*)",
+      "Bash(bin/vkb:*)",
+      "Bash(SYSTEM_HEALTH_API_PORT=3033 pnpm api:*)",
+      "mcp__serena__initial_instructions",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(rm:*)",
+      "Bash(npm view:*)",
+      "Bash(while read name)",
+      "Bash(do [ ! -f \"docs/presentation/images/$name.png\" ])",
+      "Bash(echo:*)",
+      "Bash(git fetch:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node CODING_REPO_PLACEHOLDER/integrations/mcp-constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node CODING_REPO_PLACEHOLDER/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "CODING_REPO=CODING_REPO_PLACEHOLDER node CODING_REPO_PLACEHOLDER/scripts/combined-status-line.js"
+  }
+}
+EOF
+
+    # Replace placeholders with actual paths
+    sed -i.bak "s|CODING_REPO_PLACEHOLDER|$CODING_REPO|g" "$project_settings_file"
+    sed -i.bak "s|USER_HOME_PLACEHOLDER|$HOME|g" "$project_settings_file"
+    rm -f "$project_settings_file.bak"
+
+    success "Created .claude/settings.local.json with platform-specific paths"
 }
 
 # Install constraint monitor hooks and LSL logging hooks
