@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# UKB Lightweight Script - Minimal wrapper for ukb-cli
+#
+# This lightweight script provides backward compatibility while
+# delegating all functionality to the new ukb-cli Node.js implementation.
+#
+
+set -euo pipefail
+
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+UKB_CLI="$PROJECT_ROOT/bin/ukb-cli.js"
+
+# Load environment variables from .env file if it exists
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+    set -a  # automatically export all variables
+    source "$PROJECT_ROOT/.env"
+    set +a
+fi
+
+# Ensure Node.js and ukb-cli are available
+if ! command -v node >/dev/null 2>&1; then
+    echo "Error: Node.js is required but not installed" >&2
+    exit 1
+fi
+
+if [[ ! -f "$UKB_CLI" ]]; then
+    echo "Error: ukb-cli not found at $UKB_CLI" >&2
+    exit 1
+fi
+
+# Execute ukb-cli with all arguments
+exec node "$UKB_CLI" "$@"

@@ -99,7 +99,8 @@
       "Bash(npm view:*)",
       "Bash(while read name)",
       "Bash(do [ ! -f \"docs/presentation/images/$name.png\" ])",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []
