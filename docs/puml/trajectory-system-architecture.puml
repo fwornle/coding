@@ -3,6 +3,8 @@
 
 title Integrated Trajectory Generation System v3.0
 
+top to bottom direction
+
 package "Repository Analysis" {
   [Repository Scanner] as Scanner
   [File System Analysis] as FileAnalysis

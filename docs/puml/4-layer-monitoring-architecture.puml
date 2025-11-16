@@ -3,6 +3,8 @@
 
 title 4-Layer Monitoring Architecture\nBulletproof LSL System Protection
 
+top to bottom direction
+
 package "Layer 1: System-Level Watchdog" as Layer1 #FFE6E6 {
   component [System Monitor Watchdog] as SMW
   component [macOS launchd] as launchd

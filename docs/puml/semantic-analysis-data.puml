@@ -3,6 +3,8 @@
 
 title Semantic Analysis System - Data Architecture
 
+top to bottom direction
+
 package "Knowledge Graph Schema" {
   class Entity {
     +id: string

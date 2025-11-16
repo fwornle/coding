@@ -3,6 +3,8 @@
 
 title Semantic Analysis System - Communication Architecture
 
+top to bottom direction
+
 package "Communication Infrastructure" {
   component [MQTT Broker] as MQTT
   port "Port 1883" as MQTTPort

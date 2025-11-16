@@ -3,6 +3,8 @@
 
 title UKB-CLI System Architecture
 
+top to bottom direction
+
 skinparam componentStyle rectangle
 skinparam component {
   BackgroundColor<<api>> #E8F4FD

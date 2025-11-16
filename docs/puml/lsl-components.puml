@@ -3,6 +3,8 @@
 
 title Live Session Logging System Components
 
+top to bottom direction
+
 package "Enhanced Transcript Monitor" {
   component [Transcript Path\nRefresh] as tpr <<util>>
   component [Exchange\nExtraction] as extract <<core>>

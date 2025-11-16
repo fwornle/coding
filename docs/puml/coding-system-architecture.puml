@@ -3,6 +3,8 @@
 
 title Coding Project - Complete System Architecture
 
+top to bottom direction
+
 ' User/AI Assistant Layer
 actor "Developer" as dev
 actor "AI Assistant\n(Claude/Copilot/etc)" as ai

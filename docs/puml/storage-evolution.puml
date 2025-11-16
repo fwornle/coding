@@ -3,6 +3,8 @@
 
 title Current Knowledge Storage Architecture
 
+top to bottom direction
+
 rectangle "Graph Storage System" as current #E8F5E8 {
   database "Graphology\n(In-Memory)" as graphology
   database "Level v10.0.0\n(Persistent)" as level

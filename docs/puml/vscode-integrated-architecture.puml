@@ -2,6 +2,8 @@
 !theme amiga
 title Knowledge Management System Architecture with VSCode Integration
 
+top to bottom direction
+
 package "Developer Environment" {
   [Visual Studio Code] as vscode
   [GitHub Copilot Chat] as copilot

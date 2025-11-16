@@ -3,6 +3,8 @@
 
 title Knowledge Management System - Agent-Agnostic Architecture
 
+top to bottom direction
+
 package "Input Sources" {
   [Git Repository] as git
   [Conversation Logs] as logs

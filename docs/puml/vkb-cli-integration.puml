@@ -3,6 +3,8 @@
 
 title VKB-CLI Integration with Legacy VKB
 
+top to bottom direction
+
 skinparam componentStyle rectangle
 skinparam component {
   BackgroundColor #E8F5E8

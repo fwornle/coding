@@ -3,6 +3,8 @@
 
 title Semantic Analysis System - Deployment Architecture
 
+top to bottom direction
+
 package "Single Machine Deployment" {
   node "Development Machine" as DevMachine {
     component [Claude Code] as CC

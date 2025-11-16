@@ -3,6 +3,8 @@
 
 title Constraint Monitor - Testing Architecture
 
+top to bottom direction
+
 package "Testing Framework" {
     component "test-all-constraints-comprehensive.js" as AutoTest
     component "collect-test-results.js" as Collector

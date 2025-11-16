@@ -3,6 +3,8 @@
 
 title Knowledge Management System Architecture v2.0\nGraphDB + Ontology Integration
 
+top to bottom direction
+
 package "Knowledge Capture Layer" {
   [Claude Transcripts] as transcripts
   [Enhanced Transcript\nMonitor] as monitor

@@ -3,6 +3,8 @@
 
 title Embedding Classification System Architecture
 
+top to bottom direction
+
 package "Four-Layer Classification Pipeline" {
   component [PathAnalyzer\n<1ms] as path <<core>>
   component [KeywordMatcher\n<10ms] as keyword <<core>>

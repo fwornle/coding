@@ -3,6 +3,8 @@
 
 title Semantic Analysis System - Distributed Deployment
 
+top to bottom direction
+
 node "Control Node" as control {
   component [Claude Code] as cc
   component [MCP Server] as mcp

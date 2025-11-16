@@ -3,6 +3,8 @@
 
 title Semantic Analysis System - Single Machine Deployment
 
+top to bottom direction
+
 node "Host Machine" as host {
   component [Claude Code] as cc
   component [MCP Server] as mcp

@@ -3,6 +3,8 @@
 
 title Agent-Agnostic Architecture\nCoding System
 
+top to bottom direction
+
 package "Agent Layer" {
     component "Claude Code\n(MCP)" as claude <<agent>>
     component "GitHub CoPilot\n(CLI)" as copilot <<agent>>

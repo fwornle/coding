@@ -3,6 +3,8 @@
 
 title Status Line System & Visual Feedback
 
+top to bottom direction
+
 package "Data Sources" {
   [Constraint Monitor] as constraint
   [Semantic Analysis] as semantic  

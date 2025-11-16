@@ -3,6 +3,8 @@
 
 title Adaptive LSL System Architecture
 
+top to bottom direction
+
 package "Adaptive LSL System" as system #E8F5E8 {
 
   package "Entry Point Layer" as entry #F0F0F0 {

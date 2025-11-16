@@ -12,6 +12,10 @@ skinparam PackageFontSize 18
 
 title Continuous Learning System - Service Dependencies
 
+left to right direction
+
+left to right direction
+
 rectangle "Continuous Learning System" #E8F5E8 {
   [Inference Engine] <<core>>
   [Budget Tracker] <<util>>

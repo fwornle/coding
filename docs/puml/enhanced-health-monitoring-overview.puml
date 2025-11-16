@@ -3,6 +3,8 @@
 
 title Enhanced Health Monitoring System Overview
 
+top to bottom direction
+
 package "4-Layer Protection Architecture" {
   component [Global Watchdog] as GW <<layer4>> 
   component [Global LSL Coordinator] as GLC <<layer3>>

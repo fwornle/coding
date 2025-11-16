@@ -3,6 +3,8 @@
 
 title Semantic Analysis System - Communication Architecture
 
+top to bottom direction
+
 package "Client Layer" {
   component [Claude Code] as claude
   component [External APIs] as apis

@@ -3,6 +3,8 @@
 
 title LSL System - 4-Layer Monitoring + 5-Layer Classification Architecture
 
+top to bottom direction
+
 package "4-Layer Monitoring Protection" #FFE6E6 {
   [System Watchdog (launchd)] as Watchdog <<infra>>
   [Global Service Coordinator] as GSC <<infra>>

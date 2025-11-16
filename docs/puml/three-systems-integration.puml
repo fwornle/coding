@@ -3,6 +3,8 @@
 
 title Three Knowledge Management Systems Integration
 
+top to bottom direction
+
 package "1. CONTINUOUS LEARNING\n(Automatic Real-Time)" as learning #E8F5E8 {
   [StreamingExtractor] <<core>>
   [KnowledgeRetriever] <<core>>

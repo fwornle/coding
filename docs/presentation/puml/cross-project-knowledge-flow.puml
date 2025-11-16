@@ -38,6 +38,10 @@ skinparam rectangle {
 
 title Cross-Project Knowledge Flow
 
+left to right direction
+
+left to right direction
+
 ' Left side: Automatic capture
 package "Automatic Capture" as automatic #E8F5E9 {
   rectangle "Live Coding\nSession" as session

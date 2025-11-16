@@ -3,6 +3,8 @@
 
 title Conversation-Based Redirect Detection - Data Flow
 
+top to bottom direction
+
 package "Transcript Data Sources" {
   [Transcript Entry] as TranscriptEntry
   [Working Directory (cwd)] as WorkingDir

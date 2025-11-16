@@ -2,6 +2,8 @@
 !theme amiga
 title VSCode Extension Components and Interactions
 
+top to bottom direction
+
 package "VSCode Environment" {
   component [GitHub Copilot] as copilot
   component [Command Palette] as cmdpalette

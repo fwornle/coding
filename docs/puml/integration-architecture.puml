@@ -3,6 +3,8 @@
 
 title Integration Architecture - How Components Connect
 
+top to bottom direction
+
 package "Coding Core System" as core #E8F5E8 {
   [LSL\nSystem] as lsl <<core>>
   [Trajectory\nGeneration] as trajectory <<core>>

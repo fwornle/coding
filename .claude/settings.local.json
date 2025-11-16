@@ -96,7 +96,10 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(rm:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(while read name)",
+      "Bash(do [ ! -f \"docs/presentation/images/$name.png\" ])",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []

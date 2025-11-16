@@ -3,6 +3,8 @@
 
 title Continuous Learning Knowledge System - Class Diagram
 
+top to bottom direction
+
 package "Inference" <<core>> {
   class UnifiedInferenceEngine {
     - providers: Map<string, Provider>
