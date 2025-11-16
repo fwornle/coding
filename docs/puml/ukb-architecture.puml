@@ -1,124 +1,153 @@
 @startuml ukb-architecture
 !include _standard-style.puml
 
+title UKB (Update Knowledge Base) - Current Architecture
 
-title UKB (Update Knowledge Base) Architecture
-
-package "Input Sources" {
-  [Git Repository] as git
-  [Conversation Logs] as logs
-  [Interactive Input] as interactive
-  [Code Changes] as code
+' Entry points
+package "CLI Entry Points" {
+  [bin/ukb] as ukb_bin
+  [ukb --interactive] as interactive
+  [ukb (auto)] as auto
 }
 
-package "UKB Processing Engine" {
-  [Session Analysis] as session
+' Core implementation
+package "UKB Core" {
+  [lib/ukb-database/cli.js] as cli
+  [DatabaseManager] as db_mgr
+  [UKBDatabaseWriter] as writer
+}
+
+' Input processing
+package "Knowledge Extraction" {
   [Git History Analyzer] as git_analyzer
-  [Specstory Analyzer] as spec_analyzer
-  [Pattern Extractor] as pattern
+  [StreamingKnowledgeExtractor] as extractor
+  [Pattern Detector] as pattern
   [Significance Scorer] as scorer
-  [Schema Manager] as schema
 }
 
-package "Processing Modes" {
-  [Incremental Mode] as incremental
-  [Full History Mode] as full_history
-  [Interactive Mode] as interactive_mode
-  [Agent Mode] as agent_mode
+' Ontology integration
+package "Ontology Layer" {
+  [OntologyClassifier] as ontology
+  [4-Layer Classification] as layers
 }
 
-package "State Management" {
-  [Processing State] as state
-  [Commit Tracking] as commit_track
-  [File Tracking] as file_track
-  [Schema Versioning] as version_track
+' Database layer
+package "Database Services" {
+  [GraphDatabaseService] as graph_db
+  [SQLite Service] as sqlite
+  [Qdrant Service] as qdrant
 }
 
-package "Knowledge Storage" {
-  [MCP Memory Server] as mcp
-  [shared-memory.json] as json_kb
-  [Insight Pages (.md)] as insights
-  [Processing State (.json)] as proc_state
+' Storage layer
+package "Persistent Storage" {
+  database "Graphology\n(In-Memory)" as graphology
+  database "LevelDB\n(.data/knowledge-graph/)" as leveldb
+  database "SQLite\n(.data/knowledge.db)" as sqlite_db
+  database "Qdrant\n(Vector DB)" as qdrant_db
 }
 
-package "Output & Visualization" {
-  [Knowledge Graph] as graph
-  [Web Visualizer] as vkb
-  [Team Collaboration] as team
+' Optional export
+package "Optional Export" {
+  [GraphKnowledgeExporter] as exporter
+  file "JSON Files\n(.data/knowledge-export/)" as json_export
 }
 
-' Input flow
-git --> git_analyzer
-logs --> spec_analyzer
-interactive --> interactive_mode
-code --> pattern
+' Visualization
+package "Visualization" {
+  [VKB Visualizer] as vkb
+  [Web UI (port 8080)] as web
+}
 
-' Processing flow
-session --> git_analyzer
-session --> spec_analyzer
-git_analyzer --> pattern
-spec_analyzer --> pattern
+' Entry flow
+ukb_bin --> cli
+interactive --> cli
+auto --> cli
+
+' Core processing
+cli --> db_mgr
+cli --> writer
+cli --> git_analyzer
+
+' Knowledge extraction
+git_analyzer --> extractor
+extractor --> pattern
 pattern --> scorer
-scorer --> schema
+scorer --> extractor
 
-' Mode selection
-session --> incremental
-session --> full_history
-session --> interactive_mode
-session --> agent_mode
+' Ontology classification
+extractor --> ontology
+ontology --> layers
 
-' State management
-incremental --> state
-full_history --> state
-commit_track --> state
-file_track --> state
-version_track --> state
+' Database management
+db_mgr --> graph_db
+db_mgr --> sqlite
+db_mgr --> qdrant
 
-' Storage flow
-schema --> mcp
-schema --> json_kb
-schema --> insights
-state --> proc_state
+writer --> db_mgr
 
-' Output flow
-mcp --> graph
-json_kb --> vkb
-insights --> vkb
-graph --> team
-vkb --> team
+' Storage
+graph_db --> graphology
+graph_db --> leveldb
+sqlite --> sqlite_db
+qdrant --> qdrant_db
 
-note right of git_analyzer
-  • Analyzes commit messages
-  • Categorizes by type
-  • Scores significance (1-10)
-  • Extracts domain context
-  • Tracks evolution patterns
+' Optional JSON export
+graph_db ..> exporter : optional
+exporter ..> json_export : backward\ncompatibility
+
+' Visualization
+leveldb --> vkb
+graphology --> vkb
+vkb --> web
+
+note right of cli
+  **Entry point for all UKB operations**
+  • Auto mode (git analysis)
+  • Interactive mode (guided prompts)
+  • Entity/relation management
+  • Export/import operations
 end note
 
-note right of spec_analyzer
-  • Parses conversation files
-  • Extracts problem-solution pairs
-  • Identifies transferable patterns
-  • Prevents re-analysis
-  • Domain context extraction
+note right of graph_db
+  **Primary Storage System**
+  • Graphology: In-memory graph
+  • LevelDB: Persistent storage
+  • Auto-persist: 1000ms
+  • Fail-fast on errors
 end note
 
-note right of pattern
-  • Creates meaningful names
-  • Structures observations
-  • Generates insight pages
-  • Links related patterns
-  • Ensures transferability
+note right of extractor
+  **Knowledge Processing Pipeline**
+  • Pattern detection
+  • Significance scoring (1-10)
+  • Ontology classification
+  • MCP semantic analysis integration
 end note
 
-note bottom of state
-  ~/.ukb-processing-state.json
-  
-  Tracks per-project:
-  • Last analyzed commit
-  • Processed specstory files
-  • Schema version
-  • Analysis timestamps
+note right of ontology
+  **4-Layer Classification**
+  1. Heuristic patterns
+  2. Keyword matching
+  3. Semantic similarity
+  4. LLM classification
+
+  Confidence threshold: 0.7
+end note
+
+note right of exporter
+  **Backward Compatibility**
+  • Debounced: 5000ms
+  • Team-based files
+  • Optional feature
+  • Not primary storage
+end note
+
+note bottom of db_mgr
+  **Multi-Database Orchestration**
+  • GraphDB (knowledge graph)
+  • SQLite (relational queries)
+  • Qdrant (vector search - optional)
+  • Health status monitoring
 end note
 
 @enduml
