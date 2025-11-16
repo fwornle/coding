@@ -14,7 +14,7 @@ The Ontology System provides **4-layer classification** for automatic knowledge 
 
 ## Architecture
 
-![Ontology System Architecture](../images/ontology-system-architecture.png)
+![Ontology System Architecture](../presentation/images/ontology-system-architecture.png)
 
 ### 4-Layer Classification Pipeline
 
@@ -59,7 +59,7 @@ The Ontology System provides **4-layer classification** for automatic knowledge 
 
 The ontology system integrates with UKB (manual knowledge capture):
 
-![Knowledge Extraction Ontology](../images/knowledge-extraction-ontology.png)
+![Knowledge Extraction Ontology](../presentation/images/knowledge-extraction-ontology.png)
 
 **UKB Integration**:
 1. User runs `ukb` or `ukb --interactive`
@@ -783,5 +783,5 @@ Use semantic versioning and maintain changelog
 
 - [Knowledge Management README](./README.md) - Overview of UKB and Continuous Learning
 - [UKB User Guide](./ukb-update.md) - Comprehensive UKB documentation
-- [System Architecture](../images/ontology-system-architecture.png) - Complete system diagram
+- [System Architecture](../presentation/images/ontology-system-architecture.png) - Complete system diagram
 
