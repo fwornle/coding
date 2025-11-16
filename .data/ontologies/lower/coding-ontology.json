@@ -19,8 +19,14 @@
           "type": "object",
           "description": "Time boundaries for the session",
           "properties": {
-            "start": "timestamp",
-            "end": "timestamp"
+            "start": {
+              "type": "string",
+              "description": "Session start time (ISO 8601)"
+            },
+            "end": {
+              "type": "string",
+              "description": "Session end time (ISO 8601)"
+            }
           }
         },
         "userHash": {
@@ -188,11 +194,19 @@
         },
         "capabilities": {
           "type": "array",
-          "description": "Agent capabilities"
+          "description": "Agent capabilities",
+          "items": {
+            "type": "string",
+            "description": "Capability name"
+          }
         },
         "dependencies": {
           "type": "array",
-          "description": "Required services or data"
+          "description": "Required services or data",
+          "items": {
+            "type": "string",
+            "description": "Dependency name"
+          }
         }
       },
       "requiredProperties": ["agentName", "agentType", "usesLLM"],
@@ -215,11 +229,19 @@
         },
         "observations": {
           "type": "array",
-          "description": "Array of observation strings"
+          "description": "Array of observation strings",
+          "items": {
+            "type": "string",
+            "description": "Observation content"
+          }
         },
         "relations": {
           "type": "array",
-          "description": "Relationships to other entities"
+          "description": "Relationships to other entities",
+          "items": {
+            "type": "object",
+            "description": "Entity relationship"
+          }
         },
         "metadata": {
           "type": "object",
@@ -247,7 +269,7 @@
         "dimensions": {
           "type": "number",
           "description": "Vector dimensionality",
-          "enum": [384, 1536]
+          "enum": ["384", "1536"]
         },
         "model": {
           "type": "string",
@@ -553,7 +575,11 @@
         },
         "steps": {
           "type": "array",
-          "description": "Workflow steps with dependencies"
+          "description": "Workflow steps with dependencies",
+          "items": {
+            "type": "object",
+            "description": "Workflow step"
+          }
         },
         "dataFlow": {
           "type": "object",
@@ -615,7 +641,11 @@
         },
         "registeredProjects": {
           "type": "array",
-          "description": "List of registered project paths"
+          "description": "List of registered project paths",
+          "items": {
+            "type": "string",
+            "description": "Project path"
+          }
         },
         "activeServices": {
           "type": "object",
