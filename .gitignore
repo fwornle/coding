@@ -151,3 +151,9 @@ dist/
 .tmp/
 # Process state registry (volatile runtime data)
 .live-process-registry.json
+
+# Windows artifacts
+nul
+
+# Duplicate memory-visualizer directory (proper location is integrations/memory-visualizer)
+/memory-visualizer/
