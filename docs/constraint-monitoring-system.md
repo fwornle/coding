@@ -192,6 +192,86 @@ const API_KEY = process.env.API_KEY;
 ✅ Tool call proceeding with warning
 ```
 
+### Constraint Overrides
+
+The system supports **temporary constraint overrides** for situations where a constraint needs to be bypassed (e.g., fixing the constraint configuration itself, emergency fixes, or legitimate exceptions).
+
+#### How to Use Overrides
+
+Include `OVERRIDE_CONSTRAINT` directives in your prompt to Claude:
+
+```
+OVERRIDE_CONSTRAINT: constraint-id-1
+OVERRIDE_CONSTRAINT: constraint-id-2
+
+Your actual task description goes here...
+```
+
+**Example**:
+```
+OVERRIDE_CONSTRAINT: documentation-style-skill-required
+OVERRIDE_CONSTRAINT: plantuml-standard-styling
+
+Fix the constraint patterns in .constraint-monitor.yaml
+```
+
+#### Override Mechanism
+
+1. **UserPromptSubmit Hook** (`prompt-override-parser.js`) detects `OVERRIDE_CONSTRAINT` directives
+2. Creates temporary state file: `/tmp/constraint-override-{session-id}.json`
+3. **PreToolUse Hook** reads the state file and bypasses specified constraints
+4. **Automatic Expiration**: Override expires after:
+   - **3 prompt sets** (complete request/response cycles), OR
+   - **5 minutes** (whichever comes first)
+
+#### Override State File Format
+
+```json
+{
+  "constraintIds": [
+    "documentation-style-skill-required",
+    "plantuml-standard-styling"
+  ],
+  "createdAt": 1763282756000,
+  "expiresAt": 1763283056000,
+  "promptCount": 0,
+  "maxPrompts": 3
+}
+```
+
+#### Session ID Resolution
+
+The override mechanism uses **session ID** to track which session the override applies to:
+
+1. `CLAUDE_SESSION_ID` environment variable (if set)
+2. `process.ppid` (parent process ID) as fallback
+3. `'default'` as final fallback
+
+⚠️ **Important**: Overrides are session-specific and will not carry over to new sessions.
+
+#### When to Use Overrides
+
+✅ **Legitimate uses**:
+- Fixing constraint configuration files (meta-editing)
+- Emergency hotfixes that violate patterns temporarily
+- Documented exceptions for specific scenarios
+- Testing constraint behavior
+
+❌ **DON'T abuse overrides for**:
+- Avoiding proper refactoring
+- Bypassing security constraints without justification
+- Creating parallel versions or evolutionary naming
+- Permanent workarounds
+
+#### Audit Trail
+
+All override usage is logged for audit purposes:
+
+```
+🔓 CONSTRAINT OVERRIDE: User-initiated override for constraint 'documentation-style-skill-required'
+✅ Tool allowed with constraint override(s): documentation-style-skill-required
+```
+
 ## Testing Architecture
 
 ![Constraint Testing Architecture](images/constraint-testing-architecture.png)

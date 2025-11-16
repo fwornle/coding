@@ -206,7 +206,7 @@ const { KnowledgeManager } = require('ukb-cli');
 
 // Initialize knowledge manager
 const manager = new KnowledgeManager({
-  knowledgeBasePath: './shared-memory.json',
+  knowledgeBasePath: './knowledge-graph (GraphDB)',
   mcpIntegration: true
 });
 
@@ -345,7 +345,7 @@ Implemented using Apache Kafka + Apache Flink" | ukb --add-entity
 ```bash
 # Search across all team knowledge bases
 cd /Users/<username>/Agentic/coding
-grep -l "MicroserviceArchitecture" shared-memory-*.json
+grep -l "MicroserviceArchitecture" team-specific JSON exports
 
 # Extract domain-specific implementations
 ukb --print --team raas | jq '.entities[] | select(.name | contains("Microservice"))'
@@ -374,7 +374,7 @@ All existing `ukb` commands continue to work unchanged. The system automatically
 #### What Stayed the Same
 
 - **Commands**: All existing commands work identically
-- **Data Format**: shared-memory.json format unchanged
+- **Data Format**: knowledge-graph (GraphDB) format unchanged
 - **Workflows**: Existing team workflows unaffected
 - **Git Integration**: Same git-based knowledge sharing
 

@@ -113,6 +113,10 @@ constraints:
     severity: error
     enabled: false
     suggestion: Add '!include _standard-style.puml' after @startuml and before content
+    whitelist:
+      - "*.yaml"
+      - "*.yml"
+      - ".constraint-monitor.yaml"
   - id: plantuml-file-location
     group: plantuml
     pattern: "!include.*\\.puml"
@@ -172,8 +176,8 @@ constraints:
     suggestion: "1. Invoke Skill tool with skill='documentation-style' 2. Create .puml file in docs/puml/ 3. Generate PNG with plantuml 4. Reference image in markdown"
   - id: documentation-style-skill-required
     group: documentation
-    pattern: "(?:```(?:plantuml|puml|mermaid)|@startuml|flowchart|sequenceDiagram|Architecture|## Architecture)"
-    message: "CRITICAL: Creating diagrams or architecture docs requires documentation-style skill. You MUST invoke Skill tool with skill='documentation-style' BEFORE modifying docs"
+    pattern: "(?:```(?:plantuml|puml|mermaid)|@startuml|flowchart|sequenceDiagram)"
+    message: "CRITICAL: Creating diagrams requires documentation-style skill. You MUST invoke Skill tool with skill='documentation-style' BEFORE creating diagram files"
     severity: error
     enabled: true
     suggestion: "STOP: Invoke the documentation-style skill first: Use Skill tool with parameter skill='documentation-style' to load proper workflow and standards"
@@ -208,3 +212,9 @@ settings:
     show_empty_groups: false
     collapse_disabled_groups: true
     sort_by_severity: true
+enforcement:
+  enabled: true
+  blocking_levels: [critical, error]
+  warning_levels: [warning]
+  info_levels: [info]
+  fail_open: true
