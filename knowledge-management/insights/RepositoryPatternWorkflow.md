@@ -408,7 +408,7 @@ Code examples extracted from session analysis
 
 ## Diagrams
 
-## Repository Pattern Implementation - Architecture\n\n![Repository Pattern Workflow - Architecture](./images/repositorypatternworkflow-architecture.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml repositorypatternimplementation-architecture
+## Repository Pattern Implementation - Architecture\n\n![Repository Pattern Workflow - Architecture](images/repositorypatternworkflow-architecture.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml repositorypatternimplementation-architecture
 !define RECTANGLE class
 !include ../../../docs/puml/_standard-style.puml
 
@@ -577,13 +577,13 @@ This manual log captures our entire investigation into:
 
 
 
-@enduml\n```\n</details>\n\n![Repository Pattern Implementation - Architecture (Mermaid)](./images/repositorypatternimplementation-architecture-mermaid.png)\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\ngraph TD
+@enduml\n```\n</details>\n\n\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\ngraph TD
     subgraph "Repository Pattern Implementation Architecture"
         MCP[MCP]\n        Claude[Claude]
     end
     
     
-\n```\n</details>\n\n## Repository Pattern Implementation - Workflow\n\n![Repository Pattern Workflow - Workflow](./images/repositorypatternworkflow-workflow.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml repositorypatternimplementation-workflow
+\n```\n</details>\n\n## Repository Pattern Implementation - Workflow\n\n![Repository Pattern Workflow - Workflow](images/repositorypatternworkflow-workflow.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml repositorypatternimplementation-workflow
 !include ../../../docs/puml/_standard-style.puml
 
 title Repository Pattern Implementation - Workflow
@@ -913,7 +913,7 @@ stop
 
 note right : Technologies: MCP, Claude
 
-@enduml\n```\n</details>\n\n![Repository Pattern Implementation - Workflow (Mermaid)](./images/repositorypatternimplementation-workflow-mermaid.png)\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\nflowchart TD
+@enduml\n```\n</details>\n\n\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\nflowchart TD
     A[# Post-Session Logged Conversation
 
 **Session ID:** 2025-06-13_09-31-34  
@@ -1230,7 +1230,7 @@ This manual log captures our entire investigation into:
     style A fill:#ffcccc
     style D fill:#ccffcc
     style F fill:#ccccff
-\n```\n</details>\n\n## Repository Pattern Implementation - Pattern\n\n![Repository Pattern Workflow - Pattern](./images/repositorypatternworkflow-pattern.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml repositorypatternimplementation-pattern
+\n```\n</details>\n\n## Repository Pattern Implementation - Pattern\n\n![Repository Pattern Workflow - Pattern](images/repositorypatternworkflow-pattern.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml repositorypatternimplementation-pattern
 !include ../../../docs/puml/_standard-style.puml
 
 title Repository Pattern Implementation - Design Patterns
@@ -1251,7 +1251,7 @@ package "Command" {
 
 note top : Technologies: MCP, Claude
 
-@enduml\n```\n</details>\n\n![Repository Pattern Implementation - Pattern (Mermaid)](./images/repositorypatternimplementation-pattern-mermaid.png)\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\nclassDiagram
+@enduml\n```\n</details>\n\n\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\nclassDiagram
     class RepositoryPatternImplementation {
         implement()\n        execute()\n        configure()\n        implement()
     }
@@ -1265,7 +1265,7 @@ note top : Technologies: MCP, Claude
         implement()\n        execute()\n        configure()
     }
     
-\n```\n</details>\n\n## Repository Pattern Implementation - Integration\n\n![Repository Pattern Workflow - Integration](./images/repositorypatternworkflow-integration.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml repositorypatternimplementation-integration
+\n```\n</details>\n\n## Repository Pattern Implementation - Integration\n\n![Repository Pattern Workflow - Integration](images/repositorypatternworkflow-integration.png)\n\n<details>\n<summary>PlantUML Source</summary>\n\n```plantuml\n@startuml repositorypatternimplementation-integration
 !include ../../../docs/puml/_standard-style.puml
 
 title Repository Pattern Implementation - Technology Integration
@@ -1276,7 +1276,7 @@ MCP --> Claude : integrates
 
 note top : Technologies: MCP, Claude
 
-@enduml\n```\n</details>\n\n![Repository Pattern Implementation - Integration (Mermaid)](./images/repositorypatternimplementation-integration-mermaid.png)\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\ngraph LR
+@enduml\n```\n</details>\n\n\n\n<details>\n<summary>Mermaid Source</summary>\n\n```mermaid\ngraph LR
     MCP[MCP]\n    Claude[Claude]
     
     MCP --> Claude

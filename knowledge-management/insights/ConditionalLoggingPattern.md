@@ -51,7 +51,7 @@ Implement runtime log level checking with conditional rendering patterns that co
 
 The ConditionalLoggingPattern originated in the DynArch autonomous driving visualization system, where it evolved into a sophisticated logging architecture featuring dual-axis filtering: **log levels** (priority-based) and **log categories** (domain-based).
 
-![DynArch Architecture](./images/architecture.png)
+![DynArch Architecture](images/architecture.png)
 
 #### DynArch Logger Configuration
 
@@ -154,7 +154,7 @@ The DynArch implementation includes a sophisticated LoggingControl component wit
 - **Real-time Synchronization**: Changes immediately reflected across all logging calls
 - **Color-coded Indicators**: Visual feedback matching console output colors
 
-![Simulation Data Flow](./images/sim-dataflow.png)
+![Simulation Data Flow](images/sim-dataflow.png)
 
 #### Evolution History in DynArch
 
