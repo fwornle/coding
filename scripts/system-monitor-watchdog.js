@@ -25,6 +25,7 @@ import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import ProcessStateManager from './process-state-manager.js';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -365,7 +366,7 @@ async function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   main().catch(error => {
     console.error(`System Watchdog error: ${error.message}`);
     process.exit(1);

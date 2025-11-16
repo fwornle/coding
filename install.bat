@@ -433,11 +433,14 @@ REM ============================================================================
 REM 12. INITIALIZE KNOWLEDGE DATABASES
 REM ============================================================================
 
-echo %BLUE%[12/12] Initializing knowledge databases...%NC%
+echo %BLUE%[12/12] Initializing knowledge databases and log directories...%NC%
 
 REM Create .data directory
 mkdir "%CODING_REPO%\.data" 2>nul
 mkdir "%CODING_REPO%\.data\knowledge-graph" 2>nul
+
+REM Create .logs directory for system monitoring
+mkdir "%CODING_REPO%\.logs" 2>nul
 
 REM Initialize shared memory if needed
 if not exist "%CODING_REPO%\shared-memory.json" (

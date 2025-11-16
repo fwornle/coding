@@ -10,6 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -201,7 +202,7 @@ export default eventLogger;
 export { EventLogger };
 
 // CLI interface for testing and manual logging
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   const args = process.argv.slice(2);
   
   if (args.length === 0) {

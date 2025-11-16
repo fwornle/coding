@@ -14,6 +14,7 @@ import { promises as fs } from 'fs';
 import fsSync from 'fs';
 import path from 'path';
 import lockfile from 'proper-lockfile';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 class ProcessStateManager {
   constructor(options = {}) {

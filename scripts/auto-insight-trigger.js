@@ -16,6 +16,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -326,7 +327,7 @@ class AutoInsightTrigger {
 }
 
 // CLI interface
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   const command = process.argv[2];
   const trigger = new AutoInsightTrigger();
   

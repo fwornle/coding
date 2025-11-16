@@ -8,6 +8,7 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 /**
  * Get session duration from config file in milliseconds
@@ -200,7 +201,7 @@ async function main() {
 }
 
 // Handle different execution contexts
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   main().catch(() => {
     console.log('📝 ❌ Status error');
     process.exit(1);

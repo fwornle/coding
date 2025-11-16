@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getTimeWindow, utcToLocalTime, generateLSLFilename } from './timezone-utils.js';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1070,7 +1071,7 @@ class ClassificationLogger {
 export default ClassificationLogger;
 
 // CLI usage
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   console.log('Classification Logger - Use as module in batch-lsl-processor.js');
   console.log('Example:');
   console.log('  import ClassificationLogger from "./classification-logger.js";');

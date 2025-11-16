@@ -18,6 +18,7 @@ import path from 'path';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 // Import ProcessStateManager for robust duplicate prevention
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -517,7 +518,7 @@ Examples:
 }
 
 // Run CLI if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   main().catch(error => {
     console.error('Error:', error.message);
     process.exit(1);

@@ -9,6 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 class ClaudeTranscriptReader {
   constructor() {
@@ -299,7 +300,7 @@ class ClaudeTranscriptReader {
 }
 
 // Test if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   const reader = new ClaudeTranscriptReader();
   
   console.log('🔍 Searching for Claude transcripts...');

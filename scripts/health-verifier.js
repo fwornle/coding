@@ -26,6 +26,7 @@ import { fileURLToPath } from 'url';
 import { EventEmitter } from 'events';
 import ProcessStateManager from './process-state-manager.js';
 import HealthRemediationActions from './health-remediation-actions.js';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -756,7 +757,7 @@ class HealthVerifier extends EventEmitter {
 }
 
 // CLI Interface
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   const command = process.argv[2] || 'verify';
   const verifier = new HealthVerifier({ debug: true });
 

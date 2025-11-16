@@ -13,6 +13,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import { spawn } from 'child_process';
+import { runIfMain } from '../../lib/utils/esm-cli.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_REPO || join(__dirname, '../..');
@@ -347,7 +348,7 @@ class SystemHealthAPIServer {
 }
 
 // Start the server if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
     const portConfig = loadPortConfiguration();
     const server = new SystemHealthAPIServer(portConfig.apiPort, portConfig.dashboardPort);
 

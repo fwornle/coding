@@ -12,6 +12,7 @@ import path from 'path';
 import crypto from 'crypto';
 import yaml from 'js-yaml';
 import { fileURLToPath } from 'url';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1305,7 +1306,7 @@ class LSLConfigValidator {
 }
 
 // CLI Interface
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   // Handle yaml dependency gracefully
   let yaml;
   try {

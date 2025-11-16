@@ -16,6 +16,7 @@
 
 import crypto from 'crypto';
 import os from 'os';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 class UserHashGenerator {
   constructor(options = {}) {
@@ -229,7 +230,7 @@ UserHashGenerator.getSystemInfo = function(options = {}) {
 export default UserHashGenerator;
 
 // CLI usage when run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   const generator = new UserHashGenerator({ debug: true });
   
   console.log('=== User Hash Generator Test ===');

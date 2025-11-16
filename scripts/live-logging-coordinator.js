@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import zlib from 'zlib';
 import { promisify } from 'util';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const gzip = promisify(zlib.gzip);
@@ -1128,7 +1129,7 @@ export function destroyGlobalCoordinator() {
 }
 
 // CLI execution
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   const coordinator = new LiveLoggingCoordinator({
     debug: process.argv.includes('--debug'),
     enableFileManager: !process.argv.includes('--no-file-manager'),

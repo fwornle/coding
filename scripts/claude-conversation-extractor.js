@@ -8,6 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 class ClaudeConversationExtractor {
   constructor(projectPath) {
@@ -266,7 +267,7 @@ async function main() {
 }
 
 // Execute if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   main().catch(console.error);
 }
 

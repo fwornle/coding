@@ -35,6 +35,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
 import { EmbeddingGenerator } from '../src/knowledge-management/EmbeddingGenerator.js';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -647,7 +648,7 @@ class KnowledgeMigration {
 }
 
 // CLI entry point
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   const args = process.argv.slice(2);
   const options = {
     projectPath: process.cwd(),

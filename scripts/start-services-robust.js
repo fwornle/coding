@@ -29,6 +29,7 @@ import {
   sleep
 } from '../lib/service-starter.js';
 import ProcessStateManager from './process-state-manager.js';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -617,7 +618,7 @@ async function startAllServices() {
 }
 
 // Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   startAllServices().catch(error => {
     console.error('💥 FATAL ERROR during service startup:');
     console.error(error);

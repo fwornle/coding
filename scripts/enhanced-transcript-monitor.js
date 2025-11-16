@@ -34,6 +34,7 @@ import ProcessStateManager from './process-state-manager.js';
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
 import { EmbeddingGenerator } from '../src/knowledge-management/EmbeddingGenerator.js';
 import { UnifiedInferenceEngine } from '../src/inference/UnifiedInferenceEngine.js';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 // Trajectory analyzer integration (optional - requires @anthropic-ai/sdk)
 let RealTimeTrajectoryAnalyzer = null;
@@ -2604,7 +2605,7 @@ async function main() {
 }
 
 // Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   main().catch(console.error);
 }
 

@@ -31,6 +31,7 @@ import ClaudeConversationExtractor from './claude-conversation-extractor.js';
 import { getTimeWindow, formatTimestamp, generateLSLFilename, utcToLocalTime } from './timezone-utils.js';
 import ClassificationLogger from './classification-logger.js';
 import UserHashGenerator from './user-hash-generator.js';
+import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -1840,7 +1841,7 @@ Examples:
 export default BatchLSLProcessor;
 
 // Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+runIfMain(import.meta.url, () => {
   main().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
