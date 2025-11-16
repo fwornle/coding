@@ -388,9 +388,9 @@ ls -la .specstory/history/
 
 ## 📚 Related Documentation
 
-- **[Live Session Logging System](core-systems/live-session-logging.md)** - LSL architecture and configuration
+- **[Live Session Logging System](lsl/README.md)** - LSL architecture and configuration
 - **[Constraint Monitoring System](constraint-monitoring-system.md)** - Detailed constraint enforcement docs
-- **[Status Line System](core-systems/status-line.md)** - Visual status indicators
+- **[Status Line System](health-system/README.md)** - Visual status indicators
 - **[Getting Started Guide](getting-started.md)** - Installation and setup
 
 ---

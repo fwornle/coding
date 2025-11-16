@@ -31,7 +31,7 @@ Coding is an intelligent development infrastructure that:
 - **Multi-Project Support**: Simultaneous monitoring across multiple projects
 - **Performance**: <50ms classification with 95%+ accuracy
 
-**Learn more:** [Live Session Logging Documentation](core-systems/live-session-logging.md)
+**Learn more:** [Live Session Logging Documentation](lsl/README.md)
 
 ### 2. Constraint Monitoring
 
@@ -43,7 +43,7 @@ Coding is an intelligent development infrastructure that:
 - **Dashboard Monitoring**: Live violation feed and compliance metrics
 - **Testing Framework**: Automated and interactive testing with 44% detection rate
 
-**Learn more:** [Constraint Monitoring Documentation](core-systems/constraint-monitoring.md)
+**Learn more:** [Constraint Monitoring Documentation](constraints/README.md)
 
 ### 3. Trajectory Generation
 
@@ -55,7 +55,7 @@ Coding is an intelligent development infrastructure that:
 - **Real-Time Updates**: Integrates with LSL for continuous trajectory updates
 - **Capability Focus**: Documents what the project does vs. historical activities
 
-**Learn more:** [Trajectory Generation Documentation](core-systems/trajectory-generation.md)
+**Learn more:** [Trajectory Generation Documentation](trajectories/README.md)
 
 ### 4. Status Line System
 
@@ -67,7 +67,7 @@ Coding is an intelligent development infrastructure that:
 - **Activity Detection**: Distinguishes coding infrastructure vs. project work
 - **Visual Feedback**: Icons show system state at a glance
 
-**Learn more:** [Status Line Documentation](core-systems/status-line.md)
+**Learn more:** [Status Line Documentation](health-system/README.md)
 
 ---
 
@@ -182,7 +182,7 @@ Bulletproof reliability through redundant monitoring:
 3. **Monitoring Verifier** - Mandatory session-level verification (blocks Claude startup if unhealthy)
 4. **Service-Level Health** - Individual service self-monitoring and auto-restart
 
-**Learn more:** [4-Layer Monitoring Architecture](core-systems/status-line.md#architecture)
+**Learn more:** [4-Layer Monitoring Architecture](health-system/README.md#architecture)
 
 ### Classification & Routing
 
@@ -194,7 +194,7 @@ Intelligent content classification for proper knowledge organization:
 - **Layer 3**: Embedding classifier (vector similarity) - <50ms
 - **Layer 4**: Semantic analyzer (LLM-powered) - <100ms when needed
 
-**Learn more:** [LSL Classification System](core-systems/live-session-logging.md#reliablecodingclassifier)
+**Learn more:** [LSL Classification System](lsl/README.md#reliablecodingclassifier)
 
 ### Storage Architecture
 
@@ -337,7 +337,7 @@ extract_patterns {
 ## Next Steps
 
 - **[Getting Started](getting-started.md)** - Install and configure
-- **[Core Systems](core-systems/)** - Deep dive into each system
+- **[Core Systems](.)** - Deep dive into each system
 - **[Integrations](integrations/)** - External component documentation
 - **[Knowledge Management](knowledge-management/)** - UKB/VKB workflows
 - **[Architecture](architecture/)** - System design and internals

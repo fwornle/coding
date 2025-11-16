@@ -407,8 +407,8 @@ source ~/.bashrc
 ## Next Steps
 
 - **[System Overview](system-overview.md)** - Understand what coding provides
-- **[Live Session Logging](core-systems/live-session-logging.md)** - Learn about LSL system
-- **[Constraint Monitoring](core-systems/constraint-monitoring.md)** - Real-time code quality
+- **[Live Session Logging](lsl/README.md)** - Learn about LSL system
+- **[Constraint Monitoring](constraints/README.md)** - Real-time code quality
 - **[Knowledge Management](knowledge-management/README.md)** - UKB/VKB workflows
 - **[Integration Components](integrations/README.md)** - External component documentation
 - **[Troubleshooting](../troubleshooting.md)** - Detailed troubleshooting guide
