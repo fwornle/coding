@@ -379,6 +379,6 @@ Environment Variables:
 `);
       process.exit(0);
   }
-}
+});
 
 export { AutoInsightTrigger };

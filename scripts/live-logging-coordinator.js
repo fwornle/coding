@@ -1164,7 +1164,7 @@ runIfMain(import.meta.url, () => {
   
   console.log('🚀 Enhanced Live Logging Coordinator running...');
   console.log('   Press Ctrl+C to gracefully shutdown');
-}
+});
 
 export default LiveLoggingCoordinator;
 export { LSLFileManager, EnhancedOperationalLogger, UserHashGenerator };

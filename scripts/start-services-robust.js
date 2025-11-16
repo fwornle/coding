@@ -624,6 +624,6 @@ runIfMain(import.meta.url, () => {
     console.error(error);
     process.exit(1);
   });
-}
+});
 
 export { startAllServices, SERVICE_CONFIGS };

@@ -1362,6 +1362,6 @@ Examples:
     console.error(`\nValidation failed: ${error.message}`);
     process.exit(1);
   }
-}
+});
 
 export { LSLConfigValidator };

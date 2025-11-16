@@ -321,6 +321,6 @@ runIfMain(import.meta.url, () => {
     console.log('❌ No transcript files found');
     console.log('💡 Make sure you\'re running Claude Code with MCP enabled');
   }
-}
+});
 
 export default ClaudeTranscriptReader;

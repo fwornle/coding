@@ -206,6 +206,6 @@ runIfMain(import.meta.url, () => {
     console.log('📝 ❌ Status error');
     process.exit(1);
   });
-}
+});
 
 export { SimpleStatusAnalyzer };

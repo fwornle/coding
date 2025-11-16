@@ -860,6 +860,6 @@ runIfMain(import.meta.url, () => {
       console.log('  health-verifier report [--json]     # Show detailed report');
       process.exit(1);
   }
-}
+});
 
 export default HealthVerifier;

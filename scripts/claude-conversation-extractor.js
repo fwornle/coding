@@ -269,6 +269,6 @@ async function main() {
 // Execute if run directly
 runIfMain(import.meta.url, () => {
   main().catch(console.error);
-}
+});
 
 export default ClaudeConversationExtractor;

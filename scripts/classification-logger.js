@@ -1079,4 +1079,4 @@ runIfMain(import.meta.url, () => {
   console.log('  logger.initializeLogFile();');
   console.log('  logger.logDecision({ ... });');
   console.log('  logger.finalize();');
-}
+});
