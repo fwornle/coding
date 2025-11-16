@@ -1,1 +1,5 @@
-/Users/q284340/Agentic/coding/knowledge-management/ckb
+#!/bin/bash
+# Universal ckb wrapper
+CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
+export CODING_REPO
+exec "$CODING_REPO/knowledge-management/ckb" "$@"
