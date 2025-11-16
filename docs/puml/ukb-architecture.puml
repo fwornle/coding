@@ -46,8 +46,8 @@ package "Persistent Storage" {
   database "Qdrant\n(Vector DB)" as qdrant_db
 }
 
-' Optional export
-package "Optional Export" {
+' Synchronized JSON export
+package "Git-Tracked Export" {
   [GraphKnowledgeExporter] as exporter
   file "JSON Files\n(.data/knowledge-export/)" as json_export
 }
@@ -91,9 +91,9 @@ graph_db --> leveldb
 sqlite --> sqlite_db
 qdrant --> qdrant_db
 
-' Optional JSON export
-graph_db ..> exporter : optional
-exporter ..> json_export : backward\ncompatibility
+' Automatic JSON export (REQUIRED - keeps all storage layers in sync)
+graph_db --> exporter : auto-export\n(5s debounce)
+exporter --> json_export : git-tracked\nsynchronization
 
 ' Visualization
 leveldb --> vkb
@@ -135,11 +135,12 @@ note right of ontology
 end note
 
 note right of exporter
-  **Backward Compatibility**
+  **Automatic Synchronization**
   • Debounced: 5000ms
   • Team-based files
-  • Optional feature
-  • Not primary storage
+  • Git-tracked exports
+  • REQUIRED for sync
+  • Keeps all layers in sync
 end note
 
 note bottom of db_mgr
