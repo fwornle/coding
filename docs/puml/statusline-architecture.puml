@@ -3,6 +3,8 @@
 
 title Claude Code Status Line System Architecture
 
+top to bottom direction
+
 ' Main entry point from Claude Code
 component [Claude Code] as CC <<client>>
 component [~/.claude/settings.json] as Config <<config>>

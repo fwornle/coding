@@ -3,6 +3,8 @@
 
 title Graph Storage Architecture\n(Agent-Agnostic Knowledge Management)
 
+top to bottom direction
+
 package "Knowledge Management System" {
   [UKB CLI] <<cli>>
   [VKB Server] <<api>>

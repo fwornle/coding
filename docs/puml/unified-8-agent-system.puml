@@ -3,6 +3,8 @@
 
 title "Unified 8-Agent System Architecture"
 
+top to bottom direction
+
 package "AI Coding Assistants" {
   [Claude Code\n(MCP Integration)] <<external>> as claude
   [GitHub CoPilot\n(VSCode Extension)] <<external>> as copilot

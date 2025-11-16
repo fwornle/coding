@@ -3,6 +3,8 @@
 
 title UKB (Update Knowledge Base) - Current Architecture
 
+top to bottom direction
+
 ' Entry points
 package "CLI Entry Points" {
   [bin/ukb] as ukb_bin

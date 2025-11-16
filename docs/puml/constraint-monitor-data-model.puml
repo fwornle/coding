@@ -4,6 +4,8 @@
 
 title Constraint Monitor Data Model & Storage
 
+top to bottom direction
+
 package "Qdrant (Docker Vector Database)" as qdrant_pkg {
   entity "constraint_events" {
     --

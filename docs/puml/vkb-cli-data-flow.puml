@@ -3,6 +3,8 @@
 
 title VKB-CLI Data Flow and Processing
 
+top to bottom direction
+
 skinparam component {
   BackgroundColor #E8F5E8
   FontSize 11

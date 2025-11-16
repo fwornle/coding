@@ -3,6 +3,8 @@
 !theme plain
 title Cross-Project Content Routing
 
+top to bottom direction
+
 rectangle "<project>" as nano {
   file "session.md" as nano_session
   file ".redirect-status" as redirect

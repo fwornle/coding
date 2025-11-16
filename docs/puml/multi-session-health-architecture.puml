@@ -3,6 +3,8 @@
 
 title Multi-Session Health Monitoring Architecture
 
+top to bottom direction
+
 package "Global Monitoring Layer" {
   component [Global LSL Coordinator] as GLC <<infra>>
   component [StatusLine Health Monitor] as SHM <<infra>>

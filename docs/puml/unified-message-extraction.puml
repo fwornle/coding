@@ -3,6 +3,8 @@
 
 title Unified Message Extraction System
 
+top to bottom direction
+
 !define LIVE_COLOR #E8F5E8
 !define OFFLINE_COLOR #F3E5F5  
 !define UNIFIED_COLOR #FFF3E0

@@ -3,6 +3,8 @@
 
 title Cross-Project Knowledge Flow (Dual Capture System)
 
+top to bottom direction
+
 package "AUTOMATIC: Continuous Learning (Real-Time)" as automatic {
   rectangle "Live Coding\nSession (LSL)" as session
   rectangle "StreamingKnowledge\nExtractor" as extractor

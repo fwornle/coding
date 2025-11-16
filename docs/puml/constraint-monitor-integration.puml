@@ -2,6 +2,8 @@
 !include _standard-style.puml
 title Constraint Monitor Integration with LSL System
 
+top to bottom direction
+
 rectangle "LSL System" {
   component "Enhanced Transcript Monitor" as ETM
   component "Combined Status Line" as StatusLine

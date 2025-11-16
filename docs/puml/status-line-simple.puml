@@ -3,6 +3,8 @@
 
 title Status Line System & Color Coding
 
+top to bottom direction
+
 package "Status Line Components" {
   [Constraint Monitor] as constraint
   [Semantic Analysis] as semantic

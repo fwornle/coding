@@ -3,6 +3,8 @@
 !theme plain
 title Timezone & Time Window Handling
 
+top to bottom direction
+
 rectangle "Configuration & Input" {
   component "Central .env Config" as EnvConfig
   component "Timezone Utilities" as Utils

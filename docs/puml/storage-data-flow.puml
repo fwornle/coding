@@ -3,6 +3,8 @@
 
 title Clear Data Flow - Proposed Architecture
 
+top to bottom direction
+
 actor "User Input" as user
 component "KnowledgeStorageService" as orchestrator <<core>>
 

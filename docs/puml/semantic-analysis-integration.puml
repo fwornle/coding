@@ -3,6 +3,8 @@
 
 title Semantic Analysis System - Integration Architecture
 
+top to bottom direction
+
 package "Claude Code Integration Layer" {
   component [Claude Code] as CC
   note right of CC

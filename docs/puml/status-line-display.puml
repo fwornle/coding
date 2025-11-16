@@ -3,6 +3,8 @@
 !theme plain
 title Status Line Display States
 
+top to bottom direction
+
 rectangle "Status Line Components" {
   rectangle "Constraint\nMonitoring" as Constraint {
     label "🛡️ 8.5" as Shield

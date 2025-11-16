@@ -3,6 +3,8 @@
 
 title Communication Patterns in Semantic Analysis System
 
+top to bottom direction
+
 package "Communication Methods" {
   component [MQTT Event Bus] as mqtt
   component [JSON-RPC Server] as rpc

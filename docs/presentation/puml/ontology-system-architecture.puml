@@ -1,6 +1,8 @@
 @startuml ontology-system-architecture
 !include _standard-style.puml
 
+left to right direction
+
 package "Knowledge Management" {
   [StreamingKnowledgeExtractor] as Extractor
   [GraphDatabaseService] as GraphDB

@@ -3,6 +3,8 @@
 
 title Semantic Analysis System - Complete Architecture Overview
 
+top to bottom direction
+
 package "User Interfaces" {
   actor "Claude Code" as Claude <<external>>
   actor "VSCode CoPilot" as VSCode <<external>>

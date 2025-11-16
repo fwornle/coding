@@ -3,6 +3,8 @@
 
 title Complete Knowledge System - Service Dependencies
 
+top to bottom direction
+
 package "Continuous Learning System\n(Automatic Real-Time)" as cls #E8F5E8 {
   [Inference Engine] <<core>>
   [Budget Tracker] <<util>>
