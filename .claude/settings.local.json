@@ -100,7 +100,8 @@
       "Bash(while read name)",
       "Bash(do [ ! -f \"docs/presentation/images/$name.png\" ])",
       "Bash(echo:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Skill(documentation-style)"
     ],
     "deny": [],
     "ask": []
