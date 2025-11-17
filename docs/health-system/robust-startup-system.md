@@ -89,6 +89,103 @@ If these fail after all retries → **Claude startup blocked with clear error**
 
 If these fail after all retries → **Continue in DEGRADED mode with warning**
 
+## Pre-Startup Cleanup
+
+### Crash Recovery and Process Cleanup
+
+Before starting any services, the robust startup system automatically cleans up dangling processes from crashed or abnormally terminated sessions. This ensures a clean slate and prevents startup failures due to zombie processes.
+
+![Service Startup Flow with Cleanup](../images/service-startup-integration.png)
+
+*Figure: Complete service startup flow showing pre-startup cleanup, PSM integration, and session cleanup*
+
+**Problem**: When VSCode or Claude Code crashes:
+- Transcript monitor processes remain running
+- Live logging coordinator processes continue orphaned
+- Process State Manager (PSM) contains stale entries
+- New startup attempts fail due to competing processes
+
+**Solution**: Automatic pre-startup cleanup runs before every service startup.
+
+### Cleanup Process
+
+```javascript
+async function cleanupDanglingProcesses() {
+  // 1. Kill all orphaned transcript monitors
+  await execAsync('pkill -f "enhanced-transcript-monitor.js"');
+
+  // 2. Kill all orphaned live-logging coordinators
+  await execAsync('pkill -f "live-logging-coordinator.js"');
+
+  // 3. Clean up stale PSM entries
+  await psm.cleanupStaleServices();
+}
+```
+
+### Graceful Shutdown Tracking
+
+Normal session shutdowns are recorded in `.data/session-shutdowns.json`:
+
+```json
+{
+  "claude-12345-1699364825": {
+    "timestamp": "2025-11-17T12:34:56.789Z",
+    "type": "graceful",
+    "pid": 12345
+  }
+}
+```
+
+**Benefits**:
+- Detects abnormal terminations (missing graceful shutdown record)
+- Enables crash analytics
+- Provides session continuity information
+
+### Startup Output Example
+
+```
+═══════════════════════════════════════════════════════════════════════
+🚀 STARTING CODING SERVICES (ROBUST MODE)
+═══════════════════════════════════════════════════════════════════════
+
+🧹 Pre-startup cleanup: Checking for dangling processes...
+
+   Found 21 dangling transcript monitor process(es)
+   Terminating dangling transcript monitors...
+   ✅ Cleaned up transcript monitors
+   Found 25 dangling live-logging coordinator process(es)
+   Terminating dangling live-logging coordinators...
+   ✅ Cleaned up live-logging coordinators
+   Cleaning up stale Process State Manager entries...
+   ✅ PSM cleanup complete
+
+✅ Pre-startup cleanup complete - system ready for fresh start
+
+📋 Starting REQUIRED services (Live Logging System)...
+```
+
+### Implementation
+
+**File**: `scripts/start-services-robust.js`
+
+The cleanup function runs at the start of `startAllServices()`:
+
+```javascript
+async function startAllServices() {
+  console.log('🚀 STARTING CODING SERVICES (ROBUST MODE)');
+
+  // Clean up any dangling processes from crashed sessions
+  await cleanupDanglingProcesses();
+
+  // Then proceed with normal service startup...
+}
+```
+
+**Related Files**:
+- `scripts/psm-session-cleanup.js` - Records graceful shutdowns
+- `scripts/process-state-manager.js` - PSM with `cleanupStaleServices()` method
+- `.data/session-shutdowns.json` - Graceful shutdown tracking
+
 ## Retry Strategy
 
 ### Algorithm

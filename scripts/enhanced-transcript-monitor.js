@@ -32,7 +32,8 @@ import ProcessStateManager from './process-state-manager.js';
 
 // Knowledge management dependencies
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
-import { EmbeddingGenerator } from '../src/knowledge-management/EmbeddingGenerator.js';
+// NOTE: EmbeddingGenerator removed - embedding generation now handled by MCP semantic analysis
+// import { EmbeddingGenerator } from '../src/knowledge-management/EmbeddingGenerator.js';
 import { UnifiedInferenceEngine } from '../src/inference/UnifiedInferenceEngine.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
@@ -312,12 +313,13 @@ class EnhancedTranscriptMonitor {
       });
       await databaseManager.initialize();
 
+      // NOTE: EmbeddingGenerator removed - embedding generation now handled by MCP semantic analysis
       // Initialize embedding generator
-      const embeddingGenerator = new EmbeddingGenerator({
-        projectPath: this.config.projectPath,
-        databaseManager: databaseManager,
-        debug: this.debug_enabled
-      });
+      // const embeddingGenerator = new EmbeddingGenerator({
+      //   projectPath: this.config.projectPath,
+      //   databaseManager: databaseManager,
+      //   debug: this.debug_enabled
+      // });
 
       // Initialize inference engine
       const inferenceEngine = new UnifiedInferenceEngine({
@@ -329,7 +331,7 @@ class EnhancedTranscriptMonitor {
       this.knowledgeExtractor = new StreamingKnowledgeExtractor({
         projectPath: this.config.projectPath,
         databaseManager: databaseManager,
-        embeddingGenerator: embeddingGenerator,
+        embeddingGenerator: null, // Embedding generation now handled by MCP semantic analysis
         inferenceEngine: inferenceEngine,
         trajectoryAnalyzer: this.trajectoryAnalyzer, // Pass existing trajectory analyzer if available
         enableBudgetTracking: true,

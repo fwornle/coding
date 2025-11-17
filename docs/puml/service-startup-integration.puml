@@ -27,6 +27,28 @@ deactivate PSM
 LaunchScript -> StartScript : start all services
 activate StartScript
 
+== Pre-Startup Cleanup ==
+
+StartScript -> StartScript : cleanupDanglingProcesses()
+note right
+  **Crash Recovery**
+  1. Kill orphaned transcript monitors
+  2. Kill orphaned live-logging coordinators
+  3. Clean stale PSM entries
+  4. Ensure fresh start
+end note
+
+StartScript -> StartScript : pkill -f "enhanced-transcript-monitor.js"
+StartScript -> StartScript : pkill -f "live-logging-coordinator.js"
+
+StartScript -> PSM : cleanupStaleServices()
+activate PSM
+PSM -> Registry : remove dead PIDs
+Registry --> PSM : ✅ cleaned
+deactivate PSM
+
+== Service Startup ==
+
 StartScript -> PSM : isServiceRunning('vkb-server')
 activate PSM
 PSM -> Registry : check if exists

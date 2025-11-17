@@ -441,6 +441,13 @@ class ProcessStateManager {
   }
 
   /**
+   * Alias for cleanupDeadProcesses - removes stale service entries
+   */
+  async cleanupStaleServices() {
+    return this.cleanupDeadProcesses();
+  }
+
+  /**
    * Get all services across all types
    */
   async getAllServices() {
