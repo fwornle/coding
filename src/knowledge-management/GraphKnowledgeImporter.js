@@ -17,6 +17,7 @@
  */
 
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import { getKnowledgeExportPath, getKnowledgeConfigPath, getCodingRepoPath } from './knowledge-paths.js';
 
@@ -41,6 +42,10 @@ export class GraphKnowledgeImporter {
 
     // Track if service is initialized
     this.initialized = false;
+
+    // File watcher tracking
+    this.watchers = [];
+    this.importDebounceTimers = new Map(); // Prevent re-import loops
   }
 
   /**
@@ -59,13 +64,106 @@ export class GraphKnowledgeImporter {
         await this.importAllTeams();
       }
 
+      // Setup file watchers for bi-directional sync
+      await this.setupFileWatchers();
+
       this.initialized = true;
-      console.log('✓ Graph knowledge importer initialized');
+      console.log('✓ Graph knowledge importer initialized with file watchers');
 
     } catch (error) {
       console.warn('⚠ Graph knowledge importer initialization failed:', error.message);
       throw error;
     }
+  }
+
+  /**
+   * Setup file watchers for automatic JSON sync
+   * Watches .data/knowledge-export/*.json for external changes (git pull)
+   *
+   * @returns {Promise<void>}
+   * @private
+   */
+  async setupFileWatchers() {
+    try {
+      const config = await this._loadConfig();
+      const codingRepo = getCodingRepoPath();
+
+      // Watch each team's export file
+      for (const [team, teamConfig] of Object.entries(config.teams)) {
+        const exportPath = path.join(codingRepo, teamConfig.exportPath);
+
+        try {
+          // Check if file exists before watching
+          await fs.access(exportPath);
+
+          // Setup watcher
+          const watcher = fsSync.watch(exportPath, (eventType, filename) => {
+            if (eventType === 'change') {
+              this._handleFileChange(team, exportPath);
+            }
+          });
+
+          this.watchers.push({ team, watcher, path: exportPath });
+          console.log(`👁️  Watching ${team}: ${exportPath}`);
+
+        } catch (error) {
+          // File doesn't exist yet - that's OK, will be created on first export
+          console.log(`ℹ️  Skipping watch for ${team}: file not found (will be created on export)`);
+        }
+      }
+
+    } catch (error) {
+      console.warn('⚠ Failed to setup file watchers:', error.message);
+      // Don't throw - file watching is optional enhancement
+    }
+  }
+
+  /**
+   * Handle file change event (debounced to avoid re-import loops)
+   *
+   * @param {string} team - Team name
+   * @param {string} filePath - Changed file path
+   * @private
+   */
+  _handleFileChange(team, filePath) {
+    // Clear existing timer for this team
+    if (this.importDebounceTimers.has(team)) {
+      clearTimeout(this.importDebounceTimers.get(team));
+    }
+
+    // Debounce: wait 2s before importing (avoids re-importing during export)
+    const timer = setTimeout(async () => {
+      try {
+        console.log(`📥 Detected external change to ${team} knowledge, re-importing...`);
+        const result = await this.importTeam(team);
+        console.log(`✓ Re-imported ${team}: ${result.entitiesImported} entities, ${result.relationsImported} relations`);
+      } catch (error) {
+        console.error(`❌ Failed to re-import ${team}:`, error.message);
+      } finally {
+        this.importDebounceTimers.delete(team);
+      }
+    }, 2000);
+
+    this.importDebounceTimers.set(team, timer);
+  }
+
+  /**
+   * Cleanup and destroy watchers
+   */
+  destroy() {
+    // Clear all debounce timers
+    for (const timer of this.importDebounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.importDebounceTimers.clear();
+
+    // Close all file watchers
+    for (const { team, watcher } of this.watchers) {
+      watcher.close();
+      console.log(`✓ Closed file watcher for ${team}`);
+    }
+    this.watchers = [];
+    this.initialized = false;
   }
 
   /**

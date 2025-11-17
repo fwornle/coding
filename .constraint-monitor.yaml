@@ -113,6 +113,13 @@ constraints:
     severity: critical
     enabled: true
     suggestion: "Remove backup files and commit changes to git instead. Use 'git diff' to compare versions."
+  - id: knowledge-base-direct-manipulation
+    group: architecture
+    pattern: "(?:\\.data/knowledge-(?:export|graph)/|\\.data/knowledge-export/.*\\.json)"
+    message: "CRITICAL: Knowledge base must only be manipulated through bin/ukb CLI"
+    severity: critical
+    enabled: true
+    suggestion: "Use 'bin/ukb' CLI for all knowledge base operations. Never directly edit files in .data/knowledge-export/ or .data/knowledge-graph/"
   - id: plantuml-standard-styling
     group: plantuml
     pattern: "@startuml.*\\n(?!.*!include _standard-style\\.puml)"
