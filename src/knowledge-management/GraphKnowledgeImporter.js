@@ -84,12 +84,18 @@ export class GraphKnowledgeImporter {
    * @private
    */
   async setupFileWatchers() {
+    console.log('🔍 [DEBUG] setupFileWatchers() CALLED - Starting file watcher setup');
     try {
       const config = await this._loadConfig();
+      console.log(`🔍 [DEBUG] Config loaded:`, JSON.stringify(config, null, 2));
       const codingRepo = getCodingRepoPath();
+      console.log(`🔍 [DEBUG] Coding repo path: ${codingRepo}`);
+
+      console.log(`[DEBUG] Setting up file watchers for ${Object.keys(config.teams || {}).length} teams`);
 
       // Watch each team's export file
       for (const [team, teamConfig] of Object.entries(config.teams)) {
+        console.log(`[DEBUG] Processing team: ${team}`);
         const exportPath = path.join(codingRepo, teamConfig.exportPath);
 
         try {

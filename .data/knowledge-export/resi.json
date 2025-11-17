@@ -43,7 +43,6 @@
         "Handle high-volume streaming data with back-pressure and flow control",
         "Implement windowing strategies for time-based aggregations",
         "Use reactive streams for memory-efficient processing",
-        "Handles 10K+ events/second with <100ms latency",
         "Essential for real-time analytics and data normalization systems"
       ],
       "significance": 8,
@@ -121,3 +120,4 @@
     "export_version": "1.0"
   }
 }
+// Test change at Mon Nov 17 11:18:44 CET 2025
