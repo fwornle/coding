@@ -79,6 +79,33 @@ export class UKBDatabaseWriter {
   }
 
   /**
+   * Update an existing entity in the database
+   *
+   * @param {string} entityName - Name of the entity to update
+   * @param {Object} updates - Updates to apply (observations, significance, etc.)
+   * @returns {Promise<string>} Entity ID
+   */
+  async updateEntity(entityName, updates) {
+    // For GraphDB/LevelDB, storing with the same name will overwrite
+    const entityData = {
+      name: entityName,
+      entityType: updates.entityType,
+      observations: updates.observations,
+      significance: updates.significance,
+      metadata: {
+        ...updates.metadata,
+        last_updated: new Date().toISOString()
+      }
+    };
+
+    if (this.debug) {
+      console.log(`[UKBDatabaseWriter] Updating entity: ${entityName}`);
+    }
+
+    return await this.storeEntity(entityData);
+  }
+
+  /**
    * Store a relation between entities
    *
    * @param {Object} relation - Relation object

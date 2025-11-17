@@ -756,6 +756,12 @@ export class DatabaseManager extends EventEmitter {
       this.sqlite.close();
     }
 
+    // CRITICAL: Shutdown exporter BEFORE closing graph to flush pending exports
+    // This prevents the race condition where debounced exports fire after graph is cleared
+    if (this.graphExporter) {
+      await this.graphExporter.shutdown();
+    }
+
     // Close graph database
     if (this.graphDB) {
       await this.graphDB.close();
