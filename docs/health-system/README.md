@@ -42,6 +42,11 @@ The Health System provides **failsafe monitoring** with automatic verification a
 - Database lock cleanup
 - Zombie process termination
 
+**Crash Recovery** (`scripts/start-services-robust.js`)
+- Pre-startup cleanup of dangling processes
+- Automatic cleanup after VSCode/Claude crashes
+- Graceful shutdown tracking for crash detection
+
 **Status Line** (`scripts/combined-status-line.js`)
 - Real-time indicators in Claude Code status bar
 - Multi-session support

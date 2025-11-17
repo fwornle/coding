@@ -409,6 +409,77 @@ async function createServicesStatusFile(results) {
 }
 
 /**
+ * Pre-startup cleanup to remove dangling processes from crashed sessions
+ */
+async function cleanupDanglingProcesses() {
+  console.log('🧹 Pre-startup cleanup: Checking for dangling processes...');
+  console.log('');
+
+  try {
+    // Kill dangling transcript monitors
+    const { stdout: transcriptPs } = await execAsync(
+      'ps aux | grep "enhanced-transcript-monitor.js" | grep -v grep || true',
+      { timeout: 5000 }
+    );
+
+    if (transcriptPs.trim()) {
+      const transcriptCount = transcriptPs.trim().split('\n').length;
+      console.log(`   Found ${transcriptCount} dangling transcript monitor process(es)`);
+      console.log('   Terminating dangling transcript monitors...');
+
+      try {
+        await execAsync('pkill -f "enhanced-transcript-monitor.js"', { timeout: 5000 });
+        await sleep(1000);
+        console.log('   ✅ Cleaned up transcript monitors');
+      } catch (error) {
+        // pkill returns non-zero if no processes found - this is expected on retry
+      }
+    } else {
+      console.log('   ✅ No dangling transcript monitors found');
+    }
+
+    // Kill dangling live-logging coordinators
+    const { stdout: loggingPs } = await execAsync(
+      'ps aux | grep "live-logging-coordinator.js" | grep -v grep || true',
+      { timeout: 5000 }
+    );
+
+    if (loggingPs.trim()) {
+      const loggingCount = loggingPs.trim().split('\n').length;
+      console.log(`   Found ${loggingCount} dangling live-logging coordinator process(es)`);
+      console.log('   Terminating dangling live-logging coordinators...');
+
+      try {
+        await execAsync('pkill -f "live-logging-coordinator.js"', { timeout: 5000 });
+        await sleep(1000);
+        console.log('   ✅ Cleaned up live-logging coordinators');
+      } catch (error) {
+        // pkill returns non-zero if no processes found - this is expected on retry
+      }
+    } else {
+      console.log('   ✅ No dangling live-logging coordinators found');
+    }
+
+    // Clean up stale PSM entries
+    console.log('   Cleaning up stale Process State Manager entries...');
+    try {
+      await psm.cleanupStaleServices();
+      console.log('   ✅ PSM cleanup complete');
+    } catch (error) {
+      console.log(`   ⚠️  PSM cleanup warning: ${error.message}`);
+    }
+
+    console.log('');
+    console.log('✅ Pre-startup cleanup complete - system ready for fresh start');
+    console.log('');
+  } catch (error) {
+    console.log(`⚠️  Pre-startup cleanup warning: ${error.message}`);
+    console.log('   Continuing with startup...');
+    console.log('');
+  }
+}
+
+/**
  * Main startup function
  */
 async function startAllServices() {
@@ -416,6 +487,9 @@ async function startAllServices() {
   console.log('🚀 STARTING CODING SERVICES (ROBUST MODE)');
   console.log('═══════════════════════════════════════════════════════════════════════');
   console.log('');
+
+  // Clean up any dangling processes from crashed sessions before starting
+  await cleanupDanglingProcesses();
 
   const results = {
     successful: [],
