@@ -142,6 +142,12 @@ build/
 dist/
 *.tsbuildinfo
 
+# Compiled TypeScript output (should only be in dist/)
+src/**/*.js
+src/**/*.d.ts
+!src/**/*.test.js
+!src/**/*.spec.js
+
 # Editor and IDE files
 .vscode/settings.json
 .vscode/launch.json
