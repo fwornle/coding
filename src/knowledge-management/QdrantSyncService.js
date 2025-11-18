@@ -207,10 +207,13 @@ export class QdrantSyncService extends EventEmitter {
    * @private
    */
   async _deleteFromQdrant(nodeId) {
+    // Convert node ID to UUID (must match the UUID used when storing)
+    const qdrantId = this.databaseManager._nodeIdToUUID(nodeId);
+
     try {
       // Delete from knowledge_patterns_small
       await this.databaseManager.qdrant.delete('knowledge_patterns_small', {
-        points: [nodeId]
+        points: [qdrantId]
       });
     } catch (error) {
       // Ignore if not found
@@ -222,7 +225,7 @@ export class QdrantSyncService extends EventEmitter {
     try {
       // Delete from knowledge_patterns
       await this.databaseManager.qdrant.delete('knowledge_patterns', {
-        points: [nodeId]
+        points: [qdrantId]
       });
     } catch (error) {
       // Ignore if not found
