@@ -7,14 +7,16 @@
  *
  * Architecture:
  * - Listens to GraphDatabaseService events
- * - Generates embeddings (384-dim and 1536-dim) for entity data
- * - Stores in Qdrant collections (knowledge_patterns, knowledge_patterns_small)
+ * - Generates 384-dim embeddings for entity data using local sentence-transformers
+ * - Stores in Qdrant knowledge_patterns_small collection
  * - Handles Create, Update, Delete operations
  * - Batch processing for initial population
  *
- * Collections:
- * - knowledge_patterns: 1536-dim OpenAI embeddings (high quality)
- * - knowledge_patterns_small: 384-dim local embeddings (fast)
+ * Collection:
+ * - knowledge_patterns_small: 384-dim sentence-transformers/all-MiniLM-L6-v2 embeddings
+ *
+ * Note: 1536-dim OpenAI embeddings (knowledge_patterns) not currently supported
+ * as EmbeddingGenerator lacks OpenAI API integration.
  */
 
 import { EventEmitter } from 'events';
@@ -131,11 +133,9 @@ export class QdrantSyncService extends EventEmitter {
       // Generate embeddings for the entity
       const text = this._buildEntityText(entity);
 
-      // Generate both 384-dim and 1536-dim embeddings
+      // Generate 384-dim embedding (using local sentence-transformers model)
+      // NOTE: 1536-dim OpenAI embeddings not supported by current EmbeddingGenerator
       const embedding384 = await this.embeddingGenerator.generateEmbedding(text, { dimensions: 384 });
-      const embedding1536 = await this.embeddingGenerator.generateEmbedding(text, { dimensions: 1536 });
-
-      const embeddings = { embedding384, embedding1536 };
 
       // Build payload for Qdrant
       const payload = {
@@ -150,21 +150,12 @@ export class QdrantSyncService extends EventEmitter {
         synced_at: new Date().toISOString()
       };
 
-      // Store in both Qdrant collections
-      if (embeddings.embedding384) {
+      // Store in knowledge_patterns_small (384-dim) collection
+      if (embedding384) {
         await this.databaseManager.storeVector(
           'knowledge_patterns_small',
           nodeId,
-          embeddings.embedding384,
-          payload
-        );
-      }
-
-      if (embeddings.embedding1536) {
-        await this.databaseManager.storeVector(
-          'knowledge_patterns',
-          nodeId,
-          embeddings.embedding1536,
+          embedding384,
           payload
         );
       }
@@ -203,7 +194,7 @@ export class QdrantSyncService extends EventEmitter {
   }
 
   /**
-   * Delete entity from Qdrant collections
+   * Delete entity from Qdrant collection
    * @private
    */
   async _deleteFromQdrant(nodeId) {
@@ -211,20 +202,8 @@ export class QdrantSyncService extends EventEmitter {
     const qdrantId = this.databaseManager._nodeIdToUUID(nodeId);
 
     try {
-      // Delete from knowledge_patterns_small
+      // Delete from knowledge_patterns_small (384-dim) collection
       await this.databaseManager.qdrant.delete('knowledge_patterns_small', {
-        points: [qdrantId]
-      });
-    } catch (error) {
-      // Ignore if not found
-      if (!error.message.includes('Not found')) {
-        throw error;
-      }
-    }
-
-    try {
-      // Delete from knowledge_patterns
-      await this.databaseManager.qdrant.delete('knowledge_patterns', {
         points: [qdrantId]
       });
     } catch (error) {
@@ -295,11 +274,9 @@ export class QdrantSyncService extends EventEmitter {
               // Generate embeddings
               const text = this._buildEntityText(entity);
 
-              // Generate both 384-dim and 1536-dim embeddings
+              // Generate 384-dim embedding (using local sentence-transformers model)
+              // NOTE: 1536-dim OpenAI embeddings not supported by current EmbeddingGenerator
               const embedding384 = await this.embeddingGenerator.generateEmbedding(text, { dimensions: 384 });
-              const embedding1536 = await this.embeddingGenerator.generateEmbedding(text, { dimensions: 1536 });
-
-              const embeddings = { embedding384, embedding1536 };
 
               // Build payload
               const payload = {
@@ -314,21 +291,12 @@ export class QdrantSyncService extends EventEmitter {
                 synced_at: new Date().toISOString()
               };
 
-              // Store in both collections
-              if (embeddings.embedding384) {
+              // Store in knowledge_patterns_small (384-dim) collection
+              if (embedding384) {
                 await this.databaseManager.storeVector(
                   'knowledge_patterns_small',
                   nodeId,
-                  embeddings.embedding384,
-                  payload
-                );
-              }
-
-              if (embeddings.embedding1536) {
-                await this.databaseManager.storeVector(
-                  'knowledge_patterns',
-                  nodeId,
-                  embeddings.embedding1536,
+                  embedding384,
                   payload
                 );
               }
