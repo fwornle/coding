@@ -12,7 +12,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { runIfMain } from '../../lib/utils/esm-cli.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
