@@ -33,6 +33,7 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import Database from 'better-sqlite3';
 import { EventEmitter } from 'events';
+import { createHash, randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 
@@ -420,6 +421,32 @@ export class DatabaseManager extends EventEmitter {
   }
 
   /**
+   * Convert node ID to UUID for Qdrant compatibility
+   *
+   * Qdrant requires point IDs to be either unsigned integers or UUIDs.
+   * This method generates a deterministic UUID from a string node ID using SHA-256.
+   *
+   * @param {string} nodeId - The node ID (e.g., "coding:CollectiveKnowledge")
+   * @returns {string} A valid UUID
+   */
+  _nodeIdToUUID(nodeId) {
+    // Generate deterministic UUID from node ID using SHA-256
+    const hash = createHash('sha256').update(nodeId).digest('hex');
+
+    // Format as UUID v4 (xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx)
+    // Where y is one of [8, 9, a, b]
+    const uuid = [
+      hash.slice(0, 8),
+      hash.slice(8, 12),
+      '4' + hash.slice(13, 16),  // Version 4
+      ((parseInt(hash.slice(16, 18), 16) & 0x3f) | 0x80).toString(16) + hash.slice(18, 20),  // Variant bits
+      hash.slice(20, 32)
+    ].join('-');
+
+    return uuid;
+  }
+
+  /**
    * Store vector in Qdrant
    */
   async storeVector(collection, id, vector, payload = {}) {
@@ -429,12 +456,21 @@ export class DatabaseManager extends EventEmitter {
     }
 
     try {
+      // Convert node ID to UUID for Qdrant compatibility
+      const qdrantId = this._nodeIdToUUID(id);
+
+      // Store original node ID in payload for reference
+      const enrichedPayload = {
+        ...payload,
+        node_id: id  // Preserve original node ID
+      };
+
       await this.qdrant.upsert(collection, {
         wait: false, // Async for performance
         points: [{
-          id,
+          id: qdrantId,
           vector,
-          payload
+          payload: enrichedPayload
         }]
       });
 
