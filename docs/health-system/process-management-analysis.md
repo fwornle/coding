@@ -372,6 +372,96 @@ This was identified after user reported duplicate ProcessStateManager instances 
 
 ---
 
+## Automated Cleanup Tools
+
+### Orphaned Process Cleanup Utility (2025-11-19)
+
+**Problem:**
+Orphaned node processes from previous sessions accumulate over time, consuming resources and potentially causing conflicts. These include:
+- Transcript monitors without valid project paths
+- Stuck ukb/vkb operations that never completed
+- Orphaned qdrant-sync processes
+- Old shell snapshot processes
+
+**Solution:**
+Created automated cleanup utility that intelligently detects and removes orphaned processes.
+
+**Implementation:**
+
+1. **Cleanup Script** (`scripts/cleanup-orphaned-processes.js`)
+   - Detects processes matching patterns: `vkb`, `ukb`, `enhanced-transcript`, `sync-graph`, `zsh snapshots`
+   - Validates transcript monitors have absolute paths to existing directories
+   - Identifies stuck operations (running longer than expected)
+   - Provides `--dry-run` mode for safety
+
+2. **Wrapper Command** (`bin/cleanup-orphans`)
+   - Convenient executable wrapper
+   - Pass-through for all arguments
+
+**Usage:**
+
+```bash
+# Preview what would be cleaned
+./bin/cleanup-orphans --dry-run
+
+# Clean up orphaned processes
+./bin/cleanup-orphans
+```
+
+**Detection Logic:**
+
+```javascript
+// Transcript monitors: Only valid if project path exists
+if (command.includes('enhanced-transcript-monitor.js')) {
+  const projectPath = extractProjectPath(command);
+  if (!existsSync(projectPath)) {
+    return { kill: true, reason: 'Invalid project path' };
+  }
+}
+
+// ukb/vkb operations: Stuck if still running (except vkb server)
+if (command.includes('ukb-database/cli.js') || command.includes('vkb-cli.js')) {
+  if (!command.includes('server start')) {
+    return { kill: true, reason: 'Stuck ukb/vkb operation' };
+  }
+}
+
+// Qdrant sync and shell snapshots: Always orphans if found
+if (command.includes('sync-graph-to-qdrant.js')) {
+  return { kill: true, reason: 'Orphaned qdrant sync' };
+}
+```
+
+**Example Output:**
+
+```
+🧹 Orphaned Process Cleanup
+═══════════════════════════
+
+Found 4 potentially orphaned process(es)
+
+Cleaning up 2 orphaned process(es):
+
+  ✅ Killed PID 78503: Invalid transcript monitor (path does not exist)
+  ✅ Killed PID 41120: Invalid transcript monitor (no path argument)
+
+✅ Cleanup complete: 2/2 processes cleaned up
+```
+
+**Integration:**
+
+The cleanup utility complements the automatic pre-startup cleanup in `start-services-robust.js` by providing:
+- Manual cleanup between sessions
+- Dry-run capability for safety
+- More granular control over what gets killed
+- Detailed reporting of cleanup actions
+
+**Files:**
+- `scripts/cleanup-orphaned-processes.js` - Main cleanup logic (186 lines)
+- `bin/cleanup-orphans` - Executable wrapper
+
+---
+
 ## Conclusion
 
 The Process State Manager infrastructure exists but is **incompletely implemented**. Critical gaps in process registration led to orphaned processes creating LSL files in incorrect locations.

@@ -47,6 +47,11 @@ The Health System provides **failsafe monitoring** with automatic verification a
 - Automatic cleanup after VSCode/Claude crashes
 - Graceful shutdown tracking for crash detection
 
+**Orphan Cleanup** (`bin/cleanup-orphans`)
+- Manual cleanup utility for orphaned processes
+- Targets stuck ukb/vkb operations, invalid transcript monitors
+- Dry-run mode for safe previewing
+
 **Status Line** (`scripts/combined-status-line.js`)
 - Real-time indicators in Claude Code status bar
 - Multi-session support

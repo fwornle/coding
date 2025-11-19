@@ -186,6 +186,26 @@ async function startAllServices() {
 - `scripts/process-state-manager.js` - PSM with `cleanupStaleServices()` method
 - `.data/session-shutdowns.json` - Graceful shutdown tracking
 
+### Manual Cleanup Tool
+
+For manual cleanup between sessions or when automatic cleanup isn't sufficient:
+
+```bash
+# Preview what would be cleaned
+./bin/cleanup-orphans --dry-run
+
+# Clean up orphaned processes manually
+./bin/cleanup-orphans
+```
+
+The `cleanup-orphans` utility provides targeted cleanup of:
+- Transcript monitors without valid project paths
+- Stuck ukb/vkb operations
+- Orphaned qdrant-sync processes
+- Old shell snapshot processes
+
+**See**: [Process Management Analysis](./process-management-analysis.md#automated-cleanup-tools) for detailed documentation
+
 ## Retry Strategy
 
 ### Algorithm
