@@ -46,11 +46,11 @@ if [[ -f "$SHARED_MEMORY" ]]; then
 
 ## MANDATORY FIRST STEPS:
 
-1. **Query MCP Memory for patterns:**
+1. **Query VKB for patterns:**
    ```
-   mcp__memory__search_nodes("ConditionalLoggingPattern")
-   mcp__memory__search_nodes("ReduxStateManagementPattern") 
-   mcp__memory__search_nodes("ClaudeCodeStartupPattern")
+   vkb search "ConditionalLoggingPattern"
+   vkb search "ReduxStateManagementPattern"
+   vkb search "ClaudeCodeStartupPattern"
    ```
 
 2. **Apply patterns immediately:**
@@ -111,7 +111,7 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
         
         # Store PIDs of MCP processes before cleanup
         echo -e "${YELLOW}🔍 Locating MCP processes...${NC}"
-        local mcp_pids=$(ps aux | grep -E "(mcp-server-memory|browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}' || true)
+        local mcp_pids=$(ps aux | grep -E "(browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}' || true)
         
         # Only kill processes if they exist and are still running
         if [[ -n "$mcp_pids" ]]; then
@@ -126,7 +126,7 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
             sleep 2
             
             # Check if processes are still running
-            local remaining_pids=$(ps aux | grep -E "(mcp-server-memory|browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}' || true)
+            local remaining_pids=$(ps aux | grep -E "(browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}' || true)
             
             if [[ -n "$remaining_pids" ]]; then
                 echo -e "${YELLOW}⚠️  Some processes need force termination: $remaining_pids${NC}"

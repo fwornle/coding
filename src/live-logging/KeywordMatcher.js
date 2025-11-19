@@ -345,7 +345,7 @@ class KeywordMatcher {
     return {
       keywords: {
         primary: [
-          'ukb', 'vkb', 'semantic-analysis', 'mcp__memory', 'claude-mcp',
+          'ukb', 'vkb', 'semantic-analysis', 'claude-mcp',
           'transcript-monitor', 'coding-classifier', 'session-logger',
           'knowledge-management', 'enhanced-transcript-monitor'
         ],
@@ -361,7 +361,7 @@ class KeywordMatcher {
           '/coding/', 'scripts/', 'knowledge-management/', '.specstory/'
         ],
         mcp_patterns: [
-          'mcp__memory', 'mcp__semantic-analysis', 'create_entities',
+          'mcp__semantic-analysis', 'create_entities',
           'search_nodes', 'determine_insights'
         ],
         system_concepts: [

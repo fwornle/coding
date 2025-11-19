@@ -8,6 +8,7 @@
  * - Stuck ukb/vkb operations (older than 5 minutes)
  * - Orphaned qdrant-sync processes
  * - Old shell snapshot processes
+ * - MCP memory server processes (replaced by UKB/VKB)
  *
  * Usage:
  *   node scripts/cleanup-orphaned-processes.js [--dry-run]
@@ -34,7 +35,7 @@ if (DRY_RUN) {
 function getOrphanedProcesses() {
   try {
     const output = execSync(
-      'ps aux | grep -E "node.*(vkb|ukb|enhanced-transcript|sync-graph|zsh.*snapshot)" | grep -v grep',
+      'ps aux | grep -E "(node.*(vkb|ukb|enhanced-transcript|sync-graph|zsh.*snapshot)|mcp-server-memory)" | grep -v grep',
       { encoding: 'utf8' }
     );
 
@@ -103,6 +104,11 @@ function shouldKill(process) {
   // Shell snapshots
   if (command.includes('shell-snapshots') && command.includes('zsh')) {
     return { kill: true, reason: 'Old shell snapshot' };
+  }
+
+  // MCP memory server (replaced by UKB/VKB system)
+  if (command.includes('mcp-server-memory') || command.includes('@modelcontextprotocol/server-memory')) {
+    return { kill: true, reason: 'MCP memory server (replaced by UKB/VKB)' };
   }
 
   return { kill: false };
