@@ -1,3 +1,22 @@
+# Constraint Monitor Configuration
+#
+# For detailed documentation on constraint configuration, including:
+# - applies_to property (file_path vs content checking)
+# - Semantic validation
+# - Exceptions and whitelists
+# - Pattern matching tips and best practices
+#
+# See: integrations/mcp-constraint-monitor/docs/constraint-configuration.md
+#
+# Quick Reference for applies_to:
+#   applies_to: file_path  - Check only the file path, not content
+#   (omitted)              - Check file content (default behavior)
+#
+# Example: Block edits to specific directories without false positives
+#   - id: my-constraint
+#     pattern: "\.data/restricted/"
+#     applies_to: file_path  # Only blocks files IN this path, not files mentioning it
+
 constraint_groups:
   - id: code_quality
     name: Code Quality Standards
@@ -119,6 +138,7 @@ constraints:
     message: "CRITICAL: Knowledge base must only be manipulated through bin/ukb CLI"
     severity: critical
     enabled: true
+    applies_to: file_path  # Only check file path, not content (prevents false positives in .gitignore)
     suggestion: "Use 'bin/ukb' CLI for all knowledge base operations. Never directly edit files in .data/knowledge-export/ or .data/knowledge-graph/"
   - id: plantuml-standard-styling
     group: plantuml
