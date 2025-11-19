@@ -1,0 +1,7 @@
+#!/bin/bash
+# Cleanup orphaned processes from previous sessions
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+exec node "$PROJECT_ROOT/scripts/cleanup-orphaned-processes.js" "$@"
