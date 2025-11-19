@@ -45,7 +45,7 @@ class HealthRefreshManager {
     }
   }
 
-  private async fetchAllData() {
+  async fetchAllData() {
     if (!this.store) return
 
     // Fetch health status

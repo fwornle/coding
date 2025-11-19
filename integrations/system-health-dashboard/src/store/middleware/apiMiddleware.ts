@@ -4,6 +4,7 @@ import {
   triggerVerificationSuccess,
   triggerVerificationFailure,
 } from '../slices/autoHealingSlice'
+import { healthRefreshManager } from './healthRefreshMiddleware'
 
 const API_PORT = process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}/api/health-verifier`
@@ -32,6 +33,11 @@ export const apiMiddleware: Middleware = (store) => (next) => (action) => {
         if (responseData.status === 'success') {
           store.dispatch(triggerVerificationSuccess())
           console.log('✅ Health verification triggered successfully')
+
+          // Immediately refresh health data to show updated status
+          console.log('🔄 Fetching updated health data...')
+          await healthRefreshManager.fetchAllData()
+          console.log('✅ Health data refreshed')
         } else {
           throw new Error(responseData.message || 'Verification trigger failed')
         }
