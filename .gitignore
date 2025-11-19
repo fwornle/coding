@@ -165,3 +165,9 @@ nul
 # Duplicate memory-visualizer directory (proper location is integrations/memory-visualizer)
 /memory-visualizer/
 .data/session-shutdowns.json
+
+# Test: This comment mentions .data/knowledge-export/ and .data/knowledge-graph/
+# If constraint is file-path-only, this edit should succeed!
+# Adding another test line to verify constraint is still working
+# Final test after proper service restart - mentions .data/knowledge-export/ again
+# SUCCESS: After fixing filePath passing bug, constraint now works correctly!
