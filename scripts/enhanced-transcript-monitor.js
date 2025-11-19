@@ -2099,8 +2099,8 @@ class EnhancedTranscriptMonitor {
    */
   async start() {
     if (!this.transcriptPath) {
-      console.log('❌ No current transcript file found. Make sure Claude Code is running.');
-      return;
+      console.log('⚠️  No current transcript file found yet - will wait for Claude session to start.');
+      console.log('   Monitor will pick up transcript automatically once Claude Code is running.');
     }
 
     // CRITICAL: Check for existing instances and register this service
@@ -2150,7 +2150,7 @@ class EnhancedTranscriptMonitor {
 
     console.log(`🚀 Starting enhanced transcript monitor`);
     console.log(`📁 Project: ${this.config.projectPath}`);
-    console.log(`📊 Transcript: ${path.basename(this.transcriptPath)}`);
+    console.log(`📊 Transcript: ${this.transcriptPath ? path.basename(this.transcriptPath) : 'waiting for session...'}`);
     console.log(`🔍 Check interval: ${this.config.checkInterval}ms`);
     const sessionDurationMins = Math.round(this.getSessionDurationMs() / 60000);
     console.log(`⏰ Session boundaries: Every ${sessionDurationMins} minutes`);
