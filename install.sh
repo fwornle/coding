@@ -1928,7 +1928,6 @@ create_project_local_settings() {
       "WebFetch(domain:github.com)",
       "Bash(sqlite3 .data/knowledge.db \"SELECT source, COUNT(*) as count FROM knowledge_extractions GROUP BY source\")",
       "Bash(sqlite3 .data/knowledge.db \"PRAGMA table_info(knowledge_extractions)\")",
-      "mcp__memory__read_graph",
       "Bash(vkb restart:*)",
       "Bash(bin/vkb restart:*)",
       "Bash(ps:*)",

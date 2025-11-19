@@ -325,7 +325,7 @@ class PostSessionLogger {
       // VERY SPECIFIC coding infrastructure keywords - must be precise to avoid false positives
       const codingKeywords = [
         'ukb command', 'vkb command', 'ukb --', 'vkb --', 'ukb.js', 'vkb.js',
-        'mcp__memory__', 'semantic-analysis system', 'claude-mcp command',
+        'semantic-analysis system', 'claude-mcp command',
         'post-session-logger.js', 'shared-memory-coding.json', 'knowledge-management/',
         'coding repo', '/agentic/coding', 'coding infrastructure'
       ];
