@@ -2120,7 +2120,7 @@ class EnhancedTranscriptMonitor {
     }
 
     // Check if another instance is already running for this project
-    const existingService = await this.processStateManager.getService(serviceName, 'per-project', projectPath);
+    const existingService = await this.processStateManager.getService(serviceName, 'per-project', { projectPath });
     if (existingService && this.processStateManager.isProcessAlive(existingService.pid)) {
       console.error(`❌ Another instance of ${serviceName} is already running for project ${path.basename(projectPath)}`);
       console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}`);
