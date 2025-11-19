@@ -1223,8 +1223,9 @@ class CombinedStatusLine {
                         knowledge.extractionState === 'processing' ? '⏳' :
                         knowledge.extractionState === 'idle' ? '💤' : '⚠️';
 
-      if (knowledge.errorCount > 0) {
-        parts.push(`[📚${stateIcon} ⚠️${knowledge.errorCount}]`); // Space before warning emoji
+      const errorCount = knowledge.errorCount || 0;
+      if (errorCount > 0) {
+        parts.push(`[📚${stateIcon} ⚠️${errorCount}]`); // Space before warning emoji
         if (overallColor === 'green') overallColor = 'yellow';
       } else {
         parts.push(`[📚${stateIcon}]`);
