@@ -77,12 +77,13 @@ export class KnowledgeExtractor extends EventEmitter {
 
     // Required dependencies
     this.databaseManager = config.databaseManager;
-    this.graphDatabase = config.graphDatabase;
-    this.embeddingGenerator = config.embeddingGenerator;
+    this.graphDatabase = config.graphDatabase || null; // Optional - may be locked by VKB server
+    this.embeddingGenerator = config.embeddingGenerator || null; // Optional - handled by MCP semantic analysis
     this.inferenceEngine = config.inferenceEngine;
 
-    if (!this.databaseManager || !this.graphDatabase || !this.embeddingGenerator || !this.inferenceEngine) {
-      throw new Error('KnowledgeExtractor requires databaseManager, graphDatabase, embeddingGenerator, and inferenceEngine');
+    // Only databaseManager and inferenceEngine are strictly required
+    if (!this.databaseManager || !this.inferenceEngine) {
+      throw new Error('KnowledgeExtractor requires databaseManager and inferenceEngine');
     }
 
     // Extraction configuration
@@ -126,7 +127,7 @@ export class KnowledgeExtractor extends EventEmitter {
       await this.databaseManager.initialize();
     }
 
-    if (!this.embeddingGenerator.initialized) {
+    if (this.embeddingGenerator && !this.embeddingGenerator.initialized) {
       await this.embeddingGenerator.initialize();
     }
 
