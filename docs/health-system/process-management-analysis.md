@@ -317,6 +317,61 @@ await psm.unregisterService('my-service', 'global');
 
 ---
 
+## Recent Fixes
+
+### Singleton Check Bug Fix (2025-11-19)
+
+**Issue:**
+Duplicate transcript monitor instances were running simultaneously for the same project, bypassing the singleton check that should prevent this.
+
+**Root Cause:**
+In `scripts/enhanced-transcript-monitor.js:2123`, the singleton check was calling ProcessStateManager's `getService()` method with incorrect parameters:
+
+```javascript
+// BEFORE (BROKEN):
+const existingService = await this.processStateManager.getService(serviceName, 'per-project', projectPath);
+```
+
+The third parameter was passing `projectPath` as a **string**, but `ProcessStateManager.getService()` expects it as part of a **context object**:
+
+```javascript
+// From ProcessStateManager.js:184-200
+async getService(name, type, context = {}) {
+  if (type === 'per-project' && context.projectPath) {  // ← Expects context.projectPath!
+    const projectServices = registry.services.projects[context.projectPath];
+    return projectServices ? projectServices[name] || null : null;
+  }
+}
+```
+
+Because `context.projectPath` was always **undefined**, the singleton check always returned `null`, allowing duplicate instances.
+
+**Fix Applied:**
+Changed line 2123 to pass an object instead of a string:
+
+```javascript
+// AFTER (CORRECT):
+const existingService = await this.processStateManager.getService(serviceName, 'per-project', { projectPath });
+```
+
+**Verification:**
+Tested by attempting to start duplicate instances - now properly rejects with error message:
+```
+❌ Another instance of enhanced-transcript-monitor is already running for project coding
+   PID: 41120, Started: 2025-11-19T05:52:57.324Z
+   To fix: Kill the existing instance with: kill 41120
+```
+
+**Impact:**
+- Prevents duplicate transcript monitor instances per project
+- Ensures proper singleton enforcement for per-project services
+- Reduces orphaned processes and resource waste
+
+**Related Issue:**
+This was identified after user reported duplicate ProcessStateManager instances running from previous day's session still active alongside new session's instance.
+
+---
+
 ## Conclusion
 
 The Process State Manager infrastructure exists but is **incompletely implemented**. Critical gaps in process registration led to orphaned processes creating LSL files in incorrect locations.
