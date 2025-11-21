@@ -732,6 +732,33 @@ install_constraint_monitor() {
     cd "$CODING_REPO"
 }
 
+# Install System Health Dashboard
+install_system_health_dashboard() {
+    echo -e "\n${CYAN}🏥 Installing System Health Dashboard...${NC}"
+
+    if [[ ! -d "$CODING_REPO/integrations/system-health-dashboard" ]]; then
+        warning "System Health Dashboard directory not found"
+        return 1
+    fi
+
+    cd "$CODING_REPO/integrations/system-health-dashboard"
+
+    if [[ ! -f "package.json" ]]; then
+        warning "System Health Dashboard package.json not found"
+        cd "$CODING_REPO"
+        return 1
+    fi
+
+    info "Installing System Health Dashboard dependencies..."
+    npm install || warning "Failed to install System Health Dashboard dependencies"
+
+    success "System Health Dashboard dependencies installed"
+    info "Dashboard will run on port 3032 (frontend) and 3033 (API)"
+    info "Access at: http://localhost:3032"
+
+    cd "$CODING_REPO"
+}
+
 # Install shadcn/ui MCP server for professional dashboard components
 install_shadcn_mcp() {
     echo -e "\n${CYAN}🎨 Installing shadcn/ui MCP server for professional dashboard components...${NC}"
@@ -1285,6 +1312,17 @@ verify_installation() {
     else
         warning "Constraint monitor system not installed"
     fi
+
+    # Check System Health Dashboard
+    if [[ -d "$CODING_REPO/integrations/system-health-dashboard" ]]; then
+        if [[ -d "$CODING_REPO/integrations/system-health-dashboard/node_modules" ]]; then
+            success "System Health Dashboard (ports 3032/3033) installed"
+        else
+            warning "System Health Dashboard dependencies not installed"
+        fi
+    else
+        warning "System Health Dashboard not found"
+    fi
     
     # Check Semantic Analysis MCP server
     if [[ -f "$CODING_REPO/integrations/mcp-server-semantic-analysis/dist/index.js" ]]; then
@@ -1747,6 +1785,7 @@ main() {
     install_semantic_analysis
     install_serena
     install_constraint_monitor
+    install_system_health_dashboard
     install_shadcn_mcp
     install_mcp_servers
     create_command_wrappers
