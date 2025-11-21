@@ -1225,7 +1225,10 @@ class CombinedStatusLine {
 
       const errorCount = knowledge.errorCount || 0;
       if (errorCount > 0) {
-        parts.push(`[📚${stateIcon} ⚠️${errorCount}]`); // Space before warning emoji
+        // When showing errorCount, don't duplicate the warning emoji
+        // If state is already warning, just show the count
+        const displayIcon = stateIcon === '⚠️' ? '' : stateIcon;
+        parts.push(`[📚${displayIcon}⚠️${errorCount}]`);
         if (overallColor === 'green') overallColor = 'yellow';
       } else {
         parts.push(`[📚${stateIcon}]`);
