@@ -160,7 +160,11 @@ class HealthVerifier extends EventEmitter {
           recheckResults.push(...await this.verifyServices());
           recheckResults.push(...await this.verifyProcesses());
 
-          checks.push(...recheckResults);
+          // CRITICAL FIX: Replace old checks with recheck results instead of appending
+          // This prevents duplicate violations when a service becomes healthy after auto-healing
+          const recheckIds = new Set(recheckResults.map(c => c.check_id));
+          checks = checks.filter(c => !recheckIds.has(c.check_id)); // Remove old checks
+          checks.push(...recheckResults); // Add new checks
         }
       }
 
