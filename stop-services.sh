@@ -62,6 +62,8 @@ echo "🧹 Additional process cleanup..."
 pkill -f "transcript-monitor.js" 2>/dev/null && echo "✅ Killed remaining transcript monitors" || echo "ℹ️ No transcript monitors found"
 pkill -f "start-live-logging.js" 2>/dev/null && echo "✅ Killed remaining live-logging coordinators" || echo "ℹ️ No live-logging coordinators found"
 pkill -f "live-logging-coordinator.js" 2>/dev/null && echo "✅ Killed remaining live-logging processes" || echo "ℹ️ No live-logging processes found"
+pkill -f "statusline-health-monitor.js" 2>/dev/null && echo "✅ Killed remaining health monitors" || echo "ℹ️ No health monitors found"
+pkill -f "health-verifier.js" 2>/dev/null && echo "✅ Killed health verifier" || echo "ℹ️ No health verifier found"
 pkill -f "vkb.*server" 2>/dev/null && echo "✅ Killed remaining VKB servers" || echo "ℹ️ No VKB servers found"
 
 # Clean up port conflicts
