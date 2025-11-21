@@ -331,8 +331,9 @@ export class DatabaseManager extends EventEmitter {
       };
 
       console.warn('[DatabaseManager] Graph database not available:', error.message);
-      console.warn('[DatabaseManager] Knowledge queries will fall back to SQLite');
-      // Continue with degraded functionality - graph DB is optional
+      console.warn('[DatabaseManager] Knowledge operations (entities/relations) are unavailable');
+      console.warn('[DatabaseManager] Note: SQLite is only used for analytics (budget tracking, session metrics)');
+      // Continue with degraded functionality - graph DB is optional for analytics-only operations
     }
   }
 

@@ -1,0 +1,41 @@
+@startuml
+!include _standard-style.puml
+
+title UKB Request Flow: Intelligent Routing
+
+actor "User" as user
+participant "UKB CLI" as cli
+participant "VkbApiClient" as api
+participant "VKB Server" as server
+database "LevelDB" as db
+
+user -> cli : ukb entity delete "Test"
+
+cli -> api : isServerAvailable()
+api -> server : GET /api/health
+alt Server Running
+    server --> api : 200 OK {graph: true}
+    api --> cli : true
+
+    cli -> api : deleteEntity("Test")
+    api -> server : DELETE /api/entities/Test
+    server -> db : dropNode("coding:Test")
+    server -> db : persist()
+    server --> api : 200 {success: true}
+    api --> cli : {deleted: "Test"}
+
+    cli --> user : ✓ Entity deleted (via API)
+else Server Stopped
+    server --x api : connection refused
+    api --> cli : false
+
+    cli -> db : open()
+    cli -> db : dropNode("coding:Test")
+    cli -> db : persist()
+    db --> cli : success
+    cli -> db : close()
+
+    cli --> user : ✓ Entity deleted (direct access)
+end
+
+@enduml
