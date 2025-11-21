@@ -1,0 +1,31 @@
+@startuml
+!include _standard-style.puml
+
+title Wrong Architecture: Lock Conflicts
+
+rectangle "UKB CLI" as cli
+rectangle "VKB Server" as server
+database "LevelDB\n(LOCK file)" as db
+
+cli -down-> db : "tries to open\n❌ ERROR: locked"
+server -down-> db : "holds lock continuously"
+
+note right of db
+  **Problem**: Both processes
+  try to access database directly
+
+  **Result**: Lock conflicts when
+  both are running simultaneously
+end note
+
+note left of cli
+  Attempts direct
+  database access
+end note
+
+note left of server
+  Holds exclusive
+  lock on LevelDB
+end note
+
+@enduml

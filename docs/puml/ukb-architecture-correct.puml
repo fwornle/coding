@@ -1,0 +1,32 @@
+@startuml
+!include _standard-style.puml
+
+title Correct Architecture: Lock-Free via API
+
+rectangle "UKB CLI" as cli
+rectangle "VKB Server\n(HTTP API)" as server
+database "LevelDB" as db
+
+cli -right-> server : "1. Check server status\n2. Use HTTP API if running"
+server -down-> db : "exclusive access"
+cli -down-> db : "direct access\n(only when server stopped)"
+
+note right of server
+  **Single Access Point**
+
+  - Provides HTTP API endpoints
+  - Has exclusive LevelDB access
+  - Handles all CRUD operations
+end note
+
+note left of cli
+  **Intelligent Routing**
+
+  1. Check if server is running
+  2. If yes: use API
+  3. If no: direct access
+
+  No conflicts!
+end note
+
+@enduml

@@ -1,6 +1,6 @@
 #!/bin/bash
-# UKB - Update Knowledge Base
-# GraphDB-based knowledge management (Graphology + LevelDB)
+# UKB - Update Knowledge Base (Unified CLI)
+# Smart incremental updates via comprehensive semantic analysis
 CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
 export CODING_REPO
-exec node "$CODING_REPO/lib/ukb-database/cli.js" "$@"
+exec node "$CODING_REPO/lib/ukb-unified/cli.js" "$@"

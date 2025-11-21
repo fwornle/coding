@@ -214,6 +214,7 @@ constraints:
     message: "CRITICAL: Creating diagrams requires documentation-style skill. You MUST invoke Skill tool with skill='documentation-style' BEFORE creating diagram files"
     severity: error
     enabled: true
+    applies_to: file_path  # Check file path only - allows .puml files
     suggestion: "STOP: Invoke the documentation-style skill first: Use Skill tool with parameter skill='documentation-style' to load proper workflow and standards"
     whitelist:
       - "*.puml"
