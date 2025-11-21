@@ -1,17 +1,17 @@
 {
   "version": "2.0.0",
   "teamCheckpoint": true,
-  "lastSuccessfulRun": "2025-11-20T07:05:49.011Z",
-  "lastAnalyzedCommit": "0d63e5236717fb88d0bd233b2c4cbdcb6a60f0fa",
-  "lastAnalyzedSession": null,
+  "lastSuccessfulRun": "2025-11-21T07:36:43.595Z",
+  "lastAnalyzedCommit": "564b421e1cbd6399ec78de507e2fa7a3b0c6c96e",
+  "lastAnalyzedSession": "2025-11-21_0800-0900_g9b30a.md",
   "analysisStats": {
-    "entitiesCreated": 2,
-    "relationsCreated": 6,
-    "insightsGenerated": 0,
-    "commitsAnalyzed": 1,
-    "sessionsAnalyzed": 0,
-    "duration": 2001
+    "entitiesCreated": 13,
+    "relationsCreated": 32,
+    "insightsGenerated": 4,
+    "commitsAnalyzed": 4,
+    "sessionsAnalyzed": 1,
+    "duration": 2002
   },
   "workflowType": "incremental-update",
-  "integrity": "sha256:7217e128b210e9d8068cd2ec5da4aba294cab6097f8b974342a4010391f42f5d"
+  "integrity": "sha256:86f350d8b414b203e853d464e78a27873e7b877e7fc270addbd5fab7d2b7d7c7"
 }
