@@ -7,113 +7,130 @@ top to bottom direction
 
 package "User Interfaces" {
   actor "Claude Code" as Claude <<external>>
-  actor "VSCode CoPilot" as VSCode <<external>>
   actor "CLI User" as CLIUser <<external>>
 }
 
 package "MCP Integration Layer" {
   component [MCP Server] as MCP <<api>>
-  component [Semantic Bridge] as Bridge <<api>>
-  component [CoPilot HTTP Server] as HTTP <<api>>
-  
+
   note right of MCP
-    Port: Default MCP
     • Tool integration for Claude
-    • Request routing to agents
+    • Request routing to coordinator
     • Response aggregation
-  end note
-  
-  note right of HTTP
-    Port: 8765
-    • REST API for VSCode
-    • WebSocket notifications
-    • Knowledge management
+    • 12 tools available
   end note
 }
 
 package "External Services" <<external>> {
+  cloud [Groq] as Groq
+  cloud [Gemini] as Gemini
   cloud [Custom LLM] as Custom
   cloud [Anthropic Claude] as Anthropic
   cloud [OpenAI GPT] as OpenAI
   cloud [Web Search APIs] as WebAPIs
-  
+
+  note right of Groq
+    • Default LLM provider
+    • Low cost, low latency
+    • llama-3.3-70b-versatile
+  end note
+
+  note right of Gemini
+    • Fallback provider 1
+    • Low cost, good quality
+    • gemini-2.0-flash-exp
+  end note
+
   note right of Custom
-    • Primary LLM provider
+    • Fallback provider 2
     • Custom endpoints
     • Flexible configuration
   end note
-  
+
   note right of Anthropic
-    • Secondary LLM provider
-    • Content analysis
-    • Insight generation
+    • Fallback provider 3
+    • High quality analysis
+    • claude-sonnet-4
   end note
-  
+
   note right of OpenAI
-    • Fallback LLM provider
-    • Provider redundancy
-    • Cost optimization
+    • Fallback provider 4
+    • Embeddings + LLM
+    • gpt-4-turbo-preview
   end note
 }
 
-package "Enhanced Agent System ✨" {
-  package "Core Agents" {
-    component [Semantic Analysis] as SemanticAgent <<agent>>
-    component [Web Search] as WebAgent <<agent>>
-    component [Knowledge Graph ✨] as KnowledgeAgent <<agent>>
-    component [Coordinator] as CoordinatorAgent <<agent>>
+package "10-Agent System" {
+  package "Orchestration" {
+    component [CoordinatorAgent] as CoordinatorAgent <<agent>>
   }
-  
-  package "Infrastructure Agents ⭐ NEW" {
-    component [Synchronization ✨] as SyncAgent <<agent>>
-    component [Deduplication ✨] as DedupAgent <<agent>>
-    component [Documentation] as DocAgent <<agent>>
+
+  package "Analysis Agents" {
+    component [GitHistoryAgent] as GitAgent <<agent>>
+    component [VibeHistoryAgent] as VibeAgent <<agent>>
+    component [SemanticAnalysisAgent] as SemanticAgent <<agent>>
+    component [WebSearchAgent] as WebAgent <<agent>>
+    component [InsightGenerationAgent] as InsightAgent <<agent>>
+    component [ObservationGenerationAgent] as ObsAgent <<agent>>
+    component [QualityAssuranceAgent] as QAAgent <<agent>>
+  }
+
+  package "Infrastructure Agents" {
+    component [PersistenceAgent] as PersistAgent <<agent>>
+    component [DeduplicationAgent] as DedupAgent <<agent>>
   }
 }
 
-package "Knowledge Management" {
-  component [UKB-CLI] as UKB <<cli>>
-  component [VKB-CLI] as VKB <<cli>>
-  database "shared-memory.json" as SharedMemory <<storage>>
-  cloud "MCP Memory" as MCPMemory <<external>>
+package "Storage Architecture" {
+  database "GraphDB\nGraphology + LevelDB\n.data/knowledge-graph/" as GraphDB <<storage>>
+  component [Graph Exporter] as Exporter <<storage>>
+  database "shared-memory-coding.json\nGit-tracked export" as SharedMemory <<storage>>
 }
-
 
 ' User connections
 Claude -[#4A90E2]-> MCP : tool calls
-VSCode -[#4A90E2]-> HTTP : REST API
-VSCode -[#43A047,dashed]-> HTTP : WebSocket
-CLIUser -[#4A90E2]-> UKB : commands
-CLIUser -[#4A90E2]-> VKB : commands
+CLIUser -[#4A90E2]-> MCP : API requests
 
 ' MCP layer connections (Node.js direct calls)
 MCP -[#4A90E2]-> CoordinatorAgent : workflow execution
-HTTP -[#FF9800]-> CoordinatorAgent : API requests
-Bridge -[#43A047,dashed]-> CoordinatorAgent : semantic analysis
 
-' Enhanced agent connections (Node.js direct calls)
-CoordinatorAgent -[#FF9800]-> SemanticAgent : orchestrates
-CoordinatorAgent -[#FF9800]-> WebAgent : coordinates
-CoordinatorAgent -[#FF9800]-> KnowledgeAgent : manages
-CoordinatorAgent -[#FF9800]-> SyncAgent : ensures consistency ✨
-CoordinatorAgent -[#FF9800]-> DedupAgent : prevents duplicates ✨
-CoordinatorAgent -[#FF9800]-> DocAgent : generates docs
+' Coordinator orchestrates all agents (direct function calls)
+CoordinatorAgent -[#FF9800]-> GitAgent : orchestrates
+CoordinatorAgent -[#FF9800]-> VibeAgent : coordinates
+CoordinatorAgent -[#FF9800]-> SemanticAgent : manages
+CoordinatorAgent -[#FF9800]-> WebAgent : manages
+CoordinatorAgent -[#FF9800]-> InsightAgent : manages
+CoordinatorAgent -[#FF9800]-> ObsAgent : manages
+CoordinatorAgent -[#FF9800]-> QAAgent : manages
+CoordinatorAgent -[#FF9800]-> PersistAgent : manages
+CoordinatorAgent -[#FF9800]-> DedupAgent : infrastructure
 
-' Enhanced knowledge connections
-KnowledgeAgent -[#FF9800]-> SharedMemory : read/write
-SyncAgent -[#FF9800]-> SharedMemory : bidirectional sync ✨
-DedupAgent -[#FF9800]-> SharedMemory : deduplication ✨
-UKB -[#FF9800]-> SharedMemory : update
-VKB -[#FF9800]-> SharedMemory : read
-MCPMemory -[#43A047,dashed]-> SharedMemory : sync
-SyncAgent -[#43A047,dashed]-> MCPMemory : graph DB sync ✨
+' Storage connections
+CoordinatorAgent -[#FF9800]-> GraphDB : initializes & provides
+PersistAgent -[#FF9800]-> GraphDB : stores entities
+GraphDB -[#FF9800]-> Exporter : auto-export 30s
+Exporter -[#FF9800]-> SharedMemory : writes JSON
 
-' Enhanced LLM connections
-SemanticAgent -[#4A90E2]-> Custom : primary analysis
-SemanticAgent -[#FF9800]-> Anthropic : secondary analysis
-SemanticAgent -[#757575,dotted]-> OpenAI : fallback
-DedupAgent -[#4A90E2]-> OpenAI : embeddings ✨
-DocAgent -[#4A90E2]-> Custom : documentation ✨
+' LLM connections (5-tier chain: Groq → Gemini → Custom → Anthropic → OpenAI)
+SemanticAgent -[#4A90E2]-> Groq : 1st provider
+SemanticAgent -[#4A90E2]-> Gemini : 2nd provider
+SemanticAgent -[#FF9800]-> Custom : 3rd provider
+SemanticAgent -[#FF9800]-> Anthropic : 4th provider
+SemanticAgent -[#757575,dotted]-> OpenAI : 5th provider
+VibeAgent -[#4A90E2]-> Groq : LLM
+InsightAgent -[#4A90E2]-> Groq : LLM
+ObsAgent -[#4A90E2]-> Groq : LLM
+QAAgent -[#4A90E2]-> Groq : LLM
+DedupAgent -[#4A90E2]-> OpenAI : embeddings
 WebAgent -[#43A047,dashed]-> WebAPIs : search
+
+note bottom of GraphDB
+  **Storage Architecture:**
+  • Graphology (in-memory graph)
+  • LevelDB (persistent storage)
+  • Ontology-based classification
+  • Auto-export every 30 seconds
+  • No MQTT/shared-memory messaging
+end note
 
 @enduml

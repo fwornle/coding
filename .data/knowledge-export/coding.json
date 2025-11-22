@@ -330,38 +330,6 @@
       "id": "mc4flkg34x7w16"
     },
     {
-      "name": "ConfigurationPattern",
-      "entityType": "Pattern",
-      "observations": [
-        "Problem: Multi-agent architecture complexity in semantic analysis system",
-        "Solution: Modular agent architecture with TypeScript type safety",
-        "Significance: 9/10 - ",
-        "Applies to: web backend, javascript, typescript and similar contexts",
-        "Details: http://localhost:8080/knowledge-management/insights/ConfigurationPattern.md"
-      ],
-      "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
-      },
-      "id": "mc4flkg2ek8q1m"
-    },
-    {
-      "name": "DocumentationUpdatesPattern",
-      "entityType": "Pattern",
-      "observations": [
-        "Problem: Multi-agent architecture complexity in semantic analysis system",
-        "Solution: Modular agent architecture with TypeScript type safety",
-        "Significance: 9/10 - ",
-        "Applies to: web backend, javascript, typescript and similar contexts",
-        "Details: http://localhost:8080/knowledge-management/insights/DocumentationUpdatesPattern.md"
-      ],
-      "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
-      },
-      "id": "mc4flkg1c4nyxs"
-    },
-    {
       "name": "TestOnlinePattern",
       "entityType": "Pattern",
       "observations": [
@@ -437,6 +405,22 @@
       "id": "mc4flkg17cujj"
     },
     {
+      "name": "ConfigurationPattern",
+      "entityType": "Pattern",
+      "observations": [
+        "Problem: Multi-agent architecture complexity in semantic analysis system",
+        "Solution: Modular agent architecture with TypeScript type safety",
+        "Significance: 9/10 - ",
+        "Applies to: web backend, javascript, typescript and similar contexts",
+        "Details: http://localhost:8080/knowledge-management/insights/ConfigurationPattern.md"
+      ],
+      "metadata": {
+        "created_at": "2025-11-18T10:52:18.836Z",
+        "last_updated": "2025-11-18T10:52:18.836Z"
+      },
+      "id": "mc4flkg2ek8q1m"
+    },
+    {
       "name": "BugFixPattern",
       "entityType": "TransferablePattern",
       "observations": [
@@ -447,8 +431,8 @@
         "Details: http://localhost:8080/knowledge-management/insights/BugFixPattern.md"
       ],
       "metadata": {
-        "created_at": "2025-11-22T07:16:55.878Z",
-        "last_updated": "2025-11-22T07:16:55.878Z"
+        "created_at": "2025-11-22T14:42:12.307Z",
+        "last_updated": "2025-11-22T14:42:12.307Z"
       },
       "id": "mc4flkg154s53l"
     }
@@ -545,30 +529,6 @@
       "metadata": {}
     },
     {
-      "from": "ConfigurationPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "ConfigurationPattern",
-      "to": "Coding",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "DocumentationUpdatesPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "DocumentationUpdatesPattern",
-      "to": "Coding",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
       "from": "KnowledgePersistencePattern",
       "to": "UkbCli",
       "relationType": "extends",
@@ -608,12 +568,6 @@
       "from": "TestOnlinePattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "TestOnlinePattern",
-      "to": "ConfigurationPattern",
-      "relationType": "related_to",
       "metadata": {}
     },
     {
@@ -779,38 +733,6 @@
       }
     },
     {
-      "from": "ConfigurationPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "ConfigurationPattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "DocumentationUpdatesPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "DocumentationUpdatesPattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
       "from": "KnowledgePersistencePattern",
       "to": "UkbCli",
       "relationType": "relation",
@@ -861,14 +783,6 @@
     {
       "from": "TestOnlinePattern",
       "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "TestOnlinePattern",
-      "to": "ConfigurationPattern",
       "relationType": "relation",
       "metadata": {
         "confidence": 1
@@ -1051,38 +965,6 @@
       }
     },
     {
-      "from": "ConfigurationPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "ConfigurationPattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "DocumentationUpdatesPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "DocumentationUpdatesPattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
       "from": "KnowledgePersistencePattern",
       "to": "UkbCli",
       "relationType": "relation",
@@ -1133,14 +1015,6 @@
     {
       "from": "TestOnlinePattern",
       "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "TestOnlinePattern",
-      "to": "ConfigurationPattern",
       "relationType": "relation",
       "metadata": {
         "confidence": 1
@@ -1207,14 +1081,50 @@
       "to": "EntityB",
       "relationType": "implements",
       "metadata": {}
+    },
+    {
+      "from": "ConfigurationPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "ConfigurationPattern",
+      "to": "Coding",
+      "relationType": "implemented_in",
+      "metadata": {}
+    },
+    {
+      "from": "TestOnlinePattern",
+      "to": "ConfigurationPattern",
+      "relationType": "related_to",
+      "metadata": {}
+    },
+    {
+      "from": "ConfigurationPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "relation",
+      "metadata": {}
+    },
+    {
+      "from": "ConfigurationPattern",
+      "to": "Coding",
+      "relationType": "relation",
+      "metadata": {}
+    },
+    {
+      "from": "TestOnlinePattern",
+      "to": "ConfigurationPattern",
+      "relationType": "relation",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-11-22T07:17:00.880Z",
-    "total_entities": 21,
-    "total_relations": 103,
+    "exported_at": "2025-11-22T16:25:00.120Z",
+    "total_entities": 20,
+    "total_relations": 94,
     "description": "Coding project infrastructure and patterns"
   }
 }

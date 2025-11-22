@@ -230,6 +230,29 @@ constraints:
     suggestion: "STOP: Invoke the documentation-style skill first: Use Skill tool with parameter skill='documentation-style' to load PlantUML workflow, validation, and PNG generation standards"
     whitelist:
       - ".constraint-monitor.yaml"
+  - id: plantuml-png-outdated
+    group: plantuml
+    description: "PlantUML PNG files must be regenerated after .puml modifications"
+    severity: warning
+    enabled: true
+    validation_type: post_file_edit
+    file_pattern: "\\.puml$"
+    check_type: file_timestamp_comparison
+    png_path_pattern: "{{dirname}}/{{basename}}.png"
+    max_age_seconds: 120
+    message: |
+      PlantUML source file was modified but corresponding PNG file is outdated or missing.
+
+      PUML file: {{file_path}}
+      Expected PNG: {{png_path}}
+
+      ACTION REQUIRED:
+      1. Generate PNG: plantuml {{file_path}}
+      2. Move to images: mv {{dirname}}/{{basename}}.png docs/images/
+      3. Verify PNG exists and is up-to-date
+
+      The PNG file must be updated within 120 seconds of the .puml modification.
+    suggestion: "Run: plantuml {{file_path}} && mv {{dirname}}/{{basename}}.png docs/images/"
   - id: react-hooks-deps
     group: framework_specific
     pattern: useEffect\([^,]*,\s*\[\]

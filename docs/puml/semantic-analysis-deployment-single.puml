@@ -8,50 +8,77 @@ top to bottom direction
 node "Host Machine" as host {
   component [Claude Code] as cc
   component [MCP Server] as mcp
-  
-  package "Infrastructure" {
-    component [MQTT Broker] as mqtt
-    component [JSON-RPC Server] as rpc
+
+  package "Storage Layer" {
+    database [GraphDB\nGraphology + LevelDB] as graphdb
+    component [Graph Exporter] as exporter
+    database [shared-memory-coding.json\nGit-tracked export] as storage
   }
-  
-  package "Agents" {
-    component [Semantic Agent] as sa
-    component [Web Agent] as ws
-    component [Knowledge Agent] as kg
-    component [Coordinator] as ca
+
+  package "10-Agent System" {
+    component [1. GitHistoryAgent] as git_agent
+    component [2. VibeHistoryAgent] as vibe_agent
+    component [3. SemanticAnalysisAgent] as sa
+    component [4. WebSearchAgent] as ws
+    component [5. InsightGenerationAgent] as insight_agent
+    component [6. ObservationGenerationAgent] as obs_agent
+    component [7. QualityAssuranceAgent] as qa_agent
+    component [8. PersistenceAgent] as persist_agent
+    component [9. DeduplicationAgent] as dedup_agent
+    component [10. CoordinatorAgent] as ca
   }
-  
-  database [shared-memory.json] as storage
+
   folder [.specstory/history] as history
+  folder [.data/knowledge-graph/] as kg_storage
 }
 
 cloud "External Services" {
-  component [Claude API] as claude_api
-  component [OpenAI API] as openai_api
+  component [Groq] as groq_api
+  component [Gemini] as gemini_api
+  component [Custom LLM] as custom_llm
+  component [Anthropic Claude] as claude_api
+  component [OpenAI] as openai_api
   component [Search Engines] as search
 }
 
-' Internal connections
+' MCP to Coordinator (orchestration layer)
 cc --> mcp
-mcp --> mqtt
-mcp --> rpc
+mcp --> ca : tool calls
 
-sa --> mqtt
-ws --> mqtt
-kg --> mqtt
-ca --> mqtt
+' Coordinator orchestrates all agents (direct calls, no MQTT/RPC)
+ca --> git_agent : workflow step 1
+ca --> vibe_agent : workflow step 2
+ca --> sa : workflow step 3
+ca --> ws : workflow step 4
+ca --> insight_agent : workflow step 5
+ca --> obs_agent : workflow step 6
+ca --> qa_agent : workflow step 7
+ca --> persist_agent : workflow step 8
+ca --> dedup_agent : infrastructure
 
-sa --> rpc
-ws --> rpc
-kg --> rpc
-ca --> rpc
+' Storage architecture
+ca --> graphdb : initializes & provides
+persist_agent --> graphdb : stores entities
+graphdb --> kg_storage : persists to LevelDB
+graphdb --> exporter : auto-export 30s
+exporter --> storage : writes JSON
 
-kg --> storage
-cc --> history
+' Data sources
+git_agent --> history : reads sessions
+vibe_agent --> history : analyzes conversations
+cc --> history : writes sessions
 
-' External connections
-sa --> claude_api
-sa --> openai_api
-ws --> search
+' External connections (5-tier LLM fallback: Groq → Gemini → Custom → Anthropic → OpenAI)
+sa --> groq_api : 1st provider
+sa --> gemini_api : 2nd provider
+sa --> custom_llm : 3rd provider
+sa --> claude_api : 4th provider
+sa --> openai_api : 5th provider
+vibe_agent --> groq_api : LLM
+insight_agent --> groq_api : LLM
+obs_agent --> groq_api : LLM
+qa_agent --> groq_api : LLM
+dedup_agent --> openai_api : embeddings
+ws --> search : DuckDuckGo
 
 @enduml

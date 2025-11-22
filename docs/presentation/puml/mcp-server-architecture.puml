@@ -41,7 +41,7 @@ package "Storage" as STORAGE_PKG {
   file "shared-memory-\ncoding.json" as JSON <<storage>>
 }
 
-cloud "LLMs\n(3-tier chain)" as LLMS <<external>> #FFE6E6
+cloud "LLMs\n(Groq→Gemini→\nAnthropic→OpenAI)" as LLMS <<external>> #FFE6E6
 cloud "Git Repo &\nHistory Files" as DATA_SOURCES <<external>> #E6F3FF
 
 ' Main flow
@@ -67,8 +67,7 @@ EXPORTER --> JSON : "Exports"
 ' External connections
 GIT --> DATA_SOURCES
 VIBE --> DATA_SOURCES
-SEMANTIC ..> LLMS : "3 agents\nuse LLMs"
-INSIGHT ..> LLMS
-QA ..> LLMS
+SEMANTIC ..> LLMS : "2 agents\nwith LLMs"
+INSIGHT ..> SEMANTIC : "Delegates"
 
 @enduml
