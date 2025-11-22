@@ -37,7 +37,7 @@ Use Skill tool with command: "documentation-style"
 
 ### Knowledge Management
 - **Graph Database**: Graphology + Level persistent storage
-- **Commands**: `ukb` (update), `vkb` (visualize)
+- **Commands**: `vkb` (visualize)
 - **Storage**: `.data/knowledge-graph/`
 
 ### Session Logging (LSL)

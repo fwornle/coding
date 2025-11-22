@@ -1,17 +1,17 @@
 @startuml ukb-cli-architecture
 !include _standard-style.puml
 
-title UKB-CLI System Architecture
+title UKB Unified CLI Architecture (v2.0)
 
 top to bottom direction
 
 skinparam componentStyle rectangle
 skinparam component {
-  BackgroundColor<<api>> #E8F4FD
-  BackgroundColor<<core>> #E8F5E8
-  BackgroundColor<<storage>> #FFF9E6
   BackgroundColor<<cli>> #FFE8F4
-  BackgroundColor<<util>> #F0F0F0
+  BackgroundColor<<commands>> #E8F4FD
+  BackgroundColor<<core>> #E8F5E8
+  BackgroundColor<<server>> #FFF9E6
+  BackgroundColor<<routing>> #FFE4E1
   FontSize 12
   FontColor #000000
 }
@@ -25,99 +25,109 @@ skinparam arrow {
   FontColor #000000
 }
 
-package "UKB-CLI System" {
-  
+package "UKB Unified CLI" {
+
   package "CLI Layer" <<cli>> {
-    [ukb-cli.js] as CLI
-    [Command Router] as Router
-    [Interactive Mode] as Interactive
-    [Output Formatter] as Formatter
-  }
-  
-  package "API Layer" <<api>> {
-    [KnowledgeAPI] as API
-    note right of API
-      Main orchestrator
-      Manages lifecycle
-      Coordinates operations
+    [UKBCli Class] as CLI
+    [Argument Parser] as Parser
+    [Help System] as Help
+
+    note right of CLI
+      Entry point: lib/ukb-unified/cli.js
+      Commands: default, status, checkpoint,
+      entity, relation
     end note
   }
-  
+
+  package "Command Handlers" <<commands>> {
+    [Entity Commands] as EntityCmd
+    [Relation Commands] as RelationCmd
+    [Status Command] as StatusCmd
+    [Checkpoint Command] as CheckpointCmd
+
+    note bottom of EntityCmd
+      Operations: list, add, remove,
+      search, update
+      Uses intelligent routing
+    end note
+  }
+
   package "Core Services" <<core>> {
-    [EntityManager] as Entities
-    [RelationManager] as Relations
-    [InsightProcessor] as Insights
-    [ValidationService] as Validation
-    
-    note bottom of Entities
-      CRUD operations
-      Search & filter
-      Significance ranking
-    end note
-    
-    note bottom of Relations
-      Graph operations
-      Path finding
-      Cluster detection
-    end note
-  }
-  
-  package "Storage Adapters" <<storage>> {
-    [FileStorageAdapter] as FileStorage
-    [Future: GraphDB] as GraphDB #line.dashed
-    [Future: CloudStorage] as CloudStorage #line.dashed
-    
-    interface "Storage Interface" as IStorage
-  }
-  
-  package "Utilities" <<util>> {
+    [VkbApiClient] as ApiClient
+    [TeamCheckpointManager] as Checkpoint
+    [GapAnalyzer] as GapAnalyzer
+    [WorkflowOrchestrator] as Orchestrator
     [ConfigManager] as Config
-    [Logger] as Logger
-    
-    note right of Config
-      Layered configuration
-      Environment overrides
-      Cross-platform paths
+
+    note right of ApiClient
+      HTTP client for VKB Server
+      Methods: getEntities, createEntity,
+      deleteEntity, createRelation, etc.
+    end note
+
+    note bottom of Checkpoint
+      Tracks last successful run
+      Enables incremental processing
     end note
   }
-  
-  package "External Systems" {
-    database "shared-memory.json" as JSONFile
-    cloud "MCP Memory" as MCP #line.dashed
-    component "Memory Visualizer" as Visualizer #line.dashed
+
+  package "Intelligent Routing" <<routing>> {
+    [Server Availability Check] as ServerCheck
+    [Route Decision Logic] as RouteDecision
+
+    note bottom of RouteDecision
+      Smart routing strategy:
+      1. Check if VKB server running
+      2. If yes: Use HTTP API (lock-free)
+      3. If no: Direct database access
+    end note
   }
 }
 
-' Relationships
-CLI --> Router : commands
-Router --> API : operations
-Interactive --> API : guided workflows
-Formatter <-- API : results
+package "VKB Server" <<server>> {
+  [REST API Endpoints] as API
+  [Health Check] as Health
 
-API --> Entities : entity ops
-API --> Relations : relation ops
-API --> Insights : processing
-API --> Config : configuration
-API --> Logger : logging
+  database "GraphDB Storage" as DB {
+    [Graphology Graph] as Graph
+    [LevelDB Persistence] as LevelDB
+  }
 
-Entities --> Validation : validate
-Relations --> Validation : validate
-Insights --> Entities : create/update
-Insights --> Relations : create/update
+  note right of API
+    Endpoints: /api/entities,
+    /api/relations, /api/health
+    Port: 8080 (default)
+  end note
+}
 
-Entities --> IStorage : persist
-Relations --> IStorage : persist
-IStorage <|.. FileStorage : implements
-IStorage <|.. GraphDB : implements
-IStorage <|.. CloudStorage : implements
-
-FileStorage --> JSONFile : read/write
-API ..> MCP : sync
-API ..> Visualizer : export
-
-' User interaction
 actor User
-User --> CLI : commands
-User --> Interactive : prompts
+
+User --> CLI : Run ukb command
+CLI --> Parser : Parse arguments
+Parser --> EntityCmd : Entity operations
+Parser --> RelationCmd : Relation operations
+Parser --> StatusCmd : Status query
+Parser --> CheckpointCmd : Checkpoint management
+
+EntityCmd --> ApiClient : Use API client
+RelationCmd --> ApiClient : Use API client
+StatusCmd --> ApiClient : Query status
+CheckpointCmd --> Checkpoint : Manage checkpoints
+
+EntityCmd --> RouteDecision : Route request
+RelationCmd --> RouteDecision : Route request
+
+ApiClient --> ServerCheck : Check availability
+ServerCheck --> RouteDecision : Server status
+
+RouteDecision --> API : When server running
+RouteDecision --> DB : When server stopped
+
+API --> DB : Persist/query data
+Graph --> LevelDB : Serialize graph
+
+Checkpoint --> Config : Load config
+GapAnalyzer --> Checkpoint : Read last run
+Orchestrator --> GapAnalyzer : Identify gaps
 
 @enduml

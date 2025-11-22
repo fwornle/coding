@@ -2,6 +2,8 @@
 
 Complete guide to installing, configuring, and using the unified semantic analysis & knowledge management system.
 
+> **⚠️ IMPORTANT:** The `ukb` command-line tool has been removed. Knowledge base updates are now triggered exclusively through the MCP semantic-analysis server workflow (accessible only via Claude Code agents with MCP access). This prevents confusion caused by the shell command not having access to the MCP server.
+
 ## Prerequisites
 
 - **Git** - Version control
@@ -53,7 +55,6 @@ source ~/.bashrc  # or ~/.zshrc on macOS
 
 1. **Core Commands**
    - `coding` - Launch Claude Code with all integrations
-   - `ukb` - Update Knowledge Base
    - `vkb` - View Knowledge Base (web visualization)
 
 2. **Integration Components**

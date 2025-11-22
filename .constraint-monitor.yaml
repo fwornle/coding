@@ -217,7 +217,18 @@ constraints:
     applies_to: file_path  # Check file path only - allows .puml files
     suggestion: "STOP: Invoke the documentation-style skill first: Use Skill tool with parameter skill='documentation-style' to load proper workflow and standards"
     whitelist:
-      - "*.puml"
+      - ".constraint-monitor.yaml"
+  - id: plantuml-modification-requires-skill
+    group: plantuml
+    pattern: "@startuml|!include.*\\.puml"
+    message: "CRITICAL: Modifying PlantUML files requires documentation-style skill. You MUST invoke Skill tool with skill='documentation-style' FIRST"
+    severity: error
+    enabled: true
+    applies_to: content
+    tool_filter: ["Edit", "Write", "mcp__serena__replace_symbol_body", "mcp__serena__insert_after_symbol", "mcp__serena__insert_before_symbol"]
+    file_pattern: "\\.puml$"
+    suggestion: "STOP: Invoke the documentation-style skill first: Use Skill tool with parameter skill='documentation-style' to load PlantUML workflow, validation, and PNG generation standards"
+    whitelist:
       - ".constraint-monitor.yaml"
   - id: react-hooks-deps
     group: framework_specific

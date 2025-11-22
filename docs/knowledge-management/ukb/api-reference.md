@@ -1,55 +1,91 @@
-# UKB-CLI API Reference
+# UKB Unified CLI API Reference (v2.0)
+
+Complete API documentation for lib/ukb-unified - the current implementation with lock-free architecture and VKB Server integration.
 
 ## Table of Contents
 1. [CLI Commands](#cli-commands)
-2. [Programmatic API](#programmatic-api)
-3. [Configuration](#configuration)
-4. [Data Types](#data-types)
+2. [VkbApiClient API](#vkbapiclient-api)
+3. [Data Types](#data-types)
+4. [Configuration](#configuration)
 5. [Error Handling](#error-handling)
 
 ## CLI Commands
 
-### Global Options
+### Global Usage
 
 ```bash
-ukb-cli [options] <command>
-
-Options:
-  -V, --version     output the version number
-  -h, --help        display help for command
+ukb [command] [options]
 ```
 
 ### Commands Overview
 
 | Command | Description |
 |---------|-------------|
-| `status` | Show knowledge base status |
-| `entity` | Manage entities |
-| `relation` | Manage relations |
-| `insight` | Process insights |
-| `import` | Import data from JSON |
-| `export` | Export data to JSON |
-| `interactive` | Start interactive mode |
+| (default) | Run incremental update workflow |
+| `status` | Show knowledge base and server status |
+| `checkpoint` | Manage project checkpoints |
+| `entity` | Manage entities (list, add, remove, search) |
+| `relation` | Manage relations (list, add, remove) |
 
-### `ukb-cli status`
+### Default Command (Incremental Update)
 
-Display current knowledge base statistics and configuration.
+Run intelligent incremental update based on checkpoints.
 
 ```bash
-ukb-cli status
+ukb
+```
+
+**Workflow:**
+1. Load last checkpoint for current project
+2. Analyze gaps since last run (GapAnalyzer)
+3. Process missing items via VKB Server API
+4. Save new checkpoint with timestamp
+
+**Output:**
+```
+✅ Incremental update complete
+   Processed 5 items
+   Next run will continue from: 2024-11-22T12:00:00.000Z
+```
+
+### `ukb status`
+
+Display current knowledge base and VKB Server status.
+
+```bash
+ukb status
 ```
 
 **Output:**
 ```
-Knowledge base status:
-Storage: .data/knowledge-graph (GraphDB + LevelDB)
-Entities: 234
-Relations: 567
-Last Updated: 2024-06-19T10:30:00Z
-Version: 2.0.0
+VKB Status:
+  Server: Running (port 8080)
+  Entities: 234
+  Relations: 567
+  Last update: 2024-11-22T12:00:00.000Z
+  Projects tracked: 3
 ```
 
-### `ukb-cli entity`
+### `ukb checkpoint`
+
+Manage project checkpoints for incremental processing.
+
+```bash
+# View current checkpoint
+ukb checkpoint
+
+# Clear checkpoint (forces full reprocess next run)
+ukb checkpoint clear
+```
+
+**Output:**
+```
+Checkpoint for project 'coding':
+  Last run: 2024-11-22T12:00:00.000Z
+  Processed: 234 items
+```
+
+### `ukb entity`
 
 Manage entities in the knowledge base.
 
@@ -58,24 +94,20 @@ Manage entities in the knowledge base.
 List all entities with optional filters.
 
 ```bash
-ukb-cli entity list [options]
-
-Options:
-  -t, --type <type>              Filter by entity type
-  -s, --min-significance <n>     Minimum significance score (1-10)
-  -v, --verbose                  Show detailed information
+ukb entity list
+ukb entity list --type TechnicalPattern
+ukb entity list --min-significance 8
 ```
 
-**Examples:**
-```bash
-# List all entities
-ukb-cli entity list
-
-# List only TechnicalPattern entities
-ukb-cli entity list --type TechnicalPattern
-
-# List high-significance entities with details
-ukb-cli entity list --min-significance 8 --verbose
+**Output:**
+```
+Entities (234 total):
+┌────────────────────┬─────────────────┬──────────────┐
+│ Name               │ Type            │ Significance │
+├────────────────────┼─────────────────┼──────────────┤
+│ CachingPattern     │ TechnicalPattern│ 8            │
+│ ErrorHandling      │ Solution        │ 9            │
+└────────────────────┴─────────────────┴──────────────┘
 ```
 
 #### `entity add`
@@ -83,24 +115,21 @@ ukb-cli entity list --min-significance 8 --verbose
 Add a new entity to the knowledge base.
 
 ```bash
-ukb-cli entity add [options]
-
-Options:
-  -n, --name <name>              Entity name (required in non-interactive)
-  -t, --type <type>              Entity type
-  -s, --significance <n>         Significance score (1-10)
-  -o, --observation <text>       Initial observation
-  -i, --interactive              Interactive mode
+ukb entity add "CachingPattern" "TechnicalPattern" 8
+ukb entity add "ErrorHandling" "Solution" 9 --observation "Implement try-catch"
 ```
 
-**Examples:**
-```bash
-# Interactive mode
-ukb-cli entity add --interactive
+**Arguments:**
+1. Entity name (required)
+2. Entity type (required)
+3. Significance score 1-10 (required)
 
-# Direct creation
-ukb-cli entity add -n "CachingPattern" -t "TechnicalPattern" -s 8 \
-  -o "Implement Redis caching for API responses"
+**Options:**
+- `--observation <text>`: Add initial observation
+
+**Output:**
+```
+✅ Entity created: CachingPattern
 ```
 
 #### `entity remove`
@@ -108,11 +137,12 @@ ukb-cli entity add -n "CachingPattern" -t "TechnicalPattern" -s 8 \
 Remove an entity from the knowledge base.
 
 ```bash
-ukb-cli entity remove [options]
+ukb entity remove "OldPattern"
+```
 
-Options:
-  -n, --name <name>              Entity name
-  -i, --interactive              Interactive selection
+**Output:**
+```
+✅ Entity removed: OldPattern
 ```
 
 #### `entity search`
@@ -120,22 +150,18 @@ Options:
 Search entities by keyword.
 
 ```bash
-ukb-cli entity search <query> [options]
-
-Options:
-  -v, --verbose                  Show detailed information
+ukb entity search "authentication"
 ```
 
-**Examples:**
-```bash
-# Search for caching-related entities
-ukb-cli entity search "cache"
-
-# Detailed search results
-ukb-cli entity search "error handling" --verbose
+**Output:**
+```
+Found 3 entities matching 'authentication':
+- UserAuthentication (TechnicalPattern, significance: 9)
+- AuthErrorHandling (Solution, significance: 8)
+- JWTValidation (TechnicalPattern, significance: 8)
 ```
 
-### `ukb-cli relation`
+### `ukb relation`
 
 Manage relationships between entities.
 
@@ -144,24 +170,20 @@ Manage relationships between entities.
 List all relations with optional filters.
 
 ```bash
-ukb-cli relation list [options]
-
-Options:
-  -f, --from <entity>            Filter by source entity
-  -t, --to <entity>              Filter by target entity
-  -r, --type <type>              Filter by relation type
+ukb relation list
+ukb relation list --from "Solution"
+ukb relation list --type "solves"
 ```
 
-**Examples:**
-```bash
-# List all relations
-ukb-cli relation list
-
-# List relations from specific entity
-ukb-cli relation list --from "ReactHooksPattern"
-
-# List all "implements" relations
-ukb-cli relation list --type implements
+**Output:**
+```
+Relations (567 total):
+┌─────────────┬────────────┬──────────┬──────────────┐
+│ From        │ To         │ Type     │ Significance │
+├─────────────┼────────────┼──────────┼──────────────┤
+│ Solution    │ Problem    │ solves   │ 9            │
+│ PatternA    │ PatternB   │ uses     │ 8            │
+└─────────────┴────────────┴──────────┴──────────────┘
 ```
 
 #### `relation add`
@@ -169,447 +191,228 @@ ukb-cli relation list --type implements
 Create a new relation between entities.
 
 ```bash
-ukb-cli relation add [options]
-
-Options:
-  -f, --from <entity>            Source entity
-  -t, --to <entity>              Target entity
-  -r, --type <type>              Relation type
-  -s, --significance <n>         Significance score (1-10)
-  -i, --interactive              Interactive mode
+ukb relation add "Solution" "Problem" "solves" 9
 ```
 
-**Examples:**
-```bash
-# Interactive mode
-ukb-cli relation add --interactive
+**Arguments:**
+1. From entity name (required)
+2. To entity name (required)
+3. Relation type (required)
+4. Significance score 1-10 (required)
 
-# Direct creation
-ukb-cli relation add -f "Solution" -t "Problem" -r "solves" -s 9
+**Output:**
+```
+✅ Relation created: Solution → Problem (solves)
 ```
 
-### `ukb-cli insight`
+#### `relation remove`
 
-Process insights to create entities and relations.
+Delete a relation between entities.
 
 ```bash
-ukb-cli insight [options]
-
-Options:
-  -i, --interactive              Interactive mode (recommended)
+ukb relation remove "EntityA" "EntityB"
 ```
 
-**Interactive Flow:**
-1. Select insight type (problem-solution, technical-pattern, etc.)
-2. Provide insight details
-3. System creates entities and relations automatically
-
-### `ukb-cli import/export`
-
-Import or export knowledge base data.
-
-```bash
-# Export to file
-ukb-cli export <file>
-
-# Import from file
-ukb-cli import <file> [options]
-
-Options:
-  -m, --merge                    Merge with existing data
+**Output:**
+```
+✅ Relation removed: EntityA → EntityB
 ```
 
-**Examples:**
-```bash
-# Backup current knowledge base
-ukb-cli export backup-2024-06-19.json
+## VkbApiClient API
 
-# Import and merge with existing data
-ukb-cli import team-patterns.json --merge
-```
+HTTP client for communicating with VKB Server.
 
-### `ukb-cli interactive`
+![UKB Class Diagram](../images/ukb-cli-class-diagram.png)
 
-Start interactive mode for guided operations.
-
-```bash
-ukb-cli interactive
-```
-
-**Features:**
-- Menu-driven interface
-- Guided workflows
-- Input validation
-- Contextual help
-
-## Programmatic API
-
-![UKB-CLI Class Diagram](../images/ukb-cli-class-diagram.png)
-
-The class diagram above shows the complete API structure including the KnowledgeAPI main entry point, EntityManager, RelationManager, InsightProcessor, and all supporting services. **Note**: This represents the designed API architecture; the current implementation may differ in some details.
-
-### KnowledgeAPI Class
-
-Main entry point for programmatic access.
+### Constructor
 
 ```javascript
-import KnowledgeAPI from 'knowledge-api';
+const VkbApiClient = require('lib/ukb-unified/core/VkbApiClient');
 
-const api = new KnowledgeAPI(options);
+const client = new VkbApiClient('http://localhost:8080', {
+  timeout: 5000,
+  logger: console
+});
 ```
 
-#### Constructor Options
+**Parameters:**
+- `baseUrl` (string): VKB Server URL (default: http://localhost:8080)
+- `options` (object):
+  - `timeout` (number): Request timeout in ms (default: 5000)
+  - `logger` (object): Logger instance (default: console)
 
-```typescript
-interface KnowledgeAPIOptions {
-  storage?: {
-    backend?: 'file';
-    path?: string;
-  };
-  logging?: {
-    level?: 'error' | 'warn' | 'info' | 'debug';
-    console?: boolean;
-    file?: boolean;
-    filePath?: string;
-  };
-  integrations?: {
-    mcp?: { enabled: boolean; auto_sync: boolean };
-    visualizer?: { enabled: boolean; path: string };
-  };
-}
-```
+### Server Availability
 
-#### Methods
+#### `isServerAvailable(): Promise<boolean>`
 
-##### `initialize(): Promise<void>`
-
-Initialize the API and storage backend.
+Check if VKB Server is running.
 
 ```javascript
-await api.initialize();
+const isAvailable = await client.isServerAvailable();
+// Returns: true or false
 ```
 
-##### `getStatus(): Promise<Status>`
+**HTTP Request:**
+```
+GET /api/health
+```
 
-Get current knowledge base status.
+**Response:**
+```json
+{"status": "ok"}
+```
+
+### Entity Operations
+
+#### `getEntities(params): Promise<Entity[]>`
+
+Retrieve all entities with optional filtering.
 
 ```javascript
-const status = await api.getStatus();
-console.log(`Entities: ${status.stats.entities}`);
+const entities = await client.getEntities({
+  type: 'TechnicalPattern',
+  minSignificance: 8,
+  count: true
+});
 ```
 
-##### `close(): Promise<void>`
-
-Close the API and save pending changes.
-
-```javascript
-await api.close();
+**HTTP Request:**
+```
+GET /api/entities?type=TechnicalPattern&minSignificance=8&count=true
 ```
 
-### EntityManager
-
-Accessed via `api.entities`.
-
-#### Methods
-
-##### `create(entityData): Promise<Entity>`
+#### `createEntity(entity, params): Promise<Entity>`
 
 Create a new entity.
 
 ```javascript
-const entity = await api.entities.create({
-  name: 'MyPattern',
+const entity = await client.createEntity({
+  name: 'CachingPattern',
   entityType: 'TechnicalPattern',
-  observations: ['Pattern implementation details'],
-  significance: 8
-});
+  significance: 8,
+  observations: ['Implement Redis caching']
+}, {save: true});
 ```
 
-##### `findByName(name): Promise<Entity|undefined>`
+**HTTP Request:**
+```
+POST /api/entities
+Content-Type: application/json
 
-Find entity by name.
-
-```javascript
-const entity = await api.entities.findByName('MyPattern');
+{
+  "name": "CachingPattern",
+  "entityType": "TechnicalPattern",
+  "significance": 8,
+  "observations": ["Implement Redis caching"]
+}
 ```
 
-##### `findById(id): Promise<Entity|undefined>`
-
-Find entity by ID.
-
-```javascript
-const entity = await api.entities.findById('uuid-here');
-```
-
-##### `getAll(filters): Promise<Entity[]>`
-
-Get all entities with optional filters.
-
-```javascript
-// Get all entities
-const all = await api.entities.getAll();
-
-// Filter by type
-const patterns = await api.entities.getAll({ 
-  entityType: 'TechnicalPattern' 
-});
-
-// Filter by significance
-const important = await api.entities.getAll({ 
-  minSignificance: 8 
-});
-
-// Search entities
-const results = await api.entities.getAll({ 
-  search: 'caching' 
-});
-```
-
-##### `update(nameOrId, updates): Promise<Entity>`
+#### `updateEntity(name, updates, params): Promise<Entity>`
 
 Update an existing entity.
 
 ```javascript
-const updated = await api.entities.update('MyPattern', {
+const updated = await client.updateEntity('CachingPattern', {
   significance: 9,
-  observations: [...newObservations]
-});
+  observations: ['Updated implementation']
+}, {save: true});
 ```
 
-##### `delete(nameOrId): Promise<boolean>`
+**HTTP Request:**
+```
+PUT /api/entities/CachingPattern
+Content-Type: application/json
+
+{
+  "significance": 9,
+  "observations": ["Updated implementation"]
+}
+```
+
+#### `deleteEntity(name, params): Promise<void>`
 
 Delete an entity.
 
 ```javascript
-const success = await api.entities.delete('OldPattern');
+await client.deleteEntity('OldPattern', {save: true});
 ```
 
-##### `addObservation(nameOrId, observation): Promise<Observation>`
-
-Add observation to entity.
-
-```javascript
-const obs = await api.entities.addObservation('MyPattern', {
-  type: 'insight',
-  content: 'New implementation discovered',
-  tags: ['performance', 'optimization']
-});
+**HTTP Request:**
+```
+DELETE /api/entities/OldPattern?save=true
 ```
 
-##### `search(query, options): Promise<Entity[]>`
+#### `searchEntities(query, params): Promise<Entity[]>`
 
 Search entities by keyword.
 
 ```javascript
-const results = await api.entities.search('error handling');
+const results = await client.searchEntities('authentication', {
+  limit: 10
+});
 ```
 
-### RelationManager
+**HTTP Request:**
+```
+GET /api/entities/search?q=authentication&limit=10
+```
 
-Accessed via `api.relations`.
+### Relation Operations
 
-#### Methods
+#### `getRelations(params): Promise<Relation[]>`
 
-##### `create(relationData): Promise<Relation>`
+Retrieve all relations with optional filtering.
+
+```javascript
+const relations = await client.getRelations({
+  from: 'Solution',
+  type: 'solves'
+});
+```
+
+**HTTP Request:**
+```
+GET /api/relations?from=Solution&type=solves
+```
+
+#### `createRelation(relation, params): Promise<Relation>`
 
 Create a new relation.
 
 ```javascript
-const relation = await api.relations.create({
+const relation = await client.createRelation({
   from: 'Solution',
   to: 'Problem',
   relationType: 'solves',
-  significance: 8
-});
+  significance: 9
+}, {save: true});
 ```
 
-##### `findRelation(from, to, type?): Promise<Relation|undefined>`
-
-Find specific relation.
-
-```javascript
-const relation = await api.relations.findRelation(
-  'Solution', 
-  'Problem', 
-  'solves'
-);
+**HTTP Request:**
 ```
+POST /api/relations
+Content-Type: application/json
 
-##### `getAll(filters): Promise<Relation[]>`
-
-Get all relations with filters.
-
-```javascript
-// Get all relations
-const all = await api.relations.getAll();
-
-// Filter by entity
-const entityRelations = await api.relations.getAll({ 
-  entity: 'MyPattern' 
-});
-
-// Filter by type
-const implementations = await api.relations.getAll({ 
-  relationType: 'implements' 
-});
-```
-
-##### `getForEntity(entityName, direction): Promise<Relation[]>`
-
-Get relations for specific entity.
-
-```javascript
-// Both directions
-const all = await api.relations.getForEntity('MyPattern', 'both');
-
-// Only outgoing
-const outgoing = await api.relations.getForEntity('MyPattern', 'outgoing');
-
-// Only incoming
-const incoming = await api.relations.getForEntity('MyPattern', 'incoming');
-```
-
-##### `getConnectedEntities(entityName, maxDepth): Promise<Connection[]>`
-
-Get transitively connected entities.
-
-```javascript
-const connected = await api.relations.getConnectedEntities('MyPattern', 3);
-```
-
-##### `findPath(from, to, maxDepth): Promise<string[]|null>`
-
-Find shortest path between entities.
-
-```javascript
-const path = await api.relations.findPath('Problem', 'Solution', 5);
-// Returns: ['Problem', 'Intermediate', 'Solution'] or null
-```
-
-### InsightProcessor
-
-Accessed via `api.insights`.
-
-#### Methods
-
-##### `processInsight(insightData): Promise<ProcessResult>`
-
-Process an insight to create entities and relations.
-
-```javascript
-const result = await api.insights.processInsight({
-  type: 'problem-solution',
-  problem: 'Memory leak in React components',
-  solution: 'Implement cleanup in useEffect',
-  context: { project: 'webapp' }
-});
-
-console.log(`Created ${result.entities.length} entities`);
-```
-
-##### `analyzeConversation(text, context): Promise<Insight[]>`
-
-Extract insights from conversation text.
-
-```javascript
-const insights = await api.insights.analyzeConversation(
-  conversationText,
-  { source: 'claude', project: 'myapp' }
-);
-```
-
-##### `extractPatterns(options): Promise<Pattern[]>`
-
-Extract high-value patterns.
-
-```javascript
-const patterns = await api.insights.extractPatterns({
-  minSignificance: 8,
-  maxResults: 10
-});
-```
-
-### ValidationService
-
-Accessed via `api.validation`.
-
-#### Methods
-
-##### `validateEntity(data): Promise<ValidationResult>`
-
-Validate entity data.
-
-```javascript
-const result = await api.validation.validateEntity({
-  name: 'Test',
-  entityType: 'Pattern'
-});
-
-if (!result.valid) {
-  console.error(result.errors);
+{
+  "from": "Solution",
+  "to": "Problem",
+  "relationType": "solves",
+  "significance": 9
 }
 ```
 
-#### Constants
+#### `deleteRelation(from, to, params): Promise<void>`
+
+Delete a relation.
 
 ```javascript
-// Available entity types
-ValidationService.ENTITY_TYPES
-
-// Available relation types  
-ValidationService.RELATION_TYPES
-
-// Validation patterns
-ValidationService.PATTERNS
+await client.deleteRelation('EntityA', 'EntityB', {save: true});
 ```
 
-## Configuration
-
-### Configuration Schema
-
-```typescript
-interface Configuration {
-  storage: {
-    backend: 'file';
-    path: string;
-  };
-  integrations: {
-    mcp: {
-      enabled: boolean;
-      auto_sync: boolean;
-    };
-    visualizer: {
-      enabled: boolean;
-      path: string;
-      auto_sync: boolean;
-    };
-  };
-  analysis: {
-    auto_commit_analysis: boolean;
-    significance_threshold: number;
-    max_commits_per_session: number;
-  };
-  logging: {
-    level: 'error' | 'warn' | 'info' | 'debug';
-    console: boolean;
-    file: boolean;
-    filePath?: string;
-  };
-  validation: {
-    strict_mode: boolean;
-    auto_fix: boolean;
-  };
-}
+**HTTP Request:**
 ```
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `KNOWLEDGE_API_STORAGE_PATH` | GraphDB storage path | `.data/knowledge-graph` |
-| `KNOWLEDGE_API_LOG_LEVEL` | Logging level | `info` |
-| `KNOWLEDGE_API_GRAPHDB_ENABLED` | Enable GraphDB storage | `true` |
-| `KNOWLEDGE_API_SIGNIFICANCE_THRESHOLD` | Default significance | `7` |
+DELETE /api/relations?from=EntityA&to=EntityB&save=true
+```
 
 ## Data Types
 
@@ -617,14 +420,12 @@ interface Configuration {
 
 ```typescript
 interface Entity {
-  id: string;
-  name: string;
-  entityType: EntityType;
-  observations: Observation[];
-  significance: number;        // 1-10
-  created: string;            // ISO timestamp
-  updated: string;            // ISO timestamp
-  metadata: Record<string, any>;
+  name: string;                  // Unique entity name
+  entityType: string;            // Type: TechnicalPattern, Solution, etc.
+  observations: string[];        // Array of observations
+  significance: number;          // 1-10 significance score
+  created: string;               // ISO timestamp
+  updated: string;               // ISO timestamp
 }
 ```
 
@@ -632,62 +433,75 @@ interface Entity {
 
 ```typescript
 interface Relation {
-  id: string;
-  from: string;               // Entity name
-  to: string;                 // Entity name
-  relationType: RelationType;
-  significance: number;       // 1-10
-  created: string;           // ISO timestamp
-  metadata: Record<string, any>;
+  from: string;                  // Source entity name
+  to: string;                    // Target entity name
+  relationType: string;          // Type: solves, uses, implements, etc.
+  significance: number;          // 1-10 significance score
+  created: string;               // ISO timestamp
 }
 ```
 
-### Observation
+### Checkpoint
 
 ```typescript
-interface Observation {
-  type: 'problem' | 'solution' | 'insight' | 'metric' | 'general';
-  content: string;
-  date: string;              // ISO timestamp
-  tags?: string[];
-  metadata?: Record<string, any>;
+interface Checkpoint {
+  projectKey: string;            // Project identifier
+  lastRun: string;               // ISO timestamp
+  processedCount: number;        // Number of items processed
+  metadata: object;              // Additional metadata
 }
 ```
 
-### Entity Types
+### Query Parameters
 
 ```typescript
-type EntityType = 
-  | 'WorkflowPattern'
-  | 'TechnicalPattern'
-  | 'ArchitecturePattern'
-  | 'Problem'
-  | 'Solution'
-  | 'Insight'
-  | 'Tool'
-  | 'Library'
-  | 'Framework'
-  | 'Best Practice'
-  | 'Anti-Pattern'
-  | string;  // Custom types allowed
+interface QueryParams {
+  type?: string;                 // Filter by entity/relation type
+  minSignificance?: number;      // Minimum significance threshold
+  count?: boolean;               // Return count instead of items
+  limit?: number;                // Maximum results
+  offset?: number;               // Pagination offset
+}
 ```
 
-### Relation Types
+### Save Parameters
 
 ```typescript
-type RelationType = 
-  | 'implements'
-  | 'extends'
-  | 'uses'
-  | 'requires'
-  | 'depends_on'
-  | 'related_to'
-  | 'solves'
-  | 'causes'
-  | 'prevents'
-  | 'improves'
-  | 'replaces'
-  | string;  // Custom types allowed
+interface SaveParams {
+  save?: boolean;                // Whether to persist immediately
+  skipValidation?: boolean;      // Skip validation checks
+}
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VKB_SERVER_URL` | VKB Server base URL | `http://localhost:8080` |
+| `VKB_TIMEOUT` | Request timeout (ms) | `5000` |
+| `UKB_PROJECT_KEY` | Project identifier | Derived from cwd |
+| `UKB_CHECKPOINT_DIR` | Checkpoint storage | `.data/checkpoints` |
+
+### Configuration File
+
+Location: `.ukb-config.json` (project root)
+
+```json
+{
+  "server": {
+    "url": "http://localhost:8080",
+    "timeout": 5000
+  },
+  "checkpoint": {
+    "enabled": true,
+    "directory": ".data/checkpoints"
+  },
+  "logging": {
+    "level": "info"
+  }
+}
 ```
 
 ## Error Handling
@@ -695,56 +509,91 @@ type RelationType =
 ### Error Types
 
 ```javascript
-// Base error class
-class KnowledgeAPIError extends Error {
-  constructor(message, code) {
-    super(message);
-    this.code = code;
-  }
+// Server not available
+{
+  error: 'SERVER_UNAVAILABLE',
+  message: 'VKB Server not responding',
+  suggestion: 'Start server with: vkb server start'
 }
 
-// Specific error types
-class ValidationError extends KnowledgeAPIError {}
-class NotFoundError extends KnowledgeAPIError {}
-class DuplicateError extends KnowledgeAPIError {}
-class StorageError extends KnowledgeAPIError {}
+// Entity not found
+{
+  error: 'ENTITY_NOT_FOUND',
+  message: 'Entity "MyPattern" not found'
+}
+
+// Duplicate entity
+{
+  error: 'DUPLICATE_ENTITY',
+  message: 'Entity "MyPattern" already exists'
+}
+
+// Validation failed
+{
+  error: 'VALIDATION_ERROR',
+  message: 'Invalid entity data',
+  details: ['Significance must be 1-10']
+}
 ```
 
 ### Error Codes
 
 | Code | Description |
 |------|-------------|
-| `VALIDATION_FAILED` | Input validation error |
+| `SERVER_UNAVAILABLE` | VKB Server not running or unreachable |
 | `ENTITY_NOT_FOUND` | Entity lookup failed |
 | `RELATION_NOT_FOUND` | Relation lookup failed |
 | `DUPLICATE_ENTITY` | Entity name already exists |
 | `DUPLICATE_RELATION` | Relation already exists |
-| `STORAGE_ERROR` | Storage operation failed |
-| `NOT_INITIALIZED` | API not initialized |
+| `VALIDATION_ERROR` | Input validation failed |
+| `TIMEOUT_ERROR` | Request exceeded timeout |
 
 ### Error Handling Examples
 
 ```javascript
 try {
-  const entity = await api.entities.create({
+  const entity = await client.createEntity({
     name: 'Test',
-    entityType: 'InvalidType'
+    entityType: 'InvalidType',
+    significance: 15  // Invalid
   });
 } catch (error) {
-  if (error instanceof ValidationError) {
-    console.error('Validation failed:', error.message);
-  } else if (error instanceof DuplicateError) {
-    console.error('Entity already exists');
+  if (error.code === 'VALIDATION_ERROR') {
+    console.error('Validation failed:', error.details);
+  } else if (error.code === 'SERVER_UNAVAILABLE') {
+    console.error('Server not running:', error.suggestion);
   } else {
-    console.error('Unexpected error:', error);
+    console.error('Unexpected error:', error.message);
   }
 }
 ```
 
-### Best Practices
+## Architecture Diagrams
 
-1. **Always handle errors**: Wrap API calls in try-catch
-2. **Check error types**: Use instanceof for specific handling
-3. **Log errors**: Use the Logger service for debugging
-4. **Validate input**: Use ValidationService before operations
-5. **Graceful degradation**: Provide fallbacks for failures
+### System Architecture
+![UKB Architecture](../images/ukb-cli-architecture.png)
+
+### Data Flow
+![UKB Data Flow](../images/ukb-cli-data-flow.png)
+
+### Entity Creation Sequence
+![Entity Creation](../images/ukb-cli-sequence-entity-creation.png)
+
+### Incremental Workflow
+![Incremental Workflow](../images/ukb-cli-sequence-insight-processing.png)
+
+## Best Practices
+
+1. **Always check server availability** before operations
+2. **Use checkpoints** for incremental processing
+3. **Handle errors gracefully** with appropriate fallbacks
+4. **Validate input** before API calls
+5. **Use save parameter** to control persistence
+6. **Monitor checkpoint gaps** to track processing status
+
+## See Also
+
+- **[README](./README.md)** - Overview and quick start
+- **[User Guide](./user-guide.md)** - Detailed usage examples
+- **[Lock-Free Architecture](../ukb-lock-free-architecture.md)** - Technical details
+- **[VKB Server API](../../vkb-server/README.md)** - Server documentation

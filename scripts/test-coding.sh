@@ -333,41 +333,10 @@ fi
 # PHASE 3: KNOWLEDGE MANAGEMENT TOOLS
 # =============================================================================
 
-print_section "PHASE 3: Knowledge Management Tools (UKB/VKB)"
+print_section "PHASE 3: Knowledge Management Tools (VKB)"
 
-print_test "UKB (Update Knowledge Base) tool"
-
-print_check "UKB command availability"
-if command_exists ukb; then
-    print_pass "ukb command found"
-    UKB_LOCATION=$(which ukb)
-    print_info "Location: $UKB_LOCATION"
-else
-    print_fail "ukb command not found"
-    print_repair "Running installation to fix UKB..."
-    cd "$CODING_ROOT" && ./install.sh
-    print_fixed "Installation completed"
-fi
-
-print_check "UKB functionality test"
-cd "$CODING_ROOT"
-if ukb --help >/dev/null 2>&1; then
-    print_pass "UKB responds to --help"
-else
-    print_fail "UKB --help failed"
-fi
-
-print_check "UKB test pattern creation"
-# Try auto mode instead of interactive for testing
-if ukb --auto >/dev/null 2>&1; then
-    print_pass "UKB auto mode functional"
-elif [ -d "$CODING_ROOT/.data/knowledge-graph" ]; then
-    print_pass "UKB working (GraphDB knowledge base initialized)"
-else
-    print_warning "UKB test skipped - GraphDB not initialized"
-    print_info "Knowledge is managed via GraphDB at .data/knowledge-graph/"
-    print_info "Try manually: ukb --interactive"
-fi
+print_info "UKB command removed - use MCP semantic-analysis workflow instead"
+print_info "Knowledge base updates are now triggered via MCP server only"
 
 print_test "VKB (View Knowledge Base) tool"
 
@@ -448,15 +417,7 @@ else
     print_info "Will be created when first entity is added"
 fi
 
-print_check "Team-aware UKB functionality"
-if command_exists ukb && [ -n "$CODING_TEAM" ]; then
-    if ukb --status --team "$CODING_TEAM" >/dev/null 2>&1; then
-        print_pass "UKB team functionality working"
-    else
-        print_warning "UKB team functionality may have issues"
-        print_info "Try: ukb --status --team $CODING_TEAM"
-    fi
-fi
+# UKB command removed - use MCP semantic-analysis workflow
 
 print_test "Continuous Learning Knowledge System Databases"
 
@@ -1921,16 +1882,7 @@ if [ "$KB_FILES_FOUND" = false ]; then
     print_info "Export files at .data/knowledge-export/ will be tracked in git when created"
 fi
 
-# Test UKB with actual pattern creation
-print_check "UKB end-to-end test"
-cd "$CODING_ROOT"
-TEST_RESULT=$(echo -e "Integration test problem\nSystem working solution\nTesting approach\nSystem integration\nGeneral testing\nbash,testing\n\n\n1" | ukb --interactive 2>&1 || echo "FAILED")
-if echo "$TEST_RESULT" | grep -q "successfully\|created\|updated\|Entity"; then
-    print_pass "UKB end-to-end test successful"
-else
-    print_warning "UKB end-to-end test needs manual verification"
-    print_info "Try: ukb --interactive"
-fi
+# UKB command removed - use MCP semantic-analysis workflow instead
 
 # Test VSCode Extension Bridge integration
 print_check "VSCode Extension Bridge integration test"
@@ -2084,7 +2036,6 @@ else
 fi
 
 echo -e "\n${BOLD}Quick Start Commands:${NC}"
-echo -e "  ${CYAN}ukb${NC}                    # Update knowledge base"
 echo -e "  ${CYAN}vkb${NC}                    # View knowledge graph (standalone)"
 echo -e "  ${CYAN}vkb fg${NC}                 # View knowledge graph (foreground/debug mode)"
 echo -e "  ${CYAN}claude-mcp${NC}             # Start Claude with MCP (if available)"

@@ -143,7 +143,7 @@ fi
 
 # Remove logs
 rm -f "$CODING_REPO/install.log" 2>/dev/null || true
-rm -f /tmp/ukb-*.log 2>/dev/null || true
+# ukb removed - no temp logs to clean
 rm -f /tmp/vkb-server.* 2>/dev/null || true
 
 # Remove MCP configuration files

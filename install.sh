@@ -883,16 +883,8 @@ create_command_wrappers() {
     local bin_dir="$CODING_REPO/bin"
     mkdir -p "$bin_dir"
     
-    # Create ukb wrapper
-    cat > "$bin_dir/ukb" << 'EOF'
-#!/bin/bash
-# Universal ukb wrapper
-CODING_REPO="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
-export CODING_REPO
-exec "$CODING_REPO/knowledge-management/ukb" "$@"
-EOF
-    chmod +x "$bin_dir/ukb"
-    
+    # ukb command removed - use MCP server workflow instead
+
     # Create vkb wrapper
     cat > "$bin_dir/vkb" << 'EOF'
 #!/bin/bash
@@ -925,10 +917,8 @@ configure_shell_environment() {
             # Remove old alias blocks and exports
             sed -i.bak '/# ===============================================/,/💡 Master commands/d' "$config_file" 2>/dev/null || true
             sed -i.bak '/Enhanced Knowledge Management Aliases/,/💡 Master commands/d' "$config_file" 2>/dev/null || true
-            sed -i.bak '/alias ukb=/d' "$config_file" 2>/dev/null || true
             sed -i.bak '/alias vkb=/d' "$config_file" 2>/dev/null || true
             sed -i.bak '/alias claude-mcp=/d' "$config_file" 2>/dev/null || true
-            sed -i.bak '/unalias ukb/d' "$config_file" 2>/dev/null || true
             sed -i.bak '/unalias vkb/d' "$config_file" 2>/dev/null || true
             # Remove old CODING_REPO/CLAUDE_REPO exports
             sed -i.bak '/CLAUDE_REPO.*Claude/d' "$config_file" 2>/dev/null || true
@@ -937,7 +927,7 @@ configure_shell_environment() {
     done
     
     # Clean up old wrapper scripts in ~/bin that point to wrong paths
-    local wrapper_scripts=("$HOME/bin/ukb" "$HOME/bin/vkb" "$HOME/bin/claude-mcp")
+    local wrapper_scripts=("$HOME/bin/vkb" "$HOME/bin/claude-mcp")
     for wrapper in "${wrapper_scripts[@]}"; do
         if [[ -f "$wrapper" ]] && grep -q "/Users/q284340/Claude/" "$wrapper" 2>/dev/null; then
             info "Updating old wrapper script: $wrapper"
@@ -998,10 +988,8 @@ EOF
     cat > "$CODING_REPO/scripts/cleanup-aliases.sh" << 'EOF'
 #!/bin/bash
 # Cleanup aliases from current shell session
-unalias ukb 2>/dev/null || true
 unalias vkb 2>/dev/null || true
 unalias claude-mcp 2>/dev/null || true
-unset -f ukb 2>/dev/null || true
 unset -f vkb 2>/dev/null || true
 unset -f claude-mcp 2>/dev/null || true
 EOF
@@ -1271,14 +1259,7 @@ verify_installation() {
     
     local errors=0
     
-    # Check ukb and vkb commands
-    if [[ -x "$CODING_REPO/bin/ukb" ]]; then
-        success "ukb command is available"
-    else
-        error_exit "ukb command not found or not executable"
-        ((errors++))
-    fi
-    
+    # Check vkb command (ukb removed - use MCP server workflow)
     if [[ -x "$CODING_REPO/bin/vkb" ]]; then
         success "vkb command is available"
     else
@@ -1807,7 +1788,7 @@ main() {
 export CODING_REPO="$CODING_REPO"
 export PATH="$CODING_REPO/bin:\$PATH"
 echo "✅ Agent-Agnostic Coding Tools environment activated!"
-echo "Commands 'ukb', 'vkb', and 'coding' are now available."
+echo "Commands 'vkb' and 'coding' are now available."
 echo ""
 echo "Usage:"
 echo "  coding           # Use best available agent"
@@ -1864,7 +1845,7 @@ show_installation_status() {
     echo ""
     echo -e "${CYAN}📋 Next steps:${NC}"
     echo -e "   ${CYAN}⚡ To start using commands immediately:${NC} source .activate"
-    echo -e "   ${CYAN}📖 Commands available:${NC} ukb (Update Knowledge Base), vkb (View Knowledge Base)"
+    echo -e "   ${CYAN}📖 Commands available:${NC} vkb (View Knowledge Base)"
     
     if [[ ${#INSTALLATION_FAILURES[@]} -eq 0 ]]; then
         echo ""
@@ -1983,8 +1964,6 @@ create_project_local_settings() {
       "Bash(done)",
       "Bash(npm test:*)",
       "Bash(docker info:*)",
-      "Bash(bash CODING_REPO_PLACEHOLDER/bin/ukb:*)",
-      "Bash(bin/ukb:*)",
       "Bash(bin/vkb:*)",
       "Bash(SYSTEM_HEALTH_API_PORT=3033 pnpm api:*)",
       "mcp__serena__initial_instructions",
