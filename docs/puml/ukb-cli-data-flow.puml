@@ -1,126 +1,122 @@
 @startuml ukb-cli-data-flow
 !include _standard-style.puml
 
-title UKB-CLI Data Flow Architecture
+title UKB Unified CLI Data Flow (v2.0)
 
 skinparam activityShape rectangle
 skinparam activity {
-  BackgroundColor<<input>> LightBlue
-  BackgroundColor<<process>> LightGreen
-  BackgroundColor<<storage>> LightYellow
-  BackgroundColor<<output>> LightPink
+  BackgroundColor<<input>> #FFE8F4
+  BackgroundColor<<process>> #E8F5E8
+  BackgroundColor<<routing>> #FFE4E1
+  BackgroundColor<<storage>> #FFF9E6
+  BackgroundColor<<output>> #E8F4FD
 }
 
-|Input Sources|
+|User Input|
 start
-:CLI Commands;<<input>>
+:CLI Command;<<input>>
 note right
-  ukb entity add
-  ukb relation create
-  ukb insight process
+  ukb (default incremental)
+  ukb entity list
+  ukb relation add
+  ukb checkpoint
+  ukb status
 end note
 
-:Git Commits;<<input>>
+|CLI Processing|
+:Parse Arguments;<<process>>
 note right
-  Analyze commit messages
-  Extract patterns from diffs
-  (Future feature)
+  UKBCli.parseArgs()
+  Extract command and options
 end note
 
-:Conversation Logs;<<input>>
-note right
-  Claude sessions
-  Copilot interactions
-  Chat transcripts
-end note
+:Identify Command Handler;<<process>>
 
-:Code Changes;<<input>>
-note right
-  File modifications
-  Architecture changes
-  Pattern implementations
-end note
-
-|Validation Layer|
-:Schema Validation;<<process>>
-note right
-  Joi validation
-  Type checking
-  Constraint verification
-end note
-
-if (Valid?) then (yes)
-  |Processing Pipeline|
-  :Data Normalization;<<process>>
-  note left
-    Convert to standard format
-    Add timestamps
-    Generate IDs
-  end note
-  
-  :Pattern Extraction;<<process>>
+|Intelligent Routing|
+if (Requires VKB?) then (yes)
+  :Check Server Availability;<<routing>>
   note right
-    Problem-Solution pairs
-    Technical patterns
-    Architectural changes
+    VkbApiClient.isServerAvailable()
+    Ping VKB server health endpoint
   end note
-  
-  :Significance Calculation;<<process>>
-  note left
-    1-10 scoring
-    Context weighting
-    Relationship analysis
-  end note
-  
-  :Entity/Relation Creation;<<process>>
-  
-  |Storage Layer|
-  :Persistence;<<storage>>
-  note right
-    FileStorageAdapter
-    JSON serialization
-    Atomic writes
-  end note
-  
-  :Indexing;<<storage>>
-  note left
-    Name-based lookup
-    Type categorization
-    Significance ranking
-  end note
-  
-  |Synchronization|
-  :MCP Memory Sync;<<output>>
-  note right
-    Export to MCP format
-    Bidirectional sync
-    (When enabled)
-  end note
-  
-  :Visualizer Update;<<output>>
-  note left
-    NDJSON conversion
-    Real-time updates
-    Graph visualization
-  end note
-  
-  :Response Formatting;<<output>>
-  
-  |Output|
-  :CLI Response;<<output>>
-  :API Result;<<output>>
-  :Logs;<<output>>
-  
-  stop
-  
+
+  if (Server Running?) then (yes)
+    :Route via HTTP API;<<routing>>
+    note right
+      Lock-free access
+      VkbApiClient methods:
+      - getEntities()
+      - createEntity()
+      - deleteRelation()
+    end note
+
+    |VKB Server|
+    :API Endpoint Handler;<<process>>
+    :GraphDB Operations;<<storage>>
+    note right
+      Graphology graph operations
+      LevelDB persistence
+    end note
+  else (no)
+    :Route to Direct DB Access;<<routing>>
+    note right
+      Fallback mode
+      Direct GraphDB operations
+      (Server startup required)
+    end note
+
+    |Direct Access|
+    :GraphDB Operations;<<storage>>
+  endif
+
 else (no)
-  :Error Response;<<output>>
+  |Local Operations|
+  :Checkpoint Management;<<process>>
   note right
-    Validation errors
-    User-friendly messages
-    Suggested fixes
+    TeamCheckpointManager
+    GapAnalyzer
+    ConfigManager
   end note
-  stop
+
+  :Local File Operations;<<storage>>
+  note right
+    Read/write checkpoints
+    Load configuration
+  end note
 endif
+
+|Response Processing|
+:Format Response;<<process>>
+
+:Display Results;<<output>>
+note right
+  Console output
+  JSON formatting
+  Success/error messages
+end note
+
+|Incremental Workflow|
+if (Default Command?) then (yes)
+  :Load Last Checkpoint;<<process>>
+  note right
+    TeamCheckpointManager.getLastCheckpoint()
+    Identify gaps since last run
+  end note
+
+  :Analyze Gaps;<<process>>
+  note right
+    GapAnalyzer.identifyGaps()
+    Calculate what needs processing
+  end note
+
+  :Process Missing Items;<<process>>
+  :Save New Checkpoint;<<storage>>
+  note right
+    Update checkpoint timestamp
+    Record processed items
+  end note
+endif
+
+stop
 
 @enduml

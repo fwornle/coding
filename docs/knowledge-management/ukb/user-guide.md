@@ -1,483 +1,524 @@
-# UKB-CLI - Modern Knowledge Management System
+# UKB Unified CLI User Guide (v2.0)
 
-## Overview
+Practical guide for using lib/ukb-unified - the current implementation with lock-free architecture and intelligent routing.
 
-**UKB-CLI** is a comprehensive Node.js-based knowledge management system that has replaced the legacy bash UKB script. It provides intelligent capture, analysis, and visualization of development insights through a modern, cross-platform CLI interface with enhanced performance and maintainability.
-
-**🆕 New in 2025:** Complete refactoring from a 3000+ line bash script to a modular Node.js CLI tool with stable API, comprehensive testing, and advanced features.
+**Version**: 2.0.0
+**Location**: `lib/ukb-unified/`
 
 ## Table of Contents
 
-1. [Modern Architecture](#modern-architecture)
-2. [Key Features](#key-features)
-3. [Quick Start](#quick-start)
-4. [Usage Modes](#usage-modes)
-5. [API Reference](#api-reference)
-6. [Migration Guide](#migration-guide)
-7. [Advanced Features](#advanced-features)
+1. [Getting Started](#getting-started)
+2. [Core Workflows](#core-workflows)
+3. [Advanced Features](#advanced-features)
+4. [Team Collaboration](#team-collaboration)
+5. [Troubleshooting](#troubleshooting)
 
-## Modern Architecture
+## Getting Started
 
-### UKB-CLI System Design
+### Prerequisites
 
-UKB-CLI follows a layered architecture with clear separation of concerns:
+1. **VKB Server running**: UKB Unified CLI requires VKB Server for full functionality
 
-- **CLI Layer**: Command-line interface with comprehensive argument parsing
-- **Core Services**: Knowledge management, git analysis, and insight extraction
-- **Validation Layer**: Content quality assurance and schema compliance
-- **Integration Layer**: MCP synchronization and visualizer updates
-
-![UKB Processing Workflow](../images/ukb-workflow.png)
-
-The workflow diagram above shows the complete UKB processing flow from input (git analysis or interactive mode) through validation, storage, and integration with external systems.
-
-### Backward Compatibility
-
-The new UKB-CLI maintains 100% backward compatibility:
-- All existing `ukb` commands work unchanged
-- Legacy bash script preserved as `ukb-original` 
-- Transparent delegation to Node.js implementation
-- Same data format and git integration
-
-## Key Features
-
-### 🚀 **Modern Node.js Architecture**
-- **Cross-platform**: Pure Node.js with no OS-specific dependencies
-- **Performance**: 3x faster JSON processing, 50% reduced memory usage
-- **Maintainability**: Modular design with comprehensive test coverage
-- **Stable API**: Formal API contract for agent integration
-
-### 🔍 **Enhanced Analysis Capabilities**
-- **Intelligent Git Analysis**: Incremental processing with pattern detection
-- **Interactive Mode**: Guided prompts with real-time validation
-- **Quality Assurance**: Content filtering and URL validation
-- **Structured Insights**: Problem-solution-rationale capture
-
-### 🎯 **Agent Integration**
-- **Programmatic API**: Direct integration for coding agents
-- **Real-time Capture**: Live session insight extraction
-- **GraphDB Storage**: Automatic persistence with Graphology + LevelDB
-- **Cross-Agent Support**: Works with Claude, CoPilot, and others
-
-## Quick Start
-
-### Basic Usage
 ```bash
-# Auto-analysis mode (incremental) - now powered by ukb-cli
+# Start VKB Server (in separate terminal)
+vkb server start
+
+# Or via coding infrastructure
+./bin/coding --vkb
+```
+
+2. **Verify server is running**:
+```bash
+ukb status
+```
+
+Expected output:
+```
+VKB Status:
+  Server: Running (port 8080)
+  Entities: 0
+  Relations: 0
+```
+
+### Basic Commands
+
+```bash
+# Incremental update (default)
 ukb
 
-# Interactive deep insight capture with enhanced validation
-ukb --interactive
+# Check status
+ukb status
 
-# List all entities in knowledge base
-ukb --list-entities
+# Manage entities
+ukb entity list
+ukb entity add "PatternName" "Type" 8
+ukb entity remove "PatternName"
 
-# Search knowledge base
-ukb search "pattern name"
-
-# Add specific entity types
-ukb --add-entity "EntityName" --type TransferablePattern
+# Manage relations
+ukb relation list
+ukb relation add "EntityA" "EntityB" "relationType" 9
 ```
 
-### Interactive Mode Example
+## Core Workflows
+
+### 1. Incremental Update Workflow
+
+The default command runs intelligent incremental processing.
+
 ```bash
-ukb --interactive
-# Enhanced prompts with validation:
-# - Problem description (with content filtering)
-# - Solution approach (with implementation details)
-# - Rationale for the solution
-# - Key learnings and insights
-# - Applicability context
-# - Technologies used (validated list)
-# - Reference URLs (automatically verified)
-# - Related code files
-# - Custom entity naming support
-```
-
-### New CLI Commands
-```bash
-# Management commands
-ukb --remove-entity "EntityName"
-ukb --rename-entity "OldName" "NewName"
-ukb --remove-relation "Entity1" "Entity2"
-
-# Export and analysis
-ukb --export-json
-ukb --analyze-git --depth 10
-ukb --validate
-
-# Batch operations
-ukb --add-multiple-entities entities.json
-ukb --import-relations relations.json
-```
-
-## Usage Modes
-
-### 1. Auto Mode (Default) - Enhanced
-```bash
+# Run incremental update
 ukb
 ```
-**New Features:**
-- **Intelligent git analysis** with commit categorization
-- **Incremental processing** to avoid duplicate work
-- **Performance optimizations** with faster JSON processing
-- **Automatic pattern detection** with significance scoring
 
-### 2. Interactive Mode - Completely Redesigned
-```bash
-ukb --interactive
+**What happens:**
+1. TeamCheckpointManager loads last checkpoint for current project
+2. GapAnalyzer identifies what changed since last run
+3. VkbApiClient routes operations to VKB Server
+4. New checkpoint saved with timestamp
+
+**Output:**
 ```
-**Enhanced Capabilities:**
-- **Structured input validation** with content quality filters
-- **Real-time URL verification** for reference links
-- **Custom entity naming** support
-- **Technology validation** against known frameworks
-- **Problem-solution-rationale** structured capture
-
-### 3. Git Analysis Mode - New
-```bash
-ukb --analyze-git --depth 20
+✅ Incremental update complete
+   Processed 5 items
+   Next run will continue from: 2024-11-22T12:00:00.000Z
 ```
-**Advanced Git Processing:**
-- **Configurable analysis depth** for commit history
-- **Intelligent commit categorization** (feature, fix, refactor, etc.)
-- **Technology stack detection** from file changes
-- **Pattern evolution tracking** over time
 
-### 4. Management Mode - New
-```bash
-ukb --list-entities
-ukb --remove-entity "EntityName"  
-ukb --rename-entity "Old" "New"
-```
-**Knowledge Base Management:**
-- **Entity lifecycle management** with safe operations
-- **Relationship management** with validation
-- **Batch operations** for bulk updates
-- **Data integrity** verification
+**When to use:**
+- Daily workflow at end of coding session
+- After completing a feature or fix
+- Periodically to capture project knowledge
 
-## API Reference
+### 2. Entity Management Workflow
 
-### Command Line Interface
+#### Adding Technical Patterns
 
 ```bash
-ukb-cli [options] [command]
+# Add a caching pattern
+ukb entity add "RedisCachingPattern" "TechnicalPattern" 9
 
-Commands:
-  capture              Interactive insight capture
-  analyze-git          Git history analysis
-  list-entities        List all knowledge base entities
-  search <query>       Search knowledge base content
-  add-entity <name>    Add new entity to knowledge base
-  remove-entity <name> Remove entity from knowledge base
-  rename-entity <old> <new> Rename existing entity
-  add-relation <from> <to> <type> Add relationship
-  remove-relation <from> <to> Remove relationship
-  validate             Validate knowledge base integrity
-  export-json          Export knowledge base as JSON
-  import-data <file>   Import entities/relations from file
-
-Options:
-  --interactive, -i    Enhanced interactive mode
-  --type <type>        Entity type (TransferablePattern, WorkflowPattern, etc.)
-  --significance <n>   Significance score (1-10)
-  --depth <n>          Git analysis depth
-  --technologies <list> Comma-separated technology list
-  --references <list>  Comma-separated URL list
-  --quiet, -q          Suppress output
-  --verbose, -v        Detailed output
-  --help, -h           Show help
-  --version            Show version
+# Add with observation
+ukb entity add "ErrorHandling" "Solution" 8 --observation "Implement try-catch with logging"
 ```
 
-### Programmatic API
+#### Searching and Discovery
 
-```javascript
-const { KnowledgeManager } = require('ukb-cli');
-
-// Initialize knowledge manager
-const manager = new KnowledgeManager({
-  knowledgeBasePath: '.data/knowledge-graph',
-  graphDB: true
-});
-
-// Capture structured insight
-await manager.captureInsight({
-  name: "ReactHookPattern",
-  problem: "Stateful logic duplication across components",
-  solution: "Extract logic into custom hooks",
-  rationale: "DRY principle and improved testability",
-  learnings: "Hooks enable better separation of concerns",
-  applicability: "Any React app with duplicated state logic",
-  technologies: ["React", "TypeScript"],
-  references: ["https://reactjs.org/docs/hooks-custom.html"],
-  significance: 8
-});
-
-// Git analysis
-const insights = await manager.analyzeGitHistory({
-  depth: 20,
-  sinceCommit: 'abc123',
-  includeCategories: ['feature', 'refactor']
-});
-
-// Search and query
-const results = await manager.search("authentication pattern");
-const entities = await manager.getEntitiesByType("TransferablePattern");
-```
-
-## Migration Guide
-
-### From Legacy Bash UKB
-
-**✅ Automatic Migration:** All existing `ukb` commands continue to work unchanged. The system automatically delegates to the new Node.js implementation while maintaining full compatibility.
-
-#### What Changed
-- **Internal Architecture**: Bash → Node.js modular design
-- **Performance**: 3x faster processing, 50% memory reduction  
-- **Features**: Enhanced validation, custom naming, batch operations
-- **API**: Stable programmatic interface for agent integration
-
-#### What Stayed the Same
-- **Commands**: All existing commands work identically
-- **Data Format**: Entity/relation schema unchanged (now in GraphDB)
-- **Workflows**: Existing team workflows unaffected
-- **Git Integration**: Same git-based knowledge sharing
-- **JSON Export**: Optional export to .data/knowledge-export/ for compatibility
-
-#### Verification Steps
 ```bash
-# Verify migration success
-ukb --validate
+# Search for authentication patterns
+ukb entity search "auth"
 
-# Check performance improvement
-time ukb --list-entities  # Should be significantly faster
+# List high-significance patterns
+ukb entity list --min-significance 8
 
-# Test new features
-ukb --add-entity "TestPattern" --type TransferablePattern
-ukb --remove-entity "TestPattern"
+# Filter by type
+ukb entity list --type TechnicalPattern
 ```
 
-#### Rollback Plan
-If needed, the legacy bash script is preserved:
+**Output:**
+```
+Found 3 entities matching 'auth':
+- UserAuthentication (TechnicalPattern, significance: 9)
+- AuthErrorHandling (Solution, significance: 8)
+- JWTValidation (TechnicalPattern, significance: 8)
+```
+
+### 3. Relation Management Workflow
+
+#### Creating Relationships
+
 ```bash
-# Use original bash implementation
-./knowledge-management/ukb-original --interactive
+# Link solution to problem
+ukb relation add "ErrorHandlingSolution" "MemoryLeakProblem" "solves" 9
+
+# Show pattern usage
+ukb relation add "MyComponent" "RedisCachingPattern" "uses" 8
+
+# Document dependencies
+ukb relation add "AuthService" "TokenValidator" "depends_on" 7
 ```
 
-## Schema Management
+#### Querying Relationships
 
-### Knowledge Base Structure
-```json
-{
-  "entities": [
-    {
-      "name": "PatternName",
-      "entityType": "Pattern|Solution|Architecture|Tool",
-      "significance": 1-10,
-      "problem": {
-        "description": "What problem this solves",
-        "context": "When this problem occurs"
-      },
-      "solution": {
-        "approach": "How to solve it",
-        "implementation": "Specific implementation details",
-        "code_example": "Working code snippet"
-      },
-      "observations": ["Key insights", "Lessons learned"],
-      "metadata": {
-        "technologies": ["React", "Node.js"],
-        "files": ["src/component.js"],
-        "references": ["https://docs.example.com"]
-      }
-    }
-  ],
-  "relations": [
-    {
-      "from": "PatternA",
-      "to": "PatternB", 
-      "relationType": "depends_on|similar_to|implements"
-    }
-  ]
-}
-```
-
-### Entity Types
-- **Pattern**: Reusable solutions and approaches
-- **Solution**: Specific problem fixes
-- **Architecture**: System design insights
-- **Tool**: Technology and framework usage
-- **Workflow**: Process and methodology insights
-
-## Workflow Examples
-
-### Daily Development Workflow
 ```bash
-# Morning: Check what's been learned
-vkb  # View knowledge base
+# List all relations from an entity
+ukb relation list --from "AuthService"
 
-# Throughout day: Normal development
-git add . && git commit -m "implement user authentication"
-
-# End of day: Capture insights
-ukb  # Auto-analysis of day's commits
-
-# Weekly: Review and enhance
-ukb --interactive  # Deep insight capture
+# Find all "solves" relations
+ukb relation list --type "solves"
 ```
 
-### Team Knowledge Sharing
+### 4. Checkpoint Management
+
+#### Viewing Checkpoints
+
 ```bash
-# Team lead captures architecture decisions
-ukb --interactive
-# Problem: Service communication complexity
-# Solution: Event-driven architecture with message queues
-
-# Team members learn from insights
-vkb  # Browse shared knowledge
-ukb search "event driven"  # Find relevant patterns
-
-# Knowledge base syncs via git
-git pull  # Get team insights
-git push  # Share your insights
+# Show current checkpoint
+ukb checkpoint
 ```
 
-### AI Coding Session Enhancement
+**Output:**
+```
+Checkpoint for project 'coding':
+  Last run: 2024-11-22T12:00:00.000Z
+  Processed: 234 items
+```
+
+#### Clearing Checkpoints
+
 ```bash
-# Start coding session
-claude-mcp  # or your preferred AI
-
-# During session, capture insights
-ukb --agent  # Analyzes conversation and code
-
-# Review insights immediately
-vkb  # See what was learned
+# Clear checkpoint (forces full reprocess next run)
+ukb checkpoint clear
 ```
+
+**When to clear:**
+- After major refactoring
+- When switching between branches
+- If checkpoint becomes corrupted
 
 ## Advanced Features
 
-### Enhanced Search and Filtering
+### Intelligent Routing
+
+UKB Unified CLI automatically routes between VKB Server API and direct database access.
+
+**When Server Running:**
+- Uses HTTP API (port 8080)
+- Lock-free concurrent operations
+- Real-time updates
+
+**When Server Stopped:**
+- Direct database access
+- Requires server restart for full functionality
+
+**Check routing:**
 ```bash
-# Advanced search with type filtering
-ukb search "authentication" --type TransferablePattern
-
-# Search by technology stack
-ukb search --technologies "React,TypeScript"
-
-# Filter by significance threshold
-ukb --list-entities --min-significance 7
-
-# Combined filtering
-ukb search "pattern" --type TransferablePattern --min-significance 8
+ukb status
 ```
 
-### Data Management and Validation
+### Team Checkpoints
+
+Multiple team members can work concurrently without conflicts.
+
+**How it works:**
+- Each project has its own checkpoint
+- Checkpoints tracked per-project-key
+- No file locking or race conditions
+
+**Example:**
 ```bash
-# Comprehensive validation
-ukb --validate --detailed
+# Developer A works on project 'app'
+cd /path/to/app
+ukb  # Checkpoint: app
 
-# Data integrity checks
-ukb --check-integrity
+# Developer B works on project 'api'
+cd /path/to/api
+ukb  # Checkpoint: api
 
-# Performance analysis
-ukb --analyze-performance
-
-# Export formats
-ukb --export-json --format pretty
-ukb --export-markdown --include-diagrams
-ukb --export-yaml --include-metadata
+# No conflicts - separate checkpoints
 ```
 
-### Integration with Development Tools
-```bash
-# CI/CD integration
-ukb --analyze-git --auto-commit --webhook-url "https://api.example.com"
+### GraphDB Storage
 
-# IDE integration via API
-curl -X POST "http://localhost:3001/api/capture" \
-  -H "Content-Type: application/json" \
-  -d '{"problem": "...", "solution": "..."}'
+Entities and relations stored in Graphology + LevelDB.
 
-# Custom agent integration
-UKB_API_MODE=true ukb --capture --stdin < insight.json
+**Benefits:**
+- Efficient graph operations
+- No JSON file locking
+- Fast relationship queries
+- Persistent storage
+
+**Location:**
+```
+.data/knowledge-graph/
+├── db/          # LevelDB files
+└── metadata     # Graph metadata
 ```
 
-### Quality Assurance Features
+## Team Collaboration
+
+### Daily Development Workflow
+
 ```bash
-# Content validation
-ukb --validate-content --strict
+# Morning: Check knowledge base status
+ukb status
 
-# URL verification
-ukb --verify-references --timeout 5
+# Throughout day: Normal development
+# ... coding ...
 
-# Technology validation
-ukb --validate-technologies --update-registry
+# End of day: Capture insights
+ukb  # Incremental update
 
-# Custom entity naming
-UKB_CUSTOM_NAME="MySpecificPattern" ukb --interactive
+# Optional: Add specific patterns
+ukb entity add "MyNewPattern" "TechnicalPattern" 8
 ```
 
-## Common Use Cases
+### Knowledge Sharing Workflow
 
-### Architecture Documentation
-- Capture design decisions with reasoning
-- Document pattern evolution over time
-- Share architectural insights across teams
-- Create searchable knowledge base
+```bash
+# Team lead captures architecture decision
+ukb entity add "EventDrivenArchitecture" "ArchitecturePattern" 9
+
+# Link to related patterns
+ukb relation add "EventDrivenArchitecture" "MessageQueue" "uses" 9
+
+# Team members discover pattern
+ukb entity search "event"
+ukb relation list --from "EventDrivenArchitecture"
+```
 
 ### Code Review Enhancement
-- Reference established patterns during reviews
-- Suggest improvements based on past learnings
-- Identify when to deviate from patterns
-- Build consistency across team
 
-### Onboarding New Team Members
-- Provide searchable history of decisions
-- Show evolution of system architecture
-- Demonstrate proven solutions
-- Accelerate learning curve
+```bash
+# During review, reference established patterns
+ukb entity search "caching"
 
-### Cross-Project Learning
-- Transfer patterns between projects
-- Avoid repeating past mistakes
-- Build organizational knowledge
-- Standardize approaches
+# Check if pattern is already documented
+ukb entity list --type TechnicalPattern | grep "Redis"
+
+# Add new pattern discovered during review
+ukb entity add "RedisSessionStore" "TechnicalPattern" 8
+```
+
+## Workflow Examples
+
+### Scenario 1: Implementing New Feature
+
+```bash
+# 1. Search for related patterns
+ukb entity search "authentication"
+
+# 2. Review pattern details and relations
+ukb relation list --from "JWTAuthentication"
+
+# 3. Implement feature using pattern
+# ... coding ...
+
+# 4. Document new insights
+ukb entity add "RefreshTokenPattern" "TechnicalPattern" 8
+ukb relation add "RefreshTokenPattern" "JWTAuthentication" "extends" 9
+
+# 5. Run incremental update
+ukb
+```
+
+### Scenario 2: Troubleshooting Issue
+
+```bash
+# 1. Search for similar problems
+ukb entity search "memory leak"
+
+# 2. Find related solutions
+ukb relation list --type "solves"
+
+# 3. After fixing, document solution
+ukb entity add "MemoryLeakFix" "Solution" 9
+ukb relation add "MemoryLeakFix" "MemoryLeakProblem" "solves" 10
+
+# 4. Capture in checkpoint
+ukb
+```
+
+### Scenario 3: Onboarding New Team Member
+
+```bash
+# Show project knowledge base status
+ukb status
+
+# List key patterns
+ukb entity list --min-significance 8
+
+# Explore architecture decisions
+ukb entity list --type ArchitecturePattern
+
+# Understand pattern relationships
+ukb relation list --from "MicroservicePattern"
+```
 
 ## Troubleshooting
 
-### Common Issues
-```bash
-# UKB not finding git repository
-cd /path/to/git/repo && ukb
+### VKB Server Not Running
 
-# Knowledge base corruption
-ukb --verify && ukb --repair
-
-# Missing dependencies
-./install.sh --update
-
-# Performance issues with large repos
-ukb --incremental  # Use incremental mode
+**Symptom:**
+```
+Error: VKB Server not responding
+Suggestion: Start server with: vkb server start
 ```
 
-### Debug Mode
+**Solution:**
 ```bash
-# Enable debug logging
-DEBUG=1 ukb --verbose
+# Start VKB server
+vkb server start
 
-# Check analysis results
-cat ~/.ukb/debug.log
+# Verify it's running
+ukb status
 ```
 
-## Next Steps
+### Checkpoint Issues
 
-- **[UkbCli Architecture Insights](../../knowledge-management/insights/UkbCli.md)** - Complete technical documentation with architecture diagrams
-- **[Use Cases](README.md#🎯-use-cases)** - Detailed workflow examples  
-- **[VSCode Integration](../integrations/vscode-extension.md)** - IDE integration
-- **[System Architecture](../architecture/system-overview.md)** - Technical details
+**Symptom:**
+- Incremental update processing too many items
+- Gaps not calculated correctly
 
-## Related Documentation
+**Solution:**
+```bash
+# Clear checkpoint and start fresh
+ukb checkpoint clear
+ukb  # Next run will reprocess from beginning
+```
 
-- **[UkbCli Technical Overview](../../knowledge-management/insights/UkbCli.md)** - Comprehensive architecture documentation with PlantUML diagrams
-- **[Knowledge Persistence Pattern](../../knowledge-management/insights/KnowledgePersistencePattern.md)** - Best practices for knowledge management
-- **[API Reference Documentation](../integrations/api-reference.md)** - Programmatic integration guide
+### Entity Already Exists
+
+**Symptom:**
+```
+Error: Entity "MyPattern" already exists
+```
+
+**Solution:**
+```bash
+# Update existing entity instead
+ukb entity remove "MyPattern"
+ukb entity add "MyPattern" "TechnicalPattern" 9
+
+# Or search for it first
+ukb entity search "MyPattern"
+```
+
+### Server Connection Timeout
+
+**Symptom:**
+```
+Error: Request exceeded timeout
+```
+
+**Solution:**
+```bash
+# Check server is responsive
+curl http://localhost:8080/api/health
+
+# Increase timeout if needed
+export VKB_TIMEOUT=10000
+ukb status
+```
+
+## Tips and Best Practices
+
+### 1. Regular Incremental Updates
+Run `ukb` at the end of each coding session to keep knowledge base current.
+
+### 2. Use Descriptive Names
+```bash
+# Good
+ukb entity add "PostgresConnectionPooling" "TechnicalPattern" 8
+
+# Not recommended
+ukb entity add "Pattern1" "TechnicalPattern" 8
+```
+
+### 3. Set Appropriate Significance
+- 1-3: Minor details
+- 4-6: Useful information
+- 7-8: Important patterns
+- 9-10: Critical architecture decisions
+
+### 4. Document Relationships
+Always link solutions to problems and patterns to implementations.
+
+```bash
+ukb relation add "Solution" "Problem" "solves" 9
+ukb relation add "Implementation" "Pattern" "uses" 8
+```
+
+### 5. Keep Server Running
+For best performance, keep VKB server running during development.
+
+```bash
+# Start in tmux/screen session
+tmux new -s vkb
+vkb server start
+# Detach: Ctrl+B, D
+```
+
+## Command Reference
+
+### Quick Command Summary
+
+```bash
+# Default/Incremental
+ukb                                  # Run incremental update
+
+# Status
+ukb status                          # Show system status
+
+# Entities
+ukb entity list                     # List all entities
+ukb entity add NAME TYPE SIG        # Add entity
+ukb entity remove NAME              # Remove entity
+ukb entity search QUERY             # Search entities
+
+# Relations
+ukb relation list                   # List all relations
+ukb relation add FROM TO TYPE SIG   # Add relation
+ukb relation remove FROM TO         # Remove relation
+
+# Checkpoints
+ukb checkpoint                      # View checkpoint
+ukb checkpoint clear                # Clear checkpoint
+```
+
+## Integration Examples
+
+### With Git Workflow
+
+```bash
+# After feature branch merge
+git checkout main
+git pull
+ukb  # Capture new patterns from merged code
+```
+
+### With CI/CD
+
+```yaml
+# .github/workflows/knowledge-capture.yml
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Start VKB Server
+        run: vkb server start &
+      - name: Capture knowledge
+        run: ukb
+      - name: Commit changes
+        run: |
+          git add .data/knowledge-graph/
+          git commit -m "Update knowledge base"
+```
+
+### With IDE Integration
+
+```bash
+# VS Code task (.vscode/tasks.json)
+{
+  "label": "Update Knowledge Base",
+  "type": "shell",
+  "command": "ukb",
+  "problemMatcher": []
+}
+```
+
+## See Also
+
+- **[README](./README.md)** - Overview and architecture
+- **[API Reference](./api-reference.md)** - Complete API documentation
+- **[Lock-Free Architecture](../ukb-lock-free-architecture.md)** - Technical implementation
+- **[VKB Server Documentation](../../vkb-server/README.md)** - Server setup and API
+
+## Architecture Diagrams
+
+For visual understanding of the system:
+
+- [System Architecture](../images/ukb-cli-architecture.png)
+- [Class Diagram](../images/ukb-cli-class-diagram.png)
+- [Data Flow](../images/ukb-cli-data-flow.png)
+- [Entity Creation Sequence](../images/ukb-cli-sequence-entity-creation.png)
+- [Incremental Workflow](../images/ukb-cli-sequence-insight-processing.png)

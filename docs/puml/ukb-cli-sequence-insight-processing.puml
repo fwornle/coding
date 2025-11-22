@@ -1,175 +1,191 @@
 @startuml ukb-cli-sequence-insight-processing
 !include _standard-style.puml
 
-title Insight Processing Sequence Diagram
+title Incremental Workflow Sequence Diagram (v2.0)
 
 actor User
-participant "CLI" as CLI
-participant "KnowledgeAPI" as API
-participant "InsightProcessor" as IP
-participant "EntityManager" as EM
-participant "RelationManager" as RM
-participant "ValidationService" as VS
-participant "FileStorageAdapter" as Storage
+participant "UKBCli" as CLI
+participant "WorkflowOrchestrator" as WO
+participant "TeamCheckpointManager" as CM
+participant "GapAnalyzer" as GA
+participant "VkbApiClient" as Client
+participant "VKB Server API" as API
+database "GraphDB" as DB
+database "Checkpoint Files" as CheckpointDB
 
-== Interactive Insight Processing ==
+== Incremental Update Workflow ==
 
-User -> CLI: ukb insight --interactive
-activate CLI
-
-CLI -> User: Select insight type
-User --> CLI: "Problem-Solution"
-
-CLI -> User: Describe the problem
-User --> CLI: "Complex state management in React"
-
-CLI -> User: Describe the solution  
-User --> CLI: "Implement Redux with typed hooks"
-
-CLI -> API: insights.processInsight(insightData)
-activate API
-
-API -> IP: processInsight(insightData)
-activate IP
-
-IP -> IP: validateInsightData()
-IP -> IP: extractEntities(insightData)
-
-note right of IP
-  Creates 2 entities:
-  1. Problem entity
-  2. Solution entity
+User -> CLI: ukb
+note right
+  Default command runs
+  incremental update
 end note
-
-IP -> IP: generateEntityNames()
-IP -> IP: calculateSignificance()
-
-== Entity Creation Loop ==
-
-loop for each entity
-  IP -> EM: create(entityData)
-  activate EM
-  
-  EM -> VS: validateEntity(entityData)
-  activate VS
-  VS --> EM: validation result
-  deactivate VS
-  
-  alt Entity Exists
-    EM -> EM: findByName(entityName)
-    EM -> EM: addObservation(observation)
-    EM --> IP: updated entity
-  else New Entity
-    EM -> Storage: addEntity(entity)
-    activate Storage
-    Storage --> EM: success
-    deactivate Storage
-    EM --> IP: new entity
-  end
-  
-  deactivate EM
-end
-
-== Relation Creation ==
-
-IP -> IP: extractRelations(insightData, entities)
-
-IP -> RM: create({from: "Solution", to: "Problem", type: "solves"})
-activate RM
-
-RM -> VS: validateRelation(relationData)
-activate VS
-VS --> RM: validation result
-deactivate VS
-
-RM -> Storage: addRelation(relation)
-activate Storage
-Storage --> RM: success
-deactivate Storage
-
-RM --> IP: relation object
-deactivate RM
-
-IP -> IP: compile results
-
-IP --> API: {entities: [...], relations: [...], significance: 8}
-deactivate IP
-
-API --> CLI: processing result
-deactivate API
-
-CLI -> CLI: format output
-CLI -> User: ✅ Insight processed:\n  2 entities created\n  1 relation created\n  Significance: 8/10
-
-deactivate CLI
-
-== Batch Processing ==
-
-User -> CLI: ukb process-insights insights.json
 activate CLI
 
-CLI -> CLI: read JSON file
+CLI -> CLI: parseArgs()
+CLI -> WO: executeIncrementalUpdate(projectKey)
+activate WO
 
-CLI -> API: insights.processBatch(insightArray)
-activate API
+WO -> CM: getLastCheckpoint(projectKey)
+activate CM
 
-API -> IP: processBatch(insights)
-activate IP
+CM -> CheckpointDB: Read checkpoint file
+activate CheckpointDB
+CheckpointDB --> CM: checkpoint data or null
+deactivate CheckpointDB
 
-loop for each insight
-  IP -> IP: processInsight(insight)
-  note right: Same flow as above
-  
-  alt Success
-    IP -> IP: add to results
-  else Error
-    IP -> IP: add to errors
+CM --> WO: {lastRun: timestamp, processedCount: N}
+deactivate CM
+
+WO -> GA: identifyGaps(projectKey, checkpoint)
+activate GA
+
+GA -> GA: Calculate time since last run
+GA -> GA: Identify unprocessed items
+GA -> GA: Calculate missing count
+
+GA --> WO: {gaps: [...], missingCount: M}
+deactivate GA
+
+alt Gaps Found
+  WO -> Client: isServerAvailable()
+  activate Client
+
+  Client -> API: GET /api/health
+  activate API
+  API --> Client: {status: "ok"}
+  deactivate API
+
+  Client --> WO: true
+  deactivate Client
+
+  loop for each gap item
+    WO -> Client: createEntity() or createRelation()
+    activate Client
+
+    Client -> API: POST /api/entities or /api/relations
+    activate API
+
+    API -> DB: Add to graph
+    activate DB
+    DB --> API: success
+    deactivate DB
+
+    API --> Client: {entity/relation}
+    deactivate API
+
+    Client --> WO: success
+    deactivate Client
   end
+
+  WO -> CM: saveCheckpoint(projectKey, {timestamp, processedCount})
+  activate CM
+
+  CM -> CheckpointDB: Write checkpoint file
+  activate CheckpointDB
+  CheckpointDB --> CM: success
+  deactivate CheckpointDB
+
+  CM --> WO: checkpoint saved
+  deactivate CM
+
+  WO --> CLI: {processed: M, success: true}
+  deactivate WO
+
+  CLI -> User: ✅ Incremental update complete\n   Processed M items
+  deactivate CLI
+
+else No Gaps
+  WO --> CLI: {processed: 0, message: "No updates needed"}
+  deactivate WO
+
+  CLI -> User: ℹ️  No new items to process\n   Last run: timestamp
+  deactivate CLI
 end
 
-IP --> API: {results: [...], errors: [...], processed: N, failed: M}
-deactivate IP
+== Status Query Workflow ==
 
-API --> CLI: batch result
-deactivate API
-
-CLI -> User: ✅ Processed N insights, M failed
-
-deactivate CLI
-
-== Pattern Extraction ==
-
-User -> CLI: ukb insight patterns --min-significance 8
+User -> CLI: ukb status
 activate CLI
 
-CLI -> API: insights.extractPatterns({minSignificance: 8})
+CLI -> CM: getAllCheckpoints()
+activate CM
+
+CM -> CheckpointDB: Read all checkpoint files
+activate CheckpointDB
+CheckpointDB --> CM: checkpoint data
+deactivate CheckpointDB
+
+CM --> CLI: Map<projectKey, checkpoint>
+deactivate CM
+
+CLI -> Client: isServerAvailable()
+activate Client
+
+Client -> API: GET /api/health
 activate API
-
-API -> IP: extractPatterns(options)
-activate IP
-
-IP -> EM: getHighSignificance(8)
-activate EM
-EM --> IP: high significance entities
-deactivate EM
-
-IP -> RM: getAll({minSignificance: 8})
-activate RM
-RM --> IP: high significance relations
-deactivate RM
-
-IP -> IP: findPatterns(entities, relations)
-IP -> IP: rankPatterns(patterns)
-
-IP --> API: ranked patterns
-deactivate IP
-
-API --> CLI: patterns
+API --> Client: {status: "ok"}
 deactivate API
 
-CLI -> CLI: format pattern output
-CLI -> User: Found N patterns:\n  1. Pattern A (significance: 9)\n  2. Pattern B (significance: 8)
+Client --> CLI: true
+deactivate Client
 
+CLI -> Client: getEntities({count: true})
+activate Client
+
+Client -> API: GET /api/entities?count=true
+activate API
+
+API -> DB: Count entities
+activate DB
+DB --> API: count
+deactivate DB
+
+API --> Client: {total: N}
+deactivate API
+
+Client --> CLI: entity count
+deactivate Client
+
+CLI -> Client: getRelations({count: true})
+activate Client
+
+Client -> API: GET /api/relations?count=true
+activate API
+
+API -> DB: Count relations
+activate DB
+DB --> API: count
+deactivate DB
+
+API --> Client: {total: M}
+deactivate API
+
+Client --> CLI: relation count
+deactivate Client
+
+CLI -> CLI: Format status output
+
+CLI -> User: VKB Status:\n  Server: Running (port 8080)\n  Entities: N\n  Relations: M\n  Last update: timestamp\n  Projects tracked: K
+deactivate CLI
+
+== Checkpoint Management ==
+
+User -> CLI: ukb checkpoint clear
+activate CLI
+
+CLI -> CM: clearCheckpoint(projectKey)
+activate CM
+
+CM -> CheckpointDB: Delete checkpoint file
+activate CheckpointDB
+CheckpointDB --> CM: success
+deactivate CheckpointDB
+
+CM --> CLI: checkpoint cleared
+deactivate CM
+
+CLI -> User: ✅ Checkpoint cleared for project
 deactivate CLI
 
 @enduml

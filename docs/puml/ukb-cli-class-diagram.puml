@@ -1,212 +1,182 @@
 @startuml ukb-cli-class-diagram
 !include _standard-style.puml
 
-title UKB-CLI Class Diagram
+title UKB Unified CLI Class Diagram (v2.0)
 
 skinparam classAttributeIconSize 0
 skinparam class {
-  BackgroundColor<<interface>> LightBlue
-  BackgroundColor<<abstract>> LightGray
-  BackgroundColor<<service>> LightGreen
-  BackgroundColor<<util>> LightYellow
+  BackgroundColor<<cli>> #FFE8F4
+  BackgroundColor<<command>> #E8F4FD
+  BackgroundColor<<core>> #E8F5E8
+  BackgroundColor<<client>> #FFF9E6
+  BackgroundColor<<util>> #F0F0F0
 }
 
-interface IStorage <<interface>> {
-  + initialize(): Promise<void>
-  + getEntities(): Promise<Entity[]>
-  + getRelations(): Promise<Relation[]>
-  + addEntity(entity: Entity): Promise<void>
-  + updateEntity(id: string, entity: Entity): Promise<void>
-  + removeEntity(id: string): Promise<Entity>
-  + addRelation(relation: Relation): Promise<void>
-  + updateRelation(id: string, relation: Relation): Promise<void>
-  + removeRelation(id: string): Promise<Relation>
-  + close(): Promise<void>
-}
-
-class KnowledgeAPI <<service>> {
-  - config: ConfigManager
-  - logger: Logger
-  - storage: IStorage
-  - validation: ValidationService
-  + entities: EntityManager
-  + relations: RelationManager
-  + insights: InsightProcessor
+class UKBCli <<cli>> {
+  - checkpointManager: TeamCheckpointManager
+  - gapAnalyzer: GapAnalyzer
+  - configManager: ConfigManager
   --
-  + constructor(options: ConfigOptions)
-  + initialize(): Promise<void>
-  + getStatus(): Promise<Status>
-  + close(): Promise<void>
+  + constructor()
+  + parseArgs(argv: string[]): ParsedArgs
+  + run(): Promise<void>
+  + showHelp(): void
+  + showVersion(): void
+  + defaultCommand(): Promise<void>
+  + statusCommand(): Promise<void>
+  + checkpointCommand(): Promise<void>
+  + entityCommand(action: string, args: any): Promise<void>
+  + relationCommand(action: string, args: any): Promise<void>
 }
 
-class EntityManager <<service>> {
-  - storage: IStorage
-  - validation: ValidationService
+class VkbApiClient <<client>> {
+  - baseUrl: string
+  - timeout: number
   - logger: Logger
   --
-  + create(data: EntityData): Promise<Entity>
-  + findByName(name: string): Promise<Entity>
-  + findById(id: string): Promise<Entity>
-  + getAll(filters: FilterOptions): Promise<Entity[]>
-  + update(id: string, updates: Partial<Entity>): Promise<Entity>
-  + delete(id: string): Promise<boolean>
-  + addObservation(id: string, obs: Observation): Promise<void>
-  + removeObservation(id: string, index: number): Promise<void>
-  + rename(oldName: string, newName: string): Promise<Entity>
-  + search(query: string): Promise<Entity[]>
-  + count(): Promise<number>
+  + constructor(baseUrl: string, options: Options)
+  + isServerAvailable(): Promise<boolean>
+  + getEntities(params: QueryParams): Promise<Entity[]>
+  + searchEntities(query: string, params: QueryParams): Promise<Entity[]>
+  + createEntity(entity: EntityData, params: SaveParams): Promise<Entity>
+  + updateEntity(name: string, updates: Partial<Entity>, params: SaveParams): Promise<Entity>
+  + deleteEntity(name: string, params: SaveParams): Promise<void>
+  + getRelations(params: QueryParams): Promise<Relation[]>
+  + createRelation(relation: RelationData, params: SaveParams): Promise<Relation>
+  + deleteRelation(from: string, to: string, params: SaveParams): Promise<void>
 }
 
-class RelationManager <<service>> {
-  - storage: IStorage
-  - validation: ValidationService
-  - logger: Logger
+class TeamCheckpointManager <<core>> {
+  - checkpointsDir: string
+  - configManager: ConfigManager
   --
-  + create(data: RelationData): Promise<Relation>
-  + findRelation(from: string, to: string, type?: string): Promise<Relation>
-  + findById(id: string): Promise<Relation>
-  + getAll(filters: FilterOptions): Promise<Relation[]>
-  + getForEntity(entity: string, direction: Direction): Promise<Relation[]>
-  + update(id: string, updates: Partial<Relation>): Promise<Relation>
-  + delete(id: string): Promise<boolean>
-  + getConnectedEntities(entity: string, depth: number): Promise<Connection[]>
-  + findPath(from: string, to: string): Promise<string[]>
-  + getClusters(minSize: number): Promise<string[][]>
-  + updateEntityReferences(oldName: string, newName: string): Promise<number>
+  + getLastCheckpoint(projectKey: string): Promise<Checkpoint>
+  + saveCheckpoint(projectKey: string, data: CheckpointData): Promise<void>
+  + clearCheckpoint(projectKey: string): Promise<void>
+  + getAllCheckpoints(): Promise<Map<string, Checkpoint>>
 }
 
-class InsightProcessor <<service>> {
-  - entities: EntityManager
-  - relations: RelationManager
-  - logger: Logger
+class GapAnalyzer <<core>> {
+  - checkpointManager: TeamCheckpointManager
+  - configManager: ConfigManager
   --
-  + processInsight(data: InsightData): Promise<ProcessResult>
-  + processBatch(insights: InsightData[]): Promise<BatchResult>
-  + extractPatterns(options: PatternOptions): Promise<Pattern[]>
-  + analyzeConversation(text: string, context: Context): Promise<Insight[]>
-  + analyzeCodeChanges(diff: string, commit: CommitInfo): Promise<Insight[]>
-  + generateRecommendations(context: Context): Promise<Recommendation[]>
+  + identifyGaps(projectKey: string): Promise<Gap[]>
+  + shouldProcess(item: string, lastCheckpoint: Date): boolean
+  + calculateMissing(checkpoint: Checkpoint): number
 }
 
-class ValidationService <<util>> {
-  - entitySchema: Schema
-  - relationSchema: Schema
-  - observationSchema: Schema
+class WorkflowOrchestrator <<core>> {
+  - apiClient: VkbApiClient
+  - gapAnalyzer: GapAnalyzer
+  - checkpointManager: TeamCheckpointManager
   --
-  + validateEntity(data: any): Promise<ValidationResult>
-  + validateRelation(data: any): Promise<ValidationResult>
-  + validateObservation(data: any): Promise<ValidationResult>
-  + validateEntityName(name: string): ValidationResult
-  + validateRelationType(type: string): ValidationResult
-  + validateSignificance(value: number): ValidationResult
-  + validateUrl(url: string): ValidationResult
-  + {static} ENTITY_TYPES: string[]
-  + {static} RELATION_TYPES: string[]
-}
-
-class FileStorageAdapter <<service>> {
-  - config: StorageConfig
-  - logger: Logger
-  - filePath: string
-  - data: StorageData
-  --
-  + initialize(): Promise<void>
-  + getInfo(): StorageInfo
-  + createBackup(): Promise<string>
-  + restoreFromBackup(path: string): Promise<void>
-  + exportData(): Promise<ExportData>
-  + importData(data: ImportData, merge: boolean): Promise<void>
-  + getStatistics(): Promise<Statistics>
+  + executeIncrementalUpdate(projectKey: string): Promise<Result>
+  + executeFullUpdate(projectKey: string): Promise<Result>
+  + executeWithRetry(operation: Function, maxRetries: number): Promise<any>
 }
 
 class ConfigManager <<util>> {
-  - options: ConfigOptions
+  - configPath: string
   - config: Configuration
-  - configPaths: ConfigPaths
   --
   + get(key: string, defaultValue?: any): any
   + set(key: string, value: any): void
-  + save(path?: string): Promise<void>
-  + getAll(): Configuration
-  + reset(): void
-  + validate(): ValidationResult
-  + {static} getPlatformInfo(): PlatformInfo
-  + {static} getEnvironmentInfo(): EnvironmentInfo
+  + getServerUrl(): string
+  + getProjectKey(): string
+  + save(): Promise<void>
+  + load(): Promise<void>
 }
 
 class Logger <<util>> {
-  - config: LoggerConfig
-  - levels: LogLevels
-  - colors: ColorMap
+  - level: string
+  - colors: boolean
   --
   + error(message: string, meta?: object): void
   + warn(message: string, meta?: object): void
   + info(message: string, meta?: object): void
   + debug(message: string, meta?: object): void
-  + trace(message: string, meta?: object): void
-  + child(context: object): Logger
-  + setLevel(level: string): void
-  + time(label: string): Timer
-  + logMemoryUsage(label: string): void
-  + logOperation(op: string, status: string, meta?: object): void
 }
 
-' Entity and Relation types
+package "Command Handlers" <<command>> {
+  class EntityCommand {
+    - apiClient: VkbApiClient
+    - routingDecision: RoutingDecision
+    --
+    + list(params: ListParams): Promise<void>
+    + add(entity: EntityData): Promise<void>
+    + remove(name: string): Promise<void>
+    + search(query: string): Promise<void>
+    + update(name: string, updates: Partial<Entity>): Promise<void>
+  }
+
+  class RelationCommand {
+    - apiClient: VkbApiClient
+    - routingDecision: RoutingDecision
+    --
+    + list(params: ListParams): Promise<void>
+    + add(relation: RelationData): Promise<void>
+    + remove(from: string, to: string): Promise<void>
+  }
+
+  class RoutingDecision {
+    - apiClient: VkbApiClient
+    --
+    + checkServerAvailability(): Promise<boolean>
+    + route(operation: Operation): Promise<Result>
+  }
+}
+
 class Entity {
-  + id: string
   + name: string
   + entityType: string
-  + observations: Observation[]
+  + observations: string[]
   + significance: number
   + created: string
   + updated: string
-  + metadata: object
 }
 
 class Relation {
-  + id: string
   + from: string
   + to: string
   + relationType: string
   + significance: number
   + created: string
+}
+
+class Checkpoint {
+  + projectKey: string
+  + lastRun: string
+  + processedCount: number
   + metadata: object
 }
 
-class Observation {
-  + type: string
-  + content: string
-  + date: string
-  + tags?: string[]
-  + metadata?: object
-}
-
 ' Relationships
-KnowledgeAPI --> ConfigManager : uses
-KnowledgeAPI --> Logger : uses
-KnowledgeAPI --> IStorage : uses
-KnowledgeAPI --> ValidationService : uses
-KnowledgeAPI --> EntityManager : manages
-KnowledgeAPI --> RelationManager : manages
-KnowledgeAPI --> InsightProcessor : manages
+UKBCli --> TeamCheckpointManager : uses
+UKBCli --> GapAnalyzer : uses
+UKBCli --> ConfigManager : uses
+UKBCli --> EntityCommand : delegates
+UKBCli --> RelationCommand : delegates
 
-EntityManager --> IStorage : uses
-EntityManager --> ValidationService : uses
-EntityManager --> Logger : uses
-EntityManager ..> Entity : manages
+EntityCommand --> VkbApiClient : uses
+EntityCommand --> RoutingDecision : uses
+EntityCommand ..> Entity : manages
 
-RelationManager --> IStorage : uses
-RelationManager --> ValidationService : uses
-RelationManager --> Logger : uses
-RelationManager ..> Relation : manages
+RelationCommand --> VkbApiClient : uses
+RelationCommand --> RoutingDecision : uses
+RelationCommand ..> Relation : manages
 
-InsightProcessor --> EntityManager : uses
-InsightProcessor --> RelationManager : uses
-InsightProcessor --> Logger : uses
+RoutingDecision --> VkbApiClient : checks
 
-FileStorageAdapter ..|> IStorage : implements
-FileStorageAdapter --> Logger : uses
+WorkflowOrchestrator --> VkbApiClient : uses
+WorkflowOrchestrator --> GapAnalyzer : uses
+WorkflowOrchestrator --> TeamCheckpointManager : uses
 
-Entity --> Observation : contains
+TeamCheckpointManager --> ConfigManager : uses
+TeamCheckpointManager ..> Checkpoint : manages
+
+GapAnalyzer --> TeamCheckpointManager : uses
+GapAnalyzer --> ConfigManager : uses
+
+VkbApiClient --> Logger : uses
 
 @enduml

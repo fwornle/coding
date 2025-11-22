@@ -162,12 +162,6 @@ Capture, organize, and visualize development insights with git-based team collab
 ### Knowledge Management
 
 ```bash
-# Capture insights from recent git commits
-ukb
-
-# Interactive structured capture
-ukb --interactive
-
 # Start visualization server
 vkb
 

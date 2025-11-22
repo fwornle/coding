@@ -1,131 +1,175 @@
 @startuml ukb-cli-sequence-entity-creation
 !include _standard-style.puml
 
-title Entity Creation Sequence Diagram
+title Entity Creation Sequence Diagram (v2.0)
 
 actor User
-participant "CLI" as CLI
-participant "CommandRouter" as Router
-participant "KnowledgeAPI" as API
-participant "EntityManager" as EM
-participant "ValidationService" as VS
-participant "FileStorageAdapter" as Storage
-database "shared-memory.json" as DB
+participant "UKBCli" as CLI
+participant "EntityCommand" as EC
+participant "RoutingDecision" as Router
+participant "VkbApiClient" as Client
+participant "VKB Server API" as API
+database "GraphDB\n(Graphology+LevelDB)" as DB
 
-== Interactive Entity Creation ==
+== Entity Creation via CLI ==
 
-User -> CLI: ukb entity add --interactive
+User -> CLI: ukb entity add "CachingPattern" "TechnicalPattern" 8
 activate CLI
 
-CLI -> Router: route command
+CLI -> CLI: parseArgs()
+CLI -> EC: add(entityData)
+activate EC
+
+EC -> Router: checkServerAvailability()
 activate Router
 
-Router -> API: getEntityManager()
+Router -> Client: isServerAvailable()
+activate Client
+
+Client -> API: GET /api/health
 activate API
-API --> Router: entityManager
+API --> Client: {status: "ok"}
 deactivate API
 
-Router -> CLI: start interactive prompt
+Client --> Router: true
+deactivate Client
+
+Router --> EC: serverRunning = true
 deactivate Router
 
-CLI -> User: Prompt for entity name
-User --> CLI: "ReactHooksPattern"
+alt Server Running
+  EC -> Client: createEntity(entityData, {save: true})
+  activate Client
 
-CLI -> User: Select entity type
-User --> CLI: "TechnicalPattern"
+  Client -> API: POST /api/entities\n{name, entityType, significance}
+  activate API
 
-CLI -> User: Enter significance (1-10)
-User --> CLI: "8"
+  API -> API: Validate entity data
+  API -> API: Check for duplicates
 
-CLI -> User: Add observation? (optional)
-User --> CLI: "Reusable state logic extraction"
-
-CLI -> API: entities.create(entityData)
-activate API
-
-API -> EM: create(entityData)
-activate EM
-
-EM -> VS: validateEntity(entityData)
-activate VS
-
-VS -> VS: check name format
-VS -> VS: check entity type
-VS -> VS: check significance range
-VS -> VS: validate observations
-
-alt Valid Data
-  VS --> EM: {valid: true}
-  deactivate VS
-  
-  EM -> EM: generate UUID
-  EM -> EM: add timestamps
-  EM -> EM: normalize observations
-  
-  EM -> Storage: addEntity(entity)
-  activate Storage
-  
-  Storage -> Storage: check for duplicates
-  
-  alt No Duplicate
-    Storage -> Storage: add to entities array
-    Storage -> DB: write JSON
+  alt Valid and No Duplicate
+    API -> DB: Add entity to graph
     activate DB
-    DB --> Storage: success
+    DB -> DB: Graph operations
+    DB -> DB: Persist to LevelDB
+    DB --> API: success
     deactivate DB
-    
-    Storage --> EM: success
-    deactivate Storage
-    
-    EM -> EM: log creation
-    EM --> API: entity object
-    deactivate EM
-    
-    API --> CLI: entity object
+
+    API --> Client: {entity, success: true}
     deactivate API
-    
-    CLI -> CLI: format output
-    CLI -> User: ✅ Created entity: ReactHooksPattern
-    
+
+    Client --> EC: entity object
+    deactivate Client
+
+    EC --> CLI: entity object
+    deactivate EC
+
+    CLI -> User: ✅ Entity created: CachingPattern
+    deactivate CLI
+
   else Duplicate Found
-    Storage --> EM: DuplicateError
-    EM --> API: throw Error
-    API --> CLI: Error
-    CLI -> User: ❌ Entity already exists
+    API --> Client: {error: "Entity already exists"}
+    Client --> EC: DuplicateError
+    EC --> CLI: Error
+    CLI -> User: ❌ Error: Entity already exists
   end
-  
-else Invalid Data
-  VS --> EM: {valid: false, errors: [...]}
-  EM --> API: ValidationError
-  API --> CLI: ValidationError
-  CLI -> User: ❌ Validation failed: [errors]
+
+else Server Not Running
+  EC -> User: ⚠️  VKB Server not running\nStart server with: vkb server start
+  deactivate EC
+  deactivate CLI
 end
 
-deactivate CLI
+== Entity List Operation ==
 
-== Non-Interactive Entity Creation ==
-
-User -> CLI: ukb entity add -n "ReduxPattern" -t "ArchitecturePattern" -s 9
+User -> CLI: ukb entity list
 activate CLI
 
-CLI -> Router: route command with options
+CLI -> CLI: parseArgs()
+CLI -> EC: list({})
+activate EC
+
+EC -> Router: checkServerAvailability()
 activate Router
-
-Router -> API: entities.create({name, type, significance})
+Router -> Client: isServerAvailable()
+activate Client
+Client -> API: GET /api/health
 activate API
-
-note over API, Storage
-  Same validation and storage flow as above
-  but without interactive prompts
-end note
-
-API --> Router: entity object
+API --> Client: {status: "ok"}
 deactivate API
-
-Router --> CLI: entity object
+Client --> Router: true
+deactivate Client
+Router --> EC: serverRunning = true
 deactivate Router
 
-CLI -> User: ✅ Created entity: ReduxPattern
+EC -> Client: getEntities()
+activate Client
+
+Client -> API: GET /api/entities
+activate API
+
+API -> DB: Query all entities
+activate DB
+DB --> API: entities array
+deactivate DB
+
+API --> Client: {entities: [...]}
+deactivate API
+
+Client --> EC: entities array
+deactivate Client
+
+EC -> EC: Format output
+EC --> CLI: formatted list
+deactivate EC
+
+CLI -> User: Display entities table
+deactivate CLI
+
+== Entity Deletion Operation ==
+
+User -> CLI: ukb entity remove "OldPattern"
+activate CLI
+
+CLI -> EC: remove("OldPattern")
+activate EC
+
+EC -> Router: checkServerAvailability()
+activate Router
+Router -> Client: isServerAvailable()
+activate Client
+Client -> API: GET /api/health
+activate API
+API --> Client: {status: "ok"}
+deactivate API
+Client --> Router: true
+deactivate Client
+Router --> EC: serverRunning = true
+deactivate Router
+
+EC -> Client: deleteEntity("OldPattern", {save: true})
+activate Client
+
+Client -> API: DELETE /api/entities/OldPattern
+activate API
+
+API -> DB: Remove entity from graph
+activate DB
+DB -> DB: Remove all related edges
+DB -> DB: Persist changes
+DB --> API: success
+deactivate DB
+
+API --> Client: {success: true}
+deactivate API
+
+Client --> EC: success
+deactivate Client
+
+EC --> CLI: success
+deactivate EC
+
+CLI -> User: ✅ Entity removed: OldPattern
 deactivate CLI
 
 @enduml
