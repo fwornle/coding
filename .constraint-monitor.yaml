@@ -244,6 +244,16 @@ constraints:
     severity: warning
     enabled: false
     suggestion: Use useReducer for complex state or separate into multiple useState calls
+  - id: no-ukb-bash-command
+    group: architecture
+    pattern: (?:bash|shell|command|execute|run).*\bukb\b|ukb.*(?:bash|shell|command)
+    message: "CRITICAL: 'ukb' is NOT a shell command! When user types 'ukb' at Claude prompt, call MCP semantic analysis tool (full or incremental), NOT bash"
+    severity: critical
+    enabled: true
+    applies_to: content
+    tool_filter: ["Bash"]
+    suggestion: "User typing 'ukb' at Claude prompt means: Call mcp-server-semantic-analysis tool (full or incremental workflow). Never try to run 'ukb' as a bash/shell command - it was completely removed from the system."
+    semantic_validation: true
 settings:
   compliance:
     excellent_threshold: 9
