@@ -45,9 +45,11 @@ package "Storage - 3 Sync Targets" {
 }
 
 package "LLM Provider Chain" {
-  cloud "Custom LLM\nPrimary" <<external>> as custom
-  cloud "Anthropic Claude\nSecondary" <<external>> as anthropic
-  cloud "OpenAI GPT\nFallback" <<external>> as openai
+  cloud "Groq\nDefault" <<external>> as groq
+  cloud "Gemini\nFallback #1" <<external>> as gemini
+  cloud "Custom LLM\nFallback #2" <<external>> as custom
+  cloud "Anthropic Claude\nFallback #3" <<external>> as anthropic
+  cloud "OpenAI GPT\nFallback #4" <<external>> as openai
 }
 
 ' Client connections
@@ -71,15 +73,12 @@ coord -down-> sync
 coord -down-> dedup
 
 ' LLM agents use provider chain
+sem ..> groq
+sem ..> gemini
 sem ..> custom
 sem ..> anthropic
 sem ..> openai
-ins ..> custom
-ins ..> anthropic
-ins ..> openai
-qa ..> custom
-qa ..> anthropic
-qa ..> openai
+ins ..> sem : "Delegates"
 
 ' Sync agent manages storage
 sync -down-> graphdb
@@ -110,15 +109,23 @@ note right of sync
   Bidirectional sync: 60s interval
 end note
 
-note right of custom
-  **3-Tier LLM Provider Chain**
+note right of groq
+  **4-Tier LLM Provider Chain**
 
-  Custom → Claude → GPT
+  Groq → Gemini → Custom → Anthropic → OpenAI
 
-  Used by 3 agents:
-  • SemanticAnalysisAgent
-  • InsightGenerationAgent
-  • QualityAssuranceAgent
+  Used by 2 agents directly:
+  • SemanticAnalysisAgent (direct)
+  • SemanticAnalyzer (direct)
+
+  Used by 1 agent via delegation:
+  • InsightGenerationAgent (via SemanticAnalyzer)
+
+  Models:
+  • Groq: llama-3.3-70b-versatile
+  • Gemini: gemini-2.0-flash-exp
+  • Anthropic: claude-sonnet-4-20250514
+  • OpenAI: gpt-4-turbo-preview
 end note
 
 @enduml

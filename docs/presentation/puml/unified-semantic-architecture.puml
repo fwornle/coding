@@ -26,12 +26,12 @@ package "10 Worker Agents" {
   package "LLM" #FFE6E6 {
     [Semantic] <<agent>> as sem
     [Insights] <<agent>> as ins
-    [Quality] <<agent>> as qa
   }
 
   package "Infra" #E8F4FD {
     [Sync] <<agent>> as sync
     [Dedup] <<agent>> as dedup
+    [Quality] <<agent>> as qa
   }
 }
 
@@ -40,7 +40,9 @@ package "Storage" {
   database "Files" <<storage>> as files
 }
 
-package "LLMs" {
+package "LLMs\n(4-tier chain)" {
+  cloud "Groq" <<external>> as groq
+  cloud "Gemini" <<external>> as gemini
   cloud "Custom" <<external>> as custom
   cloud "Claude" <<external>> as anthropic
   cloud "GPT" <<external>> as openai
@@ -63,11 +65,12 @@ coord --> sync
 coord --> dedup
 
 ' LLM usage
+sem ..> groq
+sem ..> gemini
 sem ..> custom
 sem ..> anthropic
 sem ..> openai
-ins ..> custom
-qa ..> custom
+ins ..> sem : "Delegates"
 
 ' Storage
 sync --> graphdb

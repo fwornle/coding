@@ -5,334 +5,86 @@ title Semantic Analysis System - Deployment Architecture
 
 top to bottom direction
 
-package "Single Machine Deployment" {
+package "Development Deployment" {
   node "Development Machine" as DevMachine {
     component [Claude Code] as CC
     component [MCP Server] as MCP
-    
-    frame "Communication Infrastructure" {
-      component [MQTT Broker] as MQTT
-      note right of MQTT: Port 1883
-      component [JSON-RPC Server] as RPC
-      note right of RPC: Port 3001
+
+    frame "10-Agent System" {
+      component [GitHistoryAgent] as Git
+      component [VibeHistoryAgent] as Vibe
+      component [SemanticAnalysisAgent] as SA
+      component [WebSearchAgent] as WS
+      component [InsightGenerationAgent] as Insight
+      component [ObservationGenerationAgent] as Obs
+      component [QualityAssuranceAgent] as QA
+      component [PersistenceAgent] as Persist
+      component [DeduplicationAgent] as Dedup
+      component [CoordinatorAgent] as Coord
     }
-    
-    frame "AI Agents" {
-      component [Semantic Analysis Agent] as SA
-      component [Web Search Agent] as WS
-      component [Knowledge Graph Agent] as KG
-      component [Coordinator Agent] as CA
-    }
-    
+
     frame "Storage" {
-      database [shared-memory.json] as SharedMemory
+      database [GraphDB\nGraphology + LevelDB] as GraphDB
+      component [Graph Exporter] as Exporter
+      database [shared-memory-coding.json] as SharedMemory
       folder [.specstory/history] as History
-      folder [Project Files] as ProjectFiles
+      folder [.data/knowledge-graph/] as KGStorage
     }
-    
+
     frame "External Services" {
+      cloud [Groq] as GroqAPI
+      cloud [Gemini] as GeminiAPI
+      cloud [Custom LLM] as CustomLLM
       cloud [Claude API] as ClaudeAPI
       cloud [OpenAI API] as OpenAIAPI
       cloud [Search Engines] as SearchEngines
     }
   }
-  
-  ' Single machine connections
+
+  ' Development machine connections (direct function calls)
   CC --> MCP
-  MCP --> MQTT
-  MCP --> RPC
-  
-  SA --> MQTT
-  WS --> MQTT
-  KG --> MQTT
-  CA --> MQTT
-  
-  SA --> RPC
-  WS --> RPC
-  KG --> RPC
-  CA --> RPC
-  
-  KG --> SharedMemory
+  MCP --> Coord
+
+  Coord --> Git
+  Coord --> Vibe
+  Coord --> SA
+  Coord --> WS
+  Coord --> Insight
+  Coord --> Obs
+  Coord --> QA
+  Coord --> Persist
+  Coord --> Dedup
+
+  Coord --> GraphDB : initializes
+  Persist --> GraphDB : stores entities
+  GraphDB --> KGStorage : LevelDB
+  GraphDB --> Exporter : auto-export 30s
+  Exporter --> SharedMemory : writes JSON
+
+  Git --> History
+  Vibe --> History
   CC --> History
-  SA --> ProjectFiles
-  
+
+  SA --> GroqAPI
+  SA --> GeminiAPI
+  SA --> CustomLLM
   SA --> ClaudeAPI
   SA --> OpenAIAPI
+  Vibe --> GroqAPI
+  Insight --> GroqAPI
+  Obs --> GroqAPI
+  QA --> GroqAPI
+  Dedup --> OpenAIAPI
   WS --> SearchEngines
 }
 
-package "Distributed Deployment" {
-  node "Control Node" as ControlNode {
-    component [Claude Code] as CC_Dist
-    component [MCP Server] as MCP_Dist
-    component [MQTT Broker] as MQTT_Dist
-    note right of MQTT_Dist: Central message broker
-    database [shared-memory.json] as SharedMemory_Dist
-  }
-  
-  node "Agent Node 1" as AgentNode1 {
-    component [Semantic Analysis Agent] as SA_1
-    component [Web Search Agent] as WS_1
-    component [JSON-RPC Server] as RPC_1
-    note right of RPC_1: Port 3001
-  }
-  
-  node "Agent Node 2" as AgentNode2 {
-    component [Knowledge Graph Agent] as KG_2
-    component [Coordinator Agent] as CA_2
-    component [JSON-RPC Server] as RPC_2
-    note right of RPC_2: Port 3002
-  }
-  
-  cloud "External Services" as ExtServices {
-    component [Claude API] as ClaudeAPI_Dist
-    component [OpenAI API] as OpenAIAPI_Dist
-    component [Search Engines] as SearchEngines_Dist
-  }
-  
-  ' Distributed connections
-  CC_Dist --> MCP_Dist
-  MCP_Dist --> MQTT_Dist
-  
-  SA_1 --> MQTT_Dist : "remote connection"
-  WS_1 --> MQTT_Dist : "remote connection"
-  KG_2 --> MQTT_Dist : "remote connection"
-  CA_2 --> MQTT_Dist : "remote connection"
-  
-  MCP_Dist --> RPC_1 : "remote calls"
-  MCP_Dist --> RPC_2 : "remote calls"
-  
-  KG_2 --> SharedMemory_Dist : "network access"
-  
-  SA_1 --> ClaudeAPI_Dist
-  SA_1 --> OpenAIAPI_Dist
-  WS_1 --> SearchEngines_Dist
-}
-
-package "Container Deployment" {
-  node "Docker Host" as DockerHost {
-    frame "Infrastructure Containers" {
-      component [MQTT Container] as MQTT_Container
-      note right of MQTT_Container
-        Image: eclipse-mosquitto
-        Port: 1883
-        Volume: /mosquitto/data
-      end note
-      
-      component [JSON-RPC Container] as RPC_Container
-      note right of RPC_Container
-        Image: semantic-analysis/rpc-server
-        Port: 3001
-        Health: /health endpoint
-      end note
-    }
-    
-    frame "Agent Containers" {
-      component [Semantic Analysis Container] as SA_Container
-      note right of SA_Container
-        Image: semantic-analysis/semantic-agent
-        Env: ANTHROPIC_API_KEY, OPENAI_API_KEY
-        Resources: 2GB RAM, 1 CPU
-      end note
-      
-      component [Web Search Container] as WS_Container
-      note right of WS_Container
-        Image: semantic-analysis/web-search-agent
-        Env: SEARCH_API_KEYS
-        Resources: 1GB RAM, 0.5 CPU
-      end note
-      
-      component [Knowledge Graph Container] as KG_Container
-      note right of KG_Container
-        Image: semantic-analysis/knowledge-agent
-        Volume: /app/shared-memory.json
-        Resources: 1GB RAM, 0.5 CPU
-      end note
-      
-      component [Coordinator Container] as CA_Container
-      note right of CA_Container
-        Image: semantic-analysis/coordinator-agent
-        Resources: 512MB RAM, 0.5 CPU
-      end note
-    }
-    
-    frame "Application Containers" {
-      component [MCP Server Container] as MCP_Container
-      note right of MCP_Container
-        Image: semantic-analysis/mcp-server
-        Port: 3000
-        Health: /status endpoint
-      end note
-    }
-    
-    frame "Storage" {
-      database [Knowledge Volume] as KnowledgeVolume
-      note right of KnowledgeVolume
-        Volume: semantic-analysis-knowledge
-        Mount: /app/data
-        Backup: automated daily
-      end note
-    }
-  }
-  
-  ' Container network connections
-  MCP_Container --> MQTT_Container : "internal network"
-  MCP_Container --> RPC_Container : "internal network"
-  
-  SA_Container --> MQTT_Container : "internal network"
-  WS_Container --> MQTT_Container : "internal network"
-  KG_Container --> MQTT_Container : "internal network"
-  CA_Container --> MQTT_Container : "internal network"
-  
-  KG_Container --> KnowledgeVolume : "volume mount"
-}
-
-package "Cloud Deployment" {
-  cloud "AWS/GCP/Azure" as CloudProvider {
-    frame "Compute Resources" {
-      component [Load Balancer] as LB
-      component [Claude Code Instance] as CC_Cloud
-      component [Agent Cluster] as AgentCluster
-      component [Auto Scaling Group] as ASG
-      component [Agent Instances] as AgentInstances
-    }
-    
-    frame "Managed Services" {
-      database [Managed Database] as ManagedDB
-      note right of ManagedDB
-        AWS RDS / Azure Database
-        Automated backups
-        High availability
-      end note
-      
-      component [Message Queue Service] as MQS
-      note right of MQS
-        AWS SQS / Azure Service Bus
-        Managed MQTT broker
-        Scalable messaging
-      end note
-      
-      component [Container Service] as ContainerService
-      note right of ContainerService
-        AWS ECS / Azure Container Instances
-        Managed containers
-        Auto-scaling
-      end note
-    }
-    
-    frame "Storage Services" {
-      database [Object Storage] as ObjectStorage
-      note right of ObjectStorage
-        AWS S3 / Azure Blob Storage
-        Knowledge base backups
-        Conversation logs
-      end note
-      
-      component [File System] as FileSystem
-      note right of FileSystem
-        AWS EFS / Azure Files
-        Shared storage
-        Project files
-      end note
-    }
-    
-    frame "Security & Monitoring" {
-      component [API Gateway] as APIGateway
-      component [Identity & Access] as IAM
-      component [Monitoring] as CloudMonitoring
-      component [Logging] as CloudLogging
-    }
-  }
-  
-  ' Cloud architecture connections
-  LB --> CC_Cloud
-  CC_Cloud --> APIGateway
-  APIGateway --> AgentCluster
-  AgentCluster --> MQS
-  AgentCluster --> ManagedDB
-  
-  AgentCluster --> ObjectStorage
-  AgentCluster --> FileSystem
-  
-  CloudMonitoring --> AgentCluster
-  CloudLogging --> AgentCluster
-  IAM --> APIGateway
-}
-
-package "Deployment Configurations" {
-  rectangle "Development Setup" as DevSetup {
-    [Local Machine] --> [All-in-One Process]
-    [All-in-One Process] --> [File-based Storage]
-    [File-based Storage] --> [Git Repository]
-    
-    note bottom
-      **Development Mode:**
-      - Single process for all agents
-      - File-based message passing
-      - Local knowledge base file
-      - Integrated with git workflow
-    end note
-  }
-  
-  rectangle "Team Setup" as TeamSetup {
-    [Shared MQTT Broker] --> [Individual Agent Processes]
-    [Individual Agent Processes] --> [Shared Knowledge Base]
-    [Shared Knowledge Base] --> [Version Control]
-    
-    note bottom
-      **Team Mode:**
-      - Shared communication infrastructure
-      - Distributed agent processes
-      - Centralized knowledge management
-      - Multi-user collaboration
-    end note
-  }
-  
-  rectangle "Production Setup" as ProdSetup {
-    [Load Balanced Entry] --> [High Availability Agents]
-    [High Availability Agents] --> [Redundant Storage]
-    [Redundant Storage] --> [Automated Backups]
-    
-    note bottom
-      **Production Mode:**
-      - High availability and failover
-      - Horizontal scaling
-      - Persistent storage with backups
-      - Monitoring and alerting
-    end note
-  }
-}
-
 note top of DevMachine
-  **Single Machine Benefits:**
-  • Simple setup and debugging
-  • No network complexity
-  • Ideal for development
-  • Resource efficient
-end note
-
-note top of ControlNode
-  **Distributed Benefits:**
-  • Better resource utilization
-  • Fault tolerance
-  • Scalable processing
-  • Agent specialization
-end note
-
-note top of DockerHost
-  **Container Benefits:**
-  • Consistent environments
-  • Easy deployment
-  • Resource isolation
-  • Simplified updates
-end note
-
-note top of CloudProvider
-  **Cloud Benefits:**
-  • Managed infrastructure
-  • Auto-scaling
-  • Global availability
-  • Enterprise features
+  **Development Deployment:**
+  • Single machine, all agents in one process
+  • GraphDB with LevelDB persistence
+  • Direct function calls (no MQTT/RPC)
+  • Auto-export to git-tracked JSON
+  • LLM fallback chain: Groq → Gemini → Custom → Anthropic → OpenAI
 end note
 
 @enduml

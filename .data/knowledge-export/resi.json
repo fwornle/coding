@@ -1,6 +1,20 @@
 {
   "entities": [
     {
+      "name": "Normalisa",
+      "entityType": "Project",
+      "observations": [
+        "Real-time data normalization and validation system",
+        "Handles streaming data from multiple sources with different schemas",
+        "Implements advanced pattern matching and transformation pipelines"
+      ],
+      "metadata": {
+        "created_at": "2025-11-18T10:51:00.060Z",
+        "last_updated": "2025-11-18T10:51:00.060Z"
+      },
+      "id": "mc4flkg111zcb4"
+    },
+    {
       "name": "CollectiveKnowledge",
       "entityType": "System",
       "observations": [
@@ -13,20 +27,6 @@
         "last_updated": "2025-11-17T20:48:45.922Z"
       },
       "id": "mc4flkg1qr4h9s"
-    },
-    {
-      "name": "Normalisa",
-      "entityType": "Project",
-      "observations": [
-        "Real-time data normalization and validation system",
-        "Handles streaming data from multiple sources with different schemas",
-        "Implements advanced pattern matching and transformation pipelines"
-      ],
-      "metadata": {
-        "created_at": "2025-11-17T20:48:45.922Z",
-        "last_updated": "2025-11-17T20:48:45.922Z"
-      },
-      "id": "mc4flkg111zcb4"
     },
     {
       "name": "StreamProcessingPattern",
@@ -98,7 +98,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "resi",
-    "exported_at": "2025-11-21T06:43:54.692Z",
+    "exported_at": "2025-11-22T17:42:42.204Z",
     "total_entities": 4,
     "total_relations": 5,
     "description": "Resi project patterns"
