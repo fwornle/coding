@@ -40,7 +40,7 @@ package "10-Agent Semantic Analysis System" {
 package "Storage Architecture" {
   database [GraphDB\nGraphology + LevelDB\n.data/knowledge-graph/] as GraphDB
   component [Graph Exporter] as Exporter
-  database [shared-memory-coding.json\nGit-tracked export] as SharedMemory
+  database [coding.json\n.data/knowledge-export/] as SharedMemory
 
   note right of GraphDB
     • Primary storage layer

@@ -99,23 +99,31 @@ class Logger <<util>> {
 
 package "Command Handlers" <<command>> {
   class EntityCommand {
-    - apiClient: VkbApiClient
-    - routingDecision: RoutingDecision
+    - codingRepo: string
+    - config: object
+    - graphDB: GraphDatabaseService
     --
-    + list(params: ListParams): Promise<void>
-    + add(entity: EntityData): Promise<void>
-    + remove(name: string): Promise<void>
-    + search(query: string): Promise<void>
-    + update(name: string, updates: Partial<Entity>): Promise<void>
+    + list(options: object): Promise<Entity[]>
+    + show(name: string, options: object): Promise<Entity>
+    + create(entity: EntityData, options: object): Promise<Entity>
+    + update(name: string, updates: Partial<Entity>, options: object): Promise<Entity>
+    + delete(name: string, options: object): Promise<void>
+    + search(query: string, options: object): Promise<Entity[]>
+    + close(): Promise<void>
   }
 
   class RelationCommand {
-    - apiClient: VkbApiClient
-    - routingDecision: RoutingDecision
+    - codingRepo: string
+    - config: object
+    - graphDB: GraphDatabaseService
     --
-    + list(params: ListParams): Promise<void>
-    + add(relation: RelationData): Promise<void>
-    + remove(from: string, to: string): Promise<void>
+    + list(options: object): Promise<Relation[]>
+    + show(from: string, to: string, options: object): Promise<Relation[]>
+    + create(relation: RelationData, options: object): Promise<Relation>
+    + update(from: string, to: string, updates: object, options: object): Promise<Relation>
+    + delete(from: string, to: string, options: object): Promise<void>
+    + findRelated(entity: string, options: object): Promise<object[]>
+    + close(): Promise<void>
   }
 
   class RoutingDecision {

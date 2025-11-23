@@ -84,7 +84,7 @@ package "10-Agent System" {
 package "Storage Architecture" {
   database "GraphDB\nGraphology + LevelDB\n.data/knowledge-graph/" as GraphDB <<storage>>
   component [Graph Exporter] as Exporter <<storage>>
-  database "shared-memory-coding.json\nGit-tracked export" as SharedMemory <<storage>>
+  database "coding.json\n.data/knowledge-export/" as SharedMemory <<storage>>
 }
 
 ' User connections

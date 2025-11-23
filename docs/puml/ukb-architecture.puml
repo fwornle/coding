@@ -5,18 +5,22 @@ title UKB (Update Knowledge Base) - Current Architecture
 
 top to bottom direction
 
-' Entry points
-package "CLI Entry Points" {
-  [bin/ukb] as ukb_bin
-  [ukb --interactive] as interactive
-  [ukb (auto)] as auto
+' Entry point
+package "CLI Entry Point" {
+  [lib/ukb-unified/cli.js] as cli
+  note right of cli
+    UKB Unified CLI (v2.0)
+    Smart incremental updates
+    Team checkpoint management
+  end note
 }
 
-' Core implementation
-package "UKB Core" {
-  [lib/ukb-database/cli.js] as cli
+' Core Services
+package "Core Services" {
+  [TeamCheckpointManager] as checkpoint
+  [GapAnalyzer] as gap
+  [WorkflowOrchestrator] as orchestrator
   [DatabaseManager] as db_mgr
-  [UKBDatabaseWriter] as writer
 }
 
 ' Input processing
@@ -60,15 +64,13 @@ package "Visualization" {
   [Web UI (port 8080)] as web
 }
 
-' Entry flow
-ukb_bin --> cli
-interactive --> cli
-auto --> cli
-
-' Core processing
+' Core processing flow
+cli --> checkpoint
+cli --> gap
+cli --> orchestrator
 cli --> db_mgr
-cli --> writer
-cli --> git_analyzer
+orchestrator --> db_mgr
+orchestrator --> git_analyzer
 
 ' Knowledge extraction
 git_analyzer --> extractor
@@ -85,7 +87,7 @@ db_mgr --> graph_db
 db_mgr --> sqlite
 db_mgr --> qdrant
 
-writer --> db_mgr
+checkpoint --> gap
 
 ' Storage
 graph_db --> graphology
@@ -102,12 +104,12 @@ leveldb --> vkb
 graphology --> vkb
 vkb --> web
 
-note right of cli
-  **Entry point for all UKB operations**
-  • Auto mode (git analysis)
-  • Interactive mode (guided prompts)
-  • Entity/relation management
-  • Export/import operations
+note right of checkpoint
+  **Team-wide Checkpoint**
+  • .data/ukb-last-run.json
+  • Git-tracked for team sync
+  • Enables incremental processing
+  • Tracks last commit & session
 end note
 
 note right of graph_db

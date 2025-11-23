@@ -34,8 +34,9 @@ package "UKB Unified CLI" {
 
     note right of CLI
       Entry point: lib/ukb-unified/cli.js
-      Commands: default, status, checkpoint,
-      entity, relation
+      Commands: default, analyze, status,
+      checkpoint, config, entity, relation,
+      search, validate, help
     end note
   }
 
@@ -46,8 +47,8 @@ package "UKB Unified CLI" {
     [Checkpoint Command] as CheckpointCmd
 
     note bottom of EntityCmd
-      Operations: list, add, remove,
-      search, update
+      Operations: list, show, create,
+      update, delete, search
       Uses intelligent routing
     end note
   }

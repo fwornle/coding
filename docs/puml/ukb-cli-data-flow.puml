@@ -17,10 +17,15 @@ start
 :CLI Command;<<input>>
 note right
   ukb (default incremental)
-  ukb entity list
-  ukb relation add
-  ukb checkpoint
+  ukb analyze [workflow]
   ukb status
+  ukb checkpoint [status|reset]
+  ukb config
+  ukb entity [list|show|delete|search]
+  ukb relation [list|show|delete|find-related]
+  ukb search <query>
+  ukb validate
+  ukb --help
 end note
 
 |CLI Processing|

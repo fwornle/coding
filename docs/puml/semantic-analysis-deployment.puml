@@ -26,7 +26,7 @@ package "Development Deployment" {
     frame "Storage" {
       database [GraphDB\nGraphology + LevelDB] as GraphDB
       component [Graph Exporter] as Exporter
-      database [shared-memory-coding.json] as SharedMemory
+      database [coding.json\n.data/knowledge-export/] as SharedMemory
       folder [.specstory/history] as History
       folder [.data/knowledge-graph/] as KGStorage
     }

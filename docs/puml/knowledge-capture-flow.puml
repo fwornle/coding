@@ -25,27 +25,22 @@ if (Semantic agents running?) then (yes)
     :Create knowledge entities;
   }
 else (no)
-  partition "Manual Capture" {
-    :Use ukb --interactive;
-    :Enter 9-line format;
-    :Manual categorization;
+  partition "Manual Capture via MCP" {
+    :User types "ukb" at Claude prompt;
+    :MCP semantic analysis tool called;
+    :execute_workflow or create_ukb_entity_with_insight;
   }
 endif
 
-:Update shared-memory.json;
-:Sync with MCP memory;
+:GraphDB updated directly;
+:Auto-export to coding.json every 5s (debounced);
 
 if (Using Claude Code?) then (yes)
-  :Instant MCP memory update;
-  :Available in current session;
+  :GraphDB available immediately;
+  :MCP memory queries work;
 else (no)
-  if (Using VSCode?) then (yes)
-    :WebSocket notification;
-    :Update knowledge panel;
-  else (no)
-    :File system update only;
-    :Requires manual refresh;
-  endif
+  :GraphDB persisted to LevelDB;
+  :JSON export for git tracking;
 endif
 
 :Knowledge available to team;
