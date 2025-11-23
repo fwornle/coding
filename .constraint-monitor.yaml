@@ -269,7 +269,7 @@ constraints:
     suggestion: Use useReducer for complex state or separate into multiple useState calls
   - id: no-ukb-bash-command
     group: architecture
-    pattern: (?:bash|shell|command|execute|run).*\bukb\b|ukb.*(?:bash|shell|command)
+    pattern: ^\s*ukb\s+(?:--help|-h|--version|-v|status|entity|relation|checkpoint|config|search|validate|analyze|--full|--force|--dry-run|--verbose|--debug)
     message: "CRITICAL: 'ukb' is NOT a shell command! When user types 'ukb' at Claude prompt, call MCP semantic analysis tool (full or incremental), NOT bash"
     severity: critical
     enabled: true
