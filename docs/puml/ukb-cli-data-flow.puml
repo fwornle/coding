@@ -1,126 +1,125 @@
 @startuml ukb-cli-data-flow
 !include _standard-style.puml
 
-title UKB Unified CLI Data Flow (v2.0)
+title Knowledge Update Flow - MCP Integration
 
 skinparam activityShape rectangle
 skinparam activity {
-  BackgroundColor<<input>> #FFE8F4
-  BackgroundColor<<process>> #E8F5E8
-  BackgroundColor<<routing>> #FFE4E1
-  BackgroundColor<<storage>> #FFF9E6
-  BackgroundColor<<output>> #E8F4FD
+  BackgroundColor<<user>> #FFE8F4
+  BackgroundColor<<claude>> #E8F5E8
+  BackgroundColor<<mcp>> #FFE4E1
+  BackgroundColor<<workflow>> #FFF9E6
+  BackgroundColor<<storage>> #E8F4FD
 }
 
-|User Input|
+|User Interaction|
 start
-:CLI Command;<<input>>
+:User types "ukb" in Claude chat;<<user>>
 note right
-  ukb (default incremental)
-  ukb analyze [workflow]
-  ukb status
-  ukb checkpoint [status|reset]
-  ukb config
-  ukb entity [list|show|delete|search]
-  ukb relation [list|show|delete|find-related]
-  ukb search <query>
-  ukb validate
-  ukb --help
+  User input variations:
+  • "ukb" (triggers incremental)
+  • "ukb full" (triggers full analysis)
+  • "run ukb"
+  • "update knowledge base"
+
+  NOTE: "ukb" is NOT a shell command
+  It's a keyword that triggers Claude
 end note
 
-|CLI Processing|
-:Parse Arguments;<<process>>
-note right
-  UKBCli.parseArgs()
-  Extract command and options
-end note
+|Claude Decision|
+:Claude detects knowledge update request;<<claude>>
 
-:Identify Command Handler;<<process>>
-
-|Intelligent Routing|
-if (Requires VKB?) then (yes)
-  :Check Server Availability;<<routing>>
+if (Full or Incremental?) then (incremental)
+  :Claude calls MCP tool;<<claude>>
   note right
-    VkbApiClient.isServerAvailable()
-    Ping VKB server health endpoint
+    mcp__semantic-analysis__execute_workflow
+    workflow_name: "incremental-analysis"
   end note
+else (full)
+  :Claude calls MCP tool;<<claude>>
+  note right
+    mcp__semantic-analysis__execute_workflow
+    workflow_name: "complete-analysis"
+  end note
+endif
 
-  if (Server Running?) then (yes)
-    :Route via HTTP API;<<routing>>
-    note right
-      Lock-free access
-      VkbApiClient methods:
-      - getEntities()
-      - createEntity()
-      - deleteRelation()
-    end note
+|MCP Server Processing|
+:MCP receives workflow request;<<mcp>>
 
-    |VKB Server|
-    :API Endpoint Handler;<<process>>
-    :GraphDB Operations;<<storage>>
-    note right
-      Graphology graph operations
-      LevelDB persistence
-    end note
-  else (no)
-    :Route to Direct DB Access;<<routing>>
-    note right
-      Fallback mode
-      Direct GraphDB operations
-      (Server startup required)
-    end note
+:Load team checkpoint;<<workflow>>
+note right
+  .data/ukb-last-run.json
+  Git-tracked for team sync
+end note
 
-    |Direct Access|
-    :GraphDB Operations;<<storage>>
-  endif
-
+if (Incremental mode?) then (yes)
+  :Calculate gap since last run;<<workflow>>
+  note right
+    GapAnalyzer identifies:
+    • New commits since last run
+    • New session logs
+  end note
 else (no)
-  |Local Operations|
-  :Checkpoint Management;<<process>>
+  :Analyze entire history;<<workflow>>
   note right
-    TeamCheckpointManager
-    GapAnalyzer
-    ConfigManager
-  end note
-
-  :Local File Operations;<<storage>>
-  note right
-    Read/write checkpoints
-    Load configuration
+    Process all commits
+    Process all sessions
   end note
 endif
 
-|Response Processing|
-:Format Response;<<process>>
-
-:Display Results;<<output>>
+|10-Agent Workflow|
+:CoordinatorAgent orchestrates;<<workflow>>
 note right
-  Console output
-  JSON formatting
-  Success/error messages
+  Sequential execution:
+  1. GitHistoryAgent
+  2. VibeHistoryAgent
+  3. SemanticAnalysisAgent
+  4. WebSearchAgent
+  5. InsightGenerationAgent
+  6. ObservationGenerationAgent
+  7. QualityAssuranceAgent
+  8. PersistenceAgent
+  9. DeduplicationAgent
+  10. CoordinatorAgent
 end note
 
-|Incremental Workflow|
-if (Default Command?) then (yes)
-  :Load Last Checkpoint;<<process>>
-  note right
-    TeamCheckpointManager.getLastCheckpoint()
-    Identify gaps since last run
-  end note
+|Knowledge Storage|
+:PersistenceAgent stores to GraphDB;<<storage>>
+note right
+  • Graphology (in-memory)
+  • LevelDB (persistent)
+  • Auto-persist: 1s interval
+end note
 
-  :Analyze Gaps;<<process>>
-  note right
-    GapAnalyzer.identifyGaps()
-    Calculate what needs processing
-  end note
+:GraphKnowledgeExporter exports JSON;<<storage>>
+note right
+  • .data/knowledge-export/coding.json
+  • Auto-export: 5s debounced
+  • Git-tracked for team sharing
+end note
 
-  :Process Missing Items;<<process>>
-  :Save New Checkpoint;<<storage>>
-  note right
-    Update checkpoint timestamp
-    Record processed items
-  end note
-endif
+:Update team checkpoint;<<storage>>
+note right
+  .data/ukb-last-run.json
+  Records:
+  • lastSuccessfulRun timestamp
+  • lastCommit hash
+  • lastSession filename
+  • stats (entities/relations/insights)
+end note
+
+|Response to User|
+:MCP returns results to Claude;<<mcp>>
+
+:Claude displays summary to user;<<claude>>
+note right
+  Shows:
+  • Entities created
+  • Relations created
+  • Insights generated
+  • Commits/sessions analyzed
+  • Duration
+end note
 
 stop
 

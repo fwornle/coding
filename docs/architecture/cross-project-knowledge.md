@@ -50,44 +50,55 @@ Assistant: [provides solution]
 
 **See**: [Continuous Learning System Documentation](../knowledge-management/continuous-learning-system.md)
 
-#### 2. **Manual: UKB (Deliberate Insight Capture)**
+#### 2. **Manual: Semantic Analysis (Deliberate Insight Capture)**
 
 **What**: Explicit capture of architectural decisions and deep insights
 **When**: End of session, after solving complex problems
-**How**: Interactive CLI tool (`ukb --interactive`)
+**How**: Type "ukb" in Claude chat → Claude calls MCP semantic-analysis tool
 **Storage**: Same `GraphDatabaseService.storeEntity()` → central graph DB
 
 **Example Flow**:
-```bash
-# After solving a complex problem:
-ukb --interactive
+```
+# After solving a complex problem, in Claude chat:
+User: "ukb"
 
-# Prompts you for:
-- Entity type (Pattern/Solution/Architecture/etc.)
-- Name and description
-- Significance (1-10)
-- Related entities
-- Deep context and rationale
+# Claude detects request and calls:
+mcp__semantic-analysis__execute_workflow
+workflow_name: "incremental-analysis"
 
-# Stores to same central database
-# Same auto-export mechanism
+# 10-Agent System executes:
+1. GitHistoryAgent - analyzes recent commits
+2. VibeHistoryAgent - analyzes session logs
+3. SemanticAnalysisAgent - extracts insights
+4. WebSearchAgent - researches patterns
+5. InsightGenerationAgent - creates structured insights
+6. ObservationGenerationAgent - adds observations
+7. QualityAssuranceAgent - validates quality
+8. PersistenceAgent - stores to GraphDB
+9. DeduplicationAgent - prevents duplicates
+10. CoordinatorAgent - orchestrates workflow
+
+# Stores to central database
+# Auto-export: .data/knowledge-export/coding.json (5s debounced)
+# Checkpoint: .data/ukb-last-run.json (team-wide sync)
 ```
 
 **Benefits**:
-- ✅ Deep, structured insights
+- ✅ Deep, structured insights via AI analysis
 - ✅ Architectural decision records
 - ✅ Team-wide knowledge sharing
 - ✅ Deliberate, high-quality capture
+- ✅ 10-agent semantic analysis workflow
 
-**See**: [UKB Documentation](../knowledge-management/ukb-update.md)
+**See**: [MCP Semantic Analysis Documentation](../knowledge-management/mcp-semantic-analysis.md)
 
 #### Why Both Systems?
 
-| Aspect | Continuous Learning | UKB Manual |
-|--------|-------------------|------------|
-| **Capture** | Automatic, real-time | Manual, deliberate |
-| **Quality** | Good, contextual | Excellent, structured |
-| **Effort** | Zero | Moderate |
+| Aspect | Continuous Learning | Semantic Analysis |
+|--------|-------------------|-------------------|
+| **Capture** | Automatic, real-time | Manual trigger, AI-driven |
+| **Quality** | Good, contextual | Excellent, AI-analyzed |
+| **Effort** | Zero | Low (just type "ukb") |
 | **Use Case** | In-the-moment solutions | Architectural decisions |
 | **Timing** | During coding | After reflection |
 

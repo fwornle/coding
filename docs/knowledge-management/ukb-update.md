@@ -1,627 +1,207 @@
 # UKB - Update Knowledge Base
 
-**Component**: [ukb-cli](../../lib/knowledge-api/)
-**Type**: Command-line tool (Node.js)
-**Purpose**: Capture and manage development insights
+> **⚠️ IMPORTANT SYSTEM CHANGE**
+>
+> The UKB CLI tool has been **completely removed** from the system and replaced with MCP (Model Context Protocol) integration.
+>
+> **What this means:**
+> - `ukb` is NO LONGER a shell command
+> - Type "ukb" in **Claude chat** to trigger knowledge updates
+> - Claude calls the MCP semantic-analysis server automatically
+> - All documentation below is **archived for historical reference only**
 
 ---
 
-## Overview
+## Current System: MCP Semantic Analysis
 
-UKB-CLI is a modern Node.js-based knowledge management system that captures, analyzes, and organizes technical knowledge across projects. It provides intelligent knowledge capture through automatic git analysis and interactive prompts.
+**When you type "ukb" in Claude chat**, Claude detects your intent and calls the MCP semantic-analysis server to execute a comprehensive 10-agent workflow.
 
-![UKB Fallback Knowledge Capture Workflow](../images/fallback-knowledge-capture.png)
+### Quick Start
 
-The UKB system provides a manual fallback mechanism for knowledge capture when automated systems are unavailable or insufficient. It supports both automatic git-based analysis and interactive modes for capturing insights.
+```
+# In Claude chat (NOT terminal):
+User: "ukb"
 
-### Key Features
+# Claude executes incremental analysis automatically
+# Shows summary of entities created, relations, insights generated
+```
 
-- **Cross-Platform**: Pure Node.js with no OS-specific dependencies
-- **Intelligent Git Analysis**: Incremental commit processing with pattern detection
-- **Interactive Mode**: Guided prompts with real-time validation
-- **Quality Assurance**: Content filtering and URL validation
-- **Agent Integration**: Programmatic API for coding agents
-- **Ontology Classification**: 4-layer hybrid pipeline for automatic entity classification
-- **Semantic Analysis Integration**: MCP semantic-analysis server for significance determination
-- **Graph Database Storage**: Graphology + LevelDB for fast, persistent knowledge graphs
+**For full documentation, see:**
+- **[MCP Semantic Analysis Documentation](./mcp-semantic-analysis.md)** - Complete guide to current system
+- **[Cross-Project Knowledge System](../architecture/cross-project-knowledge.md)** - Architecture overview
 
 ---
 
-## Quick Reference
+## What Changed?
 
-### Basic Commands
+### Old System (Deprecated)
+- `ukb` was a shell command
+- Manual execution: `ukb --interactive` or `ukb --auto`
+- CLI-based knowledge capture
+- Direct JSON file manipulation
 
-```bash
-# Auto-analysis mode (incremental git analysis)
-ukb
-
-# Interactive deep insight capture
-ukb --interactive
-
-# List all entities
-ukb --list-entities
-
-# Search knowledge base
-ukb search "pattern name"
-
-# Add specific entity
-ukb --add-entity "EntityName" --type TransferablePattern
-```
-
-### Interactive Mode
-
-```bash
-ukb --interactive
-
-# Enhanced prompts with validation:
-# - Problem description (with content filtering)
-# - Solution approach (with implementation details)
-# - Rationale for the solution
-# - Key learnings and insights
-# - Applicability context
-# - Technologies used (validated list)
-# - Reference URLs (automatically verified)
-# - Related code files
-# - Custom entity naming support
-```
+### New System (Current)
+- `ukb` is a **keyword in Claude chat**
+- Claude decides: incremental or full analysis
+- **10-agent workflow** with semantic analysis
+- **MCP tool integration**: `mcp__semantic-analysis__execute_workflow`
+- **Team synchronization** via git-tracked checkpoint files
 
 ---
 
-## Usage Modes
+## How to Use UKB Now
 
-### 1. Auto Mode (Default) - Intelligent Git Analysis
+### Trigger Knowledge Update
 
-```bash
-ukb
+Simply type in Claude chat:
+
+```
+User: "ukb"
 ```
 
-**What it does:**
-- Analyzes recent git commits for patterns
-- Incremental processing to avoid duplicate work
-- Automatic pattern detection with significance scoring
-- Categorizes commits (feature, fix, refactor, etc.)
-- Updates knowledge base automatically
+Claude will:
+1. Detect knowledge update request
+2. Decide: incremental or full analysis
+3. Call MCP semantic-analysis tool
+4. Execute 10-agent workflow
+5. Store to GraphDB → LevelDB → JSON export
+6. Show you a summary
 
-**Use when:**
-- End of development session
-- After implementing significant changes
-- Daily knowledge accumulation
-- Automated CI/CD integration
+### Full Analysis
 
-### 2. Interactive Mode - Structured Capture
-
-```bash
-ukb --interactive
+```
+User: "ukb full"
 ```
 
-**What it does:**
-- Structured problem-solution-rationale capture
-- Real-time URL verification for reference links
-- Custom entity naming support
-- Technology validation against known frameworks
-- Content quality filters
+This processes entire git history and all session logs (instead of just changes since last checkpoint).
 
-**Use when:**
-- Documenting architectural decisions
-- Capturing complex solutions
-- Recording lessons learned
-- Deep insight capture
+### Check What Will Be Analyzed
 
-### 3. Search and Query
-
-```bash
-# Search by keyword
-ukb search "authentication pattern"
-
-# List entities by type
-ukb --list-entities --type TransferablePattern
-
-# Show specific entity details
-ukb entity show "ReactHookPattern" --verbose
+```
+User: "What would ukb analyze?"
 ```
 
-### 4. Management Operations
-
-```bash
-# Remove entity
-ukb --remove-entity "EntityName"
-
-# Rename entity
-ukb --rename-entity "OldName" "NewName"
-
-# Remove relation
-ukb --remove-relation "Entity1" "Entity2"
-
-# Validate knowledge base
-ukb --validate
-
-# Export knowledge base
-ukb --export-json
-```
+Claude checks the checkpoint and reports new commits/sessions since last run.
 
 ---
 
-## Architecture
+## 10-Agent Workflow
 
-### Modern Node.js Design
+When triggered, the MCP semantic-analysis server executes:
 
-UKB-CLI follows a layered architecture:
-
-- **CLI Layer**: Command-line interface with comprehensive argument parsing
-- **Core Services**: Knowledge management, git analysis, and insight extraction
-- **Validation Layer**: Content quality assurance and schema compliance
-- **Integration Layer**: MCP synchronization and visualizer updates
-
-### Backward Compatibility
-
-100% backward compatible with legacy bash UKB:
-- All existing `ukb` commands work unchanged
-- Legacy script preserved as `ukb-original`
-- Transparent delegation to Node.js implementation
-- Same data format and git integration
-
----
-
-## Knowledge Structure
-
-### Entity Schema
-
-```json
-{
-  "name": "PatternName",
-  "entityType": "Pattern|Solution|Architecture|Tool",
-  "significance": 8,
-  "problem": {
-    "description": "What problem this solves",
-    "context": "When this problem occurs"
-  },
-  "solution": {
-    "approach": "How to solve it",
-    "implementation": "Specific implementation details",
-    "code_example": "Working code snippet"
-  },
-  "observations": ["Key insights", "Lessons learned"],
-  "metadata": {
-    "technologies": ["React", "Node.js"],
-    "files": ["src/component.js"],
-    "references": ["https://docs.example.com"]
-  }
-}
-```
-
-### Entity Types
-
-- **Pattern**: Reusable solutions and approaches
-- **Solution**: Specific problem fixes
-- **Architecture**: System design insights
-- **Tool**: Technology and framework usage
-- **Workflow**: Process and methodology insights
-
----
-
-## Programmatic API
-
-### KnowledgeAPI Class
-
-```javascript
-const { KnowledgeManager } = require('ukb-cli');
-
-// Initialize knowledge manager
-const manager = new KnowledgeManager({
-  knowledgeBasePath: '.data/knowledge-graph',
-  mcpIntegration: true
-});
-
-// Capture structured insight
-await manager.captureInsight({
-  name: "ReactHookPattern",
-  problem: "Stateful logic duplication across components",
-  solution: "Extract logic into custom hooks",
-  rationale: "DRY principle and improved testability",
-  learnings: "Hooks enable better separation of concerns",
-  applicability: "Any React app with duplicated state logic",
-  technologies: ["React", "TypeScript"],
-  references: ["https://reactjs.org/docs/hooks-custom.html"],
-  significance: 8
-});
-
-// Git analysis
-const insights = await manager.analyzeGitHistory({
-  depth: 20,
-  sinceCommit: 'abc123',
-  includeCategories: ['feature', 'refactor']
-});
-
-// Search and query
-const results = await manager.search("authentication pattern");
-const entities = await manager.getEntitiesByType("TransferablePattern");
-```
-
----
-
-## Common Use Cases
-
-### 1. Capturing Bug Fix Patterns
-
-**Scenario**: You fixed a tricky bug with React hooks dependency arrays
-
-```bash
-# Interactive capture
-ukb --interactive
-
-? Insight type: Problem-Solution
-? Problem description: useEffect infinite loop due to object dependency
-? Solution description: Use useMemo to memoize object dependencies
-
-# Quick non-interactive capture
-ukb entity add -n "ReactHooksDependencyPattern" -t "TechnicalPattern" -s 9 \
-  -o "Always memoize object and array dependencies in hooks"
-```
-
-### 2. Documenting Architecture Decisions
-
-**Scenario**: Team decided to migrate from Redux to Zustand
-
-```bash
-# Create problem entity
-ukb entity add -n "ReduxComplexityProblem" -t "Problem" -s 7 \
-  -o "Redux boilerplate becoming unmaintainable with 50+ slices"
-
-# Create solution entity
-ukb entity add -n "ZustandMigrationSolution" -t "Solution" -s 8 \
-  -o "Migrate to Zustand for simpler state management"
-
-# Create relationship
-ukb relation add -f "ZustandMigrationSolution" -t "ReduxComplexityProblem" \
-  -r "solves" -s 8
-```
-
-### 3. Post-Mortem Analysis
-
-**Scenario**: After production incident, capture learnings
-
-```bash
-# Create incident entity
-ukb entity add -n "DatabaseConnectionPoolIncident2024" -t "Problem" -s 10 \
-  -o "Production outage due to connection pool exhaustion"
-
-# Add root cause
-ukb entity add -n "MissingConnectionPoolMonitoring" -t "Problem" -s 9 \
-  -o "No alerts configured for connection pool usage"
-
-# Add solution
-ukb entity add -n "ConnectionPoolMetricsSolution" -t "Solution" -s 9 \
-  -o "Implement Prometheus metrics for connection pool monitoring"
-
-# Create relationships
-ukb relation add -f "MissingConnectionPoolMonitoring" \
-  -t "DatabaseConnectionPoolIncident2024" -r "causes"
-
-ukb relation add -f "ConnectionPoolMetricsSolution" \
-  -t "MissingConnectionPoolMonitoring" -r "solves"
-```
-
-### 4. Onboarding New Team Members
-
-**Scenario**: Create knowledge trail for new developers
-
-```bash
-# Export project-specific patterns
-ukb entity list -t "WorkflowPattern" > onboarding-patterns.txt
-
-# Create onboarding checklist
-ukb entity add -n "NewDeveloperOnboardingChecklist" -t "Documentation" -s 8
-
-# Link to key patterns
-ukb relation add -f "NewDeveloperOnboardingChecklist" \
-  -t "LocalDevelopmentSetupPattern" -r "references"
-```
-
----
-
-## Domain-Specific Knowledge Bases
-
-### Automatic Domain Detection
-
-When working in a project directory, UKB automatically creates domain-specific knowledge bases:
-
-```bash
-# Navigate to domain project
-cd /path/to/raas-project
-
-# First ukb command stores knowledge in GraphDB
-ukb --list-entities
-# Stores in: .data/knowledge-graph/ (LevelDB)
-# Auto-exports to: .data/knowledge-export/raas.json (git-tracked sync)
-
-# Add domain entity using piped input
-echo "StreamProcessingPipeline
-TechnicalPattern
-8
-Core pattern for real-time data reprocessing
-Handles high-throughput data streams with fault tolerance
-Implemented using Apache Kafka + Apache Flink" | ukb --add-entity
-```
-
-### Cross-Domain Pattern Discovery
-
-```bash
-# Search across all team knowledge bases using GraphDB
-ukb search "MicroserviceArchitecture" --all-teams
-
-# Extract domain-specific implementations
-ukb --list-entities --team raas --type ArchitecturePattern
-
-# Create cross-domain pattern in shared knowledge
-cd /any/project
-ukb entity add -n "CrossDomainMicroservicePattern" -t "ArchitecturePattern" -s 10 \
-  -o "Microservice patterns applicable across RaaS and Resilience domains"
-```
+1. **GitHistoryAgent** - Analyzes git commits since last checkpoint
+2. **VibeHistoryAgent** - Analyzes session logs (.specstory/history/)
+3. **SemanticAnalysisAgent** - Deep semantic analysis with LLM fallback chain
+4. **WebSearchAgent** - Researches technical patterns (DuckDuckGo)
+5. **InsightGenerationAgent** - Creates structured insights
+6. **ObservationGenerationAgent** - Adds observations to entities
+7. **QualityAssuranceAgent** - Validates insight quality
+8. **PersistenceAgent** - Stores entities to GraphDB
+9. **DeduplicationAgent** - Prevents duplicate entities
+10. **CoordinatorAgent** - Orchestrates all agents
 
 ---
 
 ## Storage Architecture
 
-### Primary Storage: GraphDB + LevelDB
-
-UKB uses a **database-first architecture** with fail-fast semantics:
-
-**Storage Layers**:
-1. **In-Memory**: Graphology graph database (nodes + edges)
-2. **Persistence**: LevelDB at `.data/knowledge-graph/`
-3. **Auto-Persist**: Changes saved every 1000ms
-4. **Git-Tracked Export**: Automatic JSON export for team collaboration
-
-**Benefits**:
-- 🚀 **Fast**: In-memory graph operations
-- 💾 **Durable**: LevelDB persistence survives restarts
-- 🔒 **ACID**: Atomic operations with fail-fast on errors
-- 🔄 **Synchronized**: All three layers (Graphology, LevelDB, JSON) stay in sync
-- 🤝 **Team Collaboration**: Git-tracked JSON files for PR reviews
-
-### Automatic JSON Export
-
-**CRITICAL**: JSON export is NOT optional - it automatically keeps all storage layers synchronized:
-
-```bash
-# Manual export to JSON
-ukb export .data/knowledge-export/coding.json --team coding
-
-# Import from legacy JSON
-ukb import shared-memory-old.json
+```
+Graphology (in-memory)
+        ↕ (1s auto-persist)
+    LevelDB (persistent)
+        ↕ (5s debounced export)
+JSON Files (git-tracked)
 ```
 
-**Auto-Export** (automatically enabled on initialization):
-- Event-driven: Triggers on entity/relationship changes
-- Debounced writes (5-second delay to minimize I/O)
-- Team-based files: `.data/knowledge-export/{team}.json`
-- Git-tracked for team collaboration and PR reviews
+**GraphDB**: In-memory Graphology + LevelDB at `.data/knowledge-graph/`
+**JSON Export**: Auto-exports to `.data/knowledge-export/coding.json` (git-tracked)
+**Checkpoint**: `.data/ukb-last-run.json` (git-tracked for team sync)
 
-**Synchronization Architecture**:
-- **Primary**: Graphology (in-memory) + LevelDB (persistent)
-- **Export**: Automatic JSON export keeps all three synchronized
-- **Guarantee**: Every entity/relationship update triggers export after debounce
-- **Purpose**: Git-based team collaboration, PR reviews, backup
+---
 
-## Migration from Legacy UKB
+## Team Synchronization
 
-### Automatic Migration
+```
+Developer A:
+  1. Types "ukb" in Claude
+  2. Workflow executes
+  3. Updates: .data/knowledge-export/coding.json
+  4. Updates: .data/ukb-last-run.json
+  5. Git commits both files
+  6. Git pushes to remote
 
-The system automatically imports legacy `shared-memory-*.json` files on first run:
-
-#### What Changed
-
-- **Storage**: JSON files → GraphDB + LevelDB
-- **Location**: Root directory → `.data/knowledge-graph/`
-- **Performance**: 3x faster queries, 50% less memory
-- **API**: New database-first programmatic interface
-
-#### What Stayed the Same
-
-- **Commands**: All `ukb` commands work identically
-- **Data Format**: Entity/relation schema unchanged
-- **Workflows**: Existing team workflows unaffected
-- **Git Integration**: JSON files still git-tracked for team collaboration
-- **Exports**: Automatic JSON export maintains backward compatibility
-
-#### Verification Steps
-
-```bash
-# Check database status
-ukb status
-
-# Verify entities migrated
-ukb --list-entities
-
-# Test graph operations
-ukb search "pattern" --team coding
+Developer B:
+  1. Git pulls from remote
+  2. Gets updated coding.json (knowledge)
+  3. Gets updated ukb-last-run.json (checkpoint)
+  4. Types "ukb" in Claude
+  5. Only processes commits/sessions since checkpoint
+     (avoiding duplicate work)
 ```
 
 ---
 
-## Advanced Features
+## Visualization
 
-### Batch Operations
-
-```bash
-# Add multiple entities from file
-ukb --add-multiple-entities entities.json
-
-# Import relations from file
-ukb --import-relations relations.json
-
-# Export with filters
-ukb export --type TechnicalPattern --min-significance 8
-```
-
-### Data Management
+To browse the knowledge base visually:
 
 ```bash
-# Comprehensive validation
-ukb --validate --detailed
+# In terminal:
+vkb server start
 
-# Data integrity checks
-ukb --check-integrity
-
-# Performance analysis
-ukb --analyze-performance
+# Open browser to http://localhost:8080
 ```
 
-### CI/CD Integration
-
-```bash
-# Automated knowledge updates
-ukb --analyze-git --auto-commit --webhook-url "https://api.example.com"
-
-# Custom agent integration
-UKB_API_MODE=true ukb --capture --stdin < insight.json
-```
-
-### Ontology Classification
-
-UKB automatically classifies knowledge entities using a 4-layer hybrid pipeline:
-
-**Classification Layers:**
-1. **Heuristic Patterns** - Fast pattern matching (>10,000/sec)
-2. **Keyword Matching** - Domain-specific keyword detection
-3. **Semantic Similarity** - Embedding-based classification (~1,000/sec)
-4. **LLM Analysis** - Fallback for ambiguous cases (<500ms)
-
-**Entity Classes:**
-- `ImplementationPattern` - Code patterns and best practices
-- `ArchitecturalDecision` - System design choices
-- `TechnicalSolution` - Problem-solving approaches
-- `WorkflowPattern` - Development process patterns
-- `ConfigurationPattern` - Setup and configuration knowledge
-
-**Usage Example:**
-```javascript
-// Entities are automatically classified during capture
-const result = await manager.captureInsight({
-  name: "React Custom Hooks Pattern",
-  problem: "Duplicated stateful logic across components",
-  solution: "Extract logic into reusable custom hooks"
-});
-
-// Result includes ontology metadata
-console.log(result.ontology);
-// {
-//   entityClass: "ImplementationPattern",
-//   confidence: 0.92,
-//   team: "coding",
-//   method: "heuristic",  // or "keyword", "semantic", "llm"
-//   layer: 1
-// }
-```
-
-**Querying by Ontology:**
-```bash
-# Query entities by ontology class
-ukb query --ontology-class ImplementationPattern --min-confidence 0.8
-
-# List all architectural decisions
-ukb query --ontology-class ArchitecturalDecision --team coding
-```
-
-For detailed ontology documentation, see [Migration Guide - Ontology Integration](./json-to-graphdb-migration.md#ontology-integration-new-in-v20).
-
-### Semantic Analysis Integration
-
-UKB integrates with the MCP semantic-analysis server to determine significance scores and extract deep insights from code and conversations.
-
-**Significance Determination:**
-
-When UKB processes knowledge (git commits, insights), it can use semantic analysis to:
-- Calculate significance scores (1-10) based on code impact
-- Extract architectural patterns from code
-- Identify transferable knowledge across projects
-- Generate context-aware observations
-
-**How It Works:**
-```javascript
-import { KnowledgeManager } from 'ukb-cli';
-
-const manager = new KnowledgeManager({
-  semanticAnalysis: {
-    enabled: true,
-    mcp: true  // Use MCP semantic-analysis server
-  }
-});
-
-// Automatic significance scoring via semantic analysis
-const insights = await manager.analyzeGitHistory({
-  depth: 20,
-  useSemanticAnalysis: true  // Enables MCP integration
-});
-
-// Each insight includes AI-determined significance
-insights.forEach(insight => {
-  console.log(`${insight.name}: Significance ${insight.significance}/10`);
-});
-```
-
-**MCP Tools Used:**
-- `determine_insights` - Extract insights from content
-- `analyze_code` - Code pattern and quality analysis
-- `extract_patterns` - Identify reusable design patterns
-
-**Benefits:**
-- **Accurate Significance Scores**: AI-powered analysis vs. simple heuristics
-- **Pattern Recognition**: Identifies recurring architectural patterns
-- **Context-Aware**: Understands code impact and transferability
-- **Cross-Project Learning**: Applies insights from similar patterns
-
-For complete semantic analysis documentation, see [MCP Semantic Analysis Integration](../integrations/mcp-semantic-analysis.md).
+The VKB server provides:
+- Interactive graph visualization
+- Entity browsing and search
+- Relation exploration
+- Real-time updates via WebSocket
 
 ---
 
-## Troubleshooting
+## Migration Guide
 
-### Common Issues
+If you were using the old UKB CLI system:
 
-```bash
-# UKB not finding git repository
-cd /path/to/git/repo && ukb
+### What to Stop Doing
+- ❌ `ukb --interactive` (command doesn't exist)
+- ❌ `ukb --auto` (command doesn't exist)
+- ❌ `ukb entity add ...` (command doesn't exist)
+- ❌ Manual JSON file editing
 
-# Knowledge base corruption
-ukb --verify && ukb --repair
-
-# Missing dependencies
-./install.sh --update
-
-# Performance issues with large repos
-ukb --incremental
-```
-
-### Debug Mode
-
-```bash
-# Enable debug logging
-DEBUG=1 ukb --verbose
-
-# Check analysis results
-cat ~/.ukb/debug.log
-```
+### What to Start Doing
+- ✅ Type "ukb" in Claude chat
+- ✅ Let Claude call MCP semantic-analysis tool
+- ✅ Trust the 10-agent workflow
+- ✅ Review auto-generated insights
+- ✅ Commit .data/knowledge-export/*.json and .data/ukb-last-run.json
 
 ---
 
-## Full Documentation
+## Complete Documentation
 
-For complete technical documentation, see:
+**Primary Documentation (Current System)**:
+- [MCP Semantic Analysis](./mcp-semantic-analysis.md) - Complete MCP integration guide
+- [Cross-Project Knowledge System](../architecture/cross-project-knowledge.md) - Architecture overview
+- [Continuous Learning System](./continuous-learning-system.md) - Automatic knowledge capture
 
-**[lib/knowledge-api/README.md](../../lib/knowledge-api/README.md)**
-
-Topics covered:
-- Complete architecture documentation
-- API reference with all methods
-- Plugin architecture details
-- Advanced configuration options
-- Development guide
+**Historical Documentation (Archived)**:
+- [UKB Lock-Free Architecture](../archive/historical/ukb-lock-free-architecture.md) - v2.0 architecture (deprecated)
+- [UKB Issues Analysis](../archive/historical/ukb-issues-analysis.md) - Historical analysis
 
 ---
 
-## See Also
+## Why the Change?
 
-- [VKB - Visualize Knowledge Base](./vkb-visualize.md)
-- [Knowledge Workflows](./workflows.md)
-- [Knowledge Management Overview](./README.md)
+The migration from CLI to MCP integration provides:
+
+✅ **AI-Driven Analysis**: Claude makes intelligent decisions about analysis scope
+✅ **Semantic Understanding**: 10-agent workflow extracts deep insights
+✅ **Zero Manual Effort**: Just type "ukb" - no command-line arguments
+✅ **Better Integration**: Seamless Claude Code workflow
+✅ **Team Synchronization**: Git-tracked checkpoint ensures no duplicate work
+✅ **Richer Insights**: LLM-powered semantic analysis vs. simple pattern matching
+
+---
+
+*For questions about the current MCP-based system, see [mcp-semantic-analysis.md](./mcp-semantic-analysis.md)*
