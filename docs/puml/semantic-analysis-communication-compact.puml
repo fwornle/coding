@@ -5,39 +5,41 @@ title Communication Patterns in Semantic Analysis System
 
 top to bottom direction
 
-package "Communication Methods" {
-  component [MQTT Event Bus] as mqtt
-  component [JSON-RPC Server] as rpc
+package "Client" {
+  component [Claude Code] as claude
+}
+
+package "MCP Layer" {
   component [MCP Server] as mcp
 }
 
-package "Agent Network" {
-  component [Semantic Analysis] as sa
-  component [Web Search] as ws
-  component [Knowledge Graph] as kg
-  component [Coordinator] as coord
+package "Orchestration" {
+  component [CoordinatorAgent] as coord
 }
 
-package "Client Interfaces" {
-  component [Claude Code] as claude
-  component [External APIs] as apis
+package "10-Agent System" {
+  component [Analysis Agents] as analysis
+  component [Infrastructure Agents] as infra
 }
 
-mqtt --> sa : async events
-mqtt --> ws : async events
-mqtt --> kg : async events
-mqtt --> coord : async events
-
-rpc --> sa : sync calls
-rpc --> ws : sync calls
-rpc --> kg : sync calls
-rpc --> coord : sync calls
-
-mcp --> claude : tool interface
-mcp --> mqtt : event routing
-mcp --> rpc : request proxy
+package "Storage" {
+  database [GraphDB] as graphdb
+}
 
 claude --> mcp : tool calls
-apis --> rpc : direct API calls
+mcp --> coord : direct call
+coord --> analysis : direct calls
+coord --> infra : direct calls
+coord --> graphdb : provides
+infra --> graphdb : stores
+coord --> mcp : results
+mcp --> claude : response
+
+note right of coord
+  **Direct Function Calls**
+  • No MQTT broker
+  • No JSON-RPC server
+  • Synchronous execution
+end note
 
 @enduml

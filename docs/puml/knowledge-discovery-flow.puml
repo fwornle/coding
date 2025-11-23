@@ -19,20 +19,20 @@ if (Using Claude Code?) then (yes)
     :Capture new pattern;
   endif
 else (no)
-  if (Using VSCode CoPilot?) then (yes)
-    :Use @KM search command;
-    :HTTP API /api/knowledge/search;
+  if (Using VKB Server?) then (yes)
+    :Use vkb web interface;
+    :HTTP API /api/entities;
     if (Pattern found?) then (yes)
-      :Display in chat;
+      :View in browser;
       :Apply pattern;
     else (no)
       :Manual search;
       :Implement solution;
-      :@KM ukb to capture;
+      :Type "ukb" at Claude prompt;
     endif
   else (no)
-    :Use ukb/vkb CLI directly;
-    :vkb to browse graph;
+    :Direct GraphDB access;
+    :Query coding.json (.data/knowledge-export/);
     :Manual pattern search;
   endif
 endif

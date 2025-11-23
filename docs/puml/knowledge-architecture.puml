@@ -23,7 +23,7 @@ title Knowledge Management System Architecture v2.0\nGraphDB + Ontology Integrat
 rectangle "Knowledge Sources" as SOURCES {
     [Live Sessions\n(Transcripts)]
     [Git Commits]
-    [Manual Input\n(UKB)]
+    [Manual Input\n(MCP Tools)]
     [File Changes]
 }
 
@@ -38,10 +38,10 @@ rectangle "Online Learning" as ONLINE {
 }
 
 rectangle "Manual Learning" as MANUAL {
-    [UKB Command] as UKB
-    [UKB Database Writer] as WRITER
+    [MCP Semantic Analysis] as MCP
+    [10-Agent Workflow] as WORKFLOW
 
-    note right of UKB : Direct database writes\nNo JSON intermediates\nImmediate persistence
+    note right of MCP : User types "ukb" → MCP tools\nexecute_workflow\ncreate_ukb_entity_with_insight\nDirect GraphDB writes
 }
 
 rectangle "Unified Persistent Storage" as STORAGE {
@@ -79,9 +79,9 @@ EXTRACTOR --> QDRANT : Dual embeddings\n(384d + 1536d)
 EXTRACTOR --> SQLITE : Metadata
 
 ' === Manual Learning Flow ===
-[Manual Input\n(UKB)] --> UKB : CLI commands
-UKB --> WRITER : Entity/Relation\nobjects
-WRITER --> GRAPHDB : Direct writes
+[Manual Input\n(MCP Tools)] --> MCP : User types "ukb"\nat Claude prompt
+MCP --> WORKFLOW : execute_workflow\ncreate_ukb_entity_with_insight
+WORKFLOW --> GRAPHDB : Direct writes\nvia PersistenceAgent
 
 ' === Access Layer ===
 GRAPHDB --> VKB : Query entities\nwith ontology

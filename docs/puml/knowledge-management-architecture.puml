@@ -3,50 +3,38 @@
 
 !define RECTANGLE class
 
-title Knowledge Flow: Project → MCP Memory → Git Storage
+title Knowledge Flow: MCP → GraphDB → Git Storage
 
 actor Developer
-participant "ukb Script" as UKB
-participant "Temp Files" as TEMP
 participant "Claude Code" as CLAUDE
-participant "MCP Memory" as MCP
-participant "shared-memory.json" as JSON
+participant "MCP Semantic Analysis" as MCP
+participant "GraphDB" as GRAPHDB
+participant "coding.json" as JSON
 participant "Git Repository" as GIT
 
-== Phase 1: Insight Capture ==
+== Phase 1: Manual Knowledge Capture ==
 
-Developer -> UKB: ukb --interactive
-note right: Captures deep insights\nand architectural decisions
+Developer -> CLAUDE: Types "ukb" at Claude prompt
+note right: Triggers MCP semantic\nanalysis workflow
 
-UKB -> UKB: Parse git commits
-UKB -> UKB: Analyze file changes
-UKB -> UKB: Prompt for insights
+CLAUDE -> MCP: execute_workflow or\ncreate_ukb_entity_with_insight
+note right: MCP Server routes to\nCoordinatorAgent
 
-UKB -> TEMP: Create insight files
-note right: JSON format with\nentities and observations
+MCP -> MCP: CoordinatorAgent executes\n10-agent workflow
+MCP -> MCP: Direct function calls\n(no MQTT/RPC)
 
-== Phase 2: MCP Integration ==
+== Phase 2: GraphDB Storage ==
 
-UKB -> UKB: Generate MCP operations
-UKB -> TEMP: Create mcp_sync_operations.md
+MCP -> GRAPHDB: Direct entity writes
+note right: PersistenceAgent stores\nto Graphology + LevelDB
 
-UKB -> CLAUDE: Request MCP sync
-note right: Provides structured\ndata for MCP operations
+GRAPHDB -> GRAPHDB: Auto-persist to LevelDB (1s)
+GRAPHDB -> GRAPHDB: Auto-export (5s debounced)
 
-CLAUDE -> MCP: mcp__memory__create_entities
-CLAUDE -> MCP: mcp__memory__create_relations  
-CLAUDE -> MCP: mcp__memory__add_observations
+GRAPHDB -> JSON: Export to JSON
+note right: .data/knowledge-export/\ncoding.json (git-tracked)
 
-MCP -> MCP: Build knowledge graph
-MCP -> MCP: Create bidirectional relations
-
-== Phase 3: Persistent Storage ==
-
-CLAUDE -> MCP: mcp__memory__read_graph
-MCP -> CLAUDE: Complete knowledge state
-
-CLAUDE -> JSON: Update shared-memory.json
-note right: Serialize MCP state\nto JSON format
+== Phase 3: Version Control ==
 
 JSON -> GIT: Git commit
 note right: Version-controlled\nknowledge evolution
@@ -54,18 +42,19 @@ note right: Version-controlled\nknowledge evolution
 == Cross-Session Access ==
 
 Developer -> CLAUDE: New session
-CLAUDE -> JSON: Load knowledge base
-CLAUDE -> MCP: Restore MCP state
-note right: Bidirectional sync\nensures consistency
+CLAUDE -> GRAPHDB: GraphDB auto-loads
+note right: Persistent storage via\nLevelDB
+
+GRAPHDB -> JSON: Read latest export
+JSON -> CLAUDE: Knowledge available
 
 == Knowledge Sharing ==
 
 GIT -> GIT: Git push/pull
 note right: Team knowledge\nsharing via git
 
-Developer -> UKB: vkb (visualize)
-UKB -> JSON: Read knowledge graph
-UKB -> Developer: Web visualization
-note right: Interactive knowledge\nexploration at localhost:8080
+Developer -> Developer: Run vkb server
+Developer -> Developer: Browse localhost:8080
+note right: Interactive GraphDB\nvisualization
 
 @enduml

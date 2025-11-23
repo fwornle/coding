@@ -7,11 +7,11 @@ top to bottom direction
 
 rectangle "Graph Storage System" as current #E8F5E8 {
   database "Graphology\n(In-Memory)" as graphology
-  database "Level v10.0.0\n(Persistent)" as level
-  file "shared-memory-*.json\n(Git-Tracked)" as json
+  database "LevelDB\n(Persistent)" as level
+  file "coding.json\nresi.json\nui.json\n(Git-Tracked)" as json
 
-  graphology -down-> level : persist to disk\n(atomic writes)
-  graphology <-right-> json : auto-sync\n(5s debounce)
+  graphology <-down-> level : bi-directional sync\n(1s auto-persist)
+  level <-right-> json : bi-directional sync\n(5s debounced export,\nimport on startup)
 
   note bottom of graphology
     **In-Memory Graph**
@@ -31,9 +31,9 @@ rectangle "Graph Storage System" as current #E8F5E8 {
 
   note bottom of json
     **Git-Tracked Exports**
-    • Auto-export on changes
+    • Auto-export on changes (5s)
     • Auto-import on startup
-    • Team collaboration
+    • Team collaboration via git
     • .data/knowledge-export/*.json
   end note
 }

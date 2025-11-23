@@ -5,123 +5,103 @@ title Semantic Analysis System - Communication Architecture
 
 top to bottom direction
 
-package "Communication Infrastructure" {
-  component [MQTT Broker] as MQTT
-  port "Port 1883" as MQTTPort
-  note right of MQTT
-    • Async event-driven communication
-    • Topic-based pub/sub messaging
-    • Agent coordination & notifications
-    • Workflow status updates
-  end note
-
-  component [JSON-RPC Server] as RPC
-  port "Port 3001" as RPCPort
-  note right of RPC
-    • Sync request-response operations
-    • Direct agent method calls
-    • Immediate results required
-    • Status queries & health checks
-  end note
-
+package "MCP Integration Layer" {
   component [MCP Server] as MCP
   port "Claude Code Interface" as MCPPort
   note right of MCP
-    • Claude Code tool integration
-    • User-facing API layer
-    • Request routing to agents
+    • 12 tools for Claude Code
+    • Request routing to CoordinatorAgent
     • Response aggregation
+    • Direct function calls (no MQTT/RPC)
   end note
 }
 
-package "Agent Communication Patterns" {
-  
-  rectangle "Event-Driven (MQTT)" as EventDriven {
-    [analysis/code/requested] --> [Semantic Analysis Agent]
-    [analysis/code/completed] <-- [Semantic Analysis Agent]
-    
-    [search/web/requested] --> [Web Search Agent]
-    [search/web/completed] <-- [Web Search Agent]
-    
-    [knowledge/entity/create/requested] --> [Knowledge Graph Agent]
-    [knowledge/entity/created] <-- [Knowledge Graph Agent]
-    
-    [workflow/started] --> [Coordinator Agent]
-    [workflow/step/completed] <-- [Coordinator Agent]
-    [workflow/completed] <-- [Coordinator Agent]
+package "10-Agent System - Direct Function Calls" {
+
+  component [CoordinatorAgent] as Coordinator
+  note right of Coordinator
+    **Central Orchestrator**
+    • Receives MCP tool requests
+    • Executes workflow definitions
+    • Direct function calls to agents
+    • Manages GraphDB initialization
+    • No MQTT/RPC messaging
+  end note
+
+  rectangle "Analysis Agents" {
+    component [GitHistoryAgent] as Git
+    component [VibeHistoryAgent] as Vibe
+    component [SemanticAnalysisAgent] as Semantic
+    component [WebSearchAgent] as WebSearch
+    component [InsightGenerationAgent] as Insight
+    component [ObservationGenerationAgent] as Observation
+    component [QualityAssuranceAgent] as QA
   }
 
-  rectangle "Request-Response (JSON-RPC)" as ReqResp {
-    [semantic-analysis.analyzeCode()] --> [Semantic Analysis Agent]
-    [Result] <-- [Semantic Analysis Agent]
-    
-    [web-search.search()] --> [Web Search Agent]
-    [SearchResults] <-- [Web Search Agent]
-    
-    [knowledge-graph.createEntity()] --> [Knowledge Graph Agent]
-    [Entity] <-- [Knowledge Graph Agent]
-    
-    [coordinator.startWorkflow()] --> [Coordinator Agent]
-    [WorkflowExecution] <-- [Coordinator Agent]
+  rectangle "Infrastructure Agents" {
+    component [PersistenceAgent] as Persist
+    component [DeduplicationAgent] as Dedup
   }
 }
 
-package "MCP Tool Integration" {
-  [Claude Code] --> MCP : tool calls
-  MCP --> EventDriven : events
-  MCP --> ReqResp : sync calls
-  EventDriven --> MCP : notifications
-  ReqResp --> MCP : responses
-  MCP --> [Claude Code] : results
+package "Storage Layer" {
+  database [GraphDB\nGraphology + LevelDB] as GraphDB
+  component [Graph Exporter] as Exporter
+  database [coding.json\n.data/knowledge-export/] as Storage
 }
 
-' Communication flow connections
-MQTT --> EventDriven
-RPC --> ReqResp
-MCP --> MQTT : "route events"
-MCP --> RPC : "proxy calls"
+package "External Services" {
+  cloud [Groq] as Groq
+  cloud [Gemini] as Gemini
+  cloud [Anthropic] as Anthropic
+  cloud [OpenAI] as OpenAI
+  cloud [Web APIs] as WebAPIs
+}
 
-' Topic structure detail
-note left of EventDriven
-  **Topic Structure:**
-  ├── analysis/
-  │   ├── code/requested
-  │   ├── code/completed
-  │   ├── conversation/requested
-  │   └── conversation/completed
-  ├── search/
-  │   ├── web/requested
-  │   ├── web/completed
-  │   └── technical-docs/requested
-  ├── knowledge/
-  │   ├── entity/create/requested
-  │   ├── entity/created
-  │   └── relation/created
-  └── workflow/
-      ├── started
-      ├── step/completed
-      └── completed
-end note
+' MCP to Coordinator
+[Claude Code] --> MCP : MCP tool calls
+MCP --> Coordinator : Direct function call\n(workflow execution)
 
-' RPC method detail
-note right of ReqResp
-  **RPC Methods:**
-  ├── semantic-analysis.*
-  │   ├── analyzeCode(params)
-  │   ├── analyzeConversation(params)
-  │   └── extractPatterns(params)
-  ├── web-search.*
-  │   ├── search(query, options)
-  │   ├── searchTechnicalDocs(params)
-  │   └── validateReferences(params)
-  ├── knowledge-graph.*
-  │   ├── createEntity(entity)
-  │   ├── searchEntities(query)
-  │   └── syncWithUkb(direction)
-  └── coordinator.*
-      ├── startWorkflow(type, params)
-      ├── getWorkflowStatus(id)
-      └── scheduleTask(task)
+' Coordinator orchestrates all agents via direct calls
+Coordinator --> Git : direct call
+Coordinator --> Vibe : direct call
+Coordinator --> Semantic : direct call
+Coordinator --> WebSearch : direct call
+Coordinator --> Insight : direct call
+Coordinator --> Observation : direct call
+Coordinator --> QA : direct call
+Coordinator --> Persist : direct call
+Coordinator --> Dedup : direct call
+
+' Storage connections
+Coordinator --> GraphDB : provides initialized\nGraphDB instance
+Persist --> GraphDB : stores entities
+GraphDB --> Exporter : auto-export 30s
+Exporter --> Storage : writes JSON
+
+' LLM connections (5-tier fallback chain)
+Semantic --> Groq : 1st provider
+Semantic --> Gemini : 2nd provider
+Semantic --> Anthropic : 3rd provider
+Semantic --> OpenAI : 4th provider
+Vibe --> Groq : LLM
+Insight --> Groq : LLM
+Observation --> Groq : LLM
+QA --> Groq : LLM
+Dedup --> OpenAI : embeddings
+WebSearch --> WebAPIs : search
+
+' Return path
+Coordinator --> MCP : results
+MCP --> [Claude Code] : tool response
+
+note bottom of Coordinator
+  **Direct Function Call Architecture**
+  • No MQTT broker
+  • No JSON-RPC server
+  • No event-driven pub/sub
+  • Agents called via workflow definitions
+  • Synchronous execution within Node.js
 end note
 
 @enduml

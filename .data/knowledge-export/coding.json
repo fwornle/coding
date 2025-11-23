@@ -616,465 +616,175 @@
       "from": "CodingWorkflow",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "Coding",
       "to": "SemanticAnalysis8AgentSystemImplementation",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "Coding",
       "to": "SemanticAnalysisWorkflowIssue",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "Coding",
       "to": "CollectiveKnowledge",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "CodingWorkflow",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "KnowledgePersistencePattern",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "MCPMemoryLoggingIntegrationPattern",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "NetworkAwareInstallationPattern",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "SemanticAnalysis8AgentSystemImplementation",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "SemanticAnalysisWorkflowIssue",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "UkbCli",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "VSCodeExtensionBridgePattern",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "CollectiveKnowledge",
       "to": "VkbCli",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "ComprehensiveSemanticAnalysis",
       "to": "CollectiveKnowledge",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "ComprehensiveSemanticAnalysis",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "KnowledgePersistencePattern",
       "to": "UkbCli",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "KnowledgePersistencePattern",
       "to": "VkbCli",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "KnowledgePersistencePattern",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "MCPMemoryLoggingIntegrationPattern",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "NetworkAwareInstallationPattern",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "SemanticAnalysis8AgentSystemImplementation",
       "to": "TestOnlinePattern",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "TestOnlinePattern",
       "to": "CollectiveKnowledge",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "TestOnlinePattern",
       "to": "VSCodeExtensionBridgePattern",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "UkbCli",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "VSCodeExtensionBridgePattern",
       "to": "KnowledgePersistencePattern",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "VSCodeExtensionBridgePattern",
       "to": "MCPMemoryLoggingIntegrationPattern",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "VSCodeExtensionBridgePattern",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "VkbCli",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "TestOnlinePattern",
       "to": "Coding",
       "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CodingWorkflow",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "Coding",
-      "to": "SemanticAnalysis8AgentSystemImplementation",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "Coding",
-      "to": "SemanticAnalysisWorkflowIssue",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "Coding",
-      "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "CodingWorkflow",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "KnowledgePersistencePattern",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "MCPMemoryLoggingIntegrationPattern",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "NetworkAwareInstallationPattern",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "SemanticAnalysis8AgentSystemImplementation",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "SemanticAnalysisWorkflowIssue",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "UkbCli",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "VSCodeExtensionBridgePattern",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "VkbCli",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "ComprehensiveSemanticAnalysis",
-      "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "ComprehensiveSemanticAnalysis",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "KnowledgePersistencePattern",
-      "to": "UkbCli",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "KnowledgePersistencePattern",
-      "to": "VkbCli",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "KnowledgePersistencePattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "MCPMemoryLoggingIntegrationPattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "NetworkAwareInstallationPattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "SemanticAnalysis8AgentSystemImplementation",
-      "to": "TestOnlinePattern",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "TestOnlinePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "TestOnlinePattern",
-      "to": "VSCodeExtensionBridgePattern",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "UkbCli",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "VSCodeExtensionBridgePattern",
-      "to": "KnowledgePersistencePattern",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "VSCodeExtensionBridgePattern",
-      "to": "MCPMemoryLoggingIntegrationPattern",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "VSCodeExtensionBridgePattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "VkbCli",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
-    },
-    {
-      "from": "TestOnlinePattern",
-      "to": "Coding",
-      "relationType": "relation",
-      "metadata": {
-        "confidence": 1
-      }
+      "metadata": {}
     },
     {
       "from": "EntityA",
@@ -1122,9 +832,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-11-22T16:25:00.120Z",
+    "exported_at": "2025-11-22T20:44:51.255Z",
     "total_entities": 20,
-    "total_relations": 94,
+    "total_relations": 65,
     "description": "Coding project infrastructure and patterns"
   }
 }

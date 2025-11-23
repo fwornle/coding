@@ -7,69 +7,65 @@ top to bottom direction
 
 package "Client Layer" {
   component [Claude Code] as claude
-  component [External APIs] as apis
-  component [Command Line] as cli
 }
 
 package "Integration Layer" {
   component [MCP Server] as mcp
   note right of mcp
-    • Tool registration
-    • Request routing
-    • Response formatting
+    • 12 tools for Claude Code
+    • Direct function calls
+    • No MQTT/RPC servers
   end note
 }
 
-package "Communication Infrastructure" {
-  component [MQTT Broker] as mqtt
-  note right of mqtt
-    • Async event bus
-    • Topic-based messaging
-    • Agent coordination
-  end note
-  
-  component [JSON-RPC Server] as rpc
-  note right of rpc
-    • Sync request/response
-    • Direct method calls
-    • Immediate results
+package "Orchestration Layer" {
+  component [CoordinatorAgent] as coord
+  note right of coord
+    • Receives MCP requests
+    • Executes workflows
+    • Direct agent calls
   end note
 }
 
-package "Agent Network" {
-  component [Semantic Analysis] as sa
-  component [Web Search] as ws
-  component [Knowledge Graph] as kg
-  component [Coordinator] as coord
+package "10-Agent System" {
+  component [GitHistoryAgent] as git
+  component [VibeHistoryAgent] as vibe
+  component [SemanticAnalysisAgent] as sa
+  component [WebSearchAgent] as ws
+  component [InsightGenerationAgent] as insight
+  component [ObservationGenerationAgent] as obs
+  component [QualityAssuranceAgent] as qa
+  component [PersistenceAgent] as persist
+  component [DeduplicationAgent] as dedup
+}
+
+package "Storage Layer" {
+  database [GraphDB] as graphdb
+  component [Graph Exporter] as exporter
+  database [coding.json\n.data/knowledge-export/] as storage
 }
 
 ' Vertical connection flow
-claude --> mcp : tool calls
-apis --> rpc : direct API
-cli --> rpc : commands
+claude --> mcp : MCP tool calls
+mcp --> coord : direct function call
 
-mcp --> mqtt : async events
-mcp --> rpc : sync calls
+coord --> git : direct call
+coord --> vibe : direct call
+coord --> sa : direct call
+coord --> ws : direct call
+coord --> insight : direct call
+coord --> obs : direct call
+coord --> qa : direct call
+coord --> persist : direct call
+coord --> dedup : direct call
 
-mqtt --> sa : subscribe/publish
-mqtt --> ws : subscribe/publish
-mqtt --> kg : subscribe/publish
-mqtt --> coord : subscribe/publish
-
-rpc --> sa : method calls
-rpc --> ws : method calls
-rpc --> kg : method calls
-rpc --> coord : method calls
+coord --> graphdb : provides instance
+persist --> graphdb : stores entities
+graphdb --> exporter : auto-export 30s
+exporter --> storage : writes JSON
 
 ' Return paths
-sa --> mqtt : results
-ws --> mqtt : results
-kg --> mqtt : results
-coord --> mqtt : results
-
-sa --> rpc : responses
-ws --> rpc : responses
-kg --> rpc : responses
-coord --> rpc : responses
+coord --> mcp : results
+mcp --> claude : tool response
 
 @enduml

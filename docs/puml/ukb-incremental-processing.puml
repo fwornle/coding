@@ -9,37 +9,32 @@ participant "UKB Engine" as ukb
 participant "State Manager" as state
 participant "Git Analyzer" as git
 participant "Specstory Analyzer" as spec
-participant "Processing State File" as psf
+participant "Checkpoint File" as psf
 
 == Session Start ==
 Developer -> ukb: ukb (default incremental mode)
 ukb -> state: init_processing_state(project)
 
-== State File Management ==
-state -> psf: load ~/.ukb-processing-state.json
-alt State file exists
-  psf -> state: project_state
-else State file missing
-  state -> psf: create_initial_state()
+== Checkpoint Management ==
+state -> psf: load .data/ukb-last-run.json
+alt Checkpoint exists
+  psf -> state: checkpoint_data
+else Checkpoint missing (first run)
+  state -> psf: create_initial_checkpoint()
   note right
     {
-      "projects": {},
-      "global": {
-        "last_updated": "2025-06-16T07:30:00Z",
-        "version": "3.0.0"
-      }
+      "lastSuccessfulRun": null,
+      "lastCommit": null,
+      "lastSession": null,
+      "stats": {}
     }
   end note
 end
 
-state -> psf: ensure_project_entry(project)
-note right
-  {
-    "last_commit_analyzed": null,
-    "specstory_files_analyzed": [],
-    "last_analysis": null,
-    "schema_version": "2.0.0"
-  }
+note right of psf
+  Team-wide checkpoint (.data/ukb-last-run.json)
+  Git-tracked for team synchronization
+  Enables incremental analysis
 end note
 
 == Git Incremental Analysis ==
@@ -90,19 +85,16 @@ git -> ukb: current_commit_hash
 ukb -> state: update_last_analyzed_commit(project, current_commit_hash)
 ukb -> state: update_analysis_timestamp(project)
 
-state -> psf: save_updated_state()
+state -> psf: save_updated_checkpoint()
 note right
   {
-    "projects": {
-      "project-name": {
-        "last_commit_analyzed": "abc123def456",
-        "specstory_files_analyzed": [
-          "2025-06-16_session.md",
-          "2025-06-15_debugging.md"
-        ],
-        "last_analysis": "2025-06-16T14:30:00Z",
-        "schema_version": "2.0.0"
-      }
+    "lastSuccessfulRun": "2025-11-23T14:30:00Z",
+    "lastCommit": "abc123def456",
+    "lastSession": "2025-11-23_1400-1500_g9b30a.md",
+    "stats": {
+      "entitiesCreated": 15,
+      "relationsCreated": 23,
+      "insightsGenerated": 8
     }
   }
 end note

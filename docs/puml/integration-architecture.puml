@@ -12,19 +12,23 @@ package "Coding Core System" as core #E8F5E8 {
 }
 
 package "MCP Integration Layer" as mcp #E0E7FF {
-  [Semantic\nAnalysis\n(11 Agents)] as semantic <<mcp>>
+  [Semantic\nAnalysis\n(10 Agents)] as semantic <<mcp>>
   [Serena\nAST] as serena <<mcp>>
   [Constraint\nMonitor] as monitor <<mcp>>
 }
 
 cloud "Fast LLM Providers" as llm #F0F0F0 {
-  [Groq\n(gpt-oss-20b)] as groq <<llm>>
+  [Groq\n(llama-3.3-70b)] as groq <<llm>>
+  [Gemini\n(gemini-2.0-flash)] as gemini <<llm>>
+  [Anthropic\n(claude-haiku)] as anthropic <<llm>>
   [OpenAI\n(gpt-4o-mini)] as openai <<llm>>
 }
 
 ' Connections
 lsl -down-> groq : Layer 4 Classification\n(fast semantic)
-lsl -down-> openai : Fallback
+lsl -down-> gemini : Fallback 1
+lsl -down-> anthropic : Fallback 2
+lsl -down-> openai : Fallback 3
 trajectory -down-> semantic : MCP Protocol\n(deep analysis)
 trajectory -down-> serena : Repository scan
 constraints -down-> monitor : PreToolUse Hook
@@ -40,8 +44,8 @@ note right of lsl
   **LSL Classification**
   5-layer system with fast
   semantic analysis (Layer 4)
-  using Groq/OpenAI - NOT
-  the 11-agent MCP server
+  using Groq/Gemini/Anthropic/OpenAI
+  (NOT the 10-agent MCP server)
 end note
 
 note right of trajectory

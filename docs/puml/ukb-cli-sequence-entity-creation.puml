@@ -13,11 +13,11 @@ database "GraphDB\n(Graphology+LevelDB)" as DB
 
 == Entity Creation via CLI ==
 
-User -> CLI: ukb entity add "CachingPattern" "TechnicalPattern" 8
+User -> CLI: ukb entity create <entity-data>
 activate CLI
 
 CLI -> CLI: parseArgs()
-CLI -> EC: add(entityData)
+CLI -> EC: create(entityData)
 activate EC
 
 EC -> Router: checkServerAvailability()
@@ -128,10 +128,10 @@ deactivate CLI
 
 == Entity Deletion Operation ==
 
-User -> CLI: ukb entity remove "OldPattern"
+User -> CLI: ukb entity delete "OldPattern"
 activate CLI
 
-CLI -> EC: remove("OldPattern")
+CLI -> EC: delete("OldPattern")
 activate EC
 
 EC -> Router: checkServerAvailability()

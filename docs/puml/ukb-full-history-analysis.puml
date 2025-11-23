@@ -11,9 +11,9 @@ participant "Commit Analyzer" as analyzer
 participant "Pattern Extractor" as extractor
 participant "Knowledge Base" as kb
 
-== Full History Initiation ==
-Developer -> ukb: ukb --full-history
-note right: Comprehensive codebase analysis
+== Full History Analysis ==
+Developer -> ukb: ukb --full
+note right: Comprehensive codebase analysis (ignore checkpoint)
 
 ukb -> git: git log --oneline --pretty=format:'%h|%an|%ad|%s'
 git -> ukb: all_commits.txt (e.g., 1,247 commits)
