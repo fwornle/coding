@@ -343,21 +343,6 @@
       "id": "mc4flkg1y7gvfv"
     },
     {
-      "name": "ValidLSLSession",
-      "entityType": "LSLSession",
-      "observations": [
-        "Live session log from 2025-11-15",
-        "Contains development conversation",
-        "Well-formed LSL structure"
-      ],
-      "significance": 8,
-      "metadata": {
-        "created_at": "2025-11-16T06:47:39.161Z",
-        "last_updated": "2025-11-16T06:47:39.161Z"
-      },
-      "id": "mc4flkg1yd3gnh"
-    },
-    {
       "name": "DisabledValidationEntity",
       "entityType": "TransferablePattern",
       "observations": [
@@ -383,26 +368,6 @@
         "last_updated": "2025-11-16T06:47:39.166Z"
       },
       "id": "mc4flkg2pfmylm"
-    },
-    {
-      "name": "EntityA",
-      "entityType": "Test",
-      "observations": [],
-      "metadata": {
-        "created_at": "2025-11-21T06:39:16.723Z",
-        "last_updated": "2025-11-21T06:39:16.723Z"
-      },
-      "id": "mc4flkg17cuji"
-    },
-    {
-      "name": "EntityB",
-      "entityType": "Test",
-      "observations": [],
-      "metadata": {
-        "created_at": "2025-11-21T06:39:16.732Z",
-        "last_updated": "2025-11-21T06:39:16.732Z"
-      },
-      "id": "mc4flkg17cujj"
     },
     {
       "name": "ConfigurationPattern",
@@ -435,6 +400,41 @@
         "last_updated": "2025-11-22T14:42:12.307Z"
       },
       "id": "mc4flkg154s53l"
+    },
+    {
+      "name": "ValidLSLSession",
+      "entityType": "LSLSession",
+      "observations": [
+        "Live session log from 2025-11-15",
+        "Contains development conversation",
+        "Well-formed LSL structure"
+      ],
+      "significance": 8,
+      "metadata": {
+        "created_at": "2025-11-16T06:47:39.161Z",
+        "last_updated": "2025-11-16T06:47:39.161Z"
+      },
+      "id": "mc4flkg1yd3gnh"
+    },
+    {
+      "name": "EntityA",
+      "entityType": "Test",
+      "observations": [],
+      "metadata": {
+        "created_at": "2025-11-21T06:39:16.723Z",
+        "last_updated": "2025-11-21T06:39:16.723Z"
+      },
+      "id": "mc4flkg17cuji"
+    },
+    {
+      "name": "EntityB",
+      "entityType": "Test",
+      "observations": [],
+      "metadata": {
+        "created_at": "2025-11-21T06:39:16.732Z",
+        "last_updated": "2025-11-21T06:39:16.732Z"
+      },
+      "id": "mc4flkg17cujj"
     }
   ],
   "relations": [
@@ -787,12 +787,6 @@
       "metadata": {}
     },
     {
-      "from": "EntityA",
-      "to": "EntityB",
-      "relationType": "implements",
-      "metadata": {}
-    },
-    {
       "from": "ConfigurationPattern",
       "to": "CollectiveKnowledge",
       "relationType": "contributes_to",
@@ -827,12 +821,18 @@
       "to": "ConfigurationPattern",
       "relationType": "relation",
       "metadata": {}
+    },
+    {
+      "from": "EntityA",
+      "to": "EntityB",
+      "relationType": "implements",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-11-22T20:44:51.255Z",
+    "exported_at": "2025-11-23T12:39:50.026Z",
     "total_entities": 20,
     "total_relations": 65,
     "description": "Coding project infrastructure and patterns"
