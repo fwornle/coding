@@ -1,7 +1,7 @@
 @startuml vkb-cli-data-flow
 !include _standard-style.puml
 
-title VKB-CLI Data Flow and Processing
+title VKB-CLI Data Flow and Processing (Phase 4)
 
 top to bottom direction
 
@@ -35,32 +35,39 @@ skinparam note {
   FontColor #000000
 }
 
-database "shared-memory.json" as input
+database "GraphDB\n(Graphology + LevelDB)" as graphdb
+database ".data/knowledge-export/\n*.json" as exports
 queue "Data Processor" as processor
 component "VKB Server" as server
 cloud "HTTP Server\n(Python)" as http
 cloud "Memory Visualizer\n(React)" as viz
-database "NDJSON Output" as output
+database "Visualization Cache\nmemory.json" as cache
 component "Symlink Manager" as symlink
 database "knowledge-management/" as km
 
-' Input processing
-input --> processor : read JSON
+' Primary data flow (Phase 4: GraphDB primary)
+graphdb --> processor : query entities/relations\n(online mode - default)
+exports --> processor : read JSON\n(batch mode - deprecated)
+
 processor --> processor : validate format
 processor --> processor : detect entity types
 processor --> processor : convert to NDJSON
 
 ' Data transformation
-processor --> output : write processed data
+processor --> cache : write memory.json
 processor --> symlink : create symlinks
 symlink --> km : link directory
 
-' Server operations  
+' Server operations
 processor --> server : data ready
 server --> http : start Python server
 http --> viz : serve visualizer
-http --> output : serve NDJSON data
+http --> cache : serve NDJSON data
 http --> km : serve insight files
+
+' Bidirectional sync (Phase 4)
+graphdb --> exports : auto-export (5s debounce)
+exports --> graphdb : auto-import on startup
 
 ' User interaction
 actor User
@@ -69,8 +76,25 @@ server --> User : status/logs
 User --> viz : browser access
 viz --> User : interactive visualization
 
+note right of graphdb
+  PRIMARY storage
+  .data/knowledge-graph/
+  Graphology (in-memory)
+  LevelDB (persistent)
+  Accessed via GraphDatabaseService
+end note
+
+note right of exports
+  Git-tracked persistence
+  Team collaboration
+  NOT used for VKB runtime
+  Auto-exported from GraphDB
+  Auto-imported on startup
+end note
+
 note right of processor
-  • JSON → NDJSON conversion
+  • GraphDB query (online mode - default)
+  • JSON fallback (batch mode - deprecated)
   • Enhanced observation support
   • Entity deduplication
   • Format validation
@@ -81,6 +105,7 @@ note right of server
   • Health monitoring
   • Error recovery
   • Port management
+  • Default: online mode (GraphDB)
 end note
 
 note bottom of viz
@@ -88,6 +113,7 @@ note bottom of viz
   • Real-time updates
   • Mobile-friendly
   • Search and filtering
+  • D3.js force-directed graph
 end note
 
 @enduml

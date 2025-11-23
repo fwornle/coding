@@ -248,8 +248,8 @@ VKB_DATA_SOURCE=combined vkb start
 claude-mcp
 # ... code and discuss patterns ...
 
-# 2. Add manual insights
-ukb "Architecture: Microservices with API Gateway pattern"
+# 2. Add manual insights by typing in Claude chat:
+# "ukb" - triggers MCP semantic-analysis workflow
 
 # 3. Visualize combined knowledge
 vkb start --with-online
@@ -365,11 +365,13 @@ VKB server configuration is managed through environment variables and options pa
 **Key Settings**:
 ```javascript
 {
-  dataSourceMode: 'batch' | 'online' | 'combined',
+  dataSourceMode: 'online',  // default: GraphDB direct access
+  // dataSourceMode: 'batch' | 'combined',  // legacy modes
   port: 8080,
   projectRoot: '/Users/q284340/Agentic/coding',
   visualizerDir: 'memory-visualizer/',
-  sharedMemoryPaths: ['shared-memory-coding.json', ...]
+  graphDbPath: '.data/knowledge-graph/',  // PRIMARY storage
+  exportDir: '.data/knowledge-export/'    // git-tracked persistence
 }
 ```
 
@@ -465,10 +467,19 @@ Future versions will support:
 - Binary: `/Users/q284340/Agentic/coding/bin/vkb-cli.js`
 - Wrapper: `/Users/q284340/Agentic/coding/knowledge-management/vkb`
 
-**Data Storage**:
-- GraphDB: `/Users/q284340/Agentic/coding/.data/knowledge-graph/` (PRIMARY)
-- JSON Exports: `/Users/q284340/Agentic/coding/.data/knowledge-export/*.json` (git-tracked)
-- Visualization Cache: `/Users/q284340/Agentic/coding/memory-visualizer/dist/memory*.json` (generated)
+**Data Storage (Phase 4 Architecture)**:
+- **GraphDB** (PRIMARY): `/Users/q284340/Agentic/coding/.data/knowledge-graph/`
+  - Graphology (in-memory)
+  - LevelDB (persistent)
+  - Runtime access via GraphDatabaseService
+- **JSON Exports** (git-tracked): `/Users/q284340/Agentic/coding/.data/knowledge-export/*.json`
+  - Auto-exported from GraphDB (5s debounce)
+  - Auto-imported to GraphDB on startup
+  - Team collaboration via git
+  - NOT used for VKB runtime access
+- **Visualization Cache** (generated): `/Users/q284340/Agentic/coding/memory-visualizer/dist/memory*.json`
+  - Created from GraphDB queries (online mode)
+  - Or from JSON exports (batch mode - deprecated)
 
 **Visualizer**:
 - Directory: `/Users/q284340/Agentic/coding/memory-visualizer/`

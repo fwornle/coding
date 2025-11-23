@@ -1,7 +1,7 @@
 @startuml vkb-cli-integration
 !include _standard-style.puml
 
-title VKB-CLI Integration with Legacy VKB
+title VKB-CLI Integration with GraphDB Storage
 
 top to bottom direction
 
@@ -15,6 +15,11 @@ skinparam package {
   BackgroundColor #F8F8F8
   BorderColor #888888
   FontSize 14
+  FontColor #000000
+}
+skinparam database {
+  BackgroundColor #FFF9E6
+  FontSize 12
   FontColor #000000
 }
 skinparam note {
@@ -33,6 +38,7 @@ package "Legacy VKB (Bash)" {
     579 lines
     Mixed concerns
     Platform-specific
+    (Deprecated)
   end note
 }
 
@@ -40,13 +46,13 @@ package "VKB-CLI (Node.js)" {
   [vkb wrapper] as wrapper
   [lib/vkb-server/] as server
   [VKBServer API] as api
-  
+
   note right of wrapper
     133 lines
     Backward compatible
     Delegates to Node.js
   end note
-  
+
   note right of server
     Modular design
     Cross-platform
@@ -54,10 +60,24 @@ package "VKB-CLI (Node.js)" {
   end note
 }
 
-package "Shared Components" {
-  [shared-memory.json] as data
+package "Storage Architecture (Phase 4)" {
+  database "GraphDB\n(Graphology + LevelDB)" as graphdb
+  database ".data/knowledge-export/\n*.json" as exports
   [memory-visualizer] as viz
   [Python HTTP Server] as python
+
+  note right of graphdb
+    PRIMARY storage
+    .data/knowledge-graph/
+    Runtime access
+  end note
+
+  note right of exports
+    Git-tracked persistence
+    Team collaboration
+    Auto-exported (5s debounce)
+    NOT used for VKB runtime
+  end note
 }
 
 ' Migration path
@@ -65,27 +85,34 @@ legacy ..> wrapper : replaced by
 wrapper --> server : delegates to
 server --> api : exposes
 
-' Shared usage
-legacy --> data : reads
-server --> data : reads
-legacy --> viz : serves
+' GraphDB access (Phase 4)
+server --> graphdb : queries directly\n(online mode - default)
+graphdb --> exports : auto-exports
+exports --> graphdb : auto-imports on startup
+
+' Visualization
 server --> viz : serves
-legacy --> python : spawns
 server --> python : spawns
+python --> viz : HTTP server
 
 ' Command compatibility
 actor User
-User --> legacy : vkb commands
-User --> wrapper : same commands
+User --> legacy : vkb commands\n(deprecated)
+User --> wrapper : vkb commands
 wrapper --> server : enhanced features
 
 note bottom of User
   All existing commands work unchanged:
-  • vkb start
-  • vkb stop  
+  • vkb start (default: online mode)
+  • vkb stop
   • vkb status
   • vkb logs
   • vkb restart
+
+  Data Source Modes:
+  • online (default) - GraphDB direct
+  • batch (deprecated) - JSON files
+  • combined - Both sources
 end note
 
 @enduml
