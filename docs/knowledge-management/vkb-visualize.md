@@ -180,10 +180,11 @@ vkb-cli data export --format json --output kb-export.json
 ### Workflow Integration
 
 ```bash
-# Capture insights with UKB
-ukb --interactive
+# Knowledge capture happens via:
+# 1. Continuous Learning (automatic during coding)
+# 2. MCP Semantic Analysis (type "ukb" in Claude chat)
 
-# Refresh visualization
+# Refresh visualization after knowledge updates
 vkb-cli data refresh
 
 # Or restart for comprehensive refresh
