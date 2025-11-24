@@ -239,6 +239,54 @@ export class GraphDatabaseService extends EventEmitter {
   }
 
   /**
+   * Delete an entity and all its relationships
+   *
+   * Removes the entity from the graph and all edges connected to it.
+   * Triggers persistence and JSON export through event system.
+   *
+   * @param {string} name - Entity name
+   * @param {string} team - Team scope
+   * @returns {Promise<Object>} Deletion result with entity details
+   * @throws {Error} If entity doesn't exist
+   * @emits entity:deleted When entity deleted successfully
+   */
+  async deleteEntity(name, team) {
+    const nodeId = `${team}:${name}`;
+
+    // Check if entity exists
+    if (!this.graph.hasNode(nodeId)) {
+      throw new Error(`Entity not found: ${name} (team: ${team})`);
+    }
+
+    // Get entity details before deletion (for event emission and return value)
+    const entity = this.graph.getNodeAttributes(nodeId);
+
+    // Delete the node (this automatically removes all associated edges)
+    this.graph.dropNode(nodeId);
+
+    // Mark as dirty for persistence
+    this.isDirty = true;
+
+    // Persist to Level immediately
+    if (this.levelDB) {
+      await this._persistGraphToLevel();
+      // NOTE: JSON export is handled by GraphKnowledgeExporter via events
+    }
+
+    // Emit deletion event (GraphKnowledgeExporter and QdrantSyncService listen to this)
+    this.emit('entity:deleted', { team, name, nodeId, entity });
+
+    console.log(`✓ Deleted entity: ${name} (team: ${team})`);
+
+    return {
+      success: true,
+      deleted: name,
+      team,
+      entity
+    };
+  }
+
+  /**
    * Store a relationship between two entities
    *
    * @param {string} fromEntity - Source entity name
