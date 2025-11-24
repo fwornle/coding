@@ -9,7 +9,7 @@ import { healthRefreshManager } from './healthRefreshMiddleware'
 const API_PORT = process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}/api/health-verifier`
 
-export const apiMiddleware: Middleware = (store) => (next) => (action) => {
+export const apiMiddleware: Middleware = (store) => (next) => (action: any) => {
   // Pass the action through first
   const result = next(action)
 
@@ -31,13 +31,19 @@ export const apiMiddleware: Middleware = (store) => (next) => (action) => {
 
         const responseData = await response.json()
         if (responseData.status === 'success') {
-          store.dispatch(triggerVerificationSuccess())
           console.log('✅ Health verification triggered successfully')
 
-          // Immediately refresh health data to show updated status
+          // Wait for verification to complete before fetching updated data
+          // Health verification typically takes 2-5 seconds to run all checks
+          console.log('⏳ Waiting for verification to complete (3 seconds)...')
+          await new Promise(resolve => setTimeout(resolve, 3000))
+
+          // Now fetch updated health data
           console.log('🔄 Fetching updated health data...')
           await healthRefreshManager.fetchAllData()
           console.log('✅ Health data refreshed')
+
+          store.dispatch(triggerVerificationSuccess())
         } else {
           throw new Error(responseData.message || 'Verification trigger failed')
         }
