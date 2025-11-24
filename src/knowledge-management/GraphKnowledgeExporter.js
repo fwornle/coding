@@ -67,11 +67,19 @@ export class GraphKnowledgeExporter {
           this._scheduleExport(event.team);
         });
 
+        this.graphService.on('entity:deleted', (event) => {
+          this._scheduleExport(event.team);
+        });
+
         this.graphService.on('relationship:stored', (event) => {
           this._scheduleExport(event.team);
         });
 
-        console.log('✓ Graph knowledge exporter: auto-export enabled');
+        this.graphService.on('relationship:deleted', (event) => {
+          this._scheduleExport(event.team);
+        });
+
+        console.log('✓ Graph knowledge exporter: auto-export enabled (create/update/delete)');
       }
 
       this.initialized = true;
@@ -207,7 +215,8 @@ export class GraphKnowledgeExporter {
           name: attributes.name,
           entityType: attributes.entityType,
           observations: attributes.observations || [],
-          significance: attributes.significance
+          significance: attributes.significance,
+          source: attributes.source || 'manual'  // Export source field (manual/auto)
         };
 
         // Add metadata
@@ -239,6 +248,15 @@ export class GraphKnowledgeExporter {
         });
       }
     });
+
+    // LOG: Check for Coding → CollectiveKnowledge relations
+    const codingToCollective = relations.filter(r =>
+      r.from === 'Coding' && r.to === 'CollectiveKnowledge'
+    );
+    console.log(`🔍 [EXPORT] Team "${team}": ${entities.length} entities, ${relations.length} relations. Coding→CollectiveKnowledge: ${codingToCollective.length} found`);
+    if (codingToCollective.length > 0) {
+      console.log(`🔍 [EXPORT] Coding→CollectiveKnowledge relations:`, JSON.stringify(codingToCollective, null, 2));
+    }
 
     return { entities, relations };
   }

@@ -246,11 +246,13 @@ export class GraphDatabaseService extends EventEmitter {
    *
    * @param {string} name - Entity name
    * @param {string} team - Team scope
+   * @param {Object} [options={}] - Deletion options
+   * @param {boolean} [options.force=false] - Force delete critical nodes without safety checks
    * @returns {Promise<Object>} Deletion result with entity details
-   * @throws {Error} If entity doesn't exist
+   * @throws {Error} If entity doesn't exist or if critical node deletion requires force
    * @emits entity:deleted When entity deleted successfully
    */
-  async deleteEntity(name, team) {
+  async deleteEntity(name, team, options = {}) {
     const nodeId = `${team}:${name}`;
 
     // Check if entity exists
@@ -260,6 +262,42 @@ export class GraphDatabaseService extends EventEmitter {
 
     // Get entity details before deletion (for event emission and return value)
     const entity = this.graph.getNodeAttributes(nodeId);
+
+    // Safety check: Prevent deletion of critical nodes unless force is true
+    const criticalNodeTypes = ['System', 'CollectiveKnowledge'];
+    const isCriticalNode =
+      criticalNodeTypes.includes(entity.entityType) ||
+      name === 'CollectiveKnowledge';
+
+    if (isCriticalNode && !options.force) {
+      throw new Error(
+        `Cannot delete critical node "${name}" (type: ${entity.entityType}). ` +
+        `This node is central to the knowledge graph. ` +
+        `Use force=true option only if you're absolutely certain.`
+      );
+    }
+
+    // Safety check: Warn if node has many connections (hub node)
+    const connectionCount = this.graph.degree(nodeId);
+    if (connectionCount > 10 && !options.force) {
+      console.warn(
+        `⚠️  WARNING: Deleting "${name}" which has ${connectionCount} connections. ` +
+        `This may isolate other nodes in the graph.`
+      );
+    }
+
+    // LOG: Capture relations before deletion for debugging
+    const relationsBeforeDelete = [];
+    this.graph.forEachEdge((edgeId, edgeAttrs, src, tgt) => {
+      if (src === nodeId || tgt === nodeId) {
+        relationsBeforeDelete.push({
+          from: this.graph.getNodeAttribute(src, 'name'),
+          to: this.graph.getNodeAttribute(tgt, 'name'),
+          type: edgeAttrs.type
+        });
+      }
+    });
+    console.log(`🔍 [DELETE] Deleting "${name}": Removing ${relationsBeforeDelete.length} relations:`, JSON.stringify(relationsBeforeDelete, null, 2));
 
     // Delete the node (this automatically removes all associated edges)
     this.graph.dropNode(nodeId);

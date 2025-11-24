@@ -179,6 +179,7 @@ export class GraphKnowledgeImporter {
    * @param {Object} [options={}] - Import options
    * @param {string} [options.inputPath] - Override input path
    * @param {boolean} [options.skipValidation=false] - Skip validation
+   * @param {boolean} [options.fullSync=false] - Delete entities in DB that are not in JSON (full sync)
    * @returns {Promise<{entitiesImported: number, relationsImported: number}>}
    */
   async importTeam(team, options = {}) {
@@ -244,9 +245,36 @@ export class GraphKnowledgeImporter {
         }
       }
 
-      console.log(`✓ Imported team "${team}": ${entitiesImported} entities (${entitiesSkipped} skipped), ${relationsImported} relations (${relationsSkipped} skipped) from ${inputPath}`);
+      // Full sync: delete entities that exist in DB but not in JSON
+      let entitiesDeleted = 0;
+      if (options.fullSync) {
+        const jsonEntityNames = new Set((data.entities || []).map(e => e.name));
+        const dbEntities = [];
 
-      return { entitiesImported, entitiesSkipped, relationsImported, relationsSkipped };
+        // Collect all entities for this team from DB
+        this.graphService.graph.forEachNode((nodeId, attributes) => {
+          if (attributes.team === team) {
+            dbEntities.push({ nodeId, name: attributes.name });
+          }
+        });
+
+        // Delete entities that are in DB but not in JSON
+        for (const { nodeId, name } of dbEntities) {
+          if (!jsonEntityNames.has(name)) {
+            try {
+              await this.graphService.deleteEntity(name, team);
+              console.log(`  🗑️  Deleted orphaned entity: ${name}`);
+              entitiesDeleted++;
+            } catch (error) {
+              console.warn(`Failed to delete orphaned entity "${name}":`, error.message);
+            }
+          }
+        }
+      }
+
+      console.log(`✓ Imported team "${team}": ${entitiesImported} entities (${entitiesSkipped} skipped), ${relationsImported} relations (${relationsSkipped} skipped)${options.fullSync ? `, ${entitiesDeleted} orphaned deleted` : ''} from ${inputPath}`);
+
+      return { entitiesImported, entitiesSkipped, relationsImported, relationsSkipped, entitiesDeleted };
 
     } catch (error) {
       console.error(`Import failed for team "${team}":`, error.message);
