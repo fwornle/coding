@@ -379,7 +379,9 @@ export class GraphKnowledgeImporter {
     // Check if relation already exists (deduplicate)
     const fromId = `${team}:${relation.from}`;
     const toId = `${team}:${relation.to}`;
-    const relationType = relation.relationType || relation.type || 'related-to';
+    // NOTE: Don't use relation.type as fallback if it's 'relation' - that's just an NDJSON format marker
+    const typeCandidate = relation.type !== 'relation' ? relation.type : null;
+    const relationType = relation.relationType || typeCandidate || 'related-to';
 
     // Check if edge already exists with same type
     if (this.graphService.graph.hasDirectedEdge(fromId, toId)) {

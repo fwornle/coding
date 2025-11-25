@@ -375,6 +375,62 @@ export class GraphDatabaseService extends EventEmitter {
   }
 
   /**
+   * Delete relationships by type
+   *
+   * Removes all edges with a specific type from the graph.
+   * Used for cleanup operations (e.g., removing generic 'relation' type edges).
+   *
+   * @param {string} relationType - The relationship type to delete
+   * @param {Object} [options={}] - Options
+   * @param {string} [options.team] - Filter by team (optional)
+   * @returns {Promise<{deleted: number, edges: Array}>} Deletion result
+   */
+  async deleteRelationsByType(relationType, options = {}) {
+    const { team = null } = options;
+    const edgesToDelete = [];
+
+    // Collect edges to delete (can't delete during iteration)
+    this.graph.forEachEdge((edgeId, attributes) => {
+      if (attributes.type === relationType) {
+        if (team && attributes.team !== team) {
+          return; // Skip if team filter doesn't match
+        }
+        edgesToDelete.push({
+          edgeId,
+          source: this.graph.source(edgeId),
+          target: this.graph.target(edgeId),
+          attributes
+        });
+      }
+    });
+
+    // Delete collected edges
+    for (const edge of edgesToDelete) {
+      this.graph.dropEdge(edge.edgeId);
+      console.log(`🗑️  Deleted edge: ${edge.source} → ${edge.target} (${relationType})`);
+    }
+
+    // Mark as dirty for persistence
+    if (edgesToDelete.length > 0) {
+      this.isDirty = true;
+
+      // Persist immediately
+      if (this.levelDB) {
+        await this._persistGraphToLevel();
+      }
+    }
+
+    console.log(`✓ Deleted ${edgesToDelete.length} edges with type "${relationType}"`);
+    return {
+      deleted: edgesToDelete.length,
+      edges: edgesToDelete.map(e => ({
+        from: this.graph.hasNode(e.source) ? this.graph.getNodeAttribute(e.source, 'name') : e.source,
+        to: this.graph.hasNode(e.target) ? this.graph.getNodeAttribute(e.target, 'name') : e.target
+      }))
+    };
+  }
+
+  /**
    * Find related entities using graph traversal
    *
    * Uses breadth-first search to find entities related within specified depth.
