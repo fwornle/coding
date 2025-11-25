@@ -59,6 +59,7 @@ class SystemHealthAPIServer {
         this.dashboardPort = dashboardPort;
         this.app = express();
         this.server = null;
+        this.lastAutoVerifyTime = null; // Track last auto-triggered verification to rate limit
 
         this.setupMiddleware();
         this.setupRoutes();
@@ -112,17 +113,22 @@ class SystemHealthAPIServer {
 
     /**
      * Get current health verifier status
+     * Auto-triggers verification when data is stale to ensure freshness
      */
     async handleGetHealthStatus(req, res) {
         try {
             const statusPath = join(codingRoot, '.health/verification-status.json');
 
             if (!existsSync(statusPath)) {
+                // No status file - trigger verification and return pending state
+                this.triggerBackgroundVerification();
                 return res.json({
                     status: 'success',
                     data: {
                         status: 'offline',
-                        message: 'Health verifier is not running'
+                        message: 'Health verifier is not running - verification triggered',
+                        ageMs: 0,
+                        autoHealingActive: false
                     }
                 });
             }
@@ -134,6 +140,14 @@ class SystemHealthAPIServer {
             if (age > 120000) {
                 statusData.status = 'stale';
                 statusData.ageMs = age;
+
+                // Auto-trigger verification when stale (but rate limit to avoid spam)
+                // Only trigger if we haven't triggered recently (within 30 seconds)
+                if (!this.lastAutoVerifyTime || (Date.now() - this.lastAutoVerifyTime) > 30000) {
+                    console.log('🔄 Data is stale, auto-triggering health verification...');
+                    this.triggerBackgroundVerification();
+                    this.lastAutoVerifyTime = Date.now();
+                }
             } else {
                 statusData.status = 'operational';
                 statusData.ageMs = age;
@@ -150,6 +164,30 @@ class SystemHealthAPIServer {
                 message: 'Failed to retrieve health status',
                 error: error.message
             });
+        }
+    }
+
+    /**
+     * Trigger health verification in the background (non-blocking)
+     */
+    triggerBackgroundVerification() {
+        const verifierScript = join(codingRoot, 'scripts/health-verifier.js');
+
+        if (!existsSync(verifierScript)) {
+            console.warn('⚠️ Health verifier script not found:', verifierScript);
+            return;
+        }
+
+        try {
+            const verifyProcess = spawn('node', [verifierScript, 'verify'], {
+                cwd: codingRoot,
+                detached: true,
+                stdio: 'ignore'
+            });
+            verifyProcess.unref();
+            console.log('✅ Background health verification started');
+        } catch (error) {
+            console.error('❌ Failed to trigger background verification:', error.message);
         }
     }
 

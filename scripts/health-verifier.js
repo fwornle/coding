@@ -126,7 +126,7 @@ class HealthVerifier extends EventEmitter {
     this.log('Starting health verification');
 
     try {
-      const checks = [];
+      let checks = [];  // Use let since checks may be reassigned during auto-healing recheck
 
       // Priority Check 1: Database Health
       this.log('Checking database health...');

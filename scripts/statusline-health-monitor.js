@@ -441,6 +441,16 @@ class StatusLineHealthMonitor {
       const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
       const age = Date.now() - healthData.timestamp;
 
+      // If no active transcript/session, show as inactive (black) regardless of health file age
+      if (healthData.transcriptInfo?.status === 'not_found' ||
+          (healthData.transcriptPath === null && !healthData.streamingActive)) {
+        return {
+          status: 'inactive',
+          icon: '⚫',
+          details: 'No active session'
+        };
+      }
+
       // Check trajectory status if projectPath provided
       let trajectoryStatus = null;
       if (projectPath) {
