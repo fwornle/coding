@@ -2,6 +2,8 @@
 
 Automatic system health monitoring and self-healing that ensures a stable development environment.
 
+![System Health Dashboard](../images/health-monitor.png)
+
 ## What It Provides
 
 The Health System provides **failsafe monitoring** with automatic verification and recovery:
