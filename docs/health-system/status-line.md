@@ -11,19 +11,49 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 ### Example Display
 
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | 📋🟠2130-2230(3min) →coding]
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
 ```
 
 ### Reading the Status Line
 
-**Format**: `[🏥 health | 🛡️ compliance trajectory | 📋 lsl-status]`
+**Format**: `[🏥 health | 🛡️ compliance trajectory | [api-quota] | 📋 lsl-status]`
 
 **Components**:
 - `🏥 95%` - **System Health**: Overall health score (0-100%)
 - `🛡️ 94%` - **Constraint Compliance**: Code quality compliance percentage
 - `⚙️ IMP` - **Trajectory State**: Current development activity
+- `[Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%]` - **API Quota**: LLM provider usage (see below)
 - `📋🟠2130-2230(3min)` - **LSL Status**: Logging window and activity
 - `→coding` - **Active Project**: Project with recent activity
+
+### API Quota Monitoring
+
+The status line displays real-time API quota information for all configured LLM providers.
+
+**Format**: `[Provider📊ColorPercentage ...]`
+
+**Provider Abbreviations**:
+- `Gq` - Groq (free tier: 7.2M tokens/day, 14.4K RPM)
+- `Ggl` - Google Gemini (free tier: 15 RPM, 1M TPD)
+- `A` - Anthropic Claude (billing-based, estimated status)
+- `O` - OpenAI (billing-based, estimated status)
+- `X` - X.AI (Grok) (free credits: $25)
+
+**Color Indicators**:
+- 🟢 Green - Healthy (>75% remaining)
+- 🟡 Yellow - Moderate (25-75% remaining)
+- 🟠 Orange - Low (10-25% remaining)
+- 🔴 Red - Critical (<10% remaining)
+
+**Display Logic**:
+- **Numeric Quota**: Shows percentage (e.g., `Gq📊🟢95%`)
+- **Unknown/Estimated**: Shows color only (e.g., `A📊🟢`)
+- **No Providers**: Section omitted if no API keys configured
+
+**Examples**:
+- `[Gq📊🟢95% X📊🟢85%]` - Groq at 95%, X.AI at 85%, both healthy
+- `[Gq📊🟡45% X📊🟠15%]` - Groq moderate, X.AI low
+- `[A📊🟢 O📊🟢]` - Anthropic and OpenAI (unknown quota, keys valid)
 
 ### Trajectory States
 
@@ -66,6 +96,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - **Health System**: Provides system health scores from `.health/verification-status.json`
 - **Constraint Monitor**: Provides compliance percentage from constraint API
 - **Trajectory Analyzer**: Provides current development state from `.specstory/trajectory/live-state.json`
+- **API Quota Checker**: Provides LLM provider usage from `lib/api-quota-checker.js`
 - **LSL System**: Provides logging status from Global LSL Registry
 
 ### Session Discovery
@@ -105,12 +136,12 @@ The status line displays information for **multiple active Claude Code sessions*
 
 **Single Session Display**:
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | 📋🟠2130-2230(3min) →coding]
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
 ```
 
 **Multi-Session Display**:
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | 📋C:🟢1400-1500(2m) CA:🟠2130-2230(15m)]
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% X📊🟢85%] | 📋C:🟢1400-1500(2m) CA:🟠2130-2230(15m)]
 ```
 
 Where:
@@ -137,6 +168,7 @@ Where:
    - Read health verification status
    - Query constraint monitor API
    - Read trajectory state file
+   - Check API quota for all providers
    - Scan LSL registry
 3. **Status Aggregation**: Combine all indicators
 4. **Display Update**: Update Claude Code status bar
@@ -153,6 +185,7 @@ Where:
 **Caching**:
 - Health status cached for 5 minutes
 - Constraint compliance cached for 1 minute
+- API quota cached for 30 seconds (real-time) or 5 minutes (estimated)
 - Trajectory state read on every update
 - LSL status read on every update
 
@@ -161,6 +194,7 @@ Where:
 **File Locations**:
 - Health: `.health/verification-status.json`
 - Trajectory: `.specstory/trajectory/live-state.json`
+- API Quota: `lib/api-quota-checker.js` (shared library)
 - LSL Registry: `.lsl/global-registry.json`
 - Constraint API: `http://localhost:3031/api/compliance/:project`
 
@@ -238,7 +272,7 @@ coding
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥 95% | 🛡️ 94% ⚙️ IMP | 📋🟠2130-2230(3min) →coding]
+# [🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
 ```
 
 ### Troubleshooting
@@ -280,6 +314,7 @@ node scripts/combined-status-line.js --test-abbreviations
 - `scripts/combined-status-line.js` - Main status line script
 - `scripts/health-verifier.js` - Health status provider
 - `src/live-logging/RealTimeTrajectoryAnalyzer.js` - Trajectory state provider
+- `lib/api-quota-checker.js` - API quota provider (shared library)
 - `.lsl/global-registry.json` - LSL session registry
 - `.health/verification-status.json` - Health status cache
 - `.specstory/trajectory/live-state.json` - Trajectory state

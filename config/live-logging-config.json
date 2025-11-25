@@ -45,6 +45,18 @@
           "requests_per_minute": 14400,
           "tokens_per_minute": 7200000
         }
+      },
+      "google": {
+        "default_model": "gemini-1.5-flash",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "usage_endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+        "console_url": "https://aistudio.google.com/app/apikey",
+        "free_credits": null,
+        "default_limit": null,
+        "rate_limit": {
+          "requests_per_minute": 15,
+          "tokens_per_day": 1000000
+        }
       }
     },
     "timeout": 10000,

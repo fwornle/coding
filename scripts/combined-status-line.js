@@ -578,148 +578,25 @@ class CombinedStatusLine {
         return this.apiCache;
       }
 
-      // Get API key from configured environment variables
-      const apiKeyVars = this.config.api_key_env_vars || ['XAI_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'];
-      let apiKey = null;
-      let provider = null;
+      // Use shared API quota checker utility
+      const apiQuotaChecker = await import('../lib/api-quota-checker.js');
 
-      for (const envVar of apiKeyVars) {
-        const key = process.env[envVar];
-        if (key) {
-          apiKey = key;
-          if (key.startsWith('xai-')) {
-            provider = 'xai';
-          } else if (key.startsWith('sk-') && envVar.includes('OPENAI')) {
-            provider = 'openai';
-          } else if (key.startsWith('sk-ant-') || envVar.includes('ANTHROPIC')) {
-            provider = 'anthropic';
-          }
-          break;
-        }
-      }
+      // Check all active providers in parallel
+      const providers = await apiQuotaChecker.checkAllProviders(this.config, {
+        useCache: true,
+        timeout: 5000
+      });
 
-      let apiUsage = { percentage: 'unknown', tokensUsed: 0, remainingCredits: 'unknown', model: provider || 'unknown' };
-      
-      // Try to get actual usage if possible
-      if (apiKey && provider) {
-        const providerConfig = this.config.semantic_analysis?.models?.[provider];
-        const usageEndpoint = this.config.credit_checking?.endpoints?.[provider];
-        
-        if (usageEndpoint && providerConfig) {
-          try {
-            const timeout = this.config.semantic_analysis?.timeout || 10000;
-            const response = await fetch(`${providerConfig.base_url}${usageEndpoint}`, {
-              headers: { 'Authorization': `Bearer ${apiKey}` },
-              timeout: Math.min(timeout, 5000) // Cap at 5s for status checks
-            }).catch(() => null);
-            
-            if (response?.ok) {
-              const data = await response.json();
-              
-              if (provider === 'xai') {
-                // XAI API returns actual dollar amounts
-                const totalCredits = data.credit_limit || providerConfig.default_limit || 20.00;
-                const usedCredits = data.total_usage || 0;
-                const remainingCredits = Math.max(0, totalCredits - usedCredits);
-                const remainingPercentage = Math.round((remainingCredits / totalCredits) * 100);
-                
-                apiUsage = {
-                  percentage: Math.round((usedCredits / totalCredits) * 100),
-                  tokensUsed: data.tokens_used || 0,
-                  limit: totalCredits,
-                  remainingCredits: remainingPercentage,
-                  usedCredits,
-                  model: provider
-                };
-              } else if (provider === 'anthropic') {
-                // Anthropic usage API structure
-                apiUsage = {
-                  percentage: data.usage_percentage || 'unknown',
-                  tokensUsed: data.total_tokens || 0,
-                  remainingCredits: data.remaining_balance_percentage || 'unknown',
-                  model: provider
-                };
-              }
-              
-              if (process.env.DEBUG_STATUS) {
-                console.error(`${provider.toUpperCase()} API response:`, JSON.stringify(data, null, 2));
-              }
-            }
-          } catch (error) {
-            if (process.env.DEBUG_STATUS) {
-              console.error(`${provider.toUpperCase()} API error: ${error.message}`);
-            }
-          }
-        }
-        
-        // Provider-specific fallback estimates
-        if (apiUsage.percentage === 'unknown') {
-          const fallbackConfig = this.config.semantic_analysis?.fallback_credits || {};
-          
-          if (provider === 'xai') {
-            // Conservative estimate for XAI users based on user feedback
-            apiUsage = {
-              percentage: 5, // Low usage estimate
-              tokensUsed: 0,
-              remainingCredits: fallbackConfig.conservative_estimate || 90,
-              model: provider
-            };
-          } else if (provider === 'openai' || provider === 'anthropic') {
-            // More conservative for other providers since no usage API
-            apiUsage = {
-              percentage: 25, // Moderate usage estimate
-              tokensUsed: 0,
-              remainingCredits: fallbackConfig.unknown_default || 75,
-              model: provider
-            };
-          }
-        }
-        
-        // Cache the result
-        this.apiCache = apiUsage;
-        this.lastApiCheck = now;
-      }
-      
-      // If we can't get real usage, estimate from session activity
-      if (apiUsage.percentage === 'unknown') {
-        const today = new Date().toISOString().split('T')[0];
-        const historyDir = join(rootDir, '.specstory/history');
-        
-        
-        if (existsSync(historyDir)) {
-          const files = fs.readdirSync(historyDir);
-          const todayFiles = files.filter(f => f.includes(today) && f.endsWith('.md'));
-          
-          
-          // More accurate estimation based on file content
-          let totalContent = 0;
-          todayFiles.slice(-5).forEach(file => {
-            try {
-              const content = fs.readFileSync(join(historyDir, file), 'utf8');
-              totalContent += content.length;
-            } catch (e) {}
-          });
-          
-          // Rough token estimation: ~4 chars per token
-          const estimatedTokens = Math.floor(totalContent / 4);
-          const dailyLimit = 5000; // Conservative estimate for free tier
-          const usedPercentage = Math.min(100, (estimatedTokens / dailyLimit) * 100);
-          const remainingPercentage = Math.max(0, 100 - usedPercentage);
-          
-          apiUsage = {
-            percentage: Math.round(usedPercentage),
-            tokensUsed: estimatedTokens,
-            limit: dailyLimit,
-            remainingCredits: Math.round(remainingPercentage),
-            model: 'grok'
-          };
-          
-        }
-      }
-      
-      return apiUsage;
+      // Cache the results
+      this.apiCache = { providers };
+      this.lastApiCheck = now;
+
+      return this.apiCache;
     } catch (error) {
-      return { percentage: 'unknown', tokensUsed: 0 };
+      if (process.env.DEBUG_STATUS) {
+        console.error('API usage check error:', error.message);
+      }
+      return { providers: [] };
     }
   }
 
@@ -1187,33 +1064,39 @@ class CombinedStatusLine {
       overallColor = 'red';
     }
 
-    // Semantic Analysis Status (Brain = AI/LLM API health, Checkmark = Credits OK)
+    // API Provider Status (Multi-provider display with bar chart emojis)
     if (semantic.status === 'operational') {
-      const apiUsage = await this.getAPIUsageEstimate();
+      const apiData = await this.getAPIUsageEstimate();
+      const providers = apiData.providers || [];
 
-      if (apiUsage.remainingCredits !== 'unknown') {
-        const remaining = typeof apiUsage.remainingCredits === 'number' ? apiUsage.remainingCredits : 100;
-        const thresholds = this.config.status_line?.display?.credit_thresholds || { critical: 10, warning: 20, moderate: 80 };
+      if (providers.length > 0) {
+        // Import the formatter utility
+        const apiQuotaChecker = await import('../lib/api-quota-checker.js');
 
-        if (remaining < thresholds.critical) {
-          parts.push(`[🧠API❌${remaining}%]`); // Critical - very low credits
+        // Format each provider for display
+        const providerDisplays = providers.map(p => apiQuotaChecker.formatQuotaDisplay(p));
+
+        // Combine into single bracket: [G📊🟢 A📊🟡55%]
+        parts.push(`[${providerDisplays.join(' ')}]`);
+
+        // Update overall color based on worst provider status
+        const hasCritical = providers.some(p => p.status === 'critical');
+        const hasLow = providers.some(p => p.status === 'low' || p.status === 'degraded');
+
+        if (hasCritical) {
           overallColor = 'red';
-        } else if (remaining < thresholds.warning) {
-          parts.push(`[🧠API⚠️${remaining}%]`); // Warning - low credits
-          if (overallColor === 'green') overallColor = 'yellow';
-        } else if (remaining < thresholds.moderate) {
-          parts.push(`[🧠API✅${remaining}%]`); // Show percentage when moderate
-        } else {
-          parts.push('[🧠API✅]'); // High credits - clean display
+        } else if (hasLow && overallColor === 'green') {
+          overallColor = 'yellow';
         }
       } else {
-        parts.push('[🧠API✅]'); // Unknown usage - assume OK
+        // No providers configured - show generic healthy status
+        parts.push('[API✅]');
       }
     } else if (semantic.status === 'degraded') {
-      parts.push('[🧠API⚠️]');
+      parts.push('[API⚠️]');
       if (overallColor === 'green') overallColor = 'yellow';
     } else {
-      parts.push('[🧠API❌]');
+      parts.push('[API❌]');
       overallColor = 'red';
     }
 

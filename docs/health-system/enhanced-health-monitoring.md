@@ -2,7 +2,9 @@
 
 ## Overview
 
-The Enhanced Health Monitoring System provides comprehensive health tracking and status reporting across all Claude Code sessions. This system includes individual session monitoring, smart abbreviation generation, auto-recovery mechanisms, and multi-project coordination through a 4-layer protection architecture.
+The Enhanced Health Monitoring System provides comprehensive health tracking and status reporting across all Claude Code sessions. This system includes individual session monitoring, smart abbreviation generation, auto-recovery mechanisms, multi-project coordination through a 4-layer protection architecture, and real-time API quota monitoring for LLM providers.
+
+![System Health Dashboard](../images/health-monitor.png)
 
 ## System Architecture
 
@@ -42,6 +44,13 @@ The system implements a robust 4-layer monitoring protection:
 - Individual session status with smart abbreviations
 - Integration with constraint monitoring and semantic analysis
 - Real-time health status updates
+- API quota monitoring via `lib/api-quota-checker.js`
+
+#### 5. API Quota Checker (`lib/api-quota-checker.js`)
+- Shared library for checking LLM provider quotas
+- Multi-provider support (Groq, Google, Anthropic, OpenAI, X.AI)
+- Two-tier caching strategy (30s real-time, 5min estimated)
+- Used by both statusline and dashboard for consistency
 
 ## StatusLine Architecture
 
@@ -109,23 +118,73 @@ The system provides seamless recovery without requiring user intervention:
 - Automatic detection of high CPU usage processes
 - Integration with global monitoring to catch issues that previously went unnoticed
 
+## Health Dashboard
+
+The system includes a real-time web-based health dashboard accessible at `http://localhost:3032` that provides comprehensive monitoring across four key areas:
+
+### Dashboard Features
+
+![System Health Dashboard](../images/health-monitor.png)
+
+**Monitoring Cards:**
+
+1. **Databases** (LevelDB, Qdrant)
+   - Real-time connection status
+   - Lock detection and ownership tracking
+   - Availability monitoring
+
+2. **Services** (VKB Server, Constraint Monitor, Dashboard)
+   - Port connectivity checks
+   - Process health validation
+   - Service uptime tracking
+
+3. **Processes** (Process Registry, Stale PIDs)
+   - Process State Manager (PSM) status
+   - Automatic stale PID cleanup
+   - Process lifecycle tracking
+
+4. **API Quota** (LLM Providers)
+   - Real-time quota monitoring for all configured providers
+   - Provider status: Groq, Google Gemini, Anthropic Claude, OpenAI, X.AI (Grok)
+   - Usage percentage and remaining quota display
+   - Color-coded health indicators (🟢 operational, 🟡 warning, 🔴 error)
+   - Support for both free tier and billing-based providers
+   - Auto-refresh every 5 seconds
+
+**API Quota Provider Support:**
+
+| Provider | Abbreviation | Quota Type | Display |
+|----------|--------------|------------|---------|
+| Groq | Gq | Free tier (7.2M tokens/day) | Shows percentage |
+| Google Gemini | Ggl | Free tier (15 RPM, 1M TPD) | Shows percentage |
+| Anthropic Claude | A | Billing-based | Estimated status |
+| OpenAI | O | Billing-based | Estimated status |
+| X.AI (Grok) | X | Free credits ($25) | Shows percentage |
+
+**Dashboard Actions:**
+- **Run Verification**: Manually trigger health verification
+- **Auto-Healing**: Toggle automatic recovery mechanisms
+- **Live Updates**: Real-time status updates every 5 seconds
+- **Violation Tracking**: Detailed view of active system violations
+- **Recommendations**: Actionable suggestions for system health improvement
+
 ## StatusLine Display Format
 
 ### Current Display
 ```
-✅C:🟢 CA:🟡 ND:🔴 🛡️ 8.5 🔍EX 🧠 ✅ 📋9-10
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
 ```
 
 ### Component Breakdown
 
 | Component | Icon | Description | Example |
 |-----------|------|-------------|---------|
-| Global Coding Monitor | ✅ | Overall system health | ✅ (healthy) |
-| Session Status | C:🟢 | Individual session status | C:🟢 (coding healthy) |
-| Constraint Monitor | 🛡️ 8.5 | Violation monitoring | 8.5 (compliance score) |
-| Semantic Analysis | 🔍EX | Analysis status | EX (exchanges detected) |
-| Memory Service | 🧠 ✅ | Knowledge graph status | ✅ (memory healthy) |
-| Time Window | 📋9-10 | Current time window | 9-10 (9-10 AM window) |
+| System Health | 🏥 95% | Overall health score | 95% (healthy) |
+| Constraint Compliance | 🛡️ 94% | Code quality compliance | 94% compliance |
+| Trajectory State | ⚙️ IMP | Development activity | IMP (implementing) |
+| API Quota | [Gq📊🟢95%...] | LLM provider usage | Groq 95%, X.AI 85% |
+| LSL Status | 📋🟠2130-2230 | Logging window | Session 2130-2230 |
+| Active Project | →coding | Project with activity | coding project |
 
 ### Status Indicators
 

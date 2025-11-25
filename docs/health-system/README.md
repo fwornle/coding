@@ -9,8 +9,8 @@ The Health System provides **failsafe monitoring** with automatic verification a
 - **Pre-Prompt Checks** - Verifies system health before every Claude prompt
 - **Self-Monitoring** - The health system monitors itself
 - **Auto-Healing** - Automatically restarts failed services
-- **Status Line** - Real-time indicators in Claude Code status bar
-- **Dashboard** - Visual monitoring at `http://localhost:3030`
+- **Status Line** - Real-time indicators in Claude Code status bar with API quota monitoring
+- **Dashboard** - Visual monitoring at `http://localhost:3032` with 4-card system (Databases, Services, Processes, API Quota)
 
 ## Architecture
 
@@ -55,13 +55,21 @@ The Health System provides **failsafe monitoring** with automatic verification a
 **Status Line** (`scripts/combined-status-line.js`)
 - Real-time indicators in Claude Code status bar
 - Multi-session support
-- Integrated health, constraint, trajectory, and LSL status
+- Integrated health, constraint, trajectory, API quota, and LSL status
+- LLM provider quota monitoring (Groq, Google, Anthropic, OpenAI, X.AI)
+
+**API Quota Checker** (`lib/api-quota-checker.js`)
+- Shared library for LLM provider quota monitoring
+- Multi-provider support with smart caching
+- Used by both statusline and dashboard
 
 **Dashboard** (`integrations/system-health-dashboard/`)
-- React-based real-time visualization at port 3030
+- React-based real-time visualization at port 3032
+- 4-card monitoring system (Databases, Services, Processes, API Quota)
 - Service status indicators
 - Auto-healing history
 - Manual restart controls
+- Real-time API quota tracking
 
 ## What It Monitors
 
@@ -80,6 +88,13 @@ The Health System provides **failsafe monitoring** with automatic verification a
 - Stale PID detection
 - Zombie cleanup
 - Resource monitoring
+
+### API Quota
+- **Groq** - Free tier quota (7.2M tokens/day, 14.4K RPM)
+- **Google Gemini** - Free tier quota (15 RPM, 1M TPD)
+- **Anthropic Claude** - Billing-based (estimated status)
+- **OpenAI** - Billing-based (estimated status)
+- **X.AI (Grok)** - Free credits monitoring ($25)
 
 ## How It Works
 
@@ -101,11 +116,11 @@ The Health System provides **failsafe monitoring** with automatic verification a
 
 ```bash
 # Dashboard automatically available at:
-http://localhost:3030
+http://localhost:3032
 
 # Or start manually:
 cd integrations/system-health-dashboard
-PORT=3030 npm run dashboard
+npm run dev
 ```
 
 ### Check System Health
@@ -123,8 +138,16 @@ cat .health/verification-status.json | jq '.'
 The status line appears automatically in Claude Code:
 
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | 📋🟠2130-2230(3min) →coding]
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
 ```
+
+**Components:**
+- 🏥 95% - System health
+- 🛡️ 94% - Constraint compliance
+- ⚙️ IMP - Trajectory (implementing)
+- [Gq📊🟢95%...] - API quota (Groq 95%, X.AI 85%)
+- 📋🟠2130-2230 - LSL window
+- →coding - Active project
 
 See [Status Line System](./status-line.md) for complete documentation.
 
@@ -154,11 +177,13 @@ See [Status Line System](./status-line.md) for complete documentation.
 - `scripts/health-prompt-hook.js` - Pre-prompt integration
 - `scripts/health-remediation-actions.js` - Auto-healing actions
 - `scripts/combined-status-line.js` - Status line display
+- `lib/api-quota-checker.js` - API quota checking (shared library)
 - `.health/verification-status.json` - Current health status
 
 **Dashboard**:
-- `integrations/system-health-dashboard/src/dashboard-server.js` - API server
-- `integrations/system-health-dashboard/src/dashboard/` - React UI
+- `integrations/system-health-dashboard/server.js` - API server (port 3033)
+- `integrations/system-health-dashboard/src/` - React UI (port 3032)
+- `integrations/system-health-dashboard/src/store/slices/apiQuotaSlice.ts` - API quota state
 
 ## Troubleshooting
 

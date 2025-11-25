@@ -1,6 +1,6 @@
 # System Health Dashboard
 
-Real-time monitoring dashboard for system-level health checks including databases, services, and processes.
+Real-time monitoring dashboard for system-level health checks including databases, services, processes, and LLM API quota monitoring.
 
 ## Architecture
 
@@ -17,9 +17,11 @@ Real-time monitoring dashboard for system-level health checks including database
 - **Click-to-Restart Services**: One-click service restart buttons in the dashboard (NEW!)
 - **Fast Health Detection**: 15-second verification interval for quick issue detection (improved from 60s)
 - Real-time health monitoring (5s dashboard refresh)
-- Database health (LevelDB, Qdrant)
-- Service availability (VKB, Constraint Monitor, Dashboard, Health API)
-- Process health (stale PIDs, zombies)
+- **4-Card Monitoring System**:
+  - **Databases**: LevelDB, Qdrant
+  - **Services**: VKB, Constraint Monitor, Dashboard, Health API
+  - **Processes**: Stale PIDs, zombies, Process Registry (PSM)
+  - **API Quota**: LLM provider usage (Groq, Google Gemini, Anthropic, OpenAI, X.AI)
 - Auto-healing status and history
 - Manual verification trigger
 - Detailed violation reports with actionable restart buttons
@@ -80,6 +82,39 @@ Returns current health verification status
 
 ### GET `/api/health-verifier/report`
 Returns detailed health verification report with all checks and violations
+
+### GET `/api/health-verifier/api-quota`
+Returns LLM provider API quota information
+
+```json
+{
+  "status": "success",
+  "data": {
+    "providers": [
+      {
+        "provider": "groq",
+        "name": "Groq",
+        "abbrev": "Gq",
+        "status": "healthy",
+        "quota": {
+          "remaining": 95,
+          "used": "N/A",
+          "limit": "7.2M tokens/day, 14.4K RPM",
+          "unit": "requests"
+        },
+        "cost": null,
+        "rateLimit": {
+          "requestsPerMinute": 14400,
+          "tokensPerDay": 7200000
+        },
+        "lastChecked": "2025-11-25T10:00:00.000Z",
+        "cacheStrategy": "estimated"
+      }
+    ],
+    "lastUpdate": "2025-11-25T10:00:00.000Z"
+  }
+}
+```
 
 ### POST `/api/health-verifier/verify`
 Triggers a manual health verification run
@@ -146,16 +181,53 @@ healthReport/       # Detailed verification report
   - recommendations[]
   - summary
 
+apiQuota/           # API quota monitoring (NEW)
+  - providers[]
+  - lastUpdate
+  - loading
+  - error
+
 autoHealing/        # Auto-healing control
   - enabled
   - recentAttempts[]
   - triggeringVerification
 ```
 
+### API Quota State
+
+The `apiQuotaSlice` manages LLM provider quota data:
+
+```typescript
+interface ProviderQuota {
+  provider: string
+  name: string
+  abbrev: string  // Gq, Ggl, A, O, X
+  status: 'healthy' | 'moderate' | 'low' | 'critical' | 'degraded'
+  quota: {
+    remaining: number | string
+    used: string
+    limit: string
+    unit: string
+  }
+  cost?: {
+    total: number | string
+    currency: string
+    note?: string
+  } | null
+  rateLimit?: {
+    requestsPerMinute?: number
+    tokensPerDay?: number
+  } | null
+  lastChecked: string
+  cacheStrategy: 'real-time' | 'estimated'
+}
+```
+
 ## Integration with Health Verifier
 
 This dashboard consumes data from:
 - `scripts/health-verifier.js` - Health verification engine
+- `lib/api-quota-checker.js` - API quota checking (shared library)
 - `.health/verification-status.json` - Quick status file
 - `.health/verification-report.json` - Detailed report
 
@@ -225,10 +297,17 @@ The Claude Code status line displays health status emojis (✅/⚠️/❌) for q
 - This is a limitation of Claude Code's status line system
 
 **Status Line Indicators:**
-- 📦🗄️✅ - All databases healthy
-- 🔍📊✅ - All services operational
-- ⚙️✅ - All processes healthy
-- ⚠️ - Warnings detected (1+ violations)
-- ❌ - Errors detected (requires attention)
+- 🏥 95% - Overall system health
+- 🛡️ 94% - Constraint compliance
+- ⚙️ IMP - Trajectory state (implementing)
+- [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] - API quota (Groq 95%, Anthropic, OpenAI, X.AI 85%)
+- 📋🟠2130-2230(3min) - LSL window
+- →coding - Active project
 
-For detailed violation information and one-click restart capabilities, visit the System Health Dashboard at http://localhost:3032
+**API Quota Colors:**
+- 🟢 Green - Healthy (>75% remaining)
+- 🟡 Yellow - Moderate (25-75% remaining)
+- 🟠 Orange - Low (10-25% remaining)
+- 🔴 Red - Critical (<10% remaining)
+
+For detailed violation information, one-click restart capabilities, and comprehensive API quota monitoring, visit the System Health Dashboard at http://localhost:3032

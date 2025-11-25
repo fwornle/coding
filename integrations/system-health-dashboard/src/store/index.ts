@@ -5,6 +5,7 @@ import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux'
 import healthStatusReducer from './slices/healthStatusSlice'
 import healthReportReducer from './slices/healthReportSlice'
 import autoHealingReducer from './slices/autoHealingSlice'
+import apiQuotaReducer from './slices/apiQuotaSlice'
 
 // Import middleware
 import { healthRefreshMiddleware } from './middleware/healthRefreshMiddleware'
@@ -14,6 +15,7 @@ const rootReducer = combineReducers({
   healthStatus: healthStatusReducer,
   healthReport: healthReportReducer,
   autoHealing: autoHealingReducer,
+  apiQuota: apiQuotaReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>

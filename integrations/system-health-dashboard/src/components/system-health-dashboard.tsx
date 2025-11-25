@@ -29,6 +29,7 @@ export default function SystemHealthDashboard() {
   const healthStatus = useAppSelector((state) => state.healthStatus)
   const healthReport = useAppSelector((state) => state.healthReport)
   const autoHealing = useAppSelector((state) => state.autoHealing)
+  const apiQuota = useAppSelector((state) => state.apiQuota)
 
   const handleTriggerVerification = () => {
     dispatch(triggerVerificationStart())
@@ -183,6 +184,65 @@ export default function SystemHealthDashboard() {
     return items
   }
 
+  // Build API items from quota data
+  const getAPIItems = () => {
+    const items = []
+
+    if (apiQuota.providers.length === 0) {
+      items.push({
+        name: 'No Providers',
+        status: 'offline' as const,
+        description: 'No API keys configured',
+        tooltip: 'No LLM provider API keys found in environment'
+      })
+      return items
+    }
+
+    // Map each provider to an item
+    for (const provider of apiQuota.providers) {
+      const remaining = typeof provider.quota.remaining === 'number' ? provider.quota.remaining : null
+      const status: 'operational' | 'warning' | 'error' | 'offline' =
+        provider.status === 'healthy' || provider.status === 'moderate' ? 'operational' :
+        provider.status === 'low' || provider.status === 'degraded' ? 'warning' :
+        provider.status === 'critical' ? 'error' : 'offline'
+
+      let description = ''
+      if (remaining !== null) {
+        description = `${remaining}% remaining`
+      } else if (provider.quota.remaining === 'unknown') {
+        description = 'Usage unknown'
+      } else {
+        description = `${provider.quota.used} / ${provider.quota.limit}`
+      }
+
+      let tooltip = `${provider.name}\n`
+      tooltip += `Status: ${provider.status}\n`
+      tooltip += `Used: ${provider.quota.used}\n`
+      tooltip += `Limit: ${provider.quota.limit}\n`
+      if (provider.cost && provider.cost.total !== 'unknown') {
+        tooltip += `Cost: ${provider.cost.currency} ${provider.cost.total}\n`
+      }
+      if (provider.rateLimit) {
+        if (provider.rateLimit.requestsPerMinute) {
+          tooltip += `Rate: ${provider.rateLimit.requestsPerMinute} RPM\n`
+        }
+        if (provider.rateLimit.tokensPerDay) {
+          tooltip += `Tokens: ${provider.rateLimit.tokensPerDay} TPD\n`
+        }
+      }
+      tooltip += `Cache: ${provider.cacheStrategy}`
+
+      items.push({
+        name: provider.name,
+        status,
+        description,
+        tooltip
+      })
+    }
+
+    return items
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -276,7 +336,7 @@ export default function SystemHealthDashboard() {
       )}
 
       {/* Health Status Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <HealthStatusCard
           title="Databases"
           icon={<Database className="h-5 w-5" />}
@@ -291,6 +351,11 @@ export default function SystemHealthDashboard() {
           title="Processes"
           icon={<Activity className="h-5 w-5" />}
           items={getProcessItems()}
+        />
+        <HealthStatusCard
+          title="API Quota"
+          icon={<Zap className="h-5 w-5" />}
+          items={getAPIItems()}
         />
       </div>
 
