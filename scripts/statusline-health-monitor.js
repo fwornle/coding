@@ -19,6 +19,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import ProcessStateManager from './process-state-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,6 +46,11 @@ class StatusLineHealthMonitor {
     this.maxHealingAttempts = options.maxHealingAttempts || 3;
     this.healingCooldown = options.healingCooldown || 300000; // 5 minutes between healing attempts
     this.lastHealingTime = new Map(); // Track last healing time per service
+
+    // PSM integration for singleton management
+    this.psm = new ProcessStateManager({ codingRoot: this.codingRepoPath });
+    this.serviceName = 'statusline-health-monitor';
+    this.healthRefreshInterval = null;
 
     this.ensureLogDirectory();
   }
@@ -1148,23 +1154,125 @@ class StatusLineHealthMonitor {
   }
 
   /**
+   * Check if another instance is already running via PSM
+   * @param {boolean} forceKill - If true, kill existing instance and take over
+   * @returns {Promise<{running: boolean, pid?: number, killed?: boolean}>}
+   */
+  async checkExistingInstance(forceKill = false) {
+    try {
+      // First, clean up any dead processes from PSM
+      const cleaned = await this.psm.cleanupDeadProcesses();
+      if (cleaned > 0) {
+        this.log(`Cleaned up ${cleaned} dead process(es) from PSM registry`, 'INFO');
+      }
+
+      // Check if service is registered and alive
+      const isRunning = await this.psm.isServiceRunning(this.serviceName, 'global');
+
+      if (isRunning) {
+        const service = await this.psm.getService(this.serviceName, 'global');
+        const existingPid = service?.pid;
+
+        if (forceKill && existingPid) {
+          this.log(`Force killing existing instance (PID: ${existingPid})...`, 'WARN');
+          try {
+            process.kill(existingPid, 'SIGTERM');
+            // Wait briefly for graceful shutdown
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Check if still alive, force kill if needed
+            if (this.psm.isProcessAlive(existingPid)) {
+              process.kill(existingPid, 'SIGKILL');
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          } catch (e) {
+            // Process might already be dead
+          }
+          // Clean up the registry entry
+          await this.psm.unregisterService(this.serviceName, 'global');
+          return { running: false, pid: existingPid, killed: true };
+        }
+
+        return { running: true, pid: existingPid };
+      }
+
+      return { running: false };
+    } catch (error) {
+      this.log(`Error checking existing instance: ${error.message}`, 'ERROR');
+      return { running: false };
+    }
+  }
+
+  /**
+   * Register this instance with PSM
+   */
+  async registerWithPSM() {
+    try {
+      await this.psm.registerService({
+        name: this.serviceName,
+        type: 'global',
+        pid: process.pid,
+        script: __filename,
+        metadata: {
+          startedAt: new Date().toISOString(),
+          updateInterval: this.updateInterval,
+          autoHeal: this.autoHealEnabled
+        }
+      });
+      this.log(`Registered with PSM as global service (PID: ${process.pid})`, 'INFO');
+
+      // Set up periodic health refresh to PSM
+      this.healthRefreshInterval = setInterval(async () => {
+        try {
+          await this.psm.refreshHealthCheck(this.serviceName, 'global');
+        } catch (e) {
+          this.log(`PSM health refresh failed: ${e.message}`, 'DEBUG');
+        }
+      }, 30000); // Refresh every 30 seconds
+
+      return true;
+    } catch (error) {
+      this.log(`Failed to register with PSM: ${error.message}`, 'ERROR');
+      return false;
+    }
+  }
+
+  /**
+   * Unregister from PSM
+   */
+  async unregisterFromPSM() {
+    try {
+      if (this.healthRefreshInterval) {
+        clearInterval(this.healthRefreshInterval);
+        this.healthRefreshInterval = null;
+      }
+      await this.psm.unregisterService(this.serviceName, 'global');
+      this.log('Unregistered from PSM', 'INFO');
+    } catch (error) {
+      this.log(`Failed to unregister from PSM: ${error.message}`, 'ERROR');
+    }
+  }
+
+  /**
    * Start monitoring
    */
   async start() {
     this.log('🚀 Starting StatusLine Health Monitor...');
-    
+
+    // Register with PSM
+    await this.registerWithPSM();
+
     // Initial update
     await this.updateStatusLine();
-    
+
     // Set up periodic updates
     this.updateTimer = setInterval(() => {
       this.updateStatusLine().catch(error => {
         this.log(`Update error: ${error.message}`, 'ERROR');
       });
     }, this.updateInterval);
-    
+
     this.log(`✅ StatusLine Health Monitor started (update interval: ${this.updateInterval}ms)`);
-    
+
     // Keep process alive
     process.stdin.resume();
   }
@@ -1187,6 +1295,7 @@ class StatusLineHealthMonitor {
   async gracefulShutdown() {
     this.log('📴 Shutting down StatusLine Health Monitor...');
     this.stop();
+    await this.unregisterFromPSM();
     process.exit(0);
   }
 }
@@ -1197,7 +1306,8 @@ async function main() {
   const isDebug = args.includes('--debug');
   const isDaemon = args.includes('--daemon');
   const autoHeal = args.includes('--auto-heal');
-  
+  const forceStart = args.includes('--force');
+
   if (args.includes('--help')) {
     console.log(`
 StatusLine Health Monitor
@@ -1207,9 +1317,15 @@ Usage:
 
 Options:
   --daemon      Run in daemon mode (continuous monitoring)
+  --force       Force start: kill existing instance if running
   --debug       Enable debug output
   --auto-heal   Enable auto-healing for unhealthy services
   --help        Show this help
+
+Singleton Management:
+  This daemon registers with the Process State Manager (PSM) as a global service.
+  Only one instance can run at a time across all parallel coding sessions.
+  Use --force to kill an existing instance and take over.
 
 The monitor aggregates health data from:
   - Global Coding Monitor (GCM)
@@ -1242,9 +1358,22 @@ Auto-Healing:
   process.on('SIGINT', () => monitor.gracefulShutdown());
 
   if (isDaemon) {
+    // Check for existing instance (singleton pattern)
+    const existing = await monitor.checkExistingInstance(forceStart);
+
+    if (existing.running) {
+      console.log(`❌ StatusLine Health Monitor already running (PID: ${existing.pid})`);
+      console.log(`   Use --force to kill and restart`);
+      process.exit(1);
+    }
+
+    if (existing.killed) {
+      console.log(`⚠️  Killed existing instance (PID: ${existing.pid}), starting new one...`);
+    }
+
     await monitor.start();
   } else {
-    // Single update mode
+    // Single update mode - no singleton check needed
     await monitor.updateStatusLine();
     console.log(`Status: ${monitor.lastStatus}`);
   }

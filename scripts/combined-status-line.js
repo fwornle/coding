@@ -56,6 +56,9 @@ class CombinedStatusLine {
       // Robust transcript monitor health check and auto-restart
       await this.ensureTranscriptMonitorRunning();
 
+      // Ensure statusline health monitor daemon is running (global singleton)
+      await this.ensureStatuslineHealthMonitorRunning();
+
       const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus);
 
       this.statusCache = status;
@@ -979,6 +982,110 @@ class CombinedStatusLine {
     } catch (error) {
       if (process.env.DEBUG_STATUS) {
         console.error('DEBUG: Failed to start transcript monitor:', error.message);
+      }
+    }
+  }
+
+  /**
+   * Ensure statusline health monitor daemon is running (global singleton via PSM)
+   * This is the "watcher of the watcher" - auto-restarts the health monitor if it dies
+   */
+  async ensureStatuslineHealthMonitorRunning() {
+    try {
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+
+      // Check PSM for existing healthy instance
+      try {
+        const ProcessStateManager = (await import('./process-state-manager.js')).default;
+        const psm = new ProcessStateManager();
+        await psm.initialize();
+
+        // Clean up dead processes first
+        await psm.cleanupDeadProcesses();
+
+        // Check if statusline-health-monitor is running
+        const isRunning = await psm.isServiceRunning('statusline-health-monitor', 'global');
+
+        if (isRunning) {
+          // Already running, nothing to do
+          if (process.env.DEBUG_STATUS) {
+            console.error('DEBUG: Statusline health monitor already running via PSM');
+          }
+          return;
+        }
+      } catch (psmError) {
+        if (process.env.DEBUG_STATUS) {
+          console.error('DEBUG: PSM check failed:', psmError.message);
+        }
+        // Fall through to status file check
+      }
+
+      // Fallback: Check status file freshness
+      const statusFile = join(codingPath, '.logs', 'statusline-health-status.txt');
+
+      if (existsSync(statusFile)) {
+        const stats = fs.statSync(statusFile);
+        const age = Date.now() - stats.mtime.getTime();
+
+        // If status file updated in last 30 seconds, monitor is likely running
+        if (age < 30000) {
+          if (process.env.DEBUG_STATUS) {
+            console.error('DEBUG: Status file fresh, monitor likely running');
+          }
+          return;
+        }
+      }
+
+      // Monitor not running or stale - start it
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Statusline health monitor not detected, starting...');
+      }
+      await this.startStatuslineHealthMonitor();
+    } catch (error) {
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Error checking statusline health monitor:', error.message);
+      }
+    }
+  }
+
+  /**
+   * Start the statusline health monitor daemon
+   */
+  async startStatuslineHealthMonitor() {
+    try {
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+      const monitorScript = join(codingPath, 'scripts', 'statusline-health-monitor.js');
+
+      if (!existsSync(monitorScript)) {
+        console.error('DEBUG: Statusline health monitor script not found');
+        return;
+      }
+
+      const { spawn } = await import('child_process');
+
+      // Start monitor in daemon mode with auto-heal enabled
+      const monitor = spawn('node', [monitorScript, '--daemon', '--auto-heal'], {
+        detached: true,
+        stdio: 'ignore',
+        cwd: codingPath,
+        env: {
+          ...process.env,
+          CODING_REPO: codingPath
+        }
+      });
+
+      monitor.unref(); // Allow parent to exit without waiting
+
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Started statusline health monitor with PID:', monitor.pid);
+      }
+
+      // Note: The monitor will register itself with PSM on startup
+      // We don't need to register it here since it has its own PSM integration
+
+    } catch (error) {
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Failed to start statusline health monitor:', error.message);
       }
     }
   }

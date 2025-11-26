@@ -1,0 +1,112 @@
+@startuml
+!include _standard-style.puml
+
+title PSM Singleton Pattern - StatusLine Health Monitor
+
+participant "New Daemon\nInstance" as New
+participant "Process State\nManager" as PSM
+database ".live-process-\nregistry.json" as Registry
+participant "Existing\nDaemon" as Existing
+
+== Startup: Check for Existing Instance ==
+
+New -> PSM : cleanupDeadProcesses()
+activate PSM
+PSM -> Registry : scan for dead PIDs
+Registry --> PSM : cleaned stale entries
+deactivate PSM
+
+New -> PSM : isServiceRunning('statusline-health-monitor', 'global')
+activate PSM
+PSM -> Registry : read with lock
+
+alt Service Exists in Registry
+  Registry --> PSM : {pid: 12345, status: 'running'}
+  PSM -> PSM : process.kill(12345, 0)
+  note right
+    Signal 0 checks if
+    process exists without
+    killing it
+  end note
+
+  alt Process is Alive
+    PSM --> New : true (running)
+    New -> New : exit with error\n"Already running (PID: 12345)"
+    note right of New
+      User can use --force
+      to kill and take over
+    end note
+  else Process is Dead
+    PSM --> New : false (dead PID)
+    PSM -> Registry : remove stale entry
+  end
+
+else Service Not Found
+  Registry --> PSM : null
+  PSM --> New : false
+end
+deactivate PSM
+
+== Registration ==
+
+New -> PSM : registerService({...})
+activate PSM
+PSM -> Registry : write with lock
+note right of Registry
+  {
+    "statusline-health-monitor": {
+      "pid": 99999,
+      "type": "global",
+      "startTime": 1700000000,
+      "lastHealthCheck": 1700000000,
+      "status": "running"
+    }
+  }
+end note
+Registry --> PSM : registered
+PSM --> New : success
+deactivate PSM
+
+New -> New : start monitoring loop
+
+== Health Refresh (every 30s) ==
+
+loop every 30 seconds
+  New -> PSM : refreshHealthCheck('statusline-health-monitor', 'global')
+  activate PSM
+  PSM -> Registry : update lastHealthCheck
+  Registry --> PSM : updated
+  deactivate PSM
+end
+
+== Force Takeover (--force flag) ==
+
+New -> PSM : isServiceRunning() returns true
+New -> New : forceKill = true
+
+New -> Existing : SIGTERM
+activate Existing
+Existing -> Existing : gracefulShutdown()
+Existing -> PSM : unregisterService()
+Existing --> New : (exits)
+deactivate Existing
+
+New -> PSM : cleanupDeadProcesses()
+New -> PSM : registerService()
+note right
+  New instance takes over
+  as the singleton
+end note
+
+== Graceful Shutdown ==
+
+New -> New : SIGTERM received
+New -> New : stop()
+New -> PSM : unregisterService('statusline-health-monitor', 'global')
+activate PSM
+PSM -> Registry : delete entry
+Registry --> PSM : removed
+deactivate PSM
+New -> New : process.exit(0)
+
+@enduml

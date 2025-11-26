@@ -10,6 +10,7 @@ participant "Global Service\nCoordinator" as Coordinator
 participant "Process State\nManager" as PSM
 database ".live-process-\nregistry.json" as Registry
 participant "Constraint\nDashboard" as Dashboard
+participant "StatusLine\nHealth Monitor" as SLM
 
 == Claude Session Startup ==
 
@@ -104,6 +105,34 @@ Registry --> PSM : updated
 deactivate PSM
 
 deactivate Coordinator
+
+== StatusLine Health Monitor Singleton ==
+
+Coordinator -> PSM : isServiceRunning('statusline-health-monitor')
+activate PSM
+PSM -> Registry : check if exists
+Registry --> PSM : false (not running)
+deactivate PSM
+
+Coordinator -> SLM : spawn daemon\n(--daemon --auto-heal)
+activate SLM
+SLM --> Coordinator : PID
+
+SLM -> PSM : registerService({name, type: 'global'})
+activate PSM
+PSM -> Registry : write with lock
+Registry --> PSM : registered
+deactivate PSM
+
+note right of SLM
+  **Singleton Pattern:**
+  - Checks PSM before start
+  - Blocks if already running
+  - --force to kill and take over
+  - Unregisters on shutdown
+end note
+
+SLM -> SLM : start health refresh\n(every 30s)
 
 == Session Cleanup ==
 

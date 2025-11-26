@@ -5,9 +5,21 @@ title Multi-Session Health Monitoring Architecture
 
 top to bottom direction
 
+package "Process State Manager (PSM)" {
+  component [Process State Manager] as PSM <<core>>
+  database [.live-process-registry.json] as LPR <<storage>>
+  note right of PSM
+    Singleton management:
+    - Global services (1 per machine)
+    - Per-project services
+    - Per-session services
+  end note
+}
+
 package "Global Monitoring Layer" {
   component [Global LSL Coordinator] as GLC <<infra>>
   component [StatusLine Health Monitor] as SHM <<infra>>
+  component [Combined Status Line\n(Watchdog)] as CSL <<infra>>
   component [Global Service Registry] as GSR <<storage>>
   component [Global LSL Registry] as GLR <<storage>>
 }
@@ -84,6 +96,12 @@ SHM SYNC_LINE CM : monitors
 SHM SYNC_LINE SA : monitors
 SHM SYNC_LINE TWM : monitors
 
+' PSM connections
+PSM DATA_LINE LPR : manages
+SHM SYNC_LINE PSM : registers as\nglobal service
+CSL SYNC_LINE PSM : checks health
+CSL CONTROL_LINE SHM : auto-restarts\nif dead
+
 note right of GLC
   Auto-recovery daemon
   30-second health checks
@@ -91,11 +109,19 @@ note right of GLC
 end note
 
 note right of SHM
+  **PSM Singleton Pattern:**
+  - Registers as global service
+  - Only 1 instance per machine
+  - --force to take over
+
   Individual session status:
   C:🟢 CA:🟢 ND:🟢
-  
-  Smart abbreviations from
-  project names
+end note
+
+note right of CSL
+  **Watchdog:**
+  Checks PSM every status update
+  Auto-restarts missing daemon
 end note
 
 note bottom of Health_C

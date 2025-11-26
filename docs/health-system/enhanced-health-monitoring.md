@@ -540,13 +540,122 @@ await this.levelDB.open();  // Throws on failure
 - ⚠️ Auto-recovery (some scenarios covered, not all)
 - ⚠️ Multi-project coordination (basic registry, no active coordination)
 
-**Not Yet Implemented:**
-- ❌ Layer 1: Watchdog (global service monitoring and recovery)
-- ❌ Layer 2: Coordinator (active multi-project coordination)
-- ❌ Layer 3: Verifier (comprehensive health verification)
-- ❌ Proactive health remediation
+**Now Implemented:**
+- ✅ Layer 1: Watchdog (global service monitoring and auto-restart)
+- ✅ StatusLine Health Monitor PSM integration with singleton pattern
+- ✅ Auto-restart watchdog in combined-status-line.js
+- ⚠️ Layer 2: Coordinator (basic registry, no active coordination)
+- ⚠️ Layer 3: Verifier (periodic health verification implemented)
+- ⚠️ Proactive health remediation (partial - auto-restart only)
 
-**Note**: The 4-layer architecture diagram represents the design vision, not current implementation. Most functionality currently operates at Layer 4 (process monitoring and database health checks).
+## StatusLine Health Monitor - PSM Singleton Pattern
+
+The StatusLine Health Monitor daemon now implements a robust singleton pattern via PSM integration to prevent duplicate instances and enable auto-restart:
+
+### Singleton Pattern Features
+
+![PSM Singleton Pattern](../images/psm-singleton-pattern.png)
+
+**Registration Flow:**
+1. On startup, daemon checks PSM for existing healthy instance
+2. If found and `--force` not specified, exits with error message
+3. If not found or `--force` specified, registers as global service
+4. Refreshes health check timestamp every 30 seconds
+5. On graceful shutdown, unregisters from PSM
+
+**Key Benefits:**
+- **No Duplicate Daemons**: Only one instance runs across all parallel coding sessions
+- **Auto-restart**: `combined-status-line.js` detects missing daemon and restarts it
+- **Clean Shutdown**: Proper unregistration on SIGTERM/SIGINT
+- **Force Takeover**: `--force` flag kills existing instance and starts new one
+
+### CLI Options
+
+```bash
+# Start daemon (will fail if already running)
+node scripts/statusline-health-monitor.js --daemon
+
+# Force start (kills existing instance)
+node scripts/statusline-health-monitor.js --daemon --force
+
+# With auto-healing enabled
+node scripts/statusline-health-monitor.js --daemon --auto-heal
+
+# Check help for all options
+node scripts/statusline-health-monitor.js --help
+```
+
+### Watchdog Integration
+
+The `combined-status-line.js` now includes a watchdog that checks PSM on every status update:
+
+```javascript
+async ensureStatuslineHealthMonitorRunning() {
+  // 1. Check PSM for existing healthy instance
+  const isRunning = await psm.isServiceRunning('statusline-health-monitor', 'global');
+
+  if (isRunning) return; // Already running
+
+  // 2. Fallback: Check status file freshness
+  const age = Date.now() - statusFile.mtime;
+  if (age < 30000) return; // File is fresh, likely running
+
+  // 3. Not running - auto-restart it
+  await this.startStatuslineHealthMonitor();
+}
+```
+
+**Watchdog Flow:**
+1. Every status update triggers watchdog check
+2. Checks PSM for registered `statusline-health-monitor` service
+3. Falls back to status file freshness check (< 30 seconds)
+4. If daemon is missing, spawns new instance with `--daemon --auto-heal`
+
+### PSM Registration Details
+
+The daemon registers with PSM as a global service:
+
+```javascript
+await psm.registerService({
+  name: 'statusline-health-monitor',
+  type: 'global',
+  pid: process.pid,
+  script: 'statusline-health-monitor.js',
+  metadata: {
+    startedAt: new Date().toISOString(),
+    updateInterval: 15000,
+    autoHeal: true
+  }
+});
+```
+
+**PSM Service Types:**
+- `global`: Machine-wide services (statusline-health-monitor, vkb-server)
+- `per-project`: Project-specific services (enhanced-transcript-monitor)
+- `per-session`: Session-specific services
+
+### Viewing PSM Status
+
+```bash
+# Check all registered services
+node scripts/process-state-manager.js status
+
+# Output example:
+📊 Process Health Status:
+   Total: 5 | Healthy: 5 | Unhealthy: 0
+
+Global Services:
+   ✅ global-service-coordinator (PID: 13296, uptime: 9492m)
+   ✅ global-lsl-coordinator (PID: 13816, uptime: 9491m)
+   ✅ vkb-server (PID: 6074, uptime: 858m)
+   ✅ statusline-health-monitor (PID: 39770, uptime: 1m)
+
+Project Services:
+   /Users/q284340/Agentic/coding:
+     ✅ enhanced-transcript-monitor (PID: 40417, uptime: 0m)
+```
+
+**Note**: The 4-layer architecture diagram represents the design vision. Layer 1 (Watchdog) is now fully implemented via PSM singleton pattern and combined-status-line watchdog.
 
 ## Troubleshooting
 
