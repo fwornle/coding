@@ -232,9 +232,9 @@ export default UserHashGenerator;
 // CLI usage when run directly
 runIfMain(import.meta.url, () => {
   const generator = new UserHashGenerator({ debug: true });
-  
+
   console.log('=== User Hash Generator Test ===');
   console.log('System Info:', JSON.stringify(generator.getSystemInfo(), null, 2));
   console.log('Consistency Test:', generator.testConsistency());
   console.log('Generated Hash:', generator.generateUserHash());
-}
+});

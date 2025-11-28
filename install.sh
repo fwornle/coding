@@ -1187,6 +1187,13 @@ CODING_TOOLS_PATH=/path/to/coding/repo
 XAI_API_KEY=your-xai-api-key
 OPENAI_API_KEY=your-openai-api-key
 
+# Admin API keys for real-time usage/billing data in status line
+# These are DIFFERENT from regular API keys - they have org-level permissions
+# Anthropic: Create at console.anthropic.com -> Settings -> Admin API Keys (format: sk-ant-admin-...)
+ANTHROPIC_ADMIN_API_KEY=your-anthropic-admin-api-key
+# OpenAI: Create at platform.openai.com/settings/organization/admin-keys
+OPENAI_ADMIN_API_KEY=your-openai-admin-api-key
+
 # Custom paths (optional)
 # CODING_REPO=/path/to/coding/repo (legacy, now uses CODING_TOOLS_PATH)
 # MEMORY_VISUALIZER_DIR=/path/to/memory-visualizer
@@ -1227,6 +1234,13 @@ CODING_KB_PATH=$CODING_REPO
 GROK_API_KEY=
 OPENAI_API_KEY=
 
+# Admin API keys for real-time usage/billing data in status line
+# These are DIFFERENT from regular API keys - they have org-level permissions
+# Anthropic: Create at console.anthropic.com -> Settings -> Admin API Keys (format: sk-ant-admin-...)
+ANTHROPIC_ADMIN_API_KEY=
+# OpenAI: Create at platform.openai.com/settings/organization/admin-keys
+OPENAI_ADMIN_API_KEY=
+
 # Default knowledge views to display in VKB viewer
 KNOWLEDGE_VIEW=coding,ui
 EOF
@@ -1247,6 +1261,18 @@ EOF
             echo "" >> "$CODING_REPO/.env"
             echo "# Default knowledge views to display in VKB viewer" >> "$CODING_REPO/.env"
             echo "KNOWLEDGE_VIEW=coding,ui" >> "$CODING_REPO/.env"
+        fi
+
+        # Update existing .env file to add Admin API keys if missing
+        if ! grep -q "ANTHROPIC_ADMIN_API_KEY" "$CODING_REPO/.env"; then
+            info "Adding Admin API keys to existing .env file..."
+            echo "" >> "$CODING_REPO/.env"
+            echo "# Admin API keys for real-time usage/billing data in status line" >> "$CODING_REPO/.env"
+            echo "# These are DIFFERENT from regular API keys - they have org-level permissions" >> "$CODING_REPO/.env"
+            echo "# Anthropic: Create at console.anthropic.com -> Settings -> Admin API Keys (format: sk-ant-admin-...)" >> "$CODING_REPO/.env"
+            echo "ANTHROPIC_ADMIN_API_KEY=" >> "$CODING_REPO/.env"
+            echo "# OpenAI: Create at platform.openai.com/settings/organization/admin-keys" >> "$CODING_REPO/.env"
+            echo "OPENAI_ADMIN_API_KEY=" >> "$CODING_REPO/.env"
         fi
     fi
     

@@ -276,7 +276,9 @@
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "CLAUDE_API_KEY",
-    "GEMINI_API_KEY"
+    "GEMINI_API_KEY",
+    "ANTHROPIC_ADMIN_API_KEY",
+    "OPENAI_ADMIN_API_KEY"
   ],
   "credit_checking": {
     "enabled": true,
@@ -284,8 +286,25 @@
     "max_requests_per_hour": 12,
     "endpoints": {
       "xai": null,
-      "openai": null,
-      "anthropic": "/v1/usage"
+      "openai": "/v1/organization/costs",
+      "anthropic": "/v1/organizations/cost_report"
+    }
+  },
+  "provider_budgets": {
+    "anthropic": {
+      "monthlyBudget": 100,
+      "warningThreshold": 80,
+      "criticalThreshold": 95
+    },
+    "openai": {
+      "monthlyBudget": 100,
+      "warningThreshold": 80,
+      "criticalThreshold": 95
+    },
+    "xai": {
+      "monthlyBudget": 25,
+      "warningThreshold": 80,
+      "criticalThreshold": 95
     }
   }
 }

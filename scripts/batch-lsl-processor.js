@@ -32,6 +32,7 @@ import { getTimeWindow, formatTimestamp, generateLSLFilename, utcToLocalTime } f
 import ClassificationLogger from './classification-logger.js';
 import UserHashGenerator from './user-hash-generator.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -72,6 +73,13 @@ class BatchLSLProcessor {
     }
     this.extractor = new ClaudeConversationExtractor(this.projectPath);
 
+    // Initialize redactor for sensitive data protection
+    this.redactor = new ConfigurableRedactor({
+      projectPath: this.codingRepo, // Use coding repo for config
+      debug: false
+    });
+    this.redactorInitialized = false;
+
     // Initialize classification logger for batch mode
     const projectName = path.basename(this.projectPath);
     const userHash = UserHashGenerator.generateHash({ debug: false });
@@ -108,6 +116,14 @@ class BatchLSLProcessor {
       await this.classifier.initialize();
       this.classifierInitialized = true;
       console.log('✅ Classifier initialized with multi-collection support');
+    }
+
+    // Initialize redactor for sensitive data protection
+    if (!this.redactorInitialized) {
+      console.log('🔐 Initializing redactor for sensitive data protection...');
+      await this.redactor.initialize();
+      this.redactorInitialized = true;
+      console.log('✅ Redactor initialized');
     }
 
     try {
@@ -930,12 +946,13 @@ class BatchLSLProcessor {
         markdownContent += `**Duration:** ${promptSet.endTime - promptSet.startTime}ms\n`;
         markdownContent += `**Tool Calls:** ${promptSet.toolCallCount}\n\n`;
         
-        // Add all exchanges in this prompt set
+        // Add all exchanges in this prompt set (with redaction for sensitive data)
         for (const exchange of promptSet.exchanges) {
+          const redactedContent = this.redactor.redact(exchange.content || '');
           if (exchange.type === 'user') {
-            markdownContent += `### User\n\n${exchange.content}\n\n`;
+            markdownContent += `### User\n\n${redactedContent}\n\n`;
           } else if (exchange.type === 'assistant') {
-            markdownContent += `### Assistant\n\n${exchange.content}\n\n`;
+            markdownContent += `### Assistant\n\n${redactedContent}\n\n`;
           }
         }
         
@@ -1543,10 +1560,10 @@ ${foreignOnly ? `**Coding Repository:** ${this.codingRepo}` : ''}
 
 `;
 
-      // Display the actual conversation content
+      // Display the actual conversation content (with redaction for sensitive data)
       if (exchange.content && exchange.content.trim()) {
-        // Truncate very long content for readability
-        let displayContent = exchange.content;
+        // Apply redaction first, then truncate if needed
+        let displayContent = this.redactor.redact(exchange.content);
         if (displayContent.length > 2000) {
           displayContent = displayContent.substring(0, 2000) + '\n\n*[Content truncated for readability]*';
         }
@@ -1846,4 +1863,4 @@ runIfMain(import.meta.url, () => {
     console.error('Fatal error:', error);
     process.exit(1);
   });
-}
+});

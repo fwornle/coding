@@ -140,10 +140,32 @@ class ConfigurableRedactor {
           severity: "critical"
         },
         {
+          id: "sk_ant_admin_keys",
+          name: "Anthropic Admin API Keys",
+          description: "Anthropic Admin API keys with sk-ant-admin- prefix",
+          pattern: "\\bsk-ant-admin-[a-zA-Z0-9_-]{20,}",
+          flags: "gi",
+          replacementType: "generic",
+          replacement: "<SECRET_REDACTED>",
+          enabled: true,
+          severity: "critical"
+        },
+        {
+          id: "sk_ant_keys",
+          name: "Anthropic API Keys",
+          description: "Anthropic API keys with sk-ant- prefix (non-admin)",
+          pattern: "\\bsk-ant-[a-zA-Z0-9_-]{20,}",
+          flags: "gi",
+          replacementType: "generic",
+          replacement: "<SECRET_REDACTED>",
+          enabled: true,
+          severity: "critical"
+        },
+        {
           id: "sk_keys",
           name: "sk- Prefixed Keys",
-          description: "OpenAI and similar API keys with sk- prefix",
-          pattern: "\\bsk-[a-zA-Z0-9]{20,}",
+          description: "OpenAI and similar API keys with sk- prefix (includes hyphens)",
+          pattern: "\\bsk-[a-zA-Z0-9_-]{20,}",
           flags: "gi",
           replacementType: "generic",
           replacement: "<SECRET_REDACTED>",
@@ -152,9 +174,20 @@ class ConfigurableRedactor {
         },
         {
           id: "xai_keys",
-          name: "XAI API Keys", 
+          name: "XAI API Keys",
           description: "XAI/Grok API keys with xai- prefix",
-          pattern: "\\bxai-[a-zA-Z0-9]{20,}",
+          pattern: "\\bxai-[a-zA-Z0-9_-]{20,}",
+          flags: "gi",
+          replacementType: "generic",
+          replacement: "<SECRET_REDACTED>",
+          enabled: true,
+          severity: "critical"
+        },
+        {
+          id: "groq_keys",
+          name: "Groq API Keys",
+          description: "Groq API keys with gsk_ prefix",
+          pattern: "\\bgsk_[a-zA-Z0-9]{20,}",
           flags: "gi",
           replacementType: "generic",
           replacement: "<SECRET_REDACTED>",

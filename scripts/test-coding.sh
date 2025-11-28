@@ -1218,6 +1218,26 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
         print_warning "No AI API keys set - constraint monitor will use basic pattern matching only"
         print_info "Set GROK_API_KEY or OPENAI_API_KEY for enhanced analysis"
     fi
+
+    print_check "Admin API keys for real-time usage stats"
+    local admin_keys_configured=0
+    if [ -n "${ANTHROPIC_ADMIN_API_KEY:-}" ]; then
+        print_pass "ANTHROPIC_ADMIN_API_KEY configured for real-time Anthropic usage stats"
+        admin_keys_configured=$((admin_keys_configured + 1))
+    else
+        print_info "ANTHROPIC_ADMIN_API_KEY not set - Anthropic stats will show as N/A"
+        print_info "  Get key at: console.anthropic.com -> Settings -> Admin API Keys"
+    fi
+    if [ -n "${OPENAI_ADMIN_API_KEY:-}" ]; then
+        print_pass "OPENAI_ADMIN_API_KEY configured for real-time OpenAI usage stats"
+        admin_keys_configured=$((admin_keys_configured + 1))
+    else
+        print_info "OPENAI_ADMIN_API_KEY not set - OpenAI stats will show as N/A"
+        print_info "  Get key at: platform.openai.com/settings/organization/admin-keys"
+    fi
+    if [ $admin_keys_configured -eq 0 ]; then
+        print_warning "No Admin API keys configured - status line will show estimated/unknown usage"
+    fi
     
     # Test professional dashboard startup
     print_check "Professional Dashboard startup test"

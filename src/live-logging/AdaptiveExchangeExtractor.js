@@ -215,26 +215,29 @@ class AdaptiveExchangeExtractor {
       }
       
       // Check for assistant turn end or assistant message (legacy)
+      // NOTE: Do NOT complete exchange here - accumulate multiple assistant messages until next user prompt
       else if (this.isAssistantMessage(msg, strategy) && currentExchange) {
         if (isTargetMsg) {
           console.log(`🎯 DEBUG: Target message is assistant message!`);
         }
-        currentExchange.assistantMessage = this.extractContent(msg, strategy.messageExtraction.assistantContentPath);
-        
-        // For legacy format, extract tool calls from message content
-        if (strategy.formatId === 'claude-legacy-v1' && msg.message?.content) {
+
+        // Accumulate assistant content (append to existing)
+        const newContent = this.extractContent(msg, strategy.messageExtraction.assistantContentPath);
+        if (newContent) {
+          currentExchange.assistantMessage = (currentExchange.assistantMessage || '') + newContent + '\n';
+        }
+
+        // Extract tool calls from message content (works for all formats with content arrays)
+        // This handles both legacy format AND modern format with embedded tool_use in content
+        if (msg.message?.content && Array.isArray(msg.message.content)) {
           const toolCalls = this.extractToolCallsFromContent(msg.message.content);
           if (toolCalls.length > 0) {
             currentExchange.toolCalls.push(...toolCalls);
           }
         }
-        
-        // Complete exchange
-        exchanges.push(currentExchange);
-        if (isTargetMsg) {
-          console.log(`🎯 DEBUG: Completed exchange for target (assistant message)!`);
-        }
-        currentExchange = null;
+
+        // DO NOT complete exchange here - wait for next user prompt
+        // Exchange will be completed when a new user message arrives (in userTurnIndicators check)
       }
       
       // Check for tool use (new format)
@@ -528,22 +531,25 @@ class AdaptiveExchangeExtractor {
       }
       
       // Handle assistant messages (both formats)
+      // NOTE: Do NOT complete exchange here - accumulate multiple assistant messages until next user prompt
       else if ((msg.type === 'assistant' && msg.message?.role === 'assistant') ||
                msg.type === 'claude_turn_end') {
-        
+
         if (currentExchange) {
-          currentExchange.assistantMessage = this.extractFallbackAssistantMessage(msg);
-          
-          // Extract tool calls for legacy format
+          // Accumulate assistant content (append to existing)
+          const newContent = this.extractFallbackAssistantMessage(msg);
+          if (newContent) {
+            currentExchange.assistantMessage = (currentExchange.assistantMessage || '') + newContent + '\n';
+          }
+
+          // Extract tool calls from content array
           if (msg.message?.content && Array.isArray(msg.message.content)) {
             const toolCalls = this.extractToolCallsFromContent(msg.message.content);
             currentExchange.toolCalls.push(...toolCalls);
           }
-          
-          if (this.isMeaningfulExchange(currentExchange)) {
-            exchanges.push(currentExchange);
-          }
-          currentExchange = null;
+
+          // DO NOT complete exchange here - wait for next user prompt
+          // Exchange will be completed when a new user message arrives
         }
       }
       
