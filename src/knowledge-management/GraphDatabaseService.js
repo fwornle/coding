@@ -198,12 +198,39 @@ export class GraphDatabaseService extends EventEmitter {
     };
 
     // Add or update node in graph
-    if (this.graph.hasNode(nodeId)) {
+    const isNewNode = !this.graph.hasNode(nodeId);
+    if (!isNewNode) {
       // Update existing node - replaceNodeAttributes is the correct Graphology API
       this.graph.replaceNodeAttributes(nodeId, attributes);
     } else {
       // Create new node
       this.graph.addNode(nodeId, attributes);
+
+      // CRITICAL: Ensure new entities are connected to CollectiveKnowledge to prevent orphaned nodes
+      // Skip for CollectiveKnowledge itself and Project nodes (which serve as connection points)
+      const projectNodes = ['Coding', 'DynArch', 'Timeline', 'Normalisa', 'CollectiveKnowledge'];
+      const isProjectOrCentralNode = projectNodes.includes(entity.name) ||
+                                      entity.entityType === 'Project' ||
+                                      entity.entityType === 'CentralKnowledge';
+
+      if (!isProjectOrCentralNode) {
+        const collectiveKnowledgeId = `${options.team}:CollectiveKnowledge`;
+
+        // Auto-create relation to CollectiveKnowledge if it exists
+        if (this.graph.hasNode(collectiveKnowledgeId)) {
+          const relationEdgeId = `${nodeId}__contributes_to__${collectiveKnowledgeId}`;
+          if (!this.graph.hasEdge(relationEdgeId)) {
+            this.graph.addEdge(nodeId, collectiveKnowledgeId, {
+              id: relationEdgeId,
+              relation_type: 'contributes_to',
+              team: options.team,
+              created_at: new Date().toISOString(),
+              auto_generated: true // Mark as auto-generated for audit trail
+            });
+            console.log(`[GraphDatabaseService] Auto-linked ${entity.name} to CollectiveKnowledge (orphan prevention)`);
+          }
+        }
+      }
     }
 
     // Mark as dirty for persistence
