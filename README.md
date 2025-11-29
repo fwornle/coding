@@ -31,7 +31,7 @@ coding --copilot
 - **🛡️ Constraint Monitoring** - PreToolUse hook enforcement for code quality
 - **🧠 Knowledge Management** - Capture, visualize, and share development insights
 - **📈 Trajectory Generation** - Automated project analysis and documentation
-- **🤖 Multi-Agent Analysis** - 10 specialized AI agents for comprehensive code analysis
+- **🤖 Multi-Agent Analysis** - 11 specialized AI agents for comprehensive code analysis
 
 ### Integration Support
 
@@ -84,7 +84,7 @@ Real-time code quality enforcement through PreToolUse hooks
 
 - **[System Health Dashboard](integrations/system-health-dashboard/)** - Real-time health visualization
 - **[MCP Constraint Monitor](integrations/mcp-constraint-monitor/)** - PreToolUse hook enforcement
-- **[MCP Semantic Analysis](integrations/mcp-semantic-analysis/)** - 10-agent AI analysis system
+- **[MCP Semantic Analysis](integrations/mcp-semantic-analysis/)** - 11-agent AI analysis system
 - **[VKB Visualizer](integrations/vkb-visualizer/)** - Knowledge graph visualization
 - **[Serena MCP](integrations/mcp-serena/)** - Structure-aware code search
 - **[All Integrations](integrations/)** - Complete integration list
@@ -140,7 +140,7 @@ Capture, organize, and visualize development insights with git-based team collab
 
 ### Multi-Agent Semantic Analysis
 
-10 specialized agents for comprehensive code analysis:
+11 specialized agents for comprehensive code analysis:
 
 1. **CoordinatorAgent** - Workflow orchestration
 2. **GitHistoryAgent** - Git commits and architectural decisions
@@ -150,8 +150,9 @@ Capture, organize, and visualize development insights with git-based team collab
 6. **InsightGenerationAgent** - Insight generation with PlantUML (uses LLM)
 7. **ObservationGenerationAgent** - Structured UKB-compatible observations
 8. **QualityAssuranceAgent** - Output validation with auto-correction (uses LLM)
-9. **PersistenceAgent** - Knowledge base persistence
-10. **DeduplicationAgent** - Semantic duplicate detection
+9. **ContentValidationAgent** - Stale entity detection and knowledge refresh
+10. **PersistenceAgent** - Knowledge base persistence
+11. **DeduplicationAgent** - Semantic duplicate detection
 
 **Status**: ✅ Production Ready
 
@@ -266,7 +267,7 @@ cd integrations/mcp-constraint-monitor && npm test
 ✅ **Live Session Logging** - Real-time classification with 98.3% security
 ✅ **Constraint Monitoring** - 18 active constraints with PreToolUse hooks
 ✅ **Knowledge Management** - UKB/VKB with MCP integration
-✅ **Multi-Agent Analysis** - 10 agents with workflow orchestration
+✅ **Multi-Agent Analysis** - 11 agents with workflow orchestration
 ✅ **Status Line System** - Real-time indicators in Claude Code status bar
 ✅ **Cross-Platform** - macOS, Linux, Windows support
 
