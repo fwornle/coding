@@ -85,7 +85,7 @@ export class GraphDatabaseService extends EventEmitter {
           console.log('[GraphDB] Skipping lock check on Windows');
           throw new Error('SKIP');
         }
-        // Lock file exists - check who owns it
+        // Lock file exists - check who owns it (with timeout to prevent hangs)
         const { spawn } = await import('child_process');
         const lsof = spawn('lsof', [lockPath]);
 
@@ -94,8 +94,25 @@ export class GraphDatabaseService extends EventEmitter {
           output += data.toString();
         });
 
-        await new Promise((resolve) => {
-          lsof.on('close', () => resolve());
+        // Add timeout to prevent indefinite hang if lsof gets stuck
+        const LSOF_TIMEOUT_MS = 5000;
+        await Promise.race([
+          new Promise((resolve) => {
+            lsof.on('close', () => resolve());
+          }),
+          new Promise((_, reject) => {
+            setTimeout(() => {
+              lsof.kill('SIGKILL');
+              reject(new Error(`lsof check timed out after ${LSOF_TIMEOUT_MS}ms`));
+            }, LSOF_TIMEOUT_MS);
+          })
+        ]).catch(err => {
+          // If timeout occurred, log and continue (non-fatal)
+          if (err.message.includes('timed out')) {
+            console.warn('[GraphDB] lsof check timed out, proceeding without lock verification');
+          } else {
+            throw err;
+          }
         });
 
         if (output.trim()) {
