@@ -342,21 +342,24 @@ async function registerWithPSM(result, scriptPath) {
     return; // Service already registered or using existing instance
   }
 
-  if (!result.pid || !result.service) {
+  // Support both 'service' (from startFn) and 'serviceName' (from startServiceWithRetry)
+  const serviceName = result.service || result.serviceName;
+
+  if (!result.pid || !serviceName) {
     console.log(`[PSM] Warning: Cannot register service - missing pid or service name`);
     return;
   }
 
   try {
     await psm.registerService({
-      name: result.service,
+      name: serviceName,
       pid: result.pid,
       type: 'global',
       script: scriptPath
     });
-    console.log(`[PSM] Registered ${result.service} (PID: ${result.pid})`);
+    console.log(`[PSM] Registered ${serviceName} (PID: ${result.pid})`);
   } catch (error) {
-    console.log(`[PSM] Warning: Failed to register ${result.service}: ${error.message}`);
+    console.log(`[PSM] Warning: Failed to register ${serviceName}: ${error.message}`);
   }
 }
 

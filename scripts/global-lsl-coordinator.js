@@ -135,12 +135,37 @@ class GlobalLSLCoordinator {
    * Start Enhanced Transcript Monitor for a project
    */
   async startMonitor(projectPath) {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       const monitorScript = path.join(this.codingRepoPath, 'scripts', 'enhanced-transcript-monitor.js');
       const logFile = path.join(projectPath, 'transcript-monitor.log');
+      const projectName = path.basename(projectPath);
+
+      // CRITICAL: Check PSM for existing healthy monitor before spawning
+      try {
+        const ProcessStateManager = (await import('./process-state-manager.js')).default;
+        const psm = new ProcessStateManager();
+        await psm.initialize();
+
+        // PSM getService expects context object with projectPath property for per-project services
+        const existingService = await psm.getService('enhanced-transcript-monitor', 'per-project', { projectPath });
+        if (existingService && existingService.pid) {
+          // Check if the existing monitor is actually alive
+          try {
+            process.kill(existingService.pid, 0);
+            this.log(`Found existing healthy monitor via PSM (PID: ${existingService.pid}) - reusing`);
+            resolve(existingService.pid);
+            return;
+          } catch (error) {
+            // PSM entry is stale, will clean up and start new
+            this.log(`PSM has stale monitor entry (PID: ${existingService.pid}) - will start fresh`);
+            await psm.unregisterService('enhanced-transcript-monitor', 'per-project', { projectPath });
+          }
+        }
+      } catch (psmError) {
+        this.log(`PSM check failed: ${psmError.message} - continuing with startup`);
+      }
 
       // Kill any existing monitors for this project first
-      const projectName = path.basename(projectPath);
       // CRITICAL FIX: Pass project path as argument so pkill can find it
       exec(`pkill -f "enhanced-transcript-monitor.js ${projectPath}"`, () => {
 
@@ -253,33 +278,48 @@ class GlobalLSLCoordinator {
     const { monitorPid, projectPath } = projectInfo;
 
     if (monitorPid) {
+      // First check if process actually exists
+      let processExists = false;
       try {
-        process.kill(monitorPid, 'SIGTERM');
-        this.log(`Cleaned up stale monitor PID ${monitorPid}`);
-
-        // Wait for graceful shutdown
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Force kill if still running
-        try {
-          process.kill(monitorPid, 'SIGKILL');
-        } catch (error) {
-          // Process already gone, that's fine
-        }
-
-        // CRITICAL: Unregister from PSM
-        try {
-          const ProcessStateManager = (await import('./process-state-manager.js')).default;
-          const psm = new ProcessStateManager();
-          await psm.initialize();
-          await psm.unregisterService('enhanced-transcript-monitor', 'per-project', projectPath);
-          this.log(`Monitor unregistered from PSM (PID: ${monitorPid})`);
-        } catch (psmError) {
-          this.log(`Failed to unregister monitor from PSM: ${psmError.message}`);
-        }
+        process.kill(monitorPid, 0); // Signal 0 = check existence only
+        processExists = true;
       } catch (error) {
-        // Process already gone, that's fine
+        // ESRCH = No such process - this is expected for stale entries
+        processExists = false;
         this.log(`Monitor PID ${monitorPid} already gone`);
+      }
+
+      if (processExists) {
+        try {
+          process.kill(monitorPid, 'SIGTERM');
+          this.log(`Sent SIGTERM to stale monitor PID ${monitorPid}`);
+
+          // Wait for graceful shutdown
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          // Force kill if still running
+          try {
+            process.kill(monitorPid, 0); // Check if still exists
+            process.kill(monitorPid, 'SIGKILL');
+            this.log(`Force killed monitor PID ${monitorPid}`);
+          } catch (error) {
+            // Process already gone after SIGTERM, that's fine
+          }
+        } catch (error) {
+          // Process may have died between check and kill, that's fine
+          this.log(`Monitor PID ${monitorPid} died during cleanup`);
+        }
+      }
+
+      // CRITICAL: Always unregister from PSM (even if process was already dead)
+      try {
+        const ProcessStateManager = (await import('./process-state-manager.js')).default;
+        const psm = new ProcessStateManager();
+        await psm.initialize();
+        await psm.unregisterService('enhanced-transcript-monitor', 'per-project', projectPath);
+        this.log(`Monitor unregistered from PSM (PID: ${monitorPid})`);
+      } catch (psmError) {
+        this.log(`Failed to unregister monitor from PSM: ${psmError.message}`);
       }
     }
   }
