@@ -2,7 +2,7 @@
   "entities": [
     {
       "name": "KnowledgePersistencePattern",
-      "entityType": "Pattern",
+      "entityType": "MCPAgent",
       "observations": [
         {
           "type": "rule",
@@ -37,8 +37,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-29T08:39:44.962Z",
+        "last_updated": "2025-11-29T08:39:44.962Z"
       },
       "id": "mc4flkg3g96u4x"
     },
@@ -675,7 +675,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-11-29T08:19:40.106Z",
+    "exported_at": "2025-11-29T08:39:49.962Z",
     "total_entities": 13,
     "total_relations": 54,
     "description": "Coding project infrastructure and patterns"
