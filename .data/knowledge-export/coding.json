@@ -262,44 +262,6 @@
       "id": "mc4flkgsmmjil"
     },
     {
-      "name": "ValidLSLSession",
-      "entityType": "LSLSession",
-      "observations": [
-        "Live session log from 2025-11-15",
-        "Contains development conversation",
-        "Well-formed LSL structure"
-      ],
-      "significance": 8,
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-16T06:47:39.161Z",
-        "last_updated": "2025-11-16T06:47:39.161Z"
-      },
-      "id": "mc4flkg1yd3gnh"
-    },
-    {
-      "name": "EntityA",
-      "entityType": "Test",
-      "observations": [],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-21T06:39:16.723Z",
-        "last_updated": "2025-11-21T06:39:16.723Z"
-      },
-      "id": "mc4flkg17cuji"
-    },
-    {
-      "name": "EntityB",
-      "entityType": "Test",
-      "observations": [],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-21T06:39:16.732Z",
-        "last_updated": "2025-11-21T06:39:16.732Z"
-      },
-      "id": "mc4flkg17cujj"
-    },
-    {
       "name": "SemanticAnalysisWorkflowIssue",
       "entityType": "Pattern",
       "observations": [
@@ -350,21 +312,6 @@
       "id": "mc4flkg34x7w16"
     },
     {
-      "name": "StrictValidEntity",
-      "entityType": "TransferablePattern",
-      "observations": [
-        "Valid observation 1",
-        "Valid observation 2"
-      ],
-      "significance": 7,
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-16T06:47:39.166Z",
-        "last_updated": "2025-11-16T06:47:39.166Z"
-      },
-      "id": "mc4flkg2pfmylm"
-    },
-    {
       "name": "ConfigurationPattern",
       "entityType": "Pattern",
       "observations": [
@@ -397,36 +344,6 @@
         "last_updated": "2025-11-24T18:13:01.686Z"
       },
       "id": "mc4flkg1qr4h9s"
-    },
-    {
-      "name": "BugFixPattern",
-      "entityType": "TransferablePattern",
-      "observations": [
-        "Problem: Multi-agent architecture complexity in semantic analysis system",
-        "Solution: Modular agent architecture with TypeScript type safety",
-        "Significance: 9/10 - ",
-        "Applies to: web backend, javascript, typescript, python and similar contexts",
-        "Details: http://localhost:8080/knowledge-management/insights/BugFixPattern.md"
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-24T19:04:17.956Z",
-        "last_updated": "2025-11-24T19:04:17.956Z"
-      },
-      "id": "mc4flkg154s53l"
-    },
-    {
-      "name": "DisabledValidationEntity",
-      "entityType": "TransferablePattern",
-      "observations": [
-        "Any observation works when validation is disabled"
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-24T19:04:31.588Z",
-        "last_updated": "2025-11-24T19:04:31.588Z"
-      },
-      "id": "mc4flkg2cw0goo"
     }
   ],
   "relations": [
@@ -497,6 +414,102 @@
       "metadata": {}
     },
     {
+      "from": "Coding",
+      "to": "SemanticAnalysis8AgentSystemImplementation",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "SemanticAnalysisWorkflowIssue",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ComprehensiveSemanticAnalysis",
+      "to": "Coding",
+      "relationType": "implemented_in",
+      "metadata": {}
+    },
+    {
+      "from": "ConfigurationPattern",
+      "to": "Coding",
+      "relationType": "implemented_in",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "CodingWorkflow",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "KnowledgePersistencePattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "MCPMemoryLoggingIntegrationPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "NetworkAwareInstallationPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "SemanticAnalysis8AgentSystemImplementation",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "SemanticAnalysisWorkflowIssue",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "UkbCli",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "VSCodeExtensionBridgePattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "VkbCli",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ComprehensiveSemanticAnalysis",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "ConfigurationPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
       "from": "CodingWorkflow",
       "to": "Coding",
       "relationType": "relation",
@@ -563,30 +576,6 @@
       "metadata": {}
     },
     {
-      "from": "EntityA",
-      "to": "EntityB",
-      "relationType": "implements",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "SemanticAnalysis8AgentSystemImplementation",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "SemanticAnalysisWorkflowIssue",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "ComprehensiveSemanticAnalysis",
-      "to": "Coding",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
       "from": "Coding",
       "to": "SemanticAnalysis8AgentSystemImplementation",
       "relationType": "relation",
@@ -607,79 +596,7 @@
     {
       "from": "ConfigurationPattern",
       "to": "Coding",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "ConfigurationPattern",
-      "to": "Coding",
       "relationType": "relation",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "CodingWorkflow",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "KnowledgePersistencePattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "MCPMemoryLoggingIntegrationPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "NetworkAwareInstallationPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "SemanticAnalysis8AgentSystemImplementation",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "SemanticAnalysisWorkflowIssue",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "UkbCli",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "VSCodeExtensionBridgePattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "VkbCli",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "ComprehensiveSemanticAnalysis",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
       "metadata": {}
     },
     {
@@ -746,12 +663,6 @@
       "from": "ComprehensiveSemanticAnalysis",
       "to": "CollectiveKnowledge",
       "relationType": "relation",
-      "metadata": {}
-    },
-    {
-      "from": "ConfigurationPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
       "metadata": {}
     },
     {
@@ -764,9 +675,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-11-24T19:04:36.594Z",
-    "total_entities": 19,
-    "total_relations": 55,
+    "exported_at": "2025-11-29T08:19:40.106Z",
+    "total_entities": 13,
+    "total_relations": 54,
     "description": "Coding project infrastructure and patterns"
   }
 }
