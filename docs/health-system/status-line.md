@@ -11,7 +11,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 ### Example Display
 
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 O○ X$25] | 📋🟠2130-2230(3min) →coding]
 ```
 
 ### Reading the Status Line
@@ -22,38 +22,57 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `🏥 95%` - **System Health**: Overall health score (0-100%)
 - `🛡️ 94%` - **Constraint Compliance**: Code quality compliance percentage
 - `⚙️ IMP` - **Trajectory State**: Current development activity
-- `[Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%]` - **API Quota**: LLM provider usage (see below)
+- `[Gq● A$18 O○ X$25]` - **API Quota**: LLM provider availability (see below)
 - `📋🟠2130-2230(3min)` - **LSL Status**: Logging window and activity
 - `→coding` - **Active Project**: Project with recent activity
 
 ### API Quota Monitoring
 
-The status line displays real-time API quota information for all configured LLM providers.
+The status line displays LLM provider availability using a simple, consistent format.
 
-**Format**: `[Provider📊ColorPercentage ...]`
+**Format**: `[Provider$X ...]` or `[Provider● ...]`
 
 **Provider Abbreviations**:
 - `Gq` - Groq (free tier: 7.2M tokens/day, 14.4K RPM)
 - `Ggl` - Google Gemini (free tier: 15 RPM, 1M TPD)
-- `A` - Anthropic Claude (billing-based, estimated status)
-- `O` - OpenAI (billing-based, estimated status)
-- `X` - X.AI (Grok) (free credits: $25)
-
-**Color Indicators**:
-- 🟢 Green - Healthy (>75% remaining)
-- 🟡 Yellow - Moderate (25-75% remaining)
-- 🟠 Orange - Low (10-25% remaining)
-- 🔴 Red - Critical (<10% remaining)
+- `A` - Anthropic Claude (requires Admin API key for usage data)
+- `O` - OpenAI (requires Admin API key for usage data)
+- `X` - X.AI Grok (free credits: $25)
 
 **Display Logic**:
-- **Numeric Quota**: Shows percentage (e.g., `Gq📊🟢95%`)
-- **Unknown/Estimated**: Shows color only (e.g., `A📊🟢`)
-- **No Providers**: Section omitted if no API keys configured
+
+| Scenario | Display | Meaning |
+|----------|---------|---------|
+| Prepaid credits configured | `A$18` | $18 remaining of prepaid amount |
+| Free tier (Groq, Google) | `Gq●` | Available (rate-limited only) |
+| No admin key | `O○` | Cannot get usage data |
+
+**Pie Chart Symbols** (for availability):
+- `●` (full) - Fully available / >87.5% remaining
+- `◕` (¾) - 62.5-87.5% remaining
+- `◐` (½) - 37.5-62.5% remaining
+- `◔` (¼) - 12.5-37.5% remaining
+- `○` (empty) - <12.5% remaining or no data
 
 **Examples**:
-- `[Gq📊🟢95% X📊🟢85%]` - Groq at 95%, X.AI at 85%, both healthy
-- `[Gq📊🟡45% X📊🟠15%]` - Groq moderate, X.AI low
-- `[A📊🟢 O📊🟢]` - Anthropic and OpenAI (unknown quota, keys valid)
+- `[Gq● A$18 O○ X$25]` - Groq free/available, Anthropic $18 left, OpenAI no key, xAI $25 left
+- `[Gq● A$5 X$2]` - Low credits on Anthropic and xAI
+- `[A◐ O◔]` - Anthropic at ~50%, OpenAI at ~25% (percentage mode)
+
+**Configuration**:
+
+To show remaining dollars, set `prepaidCredits` in `config/live-logging-config.json`:
+```json
+"provider_credits": {
+  "anthropic": { "prepaidCredits": 20 },
+  "openai": { "prepaidCredits": 50 },
+  "xai": { "prepaidCredits": 25 }
+}
+```
+
+**Admin API Keys** (required for usage tracking):
+- Anthropic: `ANTHROPIC_ADMIN_API_KEY` - Get at console.anthropic.com → Settings → Admin API Keys
+- OpenAI: `OPENAI_ADMIN_API_KEY` - Get at platform.openai.com/settings/organization/admin-keys
 
 ### Trajectory States
 
@@ -136,12 +155,12 @@ The status line displays information for **multiple active Claude Code sessions*
 
 **Single Session Display**:
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 O○ X$25] | 📋🟠2130-2230(3min) →coding]
 ```
 
 **Multi-Session Display**:
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% X📊🟢85%] | 📋C:🟢1400-1500(2m) CA:🟠2130-2230(15m)]
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 X$25] | 📋C:🟢1400-1500(2m) CA:🟠2130-2230(15m)]
 ```
 
 Where:
@@ -272,7 +291,7 @@ coding
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
+# [🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 O○ X$25] | 📋🟠2130-2230(3min) →coding]
 ```
 
 ### Troubleshooting

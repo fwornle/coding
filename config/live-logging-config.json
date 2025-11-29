@@ -290,21 +290,26 @@
       "anthropic": "/v1/organizations/cost_report"
     }
   },
-  "provider_budgets": {
+  "provider_credits": {
     "anthropic": {
-      "monthlyBudget": 100,
-      "warningThreshold": 80,
-      "criticalThreshold": 95
+      "prepaidCredits": 18,
+      "description": "Set to your actual prepaid credit amount in USD (e.g., 20 for $20). Leave null to show pie symbol instead."
     },
     "openai": {
-      "monthlyBudget": 100,
-      "warningThreshold": 80,
-      "criticalThreshold": 95
+      "prepaidCredits": null,
+      "description": "Set to your actual prepaid credit amount in USD. Leave null to show $X.XX spent instead of percentage."
     },
     "xai": {
-      "monthlyBudget": 25,
-      "warningThreshold": 80,
-      "criticalThreshold": 95
+      "prepaidCredits": 25,
+      "description": "xAI provides $25 free credits. Adjust if you've added more."
+    },
+    "groq": {
+      "prepaidCredits": null,
+      "description": "Groq has free tier with rate limits. No credit tracking needed."
+    },
+    "google": {
+      "prepaidCredits": null,
+      "description": "Google Gemini has free tier with rate limits. No credit tracking needed."
     }
   }
 }

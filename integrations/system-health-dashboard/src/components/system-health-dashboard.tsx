@@ -200,37 +200,52 @@ export default function SystemHealthDashboard() {
 
     // Map each provider to an item
     for (const provider of apiQuota.providers) {
-      const remaining = typeof provider.quota.remaining === 'number' ? provider.quota.remaining : null
+      const remainingCredits = typeof provider.quota.remainingCredits === 'number' ? provider.quota.remainingCredits : null
+      const remainingPercent = typeof provider.quota.remaining === 'number' ? provider.quota.remaining : null
       const status: 'operational' | 'warning' | 'error' | 'offline' =
         provider.status === 'healthy' || provider.status === 'moderate' ? 'operational' :
         provider.status === 'low' || provider.status === 'degraded' ? 'warning' :
         provider.status === 'critical' ? 'error' : 'offline'
 
+      // Description: show remaining $ if prepaid, or availability status
       let description = ''
-      if (remaining !== null) {
-        description = `${remaining}% remaining`
-      } else if (provider.quota.remaining === 'unknown') {
-        description = 'Usage unknown'
+      if (remainingCredits !== null) {
+        // Has prepaid credits configured - show remaining $
+        description = `$${Math.round(remainingCredits)} remaining`
+      } else if (provider.cacheStrategy === 'free-tier') {
+        // Free tier provider
+        description = 'Free tier (available)'
+      } else if (provider.quota.remaining === 'N/A') {
+        // No admin key configured
+        description = 'No admin key'
+      } else if (remainingPercent !== null) {
+        // Has percentage but no $ amount
+        description = `${remainingPercent}% available`
       } else {
-        description = `${provider.quota.used} / ${provider.quota.limit}`
+        description = 'Available'
       }
 
+      // Build detailed tooltip
       let tooltip = `${provider.name}\n`
       tooltip += `Status: ${provider.status}\n`
-      tooltip += `Used: ${provider.quota.used}\n`
-      tooltip += `Limit: ${provider.quota.limit}\n`
-      if (provider.cost && provider.cost.total !== 'unknown') {
-        tooltip += `Cost: ${provider.cost.currency} ${provider.cost.total}\n`
+      if (remainingCredits !== null) {
+        tooltip += `Remaining: $${remainingCredits.toFixed(2)}\n`
+      }
+      if (provider.cost && typeof provider.cost.total === 'number') {
+        tooltip += `Spent: $${provider.cost.total.toFixed(2)}\n`
+      }
+      if (provider.quota.limit) {
+        tooltip += `Limit: ${provider.quota.limit}\n`
       }
       if (provider.rateLimit) {
         if (provider.rateLimit.requestsPerMinute) {
           tooltip += `Rate: ${provider.rateLimit.requestsPerMinute} RPM\n`
         }
         if (provider.rateLimit.tokensPerDay) {
-          tooltip += `Tokens: ${provider.rateLimit.tokensPerDay} TPD\n`
+          tooltip += `Tokens: ${(provider.rateLimit.tokensPerDay / 1000000).toFixed(1)}M TPD\n`
         }
       }
-      tooltip += `Cache: ${provider.cacheStrategy}`
+      tooltip += `Data: ${provider.cacheStrategy}`
 
       items.push({
         name: provider.name,
