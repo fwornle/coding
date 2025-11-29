@@ -204,6 +204,31 @@ export class GraphDatabaseService extends EventEmitter<[never]> {
      */
     getHealth(): Promise<Object>;
     /**
+     * Delete an entity from the graph database
+     *
+     * @param {string} name - Entity name
+     * @param {string} team - Team scope
+     * @param {Object} [options={}] - Deletion options
+     * @param {boolean} [options.force=false] - Force deletion of critical nodes
+     * @returns {Promise<Object>} Deletion result
+     * @throws {Error} If entity not found or protected
+     * @emits entity:deleted When entity deleted successfully
+     */
+    deleteEntity(name: string, team: string, options?: {
+        force?: boolean | undefined;
+    }): Promise<Object>;
+    /**
+     * Delete relationships by type
+     *
+     * @param {string} relationType - The relationship type to delete
+     * @param {Object} [options={}] - Options
+     * @param {string} [options.team] - Filter by team (optional)
+     * @returns {Promise<{deleted: number, edges: Array}>} Deletion result
+     */
+    deleteRelationsByType(relationType: string, options?: {
+        team?: string | undefined;
+    }): Promise<{ deleted: number; edges: any[] }>;
+    /**
      * Close database and cleanup resources
      *
      * @returns {Promise<void>}
