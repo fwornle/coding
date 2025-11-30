@@ -128,7 +128,8 @@ export class GraphKnowledgeExporter {
    * @param {string} team - Team to export
    * @param {Object} [options={}] - Export options
    * @param {string} [options.outputPath] - Override output path
-   * @returns {Promise<string>} Path to exported file
+   * @param {boolean} [options.force] - Force export even if no content changes
+   * @returns {Promise<string|null>} Path to exported file, or null if no changes
    */
   async exportTeam(team, options = {}) {
     try {
@@ -161,6 +162,15 @@ export class GraphKnowledgeExporter {
         }
       };
 
+      // Check if content actually changed before writing (avoid timestamp-only updates)
+      if (!options.force) {
+        const hasChanges = await this._hasContentChanges(outputPath, entities, relations);
+        if (!hasChanges) {
+          console.log(`○ Skipped export for team "${team}": no content changes detected`);
+          return null;
+        }
+      }
+
       // Write to file with pretty formatting
       const jsonContent = this.prettyFormat
         ? JSON.stringify(exportData, null, 2)
@@ -176,6 +186,81 @@ export class GraphKnowledgeExporter {
       console.error(`Export failed for team "${team}":`, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Check if the content has actually changed compared to existing file
+   * Compares entities and relations, ignoring metadata like timestamps
+   *
+   * @param {string} filePath - Path to existing export file
+   * @param {Array} newEntities - New entities to compare
+   * @param {Array} newRelations - New relations to compare
+   * @returns {Promise<boolean>} True if content has changed
+   * @private
+   */
+  async _hasContentChanges(filePath, newEntities, newRelations) {
+    try {
+      // If file doesn't exist, there are definitely changes
+      const existingContent = await fs.readFile(filePath, 'utf8');
+      const existingData = JSON.parse(existingContent);
+
+      // Compare entity counts first (fast check)
+      if (existingData.entities?.length !== newEntities.length) {
+        return true;
+      }
+      if (existingData.relations?.length !== newRelations.length) {
+        return true;
+      }
+
+      // Deep compare entities (sort for stable comparison)
+      const sortedExisting = this._sortForComparison(existingData.entities, existingData.relations);
+      const sortedNew = this._sortForComparison(newEntities, newRelations);
+
+      // Compare stringified versions (excluding timestamps in metadata)
+      const existingNormalized = JSON.stringify(sortedExisting);
+      const newNormalized = JSON.stringify(sortedNew);
+
+      return existingNormalized !== newNormalized;
+
+    } catch (error) {
+      // File doesn't exist or can't be read - treat as changed
+      return true;
+    }
+  }
+
+  /**
+   * Sort entities and relations for stable comparison
+   * Also normalizes by removing volatile fields like timestamps
+   *
+   * @param {Array} entities - Entities to sort
+   * @param {Array} relations - Relations to sort
+   * @returns {Object} Sorted and normalized data
+   * @private
+   */
+  _sortForComparison(entities, relations) {
+    // Normalize entities (remove volatile metadata like timestamps)
+    const normalizedEntities = entities.map(e => ({
+      name: e.name,
+      entityType: e.entityType,
+      observations: e.observations ? [...e.observations].sort() : [],
+      significance: e.significance,
+      source: e.source,
+      problem: e.problem,
+      solution: e.solution
+    })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    // Normalize relations
+    const normalizedRelations = relations.map(r => ({
+      from: r.from,
+      to: r.to,
+      relationType: r.relationType
+    })).sort((a, b) => {
+      const aKey = `${a.from}|${a.relationType}|${a.to}`;
+      const bKey = `${b.from}|${b.relationType}|${b.to}`;
+      return aKey.localeCompare(bKey);
+    });
+
+    return { entities: normalizedEntities, relations: normalizedRelations };
   }
 
   /**
