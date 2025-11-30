@@ -97,6 +97,9 @@ integrations/mcp-server-browserbase/
 # Centralized health monitoring files
 .health/
 
+# Workflow checkpoints (timestamps that change frequently but don't need git tracking)
+.data/workflow-checkpoints.json
+
 # 4-Layer Monitoring Architecture runtime files
 .global-service-registry.json
 .mcp-sync/session-registry.json
