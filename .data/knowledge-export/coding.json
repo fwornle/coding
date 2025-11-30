@@ -37,8 +37,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.846Z",
-        "last_updated": "2025-11-30T05:53:38.846Z"
+        "created_at": "2025-11-30T06:14:08.574Z",
+        "last_updated": "2025-11-30T06:44:15.909Z"
       },
       "id": "mc4flkg3g96u4x"
     },
@@ -50,8 +50,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T06:11:27.391Z",
-        "last_updated": "2025-11-30T06:11:27.391Z"
+        "created_at": "2025-11-30T06:14:08.575Z",
+        "last_updated": "2025-11-30T06:44:15.911Z"
       },
       "id": "mc4flkgxgvxje"
     },
@@ -87,8 +87,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.865Z",
-        "last_updated": "2025-11-30T05:53:38.865Z"
+        "created_at": "2025-11-30T06:14:08.577Z",
+        "last_updated": "2025-11-30T06:44:15.912Z"
       },
       "id": "mc4flkg83d5ay"
     },
@@ -124,8 +124,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.875Z",
-        "last_updated": "2025-11-30T05:53:38.875Z"
+        "created_at": "2025-11-30T06:14:08.578Z",
+        "last_updated": "2025-11-30T06:44:15.913Z"
       },
       "id": "mc4flkg48tkow"
     },
@@ -161,8 +161,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.887Z",
-        "last_updated": "2025-11-30T05:53:38.887Z"
+        "created_at": "2025-11-30T06:14:08.579Z",
+        "last_updated": "2025-11-30T06:44:15.914Z"
       },
       "id": "mc4flkg2hdmma6"
     },
@@ -203,8 +203,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.897Z",
-        "last_updated": "2025-11-30T05:53:38.897Z"
+        "created_at": "2025-11-30T06:14:08.581Z",
+        "last_updated": "2025-11-30T06:44:15.916Z"
       },
       "id": "mc4flkg2gtg02x"
     },
@@ -221,8 +221,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.905Z",
-        "last_updated": "2025-11-30T05:53:38.905Z"
+        "created_at": "2025-11-30T06:14:08.582Z",
+        "last_updated": "2025-11-30T06:44:15.917Z"
       },
       "id": "mc4flkgt3o5ws"
     },
@@ -239,8 +239,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.913Z",
-        "last_updated": "2025-11-30T05:53:38.913Z"
+        "created_at": "2025-11-30T06:14:08.583Z",
+        "last_updated": "2025-11-30T06:44:15.918Z"
       },
       "id": "mc4flkgsmmjil"
     },
@@ -252,8 +252,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.921Z",
-        "last_updated": "2025-11-30T05:53:38.921Z"
+        "created_at": "2025-11-30T06:14:08.584Z",
+        "last_updated": "2025-11-30T06:44:15.919Z"
       },
       "id": "mc4flkgh5t7c8"
     },
@@ -265,8 +265,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.932Z",
-        "last_updated": "2025-11-30T05:53:38.932Z"
+        "created_at": "2025-11-30T06:14:08.588Z",
+        "last_updated": "2025-11-30T06:44:15.921Z"
       },
       "id": "mc4flkgvei99s"
     },
@@ -289,8 +289,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.941Z",
-        "last_updated": "2025-11-30T05:53:38.941Z"
+        "created_at": "2025-11-30T06:14:08.589Z",
+        "last_updated": "2025-11-30T06:44:15.922Z"
       },
       "id": "mc4flkg34x7w16"
     },
@@ -306,8 +306,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.949Z",
-        "last_updated": "2025-11-30T05:53:38.949Z"
+        "created_at": "2025-11-30T06:14:08.590Z",
+        "last_updated": "2025-11-30T06:44:15.923Z"
       },
       "id": "mc4flkg2ek8q1m"
     },
@@ -323,8 +323,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-30T05:53:38.958Z",
-        "last_updated": "2025-11-30T05:53:38.958Z"
+        "created_at": "2025-11-30T06:14:08.592Z",
+        "last_updated": "2025-11-30T06:44:15.924Z"
       },
       "id": "mc4flkg1qr4h9s"
     }
@@ -715,12 +715,6 @@
       "metadata": {}
     },
     {
-      "from": "KnowledgePersistencePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes to",
-      "metadata": {}
-    },
-    {
       "from": "Coding",
       "to": "Coding",
       "relationType": "implemented in",
@@ -748,9 +742,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-11-30T06:11:32.393Z",
+    "exported_at": "2025-11-30T06:44:20.931Z",
     "total_entities": 13,
-    "total_relations": 69,
+    "total_relations": 68,
     "description": "Coding project infrastructure and patterns"
   }
 }
