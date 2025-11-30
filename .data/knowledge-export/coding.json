@@ -37,8 +37,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-29T08:39:44.962Z",
-        "last_updated": "2025-11-29T08:39:44.962Z"
+        "created_at": "2025-11-30T05:53:38.846Z",
+        "last_updated": "2025-11-30T05:53:38.846Z"
       },
       "id": "mc4flkg3g96u4x"
     },
@@ -46,35 +46,18 @@
       "name": "Coding",
       "entityType": "Project",
       "observations": [
-        {
-          "date": "2025-06-06T10:00:00Z",
-          "metadata": {},
-          "type": "metric",
-          "content": "Coding knowledge management system for development teams"
-        },
-        {
-          "date": "2025-06-06T10:00:00Z",
-          "metadata": {},
-          "type": "insight",
-          "content": "Implements MCP persistence and cross-platform installation patterns"
-        },
-        {
-          "date": "2025-06-06T10:00:00Z",
-          "metadata": {},
-          "type": "insight",
-          "content": "Automated capture and visualization of programming insights"
-        }
+        "Main development hub for MCP services and knowledge management"
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T06:11:27.391Z",
+        "last_updated": "2025-11-30T06:11:27.391Z"
       },
       "id": "mc4flkgxgvxje"
     },
     {
       "name": "NetworkAwareInstallationPattern",
-      "entityType": "Pattern",
+      "entityType": "TransferablePattern",
       "observations": [
         {
           "type": "rule",
@@ -104,14 +87,14 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.865Z",
+        "last_updated": "2025-11-30T05:53:38.865Z"
       },
       "id": "mc4flkg83d5ay"
     },
     {
       "name": "MCPMemoryLoggingIntegrationPattern",
-      "entityType": "Pattern",
+      "entityType": "TransferablePattern",
       "observations": [
         {
           "type": "rule",
@@ -141,14 +124,14 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.875Z",
+        "last_updated": "2025-11-30T05:53:38.875Z"
       },
       "id": "mc4flkg48tkow"
     },
     {
       "name": "VSCodeExtensionBridgePattern",
-      "entityType": "Pattern",
+      "entityType": "TransferablePattern",
       "observations": [
         {
           "type": "rule",
@@ -178,14 +161,14 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.887Z",
+        "last_updated": "2025-11-30T05:53:38.887Z"
       },
       "id": "mc4flkg2hdmma6"
     },
     {
       "name": "CodingWorkflow",
-      "entityType": "Pattern",
+      "entityType": "MCPAgent",
       "observations": [
         {
           "type": "checklist",
@@ -220,14 +203,14 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.897Z",
+        "last_updated": "2025-11-30T05:53:38.897Z"
       },
       "id": "mc4flkg2gtg02x"
     },
     {
       "name": "UkbCli",
-      "entityType": "Pattern",
+      "entityType": "TransferablePattern",
       "observations": [
         "UKB script had grown too large and complex (3000+ lines), making it difficult to maintain and extend. The monolithic bash script mixed concerns and lacked a stable API for cross-platform knowledge management.",
         "Complete refactoring from bash script to Node.js CLI tool with modular architecture, stable API, and comprehensive documentation. Created ukb-cli package with separated concerns, proper error handling, and enhanced functionality.",
@@ -238,14 +221,14 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.905Z",
+        "last_updated": "2025-11-30T05:53:38.905Z"
       },
       "id": "mc4flkgt3o5ws"
     },
     {
       "name": "VkbCli",
-      "entityType": "Pattern",
+      "entityType": "TransferablePattern",
       "observations": [
         "VKB visualization system grew complex with server management, data processing, and web interface coordination challenges. Monolithic bash script lacked proper error handling and cross-platform reliability.",
         "Complete refactoring from bash script to Node.js CLI tool with VKBServer class API, Commander.js interface, and modular data processing. Created vkb-server package with separated concerns and cross-platform compatibility.",
@@ -256,40 +239,40 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.913Z",
+        "last_updated": "2025-11-30T05:53:38.913Z"
       },
       "id": "mc4flkgsmmjil"
     },
     {
       "name": "SemanticAnalysisWorkflowIssue",
-      "entityType": "Pattern",
+      "entityType": "MCPAgent",
       "observations": [
         "MCP coordinator workflow returns placeholder responses instead of executing full 8-agent pipeline. Server connected but coordinator not fully implemented. Expected outputs (MD, PUML, PNG files, shared-memory updates) not generated."
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.921Z",
+        "last_updated": "2025-11-30T05:53:38.921Z"
       },
       "id": "mc4flkgh5t7c8"
     },
     {
       "name": "SemanticAnalysis8AgentSystemImplementation",
-      "entityType": "Pattern",
+      "entityType": "TransferablePattern",
       "observations": [
         "Successfully implemented the complete 8-agent semantic analysis system. Replaced mock workflow handler with real coordinator execution engine. Implemented agent integration including RepositoryAnalyzer, SemanticAnalyzer, WebSearchAgent, KnowledgeManager, SynchronizationAgent, DeduplicationAgent, DocumentationAgent, and QA validation. System now executes real workflows with step-by-step coordination, quality assurance, and artifact generation. Key achievement: transformed placeholder responses into fully functional multi-agent pipeline."
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.932Z",
+        "last_updated": "2025-11-30T05:53:38.932Z"
       },
       "id": "mc4flkgvei99s"
     },
     {
       "name": "ComprehensiveSemanticAnalysis",
-      "entityType": "Pattern",
+      "entityType": "TransferablePattern",
       "observations": [
         {
           "type": "insight",
@@ -306,14 +289,14 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.941Z",
+        "last_updated": "2025-11-30T05:53:38.941Z"
       },
       "id": "mc4flkg34x7w16"
     },
     {
       "name": "ConfigurationPattern",
-      "entityType": "Pattern",
+      "entityType": "TransferablePattern",
       "observations": [
         "Problem: Multi-agent architecture complexity in semantic analysis system",
         "Solution: Modular agent architecture with TypeScript type safety",
@@ -323,14 +306,14 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-18T10:52:18.836Z",
-        "last_updated": "2025-11-18T10:52:18.836Z"
+        "created_at": "2025-11-30T05:53:38.949Z",
+        "last_updated": "2025-11-30T05:53:38.949Z"
       },
       "id": "mc4flkg2ek8q1m"
     },
     {
       "name": "CollectiveKnowledge",
-      "entityType": "System",
+      "entityType": "TransferablePattern",
       "observations": [
         {
           "date": "2025-06-06T10:00:00Z",
@@ -340,8 +323,8 @@
       ],
       "source": "manual",
       "metadata": {
-        "created_at": "2025-11-24T18:13:01.686Z",
-        "last_updated": "2025-11-24T18:13:01.686Z"
+        "created_at": "2025-11-30T05:53:38.958Z",
+        "last_updated": "2025-11-30T05:53:38.958Z"
       },
       "id": "mc4flkg1qr4h9s"
     }
@@ -670,14 +653,104 @@
       "to": "CollectiveKnowledge",
       "relationType": "relation",
       "metadata": {}
+    },
+    {
+      "from": "KnowledgePersistencePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "NetworkAwareInstallationPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "MCPMemoryLoggingIntegrationPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "VSCodeExtensionBridgePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "CodingWorkflow",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "UkbCli",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "VkbCli",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysisWorkflowIssue",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis8AgentSystemImplementation",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgePersistencePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes to",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Coding",
+      "relationType": "implemented in",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysisWorkflowIssue",
+      "to": "Coding",
+      "relationType": "implemented in",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis8AgentSystemImplementation",
+      "to": "Coding",
+      "relationType": "implemented in",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "Coding",
+      "relationType": "implemented in",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-11-29T08:39:49.962Z",
+    "exported_at": "2025-11-30T06:11:32.393Z",
     "total_entities": 13,
-    "total_relations": 54,
+    "total_relations": 69,
     "description": "Coding project infrastructure and patterns"
   }
 }

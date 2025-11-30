@@ -327,9 +327,14 @@ export class GraphKnowledgeImporter {
         console.log(`  ⏭ Skipping "${entity.name}" - DB version (${existingDate.toISOString()}) is newer than JSON (${importDate.toISOString()})`);
         return { imported: false, reason: 'db-newer' };
       } else if (existingDate.getTime() === importDate.getTime()) {
-        // Same timestamp - skip to avoid unnecessary writes
-        console.log(`  ⏭ Skipping "${entity.name}" - same timestamp (${existingDate.toISOString()})`);
-        return { imported: false, reason: 'same-timestamp' };
+        // Same timestamp - but check if entityType differs (repair mode)
+        if (existing.entityType !== entity.entityType) {
+          console.log(`  🔧 Repairing "${entity.name}" - entityType mismatch (DB: ${existing.entityType}, JSON: ${entity.entityType})`);
+          // Continue to import to fix the type
+        } else {
+          console.log(`  ⏭ Skipping "${entity.name}" - same timestamp (${existingDate.toISOString()})`);
+          return { imported: false, reason: 'same-timestamp' };
+        }
       } else {
         // JSON is newer - log update
         console.log(`  ⬆️  Updating "${entity.name}" - JSON version (${importDate.toISOString()}) is newer than DB (${existingDate.toISOString()})`);
