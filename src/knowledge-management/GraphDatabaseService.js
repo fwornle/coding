@@ -217,8 +217,32 @@ export class GraphDatabaseService extends EventEmitter {
     // Add or update node in graph
     const isNewNode = !this.graph.hasNode(nodeId);
     if (!isNewNode) {
-      // Update existing node - replaceNodeAttributes is the correct Graphology API
-      this.graph.replaceNodeAttributes(nodeId, attributes);
+      // Update existing node - PRESERVE entityType if it's a valid type (not fallback)
+      const existingAttrs = this.graph.getNodeAttributes(nodeId);
+      const existingType = existingAttrs.entityType;
+      const incomingType = attributes.entityType;
+
+      // Preserve existing entityType if:
+      // 1. Existing type is a specific type (not Unknown/TransferablePattern fallbacks)
+      // 2. Incoming type is a generic fallback
+      const fallbackTypes = ['Unknown', 'TransferablePattern'];
+      const existingIsSpecific = existingType && !fallbackTypes.includes(existingType);
+      const incomingIsFallback = !incomingType || fallbackTypes.includes(incomingType);
+
+      if (existingIsSpecific && incomingIsFallback) {
+        console.log(`[GraphDatabaseService] Preserving entityType '${existingType}' for ${entity.name} (incoming was fallback '${incomingType}')`);
+        attributes.entityType = existingType;
+      }
+
+      // Merge attributes instead of full replace - preserve created_at
+      const mergedAttributes = {
+        ...existingAttrs,
+        ...attributes,
+        created_at: existingAttrs.created_at || attributes.created_at, // Preserve original creation date
+        last_modified: new Date().toISOString()
+      };
+
+      this.graph.replaceNodeAttributes(nodeId, mergedAttributes);
     } else {
       // Create new node
       this.graph.addNode(nodeId, attributes);
@@ -394,20 +418,41 @@ export class GraphDatabaseService extends EventEmitter {
       throw new Error(`Target entity not found: ${toEntity} (team: ${team})`);
     }
 
-    // Generate deterministic edge ID to prevent duplicates
-    const edgeId = `${fromId}__${type}__${toId}`;
+    // NORMALIZE relation type: convert spaces to underscores for consistency
+    // This ensures "contributes to" and "contributes_to" are treated as the same relation
+    const normalizedType = type.replace(/\s+/g, '_');
 
-    // Check if this exact relationship already exists
-    if (this.graph.hasEdge(edgeId)) {
+    // Generate deterministic edge ID for new edges
+    const edgeId = `${fromId}__${normalizedType}__${toId}`;
+
+    // Check if ANY edge exists between these nodes with the same type (regardless of edge ID format)
+    // This handles both legacy geid_* IDs and new deterministic IDs
+    let existingEdge = null;
+    try {
+      // Get all edges from fromId to toId and check if any has matching type
+      const existingEdges = this.graph.edges(fromId, toId);
+      for (const eid of existingEdges) {
+        const edgeAttrs = this.graph.getEdgeAttributes(eid);
+        const edgeType = (edgeAttrs.type || '').replace(/\s+/g, '_'); // Normalize for comparison
+        if (edgeType === normalizedType) {
+          existingEdge = eid;
+          break;
+        }
+      }
+    } catch (e) {
+      // edges() throws if nodes don't exist, but we already validated above
+    }
+
+    if (existingEdge) {
       // Edge already exists - skip to prevent duplicates
-      console.log(`[GraphDatabaseService] Skipping duplicate relation: ${fromEntity} --[${type}]--> ${toEntity}`);
+      console.log(`[GraphDatabaseService] Skipping duplicate relation: ${fromEntity} --[${normalizedType}]--> ${toEntity} (existing: ${existingEdge})`);
       return;
     }
 
-    // Prepare edge attributes
+    // Prepare edge attributes (use normalized type)
     const attributes = {
       id: edgeId,
-      type,
+      type: normalizedType,
       confidence: metadata.confidence !== undefined ? metadata.confidence : 1.0,
       created_at: new Date().toISOString(),
       ...metadata
@@ -427,7 +472,8 @@ export class GraphDatabaseService extends EventEmitter {
 
     // Emit event for monitoring/logging (GraphKnowledgeExporter listens to this)
     // Include 'team' at top level for compatibility with export listeners
-    this.emit('relationship:stored', { from: fromId, to: toId, type, team, metadata });
+    // Use normalizedType for consistency
+    this.emit('relationship:stored', { from: fromId, to: toId, type: normalizedType, team, metadata });
   }
 
   /**
@@ -497,15 +543,20 @@ export class GraphDatabaseService extends EventEmitter {
   async deduplicateRelations() {
     console.log('🔍 Scanning for duplicate relations...');
 
-    // Group edges by their canonical key (source__type__target)
+    // Helper to normalize relation type (spaces to underscores)
+    const normalizeType = (type) => (type || '').replace(/\s+/g, '_');
+
+    // Group edges by their canonical key (source__normalizedType__target)
+    // This treats "contributes to" and "contributes_to" as the same relation
     const edgeGroups = new Map();
 
     this.graph.forEachEdge((edgeId, attributes, source, target) => {
-      const key = `${source}__${attributes.type}__${target}`;
+      const normalizedType = normalizeType(attributes.type);
+      const key = `${source}__${normalizedType}__${target}`;
       if (!edgeGroups.has(key)) {
         edgeGroups.set(key, []);
       }
-      edgeGroups.get(key).push({ edgeId, attributes, source, target });
+      edgeGroups.get(key).push({ edgeId, attributes, source, target, normalizedType });
     });
 
     // Find duplicates and mark for deletion
@@ -538,11 +589,11 @@ export class GraphDatabaseService extends EventEmitter {
         duplicateDetails.push({
           from: sourceName,
           to: targetName,
-          type: edges[0].attributes.type,
+          type: edges[0].normalizedType,
           duplicateCount: duplicates.length
         });
 
-        console.log(`  Found ${duplicates.length} duplicate(s): ${sourceName} --[${edges[0].attributes.type}]--> ${targetName}`);
+        console.log(`  Found ${duplicates.length} duplicate(s): ${sourceName} --[${edges[0].normalizedType}]--> ${targetName}`);
       }
     }
 
