@@ -234,13 +234,22 @@ export class GraphDatabaseService extends EventEmitter {
         attributes.entityType = existingType;
       }
 
+      // Check if content has actually changed (exclude timestamps from comparison)
+      const contentChanged = this._hasContentChanged(existingAttrs, attributes);
+
       // Merge attributes instead of full replace - preserve created_at
+      // Only update last_modified if content actually changed
       const mergedAttributes = {
         ...existingAttrs,
         ...attributes,
         created_at: existingAttrs.created_at || attributes.created_at, // Preserve original creation date
-        last_modified: new Date().toISOString()
+        last_modified: contentChanged ? new Date().toISOString() : existingAttrs.last_modified
       };
+
+      if (!contentChanged) {
+        // Skip update entirely if no content change - don't mark dirty, don't emit event
+        return nodeId;
+      }
 
       this.graph.replaceNodeAttributes(nodeId, mergedAttributes);
     } else {
@@ -287,6 +296,71 @@ export class GraphDatabaseService extends EventEmitter {
     this.emit('entity:stored', { team: options.team, entity: attributes, nodeId });
 
     return nodeId;
+  }
+
+  /**
+   * Check if entity content has actually changed (excluding timestamps)
+   *
+   * Compares relevant content fields between existing and incoming attributes
+   * to determine if an actual update is needed.
+   *
+   * @param {Object} existing - Existing entity attributes
+   * @param {Object} incoming - New entity attributes
+   * @returns {boolean} True if content has changed
+   * @private
+   */
+  _hasContentChanged(existing, incoming) {
+    // Fields to ignore when comparing (timestamps, metadata that changes on touch)
+    const ignoreFields = [
+      'last_modified',
+      'created_at',
+      'metadata',  // metadata often has nested timestamps
+      'ontology',  // classification metadata can change without real content change
+      'validation', // validation results may differ
+      'contentValidation'  // same as validation
+    ];
+
+    // Key content fields to check for changes
+    const contentFields = [
+      'observations',
+      'entityType',
+      'confidence',
+      'source',
+      'significance',
+      'relationships',
+      'quick_reference'
+    ];
+
+    for (const field of contentFields) {
+      const existingVal = existing[field];
+      const incomingVal = incoming[field];
+
+      // Skip if both are undefined/null
+      if (existingVal == null && incomingVal == null) continue;
+
+      // Changed if one is defined and other isn't
+      if ((existingVal == null) !== (incomingVal == null)) {
+        return true;
+      }
+
+      // For arrays (observations, relationships), compare content
+      if (Array.isArray(existingVal) && Array.isArray(incomingVal)) {
+        if (existingVal.length !== incomingVal.length) {
+          return true;
+        }
+        // Simple JSON comparison for array contents
+        if (JSON.stringify(existingVal) !== JSON.stringify(incomingVal)) {
+          return true;
+        }
+      } else {
+        // For primitives, direct comparison
+        if (existingVal !== incomingVal) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
