@@ -707,31 +707,26 @@ class StatusLineHealthMonitor {
         healthIssues.push('GraphDB missing');
         healthStatus = 'unhealthy';
       } else {
-        // Check for LevelDB files
-        const levelDbFiles = ['CURRENT', 'LOCK', 'LOG', 'MANIFEST'];
+        // Check for LevelDB files - MANIFEST files have version suffix (e.g., MANIFEST-000332)
+        const levelDbFiles = ['CURRENT', 'LOCK', 'LOG'];
         const missingFiles = levelDbFiles.filter(file => !fs.existsSync(path.join(graphDbPath, file)));
+
+        // Check for MANIFEST-* file separately (it has a version suffix)
+        const files = fs.readdirSync(graphDbPath);
+        const hasManifest = files.some(f => f.startsWith('MANIFEST-'));
+        if (!hasManifest) {
+          missingFiles.push('MANIFEST-*');
+        }
 
         if (missingFiles.length > 0) {
           healthIssues.push('LevelDB incomplete');
           healthStatus = 'warning';
         }
 
-        // Check LOCK file to see if database is in use
-        try {
-          const lockPath = path.join(graphDbPath, 'LOCK');
-          if (fs.existsSync(lockPath)) {
-            const lockStats = fs.statSync(lockPath);
-            const lockAge = Date.now() - lockStats.mtime.getTime();
-
-            // If LOCK file is older than 1 hour but database should be active, it might be stale
-            if (lockAge > 3600000) {
-              healthIssues.push('Stale lock');
-              if (healthStatus === 'healthy') healthStatus = 'warning';
-            }
-          }
-        } catch (lockError) {
-          // Ignore lock check errors
-        }
+        // NOTE: Removed "stale lock" check based on LOCK file age.
+        // The LOCK file age does NOT indicate data staleness - it only shows when the database
+        // was last accessed. A database can be perfectly healthy even if not accessed for weeks.
+        // User feedback: "I might not run this for weeks... doesn't mean we are in a 'stale data' state."
       }
 
       // Check SQLite database
