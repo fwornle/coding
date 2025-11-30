@@ -394,16 +394,27 @@ export class GraphDatabaseService extends EventEmitter {
       throw new Error(`Target entity not found: ${toEntity} (team: ${team})`);
     }
 
+    // Generate deterministic edge ID to prevent duplicates
+    const edgeId = `${fromId}__${type}__${toId}`;
+
+    // Check if this exact relationship already exists
+    if (this.graph.hasEdge(edgeId)) {
+      // Edge already exists - skip to prevent duplicates
+      console.log(`[GraphDatabaseService] Skipping duplicate relation: ${fromEntity} --[${type}]--> ${toEntity}`);
+      return;
+    }
+
     // Prepare edge attributes
     const attributes = {
+      id: edgeId,
       type,
       confidence: metadata.confidence !== undefined ? metadata.confidence : 1.0,
       created_at: new Date().toISOString(),
       ...metadata
     };
 
-    // Add edge (graph allows multiple edges between same nodes)
-    this.graph.addEdge(fromId, toId, attributes);
+    // Add edge with explicit ID (prevents duplicates)
+    this.graph.addEdgeWithKey(edgeId, fromId, toId, attributes);
 
     // Mark as dirty for persistence
     this.isDirty = true;
@@ -415,7 +426,8 @@ export class GraphDatabaseService extends EventEmitter {
     }
 
     // Emit event for monitoring/logging (GraphKnowledgeExporter listens to this)
-    this.emit('relationship:stored', { from: fromId, to: toId, type, metadata });
+    // Include 'team' at top level for compatibility with export listeners
+    this.emit('relationship:stored', { from: fromId, to: toId, type, team, metadata });
   }
 
   /**
@@ -471,6 +483,86 @@ export class GraphDatabaseService extends EventEmitter {
         from: this.graph.hasNode(e.source) ? this.graph.getNodeAttribute(e.source, 'name') : e.source,
         to: this.graph.hasNode(e.target) ? this.graph.getNodeAttribute(e.target, 'name') : e.target
       }))
+    };
+  }
+
+  /**
+   * Deduplicate relations in the graph
+   *
+   * Removes duplicate edges (same source -> target with same type).
+   * Keeps the oldest edge (by created_at) and removes newer duplicates.
+   *
+   * @returns {Promise<{duplicatesRemoved: number, details: Array}>} Deduplication result
+   */
+  async deduplicateRelations() {
+    console.log('🔍 Scanning for duplicate relations...');
+
+    // Group edges by their canonical key (source__type__target)
+    const edgeGroups = new Map();
+
+    this.graph.forEachEdge((edgeId, attributes, source, target) => {
+      const key = `${source}__${attributes.type}__${target}`;
+      if (!edgeGroups.has(key)) {
+        edgeGroups.set(key, []);
+      }
+      edgeGroups.get(key).push({ edgeId, attributes, source, target });
+    });
+
+    // Find duplicates and mark for deletion
+    const edgesToDelete = [];
+    const duplicateDetails = [];
+
+    for (const [key, edges] of edgeGroups.entries()) {
+      if (edges.length > 1) {
+        // Sort by created_at (oldest first)
+        edges.sort((a, b) => {
+          const dateA = new Date(a.attributes.created_at || 0).getTime();
+          const dateB = new Date(b.attributes.created_at || 0).getTime();
+          return dateA - dateB;
+        });
+
+        // Keep the first (oldest), delete the rest
+        const [keep, ...duplicates] = edges;
+        for (const dup of duplicates) {
+          edgesToDelete.push(dup.edgeId);
+        }
+
+        // Get readable names
+        const sourceName = this.graph.hasNode(edges[0].source)
+          ? this.graph.getNodeAttribute(edges[0].source, 'name')
+          : edges[0].source;
+        const targetName = this.graph.hasNode(edges[0].target)
+          ? this.graph.getNodeAttribute(edges[0].target, 'name')
+          : edges[0].target;
+
+        duplicateDetails.push({
+          from: sourceName,
+          to: targetName,
+          type: edges[0].attributes.type,
+          duplicateCount: duplicates.length
+        });
+
+        console.log(`  Found ${duplicates.length} duplicate(s): ${sourceName} --[${edges[0].attributes.type}]--> ${targetName}`);
+      }
+    }
+
+    // Delete duplicates
+    for (const edgeId of edgesToDelete) {
+      this.graph.dropEdge(edgeId);
+    }
+
+    // Mark as dirty and persist
+    if (edgesToDelete.length > 0) {
+      this.isDirty = true;
+      if (this.levelDB) {
+        await this._persistGraphToLevel();
+      }
+    }
+
+    console.log(`✓ Deduplication complete: removed ${edgesToDelete.length} duplicate edges`);
+    return {
+      duplicatesRemoved: edgesToDelete.length,
+      details: duplicateDetails
     };
   }
 

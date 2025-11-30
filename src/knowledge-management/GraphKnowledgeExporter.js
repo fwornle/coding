@@ -98,6 +98,12 @@ export class GraphKnowledgeExporter {
    * @private
    */
   _scheduleExport(team) {
+    // Guard: skip if team is undefined/null (defensive against malformed events)
+    if (!team || team === 'undefined') {
+      console.warn('[GraphKnowledgeExporter] Skipping export for undefined team');
+      return;
+    }
+
     // Clear existing timer if present
     if (this.exportTimers.has(team)) {
       clearTimeout(this.exportTimers.get(team));
