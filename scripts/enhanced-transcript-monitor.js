@@ -1550,10 +1550,10 @@ class EnhancedTranscriptMonitor {
     }
 
     // NEW: Check if all exchanges are complete before writing
+    // CRITICAL: Hold back ANY exchange that hasn't completed, regardless of whether it has a response yet
+    // This prevents "Text-only exchange" placeholders from being written for incomplete exchanges
     const incompleteExchanges = completedSet.filter(ex => {
-      const hasResponse = ex.claudeResponse?.trim() || ex.assistantResponse?.trim() ||
-                         (ex.toolCalls && ex.toolCalls.length > 0);
-      return hasResponse && !ex.isComplete;  // Has response but not complete
+      return !ex.isComplete;  // ANY incomplete exchange should be held back
     });
 
     if (incompleteExchanges.length > 0) {
