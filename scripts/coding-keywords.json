@@ -18,7 +18,7 @@
       "JSON-RPC", "MQTT broker", "json-rpc server",
       "browser-access", "stagehand", "vscode-km-copilot",
       "conversation-analyzer",
-      "shared-memory.json", "graphology", "adaptive-classifier",
+      "knowledge-export", "graphology", "adaptive-classifier",
       "workflow orchestration", "service orchestration",
       "agent registry", "universal launcher", "fallback services"
     ],

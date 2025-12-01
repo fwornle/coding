@@ -35,7 +35,7 @@ package "AI-Enhanced Processing" as Processing {
 
 package "Multi-Layer Storage" as Storage {
     frame "Persistent Storage" {
-        [shared-memory.json] as SharedJSON
+        [GraphDB + LevelDB] as SharedJSON
         [Documentation Files] as Docs
         [Git Repository] as GitRepo
     }

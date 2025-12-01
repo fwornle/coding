@@ -51,7 +51,7 @@ dev -> vscode : "@km vkb"
 vscode -> ext : Route visualization command
 ext -> http : Launch viewer request
 http -> vkb : Execute VKB command
-vkb -> memory : Read shared-memory.json
+vkb -> memory : Read from GraphDB
 vkb -> viz : Start HTTP server\n(localhost:8080)
 viz -> http : Viewer URL
 http -> ext : Launch confirmation
@@ -82,9 +82,9 @@ http -> ext : WebSocket notifications
 ext -> vscode : Status updates\nService notifications
 
 == Team Collaboration ==
-dev -> git : Push changes\n(includes shared-memory.json)
+dev -> git : Push changes\n(includes knowledge exports)
 git -> git : Share knowledge across team
-note right : All team members get\nupdated knowledge base\nVSCode extension provides\nconsistent access
+note right : All team members get\nupdated knowledge exports\nVSCode extension provides\nconsistent access
 
 == Command Palette Integration ==
 dev -> vscode : Command Palette\n"KM: Update Knowledge Base"

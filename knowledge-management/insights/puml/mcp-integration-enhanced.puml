@@ -58,7 +58,7 @@ package "Enhanced Knowledge System" as KnowledgeSystem {
         [Smart Routing] as SmartRoute
     }
     
-    [shared-memory.json] as SharedMem
+    [GraphDB + LevelDB] as SharedMem
 }
 
 package "Multi-Layer Storage" as Storage {

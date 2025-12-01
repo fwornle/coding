@@ -49,7 +49,7 @@ class SmartClaudeLogger {
     
     // Keywords that indicate coding/knowledge management work
     const codingKeywords = [
-      'ukb', 'vkb', 'shared-memory.json', 'knowledge-base', 'knowledge base',
+      'ukb', 'vkb', 'knowledge-export', 'knowledge-base', 'knowledge base',
       'mcp', 'claude-mcp', 'specstory', 'claude-logger', 'coding project',
       'coding repo', 'coding repository', 'agentic/coding', 'install.sh',
       'knowledge management', 'transferable pattern', 'shared knowledge',
@@ -65,7 +65,7 @@ class SmartClaudeLogger {
       'coding/',
       '.specstory',
       'knowledge-management',
-      'shared-memory.json'
+      '.data/knowledge-export'
     ];
     
     // Check for coding keywords

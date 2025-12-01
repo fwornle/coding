@@ -34,13 +34,13 @@ deactivate Config
 UKB -> Config: _resolveDefaultStoragePath()
 activate Config
 Config -> Config: projectName = path.basename(projectRoot) = "raas"
-Config -> Config: teamSpecificFile = CODING_KB_PATH + "shared-memory-raas.json"
-Config --> UKB: /Users/q284340/Agentic/coding/shared-memory-raas.json
+Config -> Config: teamSpecificFile = CODING_KB_PATH + ".data/knowledge-export/raas.json"
+Config --> UKB: /Users/q284340/Agentic/coding/.data/knowledge-export/raas.json
 deactivate Config
 
 UKB -> Storage: new FileStorageAdapter(config)
 activate Storage
-Storage -> Storage: Set filePath = shared-memory-raas.json
+Storage -> Storage: Set filePath = .data/knowledge-export/raas.json
 Storage --> UKB: Storage adapter created
 deactivate Storage
 
@@ -49,7 +49,7 @@ activate API
 API -> Storage: initialize()
 activate Storage
 
-Storage -> KBPATH: Check if shared-memory-raas.json exists
+Storage -> KBPATH: Check if raas.json exists
 activate KBPATH
 KBPATH --> Storage: File not found
 deactivate KBPATH
@@ -84,7 +84,7 @@ Creates file with:
 }
 end note
 
-Storage -> KBPATH: Write shared-memory-raas.json
+Storage -> KBPATH: Write raas.json to knowledge-export/
 activate KBPATH
 KBPATH --> Storage: File created successfully
 deactivate KBPATH
@@ -94,7 +94,7 @@ deactivate Storage
 API --> UKB: Knowledge base ready
 deactivate API
 
-UKB -> Terminal: "✅ Created new knowledge base: shared-memory-raas.json"
+UKB -> Terminal: "✅ Created new knowledge base: raas.json"
 UKB -> Terminal: Display empty entities list
 Terminal -> Developer: Show success message and empty list
 deactivate UKB
@@ -102,8 +102,8 @@ deactivate Terminal
 
 note over Developer, KBPATH #LightYellow
 Domain-specific knowledge base is now ready for RaaS patterns.
-Future ukb commands in raas-project will automatically
-use shared-memory-raas.json for team-specific knowledge.
+Future operations in raas-project will automatically
+use .data/knowledge-export/raas.json for team-specific knowledge.
 end note
 
 @enduml

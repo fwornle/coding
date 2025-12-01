@@ -18,7 +18,7 @@ end box
 box "Storage Layer" #FFF9E6
   database "Graphology\n(Memory)" as graph
   database "Level\n(Disk)" as disk
-  participant "shared-memory-*.json\n(Git-Tracked)" as json <<file>>
+  participant "knowledge-export/<team>.json\n(Git-Tracked)" as json <<file>>
 end box
 
 ' Entity creation flow
@@ -108,8 +108,8 @@ vkb --> dev : Entity list
 deactivate vkb
 
 ' Manual export (immediate trigger)
-dev -> ukb : ukb export shared-memory-coding.json --team coding
-activate ukb
+dev -> graphdb : export --team coding
+activate graphdb
 note left
   Manual export triggers
   immediate sync to JSON

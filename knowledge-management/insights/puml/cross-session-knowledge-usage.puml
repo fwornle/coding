@@ -26,7 +26,7 @@ package "Session 3" as S3 {
 }
 
 package "Knowledge Storage" as Storage {
-    [shared-memory.json] as SharedMem
+    [GraphDB + LevelDB] as SharedMem
     [MCP Memory Server] as MCPMem
     [Insights Documentation] as Docs
 }

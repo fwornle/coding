@@ -53,7 +53,7 @@ package "UkbCli System" {
 }
 
 package "External Systems" {
-  database "shared-memory.json" as memory
+  database "GraphDB + LevelDB" as memory
   cloud "MCP Memory Server" as mcp
   [Git Repository] as gitrepo
   [VKB Visualizer] as vkb

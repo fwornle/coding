@@ -6,7 +6,7 @@ This directory contains utility scripts for the Coding Knowledge Management Syst
 
 ### Core System Scripts
 
-- **`sync-shared-knowledge.sh`** - Prepares MCP memory sync operations
+- **`sync-knowledge-base.sh`** - Prepares MCP memory sync operations
   - Called automatically by `claude-mcp` at startup
   - Creates sync trigger files for automatic knowledge base loading
   - Usage: Called internally by claude-mcp
@@ -46,4 +46,4 @@ Scripts are organized here to keep the repository root clean while maintaining e
 
 ### Component-Specific Scripts
 - `browser-access/` - Browser automation scripts
-- `knowledge-management/` - Knowledge management tools (ukb, vkb)
+- `knowledge-management/` - Knowledge management tools

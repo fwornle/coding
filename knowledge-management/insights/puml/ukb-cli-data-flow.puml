@@ -44,7 +44,7 @@ package "UkbCli Processing" {
 }
 
 package "Storage & Integration" {
-  database "shared-memory.json" as memory
+  database "GraphDB + LevelDB" as memory
   cloud "MCP Memory Server" as mcp
   [Knowledge Visualizer] as visualizer
   [Legacy Systems] as legacy_sys

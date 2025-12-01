@@ -326,7 +326,7 @@ class PostSessionLogger {
       const codingKeywords = [
         'ukb command', 'vkb command', 'ukb --', 'vkb --', 'ukb.js', 'vkb.js',
         'semantic-analysis system', 'claude-mcp command',
-        'post-session-logger.js', 'shared-memory-coding.json', 'knowledge-management/',
+        'post-session-logger.js', 'knowledge-export/coding.json', 'knowledge-management/',
         'coding repo', '/agentic/coding', 'coding infrastructure'
       ];
       

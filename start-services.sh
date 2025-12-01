@@ -390,7 +390,7 @@ fi
 # Start VKB Server (with GraphDB knowledge)
 echo "🟢 Starting VKB Server (port 8080) with GraphDB..."
 cd "$CODING_DIR"
-# Use GraphDB as the primary data source (no shared-memory files needed)
+# Use GraphDB as the primary data source
 export VKB_DATA_SOURCE=online
 nohup node lib/vkb-server/cli.js server start --foreground > vkb-server.log 2>&1 &
 VKB_PID=$!

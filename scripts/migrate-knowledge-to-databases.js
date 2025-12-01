@@ -3,12 +3,12 @@
 /**
  * Knowledge Migration Script: JSON to Qdrant/SQLite
  *
- * Migrates existing shared-memory-*.json files to the new dual-database architecture
+ * Migrates existing .data/knowledge-export/*.json files to the new dual-database architecture
  * (Qdrant for vectors, SQLite for metadata). Preserves entity IDs and relationships
  * for VKB compatibility, with validation and rollback support.
  *
  * Features:
- * - Reads shared-memory-*.json files from project
+ * - Reads .data/knowledge-export/*.json files from project
  * - Generates embeddings for all knowledge items (384-dim + 1536-dim)
  * - Stores in Qdrant collections (knowledge_patterns, knowledge_patterns_small)
  * - Stores metadata in SQLite (knowledge_extractions table)
@@ -93,7 +93,7 @@ class KnowledgeMigration {
       // Find JSON files
       const jsonFiles = this.findMemoryJsonFiles();
       if (jsonFiles.length === 0) {
-        console.log('⚠️  No shared-memory-*.json files found in project.');
+        console.log('⚠️  No knowledge export JSON files found in project.');
         return;
       }
 
@@ -183,25 +183,22 @@ class KnowledgeMigration {
   }
 
   /**
-   * Find all shared-memory-*.json files in project
+   * Find all knowledge export JSON files in project
    */
   findMemoryJsonFiles() {
-    const possiblePaths = [
-      path.join(this.options.projectPath, 'shared-memory.json'),
-      path.join(this.options.projectPath, 'shared-memory-nodes.json'),
-      path.join(this.options.projectPath, '.specstory', 'shared-memory.json'),
-      path.join(this.options.projectPath, '.memory', 'shared-memory.json')
-    ];
+    const knowledgeExportDir = path.join(this.options.projectPath, '.data', 'knowledge-export');
+    const foundFiles = [];
 
-    const foundFiles = possiblePaths.filter(p => fs.existsSync(p));
+    // Check knowledge export directory
+    if (fs.existsSync(knowledgeExportDir)) {
+      const exportFiles = fs.readdirSync(knowledgeExportDir);
+      const jsonFiles = exportFiles
+        .filter(f => f.endsWith('.json'))
+        .map(f => path.join(knowledgeExportDir, f));
+      foundFiles.push(...jsonFiles);
+    }
 
-    // Also glob for any shared-memory-*.json files
-    const projectFiles = fs.readdirSync(this.options.projectPath);
-    const additionalFiles = projectFiles
-      .filter(f => f.startsWith('shared-memory') && f.endsWith('.json'))
-      .map(f => path.join(this.options.projectPath, f));
-
-    return [...new Set([...foundFiles, ...additionalFiles])];
+    return foundFiles;
   }
 
   /**

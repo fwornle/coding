@@ -23,7 +23,7 @@ end box
 
 box "Persistence Layer" #FFE6E6
     participant "Local Storage\n(.coding-tools/memory.json)" as Local
-    participant "Shared Storage\n(shared-memory.json)" as Shared
+    participant "Knowledge Export\n(.data/knowledge-export/)" as Shared
     participant "Timer (30s)" as Timer
 end box
 
@@ -40,7 +40,7 @@ Service -> Graph: addNode(entity)
 Graph -> Nodes: Node management
 Service -> Local: Save to local JSON
 Service -> Sync: Trigger immediate sync
-Sync -> Shared: Export to shared-memory.json
+Sync -> Shared: Export to knowledge-export/<team>.json
 
 == Search Operations ==
 HTTP -> Service: searchNodes(query)
@@ -53,11 +53,11 @@ Service -> HTTP: Formatted results
 Timer -> Sync: Every 30 seconds
 Sync -> Graph: Export all nodes/edges
 Graph -> Sync: Graph data
-Sync -> Shared: Update shared-memory.json
+Sync -> Shared: Update knowledge-export/<team>.json
 
 == Cross-Agent Compatibility ==
 note over Shared
-    **shared-memory.json Format:**
+    **knowledge-export/<team>.json Format:**
     {
       "entities": [...],
       "relations": [...],

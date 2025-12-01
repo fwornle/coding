@@ -43,7 +43,7 @@ package "Storage Layer" as storage #F5F5F5 {
 ' File Outputs
 folder ".specstory/history/" as lsl_logs #F0F0F0
 folder ".spec-workflow/" as spec_files #F0F0F0
-file "shared-memory-*.json\n(manual export)" as json #F0F0F0
+file ".data/knowledge-export/\n<team>.json" as json #F0F0F0
 
 ' User interactions
 dev -down-> ai : uses

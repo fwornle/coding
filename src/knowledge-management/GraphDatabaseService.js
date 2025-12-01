@@ -55,7 +55,7 @@ export class GraphDatabaseService extends EventEmitter {
     this.persistTimer = null;
     this.isDirty = false;
 
-    // JSON export settings (for keeping shared-memory JSONs in sync)
+    // JSON export settings (for keeping knowledge-export JSONs in sync)
     this.autoExportJSON = this.config.autoExportJSON !== false;
     this.jsonExportDir = this.config.jsonExportDir || path.join(path.dirname(this.dbPath), 'knowledge-export');
   }
@@ -1272,7 +1272,7 @@ export class GraphDatabaseService extends EventEmitter {
     this.graph.forEachNode((nodeId, attributes) => {
       if (attributes.team !== team) return;
 
-      // Export entity in shared-memory format (strip internal node ID)
+      // Export entity in knowledge-export JSON format (strip internal node ID)
       entities.push({
         name: attributes.name,
         entityType: attributes.entityType || 'Unknown',
@@ -1302,7 +1302,7 @@ export class GraphDatabaseService extends EventEmitter {
       const sourceAttrs = this.graph.getNodeAttributes(source);
       const targetAttrs = this.graph.getNodeAttributes(target);
 
-      // Export relation in shared-memory format
+      // Export relation in knowledge-export JSON format
       relations.push({
         from: sourceAttrs.name,
         to: targetAttrs.name,
@@ -1312,7 +1312,7 @@ export class GraphDatabaseService extends EventEmitter {
       });
     });
 
-    // Create export data matching shared-memory schema
+    // Create export data in knowledge-export schema format
     const exportData = {
       displayName: team.charAt(0).toUpperCase() + team.slice(1),
       description: `Knowledge graph export for team: ${team}`,

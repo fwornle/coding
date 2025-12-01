@@ -7,7 +7,7 @@
  * Architecture:
  * - Reads from GraphDatabaseService (in-memory graph + LevelDB)
  * - Writes to .data/knowledge-export/<team>.json
- * - Format: Pretty JSON matching shared-memory-*.json structure
+ * - Format: Pretty JSON matching knowledge-export structure
  * - Auto-export on entity/relationship changes (debounced)
  *
  * Design patterns:
@@ -148,7 +148,7 @@ export class GraphKnowledgeExporter {
       // Extract entities and relationships for this team
       const { entities, relations } = await this._extractTeamData(team);
 
-      // Build export structure (matching shared-memory-*.json format)
+      // Build export structure (matching knowledge-export format)
       const exportData = {
         entities,
         relations,
@@ -360,7 +360,7 @@ export class GraphKnowledgeExporter {
    * @private
    */
   _generateEntityId(name) {
-    // Simple deterministic ID generation (matches old shared-memory format)
+    // Simple deterministic ID generation (matches knowledge-export format)
     const hash = name.split('').reduce((acc, char) => {
       return ((acc << 5) - acc) + char.charCodeAt(0);
     }, 0);

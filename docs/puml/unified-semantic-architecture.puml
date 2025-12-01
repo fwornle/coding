@@ -40,7 +40,7 @@ package "Infrastructure Agents" #E8F4FD {
 
 package "Storage - 3 Sync Targets" {
   database "Graphology DB\nIn-memory graph" <<storage>> as graphdb
-  database "shared-memory-coding.json\nGit-tracked files" <<storage>> as files
+  database "knowledge-export/<team>.json\nGit-tracked files" <<storage>> as files
   database "MCP Memory\n(Placeholder)" <<storage>> as mcpmem
 }
 
@@ -101,7 +101,7 @@ note right of sync
 
   Active targets:
   • Graphology DB (in-memory)
-  • shared-memory.json (git)
+  • knowledge-export/ (git)
 
   Placeholder:
   • MCP Memory (incomplete)

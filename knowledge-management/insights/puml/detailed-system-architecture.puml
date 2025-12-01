@@ -33,7 +33,7 @@ package "Knowledge Management Tools" as Tools {
 }
 
 package "Data Storage" as Storage {
-    [shared-memory.json] as SharedMem
+    [GraphDB + LevelDB] as SharedMem
     [.specstory/history/] as SpecStory
     [insights/] as Insights
     [Git Repository] as Git

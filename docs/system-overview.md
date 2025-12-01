@@ -215,7 +215,7 @@ The coding project uses a **three-tier storage architecture** optimized for diff
    - Budget tracking, session metrics, embedding cache
    - **NOT for knowledge storage** (moved to Graph DB as of 2025-10-22)
 
-**Optional**: Manual export to `shared-memory-*.json` for git-tracked team collaboration.
+**Optional**: Manual export to `.data/knowledge-export/*.json` for git-tracked team collaboration.
 
 **Learn more:** [Storage Architecture](architecture/memory-systems.md) | [Knowledge Management](knowledge-management/README.md)
 

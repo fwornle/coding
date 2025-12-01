@@ -31,7 +31,7 @@ Use `vkb` to visualize available patterns or check the knowledge base directly.
 - Always start Claude Code with `claude-mcp` (not `claude code`)
 - Run `ukb` to capture valuable insights for the shared knowledge base
 - Check `.specstory/history/` for previous conversation context
-- Reference patterns from shared-memory.json when applicable
+- Reference patterns from the knowledge base when applicable
 
 ## 🔗 Related Patterns
 

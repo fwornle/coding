@@ -23,7 +23,7 @@ package "MCP Servers" as Servers {
 package "Knowledge System" as KnowledgeSystem {
     [UKB Command] as UKB
     [VKB Server] as VKB
-    [shared-memory.json] as SharedMem
+    [GraphDB + LevelDB] as SharedMem
 }
 
 package "Data Storage" as Storage {
