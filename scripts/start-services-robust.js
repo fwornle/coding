@@ -139,7 +139,7 @@ const SERVICE_CONFIGS = {
         // Ignore errors
       }
 
-      // Use GraphDB as the primary data source (no shared-memory files needed)
+      // Use GraphDB as the primary data source (no knowledge-export files needed)
       const env = { ...process.env, VKB_DATA_SOURCE: 'online' };
 
       // Create log file path

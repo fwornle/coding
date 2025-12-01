@@ -8,7 +8,7 @@ participant "Claude Code" as claude
 participant "MCP Server" as mcp
 participant "Semantic Analysis\nAgent" as sa
 participant "Knowledge Graph\nAgent" as kg
-participant "shared-memory.json" as storage
+participant "GraphDB Storage" as storage
 participant "VKB Visualizer" as vkb
 
 == Session Start ==

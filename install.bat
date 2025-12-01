@@ -649,26 +649,8 @@ mkdir "%CODING_REPO%\.data\knowledge-graph" 2>nul
 REM Create .logs directory for system monitoring
 mkdir "%CODING_REPO%\.logs" 2>nul
 
-REM Initialize shared memory if needed
-if not exist "%CODING_REPO%\shared-memory.json" (
-    echo Creating initial shared-memory.json...
-    (
-        echo {
-        echo   "entities": [],
-        echo   "relations": [],
-        echo   "metadata": {
-        echo     "version": "1.0.0",
-        echo     "created": "%date% %time%",
-        echo     "contributors": [],
-        echo     "total_entities": 0,
-        echo     "total_relations": 0
-        echo   }
-        echo }
-    ) > "%CODING_REPO%\shared-memory.json"
-    echo %GREEN%[OK]%NC% shared-memory.json created
-) else (
-    echo shared-memory.json already exists
-)
+REM Initialize knowledge export directory if needed
+mkdir "%CODING_REPO%\.data\knowledge-export" 2>nul
 
 echo %GREEN%[OK]%NC% Knowledge databases initialized
 echo.

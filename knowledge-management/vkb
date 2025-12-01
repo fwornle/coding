@@ -46,10 +46,10 @@ case "${1:-start}" in
             shift || true
         fi
         # Handle data source flags
-        # DEFAULT: Use GraphDB (online mode) - shared-memory files are deprecated
+        # DEFAULT: Use GraphDB (online mode)
         DATA_SOURCE_MODE="online"
         if [[ "${1:-}" == "--with-batch" ]]; then
-            # Legacy batch mode (requires shared-memory-*.json files)
+            # Legacy batch mode (requires knowledge-export/*.json files)
             DATA_SOURCE_MODE="combined"
             shift || true
         elif [[ "${1:-}" == "--batch-only" ]]; then
@@ -130,18 +130,18 @@ Commands:
 
 Options:
   --with-cache-clear  Clear cache before starting (not implemented)
-  --with-batch        Include batch knowledge from shared-memory files (combined view)
+  --with-batch        Include batch knowledge from knowledge-export files (combined view)
   --batch-only        Show only batch knowledge (legacy mode)
 
 Data Sources:
-  • Online (default): GraphDB knowledge (auto-learned + manual via UKB)
-  • Batch (legacy):   Manual knowledge from shared-memory.json files
+  • Online (default): GraphDB knowledge (auto-learned + manual)
+  • Batch (legacy):   Manual knowledge from .data/knowledge-export/*.json files
   • Combined:         Both online and batch knowledge
 
 Examples:
   vkb                      Start with GraphDB knowledge (default)
   vkb --with-batch         Start with both GraphDB and legacy batch files
-  vkb --batch-only         Start with batch files only (requires shared-memory-*.json)
+  vkb --batch-only         Start with batch files only (requires knowledge-export/*.json)
   vkb fg                   Start in foreground mode for debugging
   vkb restart              Restart the server
   vkb logs -n 50           Show last 50 log lines

@@ -2,7 +2,7 @@
 !theme plain
 
 package "Knowledge Layer" {
-  [shared-memory.json] as KB
+  [GraphDB + LevelDB] as KB
   [MCP Memory Server] as MCP
   [VKB Visualization] as VKB
 }

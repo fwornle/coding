@@ -130,7 +130,7 @@ note bottom of GraphDB
   • LevelDB (persistent storage)
   • Ontology-based classification
   • Auto-export every 30 seconds
-  • No MQTT/shared-memory messaging
+  • No MQTT messaging needed
 end note
 
 @enduml

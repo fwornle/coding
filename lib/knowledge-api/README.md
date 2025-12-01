@@ -161,7 +161,7 @@ The API uses a layered configuration system:
 {
   "storage": {
     "backend": "file",
-    "path": "./shared-memory.json"
+    "path": "./.data/knowledge-export/coding.json"
   },
   "integrations": {
     "mcp": {
@@ -209,7 +209,7 @@ node --test --reporter=spec test/
 
 The new system maintains backwards compatibility with existing data:
 
-1. **Data Format**: Existing `shared-memory.json` files work without changes
+1. **Data Format**: Existing `.data/knowledge-export/*.json` files work without changes
 2. **Legacy Commands**: The `ukb-refactored` script provides compatibility layer
 3. **Migration**: Automatic schema migration for enhanced features
 

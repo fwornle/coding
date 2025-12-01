@@ -39,7 +39,7 @@ package "MCP Server" as SERVER {
 package "Storage" as STORAGE_PKG {
   database "GraphDB\n(Graphology+\nLevelDB)" as GRAPHDB <<storage>> #D4EDDA
   component "Graph\nExporter" as EXPORTER <<infra>>
-  file "shared-memory-\n<project>.json" as JSON <<storage>>
+  file "knowledge-export/\n<team>.json" as JSON <<storage>>
 }
 
 cloud "LLMs\n(Groq→Gemini→\nAnthropic→OpenAI)" as LLMS <<external>> #FFE6E6

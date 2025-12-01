@@ -69,8 +69,8 @@ integrations/vscode-km-copilot/*.vsix
 # Process ID files
 *.pid
 
-# Shared memory (if you want to keep it local)
-shared-memory*.json
+# Legacy shared memory files (deprecated - now using .data/knowledge-export/)
+# shared-memory*.json
 
 # CoPilot fallback service runtime data
 .coding-tools/

@@ -27,7 +27,7 @@ ext -> ext : Parse pattern data
 ext -> client : updateKnowledge(pattern)
 client -> http : POST /api/knowledge/update
 http -> svc : Process update
-svc -> kb : Write to shared-memory.json
+svc -> kb : Write to GraphDB
 kb -> http : Update confirmation
 http -> client : Response data
 client -> ext : Pattern entity

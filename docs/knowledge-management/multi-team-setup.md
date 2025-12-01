@@ -17,14 +17,14 @@ The coding tools system supports multi-team environments with isolated knowledge
 When using teams, the system creates separate knowledge files:
 
 ```
-shared-memory-coding.json    # Cross-team patterns (always loaded)
-shared-memory-ui.json        # UI/Frontend team knowledge
-shared-memory-resi.json      # Resilience team knowledge  
-shared-memory-raas.json      # RaaS team knowledge
-shared-memory-custom.json    # Custom team knowledge
+.data/knowledge-export/coding.json    # Cross-team patterns (always loaded)
+.data/knowledge-export/ui.json        # UI/Frontend team knowledge
+.data/knowledge-export/resi.json      # Resilience team knowledge
+.data/knowledge-export/raas.json      # RaaS team knowledge
+.data/knowledge-export/custom.json    # Custom team knowledge
 ```
 
-**Important**: The `shared-memory-coding.json` file is **always loaded** regardless of team setting. This contains patterns that apply across all teams.
+**Important**: The `.data/knowledge-export/coding.json` file is **always loaded** regardless of team setting. This contains patterns that apply across all teams.
 
 ## Installation with Team Setup
 
@@ -90,7 +90,7 @@ CODING_TEAM=ui vkb
 
 ### Cross-Team Patterns
 
-Some patterns are automatically classified as cross-team and go to `shared-memory-coding.json`:
+Some patterns are automatically classified as cross-team and go to `.data/knowledge-export/coding.json`:
 
 - ConditionalLoggingPattern
 - KnowledgePersistencePattern  

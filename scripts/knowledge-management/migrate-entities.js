@@ -8,8 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const KNOWLEDGE_BASE_PATH = process.env.CODING_KNOWLEDGE_BASE || 
-  path.join(process.env.HOME, 'Agentic/coding/shared-memory.json');
+const KNOWLEDGE_BASE_PATH = process.env.CODING_KNOWLEDGE_BASE ||
+  path.join(process.env.HOME, 'Agentic/coding/.data/knowledge-export/coding.json');
 
 function parseObservation(obs, entityType, metadata) {
   const observation = {

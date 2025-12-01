@@ -14,7 +14,7 @@ package "VKB CLI System" {
 }
 
 package "External Dependencies" {
-  [shared-memory.json] as JSON
+  [GraphDB + LevelDB] as JSON
   [Node.js HTTP] as HTTP
   [Express Server] as Express
 }

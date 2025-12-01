@@ -103,7 +103,7 @@ async function main() {
       console.log(`   Relations: ${relations.length}`);
 
       // Write to JSON file
-      const outputPath = path.join(projectRoot, `shared-memory-${team}.json`);
+      const outputPath = path.join(projectRoot, '.data', 'knowledge-export', `${team}.json`);
       const data = {
         team,
         entities,

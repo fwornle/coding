@@ -108,6 +108,6 @@ note top of main : Extension entry point\nManages lifecycle and registration
 note top of participant : Handles Copilot chat integration\nParses and routes commands
 note top of client : Communicates with fallback services\nManages HTTP and WebSocket connections
 note bottom of httpserver : Provides REST API\nManages knowledge operations
-note bottom of kb : Persistent knowledge storage\nshared-memory.json
+note bottom of kb : Persistent knowledge storage\nGraphDB + LevelDB
 
 @enduml

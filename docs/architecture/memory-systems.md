@@ -43,7 +43,7 @@ The knowledge management system uses two complementary storage layers:
 
 ![Graphology Memory Fallback Architecture](../images/graphology-memory-architecture.png)
 
-The diagram above shows the Graphology-based memory fallback architecture used when MCP Memory is unavailable. It provides in-memory graph operations with periodic synchronization to shared-memory.json for cross-agent compatibility.
+The diagram above shows the Graphology-based memory fallback architecture used when MCP Memory is unavailable. It provides in-memory graph operations with periodic synchronization to .data/knowledge-export/*.json for cross-agent compatibility.
 
 **Characteristics**:
 - Pure JavaScript implementation

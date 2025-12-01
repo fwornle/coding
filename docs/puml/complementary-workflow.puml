@@ -36,7 +36,7 @@ rectangle "MCP Semantic Analysis\n(On-Demand)" as analysis #FFF9E6 {
 
 rectangle "UKB Knowledge Storage" as ukb #FFE8F4 {
   database "Graph Database\n(Graphology + Level)" as graph
-  file "shared-memory.json\n(Git-tracked)" as json
+  file "knowledge-export/\n<team>.json" as json
 
   note bottom
     Persistent

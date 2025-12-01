@@ -338,11 +338,10 @@ ls ~/.claude/logs/mcp*.log
 ### Knowledge Base Issues
 
 ```bash
-# Check shared-memory files exist
-ls -la shared-memory*.json
+# Check knowledge-export files exist
+ls -la .data/knowledge-export/*.json
 
-# If missing, initialize
-ukb --init
+# If missing, the graph database will create them automatically
 
 # Test with simple entry
 ukb "test"
@@ -396,7 +395,7 @@ If installation is corrupted:
 # Remove all data (WARNING: loses knowledge base)
 rm -rf ~/.coding-tools/
 rm -rf integrations/memory-visualizer/node_modules integrations/memory-visualizer/dist
-rm shared-memory*.json
+rm -rf .data/knowledge-export/*.json
 
 # Reinstall from scratch
 ./install.sh
@@ -448,7 +447,7 @@ ukb                    # Auto-analyze git history (in project dir)
 
 ```
 .env                          # API keys and configuration
-shared-memory*.json           # Knowledge base data
+.data/knowledge-export/*.json # Knowledge base data
 ~/.claude/settings.json       # Hook configuration
 claude_desktop_config.json    # MCP configuration
 ```

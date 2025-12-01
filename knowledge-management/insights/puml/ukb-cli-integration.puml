@@ -9,7 +9,7 @@ actor "Developer" as dev
 participant "UKB Script" as ukb
 participant "UkbCli Process" as cli
 participant "Knowledge Manager" as km
-participant "shared-memory.json" as memory
+participant "GraphDB + LevelDB" as memory
 participant "MCP Memory" as mcp
 participant "VKB Visualizer" as vkb
 

@@ -3,7 +3,7 @@
  * Migration Script: Import Batch Knowledge to SQLite Database
  *
  * This script migrates existing batch knowledge from JSON files
- * (shared-memory-*.json) to the SQLite database, adding a 'source'
+ * (.data/knowledge-export/*.json) to the SQLite database, adding a 'source'
  * column to distinguish manual vs auto-learned knowledge.
  *
  * Steps:
@@ -57,10 +57,10 @@ class KnowledgeMigration {
       // Create backup directory
       await fs.mkdir(backupDir, { recursive: true });
 
-      // Find all shared-memory files
-      const sharedMemoryFiles = await this.findSharedMemoryFiles();
+      // Find all knowledge export files
+      const knowledgeExportFiles = await this.findKnowledgeExportFiles();
 
-      for (const filePath of sharedMemoryFiles) {
+      for (const filePath of knowledgeExportFiles) {
         const fileName = path.basename(filePath);
         const backupPath = path.join(backupDir, `${fileName}.backup-${Date.now()}`);
 
@@ -68,7 +68,7 @@ class KnowledgeMigration {
         console.log(`  ✓ Backed up: ${fileName}`);
       }
 
-      console.log(`✓ Backed up ${sharedMemoryFiles.length} files to ${backupDir}`);
+      console.log(`✓ Backed up ${knowledgeExportFiles.length} files to ${backupDir}`);
 
     } catch (error) {
       console.error('❌ Failed to backup JSON files:', error.message);
@@ -82,19 +82,19 @@ class KnowledgeMigration {
   async importBatchKnowledge() {
     console.log('\n📥 Step 2: Importing batch knowledge from JSON files...');
 
-    // Find all shared-memory-*.json files
-    const sharedMemoryFiles = await this.findSharedMemoryFiles();
+    // Find all .data/knowledge-export/*.json files
+    const knowledgeExportFiles = await this.findKnowledgeExportFiles();
 
-    if (sharedMemoryFiles.length === 0) {
-      console.log('⚠️  No shared-memory-*.json files found');
+    if (knowledgeExportFiles.length === 0) {
+      console.log('⚠️  No knowledge export JSON files found');
       return;
     }
 
-    console.log(`Found ${sharedMemoryFiles.length} shared memory files:`);
-    sharedMemoryFiles.forEach(file => console.log(`  - ${path.basename(file)}`));
+    console.log(`Found ${knowledgeExportFiles.length} knowledge export files:`);
+    knowledgeExportFiles.forEach(file => console.log(`  - ${path.basename(file)}`));
 
     // Process each file
-    for (const filePath of sharedMemoryFiles) {
+    for (const filePath of knowledgeExportFiles) {
       await this.importFile(filePath);
     }
 
@@ -109,15 +109,22 @@ class KnowledgeMigration {
   }
 
   /**
-   * Find all shared-memory-*.json files in project root
+   * Find all knowledge export JSON files in .data/knowledge-export/
    */
-  async findSharedMemoryFiles() {
-    const files = await fs.readdir(PROJECT_ROOT);
-    const sharedMemoryFiles = files
-      .filter(f => f.startsWith('shared-memory-') && f.endsWith('.json'))
-      .map(f => path.join(PROJECT_ROOT, f));
+  async findKnowledgeExportFiles() {
+    const knowledgeExportDir = path.join(PROJECT_ROOT, '.data', 'knowledge-export');
 
-    return sharedMemoryFiles;
+    try {
+      const files = await fs.readdir(knowledgeExportDir);
+      const knowledgeExportFiles = files
+        .filter(f => f.endsWith('.json'))
+        .map(f => path.join(knowledgeExportDir, f));
+
+      return knowledgeExportFiles;
+    } catch (error) {
+      // Directory doesn't exist
+      return [];
+    }
   }
 
   /**
@@ -128,8 +135,8 @@ class KnowledgeMigration {
     console.log(`\n  Processing ${fileName}...`);
 
     try {
-      // Extract team name from filename (e.g., shared-memory-coding.json -> coding)
-      const teamMatch = fileName.match(/^shared-memory-(.+)\.json$/);
+      // Extract team name from filename (e.g., coding.json -> coding)
+      const teamMatch = fileName.match(/^(.+)\.json$/);
       const team = teamMatch ? teamMatch[1] : 'unknown';
 
       // Read and parse JSON file (standard format with entities/relations arrays)

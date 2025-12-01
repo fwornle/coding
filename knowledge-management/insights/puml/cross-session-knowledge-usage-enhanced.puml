@@ -30,7 +30,7 @@ package "Session 3: Workflow Orchestration" as S3 {
 }
 
 package "Enhanced Knowledge Storage" as Storage {
-    [shared-memory.json] as SharedMem
+    [GraphDB + LevelDB] as SharedMem
     [MCP Memory Server] as MCPMem
     [AI Agent State] as AgentState
     [Pattern Library] as Patterns

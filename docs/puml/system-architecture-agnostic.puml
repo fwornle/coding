@@ -20,12 +20,12 @@ package "Knowledge Capture Layer" {
 }
 
 package "Data Storage Layer" {
-  database [shared-memory.json] as storage
+  database [GraphDB + LevelDB] as storage
   note right of storage
-    • Git-tracked knowledge base
-    • Cross-project sharing
+    • Graphology in-memory graph
+    • LevelDB persistence
     • Team collaboration
-    • Version controlled
+    • Git-tracked exports
   end note
 }
 

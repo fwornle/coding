@@ -1,6 +1,6 @@
 #!/bin/bash
 # Knowledge Base Repair Tool
-# Fixes duplicate relations and other corruption in shared-memory.json
+# Fixes duplicate relations and other corruption in knowledge export files
 
 set -euo pipefail
 
@@ -19,76 +19,76 @@ echo -e "${BLUE}🔧 Knowledge Base Repair Tool${NC}"
 echo -e "${BLUE}==============================${NC}"
 echo
 
-# Check if shared-memory.json exists
-SHARED_MEMORY="$CODING_ROOT/shared-memory.json"
-if [[ ! -f "$SHARED_MEMORY" ]]; then
-    echo -e "${RED}❌ shared-memory.json not found at: $SHARED_MEMORY${NC}"
+# Knowledge export file (new format)
+KB_FILE="$CODING_ROOT/.data/knowledge-export/coding.json"
+if [[ ! -f "$KB_FILE" ]]; then
+    echo -e "${RED}❌ Knowledge base file not found at: $KB_FILE${NC}"
     exit 1
 fi
 
 # Show current stats
 echo -e "${BLUE}📊 Current Database Stats:${NC}"
-ENTITIES=$(jq '.entities | length' "$SHARED_MEMORY" 2>/dev/null || echo "0")
-RELATIONS=$(jq '.relations | length' "$SHARED_MEMORY" 2>/dev/null || echo "0")
-FILE_SIZE=$(du -h "$SHARED_MEMORY" | cut -f1)
+ENTITIES=$(jq '.entities | length' "$KB_FILE" 2>/dev/null || echo "0")
+RELATIONS=$(jq '.relations | length' "$KB_FILE" 2>/dev/null || echo "0")
+FILE_SIZE=$(du -h "$KB_FILE" | cut -f1)
 
 echo -e "  Entities: $ENTITIES"
-echo -e "  Relations: $RELATIONS"  
+echo -e "  Relations: $RELATIONS"
 echo -e "  File size: $FILE_SIZE"
 echo
 
 # Check for duplicates
 echo -e "${BLUE}🔍 Checking for corruption...${NC}"
-DUPLICATE_RELATIONS=$(jq '.relations | group_by(.from + "-" + .relationType + "-" + .to) | map(select(length > 1)) | map(length) | add // 0' "$SHARED_MEMORY" 2>/dev/null || echo "0")
+DUPLICATE_RELATIONS=$(jq '.relations | group_by(.from + "-" + .relationType + "-" + .to) | map(select(length > 1)) | map(length) | add // 0' "$KB_FILE" 2>/dev/null || echo "0")
 
 if [[ "$DUPLICATE_RELATIONS" -gt 0 ]]; then
     echo -e "${RED}⚠️  Found $DUPLICATE_RELATIONS duplicate relations!${NC}"
     echo
-    
+
     # Ask for confirmation
     echo -e "${YELLOW}Do you want to clean up the database? [y/N]${NC}"
     read -r response
-    
+
     if [[ "$response" =~ ^[Yy]$ ]]; then
         echo
         echo -e "${BLUE}🧹 Cleaning up database...${NC}"
-        
+
         # Create backup
-        BACKUP_FILE="$SHARED_MEMORY.backup.$(date +%Y%m%d_%H%M%S)"
-        cp "$SHARED_MEMORY" "$BACKUP_FILE"
+        BACKUP_FILE="$KB_FILE.backup.$(date +%Y%m%d_%H%M%S)"
+        cp "$KB_FILE" "$BACKUP_FILE"
         echo -e "${GREEN}✓ Backup created: $BACKUP_FILE${NC}"
-        
+
         # Run cleanup
-        if node "$CODING_ROOT/scripts/cleanup-shared-memory.js"; then
+        if node "$CODING_ROOT/scripts/cleanup-knowledge-export.js"; then
             echo
             echo -e "${GREEN}✅ Database cleaned successfully!${NC}"
-            
+
             # Show new stats
-            NEW_ENTITIES=$(jq '.entities | length' "$SHARED_MEMORY" 2>/dev/null || echo "0")
-            NEW_RELATIONS=$(jq '.relations | length' "$SHARED_MEMORY" 2>/dev/null || echo "0")
-            NEW_FILE_SIZE=$(du -h "$SHARED_MEMORY" | cut -f1)
-            
+            NEW_ENTITIES=$(jq '.entities | length' "$KB_FILE" 2>/dev/null || echo "0")
+            NEW_RELATIONS=$(jq '.relations | length' "$KB_FILE" 2>/dev/null || echo "0")
+            NEW_FILE_SIZE=$(du -h "$KB_FILE" | cut -f1)
+
             echo -e "${GREEN}📊 New Database Stats:${NC}"
             echo -e "  Entities: $NEW_ENTITIES (was $ENTITIES)"
             echo -e "  Relations: $NEW_RELATIONS (was $RELATIONS)"
             echo -e "  File size: $NEW_FILE_SIZE (was $FILE_SIZE)"
             echo
-            
+
             REMOVED_RELATIONS=$((RELATIONS - NEW_RELATIONS))
             if [[ "$REMOVED_RELATIONS" -gt 0 ]]; then
                 echo -e "${GREEN}🗑️  Removed $REMOVED_RELATIONS duplicate relations${NC}"
             fi
-            
+
             echo
             echo -e "${BLUE}💡 Next steps:${NC}"
             echo -e "  • Restart any running services (coding --copilot)"
             echo -e "  • Test with: vkb start"
             echo -e "  • Monitor logs for reduced sync frequency"
-            
+
         else
             echo -e "${RED}❌ Cleanup failed!${NC}"
             echo -e "${YELLOW}Restoring backup...${NC}"
-            mv "$BACKUP_FILE" "$SHARED_MEMORY"
+            mv "$BACKUP_FILE" "$KB_FILE"
             exit 1
         fi
     else

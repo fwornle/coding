@@ -20,31 +20,34 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODING_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$CODING_ROOT"
 
-# Check if shared-memory.json exists
-if [[ ! -f "shared-memory.json" ]]; then
-    echo -e "${RED}❌ shared-memory.json not found${NC}"
+# Knowledge export file (new format)
+KB_FILE=".data/knowledge-export/coding.json"
+
+# Check if knowledge export file exists
+if [[ ! -f "$KB_FILE" ]]; then
+    echo -e "${RED}❌ Knowledge base file not found: $KB_FILE${NC}"
     exit 1
 fi
 
 # Show current stats
 echo -e "${BLUE}📊 Before Cleanup:${NC}"
-ENTITIES=$(jq '.entities | length' shared-memory.json 2>/dev/null || echo "0")
-RELATIONS=$(jq '.relations | length' shared-memory.json 2>/dev/null || echo "0")
-FILE_SIZE=$(du -h shared-memory.json | cut -f1)
+ENTITIES=$(jq '.entities | length' "$KB_FILE" 2>/dev/null || echo "0")
+RELATIONS=$(jq '.relations | length' "$KB_FILE" 2>/dev/null || echo "0")
+FILE_SIZE=$(du -h "$KB_FILE" | cut -f1)
 
 echo -e "  Entities: $ENTITIES"
 echo -e "  Relations: $RELATIONS"
 echo -e "  File size: $FILE_SIZE"
 
 # Check for garbage patterns
-GARBAGE_COUNT=$(jq '[.entities[] | select(.name | test("^(GitPattern_|ConversationPattern_|SuccessPattern_.*post-logged)"))] | length' shared-memory.json 2>/dev/null || echo "0")
+GARBAGE_COUNT=$(jq '[.entities[] | select(.name | test("^(GitPattern_|ConversationPattern_|SuccessPattern_.*post-logged)"))] | length' "$KB_FILE" 2>/dev/null || echo "0")
 
 if [[ "$GARBAGE_COUNT" -gt 0 ]]; then
     echo -e "${YELLOW}⚠️  Found $GARBAGE_COUNT garbage patterns${NC}"
 fi
 
 # Check for duplicate observations
-ENTITIES_WITH_DUPS=$(jq '[.entities[] | select(.observations and (.observations | length) > (.observations | unique | length))] | length' shared-memory.json 2>/dev/null || echo "0")
+ENTITIES_WITH_DUPS=$(jq '[.entities[] | select(.observations and (.observations | length) > (.observations | unique | length))] | length' "$KB_FILE" 2>/dev/null || echo "0")
 
 if [[ "$ENTITIES_WITH_DUPS" -gt 0 ]]; then
     echo -e "${YELLOW}⚠️  Found $ENTITIES_WITH_DUPS entities with duplicate observations${NC}"
@@ -55,31 +58,31 @@ echo
 # Run cleanup if needed
 if [[ "$GARBAGE_COUNT" -gt 0 ]] || [[ "$ENTITIES_WITH_DUPS" -gt 0 ]]; then
     echo -e "${BLUE}🧹 Running cleanup...${NC}"
-    
+
     # Run garbage pattern removal
     node "$CODING_ROOT/scripts/remove-garbage-patterns.js"
-    
+
     # Run duplicate relation cleanup
-    node "$CODING_ROOT/scripts/cleanup-shared-memory.js"
-    
+    node "$CODING_ROOT/scripts/cleanup-knowledge-export.js"
+
     echo
     echo -e "${BLUE}📊 After Cleanup:${NC}"
-    NEW_ENTITIES=$(jq '.entities | length' shared-memory.json 2>/dev/null || echo "0")
-    NEW_RELATIONS=$(jq '.relations | length' shared-memory.json 2>/dev/null || echo "0")
-    NEW_FILE_SIZE=$(du -h shared-memory.json | cut -f1)
-    
+    NEW_ENTITIES=$(jq '.entities | length' "$KB_FILE" 2>/dev/null || echo "0")
+    NEW_RELATIONS=$(jq '.relations | length' "$KB_FILE" 2>/dev/null || echo "0")
+    NEW_FILE_SIZE=$(du -h "$KB_FILE" | cut -f1)
+
     echo -e "  Entities: $NEW_ENTITIES (was $ENTITIES)"
     echo -e "  Relations: $NEW_RELATIONS (was $RELATIONS)"
     echo -e "  File size: $NEW_FILE_SIZE (was $FILE_SIZE)"
     echo
-    
+
     REMOVED_ENTITIES=$((ENTITIES - NEW_ENTITIES))
     REMOVED_RELATIONS=$((RELATIONS - NEW_RELATIONS))
-    
+
     if [[ "$REMOVED_ENTITIES" -gt 0 ]] || [[ "$REMOVED_RELATIONS" -gt 0 ]]; then
         echo -e "${GREEN}🗑️  Removed: $REMOVED_ENTITIES garbage entities, $REMOVED_RELATIONS duplicate relations${NC}"
     fi
-    
+
     echo -e "${GREEN}✅ Knowledge base cleaned!${NC}"
 else
     echo -e "${GREEN}✅ Knowledge base is already clean!${NC}"
@@ -88,6 +91,6 @@ fi
 echo
 echo -e "${BLUE}💡 Quality Guidelines:${NC}"
 echo -e "  • Only add significant, transferable insights"
-echo -e "  • Use 'ukb --interactive' for manual curation"
+echo -e "  • Use MCP semantic-analysis workflow for curation"
 echo -e "  • Avoid auto-discovery of low-quality patterns"
 echo -e "  • Run 'clean-knowledge-base' periodically"

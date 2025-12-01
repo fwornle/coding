@@ -83,7 +83,7 @@ package "External Services" {
 package "Multi-Database Storage" {
   database "MCP Memory\n(Claude sessions)" <<storage>> as mcpmem
   database "Graphology\n(CoPilot integration)" <<storage>> as graphology
-  database "shared-memory.json\n(Git persistence)" <<storage>> as sharedmem
+  database "knowledge-export/\n(Git persistence)" <<storage>> as exports
 }
 
 package "Monitoring & Visualization" {

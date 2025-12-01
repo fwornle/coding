@@ -21,7 +21,7 @@ package "UKB Processing" as UKB {
 }
 
 package "Authoritative Storage" as AuthStorage {
-    [shared-memory.json] as SharedJSON
+    [GraphDB + LevelDB] as SharedJSON
     [Documentation Files] as Docs
     [Git Repository] as GitRepo
 }

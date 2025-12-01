@@ -27,8 +27,8 @@ package "Integration Layer" {
 }
 
 package "Data Storage Layer" {
-  [shared-memory.json] as storage
-  [.backups/] as backups
+  [GraphDB + LevelDB] as storage
+  [.data/knowledge-export/] as exports
 }
 
 package "Visualization Layer" {

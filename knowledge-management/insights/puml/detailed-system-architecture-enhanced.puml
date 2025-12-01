@@ -71,7 +71,7 @@ package "Knowledge Management Tools" as Tools {
 
 package "Multi-Layer Storage" as Storage {
     frame "Persistent Storage" {
-        [shared-memory.json] as SharedMem
+        [GraphDB + LevelDB] as SharedMem
         [.specstory/history/] as SpecStory
         [insights/] as Insights
     }

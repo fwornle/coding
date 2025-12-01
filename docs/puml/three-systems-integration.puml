@@ -40,7 +40,7 @@ package "3. UKB/VKB\n(Manual + Git-Tracked)" as ukb #FFF9E6 {
   [VKB Server] <<api>>
 
   database "Graph Database\n(Graphology + Level)" as graph <<storage>>
-  file "shared-memory.json\n(Git-tracked)" as json
+  file "knowledge-export/\n<team>.json" as json
 
   note right of ukb
     **Manual capture**

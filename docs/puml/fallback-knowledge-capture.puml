@@ -18,7 +18,7 @@ Dev -> UKB: "Handle async React errors"
 UKB -> Dev: Enter solution
 Dev -> UKB: "Use error boundaries"
 UKB -> Dev: [Additional prompts...]
-UKB -> KB: Write to shared-memory.json
+UKB -> KB: Write to GraphDB
 KB --> UKB: Updated
 UKB --> Dev: Knowledge captured
 

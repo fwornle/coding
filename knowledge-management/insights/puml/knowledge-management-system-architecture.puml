@@ -25,7 +25,7 @@ package "Processing" as Processing {
 }
 
 package "Storage" as Storage {
-    [shared-memory.json] as SharedMemory
+    [GraphDB + LevelDB] as SharedMemory
     [MCP Persist] as MCP
     [Docs] as Docs
 }
@@ -62,7 +62,7 @@ Team --> Visualization : explores knowledge
 
 note top of DataSources : Git commits, AI conversations,\nexpert input, code analysis
 note top of Processing : UKB engine, pattern recognition,\nsignificance scoring, deduplication
-note top of Storage : shared-memory.json,\nMCP persistence, documentation
+note top of Storage : GraphDB + LevelDB,\nMCP persistence, documentation
 note top of Visualization : VKB server, interactive graph,\nsearch and filtering
 note top of MCPServers : Browser Access,\nMemory Management
 note top of AutoLogging : Post-session processing,\nsmart content routing

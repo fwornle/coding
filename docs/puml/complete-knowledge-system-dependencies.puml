@@ -31,7 +31,7 @@ cloud "Local LLM" as local #F0F0F0 {
   [Ollama]
 }
 
-file "shared-memory-*.json\n(Git-tracked)" as json
+file ".data/knowledge-export/\n<team>.json" as json
 
 ' Continuous Learning Dependencies
 [Inference Engine] -down-> [Budget Tracker] : monitors

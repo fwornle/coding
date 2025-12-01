@@ -49,7 +49,7 @@ package "Communication Infrastructure" as CommInfra {
 }
 
 package "Storage Layer" as Storage {
-    [shared-memory.json] as SharedMemory
+    [GraphDB + LevelDB] as SharedMemory
     [MCP Memory Server] as MCPMemory
     [Knowledge Graph] as GraphDB
     [Documentation] as Docs
@@ -143,9 +143,9 @@ end note
 
 note top of Storage
   **Multi-Layer Persistence:**
-  • File-based (shared-memory.json)
+  • GraphDB (Graphology+LevelDB)
   • Runtime (MCP Memory)
-  • Graph database
+  • Git-tracked exports
   • Cross-session continuity
 end note
 
