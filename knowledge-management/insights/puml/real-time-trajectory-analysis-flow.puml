@@ -5,12 +5,10 @@ skinparam defaultFontSize 10
 
 title Real-Time Trajectory Analysis System - Flow and Integration
 
-top to bottom direction
-
 actor "Claude Code User" as User
 participant "Enhanced Transcript Monitor" as Monitor
 participant "Real-Time Trajectory Analyzer" as Analyzer
-participant "Groq gpt-oss-20b" as GroqAPI
+participant "Groq API" as GroqAPI
 participant "live-state.json" as StateFile
 participant "Status Line System" as StatusLine
 participant "Claude Code UI" as UI
@@ -27,7 +25,7 @@ Analyzer -> Analyzer : "Check analysis frequency\n(max 50/hour)"
 alt Analysis allowed
     Analyzer -> GroqAPI : "Analyze conversation pattern\nClassify trajectory state"
     activate GroqAPI
-    GroqAPI -> GroqAPI : "Process with gpt-oss-20b\nInfer trajectory state"
+    GroqAPI -> GroqAPI : "Process with LLM\nInfer trajectory state"
     GroqAPI --> Analyzer : "State classification result\n{state: 'implementing', confidence: 0.8}"
     deactivate GroqAPI
 
@@ -70,9 +68,9 @@ loop Every 5 seconds
 end
 
 note over GroqAPI
-    **Model Upgrade (2025-10-04):**
-    llama-3.1-8b-instant → gpt-oss-20b
-    Better accuracy for trajectory classification
+    **External LLM Provider:**
+    Fast inference for trajectory
+    classification with high accuracy
 end note
 
 note over StatusLine
