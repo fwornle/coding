@@ -148,20 +148,6 @@ export class GraphKnowledgeExporter {
       // Extract entities and relationships for this team
       const { entities, relations } = await this._extractTeamData(team);
 
-      // Build export structure (matching knowledge-export format)
-      const exportData = {
-        entities,
-        relations,
-        metadata: {
-          version: '1.0.0',
-          team,
-          exported_at: new Date().toISOString(),
-          total_entities: entities.length,
-          total_relations: relations.length,
-          description: teamConfig.description || `Knowledge base for team: ${team}`
-        }
-      };
-
       // Check if content actually changed before writing (avoid timestamp-only updates)
       if (!options.force) {
         const hasChanges = await this._hasContentChanges(outputPath, entities, relations);
@@ -171,6 +157,23 @@ export class GraphKnowledgeExporter {
         }
       }
 
+      // Preserve timestamps from existing file for unchanged entities
+      const entitiesWithPreservedTimestamps = await this._preserveUnchangedTimestamps(outputPath, entities);
+
+      // Build export structure (matching knowledge-export format)
+      const exportData = {
+        entities: entitiesWithPreservedTimestamps,
+        relations,
+        metadata: {
+          version: '1.0.0',
+          team,
+          exported_at: new Date().toISOString(),
+          total_entities: entitiesWithPreservedTimestamps.length,
+          total_relations: relations.length,
+          description: teamConfig.description || `Knowledge base for team: ${team}`
+        }
+      };
+
       // Write to file with pretty formatting
       const jsonContent = this.prettyFormat
         ? JSON.stringify(exportData, null, 2)
@@ -178,7 +181,7 @@ export class GraphKnowledgeExporter {
 
       await fs.writeFile(outputPath, jsonContent, 'utf8');
 
-      console.log(`✓ Exported team "${team}": ${entities.length} entities, ${relations.length} relations → ${outputPath}`);
+      console.log(`✓ Exported team "${team}": ${entitiesWithPreservedTimestamps.length} entities, ${relations.length} relations → ${outputPath}`);
 
       return outputPath;
 
@@ -186,6 +189,92 @@ export class GraphKnowledgeExporter {
       console.error(`Export failed for team "${team}":`, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Preserve timestamps from existing file for entities that haven't changed
+   * Only updates timestamps for entities with actual content changes
+   *
+   * @param {string} filePath - Path to existing export file
+   * @param {Array} newEntities - New entities from graph
+   * @returns {Promise<Array>} Entities with preserved timestamps where appropriate
+   * @private
+   */
+  async _preserveUnchangedTimestamps(filePath, newEntities) {
+    try {
+      const existingContent = await fs.readFile(filePath, 'utf8');
+      const existingData = JSON.parse(existingContent);
+
+      // Build lookup map of existing entities by name
+      const existingByName = new Map();
+      for (const entity of (existingData.entities || [])) {
+        existingByName.set(entity.name, entity);
+      }
+
+      // For each new entity, check if it has changed
+      return newEntities.map(newEntity => {
+        const existing = existingByName.get(newEntity.name);
+
+        if (!existing) {
+          // New entity - use current timestamp
+          return newEntity;
+        }
+
+        // Check if content changed (compare normalized versions)
+        const contentChanged = this._entityContentChanged(existing, newEntity);
+
+        if (!contentChanged && existing.metadata?.last_updated) {
+          // Content unchanged - preserve original timestamp
+          return {
+            ...newEntity,
+            metadata: {
+              ...newEntity.metadata,
+              created_at: existing.metadata.created_at || newEntity.metadata?.created_at,
+              last_updated: existing.metadata.last_updated
+            }
+          };
+        }
+
+        // Content changed - use new timestamp
+        return newEntity;
+      });
+
+    } catch (error) {
+      // File doesn't exist or can't be read - return entities as-is
+      return newEntities;
+    }
+  }
+
+  /**
+   * Check if entity content has changed (ignoring timestamps)
+   *
+   * @param {Object} existing - Existing entity from file
+   * @param {Object} newEntity - New entity from graph
+   * @returns {boolean} True if content has changed
+   * @private
+   */
+  _entityContentChanged(existing, newEntity) {
+    // Compare key content fields
+    if (existing.name !== newEntity.name) return true;
+    if (existing.entityType !== newEntity.entityType) return true;
+    if (existing.source !== newEntity.source) return true;
+    if (existing.significance !== newEntity.significance) return true;
+
+    // Compare observations (sorted)
+    const existingObs = (existing.observations || []).map(o =>
+      typeof o === 'string' ? o : (o.content || JSON.stringify(o))
+    ).sort();
+    const newObs = (newEntity.observations || []).map(o =>
+      typeof o === 'string' ? o : (o.content || JSON.stringify(o))
+    ).sort();
+
+    if (JSON.stringify(existingObs) !== JSON.stringify(newObs)) return true;
+
+    // Compare optional fields
+    if (JSON.stringify(existing.problem) !== JSON.stringify(newEntity.problem)) return true;
+    if (JSON.stringify(existing.solution) !== JSON.stringify(newEntity.solution)) return true;
+
+    return false;
   }
 
   /**
