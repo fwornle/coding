@@ -746,9 +746,9 @@
     "total_entities": 13,
     "total_relations": 68,
     "description": "Coding project infrastructure and patterns",
-    "lastSuccessfulWorkflowCompletion": "2025-12-01T06:28:29.608Z",
-    "last_updated": "2025-12-02T06:28:29.609Z",
-    "checkpointResetAt": "2025-12-02T06:28:29.609Z",
-    "checkpointResetReason": "1 days ago (2025-12-01T06:28:29.608Z)"
+    "lastSuccessfulWorkflowCompletion": "2025-11-25T06:46:39.190Z",
+    "last_updated": "2025-12-02T06:46:39.191Z",
+    "checkpointResetAt": "2025-12-02T06:46:39.191Z",
+    "checkpointResetReason": "7 days ago (2025-11-25T06:46:39.190Z)"
   }
 }
