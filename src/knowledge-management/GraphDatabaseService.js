@@ -202,6 +202,9 @@ export class GraphDatabaseService extends EventEmitter {
     const nodeId = `${options.team}:${entity.name}`;
 
     // Prepare node attributes
+    // Extract relationships separately (they're stored as edges, not on the node)
+    const { relationships: entityRelationships, ...entityWithoutRelationships } = entity;
+
     const attributes = {
       name: entity.name,
       entityType: entity.entityType || 'Unknown',
@@ -211,7 +214,7 @@ export class GraphDatabaseService extends EventEmitter {
       team: options.team,
       created_at: entity.created_at || new Date().toISOString(),
       last_modified: new Date().toISOString(),
-      ...entity // Include any additional attributes
+      ...entityWithoutRelationships // Include additional attributes but NOT relationships
     };
 
     // Add or update node in graph
@@ -321,13 +324,13 @@ export class GraphDatabaseService extends EventEmitter {
     ];
 
     // Key content fields to check for changes
+    // NOTE: 'relationships' is NOT included because relationships are stored as edges, not on nodes
     const contentFields = [
       'observations',
       'entityType',
       'confidence',
       'source',
       'significance',
-      'relationships',
       'quick_reference'
     ];
 
@@ -343,13 +346,13 @@ export class GraphDatabaseService extends EventEmitter {
         return true;
       }
 
-      // For arrays (observations, relationships), compare content
+      // For arrays (observations, relationships), compare content using normalized comparison
       if (Array.isArray(existingVal) && Array.isArray(incomingVal)) {
         if (existingVal.length !== incomingVal.length) {
           return true;
         }
-        // Simple JSON comparison for array contents
-        if (JSON.stringify(existingVal) !== JSON.stringify(incomingVal)) {
+        // Use normalized comparison to handle object key ordering differences
+        if (!this._arraysAreEqual(existingVal, incomingVal, field)) {
           return true;
         }
       } else {
@@ -361,6 +364,65 @@ export class GraphDatabaseService extends EventEmitter {
     }
 
     return false;
+  }
+
+  /**
+   * Compare two arrays for equality, handling different object key orderings
+   *
+   * @param {Array} arr1 - First array
+   * @param {Array} arr2 - Second array
+   * @param {string} fieldName - Name of the field (for specialized comparison)
+   * @returns {boolean} True if arrays are logically equal
+   * @private
+   */
+  _arraysAreEqual(arr1, arr2, fieldName) {
+    if (arr1.length !== arr2.length) return false;
+    if (arr1.length === 0) return true;
+
+    // For relationships array, compare by normalized key fields only
+    if (fieldName === 'relationships') {
+      const normalize = (rel) => {
+        // Only compare the key relationship fields, ignore extra metadata
+        return `${rel.from || ''}|${rel.to || ''}|${rel.relationType || rel.type || ''}`;
+      };
+      const set1 = new Set(arr1.map(normalize));
+      const set2 = new Set(arr2.map(normalize));
+      if (set1.size !== set2.size) return false;
+      for (const item of set1) {
+        if (!set2.has(item)) return false;
+      }
+      return true;
+    }
+
+    // For observations array, compare normalized content
+    if (fieldName === 'observations') {
+      const normalize = (obs) => {
+        if (typeof obs === 'string') return obs;
+        // For observation objects, compare just the content
+        return obs.content || JSON.stringify(obs);
+      };
+      const sorted1 = arr1.map(normalize).sort();
+      const sorted2 = arr2.map(normalize).sort();
+      return JSON.stringify(sorted1) === JSON.stringify(sorted2);
+    }
+
+    // Default: sort and compare (handles primitive arrays)
+    try {
+      const sorted1 = [...arr1].sort((a, b) => {
+        const strA = typeof a === 'object' ? JSON.stringify(a) : String(a);
+        const strB = typeof b === 'object' ? JSON.stringify(b) : String(b);
+        return strA.localeCompare(strB);
+      });
+      const sorted2 = [...arr2].sort((a, b) => {
+        const strA = typeof a === 'object' ? JSON.stringify(a) : String(a);
+        const strB = typeof b === 'object' ? JSON.stringify(b) : String(b);
+        return strA.localeCompare(strB);
+      });
+      return JSON.stringify(sorted1) === JSON.stringify(sorted2);
+    } catch {
+      // Fallback to direct comparison
+      return JSON.stringify(arr1) === JSON.stringify(arr2);
+    }
   }
 
   /**
