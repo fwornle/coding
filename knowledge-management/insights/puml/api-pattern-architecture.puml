@@ -1,0 +1,57 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title API Pattern Architecture Analysis
+
+package "Design Patterns" {
+  component ApiPattern <<api>>
+}
+
+note right of ApiPattern : Handles external communication\nSignificance: 7/10\nConfidence: 72%
+
+package "Core Components" {
+  component SystemHealthDashboard <<core>>
+  component ApiQuotaSlice <<storage>>
+  component ServiceStarter <<core>>
+  component HealthMonitor <<core>>
+  component HealthVerifier <<core>>
+}
+
+package "Knowledge Management" {
+  component KnowledgeExport <<storage>>
+  component MemorySystem <<storage>>
+  component ArchitectureDocs <<core>>
+}
+
+package "CLI Tools" {
+  component UkbCli <<agent>>
+  component VkbCli <<agent>>
+}
+
+ApiPattern --> SystemHealthDashboard : monitors
+ApiPattern --> ApiQuotaSlice : manages quotas
+ApiPattern --> ServiceStarter : orchestrates
+ApiPattern --> HealthMonitor : health checks
+ApiPattern --> HealthVerifier : validates
+
+SystemHealthDashboard --> HealthMonitor : displays status
+HealthMonitor --> HealthVerifier : validates health
+ServiceStarter --> HealthVerifier : ensures stability
+
+ApiPattern --> KnowledgeExport : exports data
+ApiPattern --> MemorySystem : persists state
+MemorySystem --> ArchitectureDocs : documents patterns
+
+UkbCli --> ApiPattern : utilizes
+VkbCli --> ApiPattern : integrates
+
+note bottom
+  Pattern Analysis Summary:
+  • Total Patterns: 1
+  • Category: Design (1)
+  • Average Significance: 7/10
+  • Implementation: TypeScript
+  • 32+ Related Components
+end note
+
+@enduml

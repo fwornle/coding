@@ -1,0 +1,74 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Decorator Pattern Implementation - Component Interactions
+
+participant Client
+participant "GraphKnowledgeExporter" as Exporter
+participant "GraphDatabaseService" as Database
+participant "Service Starter" as Starter
+participant "Health Monitor" as Monitor
+participant "API Quota Manager" as Quota
+
+note over Client, Quota
+  Decorator Pattern Implementation (72% Confidence)
+  Adds behavior to objects dynamically
+end note
+
+Client -> Exporter: initializeExport()
+activate Exporter
+
+Exporter -> Database: connect()
+activate Database
+Database -> Database: setupBaseConnection()
+Database --> Exporter: connectionReady
+deactivate Database
+
+Exporter -> Starter: decorateWithServices()
+activate Starter
+Starter -> Monitor: addHealthMonitoring()
+activate Monitor
+Monitor --> Starter: monitoringDecorated
+deactivate Monitor
+
+Starter -> Quota: addQuotaManagement()
+activate Quota
+Quota --> Starter: quotaDecorated
+deactivate Quota
+Starter --> Exporter: servicesDecorated
+deactivate Starter
+
+loop Knowledge Export Process
+    Exporter -> Database: queryKnowledge()
+    activate Database
+    Database --> Exporter: knowledgeData
+    deactivate Database
+    
+    alt Health Check Required
+        Exporter -> Monitor: performHealthCheck()
+        activate Monitor
+        Monitor --> Exporter: healthStatus
+        deactivate Monitor
+    end
+    
+    alt Quota Limit Check
+        Exporter -> Quota: checkQuotaLimits()
+        activate Quota
+        Quota --> Exporter: quotaStatus
+        deactivate Quota
+    end
+    
+    Exporter -> Exporter: applyDecorations()
+    note right: Dynamic behavior enhancement
+end
+
+Exporter --> Client: exportComplete
+deactivate Exporter
+
+note over Client, Quota
+  Pattern adds monitoring, quota management,
+  and health checking behaviors dynamically
+  to base knowledge export functionality
+end note
+
+@enduml

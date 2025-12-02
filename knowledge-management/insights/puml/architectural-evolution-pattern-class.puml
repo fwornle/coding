@@ -1,0 +1,106 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Architectural Evolution Pattern System" {
+    
+    package "Temporal Documentation" {
+        class TemporalDocumentationArchival {
+            -timestampFormat: string
+            -branchSuffix: string
+            -sessionId: string
+            +generateTimestamp(): string
+            +createArchive(content: string): void
+            +organizeBranchHistory(): void
+        }
+        
+        class HistoryManager {
+            -historyPath: string
+            -sessionTracker: SessionTracker
+            +archiveSession(session: Session): void
+            +retrieveHistory(dateRange: DateRange): History[]
+        }
+    }
+    
+    package "Content Processing" {
+        class ContentValidationPipeline {
+            -stages: ValidationStage[]
+            -semanticAnalyzer: SemanticAnalyzer
+            +validateContent(content: Content): ValidationResult
+            +processStages(content: Content): ProcessedContent
+        }
+        
+        class ConfigurableRedactor {
+            -redactionRules: RedactionRule[]
+            -configPath: string
+            +loadConfiguration(): void
+            +redactContent(content: string): string
+            +updateRules(rules: RedactionRule[]): void
+        }
+    }
+    
+    package "API Management" {
+        class APIQuotaManager {
+            -quotaLimits: QuotaLimit[]
+            -currentUsage: UsageMetrics
+            -adminHooks: AdminHook[]
+            +checkQuota(apiCall: APICall): boolean
+            +updateUsage(usage: UsageData): void
+            +getQuotaStatus(): QuotaStatus
+        }
+        
+        class QuotaChecker {
+            -environmentConfig: EnvConfig
+            +validateRequest(request: APIRequest): boolean
+            +getRemainingQuota(): number
+        }
+    }
+    
+    package "Data Extraction" {
+        class AdaptiveLiveLoggingExtractor {
+            -extractionLogic: ExtractionRule[]
+            -runtimeConditions: Condition[]
+            +extractLiveData(source: DataSource): ExtractedData
+            +adaptExtractionLogic(conditions: Condition[]): void
+        }
+        
+        class MultiSourceKnowledgeExporter {
+            -knowledgeSources: KnowledgeSource[]
+            -exportCategories: Category[]
+            +consolidateKnowledge(): ConsolidatedKnowledge
+            +exportToJSON(category: string): string
+        }
+    }
+    
+    package "Configuration" {
+        class RedactionPatternConfig {
+            -patterns: RedactionPattern[]
+            -configFile: string
+            +loadPatterns(): RedactionPattern[]
+            +savePatterns(patterns: RedactionPattern[]): void
+        }
+        
+        class EnvironmentConfig {
+            -envFile: string
+            -apiKeys: Map<string, string>
+            +loadEnvironment(): void
+            +getAPIKey(service: string): string
+        }
+    }
+}
+
+' Relationships
+TemporalDocumentationArchival --> HistoryManager : uses
+ContentValidationPipeline --> ConfigurableRedactor : integrates
+ConfigurableRedactor --> RedactionPatternConfig : loads from
+APIQuotaManager --> QuotaChecker : delegates to
+QuotaChecker --> EnvironmentConfig : configures from
+AdaptiveLiveLoggingExtractor --> ConfigurableRedactor : processes through
+MultiSourceKnowledgeExporter --> ContentValidationPipeline : validates with
+
+' Key file associations
+note right of RedactionPatternConfig : ".specstory/config/redaction-patterns.json"
+note right of EnvironmentConfig : ".env.example"
+note right of HistoryManager : ".specstory/history/"
+note right of MultiSourceKnowledgeExporter : ".data/knowledge-export/coding.json"
+
+@enduml

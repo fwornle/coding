@@ -1,0 +1,45 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "Developer" as dev
+participant "Git System" as git
+participant "Temporal Archival" as temporal
+participant "Configuration Manager" as config
+participant "Redaction System" as redactor
+participant "API Quota Checker" as quota
+participant "Live Logger" as logger
+participant "Knowledge Exporter" as exporter
+participant "Semantic Analysis" as semantic
+
+dev -> git: Commit changes
+git -> temporal: Generate timestamp-based history
+temporal -> temporal: Create YYYY-MM-DD_HHMM-HHMM format
+temporal -> git: Store in .specstory/history/ with session ID
+
+dev -> config: Load redaction patterns
+config -> redactor: Apply JSON configuration rules
+redactor -> config: Validate sensitive data filtering
+
+dev -> quota: Check API resource limits
+quota -> quota: Validate against .env configuration
+alt quota available
+    quota -> dev: Allow API call
+else quota exceeded
+    quota -> dev: Block API request
+end
+
+dev -> logger: Extract live system data
+logger -> redactor: Process through redaction pipeline
+redactor -> logger: Return filtered data
+logger -> temporal: Archive processed logs
+
+dev -> exporter: Export knowledge base
+exporter -> semantic: Request analysis integration
+semantic -> exporter: Return structured data
+exporter -> exporter: Generate domain-specific JSON (coding.json)
+
+note over temporal, redactor: Configuration-driven with runtime flexibility
+note over quota, logger: Centralized resource management
+note over exporter, semantic: Multi-source knowledge consolidation
+
+@enduml
