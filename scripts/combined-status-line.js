@@ -1299,11 +1299,12 @@ class CombinedStatusLine {
     // Known project mappings
     const knownMappings = {
       'coding': 'C',
-      'curriculum-alignment': 'CA', 
+      'curriculum-alignment': 'CA',
       'nano-degree': 'ND',
       'curriculum': 'CU',
       'alignment': 'AL',
-      'nano': 'N'
+      'nano': 'N',
+      'ui-template': 'UT'
     };
     
     // Check for exact match first
