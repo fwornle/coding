@@ -1,0 +1,57 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Developer" as dev
+actor "System Administrator" as admin
+actor "Knowledge System" as ks
+actor "External Services" as ext
+
+package "Knowledge Management System" {
+  usecase "Export Knowledge Graph" as export
+  usecase "Manage Graph Database" as manage_db
+  usecase "Monitor API Quotas" as quota
+  usecase "Track System Health" as health
+  usecase "Start Services" as start_services
+  usecase "Verify Health Status" as verify_health
+  usecase "Enhance Behavior Dynamically" as enhance <<DecoratorPattern>>
+  usecase "Apply Pattern Implementation" as apply_pattern
+}
+
+package "Decorator Pattern Implementation" {
+  usecase "Add Runtime Behavior" as add_behavior
+  usecase "Wrap Service Components" as wrap_services
+  usecase "Extend Functionality" as extend_func
+}
+
+dev --> export
+dev --> manage_db
+admin --> quota
+admin --> health
+admin --> start_services
+admin --> verify_health
+ks --> enhance
+ext --> apply_pattern
+
+enhance ..> add_behavior : <<include>>
+enhance ..> wrap_services : <<include>>
+enhance ..> extend_func : <<include>>
+
+export --> manage_db : <<extend>>
+quota --> health : <<include>>
+start_services --> verify_health : <<include>>
+
+note right of enhance
+  Decorator Pattern Implementation
+  Confidence: 72%
+  Significance: 7/10
+  Language: JavaScript
+end note
+
+note top of "Knowledge Management System"
+  Core system components identified
+  from pattern analysis
+end note
+
+@enduml

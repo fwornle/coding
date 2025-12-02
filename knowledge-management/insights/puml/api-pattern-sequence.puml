@@ -1,0 +1,60 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title ApiPattern External Communication Flow (Confidence: 72%)
+
+actor "External Client" as Client
+participant "System Health Dashboard" as Dashboard
+participant "API Quota Slice" as QuotaSlice
+participant "Service Starter" as ServiceStarter
+participant "Health Monitor" as HealthMonitor
+participant "Health Verifier" as HealthVerifier
+participant "Knowledge Management" as KnowledgeMgmt
+database "Knowledge Export" as KnowledgeDB
+
+Client -> Dashboard: Request system status
+activate Dashboard
+
+Dashboard -> QuotaSlice: Check API quota
+activate QuotaSlice
+QuotaSlice -> QuotaSlice: Validate quota limits
+QuotaSlice --> Dashboard: Quota status
+deactivate QuotaSlice
+
+Dashboard -> HealthMonitor: Get health metrics
+activate HealthMonitor
+
+HealthMonitor -> HealthVerifier: Verify system health
+activate HealthVerifier
+HealthVerifier -> ServiceStarter: Check service status
+activate ServiceStarter
+ServiceStarter --> HealthVerifier: Service health data
+deactivate ServiceStarter
+HealthVerifier --> HealthMonitor: Health verification result
+deactivate HealthVerifier
+
+HealthMonitor --> Dashboard: Health metrics
+deactivate HealthMonitor
+
+alt Knowledge data required
+    Dashboard -> KnowledgeMgmt: Request knowledge insights
+    activate KnowledgeMgmt
+    KnowledgeMgmt -> KnowledgeDB: Query coding patterns
+    activate KnowledgeDB
+    KnowledgeDB --> KnowledgeMgmt: Pattern data
+    deactivate KnowledgeDB
+    KnowledgeMgmt --> Dashboard: Knowledge insights
+    deactivate KnowledgeMgmt
+end
+
+Dashboard -> Dashboard: Aggregate system status
+Dashboard --> Client: Complete system health report
+deactivate Dashboard
+
+note right of Dashboard
+  ApiPattern handles external
+  communication with 72% confidence
+  across multiple system components
+end note
+
+@enduml

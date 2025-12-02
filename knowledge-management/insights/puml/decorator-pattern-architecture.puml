@@ -1,0 +1,49 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Design Patterns" {
+  package "Decorator Pattern Implementation" <<core>> {
+    component "GraphDatabaseService" <<storage>> as GDS
+    component "GraphKnowledgeExporter" <<core>> as GKE
+    component "ServiceStarter" <<core>> as SS
+    component "HealthVerifier" <<agent>> as HV
+    component "StatusLineHealthMonitor" <<agent>> as SLHM
+    
+    interface "IDecorator" as IDec
+    interface "IComponent" as IComp
+    
+    GDS .up.|> IComp
+    GKE .up.|> IDec
+    SS .up.|> IDec
+    HV .up.|> IDec
+    SLHM .up.|> IDec
+  }
+  
+  package "Frontend Components" <<api>> {
+    component "ApiQuotaSlice" <<api>> as AQS
+    AQS ..> IDec : uses
+  }
+  
+  package "Knowledge Management" <<storage>> {
+    component "KnowledgeExport" <<storage>> as KE
+    component "ArchitecturalDiagrams" <<core>> as AD
+    
+    KE ..> GDS : exports from
+    AD ..> GKE : visualizes
+  }
+}
+
+note top of "Design Patterns"
+  **Decorator Pattern Analysis**
+  - Confidence: 72%
+  - Significance: 7/10
+  - Components: 5 core services
+  - Pattern: Adds behavior dynamically
+end note
+
+GDS --> GKE : decorates
+GKE --> SS : wraps
+SS --> HV : enhances
+HV --> SLHM : monitors
+
+@enduml

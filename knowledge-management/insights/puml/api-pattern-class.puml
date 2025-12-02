@@ -1,0 +1,99 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "System Health Dashboard" {
+  class SystemHealthDashboard {
+    +render()
+    +handleHealthCheck()
+    +displayMetrics()
+  }
+  
+  class ApiQuotaSlice {
+    +state: QuotaState
+    +fetchQuota()
+    +updateQuota()
+    +resetQuota()
+  }
+}
+
+package "Service Management" {
+  class ServiceStarter {
+    +startService()
+    +stopService()
+    +restartService()
+    +getServiceStatus()
+  }
+  
+  class HealthVerifier {
+    +verifyHealth()
+    +checkEndpoints()
+    +validateResponse()
+    +reportStatus()
+  }
+  
+  class StatusLineMonitor {
+    +monitorServices()
+    +updateStatusLine()
+    +trackMetrics()
+    +generateReport()
+  }
+}
+
+package "Knowledge Management" {
+  class KnowledgeExport {
+    +exportData()
+    +formatCoding()
+    +saveToFile()
+  }
+  
+  class InsightGenerator {
+    +generateDiagrams()
+    +createArchitectureViews()
+    +analyzePatterns()
+  }
+}
+
+package "ApiPattern <<Design Pattern>>" {
+  abstract class ApiCommunicator {
+    #baseUrl: string
+    #headers: Map
+    +makeRequest()
+    +handleResponse()
+    +handleError()
+  }
+  
+  interface ExternalCommunication {
+    +connect()
+    +disconnect()
+    +sendData()
+    +receiveData()
+  }
+  
+  class ApiClient {
+    -timeout: number
+    -retryCount: number
+    +get()
+    +post()
+    +put()
+    +delete()
+  }
+}
+
+SystemHealthDashboard --> ApiQuotaSlice : uses
+SystemHealthDashboard --> ApiClient : communicates via
+ServiceStarter --> HealthVerifier : validates with
+StatusLineMonitor --> HealthVerifier : monitors via
+HealthVerifier --> ApiClient : checks endpoints
+ApiClient --|> ApiCommunicator : implements
+ApiClient ..|> ExternalCommunication : realizes
+KnowledgeExport --> InsightGenerator : generates
+InsightGenerator --> SystemHealthDashboard : creates views for
+
+note right of ApiClient
+  Confidence: 72%
+  Significance: 7/10
+  Handles external communication
+  across system components
+end note
+
+@enduml

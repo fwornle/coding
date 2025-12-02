@@ -1,0 +1,85 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor Developer as dev
+actor "System Administrator" as admin
+actor "External API" as api
+actor "Live System" as system
+
+package "Temporal Documentation System" {
+  usecase "Archive Development History" as archive
+  usecase "Generate Timestamps" as timestamp
+  usecase "Track Branch Changes" as branch
+}
+
+package "Content Validation System" {
+  usecase "Validate Content" as validate
+  usecase "Process Semantic Analysis" as semantic
+  usecase "Integrate Analysis Points" as integrate
+}
+
+package "Redaction System" {
+  usecase "Configure Redaction Rules" as config_redact
+  usecase "Filter Sensitive Data" as filter
+  usecase "Runtime Rule Modification" as modify_rules
+}
+
+package "API Quota Management" {
+  usecase "Check API Quotas" as check_quota
+  usecase "Manage Resource Limits" as manage_quota
+  usecase "Monitor API Usage" as monitor
+}
+
+package "Live Logging System" {
+  usecase "Extract Live Data" as extract
+  usecase "Process System Exchanges" as process_live
+  usecase "Configure Extraction Logic" as config_extract
+}
+
+package "Knowledge Export System" {
+  usecase "Consolidate Knowledge" as consolidate
+  usecase "Export Structured Data" as export
+  usecase "Categorize Domain Data" as categorize
+}
+
+dev --> archive
+dev --> validate
+dev --> extract
+dev --> consolidate
+
+admin --> config_redact
+admin --> manage_quota
+admin --> config_extract
+
+system --> process_live
+api --> check_quota
+
+archive ..> timestamp : <<include>>
+archive ..> branch : <<include>>
+
+validate ..> semantic : <<include>>
+validate ..> integrate : <<include>>
+
+filter ..> config_redact : <<include>>
+modify_rules ..> config_redact : <<extend>>
+
+check_quota ..> monitor : <<include>>
+manage_quota ..> monitor : <<include>>
+
+extract ..> process_live : <<include>>
+extract ..> config_extract : <<include>>
+
+consolidate ..> export : <<include>>
+consolidate ..> categorize : <<include>>
+
+dev --> filter
+admin --> check_quota
+system --> validate
+
+note right of archive : Uses YYYY-MM-DD_HHMM format\nwith branch-specific suffixes
+note right of config_redact : JSON-based configuration\nfor runtime flexibility
+note right of check_quota : Centralized quota validation\nwith environment config
+
+@enduml

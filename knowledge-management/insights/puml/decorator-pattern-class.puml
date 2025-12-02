@@ -1,0 +1,88 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+' Decorator Pattern Implementation - Confidence: 72%
+
+package "Core Components" {
+  abstract class Component {
+    + operation()
+  }
+  
+  class ConcreteComponent {
+    + operation()
+  }
+}
+
+package "Decorator Framework" {
+  abstract class Decorator {
+    - component: Component
+    + operation()
+    + setComponent(component: Component)
+  }
+  
+  class ConcreteDecoratorA {
+    - addedState: String
+    + operation()
+    + addBehavior()
+  }
+  
+  class ConcreteDecoratorB {
+    + operation()
+    + addAdditionalBehavior()
+  }
+}
+
+package "Knowledge Management" {
+  class GraphDatabaseService {
+    + query()
+    + store()
+    + export()
+  }
+  
+  class GraphKnowledgeExporter {
+    + exportData()
+    + formatOutput()
+  }
+}
+
+package "System Integration" {
+  class ServiceStarter {
+    + initialize()
+    + configure()
+  }
+  
+  class HealthMonitor {
+    + checkStatus()
+    + reportHealth()
+  }
+  
+  class ApiQuotaSlice {
+    + trackUsage()
+    + enforceQuota()
+  }
+}
+
+' Relationships
+Component <|-- ConcreteComponent
+Component <|-- Decorator
+Decorator <|-- ConcreteDecoratorA
+Decorator <|-- ConcreteDecoratorB
+Decorator o-- Component : decorates
+
+' Pattern Implementation
+GraphDatabaseService --|> Decorator : implements
+GraphKnowledgeExporter --|> ConcreteDecoratorA : extends
+ServiceStarter --|> ConcreteDecoratorB : extends
+HealthMonitor --|> ConcreteDecoratorA : extends
+ApiQuotaSlice --|> ConcreteDecoratorB : extends
+
+' Composition relationships
+GraphKnowledgeExporter --> GraphDatabaseService : uses
+ServiceStarter --> HealthMonitor : manages
+HealthMonitor --> ApiQuotaSlice : monitors
+
+note top of Decorator : "Adds behavior to objects\ndynamically - Significance: 7/10"
+
+note bottom of GraphDatabaseService : "Core knowledge management\nservice with decorator\nenhancements"
+
+@enduml

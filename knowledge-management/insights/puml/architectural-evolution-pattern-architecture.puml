@@ -1,0 +1,74 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Architectural Evolution Patterns" {
+  
+  package "Data Management" <<storage>> {
+    component "Temporal Documentation\nArchival" as TDA <<storage>>
+    component "Knowledge Export\nConsolidation" as KEC <<storage>>
+    component "Configuration-Driven\nRedaction System" as CDR <<core>>
+  }
+  
+  package "System Integration" <<api>> {
+    component "API Resource Quota\nManagement" as ARQ <<api>>
+    component "Adaptive Live Logging\nExtraction" as ALLE <<core>>
+    component "Content Validation\nPipeline" as CVP <<core>>
+  }
+  
+  package "Configuration Layer" <<core>> {
+    component "Redaction Patterns\nConfig" as RPC <<storage>>
+    component "Environment\nConfiguration" as EC <<storage>>
+  }
+  
+  package "File System Components" {
+    file ".data/knowledge-export/\ncoding.json" as KEF
+    file ".specstory/history/\n2025-11-29_0900-1000_g9b30a.md" as HSF
+    file ".specstory/config/\nredaction-patterns.json" as RPF
+    file ".env.example" as ENV
+    folder "integrations/mcp-server-\nsemantic-analysis" as MSA
+  }
+}
+
+' Pattern Relationships
+TDA --> HSF : "generates timestamped\nhistory files"
+KEC --> KEF : "exports structured\nknowledge"
+CDR --> RPF : "reads redaction\nrules"
+ARQ --> ENV : "uses environment\nconfiguration"
+CVP --> MSA : "integrates with\nsemantic analysis"
+
+' Configuration Relationships
+RPC --> CDR : "provides rules"
+EC --> ARQ : "configuration"
+
+' Cross-pattern Integration
+ALLE --> CDR : "applies redaction"
+CVP --> KEC : "validates before export"
+ARQ --> ALLE : "quota checking"
+
+note top of TDA
+  **Significance: 8**
+  Timestamp-based organization
+  with branch tracking
+end note
+
+note top of CDR
+  **Significance: 9**
+  Runtime configurable
+  sensitive data filtering
+end note
+
+note top of ARQ
+  **Significance: 8**
+  Centralized quota validation
+  with admin hooks
+end note
+
+note bottom
+  **Pattern Analysis Summary**
+  Total Patterns: 6 sub-patterns
+  Category: Architecture
+  Average Significance: 7.5
+  Implementation: TypeScript
+end note
+
+@enduml

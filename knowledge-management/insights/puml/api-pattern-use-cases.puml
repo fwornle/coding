@@ -1,0 +1,66 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title ApiPattern Use Cases - External Communication Handling
+
+left to right direction
+
+actor "System Administrator" as admin
+actor "Health Monitor" as monitor
+actor "Dashboard User" as user
+actor "External Services" as external
+actor "Knowledge Management System" as kms
+
+rectangle "API Pattern System" {
+    usecase "Monitor System Health" as UC1
+    usecase "Check API Quotas" as UC2
+    usecase "Start Services" as UC3
+    usecase "Verify Health Status" as UC4
+    usecase "Display Status Dashboard" as UC5
+    usecase "Export Knowledge" as UC6
+    usecase "Manage Service Integration" as UC7
+    usecase "Handle External Communication" as UC8
+    usecase "Process Real-time Data" as UC9
+    usecase "Track System Status" as UC10
+}
+
+rectangle "Core Components" {
+    usecase "Execute Health Verification" as UC11
+    usecase "Manage API State" as UC12
+    usecase "Handle Service Lifecycle" as UC13
+}
+
+admin --> UC3 : starts
+admin --> UC4 : verifies
+monitor --> UC1 : monitors
+monitor --> UC10 : tracks
+user --> UC5 : views
+user --> UC2 : checks
+kms --> UC6 : exports
+kms --> UC9 : processes
+external --> UC8 : communicates
+
+UC1 ..> UC11 : <<include>>
+UC2 ..> UC12 : <<include>>
+UC3 ..> UC13 : <<include>>
+UC4 ..> UC11 : <<include>>
+UC5 ..> UC12 : <<include>>
+UC7 ..> UC8 : <<include>>
+UC9 ..> UC8 : <<include>>
+
+UC8 --> external : external calls
+UC6 --> UC9 : <<extend>>
+UC1 --> UC10 : <<extend>>
+
+note right of UC8
+  Confidence: 72%
+  Significance: 7/10
+  Category: Design Pattern
+end note
+
+note bottom of "API Pattern System"
+  Handles external communication
+  across multiple system components
+end note
+
+@enduml
