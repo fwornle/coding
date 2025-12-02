@@ -641,6 +641,37 @@ class HealthVerifier extends EventEmitter {
   }
 
   /**
+   * Check if another health-verifier instance is already running
+   * @returns {Promise<{running: boolean, pid?: number}>}
+   */
+  async checkExistingInstance() {
+    try {
+      // Check PSM for existing instance
+      const isRunning = await this.psm.isServiceRunning('health-verifier', 'global');
+      if (isRunning) {
+        const services = await this.psm.getServicesByType('global');
+        const existing = services.find(s => s.name === 'health-verifier');
+        if (existing && existing.pid) {
+          // Verify the process is actually running
+          try {
+            process.kill(existing.pid, 0); // Signal 0 just checks if process exists
+            return { running: true, pid: existing.pid };
+          } catch (e) {
+            // Process doesn't exist, clean up stale entry
+            this.log(`Cleaning up stale PSM entry for health-verifier (PID: ${existing.pid})`);
+            await this.psm.unregisterService('health-verifier', 'global');
+            return { running: false };
+          }
+        }
+      }
+      return { running: false };
+    } catch (error) {
+      this.log(`Error checking existing instance: ${error.message}`, 'WARN');
+      return { running: false };
+    }
+  }
+
+  /**
    * Start daemon mode
    */
   async start() {
@@ -649,8 +680,30 @@ class HealthVerifier extends EventEmitter {
       return;
     }
 
+    // Check for existing instance (singleton enforcement)
+    const existing = await this.checkExistingInstance();
+    if (existing.running) {
+      this.log(`Another health-verifier instance is already running (PID: ${existing.pid})`);
+      console.log(`⚠️  Health verifier already running (PID: ${existing.pid})`);
+      console.log('   Use "health-verifier stop" first if you want to restart.');
+      return;
+    }
+
     this.running = true;
     this.log('Starting health verifier daemon mode');
+
+    // Register this instance with PSM
+    try {
+      await this.psm.registerService({
+        name: 'health-verifier',
+        pid: process.pid,
+        type: 'global',
+        script: 'scripts/health-verifier.js'
+      });
+      this.log(`Registered with PSM (PID: ${process.pid})`);
+    } catch (error) {
+      this.log(`Failed to register with PSM: ${error.message}`, 'WARN');
+    }
 
     // Run initial verification
     await this.verify();
@@ -671,7 +724,7 @@ class HealthVerifier extends EventEmitter {
   /**
    * Stop daemon mode
    */
-  stop() {
+  async stop() {
     if (!this.running) {
       this.log('Health verifier not running');
       return;
@@ -682,6 +735,14 @@ class HealthVerifier extends EventEmitter {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+
+    // Unregister from PSM
+    try {
+      await this.psm.unregisterService('health-verifier', 'global');
+      this.log('Unregistered from PSM');
+    } catch (error) {
+      this.log(`Failed to unregister from PSM: ${error.message}`, 'WARN');
     }
 
     this.log('Health verifier stopped');
@@ -785,8 +846,8 @@ runIfMain(import.meta.url, () => {
         .then(() => {
           console.log('✅ Health verifier started');
           // Keep process alive
-          process.on('SIGINT', () => {
-            verifier.stop();
+          process.on('SIGINT', async () => {
+            await verifier.stop();
             process.exit(0);
           });
         })
@@ -797,9 +858,15 @@ runIfMain(import.meta.url, () => {
       break;
 
     case 'stop':
-      verifier.stop();
-      console.log('✅ Health verifier stopped');
-      process.exit(0);
+      verifier.stop()
+        .then(() => {
+          console.log('✅ Health verifier stopped');
+          process.exit(0);
+        })
+        .catch(error => {
+          console.error('❌ Failed to stop:', error.message);
+          process.exit(1);
+        });
       break;
 
     case 'status':

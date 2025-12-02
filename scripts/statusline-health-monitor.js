@@ -860,11 +860,26 @@ class StatusLineHealthMonitor {
         details = healthIssues.join(', ');
       }
 
-      return {
+      const healthResult = {
         status: healthStatus,
         icon: icon,
         details: details
       };
+
+      // Trigger auto-healing for unhealthy VKB server
+      if (this.autoHealEnabled && healthStatus === 'unhealthy') {
+        this.log(`Detected unhealthy VKB server: ${healthResult.details}`, 'WARN');
+
+        // Run auto-healing asynchronously to not block health check
+        setImmediate(async () => {
+          const healed = await this.autoHealVKBServer(healthResult);
+          if (healed) {
+            this.log(`🎉 VKB server auto-healed successfully`, 'INFO');
+          }
+        });
+      }
+
+      return healthResult;
 
     } catch (error) {
       this.log(`VKB server health check error: ${error.message}`, 'DEBUG');
@@ -1034,6 +1049,96 @@ class StatusLineHealthMonitor {
       this.log('Graceful restart completed', 'INFO');
     } catch (error) {
       this.log(`Graceful restart failed: ${error.message}`, 'ERROR');
+      throw error;
+    }
+  }
+
+  /**
+   * Auto-heal VKB server when issues are detected
+   */
+  async autoHealVKBServer(healthStatus) {
+    if (!this.autoHealEnabled) return false;
+
+    const serviceKey = 'vkb-server';
+    const now = Date.now();
+
+    // Check if we're in cooldown period
+    const lastHeal = this.lastHealingTime.get(serviceKey) || 0;
+    if (now - lastHeal < this.healingCooldown) {
+      this.log(`Auto-heal cooldown for ${serviceKey}, waiting ${Math.round((this.healingCooldown - (now - lastHeal)) / 1000)}s`, 'DEBUG');
+      return false;
+    }
+
+    // Check if we've exceeded max attempts
+    const attempts = this.healingAttempts.get(serviceKey) || 0;
+    if (attempts >= this.maxHealingAttempts) {
+      this.log(`Max healing attempts (${this.maxHealingAttempts}) reached for ${serviceKey}`, 'ERROR');
+      return false;
+    }
+
+    let healed = false;
+
+    try {
+      this.log(`🔧 Auto-healing VKB server (issue: ${healthStatus.details})`, 'INFO');
+
+      // VKB healing strategy: kill any stale processes on port 8080 and restart
+      await this.restartVKBServer();
+      healed = true;
+
+      if (healed) {
+        // Update tracking
+        this.healingAttempts.set(serviceKey, attempts + 1);
+        this.lastHealingTime.set(serviceKey, now);
+
+        // Wait a bit for server to stabilize
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Verify healing worked
+        const newHealth = await this.getVKBServerHealth();
+        if (newHealth.status === 'healthy') {
+          this.log(`✅ Auto-healing successful! VKB server is now healthy`, 'INFO');
+          // Reset attempts on successful heal
+          this.healingAttempts.set(serviceKey, 0);
+          return true;
+        } else {
+          this.log(`⚠️ Auto-healing completed but VKB server still unhealthy: ${newHealth.details}`, 'WARN');
+          return false;
+        }
+      }
+    } catch (error) {
+      this.log(`VKB auto-healing failed: ${error.message}`, 'ERROR');
+      this.healingAttempts.set(serviceKey, attempts + 1);
+      this.lastHealingTime.set(serviceKey, now);
+      return false;
+    }
+
+    return false;
+  }
+
+  /**
+   * Restart VKB server
+   */
+  async restartVKBServer() {
+    try {
+      this.log('Stopping any existing VKB server processes...', 'INFO');
+
+      // Kill any process on port 8080
+      await execAsync('lsof -ti:8080 | xargs kill -9 2>/dev/null || true');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Use the bin/vkb script to start the server properly
+      const vkbScript = path.join(this.codingRepoPath, 'bin', 'vkb');
+
+      this.log('Starting VKB server via bin/vkb...', 'INFO');
+
+      // Start VKB in background
+      execAsync(`"${vkbScript}" start`).catch(err => {
+        this.log(`VKB start error (non-critical): ${err.message}`, 'DEBUG');
+      });
+
+      this.log('VKB server restart initiated', 'INFO');
+    } catch (error) {
+      this.log(`Error restarting VKB server: ${error.message}`, 'ERROR');
       throw error;
     }
   }
