@@ -7,6 +7,7 @@ interface ProviderQuota {
   status: 'healthy' | 'moderate' | 'low' | 'critical' | 'degraded'
   quota: {
     remaining: number | string
+    remainingCredits?: number | null
     used: string
     limit: string
     unit: string
@@ -21,7 +22,7 @@ interface ProviderQuota {
     tokensPerDay?: number
   } | null
   lastChecked: string
-  cacheStrategy: 'real-time' | 'estimated'
+  cacheStrategy: 'real-time' | 'estimated' | 'free-tier'
 }
 
 interface APIQuotaState {

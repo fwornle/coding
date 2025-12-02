@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAppSelector, useAppDispatch } from '@/store'
 import { triggerVerificationStart } from '@/store/slices/autoHealingSlice'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +30,23 @@ export default function SystemHealthDashboard() {
   const healthReport = useAppSelector((state) => state.healthReport)
   const autoHealing = useAppSelector((state) => state.autoHealing)
   const apiQuota = useAppSelector((state) => state.apiQuota)
+
+  // Real-time age calculation - updates every second
+  const [currentTime, setCurrentTime] = useState(Date.now())
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Calculate dynamic age based on lastUpdate timestamp
+  const calculateDynamicAge = (): number => {
+    if (!healthStatus.lastUpdate) return 0
+    const lastUpdateTime = new Date(healthStatus.lastUpdate).getTime()
+    return currentTime - lastUpdateTime
+  }
 
   const handleTriggerVerification = () => {
     dispatch(triggerVerificationStart())
@@ -299,7 +316,7 @@ export default function SystemHealthDashboard() {
                 </CardTitle>
                 <CardDescription>
                   {healthStatus.lastUpdate ? (
-                    <>Last verified {formatAge(healthStatus.ageMs)}</>
+                    <>Last verified {formatAge(calculateDynamicAge())}</>
                   ) : (
                     'Waiting for first verification...'
                   )}
