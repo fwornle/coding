@@ -211,12 +211,17 @@ export class GraphKnowledgeExporter {
         existingByName.set(entity.name, entity);
       }
 
+      let preservedCount = 0;
+      let changedCount = 0;
+      let newCount = 0;
+
       // For each new entity, check if it has changed
-      return newEntities.map(newEntity => {
+      const result = newEntities.map(newEntity => {
         const existing = existingByName.get(newEntity.name);
 
         if (!existing) {
           // New entity - use current timestamp
+          newCount++;
           return newEntity;
         }
 
@@ -225,6 +230,7 @@ export class GraphKnowledgeExporter {
 
         if (!contentChanged && existing.metadata?.last_updated) {
           // Content unchanged - preserve original timestamp
+          preservedCount++;
           return {
             ...newEntity,
             metadata: {
@@ -236,11 +242,16 @@ export class GraphKnowledgeExporter {
         }
 
         // Content changed - use new timestamp
+        changedCount++;
         return newEntity;
       });
 
+      console.log(`[GraphKnowledgeExporter] Timestamp preservation: ${preservedCount} preserved, ${changedCount} changed, ${newCount} new`);
+      return result;
+
     } catch (error) {
       // File doesn't exist or can't be read - return entities as-is
+      console.log(`[GraphKnowledgeExporter] Cannot preserve timestamps: ${error.message}`);
       return newEntities;
     }
   }
@@ -331,7 +342,8 @@ export class GraphKnowledgeExporter {
     const normalizedEntities = entities.map(e => ({
       name: e.name,
       entityType: e.entityType,
-      observations: e.observations ? [...e.observations].sort() : [],
+      // Normalize observations: extract content for objects, keep strings as-is, then sort
+      observations: this._normalizeObservations(e.observations),
       significance: e.significance,
       source: e.source,
       problem: e.problem,
@@ -350,6 +362,27 @@ export class GraphKnowledgeExporter {
     });
 
     return { entities: normalizedEntities, relations: normalizedRelations };
+  }
+
+  /**
+   * Normalize observations array for comparison
+   * Extracts just the content from observation objects, ignoring dates and other metadata
+   *
+   * @param {Array} observations - Observations array (can be strings or objects)
+   * @returns {Array} Normalized observations (strings only, sorted)
+   * @private
+   */
+  _normalizeObservations(observations) {
+    if (!observations || !Array.isArray(observations)) return [];
+
+    return observations.map(obs => {
+      if (typeof obs === 'string') return obs;
+      if (typeof obs === 'object' && obs !== null) {
+        // Extract content from observation objects, ignore type/date/metadata
+        return obs.content || JSON.stringify(obs);
+      }
+      return String(obs);
+    }).sort();
   }
 
   /**

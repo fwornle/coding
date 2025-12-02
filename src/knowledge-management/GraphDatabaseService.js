@@ -754,6 +754,123 @@ export class GraphDatabaseService extends EventEmitter {
   }
 
   /**
+   * Normalize all relation types and remove redundant 'relation' edges
+   *
+   * This method:
+   * 1. Normalizes relation types (spaces → underscores, e.g., "implemented in" → "implemented_in")
+   * 2. Removes empty/null relation types
+   * 3. Removes generic 'relation' type edges when a more specific type exists
+   *
+   * @returns {Promise<{normalized: number, genericRemoved: number, details: Object}>}
+   */
+  async normalizeAndCleanupRelations() {
+    console.log('🧹 Normalizing and cleaning up relations...');
+
+    const normalizeType = (type) => (type || '').replace(/\s+/g, '_');
+
+    let normalizedCount = 0;
+    let genericRemovedCount = 0;
+    const edgesToDelete = [];
+    const details = {
+      normalized: [],
+      genericRemoved: []
+    };
+
+    // Step 1: Normalize all relation types (fix stored values)
+    this.graph.forEachEdge((edgeId, attributes) => {
+      const currentType = attributes.type || '';
+      const normalizedType = normalizeType(currentType);
+
+      // Fix types with spaces
+      if (currentType !== normalizedType && normalizedType) {
+        this.graph.setEdgeAttribute(edgeId, 'type', normalizedType);
+        normalizedCount++;
+        details.normalized.push({
+          edgeId,
+          from: currentType,
+          to: normalizedType
+        });
+        console.log(`  Normalized: "${currentType}" → "${normalizedType}"`);
+      }
+
+      // Remove empty/null types by marking for deletion
+      if (!normalizedType) {
+        edgesToDelete.push(edgeId);
+        console.log(`  Removing edge with empty type: ${edgeId}`);
+      }
+    });
+
+    // Step 2: Find and remove 'relation' edges where a specific type exists
+    // Group edges by source-target pair
+    const edgePairs = new Map();
+    this.graph.forEachEdge((edgeId, attributes, source, target) => {
+      const pairKey = `${source}__${target}`;
+      if (!edgePairs.has(pairKey)) {
+        edgePairs.set(pairKey, []);
+      }
+      edgePairs.get(pairKey).push({ edgeId, type: attributes.type || '' });
+    });
+
+    // For each pair, if there's a 'relation' type AND a specific type, remove 'relation'
+    for (const [pairKey, edges] of edgePairs.entries()) {
+      const relationEdges = edges.filter(e => e.type === 'relation');
+      const specificEdges = edges.filter(e => e.type && e.type !== 'relation');
+
+      // If we have both generic and specific, remove the generic ones
+      if (relationEdges.length > 0 && specificEdges.length > 0) {
+        for (const relEdge of relationEdges) {
+          if (!edgesToDelete.includes(relEdge.edgeId)) {
+            edgesToDelete.push(relEdge.edgeId);
+            genericRemovedCount++;
+            details.genericRemoved.push({
+              edgeId: relEdge.edgeId,
+              pairKey,
+              keptTypes: specificEdges.map(e => e.type)
+            });
+            const [source, target] = pairKey.split('__');
+            const sourceName = this.graph.hasNode(source)
+              ? this.graph.getNodeAttribute(source, 'name')
+              : source;
+            const targetName = this.graph.hasNode(target)
+              ? this.graph.getNodeAttribute(target, 'name')
+              : target;
+            console.log(`  Removing generic 'relation': ${sourceName} → ${targetName} (specific types: ${specificEdges.map(e => e.type).join(', ')})`);
+          }
+        }
+      }
+    }
+
+    // Delete marked edges
+    for (const edgeId of edgesToDelete) {
+      try {
+        this.graph.dropEdge(edgeId);
+      } catch (e) {
+        // Edge might already be deleted
+      }
+    }
+
+    // Mark as dirty and persist
+    if (normalizedCount > 0 || edgesToDelete.length > 0) {
+      this.isDirty = true;
+      if (this.levelDB) {
+        await this._persistGraphToLevel();
+      }
+    }
+
+    console.log(`✓ Cleanup complete:`);
+    console.log(`  - Normalized ${normalizedCount} relation types`);
+    console.log(`  - Removed ${genericRemovedCount} generic 'relation' edges`);
+    console.log(`  - Removed ${edgesToDelete.length - genericRemovedCount} edges with empty types`);
+
+    return {
+      normalized: normalizedCount,
+      genericRemoved: genericRemovedCount,
+      emptyRemoved: edgesToDelete.length - genericRemovedCount,
+      details
+    };
+  }
+
+  /**
    * Find related entities using graph traversal
    *
    * Uses breadth-first search to find entities related within specified depth.
