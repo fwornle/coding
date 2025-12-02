@@ -331,6 +331,62 @@ const SERVICE_CONFIGS = {
       if (result.skipRegistration) return true;
       return createPidHealthCheck()(result);
     }
+  },
+
+  systemHealthDashboardAPI: {
+    name: 'System Health Dashboard API',
+    required: false, // OPTIONAL - system health dashboard
+    maxRetries: 2,
+    timeout: 15000,
+    startFn: async () => {
+      console.log('[SystemHealthAPI] Starting system health dashboard API on port 3033...');
+
+      // Check if already running globally (parallel session detection)
+      const isRunning = await psm.isServiceRunning('system-health-dashboard-api', 'global');
+      if (isRunning) {
+        console.log('[SystemHealthAPI] Already running globally - using existing instance');
+        // Check if port is listening
+        if (await isPortListening(3033)) {
+          return { pid: 'already-running', port: 3033, service: 'system-health-dashboard-api', skipRegistration: true };
+        } else {
+          console.log('[SystemHealthAPI] Warning: PSM shows running but port 3033 not listening - cleaning up PSM entry');
+        }
+      }
+
+      // Kill any existing process on port 3033
+      try {
+        await new Promise((resolve) => {
+          exec('lsof -ti:3033 | xargs kill -9 2>/dev/null', () => resolve());
+        });
+        await sleep(500);
+      } catch (error) {
+        // Ignore errors
+      }
+
+      const child = spawn('node', [
+        path.join(CODING_DIR, 'integrations/system-health-dashboard/server.js')
+      ], {
+        detached: true,
+        stdio: ['ignore', 'ignore', 'ignore'],
+        cwd: CODING_DIR
+      });
+
+      child.unref();
+
+      // Brief wait for process to start
+      await sleep(1000);
+
+      // Check if process is still running
+      if (!isProcessRunning(child.pid)) {
+        throw new Error('System Health Dashboard API process died immediately');
+      }
+
+      return { pid: child.pid, port: 3033, service: 'system-health-dashboard-api' };
+    },
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      return createHttpHealthCheck(3033, '/api/health')(result);
+    }
   }
 };
 
@@ -404,6 +460,16 @@ async function createServicesStatusFile(results) {
     transcript_monitor: {
       status: '✅ OPERATIONAL',
       health: 'healthy'
+    },
+    system_health_api: {
+      status: results.successful.some(r => r.serviceName === 'System Health Dashboard API')
+        ? '✅ OPERATIONAL'
+        : '⚠️ DEGRADED',
+      port: 3033,
+      dashboard_port: 3032,
+      health: results.successful.some(r => r.serviceName === 'System Health Dashboard API')
+        ? 'healthy'
+        : 'degraded'
     }
   };
 
@@ -634,6 +700,27 @@ async function startAllServices() {
     await registerWithPSM(statuslineHealthResult, 'scripts/statusline-health-monitor.js');
   } else {
     results.degraded.push(statuslineHealthResult);
+  }
+
+  console.log('');
+
+  // 6. OPTIONAL: System Health Dashboard API
+  const systemHealthAPIResult = await startServiceWithRetry(
+    SERVICE_CONFIGS.systemHealthDashboardAPI.name,
+    SERVICE_CONFIGS.systemHealthDashboardAPI.startFn,
+    SERVICE_CONFIGS.systemHealthDashboardAPI.healthCheckFn,
+    {
+      required: SERVICE_CONFIGS.systemHealthDashboardAPI.required,
+      maxRetries: SERVICE_CONFIGS.systemHealthDashboardAPI.maxRetries,
+      timeout: SERVICE_CONFIGS.systemHealthDashboardAPI.timeout
+    }
+  );
+
+  if (systemHealthAPIResult.status === 'success') {
+    results.successful.push(systemHealthAPIResult);
+    await registerWithPSM(systemHealthAPIResult, 'integrations/system-health-dashboard/server.js');
+  } else {
+    results.degraded.push(systemHealthAPIResult);
   }
 
   console.log('');
