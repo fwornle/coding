@@ -100,6 +100,9 @@ integrations/mcp-server-browserbase/
 # Workflow checkpoints (timestamps that change frequently but don't need git tracking)
 .data/workflow-checkpoints.json
 
+# Workflow execution reports (generated on each UKB run, not needed in git)
+.data/workflow-reports/
+
 # 4-Layer Monitoring Architecture runtime files
 .global-service-registry.json
 .mcp-sync/session-registry.json
