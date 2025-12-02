@@ -288,7 +288,8 @@ class StatusLineHealthMonitor {
       'nano-degree': 'ND',
       'curriculum': 'CU',
       'alignment': 'AL',
-      'nano': 'N'
+      'nano': 'N',
+      'ui-template': 'UT'
     };
 
     // Check for exact match first
