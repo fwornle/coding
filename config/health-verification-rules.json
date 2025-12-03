@@ -90,6 +90,18 @@
         "auto_heal": true,
         "auto_heal_action": "restart_health_api",
         "expected_status": "critical"
+      },
+      "enhanced_transcript_monitor": {
+        "enabled": true,
+        "severity": "error",
+        "check_type": "psm_service",
+        "service_name": "enhanced-transcript-monitor",
+        "service_type": "per-project",
+        "project_path": "/Users/q284340/Agentic/coding",
+        "description": "Live Session Logging (LSL) transcript monitor - CRITICAL for session history",
+        "auto_heal": true,
+        "auto_heal_action": "restart_transcript_monitor",
+        "expected_status": "critical"
       }
     },
     "processes": {

@@ -347,7 +347,93 @@ class HealthVerifier extends EventEmitter {
       });
     }
 
+    // Check Enhanced Transcript Monitor (LSL system - CRITICAL for session history)
+    if (serviceRules.enhanced_transcript_monitor?.enabled) {
+      const rule = serviceRules.enhanced_transcript_monitor;
+      const transcriptCheck = await this.checkPSMService(
+        'enhanced_transcript_monitor',
+        rule.service_name,
+        rule.service_type,
+        rule.project_path
+      );
+      checks.push({
+        ...transcriptCheck,
+        auto_heal: rule.auto_heal,
+        auto_heal_action: rule.auto_heal_action,
+        severity: rule.severity
+      });
+    }
+
     return checks;
+  }
+
+  /**
+   * Check if a service is running via PSM
+   */
+  async checkPSMService(checkName, serviceName, serviceType, projectPath) {
+    const check = {
+      category: 'services',
+      check: checkName,
+      check_id: `${checkName}_${Date.now()}`,
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      const psmHealth = await this.psm.getHealthStatus();
+      let serviceFound = false;
+      let serviceAlive = false;
+      let servicePid = null;
+
+      if (serviceType === 'global') {
+        const service = psmHealth.details.global[serviceName];
+        if (service) {
+          serviceFound = true;
+          serviceAlive = service.alive;
+          servicePid = service.pid;
+        }
+      } else if (serviceType === 'per-project' && projectPath) {
+        const projectServices = psmHealth.details.projects[projectPath] || [];
+        const service = projectServices.find(s => s.name === serviceName);
+        if (service) {
+          serviceFound = true;
+          serviceAlive = service.alive;
+          servicePid = service.pid;
+        }
+      }
+
+      if (!serviceFound) {
+        return {
+          ...check,
+          status: 'failed',
+          message: `${serviceName} not registered in PSM`,
+          details: { service_name: serviceName, service_type: serviceType, project_path: projectPath }
+        };
+      }
+
+      if (!serviceAlive) {
+        return {
+          ...check,
+          status: 'failed',
+          message: `${serviceName} registered but not running (PID ${servicePid} is dead)`,
+          details: { service_name: serviceName, pid: servicePid, status: 'dead' }
+        };
+      }
+
+      return {
+        ...check,
+        status: 'passed',
+        message: `${serviceName} is healthy`,
+        details: { service_name: serviceName, pid: servicePid, status: 'alive' }
+      };
+
+    } catch (error) {
+      return {
+        ...check,
+        status: 'failed',
+        message: `Failed to check ${serviceName}: ${error.message}`,
+        details: { error: error.message }
+      };
+    }
   }
 
   /**

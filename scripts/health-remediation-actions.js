@@ -136,6 +136,9 @@ export class HealthRemediationActions {
         case 'cleanup_zombies':
           result = await this.cleanupZombies(issueDetails);
           break;
+        case 'restart_transcript_monitor':
+          result = await this.restartTranscriptMonitor(issueDetails);
+          break;
         default:
           this.log(`Unknown action: ${actionName}`, 'ERROR');
           return {
@@ -528,6 +531,99 @@ export class HealthRemediationActions {
     } catch (error) {
       // No zombies found or ps command failed
       return { success: true, message: 'No zombie processes found' };
+    }
+  }
+
+  /**
+   * Restart enhanced transcript monitor (LSL system)
+   */
+  async restartTranscriptMonitor(details) {
+    try {
+      this.log('Restarting enhanced transcript monitor...');
+
+      const projectPath = details.project_path || this.codingRoot;
+      const projectName = projectPath.split('/').pop();
+
+      // Kill existing monitor if registered in PSM
+      try {
+        const service = await this.psm.getService('enhanced-transcript-monitor', 'per-project', projectPath);
+        if (service && service.pid) {
+          this.log(`Killing existing transcript monitor (PID: ${service.pid})`);
+          try {
+            process.kill(service.pid, 'SIGTERM');
+            await this.sleep(2000);
+          } catch (killError) {
+            // Process might already be dead
+          }
+          // Unregister from PSM
+          await this.psm.unregisterService('enhanced-transcript-monitor', 'per-project', projectPath);
+        }
+      } catch (error) {
+        // No existing service found
+      }
+
+      // Also kill any orphan monitors for this project
+      try {
+        const { stdout } = await execAsync(`pgrep -f "enhanced-transcript-monitor.js.*${projectName}"`);
+        const pids = stdout.trim().split('\n').filter(p => p);
+        for (const pidStr of pids) {
+          const pid = parseInt(pidStr);
+          if (pid) {
+            this.log(`Killing orphan transcript monitor (PID: ${pid})`);
+            try {
+              process.kill(pid, 'SIGTERM');
+            } catch (e) {
+              // Ignore
+            }
+          }
+        }
+        await this.sleep(1000);
+      } catch (error) {
+        // pgrep found nothing, that's fine
+      }
+
+      // Start new transcript monitor
+      const monitorScript = `${this.codingRoot}/scripts/enhanced-transcript-monitor.js`;
+      const cmd = `node ${monitorScript} ${projectPath} > /dev/null 2>&1 &`;
+
+      await execAsync(cmd, {
+        shell: '/bin/bash',
+        timeout: 5000,
+        cwd: this.codingRoot
+      });
+
+      await this.sleep(3000);
+
+      // Verify it's running via PSM
+      try {
+        const service = await this.psm.getService('enhanced-transcript-monitor', 'per-project', projectPath);
+        if (service && service.status === 'healthy') {
+          return {
+            success: true,
+            message: `Transcript monitor restarted successfully (PID: ${service.pid})`
+          };
+        }
+      } catch (error) {
+        // Check failed
+      }
+
+      // Fallback: check if process is running
+      try {
+        const { stdout } = await execAsync(`pgrep -f "enhanced-transcript-monitor.js.*${projectName}"`);
+        if (stdout.trim()) {
+          return {
+            success: true,
+            message: `Transcript monitor started (PIDs: ${stdout.trim().replace(/\n/g, ', ')})`
+          };
+        }
+      } catch (error) {
+        // pgrep found nothing
+      }
+
+      return { success: false, message: 'Failed to start transcript monitor' };
+
+    } catch (error) {
+      return { success: false, message: error.message };
     }
   }
 

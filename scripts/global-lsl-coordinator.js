@@ -241,10 +241,11 @@ class GlobalLSLCoordinator {
       return false;
     }
     
-    // Check health file
-    const healthFile = path.join(projectPath, '.transcript-monitor-health');
+    // Check health file (stored in coding project's .health directory)
+    const projectName = path.basename(projectPath);
+    const healthFile = path.join(this.codingRepoPath, '.health', `${projectName}-transcript-monitor-health.json`);
     if (!fs.existsSync(healthFile)) {
-      this.log(`Health file missing for ${path.basename(projectPath)}`);
+      this.log(`Health file missing for ${projectName}`);
       return false;
     }
     
@@ -254,19 +255,19 @@ class GlobalLSLCoordinator {
       
       // Health file should be updated recently (within 60 seconds)
       if (age > 60000) {
-        this.log(`Stale health file for ${path.basename(projectPath)} (${age}ms old)`);
+        this.log(`Stale health file for ${projectName} (${age}ms old)`);
         return false;
       }
-      
+
       // Check for suspicious activity (no exchanges processed for long time)
       if (healthData.activity && healthData.activity.isSuspicious) {
-        this.log(`Suspicious activity detected for ${path.basename(projectPath)}: ${healthData.activity.suspicionReason}`);
+        this.log(`Suspicious activity detected for ${projectName}: ${healthData.activity.suspicionReason}`);
         return false;
       }
       
       return true;
     } catch (error) {
-      this.log(`Error reading health file for ${path.basename(projectPath)}: ${error.message}`);
+      this.log(`Error reading health file for ${projectName}: ${error.message}`);
       return false;
     }
   }
