@@ -1549,21 +1549,11 @@ class EnhancedTranscriptMonitor {
       promptSetId = `ps_${timestamp}`;
     }
 
-    // NEW: Check if all exchanges are complete before writing
-    // CRITICAL: Hold back ANY exchange that hasn't completed, regardless of whether it has a response yet
-    // This prevents "Text-only exchange" placeholders from being written for incomplete exchanges
-    const incompleteExchanges = completedSet.filter(ex => {
-      return !ex.isComplete;  // ANY incomplete exchange should be held back
-    });
-
-    if (incompleteExchanges.length > 0) {
-      console.log(`⏳ Holding back prompt set - ${incompleteExchanges.length} exchange(s) still incomplete`);
-      incompleteExchanges.forEach(ex => {
-        const age = Date.now() - new Date(ex.timestamp).getTime();
-        console.log(`   - ${ex.id.substring(0, 8)}: waiting ${Math.floor(age/1000)}s`);
-      });
-      return false;  // Don't write yet, keep accumulating
-    }
+    // REMOVED: isComplete check was broken because transcript doesn't reliably provide stop_reason
+    // (only tool_use stop_reasons appear, not end_turn for text responses)
+    // This method is only called when a NEW user prompt arrives, which means the previous
+    // prompt set is definitionally complete. The "meaningful content" filter below handles
+    // exchanges that haven't received responses yet.
 
     // Filter out exchanges with no meaningful content
     const meaningfulExchanges = completedSet.filter(exchange => {
