@@ -156,6 +156,17 @@ class BatchLSLProcessor {
       if (this.classificationLogger) {
         this.classificationLogger.finalize();
       }
+
+      // For modes that create JSONL files, ensure all have corresponding MD summaries
+      // This handles cases where live monitor created JSONL but batch processor didn't process them
+      if (['retroactive', 'post-session', 'from-transcripts', 'recover', 'rebuild-missing', 'foreign-only'].includes(mode)) {
+        try {
+          console.log('\n🔄 Ensuring all JSONL files have markdown summaries...');
+          await this.regenerateMarkdownFromJsonl();
+        } catch (err) {
+          console.warn(`⚠️  Markdown regeneration warning: ${err.message}`);
+        }
+      }
     }
   }
 
@@ -209,13 +220,18 @@ class BatchLSLProcessor {
    */
   async processRetroactive(startDate, endDate) {
     console.log(`🔄 Retroactive processing: ${startDate} to ${endDate}`);
-    
+
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     if (isNaN(start) || isNaN(end)) {
       throw new Error('Invalid date format. Use YYYY-MM-DD');
     }
+
+    // CRITICAL FIX: Set end date to end of day (23:59:59.999) to include all files modified on that day
+    // Without this, files modified after midnight on the end date are excluded
+    end.setHours(23, 59, 59, 999);
+    console.log(`📅 Date range: ${start.toISOString()} to ${end.toISOString()}`);
 
     // Find transcripts in date range
     const transcriptFiles = await this.findTranscriptsInRange(start, end);
@@ -850,7 +866,14 @@ class BatchLSLProcessor {
         threshold: 4 // Use moderate threshold for individual prompt set classification
       });
 
-      console.log(`📋 Classified prompt set ${promptSet.id}: ${classification.isCoding ? 'CODING' : 'LOCAL'} (confidence: ${classification.confidence})`);
+      console.log(`📋 Classified prompt set ${promptSet.id}: ${classification.isCoding ? 'CODING' : 'LOCAL'} (confidence: ${classification.confidence}, layer: ${classification.layer || 'unknown'})`);
+
+      // DIAGNOSTIC: Check why classification logging might be skipped
+      if (!this.classificationLogger) {
+        console.warn(`⚠️  Classification logging SKIPPED: classificationLogger is ${this.classificationLogger}`);
+      } else if (!classification.decisionPath) {
+        console.warn(`⚠️  Classification logging SKIPPED for ${promptSet.id}: decisionPath is missing (layer: ${classification.layer}, reason: ${classification.reason?.substring(0, 100)})`);
+      }
 
       // Log classification decision with full 4-layer trace
       if (this.classificationLogger && classification.decisionPath) {
@@ -901,11 +924,23 @@ class BatchLSLProcessor {
       
     } catch (error) {
       console.error(`❌ Classification failed for prompt set ${promptSet.id}:`, error.message);
-      // Default to local/non-coding if classification fails
+      // CRITICAL FIX: Include decisionPath so classification logging still works
+      // This allows tracking of classification errors for debugging
       return {
         isCoding: false,
         confidence: 0.01,
         reason: `Classification error: ${error.message}`,
+        layer: 'error',
+        decisionPath: [{
+          layer: 'error',
+          input: { promptSetId: promptSet.id },
+          output: {
+            isCoding: false,
+            confidence: 0.01,
+            reason: `Classification error: ${error.message}`
+          },
+          duration: 0
+        }],
         details: {}
       };
     }

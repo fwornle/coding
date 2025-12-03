@@ -1082,7 +1082,7 @@ class ReliableCodingClassifier {
     } catch (error) {
       const totalTime = Date.now() - startTime;
       console.error('Classification error:', error.message);
-      
+
       if (this.operationalLogger) {
         this.operationalLogger.logError(error, {
           exchange: this.sanitizeForLogging(exchange),
@@ -1091,9 +1091,13 @@ class ReliableCodingClassifier {
           layer: layer || 'error'
         });
       }
-      
-      // Return safe default classification
-      return this.formatResult('NOT_CODING_INFRASTRUCTURE', 0.1, `Error: ${error.message}`, totalTime);
+
+      // CRITICAL FIX: Include decisionPath in error result for classification logging
+      // Without this, batch processor's logging is skipped silently
+      const errorResult = this.formatResult('NOT_CODING_INFRASTRUCTURE', 0.1, `Error: ${error.message}`, totalTime);
+      errorResult.layer = 'error';
+      errorResult.decisionPath = decisionPath; // Include whatever layers were processed before error
+      return errorResult;
     }
   }
 
