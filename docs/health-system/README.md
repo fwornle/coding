@@ -91,6 +91,11 @@ The Health System provides **failsafe monitoring** with automatic verification a
 - Zombie cleanup
 - Resource monitoring
 
+### Transcript Monitor
+- **LSL Health** - Verifies transcript monitor is running and processing
+- **Exchange Activity** - Tracks exchange count and last processed UUID
+- **Suspicious Activity** - Detects stuck or stale monitors
+
 ### API Quota
 - **Groq** - Free tier quota (7.2M tokens/day, 14.4K RPM)
 - **Google Gemini** - Free tier quota (15 RPM, 1M TPD)

@@ -126,11 +126,12 @@ node -e "const crypto = require('crypto'); console.log(crypto.createHash('sha256
 - Transcript monitor crashes
 - Missing content in LSL files
 - Processing delays or hangs
+- No LSL files being generated despite active sessions
 
 **Diagnosis:**
 ```bash
-# Check transcript monitor status
-cat .transcript-monitor-health
+# Check transcript monitor status (centralized health file)
+cat .health/coding-transcript-monitor-health.json | jq '{status, activity}'
 
 # Test transcript processing
 TRANSCRIPT_DEBUG=true TRANSCRIPT_SOURCE_PROJECT="/path/to/project" node scripts/enhanced-transcript-monitor.js --test
@@ -162,10 +163,22 @@ split -l 1000 large-transcript.jsonl split-transcript-
 **C. Clear Processing Cache:**
 ```bash
 # Remove health file to reset state
-rm -f .transcript-monitor-health
+rm -f .health/coding-transcript-monitor-health.json
+rm -f .health/coding-transcript-monitor-state.json
 
 # Clear temporary processing files
 find /tmp -name "*transcript*" -mtime +1 -delete
+```
+
+**D. Recover Missing LSL Files:**
+```bash
+# Batch recover from transcripts (for coding project)
+PROJECT_PATH=/Users/q284340/Agentic/coding CODING_REPO=/Users/q284340/Agentic/coding \
+  node scripts/batch-lsl-processor.js from-transcripts ~/.claude/projects/-Users-q284340-Agentic-coding
+
+# Recover specific date range
+PROJECT_PATH=/Users/q284340/Agentic/coding CODING_REPO=/Users/q284340/Agentic/coding \
+  node scripts/batch-lsl-processor.js retroactive 2024-12-01 2024-12-03
 ```
 
 ### 4. Configuration Validation Errors
