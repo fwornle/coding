@@ -12,7 +12,9 @@
 
 # Logs
 *.log
-logs/
+/logs/
+# Note: Use /logs/ (with leading slash) to only match top-level logs directory
+# This allows .specstory/logs/classification/ to be tracked via negation below
 
 # Temporary files
 *.tmp
