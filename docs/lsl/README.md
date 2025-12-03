@@ -323,10 +323,24 @@ Each pattern includes:
 ps aux | grep enhanced-transcript-monitor
 
 # Check health file
-cat .transcript-monitor-health
+cat .health/coding-transcript-monitor-health.json
 
 # Restart monitor via coding command
 coding --restart-monitor
+```
+
+**LSL files not being generated?**
+
+```bash
+# Verify monitor is processing exchanges
+tail -50 .logs/transcript-monitor-test.log
+
+# Check if LSL files exist for today
+ls -la .specstory/history/ | grep "$(date +%Y-%m-%d)"
+
+# Recover missing LSL files from transcripts
+PROJECT_PATH=/Users/q284340/Agentic/coding CODING_REPO=/Users/q284340/Agentic/coding \
+  node scripts/batch-lsl-processor.js from-transcripts ~/.claude/projects/-Users-q284340-Agentic-coding
 ```
 
 **Classification not working?**
@@ -348,6 +362,35 @@ cat .specstory/logs/classification/classification-status_<userhash>.md
 
 # Verify CODING content in coding repo
 ls -la /path/to/coding/.specstory/history/*_from-<project>.md
+```
+
+## Recovery Procedures
+
+### Batch LSL Recovery
+
+When LSL files are missing due to monitor issues, use the batch processor to recover from transcripts:
+
+```bash
+# Recover all LSL files from transcripts for this project
+PROJECT_PATH=/path/to/project CODING_REPO=/Users/q284340/Agentic/coding \
+  node /Users/q284340/Agentic/coding/scripts/batch-lsl-processor.js from-transcripts \
+  ~/.claude/projects/-Users-q284340-Agentic-<project-name>
+
+# Recover specific date range
+PROJECT_PATH=/path/to/project CODING_REPO=/Users/q284340/Agentic/coding \
+  node /Users/q284340/Agentic/coding/scripts/batch-lsl-processor.js retroactive 2024-12-01 2024-12-03
+```
+
+### Monitor Health Verification
+
+The health system now includes transcript monitor health as a verification rule:
+
+```bash
+# Check monitor health via centralized health file
+cat .health/coding-transcript-monitor-health.json | jq '{status, metrics, activity}'
+
+# View in health dashboard
+open http://localhost:3032
 ```
 
 ## See Also

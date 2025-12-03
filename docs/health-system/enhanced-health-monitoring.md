@@ -544,9 +544,39 @@ await this.levelDB.open();  // Throws on failure
 - ✅ Layer 1: Watchdog (global service monitoring and auto-restart)
 - ✅ StatusLine Health Monitor PSM integration with singleton pattern
 - ✅ Auto-restart watchdog in combined-status-line.js
+- ✅ Transcript Monitor Health Verification
 - ⚠️ Layer 2: Coordinator (basic registry, no active coordination)
 - ⚠️ Layer 3: Verifier (periodic health verification implemented)
 - ⚠️ Proactive health remediation (partial - auto-restart only)
+
+### Transcript Monitor Health Verification
+
+The health system includes transcript monitor health as a verification rule, ensuring LSL files are being generated properly.
+
+**Verification Points:**
+- Monitor process is running (PID check)
+- Health file is being updated (freshness check)
+- Exchanges are being processed (activity tracking)
+- No suspicious activity detected (stuck detection)
+
+**Health File Location:** `.health/{projectName}-transcript-monitor-health.json`
+
+**Key Metrics Tracked:**
+```json
+{
+  "status": "running",
+  "metrics": {
+    "memoryMB": 41,
+    "uptimeSeconds": 105,
+    "processId": 11610
+  },
+  "activity": {
+    "lastExchange": "uuid-here",
+    "exchangeCount": 10,
+    "isSuspicious": false
+  }
+}
+```
 
 ## StatusLine Health Monitor - PSM Singleton Pattern
 
