@@ -6,39 +6,29 @@
       "observations": [
         {
           "type": "rule",
-          "content": "NEVER edit shared-memory.json directly - ALWAYS use ukb command",
-          "date": "2025-06-19T11:09:50Z"
+          "content": "NEVER edit shared-memory.json directly - ALWAYS use vkb command or MCP tools"
         },
         {
           "type": "implementation",
-          "content": "ukb --interactive for insights, ukb --add-entity for patterns, ukb --add-relation for connections",
-          "date": "2025-06-19T11:09:50Z"
+          "content": "vkb server for visualization, MCP semantic-analysis tools for programmatic access"
         },
         {
           "type": "validation",
-          "content": "ukb ensures proper formatting, validation, and MCP synchronization",
-          "date": "2025-06-19T11:09:50Z"
+          "content": "vkb and MCP tools ensure proper formatting, validation, and GraphDB synchronization"
         },
         {
           "type": "workflow",
-          "content": "Git-tracked JSON + MCP runtime + visualization sync",
-          "date": "2025-06-19T11:09:50Z"
+          "content": "Graphology (in-memory) then LevelDB (persistence) then JSON export (backup)"
         },
         {
           "type": "benefits",
-          "content": "Cross-session persistence, agent-agnostic design, team collaboration",
-          "date": "2025-06-19T11:09:50Z"
-        },
-        {
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/KnowledgePersistencePattern.md",
-          "date": "2025-06-19T11:09:50Z"
+          "content": "Cross-session persistence, agent-agnostic design, team collaboration"
         }
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.574Z",
-        "last_updated": "2025-11-30T08:30:17.313Z"
+        "last_updated": "2025-12-04T11:39:45.553Z"
       },
       "id": "mc4flkg3g96u4x"
     },
@@ -685,7 +675,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-12-02T10:56:21.662Z",
+    "exported_at": "2025-12-04T11:39:50.563Z",
     "total_entities": 16,
     "total_relations": 50,
     "description": "Coding project infrastructure and patterns"
