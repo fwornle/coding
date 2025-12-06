@@ -1,295 +1,316 @@
-# Constraint Monitor Configuration
-#
-# For detailed documentation on constraint configuration, including:
-# - applies_to property (file_path vs content checking)
-# - Semantic validation
-# - Exceptions and whitelists
-# - Pattern matching tips and best practices
-#
-# See: integrations/mcp-constraint-monitor/docs/constraint-configuration.md
-#
-# Quick Reference for applies_to:
-#   applies_to: file_path  - Check only the file path, not content
-#   (omitted)              - Check file content (default behavior)
-#
-# Example: Block edits to specific directories without false positives
-#   - id: my-constraint
-#     pattern: "\.data/restricted/"
-#     applies_to: file_path  # Only blocks files IN this path, not files mentioning it
-
 constraint_groups:
-  - id: code_quality
-    name: Code Quality Standards
-    description: Basic code quality and best practices
-    icon: 🔧
-    color: "#4CAF50"
-  - id: security
-    name: Security Requirements
-    description: Security-focused constraints and vulnerability prevention
-    icon: 🔒
-    color: "#F44336"
-  - id: architecture
-    name: Architecture Guidelines
-    description: Development practices and architectural standards
-    icon: 🏗️
-    color: "#2196F3"
-  - id: plantuml
-    name: PlantUML Standards
-    description: Diagram creation and PlantUML workflow standards
-    icon: 📊
-    color: "#9C27B0"
-  - id: documentation
-    name: Documentation Standards
-    description: Documentation format and organization requirements
-    icon: 📚
-    color: "#FF9800"
-  - id: framework_specific
-    name: Framework-Specific Rules
-    description: Framework and library specific constraints (can be enabled per project)
-    icon: ⚛️
-    color: "#607D8B"
+- id: code_quality
+  name: Code Quality Standards
+  description: Basic code quality and best practices
+  icon: 🔧
+  color: '#4CAF50'
+- id: security
+  name: Security Requirements
+  description: Security-focused constraints and vulnerability prevention
+  icon: 🔒
+  color: '#F44336'
+- id: architecture
+  name: Architecture Guidelines
+  description: Development practices and architectural standards
+  icon: 🏗️
+  color: '#2196F3'
+- id: plantuml
+  name: PlantUML Standards
+  description: Diagram creation and PlantUML workflow standards
+  icon: 📊
+  color: '#9C27B0'
+- id: documentation
+  name: Documentation Standards
+  description: Documentation format and organization requirements
+  icon: 📚
+  color: '#FF9800'
+- id: framework_specific
+  name: Framework-Specific Rules
+  description: Framework and library specific constraints (can be enabled per project)
+  icon: ⚛️
+  color: '#607D8B'
 constraints:
-  - id: no-console-log
-    group: code_quality
-    pattern: console\.log
-    message: Use Logger.log() instead of console.log for better log management
-    severity: warning
-    enabled: true
-    suggestion: "Replace with: Logger.log('info', 'category', message)"
-  - id: no-var-declarations
-    group: code_quality
-    pattern: \bvar\s+
-    message: Use 'let' or 'const' instead of 'var'
-    severity: warning
-    enabled: true
-    suggestion: Use 'let' for mutable variables, 'const' for immutable
-  - id: proper-error-handling
-    group: code_quality
-    pattern: catch\s*\([^)]*\)\s*\{\s*\}
-    message: Empty catch blocks should be avoided
-    severity: error
-    enabled: true
-    suggestion: Add proper error handling or at minimum log the error
-  - id: proper-function-naming
-    group: code_quality
-    pattern: function\s+[a-z]
-    message: Function names should start with a verb (camelCase)
-    severity: info
-    enabled: true
-    suggestion: "Use descriptive verb-based names: getUserData(), processResults()"
-  - id: no-magic-numbers
-    group: code_quality
-    pattern: \b\d{2,}\b(?!\s*(px|%|em|rem|vh|vw))
-    message: Magic numbers detected - consider using named constants
-    severity: info
-    enabled: true
-    suggestion: "Define meaningful constants: const MAX_RETRIES = 3"
-  - id: no-hardcoded-secrets
-    group: security
-    pattern: (api[_-]?key|password|secret|token)\s*[=:]\s*['"][^'"]{8,}['"]
-    message: Potential hardcoded secret detected
-    severity: critical
-    enabled: true
-    suggestion: Use environment variables or secure key management
-    semantic_validation: true
-  - id: no-eval-usage
-    group: security
-    pattern: \beval\s*\(
-    message: eval() usage detected - security risk
-    severity: critical
-    enabled: true
-    suggestion: Avoid eval() - use safer alternatives for dynamic code execution
-  - id: no-parallel-files
-    group: architecture
-    pattern: (v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental)[._-]
-    message: "CRITICAL: No parallel versions allowed - edit the original file directly"
-    severity: critical
-    enabled: false
-    suggestion: Debug and fix the original file instead of creating parallel versions
-  - id: debug-not-speculate
-    group: architecture
-    pattern: (maybe|probably|might be|could be|seems like|appears to be).*(?:error|issue|problem|bug)
-    message: Always debug and verify - never speculate about issues
-    severity: error
-    enabled: true
-    suggestion: Use debugging tools and verification commands to identify root causes
-    semantic_validation: true
-  - id: no-evolutionary-names
-    group: architecture
-    pattern: (?:class|function|const|let|var)\s+\w*(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)\w*
-    message: "Evolutionary naming detected - refactor original instead. (Whitelisted files are exempt from this rule)"
-    severity: error
-    enabled: false
-    suggestion: Rename to descriptive functional name and refactor the original
-    semantic_validation: false
-    whitelist:
-      - scripts/enhanced-transcript-monitor.js
-      - scripts/enhanced-*.js
-  - id: no-backup-files
-    group: architecture
-    pattern: \.(backup|bak|old|orig|tmp)(-\d{8}(-\d{6})?)?$
-    message: "CRITICAL: Backup files prohibited in development - use git for versioning"
-    severity: critical
-    enabled: true
-    suggestion: "Remove backup files and commit changes to git instead. Use 'git diff' to compare versions."
-  - id: knowledge-base-direct-manipulation
-    group: architecture
-    pattern: "(?:\\.data/knowledge-(?:export|graph)/|\\.data/knowledge-export/.*\\.json)"
-    message: "CRITICAL: Knowledge base must only be manipulated through bin/ukb CLI"
-    severity: critical
-    enabled: true
-    applies_to: file_path  # Only check file path, not content (prevents false positives in .gitignore)
-    suggestion: "Use 'bin/ukb' CLI for all knowledge base operations. Never directly edit files in .data/knowledge-export/ or .data/knowledge-graph/"
-  - id: plantuml-standard-styling
-    group: plantuml
-    pattern: "@startuml.*\\n(?!.*!include _standard-style\\.puml)"
-    message: PlantUML files must include the standard styling file
-    severity: error
-    enabled: false
-    suggestion: Add '!include _standard-style.puml' after @startuml and before content
-    whitelist:
-      - "*.yaml"
-      - "*.yml"
-      - ".constraint-monitor.yaml"
-  - id: plantuml-file-location
-    group: plantuml
-    pattern: "!include.*\\.puml"
-    message: PlantUML files should be stored in docs/puml/ directory
-    severity: warning
-    enabled: true
-    suggestion: Move .puml files to docs/puml/ and update !include paths
-  - id: plantuml-diagram-workflow
-    group: plantuml
-    pattern: (?i)(architecture|diagram|flow|sequence).*(?:diagram|chart)
-    message: "Diagrams should follow PlantUML workflow: .puml files in docs/puml/, PNG files in docs/images/"
-    severity: info
-    enabled: true
-    suggestion: 1. Create .puml file in docs/puml/ with !include _standard-style.puml 2. Generate PNG with plantuml -tpng 3.
-      Store PNG in docs/images/ 4. Reference PNG in markdown
-  - id: plantuml-readability-guidelines
-    group: plantuml
-    pattern: (?i)(too wide|barely readable|restructure.*readability)
-    message: PlantUML diagrams should prioritize readability with vertical layouts and logical grouping
-    severity: info
-    enabled: true
-    suggestion: Use 'skinparam direction top to bottom layout' and group related components in rectangles or packages
-  - id: plantuml-file-organization
-    group: plantuml
-    pattern: \.puml$
-    message: "PlantUML files should follow naming convention: component-purpose.puml"
-    severity: info
-    enabled: true
-    suggestion: Use descriptive names like workflow-sequence.puml, architecture-overview.puml
-  - id: image-reference-pattern
-    group: documentation
-    pattern: "!\\[.*\\]\\((?!docs/images/).*\\.(png|jpg|jpeg|svg)\\)"
-    message: Diagram images should be stored in docs/images/ and referenced with relative paths
-    severity: warning
-    enabled: true
-    suggestion: "Move images to docs/images/ and update markdown references: ![Description](docs/images/filename.png)"
-  - id: documentation-filename-format
-    group: documentation
-    pattern: "[A-Z][a-z]+[A-Z].*\\.md$"
-    message: "Documentation files should use kebab-case naming: feature-name.md"
-    severity: info
-    enabled: true
-    suggestion: "Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md"
-  - id: update-main-readme
-    group: documentation
-    pattern: (?i)readme.*(?:update|modify|change).*(?:structure|format|content)
-    message: Main README updates should maintain consistent structure and TOC
-    severity: info
-    enabled: true
-    suggestion: "Follow established README sections: Purpose, Features, Installation, Usage, Architecture"
-  - id: no-incremental-documentation
-    group: documentation
-    pattern: "(?i)\\b(fixed|improved|added|updated|changed|modified|removed|deprecated|enhanced|new|now|recent|recently|previous|previously|old|older|formerly|originally|was|were|used to be)\\s+(in|on|for|during|as of)?\\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)?\\s*\\d{4}\\b|\\b(dec|nov|oct|sep|aug|jul|jun|may|apr|mar|feb|jan)\\s*\\d{4}\\b|\\bv\\d+\\.\\d+|version\\s+\\d|\\(fixed\\)|\\(added\\)|\\(improved\\)|\\(updated\\)"
-    message: "CRITICAL: Documentation describes CURRENT state only - no version history, fix dates, or incremental language. Use git for history."
-    severity: error
-    enabled: true
-    applies_to: content
-    tool_filter: ["Edit", "Write"]
-    file_pattern: "\\.md$"
-    suggestion: "Remove dates and incremental language. Describe how the system works NOW, not when it changed. Git provides version history."
-    whitelist:
-      - "CHANGELOG.md"
-      - "RELEASE*.md"
-  - id: no-ascii-art-in-docs
-    group: documentation
-    pattern: "[┌┐└┘│─├┤┬┴┼▲▼◄►]"
-    message: "CRITICAL: ASCII/line art detected in documentation - use PlantUML diagrams instead. You MUST invoke documentation-style skill FIRST"
-    severity: error
-    enabled: true
-    suggestion: "1. Invoke Skill tool with skill='documentation-style' 2. Create .puml file in docs/puml/ 3. Generate PNG with plantuml 4. Reference image in markdown"
-  - id: documentation-style-skill-required
-    group: documentation
-    pattern: "(?:```(?:plantuml|puml|mermaid)|@startuml|flowchart|sequenceDiagram)"
-    message: "CRITICAL: Creating diagrams requires documentation-style skill. You MUST invoke Skill tool with skill='documentation-style' BEFORE creating diagram files"
-    severity: error
-    enabled: true
-    applies_to: file_path  # Check file path only - allows .puml files
-    suggestion: "STOP: Invoke the documentation-style skill first: Use Skill tool with parameter skill='documentation-style' to load proper workflow and standards"
-    whitelist:
-      - ".constraint-monitor.yaml"
-  - id: plantuml-modification-requires-skill
-    group: plantuml
-    pattern: "@startuml|!include.*\\.puml"
-    message: "CRITICAL: Modifying PlantUML files requires documentation-style skill. You MUST invoke Skill tool with skill='documentation-style' FIRST"
-    severity: error
-    enabled: true
-    applies_to: content
-    tool_filter: ["Edit", "Write", "mcp__serena__replace_symbol_body", "mcp__serena__insert_after_symbol", "mcp__serena__insert_before_symbol"]
-    file_pattern: "\\.puml$"
-    suggestion: "STOP: Invoke the documentation-style skill first: Use Skill tool with parameter skill='documentation-style' to load PlantUML workflow, validation, and PNG generation standards"
-    whitelist:
-      - ".constraint-monitor.yaml"
-  - id: plantuml-png-outdated
-    group: plantuml
-    description: "PlantUML PNG files must be regenerated after .puml modifications"
-    severity: warning
-    enabled: true
-    validation_type: post_file_edit
-    file_pattern: "\\.puml$"
-    check_type: file_timestamp_comparison
-    png_path_pattern: "{{dirname}}/{{basename}}.png"
-    max_age_seconds: 120
-    message: |
-      PlantUML source file was modified but corresponding PNG file is outdated or missing.
+- id: no-console-log
+  group: code_quality
+  pattern: console\.log
+  message: Use Logger.log() instead of console.log for better log management
+  severity: warning
+  enabled: true
+  suggestion: 'Replace with: Logger.log(''info'', ''category'', message)'
+- id: no-var-declarations
+  group: code_quality
+  pattern: \bvar\s+
+  message: Use 'let' or 'const' instead of 'var'
+  severity: warning
+  enabled: true
+  suggestion: Use 'let' for mutable variables, 'const' for immutable
+- id: proper-error-handling
+  group: code_quality
+  pattern: catch\s*\([^)]*\)\s*\{\s*\}
+  message: Empty catch blocks should be avoided
+  severity: error
+  enabled: true
+  suggestion: Add proper error handling or at minimum log the error
+- id: proper-function-naming
+  group: code_quality
+  pattern: function\s+[a-z]
+  message: Function names should start with a verb (camelCase)
+  severity: info
+  enabled: true
+  suggestion: 'Use descriptive verb-based names: getUserData(), processResults()'
+- id: no-magic-numbers
+  group: code_quality
+  pattern: \b\d{2,}\b(?!\s*(px|%|em|rem|vh|vw))
+  message: Magic numbers detected - consider using named constants
+  severity: info
+  enabled: true
+  suggestion: 'Define meaningful constants: const MAX_RETRIES = 3'
+- id: no-hardcoded-secrets
+  group: security
+  pattern: (api[_-]?key|password|secret|token)\s*[=:]\s*['"][^'"]{8,}['"]
+  message: Potential hardcoded secret detected
+  severity: critical
+  enabled: true
+  suggestion: Use environment variables or secure key management
+  semantic_validation: true
+- id: no-eval-usage
+  group: security
+  pattern: \beval\s*\(
+  message: eval() usage detected - security risk
+  severity: critical
+  enabled: true
+  suggestion: Avoid eval() - use safer alternatives for dynamic code execution
+- id: no-parallel-files
+  group: architecture
+  pattern: (v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental)[._-]
+  message: 'CRITICAL: No parallel versions allowed - edit the original file directly'
+  severity: critical
+  enabled: false
+  suggestion: Debug and fix the original file instead of creating parallel versions
+- id: debug-not-speculate
+  group: architecture
+  pattern: (maybe|probably|might be|could be|seems like|appears to be).*(?:error|issue|problem|bug)
+  message: Always debug and verify - never speculate about issues
+  severity: error
+  enabled: true
+  suggestion: Use debugging tools and verification commands to identify root causes
+  semantic_validation: true
+- id: no-evolutionary-names
+  group: architecture
+  pattern: (?:class|function|const|let|var)\s+\w*(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)\w*
+  message: Evolutionary naming detected - refactor original instead. (Whitelisted
+    files are exempt from this rule)
+  severity: error
+  enabled: false
+  suggestion: Rename to descriptive functional name and refactor the original
+  semantic_validation: false
+  whitelist:
+  - scripts/enhanced-transcript-monitor.js
+  - scripts/enhanced-*.js
+- id: no-backup-files
+  group: architecture
+  pattern: \.(backup|bak|old|orig|tmp)(-\d{8}(-\d{6})?)?$
+  message: 'CRITICAL: Backup files prohibited in development - use git for versioning'
+  severity: critical
+  enabled: true
+  suggestion: Remove backup files and commit changes to git instead. Use 'git diff'
+    to compare versions.
+- id: knowledge-base-direct-manipulation
+  group: architecture
+  pattern: (?:\.data/knowledge-(?:export|graph)/|\.data/knowledge-export/.*\.json)
+  message: 'CRITICAL: Knowledge base must only be manipulated through bin/ukb CLI'
+  severity: critical
+  enabled: true
+  applies_to: file_path
+  suggestion: Use 'bin/ukb' CLI for all knowledge base operations. Never directly
+    edit files in .data/knowledge-export/ or .data/knowledge-graph/
+- id: plantuml-standard-styling
+  group: plantuml
+  pattern: '@startuml.*\n(?!.*!include _standard-style\.puml)'
+  message: PlantUML files must include the standard styling file
+  severity: error
+  enabled: false
+  suggestion: Add '!include _standard-style.puml' after @startuml and before content
+  whitelist:
+  - '*.yaml'
+  - '*.yml'
+  - .constraint-monitor.yaml
+- id: plantuml-file-location
+  group: plantuml
+  pattern: '!include.*\.puml'
+  message: PlantUML files should be stored in docs/puml/ directory
+  severity: warning
+  enabled: true
+  suggestion: Move .puml files to docs/puml/ and update !include paths
+- id: plantuml-diagram-workflow
+  group: plantuml
+  pattern: (?i)(architecture|diagram|flow|sequence).*(?:diagram|chart)
+  message: 'Diagrams should follow PlantUML workflow: .puml files in docs/puml/, PNG
+    files in docs/images/'
+  severity: info
+  enabled: true
+  suggestion: 1. Create .puml file in docs/puml/ with !include _standard-style.puml
+    2. Generate PNG with plantuml -tpng 3. Store PNG in docs/images/ 4. Reference
+    PNG in markdown
+- id: plantuml-readability-guidelines
+  group: plantuml
+  pattern: (?i)(too wide|barely readable|restructure.*readability)
+  message: PlantUML diagrams should prioritize readability with vertical layouts and
+    logical grouping
+  severity: info
+  enabled: true
+  suggestion: Use 'skinparam direction top to bottom layout' and group related components
+    in rectangles or packages
+- id: plantuml-file-organization
+  group: plantuml
+  pattern: \.puml$
+  message: 'PlantUML files should follow naming convention: component-purpose.puml'
+  severity: info
+  enabled: true
+  suggestion: Use descriptive names like workflow-sequence.puml, architecture-overview.puml
+- id: image-reference-pattern
+  group: documentation
+  pattern: '!\[.*\]\((?!docs/images/).*\.(png|jpg|jpeg|svg)\)'
+  message: Diagram images should be stored in docs/images/ and referenced with relative
+    paths
+  severity: warning
+  enabled: true
+  suggestion: 'Move images to docs/images/ and update markdown references: ![Description](docs/images/filename.png)'
+- id: documentation-filename-format
+  group: documentation
+  pattern: '[A-Z][a-z]+[A-Z].*\.md$'
+  message: 'Documentation files should use kebab-case naming: feature-name.md'
+  severity: info
+  enabled: true
+  suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md'
+- id: update-main-readme
+  group: documentation
+  pattern: (?i)readme.*(?:update|modify|change).*(?:structure|format|content)
+  message: Main README updates should maintain consistent structure and TOC
+  severity: info
+  enabled: true
+  suggestion: 'Follow established README sections: Purpose, Features, Installation,
+    Usage, Architecture'
+- id: no-incremental-documentation
+  group: documentation
+  pattern: (?i)\b(fixed|improved|added|updated|changed|modified|removed|deprecated|enhanced|new|now|recent|recently|previous|previously|old|older|formerly|originally|was|were|used
+    to be)\s+(in|on|for|during|as of)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)?\s*\d{4}\b|\b(dec|nov|oct|sep|aug|jul|jun|may|apr|mar|feb|jan)\s*\d{4}\b|\bv\d+\.\d+|version\s+\d|\(fixed\)|\(added\)|\(improved\)|\(updated\)
+  message: 'CRITICAL: Documentation describes CURRENT state only - no version history,
+    fix dates, or incremental language. Use git for history.'
+  severity: error
+  enabled: true
+  applies_to: content
+  tool_filter:
+  - Edit
+  - Write
+  file_pattern: \.md$
+  suggestion: Remove dates and incremental language. Describe how the system works
+    NOW, not when it changed. Git provides version history.
+  whitelist:
+  - CHANGELOG.md
+  - RELEASE*.md
+- id: no-ascii-art-in-docs
+  group: documentation
+  pattern: '[┌┐└┘│─├┤┬┴┼▲▼◄►]'
+  message: 'CRITICAL: ASCII/line art detected in documentation - use PlantUML diagrams
+    instead. You MUST invoke documentation-style skill FIRST'
+  severity: error
+  enabled: true
+  suggestion: 1. Invoke Skill tool with skill='documentation-style' 2. Create .puml
+    file in docs/puml/ 3. Generate PNG with plantuml 4. Reference image in markdown
+- id: documentation-style-skill-required
+  group: documentation
+  pattern: (?:```(?:plantuml|puml|mermaid)|@startuml|flowchart|sequenceDiagram)
+  message: 'CRITICAL: Creating diagrams requires documentation-style skill. You MUST
+    invoke Skill tool with skill=''documentation-style'' BEFORE creating diagram files'
+  severity: error
+  enabled: true
+  applies_to: file_path
+  suggestion: 'STOP: Invoke the documentation-style skill first: Use Skill tool with
+    parameter skill=''documentation-style'' to load proper workflow and standards'
+  whitelist:
+  - .constraint-monitor.yaml
+- id: plantuml-modification-requires-skill
+  group: plantuml
+  pattern: '@startuml|!include.*\.puml'
+  message: 'CRITICAL: Modifying PlantUML files requires documentation-style skill.
+    You MUST invoke Skill tool with skill=''documentation-style'' FIRST'
+  severity: error
+  enabled: false
+  applies_to: content
+  tool_filter:
+  - Edit
+  - Write
+  - mcp__serena__replace_symbol_body
+  - mcp__serena__insert_after_symbol
+  - mcp__serena__insert_before_symbol
+  file_pattern: \.puml$
+  suggestion: 'STOP: Invoke the documentation-style skill first: Use Skill tool with
+    parameter skill=''documentation-style'' to load PlantUML workflow, validation,
+    and PNG generation standards'
+  whitelist:
+  - .constraint-monitor.yaml
+- id: plantuml-png-outdated
+  group: plantuml
+  description: PlantUML PNG files must be regenerated after .puml modifications
+  severity: warning
+  enabled: true
+  validation_type: post_file_edit
+  file_pattern: \.puml$
+  check_type: file_timestamp_comparison
+  png_path_pattern: '{{dirname}}/{{basename}}.png'
+  max_age_seconds: 120
+  message: 'PlantUML source file was modified but corresponding PNG file is outdated
+    or missing.
 
-      PUML file: {{file_path}}
-      Expected PNG: {{png_path}}
 
-      ACTION REQUIRED:
-      1. Generate PNG: plantuml {{file_path}}
-      2. Move to images: mv {{dirname}}/{{basename}}.png docs/images/
-      3. Verify PNG exists and is up-to-date
+    PUML file: {{file_path}}
 
-      The PNG file must be updated within 120 seconds of the .puml modification.
-    suggestion: "Run: plantuml {{file_path}} && mv {{dirname}}/{{basename}}.png docs/images/"
-  - id: react-hooks-deps
-    group: framework_specific
-    pattern: useEffect\([^,]*,\s*\[\]
-    message: useEffect with empty deps array - verify if this is intentional
-    severity: info
-    enabled: false
-    suggestion: Ensure useEffect dependencies are correct to avoid bugs
-  - id: react-state-complexity
-    group: framework_specific
-    pattern: useState\([^)]*\{[^}]*\}[^)]*\)
-    message: Complex object in useState - consider useReducer or separate states
-    severity: warning
-    enabled: false
-    suggestion: Use useReducer for complex state or separate into multiple useState calls
-  - id: no-ukb-bash-command
-    group: architecture
-    pattern: "^ukb\\s|^ukb$|\\s+ukb\\s|\\s+ukb$|[;&|]\\s*ukb\\s|[;&|]\\s*ukb$"
-    message: "CRITICAL: 'ukb' is NOT a shell command! When user types 'ukb' at Claude prompt, call MCP semantic analysis tool (full or incremental), NOT bash"
-    severity: critical
-    enabled: true
-    applies_to: content
-    tool_filter: ["Bash"]
-    suggestion: "User typing 'ukb' at Claude prompt means: Call mcp-server-semantic-analysis tool (full or incremental workflow). Never try to run 'ukb' as a bash/shell command - it was completely removed from the system."
-    semantic_validation: true
+    Expected PNG: {{png_path}}
+
+
+    ACTION REQUIRED:
+
+    1. Generate PNG: plantuml {{file_path}}
+
+    2. Move to images: mv {{dirname}}/{{basename}}.png docs/images/
+
+    3. Verify PNG exists and is up-to-date
+
+
+    The PNG file must be updated within 120 seconds of the .puml modification.
+
+    '
+  suggestion: 'Run: plantuml {{file_path}} && mv {{dirname}}/{{basename}}.png docs/images/'
+- id: react-hooks-deps
+  group: framework_specific
+  pattern: useEffect\([^,]*,\s*\[\]
+  message: useEffect with empty deps array - verify if this is intentional
+  severity: info
+  enabled: false
+  suggestion: Ensure useEffect dependencies are correct to avoid bugs
+- id: react-state-complexity
+  group: framework_specific
+  pattern: useState\([^)]*\{[^}]*\}[^)]*\)
+  message: Complex object in useState - consider useReducer or separate states
+  severity: warning
+  enabled: false
+  suggestion: Use useReducer for complex state or separate into multiple useState
+    calls
+- id: no-ukb-bash-command
+  group: architecture
+  pattern: ^ukb\s|^ukb$|\s+ukb\s|\s+ukb$|[;&|]\s*ukb\s|[;&|]\s*ukb$
+  message: 'CRITICAL: ''ukb'' is NOT a shell command! When user types ''ukb'' at Claude
+    prompt, call MCP semantic analysis tool (full or incremental), NOT bash'
+  severity: critical
+  enabled: true
+  applies_to: content
+  tool_filter:
+  - Bash
+  suggestion: 'User typing ''ukb'' at Claude prompt means: Call mcp-server-semantic-analysis
+    tool (full or incremental workflow). Never try to run ''ukb'' as a bash/shell
+    command - it was completely removed from the system.'
+  semantic_validation: true
 settings:
   compliance:
     excellent_threshold: 9
@@ -309,7 +330,11 @@ settings:
     sort_by_severity: true
 enforcement:
   enabled: true
-  blocking_levels: [critical, error]
-  warning_levels: [warning]
-  info_levels: [info]
+  blocking_levels:
+  - critical
+  - error
+  warning_levels:
+  - warning
+  info_levels:
+  - info
   fail_open: true
