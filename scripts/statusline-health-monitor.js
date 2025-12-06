@@ -204,7 +204,9 @@ class StatusLineHealthMonitor {
                 const mostRecent = transcriptFiles[0];
                 const age = Date.now() - mostRecent.stats.mtime.getTime();
 
-                if (age < 900000) { // Active within 15 minutes
+                // Use graduated green shades for declining activity
+                // 🟢 bright green → 🟩 medium → 🌲 dark → 🫒 olive → 🪨 rock → ⚫ black
+                if (age < 300000) { // Active within 5 minutes
                   // Downgrade to amber if trajectory missing/stale
                   if (trajectoryStatus.status !== 'fresh') {
                     sessions[projectName] = {
@@ -219,18 +221,36 @@ class StatusLineHealthMonitor {
                       details: 'Active session'
                     };
                   }
-                } else if (age < 86400000) { // Idle within 24 hours
+                } else if (age < 900000) { // 5-15 minutes: cooling (darker green)
+                  sessions[projectName] = {
+                    status: 'cooling',
+                    icon: '🌲',
+                    details: 'Cooling down'
+                  };
+                } else if (age < 3600000) { // 15min - 1 hour: fading (olive)
+                  sessions[projectName] = {
+                    status: 'fading',
+                    icon: '🫒',
+                    details: 'Session fading'
+                  };
+                } else if (age < 21600000) { // 1-6 hours: dormant (rock/dark)
+                  sessions[projectName] = {
+                    status: 'dormant',
+                    icon: '🪨',
+                    details: 'Session dormant'
+                  };
+                } else if (age < 86400000) { // 6-24 hours: inactive (black)
                   sessions[projectName] = {
                     status: 'inactive',
                     icon: '⚫',
                     details: 'Session idle'
                   };
                 } else {
-                  // Older than 24 hours - show as dormant but still track it
+                  // Older than 24 hours - show as sleeping
                   sessions[projectName] = {
-                    status: 'dormant',
+                    status: 'sleeping',
                     icon: '💤',
-                    details: 'Session dormant'
+                    details: 'Session sleeping'
                   };
                 }
               }
@@ -375,13 +395,32 @@ class StatusLineHealthMonitor {
             const mostRecent = transcriptFiles[0];
             const age = Date.now() - mostRecent.stats.mtime.getTime();
 
-            if (age < 900000) { // Active within 15 minutes
+            // Use graduated green shades for declining activity
+            if (age < 300000) { // Active within 5 minutes
               return {
                 status: 'active',
                 icon: '🟢',
                 details: 'Active session'
               };
-            } else if (age < 86400000) { // Idle within 24 hours
+            } else if (age < 900000) { // 5-15 minutes: cooling
+              return {
+                status: 'cooling',
+                icon: '🌲',
+                details: 'Cooling down'
+              };
+            } else if (age < 3600000) { // 15min - 1 hour: fading
+              return {
+                status: 'fading',
+                icon: '🫒',
+                details: 'Session fading'
+              };
+            } else if (age < 21600000) { // 1-6 hours: dormant
+              return {
+                status: 'dormant',
+                icon: '🪨',
+                details: 'Session dormant'
+              };
+            } else if (age < 86400000) { // 6-24 hours: inactive
               return {
                 status: 'inactive',
                 icon: '⚫',
@@ -389,9 +428,9 @@ class StatusLineHealthMonitor {
               };
             } else {
               return {
-                status: 'dormant',
+                status: 'sleeping',
                 icon: '💤',
-                details: 'Session dormant'
+                details: 'Session sleeping'
               };
             }
           }
@@ -465,6 +504,8 @@ class StatusLineHealthMonitor {
       }
 
       // Determine health based on age and status
+      // Use graduated green shades for declining activity instead of orange/red
+      // 🟢 bright green → 🌲 dark green → ⚫ black (inactive)
       if (age < 90000) { // < 90 seconds
         if (healthData.status === 'running' && healthData.streamingActive) {
           // Check trajectory - downgrade to amber if missing/stale
@@ -482,23 +523,36 @@ class StatusLineHealthMonitor {
             details: `${healthData.activity?.exchangeCount || 0} exchanges`
           };
         } else {
+          // Not streaming but health data fresh - use graduated green
           return {
-            status: 'warning',
-            icon: '🟡',
+            status: 'idle',
+            icon: '🟩',
             details: 'Not streaming'
           };
         }
-      } else if (age < 120000) { // 90s - 2min
+      } else if (age < 300000) { // 90s - 5min: slightly stale (medium green)
         return {
-          status: 'warning',
-          icon: '🟡',
-          details: 'Stale health data'
+          status: 'stale',
+          icon: '🟩',
+          details: 'Recently active'
         };
-      } else if (age < 21600000) { // 2min - 6 hours: unhealthy (red)
+      } else if (age < 900000) { // 5min - 15min: stale (darker green)
         return {
-          status: 'unhealthy',
-          icon: '🔴',
-          details: 'Health data too old'
+          status: 'cooling',
+          icon: '🌲',
+          details: 'Cooling down'
+        };
+      } else if (age < 3600000) { // 15min - 1 hour: fading (dark green/olive)
+        return {
+          status: 'fading',
+          icon: '🫒',
+          details: 'Session fading'
+        };
+      } else if (age < 21600000) { // 1 hour - 6 hours: dormant but trackable (very dark)
+        return {
+          status: 'dormant',
+          icon: '🪨',
+          details: 'Session dormant'
         };
       } else {
         // > 6 hours: inactive (black)
@@ -1436,8 +1490,10 @@ The monitor aggregates health data from:
 Status Line Format:
   [GCM:✅] [Sessions: coding:🟢 curriculum-alignment:🟡] [Guards:✅]
 
-Health Indicators:
-  🟢 Healthy    🟡 Warning    🔴 Unhealthy    ❌ Failed    ⚫ Inactive
+Health Indicators (graduated green for session activity):
+  🟢 Active     🟩 Idle       🌲 Cooling      🫒 Fading
+  🪨 Dormant    ⚫ Inactive   💤 Sleeping     🟡 Warning
+  ❌ Failed
 
 Auto-Healing:
   When --auto-heal is enabled, the monitor will automatically:
