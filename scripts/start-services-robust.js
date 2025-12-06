@@ -478,6 +478,34 @@ async function createServicesStatusFile(results) {
 }
 
 /**
+ * Wait for a process pattern to be fully terminated
+ * Returns true when no more processes match the pattern
+ */
+async function waitForProcessTermination(pattern, maxWaitMs = 5000, checkIntervalMs = 200) {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const { stdout } = await execAsync(
+        `ps aux | grep "${pattern}" | grep -v grep || true`,
+        { timeout: 2000 }
+      );
+
+      if (!stdout.trim()) {
+        return true; // No more processes found
+      }
+
+      await sleep(checkIntervalMs);
+    } catch (error) {
+      // ps command failed, assume processes are gone
+      return true;
+    }
+  }
+
+  return false; // Timeout - processes may still be running
+}
+
+/**
  * Pre-startup cleanup to remove dangling processes from crashed sessions
  */
 async function cleanupDanglingProcesses() {
@@ -497,8 +525,19 @@ async function cleanupDanglingProcesses() {
       console.log('   Terminating dangling transcript monitors...');
 
       try {
+        // First try graceful SIGTERM
         await execAsync('pkill -f "enhanced-transcript-monitor.js"', { timeout: 5000 });
-        await sleep(1000);
+
+        // Wait for processes to actually terminate (up to 3 seconds)
+        const terminated = await waitForProcessTermination('enhanced-transcript-monitor.js', 3000);
+
+        if (!terminated) {
+          // Force kill with SIGKILL if still running
+          console.log('   ⚠️  Graceful termination timed out, forcing kill...');
+          await execAsync('pkill -9 -f "enhanced-transcript-monitor.js"', { timeout: 5000 }).catch(() => {});
+          await waitForProcessTermination('enhanced-transcript-monitor.js', 2000);
+        }
+
         console.log('   ✅ Cleaned up transcript monitors');
       } catch (error) {
         // pkill returns non-zero if no processes found - this is expected on retry
@@ -519,8 +558,19 @@ async function cleanupDanglingProcesses() {
       console.log('   Terminating dangling live-logging coordinators...');
 
       try {
+        // First try graceful SIGTERM
         await execAsync('pkill -f "live-logging-coordinator.js"', { timeout: 5000 });
-        await sleep(1000);
+
+        // Wait for processes to actually terminate (up to 3 seconds)
+        const terminated = await waitForProcessTermination('live-logging-coordinator.js', 3000);
+
+        if (!terminated) {
+          // Force kill with SIGKILL if still running
+          console.log('   ⚠️  Graceful termination timed out, forcing kill...');
+          await execAsync('pkill -9 -f "live-logging-coordinator.js"', { timeout: 5000 }).catch(() => {});
+          await waitForProcessTermination('live-logging-coordinator.js', 2000);
+        }
+
         console.log('   ✅ Cleaned up live-logging coordinators');
       } catch (error) {
         // pkill returns non-zero if no processes found - this is expected on retry
