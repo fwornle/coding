@@ -95,6 +95,24 @@ To show remaining dollars, set `prepaidCredits` in `config/live-logging-config.j
 - `(Xmin)` - Minutes since last activity
 - `→project` - Project with activity
 
+### Session Activity Indicators
+
+Session activity uses a **graduated green color scheme** that transitions smoothly from active to inactive, avoiding jarring orange/red colors that imply errors:
+
+| Icon | Status | Time Since Activity | Description |
+|------|--------|---------------------|-------------|
+| 🟢 | Active | < 5 minutes | Currently active session |
+| 🟩 | Idle | 90s - 5 minutes | Health data fresh, not streaming |
+| 🌲 | Cooling | 5 - 15 minutes | Recently active, cooling down |
+| 🫒 | Fading | 15 min - 1 hour | Session activity fading |
+| 🪨 | Dormant | 1 - 6 hours | Session dormant but trackable |
+| ⚫ | Inactive | 6 - 24 hours | Session idle |
+| 💤 | Sleeping | > 24 hours | Long-term dormant session |
+| 🟡 | Warning | Any | Trajectory file missing or stale |
+| ❌ | Error | Any | Health check failed |
+
+**Design Rationale**: Projects that aren't actively being worked on should show gradual "cooling" colors rather than alarming red/orange. Red is reserved for actual errors, not inactive sessions.
+
 ## Architecture
 
 ![StatusLine Architecture](../images/statusline-architecture.png)
@@ -223,17 +241,25 @@ Where:
 
 ![Service Lifecycle State](../images/service-lifecycle-state.png)
 
-**Health States**:
-- **Healthy** (Green) - Service operational (score 80-100)
-- **Degraded** (Yellow) - Service impaired (score 50-79)
-- **Unhealthy** (Red) - Service failing (score 0-49)
-- **Unknown** (Gray) - Cannot determine status
+**Service Health States** (for system services like GCM, Guards, DB, VKB):
+- **Healthy** (✅) - Service operational
+- **Warning** (🟡) - Service degraded but functional
+- **Unhealthy** (🔴) - Service failing
+- **Unknown** (❓) - Cannot determine status
+
+**Session Activity States** (for project sessions - graduated green scheme):
+- **Active** (🟢) - Currently active (< 5 min)
+- **Cooling** (🌲) - Recently active (5-15 min)
+- **Fading** (🫒) - Activity fading (15 min - 1 hr)
+- **Dormant** (🪨) - Dormant but trackable (1-6 hr)
+- **Inactive** (⚫) - Session idle (6-24 hr)
+- **Sleeping** (💤) - Long-term dormant (> 24 hr)
 
 **Transitions**:
-- Health check success → Healthy
-- Partial failure → Degraded
+- Health check success → Healthy/Active
+- Partial failure → Warning
 - Complete failure → Unhealthy
-- Check timeout → Unknown
+- Time passage → Cooling → Fading → Dormant → Inactive → Sleeping
 
 ### Status Display States
 
