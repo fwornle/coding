@@ -6,74 +6,217 @@
       "observations": [
         {
           "type": "architecture",
-          "content": "The system uses a graph database (Graphology + LevelDB) for knowledge storage, with JSON exports for backups at .data/knowledge-export",
-          "date": "2025-12-06T06:56:54.253Z",
+          "content": "The system uses a modular architecture with separate components for graph database services, knowledge exporters, and adapters.",
+          "date": "2025-12-06T14:00:46.059Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-06T06:57:00.270Z",
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
             "source": "entity-refresh",
             "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 110,
-            "vibeSessionsAnalyzed": 1
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
           }
         },
         {
           "type": "implementation",
-          "content": "The system provides a command-line interface using tools such as vkb and MCP tools for interacting with the knowledge base",
-          "date": "2025-12-06T06:56:54.253Z",
+          "content": "The system uses Graphology and LevelDB for knowledge storage at .data/knowledge-graph.",
+          "date": "2025-12-06T14:00:46.059Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-06T06:57:00.270Z",
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
             "source": "entity-refresh",
             "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 110,
-            "vibeSessionsAnalyzed": 1
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
           }
         },
         {
           "type": "validation",
-          "content": "The system uses a 3-tier KB update detector to ensure data consistency and integrity",
-          "date": "2025-12-06T06:56:54.253Z",
+          "content": "The system uses the PersistenceAgent component to handle persistence-related operations and ensure data consistency and integrity.",
+          "date": "2025-12-06T14:00:46.059Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-06T06:57:00.270Z",
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
             "source": "entity-refresh",
             "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 110,
-            "vibeSessionsAnalyzed": 1
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
           }
         },
         {
           "type": "workflow",
-          "content": "The system uses a modular architecture, with separate components for graph database services, knowledge exporters, and adapters, to provide a scalable and maintainable design",
-          "date": "2025-12-06T06:56:54.253Z",
+          "content": "The system provides a command-line interface using the vkb command for visualization and MCP tools for knowledge operations.",
+          "date": "2025-12-06T14:00:46.059Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-06T06:57:00.270Z",
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
             "source": "entity-refresh",
             "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 110,
-            "vibeSessionsAnalyzed": 1
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
           }
         },
         {
           "type": "benefits",
-          "content": "The system provides cross-session persistence, agent-agnostic design, and team collaboration features using GraphDatabaseService and GraphKnowledgeExporter components",
-          "date": "2025-12-06T06:56:54.253Z",
+          "content": "The system uses separate directories for different services, such as lib/ukb-unified and integrations/mcp-server-semantic-analysis/src.",
+          "date": "2025-12-06T14:00:46.059Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-06T06:57:00.270Z",
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
             "source": "entity-refresh",
             "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 110,
-            "vibeSessionsAnalyzed": 1
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "The system uses the GraphDatabaseService component to provide graph database services.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "implementation",
+          "content": "The system uses the graph-sync command to synchronize data between the graph database and JSON exports.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "validation",
+          "content": "The system stores knowledge exports at .data/knowledge-export, which are auto-synced from the graph database.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "workflow",
+          "content": "The system uses the VkbApiClient component to interact with the knowledge base.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "benefits",
+          "content": "The system uses the GraphKnowledgeExporter component to export knowledge from the graph database.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "The system uses a microservices architecture with separate components for different services.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "validation",
+          "content": "The system uses the coding command to perform coding-related operations.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "workflow",
+          "content": "The system uses the vkb command for visualization and MCP tools for knowledge operations.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "The system uses separate components for graph database services, knowledge exporters, and adapters, which are stored in separate directories such as src/knowledge-management and lib/ukb-unified.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "implementation",
+          "content": "The system uses the PersistenceAgent component to handle persistence-related operations and ensure data consistency and integrity, and stores knowledge exports at .data/knowledge-export.",
+          "date": "2025-12-06T14:00:46.059Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-06T14:00:52.355Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 111,
+            "vibeSessionsAnalyzed": 2
+          }
+        },
+        {
+          "type": "insight-document",
+          "content": "Detailed insight document available at: knowledge-management/insights/KnowledgePersistencePattern.md",
+          "date": "2025-12-06T14:00:58.938Z",
+          "metadata": {
+            "insightPath": "knowledge-management/insights/KnowledgePersistencePattern.md",
+            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/KnowledgePersistencePattern.md",
+            "diagramsGenerated": 0,
+            "generatedBy": "entity-refresh",
+            "refreshedAt": "2025-12-06T14:00:58.940Z",
+            "source": "entity-refresh"
           }
         }
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.574Z",
-        "last_updated": "2025-12-06T06:57:00.322Z"
+        "last_updated": "2025-12-06T14:00:59.045Z"
       },
       "id": "mc4flkg3g96u4x"
     },
@@ -726,7 +869,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-12-06T06:57:05.331Z",
+    "exported_at": "2025-12-06T14:01:04.048Z",
     "total_entities": 16,
     "total_relations": 51,
     "description": "Coding project infrastructure and patterns"

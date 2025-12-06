@@ -1,0 +1,48 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Persistence Pattern" {
+  class KnowledgeBase {
+    + storeKnowledge()
+    + retrieveKnowledge()
+    + updateKnowledge()
+  }
+
+  class GraphDatabase {
+    + storeData()
+    + retrieveData()
+    + updateData()
+  }
+
+  class LevelDB {
+    + storeData()
+    + retrieveData()
+    + updateData()
+  }
+
+  class JSONExporter {
+    + exportKnowledge()
+  }
+
+  class CommandlineInterface {
+    + interactWithKnowledgeBase()
+  }
+
+  class KBUpdateDetector {
+    + detectUpdates()
+  }
+
+  KnowledgeBase --* GraphDatabase : uses
+  GraphDatabase --* LevelDB : uses
+  KnowledgeBase --* JSONExporter : uses
+  KnowledgeBase --* CommandlineInterface : uses
+  KnowledgeBase --* KBUpdateDetector : uses
+}
+
+class KnowledgePersistencePattern {
+  + applyPattern()
+}
+
+KnowledgePersistencePattern --* KnowledgeBase : implements
+
+@enduml
