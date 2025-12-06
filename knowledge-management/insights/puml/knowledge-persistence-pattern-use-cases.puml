@@ -1,0 +1,27 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+actor SystemAdmin as "System Admin"
+actor CommandLineUser as "Command Line User"
+
+usecase "Interact with Knowledge Base" as (Interact with Knowledge Base)
+usecase "Update Knowledge Base" as (Update Knowledge Base)
+usecase "Export Knowledge" as (Export Knowledge)
+
+package "KnowledgePersistencePattern" {
+  (Interact with Knowledge Base) ..> (Update Knowledge Base) : >> include
+  (Update Knowledge Base) ..> (Export Knowledge) : >> extend
+}
+
+SystemAdmin -- (Interact with Knowledge Base)
+CommandLineUser -- (Interact with Knowledge Base)
+
+package "GraphDatabase" {
+  usecase "Store Knowledge" as (Store Knowledge)
+  usecase "Detect KB Update" as (Detect KB Update)
+}
+
+(Interact with Knowledge Base) ..> (Store Knowledge) : >> use
+(Update Knowledge Base) ..> (Detect KB Update) : >> use
+
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant GraphDatabase as "Graph Database (Graphology + LevelDB)"
+participant CommandLineInterface as "Command Line Interface (vkb, coding)"
+participant KnowledgeBase as "Knowledge Base"
+participant ThreeTierKBUpdateDetector as "3-Tier KB Update Detector"
+
+CommandLineInterface->>GraphDatabase: Interact with Knowledge Base
+GraphDatabase->>KnowledgeBase: Store and Retrieve Knowledge
+ThreeTierKBUpdateDetector->>GraphDatabase: Ensure Data Consistency and Integrity
+GraphDatabase->>CommandLineInterface: Provide JSON Exports for Backups
+
+alt Successful Interaction
+    CommandLineInterface->>GraphDatabase: Valid Command
+    GraphDatabase->>CommandLineInterface: Successful Response
+else Failed Interaction
+    CommandLineInterface->>GraphDatabase: Invalid Command
+    GraphDatabase->>CommandLineInterface: Error Response
+end
+
+loop Periodic Backup
+    GraphDatabase->>CommandLineInterface: Trigger Backup
+    CommandLineInterface->>GraphDatabase: Export Knowledge to .data/knowledge-export
+end
+
+@enduml

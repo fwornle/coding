@@ -1,0 +1,46 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Persistence Pattern" {
+  component GraphDatabase <<storage>> as "Graph Database"
+  component LevelDB <<storage>> as "LevelDB"
+  component PersistenceAgent <<agent>> as "Persistence Agent"
+  component GraphDatabaseService <<core>> as "Graph Database Service"
+  component VkbApiClient <<api>> as "Vkb Api Client"
+  component GraphKnowledgeExporter <<core>> as "Graph Knowledge Exporter"
+
+  GraphDatabase --* LevelDB
+  PersistenceAgent --* GraphDatabase
+  PersistenceAgent --* GraphDatabaseService
+  GraphDatabaseService --* GraphDatabase
+  VkbApiClient --* GraphDatabaseService
+  GraphKnowledgeExporter --* GraphDatabase
+
+  note as AutoNote1
+  Entity: KnowledgePersistencePattern
+  Type: GraphDatabase
+  Purpose: To provide a modular architecture for knowledge persistence and graph database services.
+end note
+}
+
+package "Tools and Interfaces" {
+  component vkb <<api>> as "vkb command"
+  component MCP_tools <<api>> as "MCP tools"
+  component graph_sync <<api>> as "graph-sync command"
+  component coding <<api>> as "coding command"
+
+  vkb --* VkbApiClient
+  MCP_tools --* GraphDatabaseService
+  graph_sync --* GraphDatabaseService
+  coding --* PersistenceAgent
+}
+
+package "Data Storage" {
+  component knowledge_graph <<storage>> as ".data/knowledge-graph"
+  component knowledge_export <<storage>> as ".data/knowledge-export"
+
+  GraphDatabase --* knowledge_graph
+  GraphKnowledgeExporter --* knowledge_export
+}
+
+@enduml
