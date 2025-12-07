@@ -7,10 +7,9 @@ skinparam defaultFontSize 14
 skinparam titleFontSize 20
 skinparam packageFontSize 16
 skinparam componentFontSize 13
-skinparam noteFontSize 11
 skinparam ArrowThickness 2
 
-title MCP Semantic Analysis Server - 11-Agent Architecture
+title MCP Semantic Analysis - 13-Agent Architecture
 
 left to right direction
 
@@ -18,32 +17,42 @@ package "MCP Server" as SERVER {
   component "MCP\nProtocol" as MCP <<infra>>
   component "Tool Layer\n(12 Tools)" as TOOLS <<api>>
 
-  package "Coordinator" as COORD_PKG {
-    component "Coordinator\nAgent" as COORDINATOR <<agent>> #FFE6CC
+  package "Orchestration" as COORD_PKG #FFE6CC {
+    component "Coordinator" as COORDINATOR <<agent>>
   }
 
-  package "10 Worker Agents" as AGENTS_PKG {
-    component "Git\nHistory" as GIT <<agent>> #E6F3FF
-    component "Vibe\nHistory" as VIBE <<agent>> #E6F3FF
-    component "Semantic\nAnalysis" as SEMANTIC <<agent>> #FFE6E6
-    component "Web\nSearch" as WEB <<agent>> #E6F3FF
-    component "Insight\nGeneration" as INSIGHT <<agent>> #FFE6E6
-    component "Observation\nGeneration" as OBS <<agent>> #E6F3FF
-    component "Quality\nAssurance" as QA <<agent>> #FFE6E6
-    component "Content\nValidation" as CONTENT <<agent>> #E6F3FF
-    component "Persistence" as PERSIST <<agent>> #E6F3FF
-    component "Deduplication" as DEDUP <<agent>> #E6F3FF
+  package "Core Analysis (5)" as ANALYSIS_PKG #E6F3FF {
+    component "Git\nHistory" as GIT <<agent>>
+    component "Vibe\nHistory" as VIBE <<agent>>
+    component "Semantic\nAnalysis" as SEMANTIC <<agent>>
+    component "Web\nSearch" as WEB <<agent>>
+    component "Insight\nGeneration" as INSIGHT <<agent>>
+  }
+
+  package "Quality (3)" as QUALITY_PKG #FFE6E6 {
+    component "QA" as QA <<agent>>
+    component "Content\nValidation" as CONTENT <<agent>>
+    component "Observation\nGen" as OBS <<agent>>
+  }
+
+  package "Infrastructure (3)" as INFRA_PKG #E6FFE6 {
+    component "Persistence" as PERSIST <<agent>>
+    component "Deduplication" as DEDUP <<agent>>
+    component "Git Staleness\nDetector" as STALE <<agent>>
+  }
+
+  package "Support" as SUPPORT_PKG #F0F0F0 {
+    component "Semantic\nAnalyzer" as ANALYZER <<infra>>
   }
 }
 
 package "Storage" as STORAGE_PKG {
   database "GraphDB\n(Graphology+\nLevelDB)" as GRAPHDB <<storage>> #D4EDDA
-  component "Graph\nExporter" as EXPORTER <<infra>>
   file "knowledge-export/\n<team>.json" as JSON <<storage>>
 }
 
-cloud "LLMs\n(Groq→Gemini→\nAnthropic→OpenAI)" as LLMS <<external>> #FFE6E6
-cloud "Git Repo &\nHistory Files" as DATA_SOURCES <<external>> #E6F3FF
+cloud "LLMs\n5-Tier Chain" as LLMS <<external>> #FFE6E6
+cloud "Data\nSources" as DATA_SOURCES <<external>> #E6F3FF
 
 ' Main flow
 MCP --> TOOLS
@@ -55,22 +64,30 @@ COORDINATOR --> WEB
 COORDINATOR --> INSIGHT
 COORDINATOR --> OBS
 COORDINATOR --> QA
-COORDINATOR --> PERSIST
 COORDINATOR --> CONTENT
+COORDINATOR --> PERSIST
 COORDINATOR --> DEDUP
+COORDINATOR --> STALE
+COORDINATOR ..> GRAPHDB : "Init"
+
+' LLM connections
+VIBE ..> ANALYZER
+SEMANTIC ..> ANALYZER
+WEB ..> ANALYZER
+INSIGHT ..> ANALYZER
+OBS ..> ANALYZER
+QA ..> ANALYZER
+ANALYZER ..> LLMS
 
 ' Storage connections
-COORDINATOR ..> GRAPHDB : "Initializes"
-PERSIST --> GRAPHDB : "Stores"
-DEDUP --> GRAPHDB : "Queries"
-CONTENT --> GRAPHDB : "Validates"
-GRAPHDB --> EXPORTER : "Auto-persist\n30s"
-EXPORTER --> JSON : "Exports"
+PERSIST --> GRAPHDB
+DEDUP --> GRAPHDB
+CONTENT --> GRAPHDB
+GRAPHDB --> JSON
 
-' External connections
+' Data sources
 GIT --> DATA_SOURCES
 VIBE --> DATA_SOURCES
-SEMANTIC ..> LLMS : "2 agents\nwith LLMs"
-INSIGHT ..> SEMANTIC : "Delegates"
+STALE --> DATA_SOURCES
 
 @enduml

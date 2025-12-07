@@ -1,0 +1,36 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "SemanticAnalysisAgentSystemImplementation" as semanticAnalysis {
+  note as AutoNote1
+    Purpose: Provides a graph database for semantic analysis
+  end note
+  component GraphDatabase as "GraphDatabase <<storage>>" 
+  component LevelDB as "LevelDB <<storage>>"
+  component GraphDatabaseService as "GraphDatabaseService <<core>>"
+  component GraphKnowledgeExporter as "GraphKnowledgeExporter <<core>>"
+  component GraphDatabaseAdapter as "GraphDatabaseAdapter <<api>>"
+
+  GraphDatabase --* LevelDB
+  GraphDatabaseService --* GraphDatabase
+  GraphKnowledgeExporter --* GraphDatabase
+  GraphDatabaseAdapter --* GraphDatabase
+
+  package "CLI Access" as cliAccess {
+    component vkb as "vkb <<api>>"
+    component coding as "coding <<api>>"
+    component graph_sync as "graph-sync <<api>>"
+    vkb --* GraphDatabaseService
+    coding --* GraphDatabaseService
+    graph_sync --* GraphDatabaseAdapter
+  }
+
+  package "Auto-Sync JSON Exports" as jsonExports {
+    component JSON_Export as "JSON Export <<storage>>"
+
+    GraphKnowledgeExporter --* JSON_Export
+    vkb --* JSON_Export
+  }
+}
+
+@enduml

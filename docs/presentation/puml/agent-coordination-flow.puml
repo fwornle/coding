@@ -1,0 +1,49 @@
+@startuml agent-coordination-flow
+!include _standard-style.puml
+
+' Presentation-optimized version (larger fonts, essential flows only)
+
+skinparam defaultFontSize 14
+skinparam titleFontSize 20
+skinparam ArrowThickness 2
+
+title 13-Agent Workflow
+
+participant "Claude" as CLAUDE
+participant "Coordinator" as COORD #FFE6CC
+participant "Git/Vibe\nAgents" as DATA #E6F3FF
+participant "Analysis\nAgents" as ANALYSIS #E6F3FF
+participant "Insight\nAgent" as INSIGHT #E6F3FF
+participant "QA/Validation\nAgents" as QA #FFE6E6
+participant "Persistence\nAgents" as PERSIST #E6FFE6
+database "GraphDB" as DB #D4EDDA
+
+CLAUDE -> COORD : execute_workflow
+activate COORD
+
+== Data Collection ==
+COORD -> DATA : analyze()
+DATA --> COORD : results
+
+== Analysis ==
+COORD -> ANALYSIS : process()
+ANALYSIS --> COORD : semantic_analysis
+
+== Generation ==
+COORD -> INSIGHT : generate()
+INSIGHT --> COORD : insights + diagrams
+
+== Validation ==
+COORD -> QA : validate()
+QA --> COORD : validated
+
+== Persistence ==
+COORD -> PERSIST : store()
+PERSIST -> DB : persist()
+DB --> PERSIST : stored
+PERSIST --> COORD : complete
+
+COORD --> CLAUDE : workflow_complete
+deactivate COORD
+
+@enduml
