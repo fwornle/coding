@@ -1,0 +1,62 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "NetworkAwareInstallationPattern" {
+    package "Storage Layer" {
+        component [LevelDB] <<storage>>
+        component [GraphDatabaseService] <<core>>
+        component [GraphDatabaseAdapter] <<api>>
+        folder ".data/knowledge-graph" as KGStorage <<storage>>
+        folder ".data/knowledge-export" as JSONExport <<storage>>
+    }
+    
+    package "Processing Layer" {
+        component [ParallelWorkers] <<core>>
+        component [BatchModeSemanticAnalysis] <<core>>
+        component [PersistenceAgent] <<agent>>
+        component [IncrementalContentConstraints] <<core>>
+    }
+    
+    package "Command Interface" {
+        component [VKBCommand] <<api>>
+        component [CodingCommand] <<api>>
+        component [GraphSyncCommand] <<api>>
+    }
+    
+    package "Network Operations" {
+        component [NetworkAwareOperations] <<core>>
+        component [ScalableProcessingPatterns] <<core>>
+    }
+}
+
+' Storage relationships
+GraphDatabaseService --> LevelDB : uses
+GraphDatabaseService --> Graphology : implements with
+GraphDatabaseAdapter --> GraphDatabaseService : wraps
+KGStorage --> LevelDB : stores
+JSONExport --> GraphDatabaseService : auto-synced from
+
+' Processing relationships
+ParallelWorkers --> BatchModeSemanticAnalysis : executes
+PersistenceAgent --> GraphDatabaseAdapter : uses
+PersistenceAgent --> KGStorage : persists to
+IncrementalContentConstraints --> ParallelWorkers : constrains edit/write ops
+
+' Command relationships
+VKBCommand --> GraphDatabaseService : visualizes
+CodingCommand --> ParallelWorkers : triggers development ops
+GraphSyncCommand --> JSONExport : synchronizes
+GraphSyncCommand --> KGStorage : synchronizes
+
+' Network operations
+NetworkAwareOperations --> ScalableProcessingPatterns : implements
+ScalableProcessingPatterns --> ParallelWorkers : utilizes
+NetworkAwareOperations --> PersistenceAgent : coordinates with
+
+note top of NetworkAwareInstallationPattern
+  TransferablePattern for network-aware installations
+  Features scalable processing with dual storage persistence
+  Avoids deprecated shared-memory.json approach
+end note
+
+@enduml

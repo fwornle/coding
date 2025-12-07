@@ -3,55 +3,72 @@
 
 left to right direction
 
-actor "Developer" as dev
 actor "System Administrator" as admin
-actor "Knowledge System" as ks
-actor "External Services" as ext
+actor "Developer" as dev
+actor "Data Analyst" as analyst
+actor "External System" as external
 
-package "Knowledge Management System" {
-  usecase "Export Knowledge Graph" as export
-  usecase "Manage Graph Database" as manage_db
-  usecase "Monitor API Quotas" as quota
-  usecase "Track System Health" as health
-  usecase "Start Services" as start_services
-  usecase "Verify Health Status" as verify_health
-  usecase "Enhance Behavior Dynamically" as enhance <<DecoratorPattern>>
-  usecase "Apply Pattern Implementation" as apply_pattern
+rectangle "Microservices Architecture" {
+    usecase "Deploy Microservices" as deploy
+    usecase "Monitor Service Health" as monitor
+    usecase "Scale Services" as scale
 }
 
-package "Decorator Pattern Implementation" {
-  usecase "Add Runtime Behavior" as add_behavior
-  usecase "Wrap Service Components" as wrap_services
-  usecase "Extend Functionality" as extend_func
+rectangle "Graph Database Operations" {
+    usecase "Store Knowledge Graph" as store
+    usecase "Query Graph Data" as query
+    usecase "Manage LevelDB Storage" as leveldb
 }
 
-dev --> export
-dev --> manage_db
-admin --> quota
-admin --> health
-admin --> start_services
-admin --> verify_health
-ks --> enhance
-ext --> apply_pattern
+rectangle "Event-Driven Processing" {
+    usecase "Process Semantic Analysis" as semantic
+    usecase "Execute Batch Operations" as batch
+    usecase "Handle Parallel Workers" as parallel
+}
 
-enhance ..> add_behavior : <<include>>
-enhance ..> wrap_services : <<include>>
-enhance ..> extend_func : <<include>>
+rectangle "Decorator Pattern Implementation" {
+    usecase "Apply Behavior Decorators" as decorate
+    usecase "Extend Object Functionality" as extend
+    usecase "Maintain Object Structure" as maintain
+}
 
-export --> manage_db : <<extend>>
-quota --> health : <<include>>
-start_services --> verify_health : <<include>>
+rectangle "API & Data Management" {
+    usecase "Access VKB API" as vkbapi
+    usecase "Implement Access Control" as access
+    usecase "Ensure Data Consistency" as consistency
+}
 
-note right of enhance
-  Decorator Pattern Implementation
-  Confidence: 72%
-  Significance: 7/10
-  Language: JavaScript
-end note
+' Actor relationships
+admin --> deploy
+admin --> monitor
+admin --> scale
+admin --> access
 
-note top of "Knowledge Management System"
-  Core system components identified
-  from pattern analysis
-end note
+dev --> decorate
+dev --> extend
+dev --> maintain
+dev --> semantic
+
+analyst --> query
+analyst --> store
+analyst --> batch
+
+external --> vkbapi
+
+' Include relationships
+deploy ..> monitor : <<include>>
+semantic ..> parallel : <<include>>
+batch ..> parallel : <<include>>
+store ..> leveldb : <<include>>
+vkbapi ..> access : <<include>>
+extend ..> maintain : <<include>>
+
+' Extend relationships
+scale ..> monitor : <<extend>>
+consistency ..> store : <<extend>>
+
+note right of decorate : "Adds behavior without\nmodifying structure"
+note bottom of parallel : "Enhances responsiveness\nand fault tolerance"
+note right of leveldb : "Graphology + LevelDB\nfor robust storage"
 
 @enduml

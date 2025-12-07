@@ -192,38 +192,91 @@
     },
     {
       "name": "NetworkAwareInstallationPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "GraphDatabase",
       "observations": [
         {
-          "type": "rule",
-          "content": "Always implement network-aware detection with graceful fallbacks for enterprise environments",
-          "date": "2025-06-19T11:10:37Z"
+          "type": "architecture",
+          "content": "Current codebase uses GraphDatabaseService with Graphology + LevelDB storage at .data/knowledge-graph, with auto-synced JSON exports to .data/knowledge-export directory",
+          "date": "2025-12-07T10:47:10.777Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T10:47:36.576Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
         },
         {
           "type": "implementation",
-          "content": "Network detection patterns, timeout-based operations, selective repository mirroring",
-          "date": "2025-06-19T11:10:37Z"
+          "content": "Recent parallel workers implementation for batch mode semantic analysis suggests scalable processing patterns suitable for network-aware operations",
+          "date": "2025-12-07T10:47:10.777Z",
+          "metadata": {
+            "confidence": 0.8,
+            "refreshedAt": "2025-12-07T10:47:36.576Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
         },
         {
-          "type": "applicability",
-          "content": "Enterprise development tools, CI/CD systems, developer onboarding scripts",
-          "date": "2025-06-19T11:10:37Z"
+          "type": "workflow",
+          "content": "Available commands include 'vkb' for visualization, 'coding' for development operations, and 'graph-sync' for knowledge synchronization between storage layers",
+          "date": "2025-12-07T10:47:10.777Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T10:47:36.576Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
         },
         {
-          "type": "significance",
-          "content": "9/10 - Critical for enterprise software deployment",
-          "date": "2025-06-19T11:10:37Z"
+          "type": "validation",
+          "content": "Incremental content constraints now only apply to edit/write operations, reducing unnecessary processing overhead for network-dependent installations",
+          "date": "2025-12-07T10:47:10.777Z",
+          "metadata": {
+            "confidence": 0.7,
+            "refreshedAt": "2025-12-07T10:47:36.576Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
         },
         {
-          "type": "link",
-          "content": "Details: http://localhost:8080/knowledge-management/insights/NetworkAwareInstallationPattern.md",
-          "date": "2025-06-19T11:10:37Z"
+          "type": "rule",
+          "content": "Knowledge persistence must utilize GraphDatabaseAdapter and PersistenceAgent components, avoiding the removed shared-memory.json approach",
+          "date": "2025-12-07T10:47:10.777Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T10:47:36.576Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
+        },
+        {
+          "type": "insight-document",
+          "content": "Detailed insight document available at: knowledge-management/insights/NetworkAwareInstallationPattern.md",
+          "date": "2025-12-07T10:48:51.215Z",
+          "metadata": {
+            "insightPath": "knowledge-management/insights/NetworkAwareInstallationPattern.md",
+            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/NetworkAwareInstallationPattern.md",
+            "diagramsGenerated": 4,
+            "generatedBy": "entity-refresh",
+            "refreshedAt": "2025-12-07T10:48:51.217Z",
+            "source": "entity-refresh"
+          }
         }
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.577Z",
-        "last_updated": "2025-11-30T08:30:17.333Z"
+        "last_updated": "2025-12-07T10:48:51.367Z"
       },
       "id": "mc4flkg83d5ay"
     },
@@ -801,52 +854,256 @@
     },
     {
       "name": "ApiPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "GraphDatabase",
       "observations": [
-        "Problem: Multi-agent architecture complexity in semantic analysis system",
-        "Solution: Configuration-driven development approach",
-        "Significance: 10/10 - ",
-        "Applies to: web backend, javascript, typescript, python and similar contexts",
-        "Details: http://localhost:8080/knowledge-management/insights/ApiPattern.md"
+        {
+          "type": "architecture",
+          "content": "The system uses a microservices-based architecture, with components such as GraphDatabaseService and VkbApiClient, to manage knowledge storage and export.",
+          "date": "2025-12-07T08:54:24.433Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T08:54:30.200Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 1
+          }
+        },
+        {
+          "type": "implementation",
+          "content": "The GraphDatabaseService component is used to interact with the knowledge graph stored in .data/knowledge-graph.",
+          "date": "2025-12-07T08:54:24.433Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T08:54:30.200Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 1
+          }
+        },
+        {
+          "type": "validation",
+          "content": "The system uses JSON exports at .data/knowledge-export, which are auto-synced from the GraphDB, to provide a data-driven development approach.",
+          "date": "2025-12-07T08:54:24.433Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T08:54:30.200Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 1
+          }
+        },
+        {
+          "type": "workflow",
+          "content": "The system uses parallel workers for batch mode semantic analysis, as seen in the recent Git activity, to improve performance.",
+          "date": "2025-12-07T08:54:24.433Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T08:54:30.200Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 1
+          }
+        },
+        {
+          "type": "benefits",
+          "content": "The use of specific commands, such as vkb and graph-sync, provides a clear and organized way to manage knowledge operations and visualization.",
+          "date": "2025-12-07T08:54:24.433Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T08:54:30.200Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 1
+          }
+        },
+        {
+          "type": "insight-document",
+          "content": "Detailed insight document available at: knowledge-management/insights/ApiPattern.md",
+          "date": "2025-12-07T08:55:40.943Z",
+          "metadata": {
+            "insightPath": "knowledge-management/insights/ApiPattern.md",
+            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ApiPattern.md",
+            "diagramsGenerated": 4,
+            "generatedBy": "entity-refresh",
+            "refreshedAt": "2025-12-07T08:55:40.946Z",
+            "source": "entity-refresh"
+          }
+        }
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-02T07:55:27.986Z",
-        "last_updated": "2025-12-02T09:47:16.525Z"
+        "last_updated": "2025-12-07T08:55:40.992Z"
       },
       "id": "mc4flkg3cz7gvq"
     },
     {
       "name": "ArchitecturalEvolutionPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "MCPAgent",
       "observations": [
-        "Problem: Multi-agent architecture complexity in semantic analysis system",
-        "Solution: Configuration-driven development approach",
-        "Significance: 10/10 - ",
-        "Applies to: web backend, javascript, typescript, python and similar contexts",
-        "Details: http://localhost:8080/knowledge-management/insights/ArchitecturalEvolutionPattern.md"
+        {
+          "type": "implementation",
+          "content": "ArchitecturalEvolutionPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-07T08:59:00.806Z",
+          "metadata": {
+            "confidence": 0.9,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-07T08:59:00.810Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-07T08:59:00.806Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-07T08:59:00.810Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-07T08:59:00.806Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-07T08:59:00.810Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-07T08:59:00.806Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-07T08:59:00.810Z"
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "Pattern extracted from codebase analysis and stored as reusable knowledge entity",
+          "date": "2025-12-07T08:59:00.806Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-07T08:59:00.810Z"
+          }
+        },
+        {
+          "type": "insight-document",
+          "content": "Detailed insight document available at: knowledge-management/insights/ArchitecturalEvolutionPattern.md",
+          "date": "2025-12-07T09:00:38.395Z",
+          "metadata": {
+            "insightPath": "knowledge-management/insights/ArchitecturalEvolutionPattern.md",
+            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ArchitecturalEvolutionPattern.md",
+            "diagramsGenerated": 4,
+            "generatedBy": "entity-refresh",
+            "refreshedAt": "2025-12-07T09:00:38.397Z",
+            "source": "entity-refresh"
+          }
+        }
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-02T07:55:27.994Z",
-        "last_updated": "2025-12-02T07:55:27.994Z"
+        "last_updated": "2025-12-07T09:00:38.431Z"
       },
       "id": "mc4flkg6pyxea"
     },
     {
       "name": "DecoratorPattern",
-      "entityType": "TransferablePattern",
+      "entityType": "GraphDatabase",
       "observations": [
-        "Problem: Multi-agent architecture complexity in semantic analysis system",
-        "Solution: Configuration-driven development approach",
-        "Significance: 10/10 - ",
-        "Applies to: web backend, javascript, typescript, python and similar contexts",
-        "Details: http://localhost:8080/knowledge-management/insights/DecoratorPattern.md"
+        {
+          "type": "architecture",
+          "content": "The system utilizes a microservices-based architecture, with components like GraphDatabaseService and PersistenceAgent, to promote scalability and flexibility.",
+          "date": "2025-12-07T10:33:03.592Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T10:33:09.759Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
+        },
+        {
+          "type": "implementation",
+          "content": "The GraphDatabaseService uses Graphology + LevelDB for knowledge storage, which provides a robust data management system.",
+          "date": "2025-12-07T10:33:03.592Z",
+          "metadata": {
+            "confidence": 0.8,
+            "refreshedAt": "2025-12-07T10:33:09.759Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
+        },
+        {
+          "type": "workflow",
+          "content": "The system employs an event-driven approach, with features like parallel workers for batch mode semantic analysis, to enhance system responsiveness and fault tolerance.",
+          "date": "2025-12-07T10:33:03.592Z",
+          "metadata": {
+            "confidence": 0.8,
+            "refreshedAt": "2025-12-07T10:33:09.759Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
+        },
+        {
+          "type": "validation",
+          "content": "The removal of shared-memory.json might introduce data consistency issues, and proper access control should be implemented for the VkbApiClient and data storage.",
+          "date": "2025-12-07T10:33:03.592Z",
+          "metadata": {
+            "confidence": 0.7,
+            "refreshedAt": "2025-12-07T10:33:09.759Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
+        },
+        {
+          "type": "benefits",
+          "content": "The use of the Decorator Pattern allows for added behavior to objects without modifying their structure, promoting flexibility and maintainability.",
+          "date": "2025-12-07T10:33:03.592Z",
+          "metadata": {
+            "confidence": 0.9,
+            "refreshedAt": "2025-12-07T10:33:09.759Z",
+            "source": "entity-refresh",
+            "analysisMethod": "full-pipeline",
+            "gitCommitsAnalyzed": 120,
+            "vibeSessionsAnalyzed": 0
+          }
+        },
+        {
+          "type": "insight-document",
+          "content": "Detailed insight document available at: knowledge-management/insights/DecoratorPattern.md",
+          "date": "2025-12-07T10:33:53.342Z",
+          "metadata": {
+            "insightPath": "knowledge-management/insights/DecoratorPattern.md",
+            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/DecoratorPattern.md",
+            "diagramsGenerated": 4,
+            "generatedBy": "entity-refresh",
+            "refreshedAt": "2025-12-07T10:33:53.344Z",
+            "source": "entity-refresh"
+          }
+        }
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-02T09:42:47.766Z",
-        "last_updated": "2025-12-02T09:42:47.766Z"
+        "last_updated": "2025-12-07T10:33:53.459Z"
       },
       "id": "mc4flkg2spe7lh"
     },
@@ -1294,14 +1551,38 @@
       "to": "MCPMemoryLoggingIntegrationPattern",
       "relationType": "contains",
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ApiPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ArchitecturalEvolutionPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "DecoratorPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "NetworkAwareInstallationPattern",
+      "relationType": "contains",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-12-07T08:31:07.572Z",
+    "exported_at": "2025-12-07T10:48:56.370Z",
     "total_entities": 16,
-    "total_relations": 61,
+    "total_relations": 65,
     "description": "Coding project infrastructure and patterns"
   }
 }

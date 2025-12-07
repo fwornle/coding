@@ -1,49 +1,45 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Design Patterns" {
-  package "Decorator Pattern Implementation" <<core>> {
-    component "GraphDatabaseService" <<storage>> as GDS
-    component "GraphKnowledgeExporter" <<core>> as GKE
-    component "ServiceStarter" <<core>> as SS
-    component "HealthVerifier" <<agent>> as HV
-    component "StatusLineHealthMonitor" <<agent>> as SLHM
-    
-    interface "IDecorator" as IDec
-    interface "IComponent" as IComp
-    
-    GDS .up.|> IComp
-    GKE .up.|> IDec
-    SS .up.|> IDec
-    HV .up.|> IDec
-    SLHM .up.|> IDec
-  }
-  
-  package "Frontend Components" <<api>> {
-    component "ApiQuotaSlice" <<api>> as AQS
-    AQS ..> IDec : uses
-  }
-  
-  package "Knowledge Management" <<storage>> {
-    component "KnowledgeExport" <<storage>> as KE
-    component "ArchitecturalDiagrams" <<core>> as AD
-    
-    KE ..> GDS : exports from
-    AD ..> GKE : visualizes
-  }
+package "Decorator Pattern" {
+  note as AutoNote2
+  Entity: DecoratorPattern, Type: TransferablePattern
+  end note
+  note as AutoNote3
+  Purpose: Allows for added behavior to objects without modifying their structure
+  end note
 }
 
-note top of "Design Patterns"
-  **Decorator Pattern Analysis**
-  - Confidence: 72%
-  - Significance: 7/10
-  - Components: 5 core services
-  - Pattern: Adds behavior dynamically
-end note
+package "Data Storage" {
+  component GraphDatabaseService <<storage>> as "Graph Database Service"
+  component LevelDB <<storage>> as "LevelDB"
+  GraphDatabaseService --* LevelDB
+}
 
-GDS --> GKE : decorates
-GKE --> SS : wraps
-SS --> HV : enhances
-HV --> SLHM : monitors
+package "Agents" {
+  component PersistenceAgent <<agent>> as "Persistence Agent"
+  component VkbApiClient <<api>> as "VkbApiClient"
+  PersistenceAgent --* GraphDatabaseService
+  VkbApiClient --* GraphDatabaseService
+}
+
+package "Event-Driven Approach" {
+  component ParallelWorkers <<core>> as "Parallel Workers"
+  component EventDrivenSystem <<core>> as "Event-Driven System"
+  ParallelWorkers --* EventDrivenSystem
+  EventDrivenSystem --* GraphDatabaseService
+}
+
+GraphDatabaseService --* PersistenceAgent
+VkbApiClient --* PersistenceAgent
+ParallelWorkers --* VkbApiClient
+
+note as AutoNote1
+  Relationships:
+  - GraphDatabaseService uses LevelDB for knowledge storage
+  - PersistenceAgent interacts with GraphDatabaseService
+  - VkbApiClient interacts with GraphDatabaseService and PersistenceAgent
+  - ParallelWorkers enhance system responsiveness and fault tolerance
+end note
 
 @enduml

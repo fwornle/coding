@@ -3,83 +3,74 @@
 
 left to right direction
 
-actor Developer as dev
-actor "System Administrator" as admin
-actor "External API" as api
-actor "Live System" as system
+actor "System Architect" as architect
+actor "Developer" as dev
+actor "Knowledge Manager" as km
+actor "MCP Client" as mcp
 
-package "Temporal Documentation System" {
-  usecase "Archive Development History" as archive
-  usecase "Generate Timestamps" as timestamp
-  usecase "Track Branch Changes" as branch
+package "Knowledge Management System" {
+    usecase "Store Architectural Patterns" as store
+    usecase "Extract Pattern Knowledge" as extract
+    usecase "Query Knowledge Graph" as query
+    usecase "Export Knowledge to JSON" as export
+    usecase "Sync Graph to Export" as sync
+    usecase "Manage Pattern Lifecycle" as lifecycle
 }
 
-package "Content Validation System" {
-  usecase "Validate Content" as validate
-  usecase "Process Semantic Analysis" as semantic
-  usecase "Integrate Analysis Points" as integrate
+package "Data Storage Layer" {
+    usecase "Persist to GraphDB" as graphdb
+    usecase "Store in LevelDB" as leveldb
+    usecase "Maintain Knowledge Graph" as maintain
 }
 
-package "Redaction System" {
-  usecase "Configure Redaction Rules" as config_redact
-  usecase "Filter Sensitive Data" as filter
-  usecase "Runtime Rule Modification" as modify_rules
+package "Integration Layer" {
+    usecase "Provide Semantic Analysis" as semantic
+    usecase "Serve MCP Protocol" as mcpserve
+    usecase "Transfer Patterns" as transfer
 }
 
-package "API Quota Management" {
-  usecase "Check API Quotas" as check_quota
-  usecase "Manage Resource Limits" as manage_quota
-  usecase "Monitor API Usage" as monitor
+package "Codebase Analysis" {
+    usecase "Analyze Source Code" as analyze
+    usecase "Identify Evolution Patterns" as identify
+    usecase "Remove Legacy Components" as cleanup
 }
 
-package "Live Logging System" {
-  usecase "Extract Live Data" as extract
-  usecase "Process System Exchanges" as process_live
-  usecase "Configure Extraction Logic" as config_extract
-}
+architect --> store
+architect --> extract
+architect --> lifecycle
 
-package "Knowledge Export System" {
-  usecase "Consolidate Knowledge" as consolidate
-  usecase "Export Structured Data" as export
-  usecase "Categorize Domain Data" as categorize
-}
+dev --> query
+dev --> analyze
+dev --> identify
 
-dev --> archive
-dev --> validate
-dev --> extract
-dev --> consolidate
+km --> export
+km --> sync
+km --> maintain
 
-admin --> config_redact
-admin --> manage_quota
-admin --> config_extract
+mcp --> semantic
+mcp --> mcpserve
+mcp --> transfer
 
-system --> process_live
-api --> check_quota
+store ..> graphdb : <<include>>
+store ..> leveldb : <<include>>
 
-archive ..> timestamp : <<include>>
-archive ..> branch : <<include>>
+extract --> identify : <<extend>>
+extract --> cleanup : <<extend>>
 
-validate ..> semantic : <<include>>
-validate ..> integrate : <<include>>
+query ..> maintain : <<include>>
 
-filter ..> config_redact : <<include>>
-modify_rules ..> config_redact : <<extend>>
+export ..> sync : <<include>>
+sync --> graphdb : <<extend>>
 
-check_quota ..> monitor : <<include>>
-manage_quota ..> monitor : <<include>>
+semantic --> query : <<extend>>
+transfer --> store : <<extend>>
 
-extract ..> process_live : <<include>>
-extract ..> config_extract : <<include>>
+note right of cleanup : "shared-memory.json\nhas been removed"
 
-consolidate ..> export : <<include>>
-consolidate ..> categorize : <<include>>
+note bottom of graphdb : "Storage at:\n.data/knowledge-graph\n(Graphology + LevelDB)"
 
-dev --> filter
-admin --> check_quota
-system --> validate
+note bottom of export : "Auto-sync to:\n.data/knowledge-export"
 
-note right of archive : Uses YYYY-MM-DD_HHMM format\nwith branch-specific suffixes
-note right of config_redact : JSON-based configuration\nfor runtime flexibility
-note right of check_quota : Centralized quota validation\nwith environment config
+note top of semantic : "Implemented in:\nmcp-server-semantic-analysis"
 
 @enduml

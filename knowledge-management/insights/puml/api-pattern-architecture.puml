@@ -1,57 +1,47 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title API Pattern Architecture Analysis
+!define RECTANGLE class
 
-package "Design Patterns" {
-  component ApiPattern <<api>>
+package "Knowledge Management System" {
+    
+    package "API Layer" {
+        component [VkbApiClient] <<api>>
+        component [ApiPattern] <<core>>
+    }
+    
+    package "Core Services" {
+        component [GraphDatabaseService] <<core>>
+        component [SemanticAnalysisService] <<core>>
+        component [ParallelWorkers] <<core>>
+    }
+    
+    package "Storage Layer" {
+        database [GraphDatabase\n(.data/knowledge-graph)] <<storage>>
+        database [JSONExports\n(.data/knowledge-export)] <<storage>>
+    }
+    
+    package "Command Interface" {
+        component [vkb_command] <<api>>
+        component [graph-sync_command] <<api>>
+    }
 }
 
-note right of ApiPattern : Handles external communication\nSignificance: 7/10\nConfidence: 72%
+[ApiPattern] --> [VkbApiClient] : "uses"
+[VkbApiClient] --> [GraphDatabaseService] : "interacts with"
+[GraphDatabaseService] --> [GraphDatabase\n(.data/knowledge-graph)] : "reads/writes"
+[GraphDatabaseService] --> [JSONExports\n(.data/knowledge-export)] : "auto-sync exports"
 
-package "Core Components" {
-  component SystemHealthDashboard <<core>>
-  component ApiQuotaSlice <<storage>>
-  component ServiceStarter <<core>>
-  component HealthMonitor <<core>>
-  component HealthVerifier <<core>>
-}
+[SemanticAnalysisService] --> [ParallelWorkers] : "batch processing"
+[ParallelWorkers] --> [GraphDatabaseService] : "updates knowledge"
 
-package "Knowledge Management" {
-  component KnowledgeExport <<storage>>
-  component MemorySystem <<storage>>
-  component ArchitectureDocs <<core>>
-}
+[vkb_command] --> [GraphDatabaseService] : "manages operations"
+[graph-sync_command] --> [GraphDatabaseService] : "synchronizes data"
 
-package "CLI Tools" {
-  component UkbCli <<agent>>
-  component VkbCli <<agent>>
-}
+note top of [ApiPattern] : TransferablePattern\nMicroservices-based architecture\nfor knowledge management
 
-ApiPattern --> SystemHealthDashboard : monitors
-ApiPattern --> ApiQuotaSlice : manages quotas
-ApiPattern --> ServiceStarter : orchestrates
-ApiPattern --> HealthMonitor : health checks
-ApiPattern --> HealthVerifier : validates
+note right of [JSONExports\n(.data/knowledge-export)] : Data-driven development\nAuto-synced from GraphDB
 
-SystemHealthDashboard --> HealthMonitor : displays status
-HealthMonitor --> HealthVerifier : validates health
-ServiceStarter --> HealthVerifier : ensures stability
-
-ApiPattern --> KnowledgeExport : exports data
-ApiPattern --> MemorySystem : persists state
-MemorySystem --> ArchitectureDocs : documents patterns
-
-UkbCli --> ApiPattern : utilizes
-VkbCli --> ApiPattern : integrates
-
-note bottom
-  Pattern Analysis Summary:
-  • Total Patterns: 1
-  • Category: Design (1)
-  • Average Significance: 7/10
-  • Implementation: TypeScript
-  • 32+ Related Components
-end note
+note bottom of [ParallelWorkers] : Batch mode processing\nfor improved performance
 
 @enduml

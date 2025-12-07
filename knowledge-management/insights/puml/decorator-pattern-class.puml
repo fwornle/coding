@@ -1,88 +1,121 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-' Decorator Pattern Implementation - Confidence: 72%
-
 package "Core Components" {
-  abstract class Component {
-    + operation()
-  }
-  
-  class ConcreteComponent {
-    + operation()
-  }
+    abstract class Component <<interface>> {
+        +operation(): void
+    }
+    
+    class ConcreteComponent {
+        +operation(): void
+    }
+    
+    abstract class Decorator <<abstract>> {
+        -component: Component
+        +Decorator(component: Component)
+        +operation(): void
+    }
+    
+    class ConcreteDecorator {
+        +operation(): void
+        +addedBehavior(): void
+    }
 }
 
-package "Decorator Framework" {
-  abstract class Decorator {
-    - component: Component
-    + operation()
-    + setComponent(component: Component)
-  }
-  
-  class ConcreteDecoratorA {
-    - addedState: String
-    + operation()
-    + addBehavior()
-  }
-  
-  class ConcreteDecoratorB {
-    + operation()
-    + addAdditionalBehavior()
-  }
+package "Microservices Architecture" {
+    class GraphDatabaseService <<service>> {
+        -graphologyEngine: GraphologyEngine
+        -levelDbAdapter: LevelDbAdapter
+        +storeKnowledge(data: KnowledgeData): void
+        +queryGraph(query: GraphQuery): Result
+        +processSemanticAnalysis(): void
+    }
+    
+    class PersistenceAgent <<service>> {
+        -database Service: GraphDatabaseService
+        +persistData(entity: Entity): void
+        +retrieveData(id: String): Entity
+        +ensureDataConsistency(): void
+    }
+    
+    class VkbApiClient <<service>> {
+        -accessControl: AccessControl
+        +authenticate(credentials: Credentials): Token
+        +makeRequest(endpoint: String): Response
+        +validateAccess(token: Token): boolean
+    }
 }
 
-package "Knowledge Management" {
-  class GraphDatabaseService {
-    + query()
-    + store()
-    + export()
-  }
-  
-  class GraphKnowledgeExporter {
-    + exportData()
-    + formatOutput()
-  }
+package "Event-Driven System" {
+    class EventProcessor <<service>> {
+        -parallelWorkers: WorkerPool
+        +processBatchAnalysis(events: List<Event>): void
+        +enhanceResponsiveness(): void
+        +handleFaultTolerance(): void
+    }
+    
+    class WorkerPool {
+        -workers: List<Worker>
+        +executeParallel(tasks: List<Task>): void
+        +scaleDynamically(): void
+    }
+    
+    class Worker {
+        +processTask(task: Task): Result
+        +reportStatus(): Status
+    }
 }
 
-package "System Integration" {
-  class ServiceStarter {
-    + initialize()
-    + configure()
-  }
-  
-  class HealthMonitor {
-    + checkStatus()
-    + reportHealth()
-  }
-  
-  class ApiQuotaSlice {
-    + trackUsage()
-    + enforceQuota()
-  }
+package "Pattern Implementation" {
+    class DecoratorPattern <<TransferablePattern>> {
+        +addBehaviorWithoutModification(): void
+        +promoteFlexibility(): void
+        +maintainStructure(): void
+    }
+    
+    class TransferablePattern <<interface>> {
+        +transfer(): void
+        +adapt(): void
+    }
 }
 
-' Relationships
+' Decorator Pattern relationships
 Component <|-- ConcreteComponent
 Component <|-- Decorator
-Decorator <|-- ConcreteDecoratorA
-Decorator <|-- ConcreteDecoratorB
-Decorator o-- Component : decorates
+Decorator <|-- ConcreteDecorator
+Decorator o-- Component
 
-' Pattern Implementation
-GraphDatabaseService --|> Decorator : implements
-GraphKnowledgeExporter --|> ConcreteDecoratorA : extends
-ServiceStarter --|> ConcreteDecoratorB : extends
-HealthMonitor --|> ConcreteDecoratorA : extends
-ApiQuotaSlice --|> ConcreteDecoratorB : extends
+' Service relationships
+GraphDatabaseService --> PersistenceAgent : uses
+EventProcessor --> WorkerPool : manages
+WorkerPool --> Worker : contains
+VkbApiClient ..> GraphDatabaseService : accesses
 
-' Composition relationships
-GraphKnowledgeExporter --> GraphDatabaseService : uses
-ServiceStarter --> HealthMonitor : manages
-HealthMonitor --> ApiQuotaSlice : monitors
+' Pattern relationships
+TransferablePattern <|-- DecoratorPattern
+DecoratorPattern ..> Decorator : implements
+DecoratorPattern ..> ConcreteDecorator : realizes
 
-note top of Decorator : "Adds behavior to objects\ndynamically - Significance: 7/10"
+' Cross-package dependencies
+PersistenceAgent ..> EventProcessor : triggers events
+GraphDatabaseService --> EventProcessor : sends analysis data
 
-note bottom of GraphDatabaseService : "Core knowledge management\nservice with decorator\nenhancements"
+note right of DecoratorPattern
+  Allows added behavior to objects
+  without modifying their structure,
+  promoting flexibility and
+  maintainability
+end note
+
+note top of GraphDatabaseService
+  Uses Graphology + LevelDB
+  for robust knowledge storage
+end note
+
+note bottom of EventProcessor
+  Parallel workers for batch mode
+  semantic analysis enhance
+  system responsiveness
+end note
 
 @enduml
