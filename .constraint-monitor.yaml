@@ -194,7 +194,7 @@ constraints:
 - id: no-incremental-documentation
   group: documentation
   pattern: (?i)\b(fixed|improved|added|updated|changed|modified|removed|deprecated|enhanced|new|now|recent|recently|previous|previously|old|older|formerly|originally|was|were|used
-    to be)\s+(in|on|for|during|as of)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)?\s*\d{4}\b|\b(dec|nov|oct|sep|aug|jul|jun|may|apr|mar|feb|jan)\s*\d{4}\b|\bv\d+\.\d+|version\s+\d|\(fixed\)|\(added\)|\(improved\)|\(updated\)
+    to be)\s+(in|on|for|during|as of)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)?\s*\d{4}\b|\b(dec|nov|oct|sep|aug|jul|jun|may|apr|mar|feb|jan)\s*\d{4}\b|(?:since|as of|in|from)\s+v\d+\.\d+|version\s+\d+\.\d+\s+(?:added|changed|fixed|updated)|\(fixed\)|\(added\)|\(improved\)|\(updated\)
   message: 'CRITICAL: Documentation describes CURRENT state only - no version history,
     fix dates, or incremental language. Use git for history.'
   severity: error
