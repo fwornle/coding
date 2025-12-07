@@ -1,76 +1,62 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
-
-actor "System Architect" as architect
 actor "Developer" as dev
-actor "Knowledge Manager" as km
-actor "MCP Client" as mcp
+actor "System Administrator" as admin
+actor "External System" as ext
 
-package "Knowledge Management System" {
-    usecase "Store Architectural Patterns" as store
-    usecase "Extract Pattern Knowledge" as extract
-    usecase "Query Knowledge Graph" as query
-    usecase "Export Knowledge to JSON" as export
-    usecase "Sync Graph to Export" as sync
-    usecase "Manage Pattern Lifecycle" as lifecycle
+package "Knowledge Management" {
+    usecase "Manage Domain Logic" as manage_domain
+    usecase "Perform Semantic Analysis" as semantic_analysis
+    usecase "Execute Batch Processing" as batch_process
+    usecase "Track Content Changes" as track_changes
 }
 
-package "Data Storage Layer" {
-    usecase "Persist to GraphDB" as graphdb
-    usecase "Store in LevelDB" as leveldb
-    usecase "Maintain Knowledge Graph" as maintain
+package "Data Operations" {
+    usecase "Store Graph Data" as store_graph
+    usecase "Export Knowledge" as export_knowledge
+    usecase "Synchronize Data" as sync_data
+    usecase "Persist Knowledge" as persist_knowledge
 }
 
-package "Integration Layer" {
-    usecase "Provide Semantic Analysis" as semantic
-    usecase "Serve MCP Protocol" as mcpserve
-    usecase "Transfer Patterns" as transfer
+package "Command Interface" {
+    usecase "Visualize Knowledge (vkb)" as visualize
+    usecase "Execute Development Tasks" as dev_tasks
+    usecase "Sync Graph Data" as graph_sync
 }
 
-package "Codebase Analysis" {
-    usecase "Analyze Source Code" as analyze
-    usecase "Identify Evolution Patterns" as identify
-    usecase "Remove Legacy Components" as cleanup
+package "Integration Services" {
+    usecase "Connect External APIs" as external_api
+    usecase "Manage MCP Server" as mcp_server
 }
 
-architect --> store
-architect --> extract
-architect --> lifecycle
+' Actor relationships
+dev --> visualize
+dev --> dev_tasks
+dev --> manage_domain
+dev --> semantic_analysis
 
-dev --> query
-dev --> analyze
-dev --> identify
+admin --> graph_sync
+admin --> sync_data
+admin --> export_knowledge
 
-km --> export
-km --> sync
-km --> maintain
+ext --> external_api
+ext --> mcp_server
 
-mcp --> semantic
-mcp --> mcpserve
-mcp --> transfer
+' Use case relationships
+semantic_analysis ..> batch_process : <<include>>
+manage_domain ..> track_changes : <<include>>
+store_graph ..> persist_knowledge : <<include>>
+export_knowledge ..> sync_data : <<extend>>
 
-store ..> graphdb : <<include>>
-store ..> leveldb : <<include>>
+visualize --> store_graph
+dev_tasks --> manage_domain
+graph_sync --> sync_data
+semantic_analysis --> store_graph
+external_api --> persist_knowledge
 
-extract --> identify : <<extend>>
-extract --> cleanup : <<extend>>
-
-query ..> maintain : <<include>>
-
-export ..> sync : <<include>>
-sync --> graphdb : <<extend>>
-
-semantic --> query : <<extend>>
-transfer --> store : <<extend>>
-
-note right of cleanup : "shared-memory.json\nhas been removed"
-
-note bottom of graphdb : "Storage at:\n.data/knowledge-graph\n(Graphology + LevelDB)"
-
-note bottom of export : "Auto-sync to:\n.data/knowledge-export"
-
-note top of semantic : "Implemented in:\nmcp-server-semantic-analysis"
+note right of semantic_analysis : "Parallel worker implementation\nwith incremental constraints"
+note bottom of store_graph : "Graphology + LevelDB\nat .data/knowledge-graph"
+note right of export_knowledge : "Auto-synchronized JSON\nat .data/knowledge-export"
 
 @enduml

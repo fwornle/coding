@@ -1,30 +1,77 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant SemanticAnalysisAgentSystemImplementation as "Semantic Analysis Agent"
-participant GraphDatabase as "Graph Database (.data/knowledge-graph)"
-participant GraphDatabaseService as "Graph Database Service"
-participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
-participant GraphDatabaseAdapter as "Graph Database Adapter"
-participant CLI as "CLI (vkb command)"
-participant MCP as "MCP Tools"
-participant JSONExporter as "JSON Exporter (.data/knowledge-export)"
+participant "CLI User" as User
+participant "VKB Command" as VKB
+participant "Graph-Sync Command" as Sync
+participant "MCP Server" as MCP
+participant "Semantic Analysis Agent" as Agent
+participant "Parallel Worker Pool" as Workers
+participant "GraphDatabaseService" as GDS
+participant "GraphDatabaseAdapter" as GDA
+participant "GraphKnowledgeExporter" as GKE
+participant "Graphology + LevelDB" as Storage
+participant "Knowledge Export\n(.data/knowledge-export)" as Export
 
-SemanticAnalysisAgent->>GraphDatabase: Initialize graph database
-GraphDatabase->>GraphDatabaseService: Register with Graph Database Service
-GraphDatabaseService->>GraphDatabaseAdapter: Manage data storage and retrieval
-GraphDatabaseAdapter->>GraphDatabase: Store and retrieve data
+note over Storage : Primary storage at\n.data/knowledge-graph
+note over Export : Auto-synchronized JSON exports\nreplaces shared-memory.json
 
-CLI->>SemanticAnalysisAgent: Access via vkb command
-MCP->>SemanticAnalysisAgent: Access for knowledge operations
-SemanticAnalysisAgent->>GraphKnowledgeExporter: Export knowledge graph
-GraphKnowledgeExporter->>JSONExporter: Export to JSON (.data/knowledge-export)
+User -> VKB : vkb visualization request
+activate VKB
+VKB -> GDS : query graph data
+activate GDS
+GDS -> GDA : fetch graph structure
+activate GDA
+GDA -> Storage : read from LevelDB
+Storage -> GDA : return graph data
+GDA -> GDS : structured data
+GDS -> VKB : visualization data
+VKB -> User : display visualization
 
-alt Auto-sync JSON exports
-    JSONExporter->>GraphKnowledgeExporter: Sync knowledge graph export
-    GraphKnowledgeExporter->>GraphDatabase: Update graph database
+User -> Sync : graph-sync command
+activate Sync
+Sync -> GDS : synchronization request
+GDS -> GKE : trigger export
+activate GKE
+GKE -> Storage : read latest graph state
+Storage -> GKE : current graph data
+GKE -> Export : write JSON exports
+GKE -> Sync : sync complete
+deactivate GKE
+Sync -> User : sync confirmation
+deactivate Sync
+
+MCP -> Agent : semantic analysis request
+activate Agent
+alt batch mode processing
+    Agent -> Workers : distribute batch tasks
+    activate Workers
+    loop for each batch item
+        Workers -> GDS : process semantic data
+        GDS -> GDA : update graph
+        GDA -> Storage : persist changes
+    end
+    Workers -> Agent : batch results
+    deactivate Workers
+else single item processing
+    Agent -> GDS : process single item
+    GDS -> GDA : update graph
+    GDA -> Storage : persist changes
 end
 
-SemanticAnalysisAgent->>GraphDatabase: Auto-sync with graph database
+Agent -> GKE : trigger auto-export
+activate GKE
+GKE -> Export : update JSON exports
+deactivate GKE
+
+Agent -> MCP : analysis complete
+deactivate Agent
+
+note over Workers : Recent implementation\nwith active bug fixes
+note over Agent, GKE : Component reference issues\nindicate dependency management\nneeds improvement
+
+deactivate GDA
+deactivate GDS
+deactivate VKB
 
 @enduml

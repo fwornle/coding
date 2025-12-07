@@ -1,0 +1,73 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+actor User
+participant "CLI Interface" as CLI
+participant "VkbApiClient" as API
+participant "GraphDatabaseService" as GDS
+participant "GraphDatabaseAdapter" as GDA
+participant "PersistenceAgent" as PA
+participant "GraphKnowledgeExporter" as GKE
+participant "Semantic Analysis\nWorker Pool" as SAW
+database "Graphology + LevelDB\n(.data/knowledge-graph)" as DB
+database "JSON Export\n(.data/knowledge-export)" as JSON
+
+User -> CLI: Execute command ('vkb', 'coding', 'graph-sync')
+
+alt vkb command
+    CLI -> API: Initialize VkbApiClient
+    API -> GDS: Request knowledge base data
+    GDS -> GDA: Query graph database
+    GDA -> PA: Access storage layer
+    PA -> DB: Retrieve graph data
+    DB --> PA: Return graph data
+    PA --> GDA: Return formatted data
+    GDA --> GDS: Return database results
+    GDS --> API: Return knowledge data
+    API --> CLI: Return visualization data
+    CLI --> User: Display knowledge base
+
+else coding command
+    CLI -> GDS: Execute development operations
+    GDS -> SAW: Initialize parallel workers
+    loop Batch Processing
+        SAW -> GDA: Process semantic analysis
+        GDA -> PA: Store analysis results
+        PA -> DB: Persist to graph database
+    end
+    GDS --> CLI: Operation complete
+    CLI --> User: Development operation result
+
+else graph-sync command
+    CLI -> GKE: Trigger export process
+    GKE -> GDS: Request graph data
+    GDS -> GDA: Query complete graph
+    GDA -> PA: Access full dataset
+    PA -> DB: Retrieve all graph data
+    DB --> PA: Return complete dataset
+    PA --> GDA: Return full graph data
+    GDA --> GDS: Return database snapshot
+    GDS --> GKE: Provide export data
+    GKE -> JSON: Sync to JSON export
+    GKE --> CLI: Export complete
+    CLI --> User: Synchronization result
+end
+
+note right of SAW
+Parallel worker implementation
+for batch semantic analysis
+(recent architectural improvement)
+end note
+
+note right of DB
+Primary storage:
+Graphology + LevelDB
+at .data/knowledge-graph
+end note
+
+note right of JSON
+Automated JSON export sync
+replaces shared-memory.json
+end note
+
+@enduml

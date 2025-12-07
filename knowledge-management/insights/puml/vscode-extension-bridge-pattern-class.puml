@@ -1,122 +1,97 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "VSCode Extension Bridge Pattern" {
-    abstract class TransferablePattern <<pattern>> {
-        +transferData()
-        +validateStructure()
+package "src/knowledge-management" {
+    class KnowledgeManager <<service>> {
+        -graphDatabaseService: GraphDatabaseService
+        -persistenceAgent: PersistenceAgent
+        +storeKnowledgeEntity(entity: Object)
+        +retrieveEntity(id: String)
+        +exportToJSON()
     }
     
-    class VSCodeExtensionBridgePattern {
-        -bridgeConfig: Configuration
-        +initializeBridge()
-        +handleExtensionCommunication()
-    }
-}
-
-package "Knowledge Graph Storage" {
-    class GraphDatabaseService <<service>> {
-        -graphology: GraphologyInstance
-        -levelDB: LevelDBInstance
-        +queryGraph()
-        +updateNodes()
+    class PersistenceAgent <<service>> {
+        -adapter: GraphDatabaseAdapter
+        +persist(data: Object)
+        +load(query: String)
         +syncToExport()
     }
+}
+
+package "lib/ukb-unified" {
+    abstract class GraphDatabaseAdapter {
+        #connectionString: String
+        +abstract connect()
+        +abstract query(sql: String)
+        +abstract store(entity: Object)
+    }
     
-    class GraphDatabaseAdapter <<adapter>> {
-        -dataPath: String
+    class GraphologyLevelDBAdapter {
+        -graphology: GraphologyInstance
+        -levelDB: LevelDBInstance
+        -storagePath: String
         +connect()
-        +executeQuery()
-        +handleTransaction()
+        +query(sql: String)
+        +store(entity: Object)
+        +createIndex(field: String)
     }
     
-    class PersistenceAgent <<agent>> {
-        -validationRules: ValidationRule[]
-        +validateData()
-        +persistToStorage()
-        +handleRollback()
-    }
-    
-    class GraphKnowledgeExporter <<exporter>> {
-        -exportPath: String
-        +exportToJSON()
-        +validateExport()
-        +scheduleSync()
+    interface GraphDatabaseService <<interface>> {
+        +executeQuery(query: String)
+        +storeEntity(entity: Object)
+        +createRelationship(from: String, to: String, type: String)
     }
 }
 
-package "API and Commands" {
-    class VkbApiClient <<client>> {
-        -apiEndpoint: String
-        -authToken: String
-        +sendVisualizationRequest()
-        +handleApiResponse()
-        +manageConnection()
+package "integrations/mcp-server-semantic-analysis/src" {
+    class SemanticAnalysisService <<service>> {
+        -knowledgeManager: KnowledgeManager
+        +analyzeCodebase()
+        +extractPatterns()
+        +storeAnalysisResults()
     }
     
-    class VkbCommand <<command>> {
-        +executeVisualization()
-        +handleUserInput()
-    }
-    
-    class GraphSyncCommand <<command>> {
-        +executeSynchronization()
-        +validateSyncStatus()
+    class VSCodeExtensionBridgePattern <<entity>> {
+        -patternId: String
+        -components: List<String>
+        -implementationPaths: List<String>
+        -extractedFrom: String
+        +getArchitecturalComponents()
+        +getImplementationDetails()
     }
 }
 
-package "Semantic Analysis Integration" {
-    class MCPServer <<server>> {
-        -serverConfig: Configuration
-        +processSemanticAnalysis()
-        +extractKnowledge()
-        +classifyContent()
+package "Storage Layer" {
+    class GraphologyStorage <<file>> {
+        -path: ".data/knowledge-graph"
+        -format: "LevelDB"
+        +read()
+        +write()
+        +backup()
     }
     
-    class SemanticAnalysisIntegration <<integration>> {
-        -analysisRules: AnalysisRule[]
-        +performAutomatedExtraction()
-        +integrateWithKnowledgeGraph()
+    class JSONExportStorage <<file>> {
+        -path: ".data/knowledge-export"
+        -autoSync: Boolean
+        +exportFromGraph()
+        +syncWithGraphDB()
     }
 }
 
-package "Data Storage" {
-    class DataDirectory <<file>> {
-        +knowledgeGraphPath: "/data/knowledge-graph"
-        +knowledgeExportPath: "/data/knowledge-export"
-    }
-}
+' Relationships
+KnowledgeManager --> PersistenceAgent : uses
+PersistenceAgent --> GraphDatabaseAdapter : delegates to
+GraphologyLevelDBAdapter --|> GraphDatabaseAdapter : implements
+GraphologyLevelDBAdapter ..|> GraphDatabaseService : implements
+SemanticAnalysisService --> KnowledgeManager : uses
+SemanticAnalysisService --> VSCodeExtensionBridgePattern : creates
+GraphologyLevelDBAdapter --> GraphologyStorage : stores to
+PersistenceAgent --> JSONExportStorage : exports to
+JSONExportStorage ..> GraphologyStorage : syncs from
 
-' Inheritance
-TransferablePattern <|-- VSCodeExtensionBridgePattern
-
-' Composition relationships
-GraphDatabaseService *-- GraphDatabaseAdapter
-GraphDatabaseService *-- PersistenceAgent
-GraphDatabaseService *-- GraphKnowledgeExporter
-
-' Dependencies
-VSCodeExtensionBridgePattern ..> GraphDatabaseService : uses
-VkbApiClient ..> GraphDatabaseService : communicates
-VkbCommand ..> VkbApiClient : invokes
-GraphSyncCommand ..> GraphDatabaseService : synchronizes
-
-' Storage relationships
-GraphDatabaseService --> DataDirectory : stores data
-GraphKnowledgeExporter --> DataDirectory : exports to
-
-' MCP Integration
-MCPServer *-- SemanticAnalysisIntegration
-SemanticAnalysisIntegration ..> GraphDatabaseService : feeds data
-
-' Command relationships
-VkbCommand ..> GraphDatabaseService : visualizes
-GraphSyncCommand ..> GraphKnowledgeExporter : triggers export
-
-note top of VSCodeExtensionBridgePattern : "Main bridge pattern for VSCode extension\nintegration with knowledge graph system"
-
-note bottom of GraphDatabaseService : "Uses Graphology + LevelDB with\nauto-sync to JSON exports"
-
-note right of MCPServer : "Located at integrations/mcp-server-\nsemantic-analysis/src"
+' Notes
+note right of VSCodeExtensionBridgePattern : "Pattern extracted from codebase\nanalysis across multiple modules"
+note bottom of GraphologyStorage : "Replaced shared-memory.json\nwith persistent graph storage"
+note bottom of JSONExportStorage : "Auto-synced exports\nfor external consumption"
 
 @enduml

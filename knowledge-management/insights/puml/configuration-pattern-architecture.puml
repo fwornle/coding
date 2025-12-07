@@ -1,63 +1,65 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management Core" {
-  component [ConfigurationPattern] <<core>> as CP
-  component [KnowledgeManager] <<core>> as KM
-  component [PatternExtractor] <<core>> as PE
+package "Configuration Pattern Architecture" {
+    
+    package "Core Implementation" {
+        component [ConfigurationPattern] <<agent>> as cp
+        component [Environment Variables] <<config>> as env
+        component [Project Config Files] <<config>> as projconfig
+    }
+    
+    package "Knowledge Management Layer" {
+        component [src/knowledge-management] <<core>> as km
+        component [lib/ukb-unified] <<core>> as ukb
+    }
+    
+    package "MCP Integration" {
+        component [integrations/mcp-server-semantic-analysis] <<api>> as mcpserver
+        component [MCP Agent Tools] <<agent>> as mcptools
+    }
+    
+    package "Storage Layer" {
+        component [Graphology Engine] <<storage>> as graphology
+        component [LevelDB] <<storage>> as leveldb
+        database ".data/knowledge-graph" <<storage>> as kgdb
+    }
+    
+    package "Export Layer" {
+        component [JSON Exporter] <<core>> as jsonexp
+        database ".data/knowledge-export" <<storage>> as exportdb
+        note right of exportdb : Auto-synced from GraphDB
+    }
 }
 
-package "Storage Layer" {
-  component [Graphology] <<storage>> as GR
-  component [LevelDB] <<storage>> as LDB
-  database ".data/knowledge-graph" <<storage>> as KGD
-}
+' Configuration relationships
+cp --> env : reads configuration
+cp --> projconfig : loads settings
 
-package "Export & Sync" {
-  component [JSONExporter] <<api>> as JE
-  folder ".data/knowledge-export" <<storage>> as KED
-  component [AutoSyncService] <<core>> as ASS
-}
+' Core implementation relationships
+cp --> km : implements pattern
+cp --> ukb : unified knowledge base
+km --> ukb : manages knowledge
 
-package "Implementation Locations" {
-  component [src/knowledge-management] <<module>> as SKM
-  component [lib/ukb-unified] <<module>> as LUU
-  component [integrations/mcp-server-semantic-analysis] <<module>> as MCP
-}
+' MCP integration relationships
+cp --> mcpserver : semantic analysis
+mcpserver --> mcptools : agent coordination
 
-package "Legacy (Removed)" {
-  component [shared-memory.json] <<deprecated>> as SMJ
-}
+' Storage relationships
+km --> graphology : graph operations
+graphology --> leveldb : persistent storage
+leveldb --> kgdb : knowledge graph data
 
-' Core relationships
-CP --> KM : "managed by"
-KM --> PE : "uses"
-CP --> GR : "stored in"
-GR --> LDB : "persisted via"
-LDB --> KGD : "writes to"
+' Export relationships
+kgdb --> jsonexp : exports data
+jsonexp --> exportdb : synchronized output
 
-' Export flow
-KM --> JE : "exports via"
-JE --> KED : "outputs to"
-ASS --> KGD : "syncs from"
-ASS --> KED : "auto-updates"
+' Cross-layer relationships
+mcpserver --> km : pattern extraction
+ukb --> kgdb : stores patterns
 
-' Implementation relationships
-CP --> SKM : "implemented in"
-CP --> LUU : "implemented in"
-CP --> MCP : "implemented in"
+note top of cp : Pattern extracted from codebase analysis\nand stored as reusable knowledge entity
 
-' Legacy removal
-SMJ -[#red]-> CP : "replaced by\nGraphology+LevelDB"
-
-note top of CP
-  TransferablePattern extracted from codebase analysis
-  Enables reusable knowledge entity storage
-end note
-
-note bottom of KGD
-  Primary knowledge storage using
-  Graphology + LevelDB architecture
-end note
+note bottom of kgdb : Replaced shared-memory.json\nwith GraphDB + LevelDB architecture
 
 @enduml

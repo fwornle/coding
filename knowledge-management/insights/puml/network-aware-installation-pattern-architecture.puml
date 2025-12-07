@@ -1,62 +1,62 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "NetworkAwareInstallationPattern" {
-    package "Storage Layer" {
-        component [LevelDB] <<storage>>
-        component [GraphDatabaseService] <<core>>
-        component [GraphDatabaseAdapter] <<api>>
-        folder ".data/knowledge-graph" as KGStorage <<storage>>
-        folder ".data/knowledge-export" as JSONExport <<storage>>
-    }
-    
-    package "Processing Layer" {
-        component [ParallelWorkers] <<core>>
-        component [BatchModeSemanticAnalysis] <<core>>
-        component [PersistenceAgent] <<agent>>
-        component [IncrementalContentConstraints] <<core>>
-    }
-    
-    package "Command Interface" {
-        component [VKBCommand] <<api>>
-        component [CodingCommand] <<api>>
-        component [GraphSyncCommand] <<api>>
-    }
-    
-    package "Network Operations" {
-        component [NetworkAwareOperations] <<core>>
-        component [ScalableProcessingPatterns] <<core>>
-    }
+package "Knowledge Management Infrastructure" {
+  component "NetworkAwareInstallationPattern" as NAIP <<core>>
+  
+  package "src/knowledge-management" {
+    component "KnowledgeManager" as KM <<core>>
+    component "PatternExtractor" as PE <<core>>
+  }
+  
+  package "lib/ukb-unified" {
+    component "UnifiedKnowledgeBase" as UKB <<core>>
+    component "GraphologyEngine" as GE <<core>>
+  }
+  
+  package "integrations/mcp-server-semantic-analysis/src" {
+    component "SemanticAnalysisServer" as SAS <<api>>
+    component "MCPInterface" as MCP <<api>>
+  }
 }
 
-' Storage relationships
-GraphDatabaseService --> LevelDB : uses
-GraphDatabaseService --> Graphology : implements with
-GraphDatabaseAdapter --> GraphDatabaseService : wraps
-KGStorage --> LevelDB : stores
-JSONExport --> GraphDatabaseService : auto-synced from
+package "Data Storage Layer" {
+  package ".data/knowledge-graph" {
+    database "Graphology + LevelDB" as GraphDB <<storage>>
+  }
+  
+  package ".data/knowledge-export" {
+    database "JSON Exports" as JSONExport <<storage>>
+  }
+  
+  note right of JSONExport
+    Auto-synced from GraphDB
+    Replaces removed shared-memory.json
+  end note
+}
 
-' Processing relationships
-ParallelWorkers --> BatchModeSemanticAnalysis : executes
-PersistenceAgent --> GraphDatabaseAdapter : uses
-PersistenceAgent --> KGStorage : persists to
-IncrementalContentConstraints --> ParallelWorkers : constrains edit/write ops
+' Relationships
+NAIP --> KM : implements
+NAIP --> UKB : implements
+NAIP --> SAS : implements
 
-' Command relationships
-VKBCommand --> GraphDatabaseService : visualizes
-CodingCommand --> ParallelWorkers : triggers development ops
-GraphSyncCommand --> JSONExport : synchronizes
-GraphSyncCommand --> KGStorage : synchronizes
+KM --> PE : uses
+KM --> GraphDB : stores patterns
 
-' Network operations
-NetworkAwareOperations --> ScalableProcessingPatterns : implements
-ScalableProcessingPatterns --> ParallelWorkers : utilizes
-NetworkAwareOperations --> PersistenceAgent : coordinates with
+UKB --> GE : uses
+GE --> GraphDB : reads/writes
 
-note top of NetworkAwareInstallationPattern
-  TransferablePattern for network-aware installations
-  Features scalable processing with dual storage persistence
-  Avoids deprecated shared-memory.json approach
+SAS --> MCP : exposes
+SAS --> GraphDB : queries
+
+GraphDB --> JSONExport : auto-sync
+
+PE --> GraphDB : extracts to
+
+note top of NAIP
+  Core pattern for network-aware installation
+  extracted from codebase analysis
+  Enables semantic analysis and knowledge management
 end note
 
 @enduml

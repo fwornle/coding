@@ -3,54 +3,63 @@
 
 left to right direction
 
-actor "Knowledge Engineer" as KE
-actor "Developer" as DEV
-actor "System Administrator" as SA
-actor "External System" as EXT
+actor "Developer" as dev
+actor "Knowledge System" as ks
+actor "MCP Client" as mcp
 
-package "Knowledge Management System" {
-    usecase "Store Knowledge Graph" as UC1
-    usecase "Export Knowledge Data" as UC2
-    usecase "Sync Graph Database" as UC3
-    usecase "Perform Semantic Analysis" as UC4
-    usecase "Execute Batch Processing" as UC5
-    usecase "Visualize Knowledge Graph" as UC6
-    usecase "Manage VKB Operations" as UC7
-    usecase "Access API Endpoints" as UC8
+rectangle "ApiPattern GraphDatabase System" {
+    package "Knowledge Management" {
+        usecase "Store Graph Data" as store
+        usecase "Query Knowledge Graph" as query
+        usecase "Export Knowledge" as export
+        usecase "Manage VKB" as vkb
+    }
+    
+    package "Unified Knowledge Base" {
+        usecase "Access VkbApiClient" as client
+        usecase "Sync GraphDB to JSON" as sync
+        usecase "Persist to LevelDB" as persist
+    }
+    
+    package "Semantic Analysis" {
+        usecase "Analyze Code Patterns" as analyze
+        usecase "Extract Knowledge Entities" as extract
+        usecase "Serve MCP Requests" as serve
+    }
 }
 
-package "Data Processing" {
-    usecase "Process in Parallel" as UC9
-    usecase "Auto-sync JSON Exports" as UC10
-}
+dev --> store
+dev --> query
+dev --> export
+dev --> analyze
 
-KE --> UC1
-KE --> UC2
-KE --> UC4
-KE --> UC6
-KE --> UC7
+ks --> vkb
+ks --> sync
+ks --> persist
 
-DEV --> UC2
-DEV --> UC8
-DEV --> UC10
+mcp --> serve
+mcp --> client
 
-SA --> UC3
-SA --> UC5
-SA --> UC7
+store ..> persist : <<include>>
+query ..> client : <<include>>
+export ..> sync : <<include>>
+analyze ..> extract : <<include>>
+extract ..> store : <<extend>>
+serve ..> query : <<include>>
 
-EXT --> UC8
+note right of sync
+  Auto-synced from GraphDB
+  to .data/knowledge-export
+end note
 
-UC3 ..> UC1 : <<include>>
-UC5 ..> UC9 : <<include>>
-UC2 ..> UC10 : <<include>>
-UC4 ..> UC5 : <<extend>>
-UC7 ..> UC3 : <<include>>
-UC7 ..> UC6 : <<include>>
+note bottom of persist
+  Graphology + LevelDB
+  at .data/knowledge-graph
+end note
 
-note right of UC1 : Stores data in\n.data/knowledge-graph
-note right of UC2 : Exports to\n.data/knowledge-export
-note bottom of UC5 : Uses parallel workers\nfor performance
-note right of UC3 : graph-sync command
-note right of UC7 : vkb command interface
+note top of serve
+  Replaces removed
+  shared-memory.json
+end note
 
 @enduml

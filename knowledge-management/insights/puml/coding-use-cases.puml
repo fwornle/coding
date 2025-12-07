@@ -1,0 +1,74 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor Developer as dev
+actor "System Administrator" as admin
+actor "External System" as ext
+
+package "Knowledge Management System" {
+  usecase "Visualize Knowledge Base" as viz
+  usecase "Query Knowledge Graph" as query
+  usecase "Export Knowledge Data" as export
+  usecase "Manage Graph Storage" as storage
+  
+  package "Development Operations" {
+    usecase "Execute Coding Commands" as coding
+    usecase "Run Development Tasks" as devtasks
+    usecase "Manage Project Structure" as project
+  }
+  
+  package "Data Synchronization" {
+    usecase "Sync Graph Database" as sync
+    usecase "Export to JSON" as jsonexport
+    usecase "Batch Semantic Analysis" as semantic
+    usecase "Parallel Processing" as parallel
+  }
+  
+  package "Storage Operations" {
+    usecase "Manage LevelDB Storage" as leveldb
+    usecase "Handle Graph Persistence" as persist
+    usecase "Database Abstraction" as abstraction
+  }
+}
+
+dev --> viz : uses 'vkb' command
+dev --> coding : uses 'coding' command
+dev --> query
+dev --> export
+
+admin --> sync : uses 'graph-sync' command
+admin --> storage
+admin --> leveldb
+admin --> persist
+
+ext --> semantic : requests analysis
+ext --> parallel : batch operations
+
+viz ..> query : <<include>>
+export ..> jsonexport : <<include>>
+sync ..> persist : <<include>>
+semantic ..> parallel : <<extend>>
+storage ..> abstraction : <<include>>
+persist ..> leveldb : <<include>>
+
+note right of viz
+  Primary interface through
+  'vkb' command for knowledge
+  base visualization
+end note
+
+note bottom of sync
+  Automated sync between
+  Graphology + LevelDB and
+  JSON export format
+end note
+
+note right of semantic
+  Recent architectural improvement
+  with parallel worker implementation
+  for batch processing
+end note
+
+@enduml

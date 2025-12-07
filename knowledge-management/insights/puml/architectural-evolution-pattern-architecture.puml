@@ -1,63 +1,70 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-  component KnowledgeManager <<core>>
-  component GraphologyEngine <<storage>>
-  component LevelDBStorage <<storage>>
-  component JSONExporter <<api>>
+package "Knowledge Management Core" {
+    component [src/knowledge-management] <<core>> as KnowledgeCore
+    component [GraphDatabaseService] <<core>> as GraphDB
+    component [PersistenceAgent] <<agent>> as PersistAgent
 }
 
-package "Unified Knowledge Base" {
-  component UKBCore <<core>>
-  component PatternExtractor <<core>>
-  component TransferablePattern <<pattern>>
+package "Shared Utilities" {
+    component [lib/ukb-unified] <<core>> as SharedUtils
+    component [GraphDatabaseAdapter] <<core>> as GraphAdapter
 }
 
-package "MCP Semantic Analysis" {
-  component MCPServer <<api>>
-  component SemanticAnalyzer <<core>>
-  component CodebaseAnalyzer <<agent>>
+package "Analysis Services" {
+    component [integrations/mcp-server-semantic-analysis/src] <<api>> as SemanticAnalysis
+    component [ParallelWorker] <<core>> as ParallelWorker
 }
 
-package "Data Storage" {
-  database "GraphDB\n(.data/knowledge-graph)" as GraphDB <<storage>>
-  file "JSON Export\n(.data/knowledge-export)" as JSONStore <<storage>>
-  note right of JSONStore : Auto-synced from GraphDB
+package "Storage Layer" {
+    database "LevelDB\n(.data/knowledge-graph)" <<storage>> as LevelDB
+    component [Graphology] <<storage>> as Graphology
+    file "JSON Exports\n(.data/knowledge-export)" <<storage>> as JSONExports
+    component [GraphKnowledgeExporter] <<core>> as Exporter
 }
 
-package "Architecture Patterns" {
-  component ArchitecturalEvolutionPattern <<TransferablePattern>>
-  note as N1
-  Extracted from codebase analysis
-  Stored as reusable knowledge entity
-  Replaces shared-memory.json approach
-  end note
-  ArchitecturalEvolutionPattern .. N1
+package "External Integrations" {
+    component [VkbApiClient] <<api>> as ApiClient
 }
 
-' Relationships
-KnowledgeManager --> GraphologyEngine
-GraphologyEngine --> LevelDBStorage
-GraphologyEngine --> GraphDB
-JSONExporter --> JSONStore
-GraphDB --> JSONStore : auto-sync
+package "Command Interface" {
+    component [vkb] <<api>> as VkbCommand
+    component [coding] <<api>> as CodingCommand
+    component [graph-sync] <<api>> as SyncCommand
+}
 
-UKBCore --> KnowledgeManager
-PatternExtractor --> UKBCore
-TransferablePattern --> PatternExtractor
+' Core relationships
+KnowledgeCore --> GraphDB : manages
+GraphDB --> PersistAgent : uses
+GraphDB --> GraphAdapter : through
 
-MCPServer --> SemanticAnalyzer
-SemanticAnalyzer --> CodebaseAnalyzer
-CodebaseAnalyzer --> PatternExtractor : extracts patterns
+' Storage relationships
+GraphDB --> Graphology : stores in
+Graphology --> LevelDB : persisted by
+Exporter --> JSONExports : exports to
+Graphology --> Exporter : auto-sync
 
-ArchitecturalEvolutionPattern --> TransferablePattern : implements
-ArchitecturalEvolutionPattern --> GraphDB : stored in
+' Analysis pipeline
+SemanticAnalysis --> ParallelWorker : batch processing
+ParallelWorker --> GraphDB : integrates with
+ParallelWorker --> PersistAgent : works with
 
-note top of ArchitecturalEvolutionPattern
-  Evolution from shared-memory.json
-  to Graphology + LevelDB architecture
-  with auto-synced JSON exports
-end note
+' Shared utilities
+SharedUtils --> GraphAdapter : provides
+GraphAdapter --> SyncCommand : enables
+
+' External integrations
+ApiClient --> KnowledgeCore : integrates with
+ApiClient --> GraphDB : maintains local persistence
+
+' Command interface
+VkbCommand --> KnowledgeCore : visualization
+CodingCommand --> KnowledgeCore : development
+SyncCommand --> GraphAdapter : data sync
+
+note top of KnowledgeCore : Incremental content constraints\nonly on edit/write operations
+note right of SemanticAnalysis : Update classification via\nsemantic analysis pipeline
+note bottom of Graphology : Auto-synchronized with\nJSON exports
 
 @enduml

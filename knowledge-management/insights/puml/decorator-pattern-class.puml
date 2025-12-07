@@ -1,121 +1,107 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Core Components" {
+package "Knowledge Management" <<system>> {
     abstract class Component <<interface>> {
         +operation(): void
     }
     
-    class ConcreteComponent {
+    class ConcreteComponent <<core>> {
         +operation(): void
+        -data: any
     }
     
-    abstract class Decorator <<abstract>> {
+    abstract class Decorator <<pattern>> {
         -component: Component
-        +Decorator(component: Component)
         +operation(): void
+        +setComponent(component: Component): void
     }
     
-    class ConcreteDecorator {
+    class SemanticAnalysisDecorator <<decorator>> {
         +operation(): void
-        +addedBehavior(): void
+        +analyzeSemantics(): void
+        -analysisEngine: AnalysisEngine
+    }
+    
+    class KnowledgeStorageDecorator <<decorator>> {
+        +operation(): void
+        +storeKnowledge(): void
+        -graphDatabase: GraphDatabase
+    }
+    
+    class ExportDecorator <<decorator>> {
+        +operation(): void
+        +exportToJson(): void
+        -exportPath: string
     }
 }
 
-package "Microservices Architecture" {
-    class GraphDatabaseService <<service>> {
-        -graphologyEngine: GraphologyEngine
-        -levelDbAdapter: LevelDbAdapter
-        +storeKnowledge(data: KnowledgeData): void
-        +queryGraph(query: GraphQuery): Result
-        +processSemanticAnalysis(): void
+package "Storage Layer" <<infrastructure>> {
+    class GraphDatabase <<database>> {
+        +store(data: any): void
+        +query(pattern: string): any[]
+        +getGraph(): Graph
+        -graphology: Graphology
+        -levelDB: LevelDB
     }
     
-    class PersistenceAgent <<service>> {
-        -database Service: GraphDatabaseService
-        +persistData(entity: Entity): void
-        +retrieveData(id: String): Entity
-        +ensureDataConsistency(): void
+    class Graphology <<library>> {
+        +addNode(id: string): void
+        +addEdge(source: string, target: string): void
+        +export(): object
     }
     
-    class VkbApiClient <<service>> {
-        -accessControl: AccessControl
-        +authenticate(credentials: Credentials): Token
-        +makeRequest(endpoint: String): Response
-        +validateAccess(token: Token): boolean
+    class LevelDB <<storage>> {
+        +put(key: string, value: any): void
+        +get(key: string): any
+        +createReadStream(): Stream
+    }
+    
+    class JsonExporter <<service>> {
+        +export(graph: Graph): void
+        +autoSync(): void
+        -exportDirectory: string
     }
 }
 
-package "Event-Driven System" {
-    class EventProcessor <<service>> {
-        -parallelWorkers: WorkerPool
-        +processBatchAnalysis(events: List<Event>): void
-        +enhanceResponsiveness(): void
-        +handleFaultTolerance(): void
+package "Integration Layer" <<service>> {
+    class McpSemanticServer <<server>> {
+        +processRequest(request: any): any
+        +initializeDecorators(): void
+        -decoratorChain: Decorator[]
     }
     
-    class WorkerPool {
-        -workers: List<Worker>
-        +executeParallel(tasks: List<Task>): void
-        +scaleDynamically(): void
-    }
-    
-    class Worker {
-        +processTask(task: Task): Result
-        +reportStatus(): Status
+    class UkbUnifiedLib <<library>> {
+        +createDecoratorChain(): Decorator[]
+        +configureComponents(): void
     }
 }
 
-package "Pattern Implementation" {
-    class DecoratorPattern <<TransferablePattern>> {
-        +addBehaviorWithoutModification(): void
-        +promoteFlexibility(): void
-        +maintainStructure(): void
-    }
-    
-    class TransferablePattern <<interface>> {
-        +transfer(): void
-        +adapt(): void
-    }
-}
-
-' Decorator Pattern relationships
+' Decorator Pattern Relationships
 Component <|-- ConcreteComponent
 Component <|-- Decorator
-Decorator <|-- ConcreteDecorator
-Decorator o-- Component
+Decorator <|-- SemanticAnalysisDecorator
+Decorator <|-- KnowledgeStorageDecorator
+Decorator <|-- ExportDecorator
 
-' Service relationships
-GraphDatabaseService --> PersistenceAgent : uses
-EventProcessor --> WorkerPool : manages
-WorkerPool --> Worker : contains
-VkbApiClient ..> GraphDatabaseService : accesses
+Decorator o-- Component : decorates
 
-' Pattern relationships
-TransferablePattern <|-- DecoratorPattern
-DecoratorPattern ..> Decorator : implements
-DecoratorPattern ..> ConcreteDecorator : realizes
+' Storage Relationships
+GraphDatabase *-- Graphology
+GraphDatabase *-- LevelDB
+KnowledgeStorageDecorator --> GraphDatabase : uses
+ExportDecorator --> JsonExporter : uses
+JsonExporter --> GraphDatabase : reads from
 
-' Cross-package dependencies
-PersistenceAgent ..> EventProcessor : triggers events
-GraphDatabaseService --> EventProcessor : sends analysis data
+' Integration Relationships
+McpSemanticServer --> Decorator : manages
+UkbUnifiedLib --> Decorator : creates
+SemanticAnalysisDecorator --> McpSemanticServer : integrates with
 
-note right of DecoratorPattern
-  Allows added behavior to objects
-  without modifying their structure,
-  promoting flexibility and
-  maintainability
-end note
-
-note top of GraphDatabaseService
-  Uses Graphology + LevelDB
-  for robust knowledge storage
-end note
-
-note bottom of EventProcessor
-  Parallel workers for batch mode
-  semantic analysis enhance
-  system responsiveness
-end note
+' Annotations
+note right of Decorator : "Core decorator pattern\nimplementation"
+note bottom of GraphDatabase : "Located at:\n.data/knowledge-graph"
+note bottom of JsonExporter : "Auto-synced exports at:\n.data/knowledge-export"
+note top of McpSemanticServer : "MCP server for\nsemantic analysis"
 
 @enduml

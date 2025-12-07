@@ -1,32 +1,84 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor User as "User"
-actor CLI as "Command Line Interface"
-actor MCP as "MCP Tools"
+left to right direction
 
-usecase "Visualize Knowledge Graph" as (Visualize Knowledge Graph)
-usecase "Perform Knowledge Operations" as (Perform Knowledge Operations)
-usecase "Access JSON Exports" as (Access JSON Exports)
+actor "System Administrator" as admin
+actor "Developer" as dev
+actor "MCP Client" as mcp
+actor "External System" as ext
 
-User -- (Visualize Knowledge Graph)
-User -- (Perform Knowledge Operations)
-User -- (Access JSON Exports)
-
-CLI -- (Visualize Knowledge Graph)
-MCP -- (Perform Knowledge Operations)
-
-package "SemanticAnalysisAgentSystemImplementation" {
-  component GraphDatabaseService as "Graph Database Service"
-  component GraphKnowledgeExporter as "Graph Knowledge Exporter"
-  component GraphDatabaseAdapter as "Graph Database Adapter"
-  
-  (Visualize Knowledge Graph) ..> GraphDatabaseService : uses
-  (Perform Knowledge Operations) ..> GraphDatabaseService : uses
-  (Access JSON Exports) ..> GraphKnowledgeExporter : uses
-  
-  GraphDatabaseService -- GraphDatabaseAdapter
-  GraphKnowledgeExporter -- GraphDatabaseAdapter
+rectangle "Semantic Analysis Agent System" {
+    usecase "Perform Semantic Analysis" as analyze
+    usecase "Generate Insights" as insights
+    usecase "Generate PlantUML Diagrams" as plantuml
+    usecase "Batch Process Analysis" as batch
+    usecase "Visualize Knowledge Graph" as visualize
+    usecase "Synchronize Graph Data" as sync
+    usecase "Export Knowledge Base" as export
+    usecase "Query Graph Database" as query
+    usecase "Manage Graph Storage" as storage
+    usecase "Process Parallel Workers" as parallel
 }
+
+rectangle "Data Management" {
+    usecase "Store Graph Data" as store
+    usecase "Export JSON Data" as json_export
+    usecase "Adapt Database Operations" as adapt
+}
+
+rectangle "CLI Operations" {
+    usecase "Execute VKB Commands" as vkb
+    usecase "Run Graph Sync" as graph_sync
+}
+
+rectangle "MCP Integration" {
+    usecase "Serve MCP Requests" as mcp_serve
+    usecase "Handle External Integrations" as integrate
+}
+
+admin --> visualize
+admin --> sync
+admin --> vkb
+admin --> graph_sync
+
+dev --> analyze
+dev --> insights
+dev --> plantuml
+dev --> query
+dev --> export
+
+mcp --> mcp_serve
+mcp --> integrate
+
+ext --> mcp_serve
+
+analyze ..> batch : <<include>>
+analyze ..> parallel : <<include>>
+batch --> storage
+insights --> plantuml : <<extend>>
+visualize --> query : <<include>>
+sync --> store : <<include>>
+export --> json_export : <<include>>
+storage --> store : <<include>>
+storage --> adapt : <<include>>
+mcp_serve --> query : <<include>>
+vkb --> visualize : <<include>>
+graph_sync --> sync : <<include>>
+
+note right of batch
+  Uses parallel workers for
+  performance optimization
+end note
+
+note bottom of storage
+  Graphology + LevelDB
+  at .data/knowledge-graph
+end note
+
+note right of json_export
+  Auto-synchronized exports
+  at .data/knowledge-export
+end note
 
 @enduml

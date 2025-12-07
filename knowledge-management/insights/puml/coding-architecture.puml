@@ -1,0 +1,55 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Coding Project - Knowledge Management System Architecture
+
+package "Knowledge Management Core" {
+  component [GraphDatabaseService] <<core>>
+  component [GraphDatabaseAdapter] <<core>>
+  component [GraphKnowledgeExporter] <<core>>
+  component [PersistenceAgent] <<agent>>
+  component [VkbApiClient] <<api>>
+}
+
+package "Unified Libraries" {
+  component [UKB-Unified] <<library>>
+}
+
+package "Semantic Analysis Integration" {
+  component [MCP Server] <<api>>
+  component [Parallel Workers] <<core>>
+}
+
+package "Storage Layer" {
+  database [Graphology] <<storage>>
+  database [LevelDB] <<storage>>
+  component [Knowledge Graph Data] <<storage>>
+  component [Export Data] <<storage>>
+}
+
+package "Command Interface" {
+  component [VKB Command] <<interface>> 
+  component [Coding Command] <<interface>>
+  component [Graph Sync Command] <<interface>>
+}
+
+note top of [Knowledge Management Core] : Core logic in src/knowledge-management
+
+[GraphDatabaseService] --> [Graphology] : stores data
+[GraphDatabaseService] --> [LevelDB] : persists to
+[GraphDatabaseAdapter] --> [GraphDatabaseService] : abstracts
+[PersistenceAgent] --> [Knowledge Graph Data] : manages
+[GraphKnowledgeExporter] --> [Export Data] : exports to
+
+[VKB Command] --> [VkbApiClient] : visualizes knowledge base
+[Coding Command] --> [GraphDatabaseService] : development operations
+[Graph Sync Command] --> [GraphKnowledgeExporter] : synchronizes data
+
+[MCP Server] --> [Parallel Workers] : batch semantic analysis
+[Parallel Workers] --> [GraphDatabaseService] : processes data
+
+[UKB-Unified] --> [GraphDatabaseAdapter] : provides unified libraries
+
+note bottom : Recent improvements: Parallel worker implementation\nand removal of shared-memory.json in favor\nof graph-based storage
+
+@enduml

@@ -1,0 +1,84 @@
+@startuml deep-insight-generation
+!include _standard-style.puml
+
+title Deep Insight Generation Flow
+
+skinparam defaultFontSize 11
+skinparam arrowThickness 1.5
+
+actor "User/Agent" as USER
+participant "refresh_entity\nTool" as REFRESH
+participant "Content\nValidation\nAgent" as CVA
+participant "Insight\nGeneration\nAgent" as IGA
+participant "Semantic\nAnalyzer" as SA
+participant "Serena\nCode\nAnalyzer" as SERENA
+participant "LLM\n(Groq/Gemini/\nAnthropic)" as LLM
+database "GraphDB" as DB
+collections "Insight\nDocument\n(.md)" as MD
+
+USER -> REFRESH : refresh_entity(name, team)
+activate REFRESH
+
+REFRESH -> CVA : validateAndRefresh()
+activate CVA
+
+CVA -> DB : loadEntity()
+CVA <-- DB : entity + observations
+
+CVA -> CVA : buildInsightAnalysisContext()
+note right
+  Protected entity types enforced:
+  - Coding -> Project
+  - CollectiveKnowledge -> System
+end note
+
+CVA -> IGA : refreshEntityInsights()
+activate IGA
+
+IGA -> SERENA : analyzeCodeReferences()
+activate SERENA
+SERENA --> IGA : code symbols + file structures
+deactivate SERENA
+
+group Deep Insight Generation [LLM-powered analysis]
+  IGA -> SA : analyzeContent(prompt)
+  activate SA
+  note right #E6F3FF
+    **Prompt instructs LLM to:**
+    - Synthesize understanding
+    - Analyze architecture decisions
+    - Explain implementation
+    - Identify integration points
+    - Extract best practices
+  end note
+  SA -> LLM : architecture analysis
+  LLM --> SA : synthesized insight
+  SA --> IGA : deepInsightContent
+  deactivate SA
+end
+
+alt Deep insight succeeded
+  IGA -> IGA : Use LLM-generated content
+else Deep insight failed
+  IGA -> IGA : Fallback to bullet formatting
+end
+
+IGA -> IGA : generateDiagrams(4 types)
+note right
+  Architecture, Sequence,
+  Class, Use Cases
+end note
+
+IGA -> MD : write insight document
+
+IGA --> CVA : insightResult
+deactivate IGA
+
+CVA -> DB : updateEntity()
+CVA --> REFRESH : refreshResult
+deactivate CVA
+
+REFRESH --> USER : success + diagrams
+deactivate REFRESH
+
+@enduml

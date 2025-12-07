@@ -1,28 +1,59 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant GraphDatabaseService as "Graph Database Service"
-participant PersistenceAgent as "Persistence Agent"
-participant VkbApiClient as "VKB API Client"
-participant DecoratorPattern as "Decorator Pattern"
+participant "Knowledge Management\n(src/knowledge-management)" as KM
+participant "UKB Unified\n(lib/ukb-unified)" as UKB
+participant "MCP Server\n(integrations/mcp-server-semantic-analysis)" as MCP
+participant "Graphology Engine" as Graph
+participant "LevelDB Storage\n(.data/knowledge-graph)" as LevelDB
+participant "JSON Export\n(.data/knowledge-export)" as JSONExport
 
-note over GraphDatabaseService: Microservices-based architecture
-GraphDatabaseService ->> PersistenceAgent: Request data storage
-PersistenceAgent ->> GraphDatabaseService: Store data in Graphology + LevelDB
+note over KM, JSONExport : DecoratorPattern Implementation in GraphDatabase Architecture
 
-note over GraphDatabaseService: Event-driven approach
-GraphDatabaseService ->> VkbApiClient: Trigger event for batch mode semantic analysis
-VkbApiClient ->> GraphDatabaseService: Process event with parallel workers
+KM -> UKB : Initialize DecoratorPattern entity
+activate UKB
 
-alt Access control check
-    GraphDatabaseService ->> VkbApiClient: Request access control for data storage
-    VkbApiClient ->> GraphDatabaseService: Grant access control for data storage
-else Data consistency issue
-    note over GraphDatabaseService: Data consistency issue due to removal of shared-memory.json
-    GraphDatabaseService ->> PersistenceAgent: Handle data inconsistency
-    note over GraphDatabaseService: Applying Decorator Pattern for added behavior
-    DecoratorPattern ->> GraphDatabaseService: Add behavior without modifying structure
-    GraphDatabaseService ->> DecoratorPattern: Enhance functionality with added behavior
+UKB -> Graph : Create pattern node
+activate Graph
+
+Graph -> LevelDB : Store pattern metadata
+activate LevelDB
+LevelDB --> Graph : Confirm storage
+deactivate LevelDB
+
+Graph --> UKB : Pattern node created
+deactivate Graph
+
+UKB -> MCP : Register for semantic analysis
+activate MCP
+
+MCP -> MCP : Analyze DecoratorPattern\nacross modules
+MCP -> Graph : Update pattern relationships
+activate Graph
+
+Graph -> LevelDB : Persist relationship data
+activate LevelDB
+LevelDB --> Graph : Data persisted
+deactivate LevelDB
+
+Graph --> MCP : Relationships updated
+deactivate Graph
+
+opt Auto-sync enabled
+    Graph -> JSONExport : Export pattern data
+    activate JSONExport
+    JSONExport -> JSONExport : Generate JSON representation
+    JSONExport --> Graph : Export complete
+    deactivate JSONExport
 end
+
+MCP --> UKB : Semantic analysis complete
+deactivate MCP
+
+UKB --> KM : DecoratorPattern entity ready
+deactivate UKB
+
+note right of LevelDB : Primary storage:\nGraphology + LevelDB
+note right of JSONExport : Auto-synced from GraphDB\n(shared-memory.json removed)
 
 @enduml

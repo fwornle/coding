@@ -1,39 +1,33 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Storage" {
-  component GraphDatabase <<storage>> as "Graph Database"
-  component LevelDB <<storage>> as "LevelDB"
-  component "Knowledge Export" <<storage>> as "Knowledge Export (.data/knowledge-export)"
-}
-
 package "Knowledge Management" {
-  component GraphDatabaseService <<core>> as "Graph Database Service"
-  component GraphKnowledgeExporter <<agent>> as "Graph Knowledge Exporter"
-  component PersistenceAgent <<agent>> as "Persistence Agent"
+  component "UkbCli" <<core>> as UkbCli
+  component "GraphDatabase" <<storage>> as GraphDB
 }
 
-package "API Clients" {
-  component VkbApiClient <<api>> as "Vkb API Client"
+package "Unified Library" {
+  component "VkbApiClient" <<api>> as ApiClient
+  component "Knowledge Base Core" <<core>> as KBCore
 }
 
-package "Tools" {
-  component "MCP Tools" <<tool>> as "MCP Tools"
-  component "Vkb Command" <<tool>> as "Vkb Command"
+package "MCP Integration" {
+  component "MCP Server" <<api>> as MCPServer
+  component "Semantic Analysis" <<core>> as SemanticAnalysis
 }
 
-note as AutoNote1
+' Core relationships
+UkbCli --> GraphDB : stores/retrieves
+UkbCli --> ApiClient : uses
+ApiClient --> KBCore : interfaces with
+MCPServer --> SemanticAnalysis : processes
+SemanticAnalysis --> KBCore : analyzes
 
-  UkbCli: A Transferable Pattern for managing knowledge storage and exports.
+' Cross-package integration
+UkbCli ..> MCPServer : integrates with
+ApiClient ..> SemanticAnalysis : provides data
 
-end note
-
-GraphDatabaseService --* GraphDatabase
-GraphKnowledgeExporter --* GraphDatabase
-PersistenceAgent --* GraphDatabase
-GraphKnowledgeExporter --* "Knowledge Export"
-VkbApiClient --* GraphDatabaseService
-"MCP Tools" --* GraphDatabaseService
-"Vkb Command" --* GraphDatabaseService
+note top of UkbCli : CLI tool for unified knowledge base\nmanagement across distributed components
+note bottom of GraphDB : Primary storage removed from\nshared-memory.json configuration
 
 @enduml

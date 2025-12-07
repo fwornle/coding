@@ -1,54 +1,54 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management Core" {
-  component [KnowledgeManager] <<core>>
-  component [GraphDatabase] <<storage>>
-  component [SemanticProcessor] <<core>>
-  component [ConceptExtractor] <<core>>
+title CollectiveKnowledge System Architecture
+
+package "Core Commands" {
+  component [vkb] <<command>>
+  component [coding] <<command>>
+  component [graph-sync] <<command>>
 }
 
-package "Unified Knowledge Base" {
-  component [UKBUnified] <<core>>
-  component [LevelDB] <<storage>>
-  component [IndexManager] <<core>>
-  component [QueryEngine] <<api>>
+package "Knowledge Management Services" {
+  component [GraphDatabaseService] <<core>>
+  component [GraphKnowledgeExporter] <<core>>
+  component [GraphDatabaseAdapter] <<core>>
+  component [PersistenceAgent] <<agent>>
+  component [VkbApiClient] <<api>>
 }
 
-package "MCP Semantic Analysis" {
-  component [MCPServer] <<api>>
-  component [SemanticAnalyzer] <<agent>>
-  component [NLPProcessor] <<core>>
-  component [EntityRecognizer] <<core>>
+package "Storage Layer" {
+  package ".data/knowledge-graph" {
+    component [Graphology] <<storage>>
+    component [LevelDB] <<storage>>
+  }
+  
+  package ".data/knowledge-export" {
+    component [JSON Exports] <<storage>>
+  }
 }
 
-package "Integration Layer" {
-  component [APIGateway] <<api>>
-  component [DataBridge] <<core>>
-  component [EventBus] <<core>>
-}
+note as N1
+  Hybrid knowledge management system with graph-based storage
+  and automated synchronization capabilities
+end note
 
-[KnowledgeManager] --> [GraphDatabase] : stores concepts
-[KnowledgeManager] --> [SemanticProcessor] : processes knowledge
-[SemanticProcessor] --> [ConceptExtractor] : extracts concepts
+[vkb] --> [GraphDatabaseService]
+[coding] --> [GraphDatabaseService]
+[graph-sync] --> [GraphKnowledgeExporter]
 
-[UKBUnified] --> [LevelDB] : persists data
-[UKBUnified] --> [IndexManager] : manages indices
-[QueryEngine] --> [UKBUnified] : queries knowledge
+[GraphDatabaseService] --> [GraphDatabaseAdapter]
+[GraphDatabaseAdapter] --> [Graphology]
+[Graphology] --> [LevelDB]
 
-[MCPServer] --> [SemanticAnalyzer] : semantic analysis
-[SemanticAnalyzer] --> [NLPProcessor] : natural language processing
-[SemanticAnalyzer] --> [EntityRecognizer] : entity recognition
+[GraphKnowledgeExporter] --> [JSON Exports]
+[PersistenceAgent] --> [Graphology]
+[PersistenceAgent] --> [JSON Exports]
 
-[APIGateway] --> [MCPServer] : external access
-[DataBridge] --> [KnowledgeManager] : knowledge sync
-[DataBridge] --> [UKBUnified] : unified access
-[EventBus] --> [DataBridge] : event coordination
+[VkbApiClient] --> [JSON Exports] : external access
 
-note top of [KnowledgeManager] : Central knowledge management\nwith graph-based storage
+note right of [JSON Exports] : Automated synchronization\nfor external access
 
-note top of [UKBUnified] : Unified knowledge base\nwith LevelDB persistence
-
-note top of [MCPServer] : MCP semantic analysis\nserver for external integration
+note bottom of [Graphology] : Primary storage with\nhybrid architecture
 
 @enduml

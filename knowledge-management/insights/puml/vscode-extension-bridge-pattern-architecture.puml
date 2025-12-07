@@ -1,55 +1,95 @@
 @startuml
-!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+!include ./_standard-style.puml
+```
 
-title VSCode Extension Bridge Pattern Architecture
+### **Structural Improvements:**
 
-package "VSCode Extension Layer" {
-    component [vkb Command] <<api>>
-    component [graph-sync Command] <<api>>
-    component [VkbApiClient] <<core>>
+1. **Add Error Handling Components:**
+```plantuml
+component ErrorHandler <<util>>
+component RetryManager <<util>>
+```
+
+2. **Include Caching Layer:**
+```plantuml
+component CacheManager <<cache>>
+GraphDatabaseAdapter --> CacheManager : caches via
+```
+
+3. **Add Configuration Management:**
+```plantuml
+component ConfigManager <<config>>
+PersistenceAgent --> ConfigManager : configured by
+```
+
+### **Documentation Enhancements:**
+- Add version information to components
+- Include data flow directions
+- Specify API contracts between layers
+- Document error handling strategies
+
+### **Security Hardening:**
+- Use environment-based configuration
+- Implement proper access controls
+- Add audit logging components
+- Encrypt sensitive data paths
+
+### **Corrected Code:**
+```plantuml
+@startuml
+!include ./_standard-style.puml
+
+package "VSCode Extension Bridge Pattern" {
+    package "src/knowledge-management" {
+        component GraphDatabaseService <<core>>
+        component GraphDatabaseAdapter <<api>>
+        component PersistenceAgent <<agent>>
+    }
+    
+    package "lib/ukb-unified" {
+        component UnifiedKnowledgeBase <<core>>
+        component KnowledgeManager <<core>>
+    }
+    
+    package "integrations/mcp-server-semantic-analysis/src" {
+        component MCPServer <<api>>
+        component SemanticAnalyzer <<core>>
+    }
+    
+    package "Storage Layer" {
+        database "Graphology\n+ LevelDB" <<storage>> as GraphDB
+        folder ".data/knowledge-graph" <<storage>> as KnowledgeStorage
+        folder ".data/knowledge-export" <<storage>> as JSONExport
+    }
 }
 
-package "Core Services" {
-    component [GraphDatabaseService] <<core>>
-    component [GraphDatabaseAdapter] <<core>>
-    component [PersistenceAgent] <<agent>>
-    component [GraphKnowledgeExporter] <<agent>>
-}
+' Core relationships
+GraphDatabaseService --> GraphDatabaseAdapter : uses
+GraphDatabaseAdapter --> PersistenceAgent : delegates to
+PersistenceAgent --> GraphDB : persists to
+GraphDB --> KnowledgeStorage : stored at
 
-package "Storage Layer" {
-    component [Graphology] <<storage>>
-    component [LevelDB] <<storage>>
-    folder ".data/knowledge-graph" as KnowledgeGraph <<storage>>
-    folder ".data/knowledge-export" as KnowledgeExport <<storage>>
-}
+' Knowledge management flow
+UnifiedKnowledgeBase --> GraphDatabaseService : manages via
+KnowledgeManager --> UnifiedKnowledgeBase : coordinates
 
-package "Integration Layer" {
-    component [MCP Server] <<api>> #lightblue
-    component [Semantic Analysis] <<core>> #lightblue
-    folder "integrations/mcp-server-semantic-analysis/src" as MCPIntegration <<storage>>
-}
+' MCP integration
+MCPServer --> SemanticAnalyzer : processes via
+SemanticAnalyzer --> GraphDatabaseService : stores analysis in
 
-' Main flow relationships
-[vkb Command] --> [VkbApiClient] : visualization
-[graph-sync Command] --> [VkbApiClient] : synchronization
-[VkbApiClient] --> [GraphDatabaseService] : API calls
+' Export synchronization
+GraphDB --> JSONExport : auto-syncs to
+JSONExport : JSON exports for external access
 
-[GraphDatabaseService] --> [GraphDatabaseAdapter] : data operations
-[GraphDatabaseAdapter] --> [Graphology] : graph operations
-[GraphDatabaseAdapter] --> [LevelDB] : persistence
+note top of "VSCode Extension Bridge Pattern"
+  Bridge Pattern implementation for VSCode extensions
+  Replaces shared-memory.json with graph database
+  Provides unified knowledge management across components
+end note
 
-[Graphology] --> KnowledgeGraph : stores data
-[LevelDB] --> KnowledgeGraph : persists to
-
-[PersistenceAgent] --> KnowledgeGraph : validates data
-[GraphKnowledgeExporter] --> KnowledgeGraph : reads from
-[GraphKnowledgeExporter] --> KnowledgeExport : auto-sync JSON exports
-
-' MCP Integration
-[MCP Server] --> [Semantic Analysis] : enables
-[Semantic Analysis] --> MCPIntegration : processes
-MCPIntegration --> [GraphDatabaseService] : knowledge extraction
-
-note bottom : VSCodeExtensionBridgePattern enables knowledge graph operations\nthrough VSCode commands with automated semantic analysis\nand persistent storage using Graphology + LevelDB architecture
+note bottom of GraphDB
+  Primary storage: Graphology + LevelDB
+  Location: .data/knowledge-graph
+end note
 
 @enduml

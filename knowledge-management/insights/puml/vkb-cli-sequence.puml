@@ -1,34 +1,98 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant VkbCli as "VkbCli (TransferablePattern)"
-participant GraphDatabaseService as "Graph Database Service"
-participant PersistenceAgent as "Persistence Agent"
-participant VkbApiClient as "Vkb Api Client"
-participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
-participant Graphology as "Graphology"
-participant LevelDB as "LevelDB"
+participant "User" as U
+participant "VkbCli" as CLI
+participant "GraphDatabaseService" as GDS
+participant "GraphDatabaseAdapter" as GDA
+participant "PersistenceAgent" as PA
+participant "VkbApiClient" as API
+participant "GraphKnowledgeExporter" as GKE
+participant "Graphology + LevelDB\n(.data/knowledge-graph)" as PRIMARY
+participant "JSON Export\n(.data/knowledge-export)" as EXPORT
 
-VkbCli->>VkbApiClient: Request data manipulation
-VkbApiClient->>GraphDatabaseService: Manipulate data in graph database
-GraphDatabaseService->>Graphology: Interact with graph database
-Graphology->>LevelDB: Store and retrieve data
-LevelDB->>Graphology: Provide data storage
+U -> CLI: vkb command
+activate CLI
+CLI -> GDS: process request
+activate GDS
+GDS -> GDA: data access operation
+activate GDA
+GDA -> PA: storage operation
+activate PA
+PA -> PRIMARY: read/write graph data
+activate PRIMARY
+PRIMARY --> PA: graph data
+deactivate PRIMARY
+PA --> GDA: operation result
+deactivate PA
+GDA --> GDS: data result
+deactivate GDA
 
-alt Successful data manipulation
-    GraphDatabaseService->>VkbApiClient: Confirm data manipulation
-    VkbApiClient->>VkbCli: Return result of data manipulation
+opt external API call required
+    GDS -> API: external interaction
+    activate API
+    API --> GDS: API response
+    deactivate API
 end
 
-opt Data export required
-    VkbCli->>GraphKnowledgeExporter: Request data export
-    GraphKnowledgeExporter->>GraphDatabaseService: Retrieve data from graph database
-    GraphDatabaseService->>GraphKnowledgeExporter: Provide data for export
-    GraphKnowledgeExporter->>VkbCli: Export data to .data/knowledge-export directory
-end
+GDS -> GKE: trigger export
+activate GKE
+GKE -> EXPORT: write JSON export
+activate EXPORT
+EXPORT --> GKE: export complete
+deactivate EXPORT
+GKE --> GDS: export result
+deactivate GKE
 
-VkbCli->>PersistenceAgent: Request data synchronization
-PersistenceAgent->>GraphDatabaseService: Synchronize data in graph database
-GraphDatabaseService->>PersistenceAgent: Confirm data synchronization
+GDS --> CLI: operation complete
+deactivate GDS
+CLI --> U: response
+deactivate CLI
+
+U -> CLI: coding command
+activate CLI
+note right: Batch semantic analysis\nwith parallel workers
+CLI -> GDS: batch processing
+activate GDS
+GDS -> GDA: incremental content handling
+activate GDA
+GDA -> PA: constraint optimization
+activate PA
+PA -> PRIMARY: optimized write operations
+PRIMARY --> PA: batch results
+PA --> GDA: processing complete
+deactivate PA
+GDA --> GDS: batch complete
+deactivate GDA
+GDS -> GKE: auto-sync export
+activate GKE
+GKE -> EXPORT: synchronized JSON
+EXPORT --> GKE: sync complete
+deactivate EXPORT
+GKE --> GDS: sync result
+deactivate GKE
+GDS --> CLI: batch complete
+deactivate GDS
+CLI --> U: coding results
+deactivate CLI
+
+U -> CLI: graph-sync command
+activate CLI
+CLI -> GDS: manual sync request
+activate GDS
+GDS -> GKE: force export sync
+activate GKE
+GKE -> PRIMARY: read latest graph state
+PRIMARY --> GKE: current data
+GKE -> EXPORT: update JSON exports
+EXPORT --> GKE: sync complete
+GKE --> GDS: manual sync complete
+deactivate GKE
+GDS --> CLI: sync result
+deactivate GDS
+CLI --> U: sync confirmation
+deactivate CLI
+
+note over PRIMARY, EXPORT: Dual-storage architecture\nwith auto-synchronization
 
 @enduml

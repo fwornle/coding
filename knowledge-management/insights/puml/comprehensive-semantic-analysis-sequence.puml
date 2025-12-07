@@ -1,51 +1,67 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Client Application" as Client
-participant "Knowledge Management\nsrc/knowledge-management" as KM
-participant "UKB Unified Library\nlib/ukb-unified" as UKB
-participant "MCP Semantic Server\nintegrations/mcp-server-semantic-analysis" as MCP
-participant "Semantic Analysis Engine" as SAE
-participant "Knowledge Base" as KB
+participant "MCP Client" as Client
+participant "Semantic Analysis\nMCP Server" as MCPServer
+participant "Knowledge Management\nCore" as KnowledgeCore
+participant "UKB Unified\nLibrary" as UKBLib
+participant "Semantic Processor" as Processor
+participant "Analysis Engine" as Engine
 
-Client -> KM: Request semantic analysis
-activate KM
+Client -> MCPServer: Initialize semantic analysis request
+activate MCPServer
 
-KM -> UKB: Initialize unified knowledge base
-activate UKB
-UKB -> KB: Load knowledge structures
-KB --> UKB: Knowledge data
-UKB --> KM: Knowledge base ready
+MCPServer -> KnowledgeCore: Load knowledge base
+activate KnowledgeCore
+KnowledgeCore -> UKBLib: Access unified knowledge structures
+activate UKBLib
+UKBLib --> KnowledgeCore: Return knowledge graph
+deactivate UKBLib
+KnowledgeCore --> MCPServer: Knowledge base ready
+deactivate KnowledgeCore
 
-KM -> MCP: Establish MCP connection
-activate MCP
-MCP -> SAE: Initialize semantic engine
-activate SAE
-SAE --> MCP: Engine ready
-MCP --> KM: Connection established
+MCPServer -> Processor: Start semantic processing
+activate Processor
 
-KM -> SAE: Process semantic analysis request
-SAE -> UKB: Query knowledge patterns
-UKB -> KB: Retrieve semantic patterns
-KB --> UKB: Pattern data
-UKB --> SAE: Knowledge patterns
+Processor -> Engine: Analyze semantic patterns
+activate Engine
 
-SAE -> SAE: Perform comprehensive analysis
-note right: Multi-dimensional semantic\nanalysis with pattern matching
-
-SAE -> MCP: Return analysis results
-MCP -> KM: Deliver processed results
-
-alt Analysis successful
-    KM -> KB: Store analysis insights
-    KM --> Client: Return comprehensive results
-else Analysis failed
-    KM --> Client: Return error response
+alt Complex Analysis Required
+    Engine -> UKBLib: Query semantic relationships
+    activate UKBLib
+    UKBLib --> Engine: Return semantic mappings
+    deactivate UKBLib
+    
+    Engine -> KnowledgeCore: Update knowledge graph
+    activate KnowledgeCore
+    KnowledgeCore --> Engine: Confirm updates
+    deactivate KnowledgeCore
+else Simple Analysis
+    Engine -> Engine: Process locally
 end
 
-deactivate SAE
-deactivate MCP
-deactivate UKB
-deactivate KM
+Engine --> Processor: Return analysis results
+deactivate Engine
+
+Processor -> MCPServer: Compile comprehensive results
+deactivate Processor
+
+MCPServer --> Client: Return semantic analysis
+deactivate MCPServer
+
+note right of UKBLib
+  Unified knowledge base
+  replacing shared-memory.json
+end note
+
+note left of KnowledgeCore
+  Located in:
+  src/knowledge-management
+end note
+
+note over MCPServer
+  Located in:
+  integrations/mcp-server-semantic-analysis/src
+end note
 
 @enduml

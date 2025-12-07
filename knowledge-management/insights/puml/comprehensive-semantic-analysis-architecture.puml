@@ -2,58 +2,50 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Management" {
-  component [Semantic Analysis Core] <<core>> as SACore
-  component [Knowledge Graph] <<storage>> as KG
-  component [Entity Extractor] <<processor>> as EE
-  component [Relationship Mapper] <<processor>> as RM
+    component [SemanticProcessor] <<core>>
+    component [KnowledgeStore] <<storage>>
+    component [ContextManager] <<core>>
 }
 
 package "UKB Unified Library" {
-  component [Unified Knowledge Base] <<storage>> as UKB
-  component [Semantic Vector Store] <<storage>> as SVS
-  component [Context Manager] <<core>> as CM
-  component [Pattern Matcher] <<processor>> as PM
+    component [UnifiedKnowledgeBase] <<core>>
+    component [SemanticIndexer] <<core>>
+    component [QueryProcessor] <<api>>
 }
 
 package "MCP Server Integration" {
-  component [MCP Semantic Server] <<api>> as MCP
-  component [Analysis Tools] <<agent>> as AT
-  component [Semantic Protocols] <<api>> as SP
-  component [Transfer Interface] <<api>> as TI
+    component [MCPSemanticServer] <<api>>
+    component [AnalysisTools] <<agent>>
+    component [SemanticProtocol] <<api>>
 }
 
-package "External Systems" {
-  component [Client Applications] <<external>> as CA
-  database [Graph Database] <<storage>> as GDB
-  database [Vector Database] <<storage>> as VDB
-}
+component [ComprehensiveSemanticAnalysis] <<agent>>
 
-' Core relationships
-SACore --> KG : manages
-SACore --> EE : uses
-SACore --> RM : coordinates
-KG --> GDB : persists to
+[ComprehensiveSemanticAnalysis] --> [SemanticProcessor] : orchestrates
+[ComprehensiveSemanticAnalysis] --> [UnifiedKnowledgeBase] : queries
+[ComprehensiveSemanticAnalysis] --> [MCPSemanticServer] : integrates
 
-' UKB connections
-UKB --> SVS : integrates
-CM --> UKB : accesses
-PM --> SVS : queries
-SACore --> CM : utilizes
+[SemanticProcessor] --> [KnowledgeStore] : stores/retrieves
+[SemanticProcessor] --> [ContextManager] : manages context
 
-' MCP integration
-MCP --> AT : exposes
-MCP --> SP : implements
-TI --> SACore : transfers patterns
-AT --> PM : leverages
+[UnifiedKnowledgeBase] --> [SemanticIndexer] : indexes knowledge
+[QueryProcessor] --> [SemanticIndexer] : searches
 
-' External connections
-CA --> MCP : requests analysis
-SVS --> VDB : stores vectors
-EE --> GDB : writes entities
-RM --> GDB : writes relationships
+[MCPSemanticServer] --> [AnalysisTools] : exposes
+[MCPSemanticServer] --> [SemanticProtocol] : implements
 
-note top of SACore : TransferablePattern implementation\nacross three main modules
+[AnalysisTools] ..> [QueryProcessor] : uses
+[ContextManager] ..> [UnifiedKnowledgeBase] : synchronizes
 
-note bottom of MCP : Provides semantic analysis\nas transferable service
+note top of [ComprehensiveSemanticAnalysis]
+MCP Agent providing comprehensive
+semantic analysis capabilities across
+distributed knowledge components
+end note
+
+note bottom
+Legacy shared-memory.json removed
+All components now use direct integration
+end note
 
 @enduml

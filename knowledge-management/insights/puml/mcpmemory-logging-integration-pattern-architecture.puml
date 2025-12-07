@@ -1,55 +1,50 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title MCPMemoryLoggingIntegrationPattern Architecture
+!define RECTANGLE class
 
 package "Knowledge Management" {
-  component GraphDatabaseService <<core>>
-  component GraphKnowledgeExporter <<core>>
-  component GraphDatabaseAdapter <<core>>
-}
-
-package "UKB Unified Library" {
-  component UnifiedKnowledgeBase <<api>>
-  component KnowledgeProcessor <<core>>
-}
-
-package "MCP Server Integration" {
-  component MCPSemanticAnalysis <<api>>
-  component MCPTools <<agent>>
-  component LoggingService <<core>>
+    component GraphDatabaseService <<core>>
+    component GraphKnowledgeExporter <<core>>
+    component GraphDatabaseAdapter <<core>>
 }
 
 package "Storage Layer" {
-  database "Graphology\n(.data/knowledge-graph)" as GraphDB <<storage>>
-  database "LevelDB\n(.data/knowledge-graph)" as LevelDB <<storage>>
-  folder "JSON Exports\n(.data/knowledge-export)" as JSONExports <<storage>>
+    component Graphology <<storage>>
+    component LevelDB <<storage>>
+    folder ".data/knowledge-graph" as KnowledgeGraphData <<storage>>
+    folder ".data/knowledge-export" as ExportData <<storage>>
 }
 
-package "Legacy Components" {
-  component SharedMemoryJSON <<deprecated>> #lightgray
-  note right of SharedMemoryJSON : REMOVED from codebase
+package "MCP Integration" {
+    component "MCP Server" <<api>>
+    component "Semantic Analysis" <<core>>
 }
 
-' Core relationships
+package "Implementation Locations" {
+    component "src/knowledge-management" as SrcKM <<source>>
+    component "lib/ukb-unified" as LibUKB <<source>>
+    component "integrations/mcp-server-semantic-analysis/src" as IntMCP <<source>>
+}
+
+note top of GraphDatabaseService : MCPMemoryLoggingIntegrationPattern\nReplaces shared-memory.json with\nGraph-based knowledge storage
+
 GraphDatabaseService --> GraphDatabaseAdapter
-GraphDatabaseAdapter --> GraphDB
-GraphDatabaseAdapter --> LevelDB
-GraphKnowledgeExporter --> JSONExports
+GraphDatabaseAdapter --> Graphology
+Graphology --> LevelDB
+LevelDB --> KnowledgeGraphData
+
+GraphKnowledgeExporter --> ExportData
 GraphDatabaseService --> GraphKnowledgeExporter
+ExportData ..> KnowledgeGraphData : auto-synced
 
-' Integration relationships
-UnifiedKnowledgeBase --> GraphDatabaseService
-KnowledgeProcessor --> UnifiedKnowledgeBase
-MCPSemanticAnalysis --> KnowledgeProcessor
-MCPTools --> MCPSemanticAnalysis
-LoggingService --> MCPSemanticAnalysis
+"MCP Server" --> "Semantic Analysis"
+"Semantic Analysis" --> GraphDatabaseService
 
-' Storage relationships
-GraphDB --> JSONExports : auto-sync
-LevelDB --> JSONExports : auto-sync
+SrcKM ..> GraphDatabaseService : implements
+LibUKB ..> GraphDatabaseAdapter : implements
+IntMCP ..> "MCP Server" : implements
 
-note top of GraphDB : Primary knowledge storage\nusing Graphology + LevelDB
-note top of JSONExports : Auto-synced exports\nfrom GraphDB
+note bottom : Pattern provides unified knowledge storage\nacross MCP tools and agents using GraphDB
 
 @enduml

@@ -1,114 +1,102 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-    abstract class ArchitecturalEvolutionPattern <<TransferablePattern>> {
-        -patternId: String
-        -evolutionStage: String
-        -transferabilityScore: Float
-        +extractPattern(): Pattern
-        +applyPattern(): void
-        +validateTransfer(): Boolean
-    }
-    
-    class KnowledgeManager {
-        -graphStorage: GraphologyAdapter
-        -levelDbStore: LevelDBAdapter
-        -exportPath: String
-        +storePattern(pattern: Pattern): void
-        +retrievePattern(id: String): Pattern
-        +syncToJson(): void
-    }
-    
-    class PatternExtractor {
-        -codebaseAnalyzer: CodebaseAnalyzer
-        -patternTemplates: Map
-        +analyzeCodebase(): List<Pattern>
-        +identifyEvolutionStages(): List<Stage>
-        +extractTransferableElements(): List<Element>
-    }
+package "Knowledge Management Core" {
+  class KnowledgeManagementSystem <<service>> {
+    +processContent()
+    +manageKnowledge()
+    +enforceConstraints()
+  }
+  
+  class GraphDatabaseService <<service>> {
+    -graphologyInstance: Graph
+    -leveldbInstance: LevelDB
+    +query()
+    +persist()
+    +synchronize()
+  }
+  
+  class PersistenceAgent <<agent>> {
+    +handleWrite()
+    +handleEdit()
+    +validateConstraints()
+  }
+}
+
+package "Shared Utilities" {
+  class UkbUnified <<library>> {
+    +sharedUtilities()
+    +commonFunctions()
+  }
+  
+  class GraphDatabaseAdapter <<adapter>> {
+    +adaptQuery()
+    +adaptPersistence()
+    +handleSynchronization()
+  }
+}
+
+package "Semantic Analysis Services" {
+  class SemanticAnalysisService <<service>> {
+    +analyzeContent()
+    +classifyUpdates()
+    +processBatch()
+  }
+  
+  class ParallelWorker <<worker>> {
+    -batchMode: boolean
+    +executeBatch()
+    +processInParallel()
+  }
 }
 
 package "Storage Layer" {
-    class GraphologyAdapter {
-        -graphInstance: Graph
-        -dataPath: String
-        +addNode(node: Node): void
-        +addEdge(edge: Edge): void
-        +query(criteria: QueryCriteria): ResultSet
-    }
-    
-    class LevelDBAdapter {
-        -dbConnection: LevelDB
-        -storagePath: String
-        +put(key: String, value: Any): void
-        +get(key: String): Any
-        +batch(operations: List): void
-    }
-    
-    class JsonExporter {
-        -exportPath: String
-        -autoSync: Boolean
-        +exportToJson(data: Any): void
-        +scheduleAutoSync(): void
-        +validateExport(): Boolean
-    }
+  class GraphKnowledgeExporter <<exporter>> {
+    -exportPath: string
+    +exportToJson()
+    +autoSync()
+  }
+  
+  class DataStorage <<file>> {
+    +knowledgeGraph: ".data/knowledge-graph"
+    +knowledgeExport: ".data/knowledge-export"
+  }
 }
 
-package "Integration Layer" {
-    class McpSemanticServer {
-        -semanticAnalyzer: SemanticAnalyzer
-        -patternMatcher: PatternMatcher
-        +analyzeSemantics(input: String): Analysis
-        +matchPatterns(analysis: Analysis): List<Match>
-        +serveResults(): Response
-    }
-    
-    class UnifiedKnowledgeBase {
-        -patternRegistry: Map
-        -evolutionTracker: EvolutionTracker
-        +registerPattern(pattern: Pattern): void
-        +trackEvolution(changes: List): void
-        +unifyKnowledge(): KnowledgeGraph
-    }
+package "Command Interface" {
+  class CommandInterface <<interface>> {
+    +vkb()
+    +coding()
+    +graphSync()
+  }
 }
 
-package "Implementation Sites" {
-    class SourceKnowledgeManagement <<implementation>> {
-        -location: "src/knowledge-management"
-    }
-    
-    class LibUkbUnified <<implementation>> {
-        -location: "lib/ukb-unified"
-    }
-    
-    class McpServerIntegration <<implementation>> {
-        -location: "integrations/mcp-server-semantic-analysis/src"
-    }
+package "External Integration" {
+  class VkbApiClient <<client>> {
+    +integrateExternal()
+    +maintainConnection()
+  }
+  
+  class ArchitecturalEvolutionPattern <<agent>> {
+    +trackEvolution()
+    +analyzePatterns()
+    +generateInsights()
+  }
 }
 
 ' Relationships
-ArchitecturalEvolutionPattern --|> KnowledgeManager
-KnowledgeManager --> GraphologyAdapter
-KnowledgeManager --> LevelDBAdapter
-KnowledgeManager --> JsonExporter
-PatternExtractor --> ArchitecturalEvolutionPattern
-McpSemanticServer --> UnifiedKnowledgeBase
-UnifiedKnowledgeBase --> ArchitecturalEvolutionPattern
-
-' Implementation relationships
-SourceKnowledgeManagement ..|> KnowledgeManager
-LibUkbUnified ..|> UnifiedKnowledgeBase
-McpServerIntegration ..|> McpSemanticServer
-
-' Storage relationships
-GraphologyAdapter --> LevelDBAdapter : "persists to"
-JsonExporter ..> GraphologyAdapter : "exports from"
-
-' Notes
-note right of ArchitecturalEvolutionPattern : "Extracted from codebase analysis\nStored as reusable knowledge entity"
-note bottom of GraphologyAdapter : "Storage: .data/knowledge-graph"
-note bottom of JsonExporter : "Auto-sync: .data/knowledge-export"
-note top of SourceKnowledgeManagement : "shared-memory.json REMOVED"
+KnowledgeManagementSystem --> GraphDatabaseService : uses
+KnowledgeManagementSystem --> PersistenceAgent : coordinates
+GraphDatabaseService --> UkbUnified : depends on
+GraphDatabaseService --> GraphDatabaseAdapter : implements through
+SemanticAnalysisService --> ParallelWorker : utilizes
+SemanticAnalysisService --> GraphDatabaseService : integrates with
+SemanticAnalysisService --> PersistenceAgent : works with
+GraphKnowledgeExporter --> DataStorage : exports to
+GraphDatabaseService --> DataStorage : stores in
+CommandInterface --> GraphDatabaseAdapter : synchronizes via
+VkbApiClient --> ArchitecturalEvolutionPattern : supports
+ArchitecturalEvolutionPattern --> GraphDatabaseService : maintains patterns through
+PersistenceAgent --> SemanticAnalysisService : triggers analysis
 
 @enduml

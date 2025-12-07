@@ -1,23 +1,18 @@
 # DecoratorPattern
 
-**Type:** TransferablePattern
+**Type:** GraphDatabase
 
-The system employs an event-driven approach, with features like parallel workers for batch mode semantic analysis, to enhance system responsiveness and fault tolerance.
+DecoratorPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
 ## What It Is
 
-- The system employs an event-driven approach, with features like parallel workers for batch mode semantic analysis, to enhance system responsiveness and fault tolerance.
+- DecoratorPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
-- The use of the Decorator Pattern allows for added behavior to objects without modifying their structure, promoting flexibility and maintainability.
+- shared-memory.json has been REMOVED from the codebase
 
-- The system utilizes a microservices-based architecture, with components like GraphDatabaseService and PersistenceAgent, to promote scalability and flexibility.
+- JSON exports are at .data/knowledge-export (auto-synced from GraphDB)
 
-- The GraphDatabaseService uses Graphology + LevelDB for knowledge storage, which provides a robust data management system.
-
-
-## Usage Guidelines
-
-- The removal of shared-memory.json might introduce data consistency issues, and proper access control should be implemented for the VkbApiClient and data storage.
+- Pattern extracted from codebase analysis and stored as reusable knowledge entity
 
 
 ## Diagrams
@@ -44,4 +39,4 @@ The system employs an event-driven approach, with features like parallel workers
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

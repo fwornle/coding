@@ -1,6 +1,6 @@
 # MCPMemoryLoggingIntegrationPattern
 
-**Type:** TransferablePattern
+**Type:** GraphDatabase
 
 MCPMemoryLoggingIntegrationPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
@@ -12,7 +12,7 @@ MCPMemoryLoggingIntegrationPattern is implemented across: src/knowledge-manageme
 
 - JSON exports are at .data/knowledge-export (auto-synced from GraphDB)
 
-- Core components: GraphDatabaseService, GraphKnowledgeExporter, GraphDatabaseAdapter
+- Pattern extracted from codebase analysis and stored as reusable knowledge entity
 
 
 ## Diagrams
@@ -39,4 +39,4 @@ MCPMemoryLoggingIntegrationPattern is implemented across: src/knowledge-manageme
 
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

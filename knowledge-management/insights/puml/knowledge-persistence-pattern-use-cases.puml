@@ -1,50 +1,54 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title KnowledgePersistencePattern Use Case Diagram
+title Knowledge Persistence Pattern - Use Cases
 
-actor User as "User"
-actor VkbApiClient as "VkbApiClient"
-actor MCPTools as "MCP Tools"
+actor "Developer" as dev
+actor "System" as sys
+actor "Knowledge Manager" as km
+actor "MCP Server" as mcp
 
-usecase "Visualize Knowledge" as (VisualizeKnowledge)
-usecase "Perform Knowledge Operations" as (PerformKnowledgeOperations)
-usecase "Synchronize Data" as (SynchronizeData)
-usecase "Export Knowledge" as (ExportKnowledge)
-usecase "Perform Coding Operations" as (PerformCodingOperations)
-
-User -- (VisualizeKnowledge)
-User -- (PerformKnowledgeOperations)
-User -- (PerformCodingOperations)
-
-VkbApiClient -- (VisualizeKnowledge)
-VkbApiClient -- (PerformKnowledgeOperations)
-
-MCPTools -- (PerformKnowledgeOperations)
-
-(VisualizeKnowledge) ..> (SynchronizeData) : include
-(PerformKnowledgeOperations) ..> (SynchronizeData) : include
-(ExportKnowledge) ..> (SynchronizeData) : extend
-(PerformCodingOperations) ..> (ExportKnowledge) : include
-
-package "Graph Database Services" {
-  (SynchronizeData)
-  (ExportKnowledge)
+package "Knowledge Management" {
+  usecase "Store Knowledge Entity" as store
+  usecase "Export to JSON" as export
+  usecase "Query Knowledge Graph" as query
+  usecase "Persist to LevelDB" as persist
+  usecase "Load from GraphDB" as load
+  usecase "Sync Data" as sync
 }
 
-package "Graph Database" {
-  component GraphDatabase as "Graph Database"
-  component LevelDB as "LevelDB"
-  component Graphology as "Graphology"
-  GraphDatabase -- LevelDB
-  GraphDatabase -- Graphology
+package "Graph Database Operations" {
+  usecase "Maintain In-Memory Graph" as memory
+  usecase "Handle Entity Events" as events
+  usecase "Auto-Export on Storage" as autoexport
 }
 
-package "Knowledge Persistence" {
-  component PersistenceAgent as "PersistenceAgent"
-  component GraphKnowledgeExporter as "GraphKnowledgeExporter"
-  (ExportKnowledge) -- GraphKnowledgeExporter
-  PersistenceAgent -- GraphDatabase
+package "File System Operations" {
+  usecase "Write to .data/knowledge-graph" as writedb
+  usecase "Write to .data/knowledge-export" as writejson
+  usecase "Remove shared-memory.json" as cleanup
 }
+
+dev --> store : creates knowledge
+dev --> query : retrieves data
+km --> export : manual export
+sys --> events : triggers entity:stored
+mcp --> load : semantic analysis
+
+store --> persist : includes
+store --> events : triggers
+events --> autoexport : includes
+autoexport --> export : extends
+export --> writejson : includes
+persist --> writedb : includes
+memory --> persist : includes
+query --> memory : includes
+load --> memory : includes
+sync --> export : includes
+
+note right of autoexport : Listens to entity:stored events
+note bottom of writedb : Graphology + LevelDB storage
+note bottom of writejson : Auto-synced from GraphDB
+note top of cleanup : Legacy file removed from codebase
 
 @enduml
