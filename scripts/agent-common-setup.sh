@@ -210,6 +210,41 @@ start_statusline_health_monitor() {
 }
 
 # ==============================================================================
+# BROWSER ACCESS SSE SERVER
+# ==============================================================================
+# Start the shared browser-access SSE server for parallel Claude sessions
+start_browser_access_server() {
+  local coding_repo="$1"
+  local browser_access_dir="$coding_repo/integrations/browser-access"
+
+  # Check if the SSE server is already running on port 3847
+  if lsof -i :3847 -sTCP:LISTEN >/dev/null 2>&1; then
+    log "Browser access SSE server already running"
+    return 0
+  fi
+
+  # Check if the server script exists
+  if [ ! -f "$browser_access_dir/browser-access-server" ]; then
+    log "⚠️ Browser access server script not found"
+    return 1
+  fi
+
+  log "Starting browser access SSE server..."
+
+  # Start the server with required environment variables
+  cd "$browser_access_dir"
+  LOCAL_CDP_URL="${LOCAL_CDP_URL:-ws://localhost:9222}" \
+    ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+    ./browser-access-server start >/dev/null 2>&1
+
+  if lsof -i :3847 -sTCP:LISTEN >/dev/null 2>&1; then
+    log "✅ Browser access SSE server started on port 3847"
+  else
+    log "⚠️ Browser access SSE server may have failed to start"
+  fi
+}
+
+# ==============================================================================
 # GLOBAL LSL MONITORING
 # ==============================================================================
 # Start Global LSL Coordinator monitoring daemon for auto-recovery
@@ -433,6 +468,9 @@ agent_common_init() {
   # Start the Global LSL Coordinator monitoring for auto-recovery
   start_global_lsl_monitoring "$coding_repo"
 
+  # Start the browser access SSE server for parallel sessions
+  start_browser_access_server "$coding_repo"
+
   # Ensure CLAUDE.md exists with mandatory skill instructions (especially for new projects)
   ensure_claude_md_with_skill_instruction "$target_project_dir" "$coding_repo"
 
@@ -453,6 +491,7 @@ export -f show_session_reminder
 export -f start_transcript_monitoring
 export -f start_statusline_health_monitor
 export -f start_global_lsl_monitoring
+export -f start_browser_access_server
 export -f ensure_claude_md_with_skill_instruction
 export -f ensure_statusline_config
 export -f agent_common_init

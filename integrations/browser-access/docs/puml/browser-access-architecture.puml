@@ -1,0 +1,64 @@
+@startuml browser-access-architecture
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Browser Access SSE Architecture\nParallel Session Support
+
+' Components
+actor "Claude Session 1" as session1
+actor "Claude Session 2" as session2
+actor "Claude Session N" as sessionN
+
+package "Per-Session (stdio)" {
+    component "stdio-proxy.js" as proxy1
+    component "stdio-proxy.js" as proxy2
+    component "stdio-proxy.js" as proxyN
+}
+
+package "Shared Server (port 3847)" {
+    component "sse-server.js" as sseServer
+    database "Session Store" as sessions
+}
+
+package "Browser Control" {
+    component "Stagehand" as stagehand
+}
+
+cloud "Chrome Browser" as chrome {
+    component "CDP\nws://localhost:9222" as cdp
+}
+
+' Connections - Session 1
+session1 -down-> proxy1 : stdio
+proxy1 -down-> sseServer : SSE/HTTP
+
+' Connections - Session 2
+session2 -down-> proxy2 : stdio
+proxy2 -down-> sseServer : SSE/HTTP
+
+' Connections - Session N
+sessionN -down-> proxyN : stdio
+proxyN -down-> sseServer : SSE/HTTP
+
+' Shared components
+sseServer -right-> sessions : manage
+sseServer -down-> stagehand : single instance
+stagehand -down-> cdp : WebSocket
+
+note right of sseServer
+  Single shared server
+  handles all sessions
+  via SSE transport
+end note
+
+note right of stagehand
+  One Stagehand instance
+  shared across all
+  Claude sessions
+end note
+
+note bottom of cdp
+  Chrome DevTools Protocol
+  Single connection point
+end note
+
+@enduml

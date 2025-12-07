@@ -863,14 +863,21 @@ install_shadcn_mcp() {
 install_mcp_servers() {
     echo -e "\n${CYAN}🔌 Installing MCP servers...${NC}"
     
-    # Install browser-access (Stagehand)
+    # Install browser-access (Stagehand with SSE architecture)
     if [[ -d "$CODING_REPO/integrations/browser-access" ]]; then
-        info "Installing browser-access MCP server..."
+        info "Installing browser-access MCP server (SSE architecture)..."
         cd "$CODING_REPO/integrations/browser-access"
         npm install || error_exit "Failed to install browser-access dependencies"
         npm run build || error_exit "Failed to build browser-access"
-        chmod +x dist/index.js 2>/dev/null || true
-        success "Browser-access MCP server installed"
+        chmod +x dist/index.js dist/sse-server.js dist/stdio-proxy.js browser-access-server 2>/dev/null || true
+
+        # Ensure logs directory exists for SSE server
+        mkdir -p "$CODING_REPO/integrations/browser-access/logs"
+
+        success "Browser-access MCP server installed (SSE + proxy architecture)"
+        info "  - SSE server: dist/sse-server.js (shared, port 3847)"
+        info "  - Stdio proxy: dist/stdio-proxy.js (per-session)"
+        info "  - Management: ./browser-access-server {start|stop|status}"
     else
         warning "browser-access directory not found, skipping..."
     fi

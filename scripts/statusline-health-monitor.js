@@ -947,6 +947,96 @@ class StatusLineHealthMonitor {
   }
 
   /**
+   * Get Browser Access SSE Server health status
+   * Monitors the shared MCP server for parallel Claude sessions
+   */
+  async getBrowserAccessHealth() {
+    try {
+      const browserAccessPort = 3847;
+      let healthIssues = [];
+      let healthStatus = 'healthy';
+
+      // Check if the SSE server is listening on port 3847
+      try {
+        const portCheck = await execAsync(`lsof -i :${browserAccessPort} -sTCP:LISTEN | grep -q LISTEN && echo "listening" || echo "not_listening"`, {
+          timeout: 2000,
+          encoding: 'utf8'
+        });
+
+        if (!portCheck.stdout.includes('listening')) {
+          // Server not running - this is acceptable if browser automation not needed
+          return {
+            status: 'inactive',
+            icon: '⚪',
+            details: 'SSE server not running (optional)'
+          };
+        }
+
+        // Port is listening - check health endpoint
+        try {
+          const healthResponse = await Promise.race([
+            execAsync(`curl -s http://localhost:${browserAccessPort}/health --max-time 3`),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+          ]);
+
+          const healthData = JSON.parse(healthResponse.stdout.trim());
+
+          if (healthData.status === 'ok') {
+            const sessions = healthData.sessions || 0;
+            const stagehandInit = healthData.stagehandInitialized ? 'yes' : 'no';
+            return {
+              status: 'healthy',
+              icon: '✅',
+              details: `SSE :3847 OK (${sessions} sessions, stagehand: ${stagehandInit})`
+            };
+          } else {
+            healthIssues.push('Health endpoint returned error');
+            healthStatus = 'warning';
+          }
+        } catch (healthError) {
+          if (healthError.message === 'timeout') {
+            healthIssues.push('Health timeout');
+            healthStatus = 'warning';
+          } else {
+            healthIssues.push('Health check failed');
+            healthStatus = 'warning';
+          }
+        }
+      } catch (portError) {
+        healthIssues.push('Port check failed');
+        healthStatus = 'warning';
+      }
+
+      // Determine icon and details
+      let icon, details;
+      if (healthStatus === 'healthy') {
+        icon = '✅';
+        details = 'Browser SSE OK';
+      } else if (healthStatus === 'warning') {
+        icon = '🟡';
+        details = healthIssues.join(', ');
+      } else {
+        icon = '🔴';
+        details = healthIssues.join(', ');
+      }
+
+      return {
+        status: healthStatus,
+        icon: icon,
+        details: details
+      };
+
+    } catch (error) {
+      this.log(`Browser access health check error: ${error.message}`, 'DEBUG');
+      return {
+        status: 'unknown',
+        icon: '❓',
+        details: 'Health check failed'
+      };
+    }
+  }
+
+  /**
    * Auto-heal constraint monitor service when issues are detected
    */
   async autoHealConstraintMonitor(healthStatus) {
@@ -1204,7 +1294,7 @@ class StatusLineHealthMonitor {
   /**
    * Format status line display
    */
-  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth) {
+  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth) {
     let statusLine = '';
 
     // Global Coding Monitor with reason code if not healthy
@@ -1216,9 +1306,12 @@ class StatusLineHealthMonitor {
     }
 
     // Project Sessions - show individual session statuses with abbreviations
-    // Filter out dormant sessions to avoid clutter
+    // Filter out old sessions to avoid clutter:
+    // - dormant (1-6h), inactive (>6h), sleeping (>24h) are hidden
+    // - Only show active, healthy, warning, cooling, fading, stale sessions
+    const hiddenStatuses = ['dormant', 'inactive', 'sleeping'];
     const sessionEntries = Object.entries(sessionHealth)
-      .filter(([, health]) => health.status !== 'dormant');
+      .filter(([, health]) => !hiddenStatuses.includes(health.status));
 
     if (sessionEntries.length > 0) {
       const sessionStatuses = sessionEntries
@@ -1254,6 +1347,16 @@ class StatusLineHealthMonitor {
       statusLine += ` [VKB:${vkbHealth.icon}]`;
     }
 
+    // Browser Access SSE Server Health (only show if not inactive)
+    if (browserAccessHealth && browserAccessHealth.status !== 'inactive') {
+      if (browserAccessHealth.icon === '🟡' || browserAccessHealth.icon === '🔴') {
+        const reason = this.getShortReason(browserAccessHealth.details || browserAccessHealth.status);
+        statusLine += ` [Browser:${browserAccessHealth.icon}(${reason})]`;
+      } else {
+        statusLine += ` [Browser:${browserAccessHealth.icon}]`;
+      }
+    }
+
     return statusLine;
   }
 
@@ -1262,17 +1365,18 @@ class StatusLineHealthMonitor {
    */
   async updateStatusLine() {
     try {
-      // Gather health data from all components (including new database and VKB checks)
-      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth] = await Promise.all([
+      // Gather health data from all components (including new database, VKB, and browser-access checks)
+      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth] = await Promise.all([
         this.getGlobalCodingMonitorHealth(),
         this.getProjectSessionsHealth(),
         this.getConstraintMonitorHealth(),
         this.getDatabaseHealth(),
-        this.getVKBServerHealth()
+        this.getVKBServerHealth(),
+        this.getBrowserAccessHealth()
       ]);
 
       // Format status line
-      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth);
+      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth);
 
       // Only update if changed to avoid unnecessary updates
       if (statusLine !== this.lastStatus) {
@@ -1299,6 +1403,7 @@ class StatusLineHealthMonitor {
           console.log(`  Constraints: ${constraintHealth.status} - ${constraintHealth.details}`);
           console.log(`  Database: ${databaseHealth.status} - ${databaseHealth.details}`);
           console.log(`  VKB: ${vkbHealth.status} - ${vkbHealth.details}`);
+          console.log(`  Browser Access: ${browserAccessHealth.status} - ${browserAccessHealth.details}`);
           console.log('='.repeat(80) + '\n');
         }
       }
