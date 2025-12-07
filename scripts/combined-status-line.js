@@ -882,9 +882,11 @@ class CombinedStatusLine {
         // Fall through to health file check
       }
 
-      // Check if integrated transcript monitor is running by looking for health file
+      // Check if integrated transcript monitor is running by looking for CENTRALIZED health file
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
-      const healthFile = join(codingPath, '.transcript-monitor-health');
+      // CRITICAL FIX: Use centralized health file location (same as getCentralizedHealthFile in enhanced-transcript-monitor.js)
+      const projectName = basename(projectPath);
+      const healthFile = join(codingPath, '.health', `${projectName}-transcript-monitor-health.json`);
 
       if (!existsSync(healthFile)) {
         // Monitor not running, start it in background
