@@ -1,82 +1,104 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Persistence Pattern" {
-  class KnowledgePersistencePattern {
-    - graphDatabase: GraphDatabase
-    + persistKnowledge()
-    + retrieveKnowledge()
-  }
-
-  class GraphDatabase {
-    - graphology: Graphology
-    - levelDB: LevelDB
-    + storeKnowledge()
-    + retrieveKnowledge()
-  }
-
-  class Graphology {
-  }
-
-  class LevelDB {
-  }
+package "Knowledge Management" {
+    class KnowledgePersistencePattern <<pattern>> {
+        +type: GraphDatabase
+        +storageLocation: string
+        +exportLocation: string
+        +initialize()
+        +persist()
+        +export()
+    }
+    
+    class GraphDatabaseService <<service>> {
+        -graphologyInstance: Graphology
+        -levelDbAdapter: LevelDB
+        -storagePath: string
+        +store(entity: KnowledgeEntity)
+        +retrieve(id: string)
+        +persist()
+        +load()
+    }
+    
+    class GraphKnowledgeExporter <<service>> {
+        -exportPath: string
+        -eventListener: EventListener
+        +exportToJson()
+        +onEntityStored(event: EntityStoredEvent)
+        +autoSync()
+    }
+    
+    class PersistenceAgent <<agent>> {
+        -database Service: GraphDatabaseService
+        -exporter: GraphKnowledgeExporter
+        +manageKnowledge()
+        +handlePersistence()
+    }
 }
 
-package "Graph Database Service" {
-  class GraphDatabaseService {
-    + provideGraphDatabaseServices()
-  }
-
-  class GraphDatabaseService --* GraphDatabase
+package "Storage Infrastructure" {
+    class Graphology <<library>> {
+        +addNode(data: any)
+        +addEdge(source: string, target: string)
+        +getNode(id: string)
+        +serialize()
+    }
+    
+    class LevelDB <<database>> {
+        +put(key: string, value: any)
+        +get(key: string)
+        +batch(operations: any[])
+    }
 }
 
-package "Command Line Interface" {
-  class VkbCommand {
-    + visualizeKnowledge()
-    + performMCPToolsOperations()
-  }
-
-  class VkbCommand --* KnowledgePersistencePattern
+package "File System" {
+    class KnowledgeGraphStorage <<file>> {
+        +path: ".data/knowledge-graph"
+        +type: "LevelDB"
+    }
+    
+    class JsonExportStorage <<file>> {
+        +path: ".data/knowledge-export"
+        +type: "JSON"
+        +autoSynced: boolean
+    }
 }
 
-package "Graph Sync" {
-  class GraphSyncCommand {
-    + synchronizeGraphDatabaseWithJSONExports()
-  }
-
-  class GraphSyncCommand --* GraphDatabase
+package "Event System" {
+    class EntityStoredEvent <<event>> {
+        +entity Id: string
+        +timestamp: Date
+        +data: any
+    }
 }
 
-package "Knowledge Export" {
-  class GraphKnowledgeExporter {
-    + exportKnowledgeFromGraphDatabase()
-  }
+' Relationships
+KnowledgePersistencePattern --> GraphDatabaseService : implements
+KnowledgePersistencePattern --> GraphKnowledgeExporter : uses
+KnowledgePersistencePattern --> PersistenceAgent : orchestrates
 
-  class GraphKnowledgeExporter --* GraphDatabase
-}
+GraphDatabaseService --> Graphology : uses
+GraphDatabaseService --> LevelDB : persists to
+GraphDatabaseService --> KnowledgeGraphStorage : stores in
 
-package "Vkb Api Client" {
-  class VkbApiClient {
-    + interactWithKnowledgeBase()
-  }
+GraphKnowledgeExporter --> JsonExportStorage : exports to
+GraphKnowledgeExporter --> EntityStoredEvent : listens to
 
-  class VkbApiClient --* KnowledgePersistencePattern
-}
+PersistenceAgent --> GraphDatabaseService : manages
+PersistenceAgent --> GraphKnowledgeExporter : coordinates
 
-package "Persistence Agent" {
-  class PersistenceAgent {
-    + persistKnowledgeInGraphDatabase()
-  }
+EntityStoredEvent ..> GraphKnowledgeExporter : triggers
 
-  class PersistenceAgent --* GraphDatabase
-}
+note right of KnowledgePersistencePattern
+  Pattern extracted from codebase analysis
+  Replaces shared-memory.json approach
+  Auto-syncs GraphDB to JSON exports
+end note
 
-KnowledgePersistencePattern --* GraphDatabaseService
-GraphDatabaseService --* GraphDatabase
-VkbCommand --* GraphDatabaseService
-GraphSyncCommand --* GraphDatabase
-GraphKnowledgeExporter --* GraphDatabase
-VkbApiClient --* KnowledgePersistencePattern
-PersistenceAgent --* GraphDatabase
+note bottom of GraphKnowledgeExporter
+  Listens to entity:stored events
+  Auto-exports to .data/knowledge-export
+end note
 
 @enduml

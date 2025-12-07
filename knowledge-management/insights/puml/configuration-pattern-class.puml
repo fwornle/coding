@@ -1,109 +1,123 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-abstract class TransferablePattern <<pattern>> {
-  +patternId: string
-  +version: string
-  +extractionDate: Date
-  +validate(): boolean
-  +serialize(): string
-}
-
-class ConfigurationPattern <<transferable>> {
-  -knowledgeGraph: GraphologyInstance
-  -levelDbAdapter: LevelDBAdapter
-  -exportPath: string
-  +extractFromCodebase(): void
-  +storeInGraph(): void
-  +syncToJSON(): void
-  +getConfiguration(): Config
-}
-
 package "Knowledge Management" {
-  class KnowledgeGraphManager <<service>> {
-    -graphInstance: Graphology
-    -persistenceLayer: LevelDB
-    +addPattern(pattern: TransferablePattern): void
-    +queryPatterns(criteria: QueryCriteria): Pattern[]
-    +syncToExport(): void
-  }
-
-  class PatternExtractor <<service>> {
-    -sourceAnalyzer: CodeAnalyzer
-    -patternDetector: PatternDetector
-    +extractConfigurationPatterns(): ConfigurationPattern[]
-    +analyzeCodebase(path: string): AnalysisResult
-  }
+    class ConfigurationPattern <<MCPAgent>> {
+        -environmentConfig: Map<String, String>
+        -projectConfig: ProjectConfig
+        -knowledgeGraph: GraphologyDB
+        -exportPath: String
+        +loadConfiguration(): void
+        +validateConfig(): boolean
+        +syncToExport(): void
+        +getConfigValue(key: String): String
+    }
+    
+    class KnowledgeStorage {
+        -graphDb: GraphologyDB
+        -levelDb: LevelDB
+        -dataPath: String
+        +storeEntity(entity: Object): void
+        +retrieveEntity(id: String): Object
+        +exportToJson(): void
+        +syncData(): void
+    }
+    
+    class GraphologyDB {
+        -graphInstance: Graph
+        -dbConnection: LevelDB
+        +addNode(node: Object): void
+        +addEdge(source: String, target: String): void
+        +query(pattern: String): Array
+        +persist(): void
+    }
 }
 
-package "Storage Layer" {
-  class GraphologyStorage <<storage>> {
-    -graphPath: string
-    -nodes: Map
-    -edges: Map
-    +addNode(node: GraphNode): void
-    +addEdge(edge: GraphEdge): void
-    +query(selector: string): Result[]
-  }
-
-  class LevelDBPersistence <<storage>> {
-    -dbPath: string
-    -connection: LevelDB
-    +store(key: string, value: any): Promise
-    +retrieve(key: string): Promise
-    +batch(operations: Operation[]): Promise
-  }
-
-  class JSONExporter <<file>> {
-    -exportDirectory: string
-    +exportToJSON(data: any): void
-    +autoSync(source: GraphStorage): void
-  }
+package "Unified Knowledge Base" {
+    class UKBUnified {
+        -patternRegistry: Map<String, Pattern>
+        -configManager: ConfigurationPattern
+        +registerPattern(pattern: Pattern): void
+        +getPattern(id: String): Pattern
+        +exportKnowledge(): void
+    }
+    
+    abstract class Pattern {
+        #id: String
+        #type: String
+        #metadata: Map<String, Object>
+        +abstract validate(): boolean
+        +export(): Object
+    }
 }
 
-package "Integration Layer" {
-  class MCPServerAdapter <<service>> {
-    -semanticAnalyzer: SemanticAnalyzer
-    -patternRegistry: PatternRegistry
-    +analyzeSemantics(pattern: ConfigurationPattern): SemanticResult
-    +registerPattern(pattern: TransferablePattern): void
-  }
-
-  class UKBUnifiedLib <<library>> {
-    -patternCatalog: PatternCatalog
-    -knowledgeBase: KnowledgeBase
-    +integratePattern(pattern: ConfigurationPattern): void
-    +queryUnifiedKnowledge(query: string): Result[]
-  }
+package "MCP Server Integration" {
+    class MCPServerSemanticAnalysis {
+        -configPattern: ConfigurationPattern
+        -analysisEngine: SemanticEngine
+        +analyzeCode(): AnalysisResult
+        +extractPatterns(): Array<Pattern>
+        +updateKnowledge(): void
+    }
+    
+    class SemanticEngine {
+        -knowledgeBase: UKBUnified
+        +processSource(code: String): void
+        +identifyPatterns(): Array<Pattern>
+        +generateInsights(): InsightData
+    }
 }
 
-TransferablePattern <|-- ConfigurationPattern
-ConfigurationPattern --> KnowledgeGraphManager : stores in
-KnowledgeGraphManager --> GraphologyStorage : uses
-KnowledgeGraphManager --> LevelDBPersistence : persists with
-KnowledgeGraphManager --> JSONExporter : exports via
-PatternExtractor --> ConfigurationPattern : creates
-MCPServerAdapter --> ConfigurationPattern : analyzes
-UKBUnifiedLib --> ConfigurationPattern : integrates
-GraphologyStorage --> LevelDBPersistence : backed by
-JSONExporter ..> GraphologyStorage : syncs from
+package "Data Layer" {
+    class LevelDB <<database>> {
+        -dbPath: String
+        -connection: Connection
+        +put(key: String, value: Object): void
+        +get(key: String): Object
+        +batch(operations: Array): void
+    }
+    
+    class JSONExporter {
+        -exportPath: String
+        -autoSync: boolean
+        +exportData(data: Object): void
+        +scheduleSync(): void
+        +validateExport(): boolean
+    }
+}
 
-note right of ConfigurationPattern
-  Extracted from:
-  - src/knowledge-management
-  - lib/ukb-unified  
-  - integrations/mcp-server-semantic-analysis/src
-end note
+package "Configuration Layer" {
+    class EnvironmentConfig {
+        -envVars: Map<String, String>
+        +getVar(name: String): String
+        +validateRequired(): boolean
+    }
+    
+    class ProjectConfig {
+        -configFile: String
+        -settings: Map<String, Object>
+        +loadFromFile(): void
+        +merge(envConfig: EnvironmentConfig): void
+    }
+}
 
-note bottom of GraphologyStorage
-  Storage Location:
-  .data/knowledge-graph
-end note
+' Relationships
+ConfigurationPattern --> KnowledgeStorage : manages
+ConfigurationPattern --> EnvironmentConfig : uses
+ConfigurationPattern --> ProjectConfig : uses
+KnowledgeStorage --> GraphologyDB : contains
+KnowledgeStorage --> JSONExporter : exports via
+GraphologyDB --> LevelDB : persists to
+UKBUnified --> ConfigurationPattern : configured by
+UKBUnified --> Pattern : contains
+MCPServerSemanticAnalysis --> ConfigurationPattern : uses
+MCPServerSemanticAnalysis --> SemanticEngine : delegates to
+SemanticEngine --> UKBUnified : updates
+ConfigurationPattern ..|> Pattern : implements
+ProjectConfig --> EnvironmentConfig : merges with
 
-note bottom of JSONExporter
-  Export Location:
-  .data/knowledge-export
-  (auto-synced from GraphDB)
-end note
+note right of ConfigurationPattern : "Extracted from codebase analysis\nStored as reusable knowledge entity"
+note bottom of KnowledgeStorage : "Storage at .data/knowledge-graph\nExports to .data/knowledge-export"
+note top of LevelDB : "Replaced shared-memory.json\nPersistent graph storage"
 
 @enduml

@@ -1,151 +1,111 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-    class KnowledgeManager <<service>> {
-        -repository: KnowledgeRepository
-        -indexer: KnowledgeIndexer
-        -validator: KnowledgeValidator
-        +storeKnowledge(data: KnowledgeData): Result
-        +retrieveKnowledge(query: Query): KnowledgeSet
-        +updateKnowledge(id: string, data: KnowledgeData): Result
-        +deleteKnowledge(id: string): Result
-    }
-    
-    class KnowledgeRepository <<interface>> {
-        +save(data: KnowledgeData): Promise<string>
-        +findById(id: string): Promise<KnowledgeData>
-        +findByQuery(query: Query): Promise<KnowledgeData[]>
-        +update(id: string, data: KnowledgeData): Promise<void>
-        +delete(id: string): Promise<void>
-    }
-    
-    class KnowledgeIndexer {
-        -searchEngine: SearchEngine
-        -vectorizer: Vectorizer
-        +indexDocument(doc: Document): void
-        +searchIndex(query: string): SearchResult[]
-        +updateIndex(id: string, doc: Document): void
-        +removeFromIndex(id: string): void
-    }
-    
-    class KnowledgeValidator {
-        -schemaValidator: SchemaValidator
-        -contentAnalyzer: ContentAnalyzer
-        +validateStructure(data: KnowledgeData): ValidationResult
-        +validateContent(data: KnowledgeData): ValidationResult
-        +sanitizeData(data: KnowledgeData): KnowledgeData
-    }
-    
-    class KnowledgeData {
-        +id: string
-        +title: string
-        +content: string
-        +metadata: Metadata
-        +tags: string[]
-        +createdAt: Date
-        +updatedAt: Date
-        +version: number
-    }
+package "Command Layer" {
+  class VkbCommand <<command>> {
+    +execute(): void
+    +validateInput(): boolean
+  }
+  
+  class CodingCommand <<command>> {
+    +execute(): void
+    +processCode(): void
+  }
+  
+  class GraphSyncCommand <<command>> {
+    +execute(): void
+    +synchronize(): void
+  }
 }
 
-package "UKB Unified Library" {
-    class UnifiedKnowledgeBase <<service>> {
-        -knowledgeManager: KnowledgeManager
-        -semanticAnalyzer: SemanticAnalyzer
-        -relationshipMapper: RelationshipMapper
-        +integrateKnowledge(source: string, data: any): Result
-        +queryUnified(query: UnifiedQuery): UnifiedResult
-        +buildRelationships(): void
-        +synchronizeData(): void
-    }
-    
-    class SemanticAnalyzer {
-        -nlpProcessor: NLPProcessor
-        -conceptExtractor: ConceptExtractor
-        +analyzeContent(content: string): SemanticAnalysis
-        +extractEntities(text: string): Entity[]
-        +identifyRelationships(text: string): Relationship[]
-        +generateSummary(content: string): string
-    }
-    
-    class RelationshipMapper {
-        -graphDatabase: GraphDatabase
-        -relationshipEngine: RelationshipEngine
-        +mapRelationships(entities: Entity[]): RelationshipGraph
-        +updateRelationships(graph: RelationshipGraph): void
-        +queryRelationships(entity: Entity): Relationship[]
-    }
-    
-    abstract class DataIntegration {
-        #sourceId: string
-        #transformationRules: Rule[]
-        +{abstract} extractData(): RawData
-        +{abstract} transformData(data: RawData): KnowledgeData
-        +{abstract} validateIntegration(): ValidationResult
-    }
+package "Knowledge Management Services" {
+  class GraphDatabaseService <<service>> {
+    -adapter: GraphDatabaseAdapter
+    +query(query: string): Result
+    +store(data: KnowledgeNode): void
+    +retrieve(id: string): KnowledgeNode
+  }
+  
+  class GraphKnowledgeExporter <<service>> {
+    -persistenceAgent: PersistenceAgent
+    +exportToJson(): void
+    +scheduleAutoExport(): void
+    +validateExport(): boolean
+  }
+  
+  class VkbApiClient <<service>> {
+    -baseUrl: string
+    +sendRequest(endpoint: string): Response
+    +authenticate(): void
+  }
 }
 
-package "MCP Semantic Analysis Server" {
-    class MCPSemanticServer <<service>> {
-        -semanticAnalyzer: SemanticAnalyzer
-        -knowledgeInterface: KnowledgeInterface
-        -requestHandler: RequestHandler
-        +handleAnalysisRequest(request: AnalysisRequest): AnalysisResponse
-        +processSemanticQuery(query: SemanticQuery): SemanticResult
-        +streamAnalysis(data: StreamData): Observable<AnalysisResult>
-    }
-    
-    class SemanticProcessor {
-        -textAnalyzer: TextAnalyzer
-        -contextBuilder: ContextBuilder
-        -inferenceEngine: InferenceEngine
-        +processText(text: string): ProcessingResult
-        +buildContext(data: ContextData): Context
-        +performInference(context: Context): InferenceResult
-    }
-    
-    class KnowledgeInterface <<interface>> {
-        +queryKnowledge(query: string): Promise<KnowledgeResult>
-        +updateKnowledge(data: KnowledgeUpdate): Promise<void>
-        +subscribeToChanges(callback: ChangeCallback): Subscription
-    }
-    
-    class AnalysisRequest {
-        +requestId: string
-        +content: string
-        +analysisType: AnalysisType
-        +parameters: AnalysisParameters
-        +timestamp: Date
-    }
-    
-    class AnalysisResponse {
-        +requestId: string
-        +results: AnalysisResult[]
-        +confidence: number
-        +processingTime: number
-        +metadata: ResponseMetadata
-    }
+package "Data Access Layer" {
+  class GraphDatabaseAdapter <<adapter>> {
+    -graphologyInstance: Graphology
+    -levelDbConnection: LevelDB
+    +connect(): void
+    +executeQuery(query: string): Result
+    +persistNode(node: KnowledgeNode): void
+  }
+  
+  class PersistenceAgent <<agent>> {
+    -exportPath: string
+    +writeToFile(data: Object, path: string): void
+    +ensureDirectory(path: string): void
+    +synchronizeFiles(): void
+  }
+}
+
+package "Storage Infrastructure" {
+  class Graphology <<external>> {
+    +addNode(id: string, attributes: Object): void
+    +addEdge(source: string, target: string): void
+    +getNodeAttributes(id: string): Object
+  }
+  
+  class LevelDB <<external>> {
+    +put(key: string, value: string): void
+    +get(key: string): string
+    +batch(operations: Array): void
+  }
+}
+
+package "Data Models" {
+  class KnowledgeNode {
+    -id: string
+    -content: string
+    -metadata: Object
+    -relationships: Array
+    +getId(): string
+    +getContent(): string
+  }
+  
+  class CollectiveKnowledge <<system>> {
+    -storageLocation: string
+    -exportLocation: string
+    +initialize(): void
+    +processKnowledge(): void
+  }
 }
 
 ' Relationships
-KnowledgeManager --> KnowledgeRepository : uses
-KnowledgeManager --> KnowledgeIndexer : uses
-KnowledgeManager --> KnowledgeValidator : uses
-KnowledgeManager --> KnowledgeData : manages
+VkbCommand --> GraphDatabaseService : uses
+CodingCommand --> GraphDatabaseService : uses
+GraphSyncCommand --> GraphKnowledgeExporter : triggers
 
-UnifiedKnowledgeBase --> KnowledgeManager : integrates
-UnifiedKnowledgeBase --> SemanticAnalyzer : uses
-UnifiedKnowledgeBase --> RelationshipMapper : uses
+GraphDatabaseService --> GraphDatabaseAdapter : depends on
+GraphKnowledgeExporter --> PersistenceAgent : uses
+GraphKnowledgeExporter --> GraphDatabaseService : reads from
 
-MCPSemanticServer --> SemanticProcessor : uses
-MCPSemanticServer --> KnowledgeInterface : implements
-MCPSemanticServer --> AnalysisRequest : processes
-MCPSemanticServer --> AnalysisResponse : generates
+GraphDatabaseAdapter --> Graphology : utilizes
+GraphDatabaseAdapter --> LevelDB : utilizes
+GraphDatabaseAdapter --> KnowledgeNode : manages
 
-SemanticProcessor --> SemanticAnalyzer : extends
-KnowledgeInterface --> UnifiedKnowledgeBase : connects to
+PersistenceAgent ..> "exports to\n.data/knowledge-export" : <<file system>>
+GraphDatabaseAdapter ..> "stores in\n.data/knowledge-graph" : <<file system>>
 
-DataIntegration --> KnowledgeData : produces
+CollectiveKnowledge *-- GraphDatabaseService : contains
+CollectiveKnowledge *-- GraphKnowledgeExporter : contains
 
 @enduml

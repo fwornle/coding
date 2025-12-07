@@ -1,64 +1,70 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Client" as C
-participant "VKB Command" as VKB
-participant "Graph Sync" as GS
-participant "GraphDatabaseService" as GDS
-participant "Knowledge Graph\n(.data/knowledge-graph)" as KG
-participant "VkbApiClient" as API
-participant "Parallel Workers" as PW
-participant "JSON Export\n(.data/knowledge-export)" as JE
+participant "Client Application" as Client
+participant "VkbApiClient" as ApiClient
+participant "Knowledge Management" as KnowledgeMgmt
+participant "UKB Unified" as UKB
+participant "MCP Semantic Analysis" as MCP
+participant "Graphology Engine" as Graph
+participant "LevelDB Storage" as LevelDB
+participant "JSON Export System" as JSONExport
 
-C -> VKB: Execute vkb command
-activate VKB
+Client -> ApiClient: Request ApiPattern data
+activate ApiClient
 
-VKB -> GDS: Initialize GraphDatabaseService
-activate GDS
+ApiClient -> KnowledgeMgmt: Query knowledge graph
+activate KnowledgeMgmt
 
-GDS -> KG: Connect to knowledge graph
-activate KG
-
-alt Batch Mode Semantic Analysis
-    VKB -> PW: Deploy parallel workers
-    activate PW
+alt Knowledge exists in graph
+    KnowledgeMgmt -> Graph: Retrieve ApiPattern nodes
+    activate Graph
     
-    loop For each batch
-        PW -> GDS: Process semantic data
-        GDS -> KG: Store knowledge patterns
-    end
+    Graph -> LevelDB: Read graph data
+    activate LevelDB
+    LevelDB --> Graph: Return stored patterns
+    deactivate LevelDB
     
-    deactivate PW
+    Graph --> KnowledgeMgmt: Return ApiPattern entities
+    deactivate Graph
+    
+    KnowledgeMgmt -> UKB: Process unified knowledge
+    activate UKB
+    UKB --> KnowledgeMgmt: Unified pattern data
+    deactivate UKB
+    
+else Pattern needs analysis
+    KnowledgeMgmt -> MCP: Analyze codebase patterns
+    activate MCP
+    
+    MCP -> MCP: Extract ApiPattern from:\n- src/knowledge-management\n- lib/ukb-unified\n- integrations/mcp-server-semantic-analysis/src
+    
+    MCP --> KnowledgeMgmt: Analyzed patterns
+    deactivate MCP
+    
+    KnowledgeMgmt -> Graph: Store new patterns
+    activate Graph
+    Graph -> LevelDB: Persist to .data/knowledge-graph
+    activate LevelDB
+    LevelDB --> Graph: Confirm storage
+    deactivate LevelDB
+    deactivate Graph
 end
 
-VKB -> API: Initialize VkbApiClient
-activate API
+KnowledgeMgmt -> JSONExport: Auto-sync to export
+activate JSONExport
+JSONExport -> JSONExport: Export to .data/knowledge-export
+JSONExport --> KnowledgeMgmt: Export complete
+deactivate JSONExport
 
-API -> GDS: Query knowledge data
-GDS -> KG: Retrieve graph data
-KG --> GDS: Return graph results
-GDS --> API: Return processed data
+KnowledgeMgmt --> ApiClient: Return ApiPattern data
+deactivate KnowledgeMgmt
 
-C -> GS: Execute graph-sync command
-activate GS
+ApiClient --> Client: ApiPattern response
+deactivate ApiClient
 
-GS -> GDS: Trigger synchronization
-GDS -> KG: Extract knowledge graph
-KG --> GDS: Return graph data
+note over Graph, LevelDB: GraphDatabase implementation\nreplaces shared-memory.json
 
-GDS -> JE: Auto-sync to JSON export
-activate JE
-note right of JE: Data-driven development\napproach with JSON exports
-
-JE --> GDS: Sync confirmation
-GDS --> GS: Sync completed
-GS --> C: Synchronization complete
-
-deactivate JE
-deactivate GS
-deactivate API
-deactivate KG
-deactivate GDS
-deactivate VKB
+note over JSONExport: Auto-synced JSON exports\nfor external consumption
 
 @enduml

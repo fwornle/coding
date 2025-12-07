@@ -3,71 +3,66 @@
 
 left to right direction
 
-actor "System Administrator" as admin
-actor "Developer" as dev
-actor "Network Service" as network
-actor "Knowledge Analyst" as analyst
+actor "Knowledge Engineer" as KE
+actor "Semantic Analyzer" as SA
+actor "MCP Server" as MCP
+actor "Application Developer" as DEV
 
-package "NetworkAwareInstallationPattern" {
-  usecase "Initialize Graph Database" as init
-  usecase "Configure Network Settings" as config
-  usecase "Install Pattern Components" as install
-  usecase "Validate Network Connectivity" as validate
-  usecase "Setup Storage Layers" as storage
+package "Knowledge Management System" {
+  usecase "Store Pattern Knowledge" as UC1
+  usecase "Query Network Patterns" as UC2
+  usecase "Export Knowledge Data" as UC3
+  usecase "Sync GraphDB to JSON" as UC4
 }
 
-package "Knowledge Management" {
-  usecase "Synchronize Knowledge Graph" as sync
-  usecase "Export JSON Data" as export
-  usecase "Visualize Knowledge Base" as viz
-  usecase "Batch Semantic Analysis" as batch
-  usecase "Incremental Processing" as incremental
+package "Semantic Analysis Infrastructure" {
+  usecase "Analyze Network Installation" as UC5
+  usecase "Extract Patterns" as UC6
+  usecase "Generate Semantic Models" as UC7
 }
 
-package "Development Operations" {
-  usecase "Execute Coding Commands" as coding
-  usecase "Monitor Parallel Workers" as workers
-  usecase "Manage Persistence" as persist
-  usecase "Handle Graph Adapter" as adapter
+package "Data Storage Operations" {
+  usecase "Write to Graphology+LevelDB" as UC8
+  usecase "Maintain Graph Structure" as UC9
+  usecase "Auto-sync to Export Format" as UC10
 }
 
-package "Storage Systems" {
-  usecase "Access LevelDB" as leveldb
-  usecase "Manage Graphology Data" as graphology
-  usecase "Maintain Auto-sync" as autosync
+package "Integration Services" {
+  usecase "Provide MCP Interface" as UC11
+  usecase "Serve Semantic Analysis" as UC12
+  usecase "Handle Client Requests" as UC13
 }
 
-admin --> init
-admin --> config
-admin --> install
-admin --> validate
+KE --> UC1
+KE --> UC2
+KE --> UC3
 
-dev --> coding
-dev --> workers
-dev --> persist
+SA --> UC5
+SA --> UC6
+SA --> UC7
 
-network --> validate
-network --> config
-network --> storage
+MCP --> UC11
+MCP --> UC12
+MCP --> UC13
 
-analyst --> sync
-analyst --> viz
-analyst --> batch
+DEV --> UC2
+DEV --> UC3
 
-init --> storage : <<include>>
-install --> adapter : <<include>>
-sync --> export : <<include>>
-batch --> workers : <<include>>
-persist --> adapter : <<include>>
+UC1 ..> UC8 : <<include>>
+UC2 ..> UC9 : <<include>>
+UC3 ..> UC10 : <<include>>
 
-storage --> leveldb : <<include>>
-storage --> graphology : <<include>>
-export --> autosync : <<include>>
+UC5 ..> UC6 : <<include>>
+UC6 ..> UC1 : <<extend>>
 
-incremental --> batch : <<extend>>
+UC8 ..> UC4 : <<include>>
+UC4 ..> UC10 : <<include>>
 
-note right of validate : "Network connectivity required\nfor distributed operations"
-note bottom of batch : "Parallel workers for\nscalable processing"
-note right of storage : "GraphDatabaseService with\nGraphology + LevelDB at\n.data/knowledge-graph"
+UC11 ..> UC12 : <<include>>
+UC12 ..> UC7 : <<include>>
+
+note right of UC8 : "Storage at .data/knowledge-graph\nusing Graphology + LevelDB"
+note right of UC10 : "Auto-sync to .data/knowledge-export\nJSON format"
+note top of UC6 : "NetworkAwareInstallationPattern\nextracted from codebase analysis"
 
 @enduml

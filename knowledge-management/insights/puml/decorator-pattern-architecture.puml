@@ -1,45 +1,59 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Decorator Pattern" {
-  note as AutoNote2
-  Entity: DecoratorPattern, Type: TransferablePattern
+package "Knowledge Management" {
+  component [src/knowledge-management] <<core>> as KM
+  component [lib/ukb-unified] <<core>> as UKB
+}
+
+package "Semantic Analysis Integration" {
+  component [integrations/mcp-server-semantic-analysis/src] <<api>> as MCP
+}
+
+package "Graph Database Storage" {
+  component [Graphology] <<storage>> as Graph
+  component [LevelDB] <<storage>> as LevelDB
+  database ".data/knowledge-graph" <<storage>> as GraphStorage
+}
+
+package "Export Layer" {
+  component [JSON Export] <<api>> as JSONExport
+  database ".data/knowledge-export" <<storage>> as ExportStorage
+}
+
+package "DecoratorPattern Implementation" {
+  component [DecoratorPattern Entity] <<core>> as DecoratorEntity
+  note right of DecoratorEntity
+    Extracted from codebase analysis
+    Stored as reusable knowledge entity
+    Part of semantic analysis infrastructure
   end note
-  note as AutoNote3
-  Purpose: Allows for added behavior to objects without modifying their structure
-  end note
 }
 
-package "Data Storage" {
-  component GraphDatabaseService <<storage>> as "Graph Database Service"
-  component LevelDB <<storage>> as "LevelDB"
-  GraphDatabaseService --* LevelDB
-}
+' Core relationships
+KM --> Graph : uses
+UKB --> Graph : integrates with
+MCP --> DecoratorEntity : implements
+Graph --> LevelDB : persisted by
+Graph --> GraphStorage : stores data in
 
-package "Agents" {
-  component PersistenceAgent <<agent>> as "Persistence Agent"
-  component VkbApiClient <<api>> as "VkbApiClient"
-  PersistenceAgent --* GraphDatabaseService
-  VkbApiClient --* GraphDatabaseService
-}
+' Export relationships
+GraphStorage --> JSONExport : auto-synced to
+JSONExport --> ExportStorage : exports to
 
-package "Event-Driven Approach" {
-  component ParallelWorkers <<core>> as "Parallel Workers"
-  component EventDrivenSystem <<core>> as "Event-Driven System"
-  ParallelWorkers --* EventDrivenSystem
-  EventDrivenSystem --* GraphDatabaseService
-}
+' Pattern implementation relationships
+KM --> DecoratorEntity : manages
+UKB --> DecoratorEntity : utilizes
+MCP --> DecoratorEntity : analyzes
 
-GraphDatabaseService --* PersistenceAgent
-VkbApiClient --* PersistenceAgent
-ParallelWorkers --* VkbApiClient
+' Data flow
+DecoratorEntity ..> GraphStorage : stored in
+GraphStorage ..> ExportStorage : synced to
 
-note as AutoNote1
-  Relationships:
-  - GraphDatabaseService uses LevelDB for knowledge storage
-  - PersistenceAgent interacts with GraphDatabaseService
-  - VkbApiClient interacts with GraphDatabaseService and PersistenceAgent
-  - ParallelWorkers enhance system responsiveness and fault tolerance
+note top of "Knowledge Management"
+  DecoratorPattern implementation spans across
+  multiple components for comprehensive
+  semantic analysis and knowledge storage
 end note
 
 @enduml

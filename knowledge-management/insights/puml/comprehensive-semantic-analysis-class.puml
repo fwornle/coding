@@ -1,106 +1,126 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "src/knowledge-management" {
-    class KnowledgeSemanticAnalyzer <<service>> {
-        -vectorStore: VectorStore
-        -embeddingModel: EmbeddingModel
-        -semanticIndex: SemanticIndex
-        +analyzeKnowledgeBase(): AnalysisResult
-        +extractSemanticPatterns(): Pattern[]
-        +buildSemanticGraph(): SemanticGraph
-        +identifyConceptClusters(): Cluster[]
-    }
-    
-    class SemanticIndex <<data>> {
-        -indexedConcepts: Map<string, Concept>
-        -relationshipGraph: Graph
-        +indexConcept(concept: Concept): void
-        +findSimilarConcepts(query: string): Concept[]
-        +updateRelationships(): void
-    }
-    
-    class ConceptExtractor <<service>> {
-        -nlpProcessor: NLPProcessor
-        -domainOntology: Ontology
-        +extractConcepts(text: string): Concept[]
-        +validateConcepts(concepts: Concept[]): boolean
-        +enrichWithContext(concepts: Concept[]): Concept[]
-    }
-}
-
-package "lib/ukb-unified" {
-    abstract class UnifiedSemanticBase <<pattern>> {
-        #semanticProcessor: SemanticProcessor
-        #patternMatcher: PatternMatcher
-        +processSemanticData(data: any): SemanticData
-        +applySemanticRules(rules: Rule[]): void
-        {abstract} +executeAnalysis(): AnalysisResult
-    }
-    
+package "Knowledge Management" {
     class SemanticProcessor <<service>> {
-        -tokenizer: Tokenizer
-        -syntaxAnalyzer: SyntaxAnalyzer
-        -semanticRules: Rule[]
-        +processText(text: string): ProcessedText
-        +identifyEntities(text: string): Entity[]
-        +analyzeRelationships(entities: Entity[]): Relationship[]
+        -analysisEngine: AnalysisEngine
+        -contextManager: ContextManager
+        +processDocument(content: string): Analysis
+        +extractSemantics(text: string): SemanticData
+        +generateInsights(data: SemanticData): Insights
     }
     
-    class PatternMatcher <<utility>> {
-        -patterns: Pattern[]
-        -matchingAlgorithm: Algorithm
-        +matchPatterns(input: string): Match[]
-        +registerPattern(pattern: Pattern): void
-        +validateMatches(matches: Match[]): boolean
+    class ContextManager {
+        -contextStore: Map
+        -sessionId: string
+        +createContext(id: string): Context
+        +updateContext(context: Context): void
+        +getContext(id: string): Context
+    }
+    
+    class AnalysisEngine {
+        -algorithms: Algorithm[]
+        -modelAdapter: ModelAdapter
+        +analyze(input: string): AnalysisResult
+        +configure(settings: Config): void
     }
 }
 
-package "integrations/mcp-server-semantic-analysis/src" {
-    class MCPSemanticServer <<server>> {
-        -analysisEngine: ComprehensiveSemanticAnalysis
-        -requestHandler: RequestHandler
-        -responseFormatter: ResponseFormatter
-        +handleAnalysisRequest(request: Request): Response
-        +formatSemanticResults(results: AnalysisResult): FormattedResponse
-        +validateRequest(request: Request): boolean
+package "UKB Unified Library" {
+    abstract class UnifiedKnowledgeBase {
+        #knowledgeStore: KnowledgeStore
+        #indexManager: IndexManager
+        +{abstract} query(terms: string[]): QueryResult
+        +{abstract} index(content: Content): void
     }
     
-    class SemanticAnalysisHandler <<handler>> {
-        -analyzer: ComprehensiveSemanticAnalysis
-        -validator: RequestValidator
-        +processAnalysisRequest(data: RequestData): AnalysisResult
-        +handleBatchAnalysis(batch: RequestData[]): AnalysisResult[]
-        +streamAnalysisResults(stream: DataStream): void
+    class SemanticKnowledgeBase extends UnifiedKnowledgeBase {
+        -semanticIndex: SemanticIndex
+        -relationshipGraph: Graph
+        +query(terms: string[]): QueryResult
+        +index(content: Content): void
+        +findRelationships(entity: Entity): Relationship[]
+    }
+    
+    class KnowledgeStore {
+        -storage: StorageAdapter
+        -metadata: MetadataManager
+        +store(key: string, value: any): void
+        +retrieve(key: string): any
+        +search(criteria: SearchCriteria): SearchResult[]
     }
 }
 
-class ComprehensiveSemanticAnalysis <<transferable-pattern>> {
-    -knowledgeAnalyzer: KnowledgeSemanticAnalyzer
-    -unifiedBase: UnifiedSemanticBase
-    -mcpIntegration: MCPSemanticServer
-    +executeComprehensiveAnalysis(input: AnalysisInput): AnalysisResult
-    +integrateMultipleSources(sources: DataSource[]): IntegratedResult
-    +generateSemanticInsights(data: any): Insight[]
-    +exportAnalysisPattern(): TransferablePattern
+package "MCP Server Integration" {
+    class ComprehensiveSemanticAnalysis <<MCPAgent>> {
+        -processor: SemanticProcessor
+        -knowledgeBase: SemanticKnowledgeBase
+        -mcpAdapter: MCPAdapter
+        +handleRequest(request: MCPRequest): MCPResponse
+        +performAnalysis(content: string): AnalysisReport
+        +initializeAgent(): void
+    }
+    
+    class MCPAdapter {
+        -serverConnection: Connection
+        -messageHandler: MessageHandler
+        +sendResponse(response: MCPResponse): void
+        +receiveRequest(): MCPRequest
+        +establishConnection(): void
+    }
+    
+    interface MCPAgent {
+        +handleRequest(request: MCPRequest): MCPResponse
+        +initializeAgent(): void
+    }
+}
+
+package "Core Types" {
+    class SemanticData {
+        +entities: Entity[]
+        +relationships: Relationship[]
+        +concepts: Concept[]
+        +confidence: number
+    }
+    
+    class AnalysisResult {
+        +semanticData: SemanticData
+        +insights: Insights
+        +metadata: Metadata
+        +timestamp: Date
+    }
+    
+    enum AnalysisType {
+        SEMANTIC
+        SYNTACTIC
+        CONTEXTUAL
+        COMPREHENSIVE
+    }
 }
 
 ' Relationships
-ComprehensiveSemanticAnalysis --> KnowledgeSemanticAnalyzer : uses
-ComprehensiveSemanticAnalysis --> UnifiedSemanticBase : extends
-ComprehensiveSemanticAnalysis --> MCPSemanticServer : integrates
+ComprehensiveSemanticAnalysis --|> MCPAgent
+ComprehensiveSemanticAnalysis --* SemanticProcessor
+ComprehensiveSemanticAnalysis --* SemanticKnowledgeBase
+ComprehensiveSemanticAnalysis --* MCPAdapter
 
-KnowledgeSemanticAnalyzer --> SemanticIndex : manages
-KnowledgeSemanticAnalyzer --> ConceptExtractor : uses
+SemanticProcessor --* ContextManager
+SemanticProcessor --* AnalysisEngine
+SemanticProcessor ..> SemanticData : creates
+SemanticProcessor ..> AnalysisResult : produces
 
-UnifiedSemanticBase --> SemanticProcessor : contains
-UnifiedSemanticBase --> PatternMatcher : uses
+SemanticKnowledgeBase --* KnowledgeStore
+AnalysisEngine ..> AnalysisResult : generates
+AnalysisResult --* SemanticData
 
-MCPSemanticServer --> SemanticAnalysisHandler : delegates
-SemanticAnalysisHandler --> ComprehensiveSemanticAnalysis : analyzes with
-
-' Cross-package dependencies
-SemanticAnalysisHandler ..> KnowledgeSemanticAnalyzer : leverages
-MCPSemanticServer ..> UnifiedSemanticBase : implements
+note right of ComprehensiveSemanticAnalysis
+  Main MCP Agent implementation
+  Distributed across multiple modules:
+  - src/knowledge-management
+  - lib/ukb-unified  
+  - integrations/mcp-server-semantic-analysis/src
+  
+  Note: shared-memory.json removed from codebase
+end note
 
 @enduml

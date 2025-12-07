@@ -1,30 +1,88 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant KnowledgePersistencePattern as "Knowledge Persistence Pattern"
-participant GraphDatabase as "Graph Database"
-participant VkbApiClient as "VKB API Client"
-participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
-participant PersistenceAgent as "Persistence Agent"
-participant GraphDatabaseService as "Graph Database Service"
+participant "Knowledge Management" as KM
+participant "PersistenceAgent" as PA
+participant "GraphDatabaseService" as GDS
+participant "Graphology (In-Memory)" as Graph
+participant "LevelDB" as LDB
+participant "GraphKnowledgeExporter" as GKE
+participant "Event System" as Events
+participant "JSON Export" as JSON
 
-KnowledgePersistencePattern->>GraphDatabase: Initialize graph database
-GraphDatabase->>GraphDatabaseService: Provide graph database services
-GraphDatabaseService->>VkbApiClient: Interact with knowledge base
-VkbApiClient->>GraphKnowledgeExporter: Export knowledge from graph database
-GraphKnowledgeExporter->>GraphDatabase: Export knowledge to JSON
+== Knowledge Storage Process ==
 
-alt Synchronizing data
-    GraphDatabaseService->>GraphKnowledgeExporter: Synchronize data with JSON exports
-    GraphKnowledgeExporter->>GraphDatabase: Update graph database with synchronized data
+KM -> PA: Store knowledge entity
+activate PA
+
+PA -> GDS: persist(entity)
+activate GDS
+
+GDS -> Graph: addNode/addEdge(entity)
+activate Graph
+Graph --> GDS: success
+deactivate Graph
+
+GDS -> LDB: write(.data/knowledge-graph)
+activate LDB
+LDB --> GDS: persisted
+deactivate LDB
+
+GDS --> PA: stored
+deactivate GDS
+
+PA -> Events: emit("entity:stored", entity)
+activate Events
+
+Events -> GKE: notify(entity:stored)
+activate GKE
+
+GKE -> JSON: export(.data/knowledge-export)
+activate JSON
+JSON --> GKE: exported
+deactivate JSON
+
+GKE --> Events: export complete
+deactivate GKE
+deactivate Events
+
+PA --> KM: persistence complete
+deactivate PA
+
+== Knowledge Retrieval Process ==
+
+KM -> GDS: query(criteria)
+activate GDS
+
+alt In-memory cache available
+    GDS -> Graph: search(criteria)
+    activate Graph
+    Graph --> GDS: results
+    deactivate Graph
+else Cache miss
+    GDS -> LDB: read(.data/knowledge-graph)
+    activate LDB
+    LDB --> GDS: data
+    deactivate LDB
+    
+    GDS -> Graph: load(data)
+    activate Graph
+    Graph --> GDS: loaded
+    deactivate Graph
 end
 
-loop Coding operations
-    KnowledgePersistencePattern->>GraphDatabase: Perform coding-related operations
-    GraphDatabase->>PersistenceAgent: Persist knowledge in graph database
-end
+GDS --> KM: knowledge entities
+deactivate GDS
 
-KnowledgePersistencePattern->>VkbApiClient: Visualize knowledge using VKB API client
-VkbApiClient->>GraphDatabase: Retrieve knowledge from graph database for visualization
+note right of GDS
+  Dual persistence:
+  - Graphology for fast queries
+  - LevelDB for durability
+end note
+
+note right of GKE
+  Auto-sync JSON exports
+  triggered by entity:stored events
+end note
 
 @enduml

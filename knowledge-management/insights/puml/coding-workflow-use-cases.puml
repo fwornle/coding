@@ -7,63 +7,58 @@ actor "Developer" as dev
 actor "MCP Client" as mcp
 actor "System" as sys
 
-package "CodingWorkflow System" {
-  usecase "Execute Workflow" as exec
-  usecase "Trigger Analysis" as trigger
-  usecase "Store Knowledge" as store
-  usecase "Export Data" as export
-  usecase "Query Knowledge Graph" as query
-  usecase "Incremental Analysis" as incremental
-  usecase "Manage Graph Database" as manage
-  usecase "Sync Data" as sync
+rectangle "Knowledge Management" {
+    usecase "Store Knowledge" as store
+    usecase "Query Knowledge Graph" as query
+    usecase "Export Knowledge" as export
+    usecase "Sync Data" as sync
 }
 
-package "Knowledge Management" {
-  usecase "Build Knowledge Graph" as build
-  usecase "Process Semantic Data" as semantic
-  usecase "Maintain Graph Structure" as maintain
+rectangle "Semantic Analysis" {
+    usecase "Execute Workflow" as execute
+    usecase "Analyze Code" as analyze
+    usecase "Generate Insights" as insights
+    usecase "Incremental Analysis" as incremental
 }
 
-package "Data Storage" {
-  usecase "Store in Graphology+LevelDB" as graphdb
-  usecase "Generate JSON Export" as json_export
-  usecase "Auto-sync Data" as auto_sync
+rectangle "Data Persistence" {
+    usecase "Persist to LevelDB" as leveldb
+    usecase "Manage Graph Data" as graphdata
+    usecase "Auto-sync Exports" as autosync
 }
 
-' Actor relationships
-dev --> exec : "Manual execution"
-mcp --> exec : "execute_workflow tool"
-sys --> incremental : "Automatic trigger"
+dev --> execute : triggers via MCP tools
+mcp --> execute : execute_workflow
+sys --> incremental : automatic trigger
 
-' Main workflow relationships
-exec --> trigger
-exec --> store
-exec --> export
+execute ..> analyze : <<include>>
+execute ..> store : <<include>>
+analyze --> insights : generates
+analyze --> query : accesses
 
-' Include relationships
-trigger ..> build : <<include>>
-trigger ..> semantic : <<include>>
-store ..> graphdb : <<include>>
-export ..> json_export : <<include>>
-export ..> auto_sync : <<include>>
+store --> leveldb : persists to
+store --> graphdata : manages via Graphology
+query --> graphdata : reads from
 
-' Extend relationships
-incremental ..> trigger : <<extend>>
-query ..> manage : <<extend>>
-sync ..> auto_sync : <<extend>>
+export --> autosync : triggers
+autosync --> sync : performs
+sync --> graphdata : syncs from GraphDB
 
-' Knowledge management flows
-build --> maintain
-semantic --> store
-maintain --> manage
+note right of execute
+  Implemented across:
+  - src/knowledge-management
+  - lib/ukb-unified  
+  - integrations/mcp-server-semantic-analysis/src
+end note
 
-' Storage flows
-graphdb --> sync
-json_export --> auto_sync
+note bottom of graphdata
+  Storage: .data/knowledge-graph
+  Uses: Graphology + LevelDB
+end note
 
-note right of exec : "Triggered via MCP tools\nor automatic analysis"
-note bottom of graphdb : "Located at:\n.data/knowledge-graph"
-note bottom of json_export : "Located at:\n.data/knowledge-export"
-note top of incremental : "Replaces shared-memory.json\napproach"
+note bottom of export
+  Location: .data/knowledge-export
+  Auto-synced from GraphDB
+end note
 
 @enduml

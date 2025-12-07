@@ -1,82 +1,60 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant Client
-participant NetworkAwareInstallationPattern
-participant GraphDatabaseService
-participant GraphDatabaseAdapter
-participant PersistenceAgent
-participant ParallelWorkers
-participant "Graphology + LevelDB" as Storage
-participant "JSON Export" as JSONExport
-participant FileSystem
+participant "Knowledge Management\nSystem" as KMS
+participant "UKB Unified\nLibrary" as UKB
+participant "MCP Server\nSemantic Analysis" as MCP
+participant "Graphology\nGraph Engine" as Graph
+participant "LevelDB\nStorage" as LevelDB
+participant "JSON Export\nSystem" as Export
 
-Client -> NetworkAwareInstallationPattern: initiate installation
-activate NetworkAwareInstallationPattern
+note over KMS, Export : NetworkAwareInstallationPattern Implementation
 
-NetworkAwareInstallationPattern -> GraphDatabaseService: initialize database service
-activate GraphDatabaseService
+KMS -> UKB : Initialize pattern analysis
+activate UKB
 
-GraphDatabaseService -> GraphDatabaseAdapter: setup adapter
-activate GraphDatabaseAdapter
+UKB -> MCP : Request semantic analysis
+activate MCP
 
-GraphDatabaseAdapter -> Storage: connect to .data/knowledge-graph
-activate Storage
+MCP -> Graph : Create network-aware nodes
+activate Graph
 
-NetworkAwareInstallationPattern -> PersistenceAgent: initialize persistence
-activate PersistenceAgent
+Graph -> LevelDB : Persist graph structure
+activate LevelDB
+LevelDB --> Graph : Storage confirmation
+deactivate LevelDB
 
-note right of PersistenceAgent
-  Avoids removed shared-memory.json
-  Uses GraphDatabaseAdapter only
-end note
+Graph --> MCP : Graph structure ready
+deactivate Graph
 
-alt scalable processing required
-    NetworkAwareInstallationPattern -> ParallelWorkers: initialize batch processing
-    activate ParallelWorkers
-    
-    ParallelWorkers -> GraphDatabaseService: perform semantic analysis
-    GraphDatabaseService -> Storage: batch operations
-    
-    deactivate ParallelWorkers
-end
+MCP -> MCP : Extract installation patterns
+MCP -> MCP : Analyze network topology
 
-NetworkAwareInstallationPattern -> GraphDatabaseService: setup auto-sync
-GraphDatabaseService -> JSONExport: export to .data/knowledge-export
-activate JSONExport
+MCP --> UKB : Pattern analysis complete
+deactivate MCP
 
-JSONExport -> FileSystem: write JSON files
-activate FileSystem
+UKB -> Graph : Store pattern as knowledge entity
+activate Graph
 
-loop incremental operations
-    NetworkAwareInstallationPattern -> GraphDatabaseService: check edit/write operations only
-    
-    opt content constraints apply
-        GraphDatabaseService -> Storage: validate constraints
-        Storage --> GraphDatabaseService: validation result
-    end
-    
-    GraphDatabaseService -> JSONExport: auto-sync export
-    JSONExport -> FileSystem: update JSON files
-end
+Graph -> LevelDB : Save NetworkAwareInstallationPattern
+activate LevelDB
+LevelDB --> Graph : Pattern stored
+deactivate LevelDB
 
-NetworkAwareInstallationPattern -> Client: provide vkb command
-NetworkAwareInstallationPattern -> Client: provide coding command  
-NetworkAwareInstallationPattern -> Client: provide graph-sync command
+Graph -> Export : Auto-sync to JSON export
+activate Export
+Export -> Export : Write to .data/knowledge-export
+Export --> Graph : Export complete
+deactivate Export
 
-note over Client, FileSystem
-  Commands available:
-  - vkb: visualization
-  - coding: development operations
-  - graph-sync: knowledge synchronization
-end note
+Graph --> UKB : Pattern entity stored
+deactivate Graph
 
-deactivate FileSystem
-deactivate JSONExport
-deactivate PersistenceAgent
-deactivate Storage
-deactivate GraphDatabaseAdapter
-deactivate GraphDatabaseService
-deactivate NetworkAwareInstallationPattern
+UKB --> KMS : NetworkAwareInstallationPattern ready
+deactivate UKB
+
+note over Graph, LevelDB : Data stored at .data/knowledge-graph
+note over Export : JSON exports at .data/knowledge-export
+note over KMS, Export : shared-memory.json REMOVED from codebase
 
 @enduml

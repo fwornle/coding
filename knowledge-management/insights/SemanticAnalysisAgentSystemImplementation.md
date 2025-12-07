@@ -2,17 +2,17 @@
 
 **Type:** GraphDatabase
 
-The SemanticAnalysisAgentSystemImplementation uses a graph database with Graphology + LevelDB at .data/knowledge-graph for primary storage.
+The system uses Graphology + LevelDB at .data/knowledge-graph for primary graph storage with verified components GraphDatabaseService, GraphKnowledgeExporter, and GraphDatabaseAdapter managing the dat...
 
 ## What It Is
 
-- The system provides CLI access via the vkb command for visualization and MCP tools for knowledge operations.
+- Recent parallel worker implementation for batch mode semantic analysis indicates performance optimization efforts, with active bug fixes for insight generation and PlantUML generation agents
 
-- The system auto-syncs JSON exports at .data/knowledge-export, which can be accessed using the vkb command.
+- The system provides CLI access through vkb command for visualization and graph-sync command for synchronization, with MCP server integration at integrations/mcp-server-semantic-analysis/src
 
-- The SemanticAnalysisAgentSystemImplementation uses a graph database with Graphology + LevelDB at .data/knowledge-graph for primary storage.
+- Auto-synchronized JSON exports are maintained at .data/knowledge-export directory, removing dependency on the previously used shared-memory.json approach
 
-- The system uses the GraphDatabaseService, GraphKnowledgeExporter, and GraphDatabaseAdapter components to manage data storage and retrieval.
+- Current architecture shows component reference issues and stale observations, indicating need for improved dependency management and documentation synchronization
 
 
 ## Diagrams
@@ -39,4 +39,4 @@ The SemanticAnalysisAgentSystemImplementation uses a graph database with Graphol
 
 ---
 
-*Generated from 4 observations*
+*Generated from 5 observations*

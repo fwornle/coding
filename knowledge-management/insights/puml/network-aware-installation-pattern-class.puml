@@ -1,130 +1,116 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Core Pattern" {
-    abstract class TransferablePattern <<pattern>> {
-        +transfer(): void
-        +validate(): boolean
-    }
-    
-    class NetworkAwareInstallationPattern <<service>> {
+package "Knowledge Management" {
+    class NetworkAwareInstallationPattern <<pattern>> {
+        -patternId: string
         -networkConfig: NetworkConfig
-        -installationState: InstallationState
-        +executeNetworkAwareInstallation(): void
-        +checkNetworkConnectivity(): boolean
-        +handleOfflineMode(): void
+        -installationSteps: InstallationStep[]
+        +analyzeNetworkTopology(): NetworkTopology
+        +generateInstallationPlan(): InstallationPlan
+        +validateConnectivity(): ValidationResult
+        +executeInstallation(): ExecutionResult
     }
-}
 
-package "Graph Database Layer" {
-    class GraphDatabaseService <<service>> {
-        -storageAdapter: GraphStorageAdapter
-        -exportPath: string
-        +query(query: string): Result
-        +sync(): void
-        +exportToJSON(): void
+    class KnowledgeManager <<service>> {
+        -graphDb: GraphDatabase
+        -exportManager: ExportManager
+        +storePattern(pattern: Pattern): void
+        +retrievePattern(id: string): Pattern
+        +syncToExport(): void
     }
-    
-    class GraphDatabaseAdapter <<adapter>> {
-        -graphology: Graphology
-        -levelDB: LevelDB
-        +connect(): void
-        +executeQuery(): Result
-        +persistData(): void
-    }
-    
-    class PersistenceAgent <<service>> {
-        -dataPath: string
-        -syncEnabled: boolean
-        +saveToGraph(): void
-        +loadFromGraph(): void
-        +autoSync(): void
-    }
-}
 
-package "Storage Components" {
-    class Graphology <<external>> {
-        +addNode(): void
-        +addEdge(): void
-        +getGraph(): Graph
-    }
-    
-    class LevelDB <<external>> {
-        -dbPath: string
-        +put(): void
-        +get(): void
-        +batch(): void
-    }
-}
-
-package "Processing Layer" {
-    class ParallelWorkers <<service>> {
-        -workerPool: WorkerPool
-        -batchSize: number
-        +processBatch(): void
-        +scaleWorkers(): void
-    }
-    
     class SemanticAnalyzer <<service>> {
-        -analysisConfig: AnalysisConfig
-        +analyzeBatch(): AnalysisResult
-        +processIncremental(): void
+        -patternExtractor: PatternExtractor
+        -codebaseAnalyzer: CodebaseAnalyzer
+        +extractPatterns(codebase: Codebase): Pattern[]
+        +analyzeSemantics(code: string): SemanticData
     }
 }
 
-package "Command Interface" {
-    class CommandHandler <<service>> {
-        +executeVKB(): void
-        +executeCoding(): void
-        +executeGraphSync(): void
+package "Storage Layer" {
+    class GraphDatabase <<database>> {
+        -graphology: GraphologyInstance
+        -levelDb: LevelDB
+        -storagePath: string
+        +store(entity: Entity): void
+        +query(criteria: QueryCriteria): Entity[]
+        +connect(): void
+        +disconnect(): void
     }
-    
-    enum CommandType {
-        VKB
-        CODING
-        GRAPH_SYNC
+
+    class ExportManager <<service>> {
+        -exportPath: string
+        -autoSync: boolean
+        +exportToJson(data: GraphData): void
+        +scheduleSync(): void
+        +validateExport(): boolean
+    }
+
+    class LevelDB <<persistence>> {
+        -dbPath: string
+        -options: LevelDbOptions
+        +put(key: string, value: any): void
+        +get(key: string): any
+        +delete(key: string): void
+    }
+
+    class GraphologyInstance <<graph>> {
+        -nodes: Node[]
+        -edges: Edge[]
+        +addNode(node: Node): void
+        +addEdge(edge: Edge): void
+        +traverse(strategy: TraversalStrategy): Path[]
+    }
+}
+
+package "Integration Layer" {
+    class MCPServer <<server>> {
+        -semanticAnalyzer: SemanticAnalyzer
+        -knowledgeManager: KnowledgeManager
+        +handleRequest(request: MCPRequest): MCPResponse
+        +processSemanticAnalysis(code: string): AnalysisResult
+    }
+
+    class UKBUnified <<library>> {
+        -patternRegistry: PatternRegistry
+        +registerPattern(pattern: Pattern): void
+        +getPattern(id: string): Pattern
+        +listPatterns(): Pattern[]
     }
 }
 
 package "Configuration" {
-    class NetworkConfig <<config>> {
-        -knowledgeGraphPath: string
-        -exportDirectory: string
-        -syncInterval: number
-        +getStoragePath(): string
+    class DataPaths <<config>> {
+        +KNOWLEDGE_GRAPH_PATH: string = ".data/knowledge-graph"
+        +KNOWLEDGE_EXPORT_PATH: string = ".data/knowledge-export"
+        +validatePaths(): boolean
     }
-    
-    class InstallationState <<state>> {
-        -isNetworkAware: boolean
-        -processingMode: ProcessingMode
-        -constraintsEnabled: boolean
-        +updateState(): void
+
+    class NetworkConfig <<config>> {
+        -topology: NetworkTopology
+        -connectivity: ConnectivityRules
+        -security: SecurityConfig
     }
 }
 
-' Inheritance relationships
-TransferablePattern <|-- NetworkAwareInstallationPattern
+' Relationships
+NetworkAwareInstallationPattern --* KnowledgeManager : stored by
+KnowledgeManager --> GraphDatabase : uses
+SemanticAnalyzer --> NetworkAwareInstallationPattern : extracts
+GraphDatabase --> GraphologyInstance : contains
+GraphDatabase --> LevelDB : persists with
+GraphDatabase --> ExportManager : exports via
+MCPServer --> SemanticAnalyzer : uses
+MCPServer --> KnowledgeManager : queries
+UKBUnified --> NetworkAwareInstallationPattern : provides
+NetworkAwareInstallationPattern --> NetworkConfig : configured by
+ExportManager --> DataPaths : writes to
+GraphDatabase --> DataPaths : stores at
 
-' Composition relationships
-NetworkAwareInstallationPattern *-- NetworkConfig
-NetworkAwareInstallationPattern *-- InstallationState
-GraphDatabaseService *-- GraphDatabaseAdapter
-GraphDatabaseService *-- PersistenceAgent
-GraphDatabaseAdapter *-- Graphology
-GraphDatabaseAdapter *-- LevelDB
-ParallelWorkers *-- SemanticAnalyzer
-
-' Dependencies
-NetworkAwareInstallationPattern ..> GraphDatabaseService : uses
-NetworkAwareInstallationPattern ..> ParallelWorkers : delegates to
-GraphDatabaseService ..> CommandHandler : triggered by
-CommandHandler ..> CommandType : handles
-PersistenceAgent ..> NetworkConfig : configures from
-
-' Annotations
-note right of NetworkAwareInstallationPattern : Implements scalable network-aware\ninstallation with graph persistence
-note bottom of GraphDatabaseAdapter : Storage at .data/knowledge-graph\nwith JSON export to .data/knowledge-export
-note top of ParallelWorkers : Batch mode processing\nfor network operations
-note left of PersistenceAgent : Avoids deprecated\nshared-memory.json approach
+' Notes
+note right of GraphDatabase : "Graphology + LevelDB\nat .data/knowledge-graph"
+note right of ExportManager : "JSON exports at\n.data/knowledge-export\n(auto-synced)"
+note bottom of NetworkAwareInstallationPattern : "Pattern extracted from codebase\nanalysis across multiple modules"
 
 @enduml

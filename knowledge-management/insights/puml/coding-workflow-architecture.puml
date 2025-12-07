@@ -1,65 +1,63 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+package "MCP Integration Layer" {
+    component [MCP Server] <<api>>
+    component [execute_workflow] <<tool>>
+}
+
+package "Core CodingWorkflow" {
+    component [CodingWorkflow Agent] <<agent>>
+    component [Semantic Analysis Engine] <<core>>
+    component [Incremental Analyzer] <<core>>
+}
+
 package "Knowledge Management" {
-    component "CodingWorkflow" <<core>> {
-        component "Semantic Analysis" <<agent>>
-        component "Incremental Analysis" <<core>>
-        component "Workflow Executor" <<core>>
-    }
+    component [src/knowledge-management] <<core>>
+    component [lib/ukb-unified] <<core>>
 }
 
-package "Graph Database Infrastructure" {
-    component "Graphology Engine" <<storage>>
-    component "LevelDB" <<storage>>
-    database ".data/knowledge-graph" <<storage>>
+package "Storage Layer" {
+    component [Graphology GraphDB] <<storage>>
+    component [LevelDB] <<storage>>
+    component [Knowledge Graph Store] <<storage>>
+    component [JSON Export Handler] <<storage>>
 }
 
-package "Export & Sync" {
-    folder ".data/knowledge-export" <<storage>>
-    component "Auto-Sync Service" <<core>>
+package "Data Persistence" {
+    folder ".data/knowledge-graph" as KGData
+    folder ".data/knowledge-export" as ExportData
 }
 
-package "Integration Layer" {
-    component "MCP Server" <<api>>
-    component "execute_workflow" <<api>>
+package "Analysis Components" {
+    component [integrations/mcp-server-semantic-analysis] <<core>>
 }
 
-package "Implementation Locations" {
-    folder "src/knowledge-management" <<core>>
-    folder "lib/ukb-unified" <<core>>
-    folder "integrations/mcp-server-semantic-analysis/src" <<core>>
-}
+[MCP Server] --> [execute_workflow] : triggers
+[execute_workflow] --> [CodingWorkflow Agent] : executes
+[Incremental Analyzer] --> [CodingWorkflow Agent] : auto-triggers
 
-' Workflow Triggers
-[MCP Server] --> [execute_workflow] : "Tool invocation"
-[execute_workflow] --> [CodingWorkflow] : "Manual trigger"
-[Incremental Analysis] --> [CodingWorkflow] : "Auto trigger"
+[CodingWorkflow Agent] --> [Semantic Analysis Engine] : processes
+[CodingWorkflow Agent] --> [src/knowledge-management] : manages
 
-' Core Workflow Processing
-[CodingWorkflow] --> [Semantic Analysis] : "Process code"
-[Workflow Executor] --> [Graphology Engine] : "Store knowledge"
-[Graphology Engine] --> [LevelDB] : "Persist data"
-[LevelDB] --> [.data/knowledge-graph] : "File storage"
+[src/knowledge-management] <--> [lib/ukb-unified] : unified interface
+[lib/ukb-unified] --> [Graphology GraphDB] : stores knowledge
 
-' Export and Sync
-[Graphology Engine] --> [Auto-Sync Service] : "Graph changes"
-[Auto-Sync Service] --> [.data/knowledge-export] : "JSON export"
+[Graphology GraphDB] <--> [LevelDB] : persistence
+[Knowledge Graph Store] --> KGData : persists to
+[JSON Export Handler] --> ExportData : auto-syncs
 
-' Implementation Distribution
-[src/knowledge-management] ..> [CodingWorkflow] : "implements"
-[lib/ukb-unified] ..> [CodingWorkflow] : "implements"
-[integrations/mcp-server-semantic-analysis/src] ..> [CodingWorkflow] : "implements"
+[integrations/mcp-server-semantic-analysis] --> [Semantic Analysis Engine] : analyzes
+[Semantic Analysis Engine] --> [Knowledge Graph Store] : updates
 
-note top of CodingWorkflow
-  Core semantic analysis workflow for code understanding
-  and knowledge graph population. Replaces deprecated
-  shared-memory.json approach.
+note top of [CodingWorkflow Agent]
+  MCP Agent for semantic analysis
+  and knowledge management workflow
 end note
 
-note right of [.data/knowledge-graph]
-  Primary storage: Graphology + LevelDB
-  Replaces shared-memory.json
+note bottom of KGData
+  Replaces removed shared-memory.json
+  Uses Graphology + LevelDB storage
 end note
 
 @enduml

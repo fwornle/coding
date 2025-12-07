@@ -1,36 +1,65 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor User as "User"
-actor VkbApiClient as "VkbApiClient"
-actor GraphDatabaseService as "GraphDatabaseService"
-actor PersistenceAgent as "PersistenceAgent"
-actor GraphKnowledgeExporter as "GraphKnowledgeExporter"
+left to right direction
 
-usecase "Manipulate Data" as (Manipulate Data)
-usecase "Synchronize Data" as (Synchronize Data)
-usecase "Export Data" as (Export Data)
+actor "Developer" as dev
+actor "External System" as ext
+actor "CI/CD Pipeline" as ci
 
-User -- (Manipulate Data)
-User -- (Synchronize Data)
-VkbApiClient -- (Manipulate Data)
-VkbApiClient -- (Synchronize Data)
-GraphDatabaseService -- (Manipulate Data)
-GraphDatabaseService -- (Synchronize Data)
-PersistenceAgent -- (Manipulate Data)
-PersistenceAgent -- (Synchronize Data)
-GraphKnowledgeExporter -- (Export Data)
-
-(Manipulate Data) ..> (Export Data) : include
-(Synchronize Data) ..> (Export Data) : include
-
-package "Data Management" {
-  (Manipulate Data)
-  (Synchronize Data)
+package "VkbCli Knowledge Graph System" {
+    usecase "Manage Knowledge Base" as manage
+    usecase "Execute Coding Operations" as coding
+    usecase "Synchronize Graph Data" as sync
+    
+    package "Data Management" {
+        usecase "Store Graph Data" as store
+        usecase "Export to JSON" as export
+        usecase "Query Knowledge" as query
+        usecase "Batch Semantic Analysis" as batch
+    }
+    
+    package "Performance Operations" {
+        usecase "Parallel Processing" as parallel
+        usecase "Incremental Updates" as incremental
+        usecase "Constraint Optimization" as optimize
+    }
+    
+    package "Monitoring" {
+        usecase "Visual Activity Indicators" as visual
+        usecase "Track Project Changes" as track
+    }
 }
 
-package "Data Export" {
-  (Export Data)
+package "Storage Layer" {
+    usecase "Access Graphology + LevelDB" as graphdb
+    usecase "Manage JSON Exports" as jsonmgmt
 }
+
+' Actor relationships
+dev --> manage : "vkb command"
+dev --> coding : "coding command" 
+dev --> sync : "graph-sync command"
+ci --> batch : "automated analysis"
+ext --> query : "API access"
+
+' Use case relationships
+manage ..> store : <<include>>
+manage ..> query : <<include>>
+coding ..> incremental : <<include>>
+coding ..> optimize : <<include>>
+sync ..> export : <<include>>
+sync ..> store : <<include>>
+
+store --> graphdb : "primary storage"
+export --> jsonmgmt : "synchronized export"
+batch ..> parallel : <<include>>
+manage ..> visual : <<extend>>
+coding ..> track : <<extend>>
+
+note right of graphdb : ".data/knowledge-graph\n(Graphology + LevelDB)"
+note right of jsonmgmt : ".data/knowledge-export\n(Auto-synchronized JSON)"
+note top of batch : "Performance improvements\nwith parallel workers"
+note bottom of incremental : "Edit/write operations\nwith constraint optimization"
 
 @enduml

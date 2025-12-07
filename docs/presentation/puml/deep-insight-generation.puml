@@ -1,0 +1,52 @@
+@startuml deep-insight-generation
+!include _standard-style.puml
+
+' Presentation-optimized version (larger fonts, simplified flow)
+
+title Deep Insight Generation
+
+actor User as USER
+participant "refresh_entity" as REFRESH
+participant "Content\nValidation" as CVA
+participant "Insight\nGeneration" as IGA
+participant "Semantic\nAnalyzer" as SA
+participant "LLM" as LLM
+database "GraphDB" as DB
+collections "Insight.md" as MD
+
+USER -> REFRESH : refresh(name, team)
+activate REFRESH
+
+REFRESH -> CVA : validate
+activate CVA
+
+CVA -> DB : loadEntity
+CVA <-- DB : observations
+
+CVA -> IGA : generateInsights
+activate IGA
+
+group LLM Deep Analysis
+  IGA -> SA : analyzeContent
+  activate SA
+  SA -> LLM : synthesize
+  LLM --> SA : insight
+  SA --> IGA : deepContent
+  deactivate SA
+end
+
+IGA -> IGA : generateDiagrams
+
+IGA -> MD : writeDocument
+
+IGA --> CVA : result
+deactivate IGA
+
+CVA -> DB : update
+CVA --> REFRESH : success
+deactivate CVA
+
+REFRESH --> USER : complete
+deactivate REFRESH
+
+@enduml

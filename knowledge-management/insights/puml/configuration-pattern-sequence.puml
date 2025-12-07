@@ -1,42 +1,123 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Knowledge Management" as KM
-participant "UKB Unified" as UKB
-participant "MCP Semantic Server" as MCP
-participant "Graphology Engine" as Graph
-participant "LevelDB Storage" as LevelDB
-participant "JSON Export" as Export
+actor "Developer" as dev
+participant "MCP Server" as mcp
+participant "ConfigurationPattern" as config
+participant "Knowledge Management" as km
+participant "UKB Unified" as ukb
+participant "Graphology" as graph
+participant "LevelDB" as leveldb
+participant "Environment Variables" as env
+participant "Project Config" as projconf
 
-== Configuration Pattern Discovery ==
-KM -> Graph: Store pattern metadata
-Graph -> LevelDB: Persist to .data/knowledge-graph
-KM -> UKB: Register TransferablePattern
-UKB -> MCP: Notify semantic analysis
+dev -> mcp : Initialize MCP Agent
+activate mcp
 
-== Pattern Extraction & Transfer ==
-MCP -> Graph: Query existing patterns
-Graph -> MCP: Return pattern data
-MCP -> UKB: Process ConfigurationPattern
-UKB -> KM: Update knowledge base
+mcp -> config : Load Configuration Pattern
+activate config
 
-== Data Synchronization ==
-loop Auto-sync Process
-    Graph -> Export: Export knowledge data
-    Export -> Export: Write to .data/knowledge-export/*.json
-    Note over Export: Auto-synced from GraphDB
+config -> env : Read environment variables
+activate env
+env --> config : Environment settings
+deactivate env
+
+config -> projconf : Load project-level config
+activate projconf
+projconf --> config : Project configuration
+deactivate projconf
+
+config -> km : Initialize knowledge management
+activate km
+
+km -> ukb : Setup UKB unified layer
+activate ukb
+
+ukb -> graph : Initialize Graphology
+activate graph
+
+graph -> leveldb : Connect to .data/knowledge-graph
+activate leveldb
+leveldb --> graph : Database connection established
+deactivate leveldb
+
+graph --> ukb : Graph storage ready
+deactivate graph
+
+ukb --> km : Knowledge layer initialized
+deactivate ukb
+
+km --> config : Knowledge management ready
+deactivate km
+
+config --> mcp : Configuration pattern loaded
+deactivate config
+
+alt Knowledge Export Process
+    mcp -> km : Export knowledge data
+    activate km
+    
+    km -> graph : Query knowledge graph
+    activate graph
+    graph -> leveldb : Retrieve graph data
+    activate leveldb
+    leveldb --> graph : Graph data
+    deactivate leveldb
+    graph --> km : Knowledge entities
+    deactivate graph
+    
+    km -> km : Generate JSON export
+    km -> km : Save to .data/knowledge-export
+    km --> mcp : Export completed
+    deactivate km
 end
 
-== Pattern Reuse ==
-alt Pattern Found
-    KM -> Graph: Query ConfigurationPattern
-    Graph -> KM: Return cached pattern
-else Pattern Not Found
-    KM -> Graph: Extract new pattern
-    Graph -> LevelDB: Store pattern
-    Graph -> Export: Trigger export sync
+opt Semantic Analysis Integration
+    mcp -> config : Process semantic analysis request
+    activate config
+    
+    config -> km : Store pattern as reusable entity
+    activate km
+    
+    km -> ukb : Update unified knowledge base
+    activate ukb
+    
+    ukb -> graph : Store configuration pattern
+    activate graph
+    
+    graph -> leveldb : Persist to storage
+    activate leveldb
+    leveldb --> graph : Data persisted
+    deactivate leveldb
+    
+    graph --> ukb : Pattern stored
+    deactivate graph
+    
+    ukb --> km : Knowledge base updated
+    deactivate ukb
+    
+    km --> config : Pattern entity created
+    deactivate km
+    
+    config --> mcp : Semantic analysis complete
+    deactivate config
 end
 
-Note over KM, Export: shared-memory.json REMOVED from architecture
-Note over Graph, LevelDB: Knowledge stored in Graphology + LevelDB
+mcp --> dev : MCP Agent ready with ConfigurationPattern
+deactivate mcp
+
+note right of config
+  ConfigurationPattern spans:
+  - src/knowledge-management
+  - lib/ukb-unified  
+  - integrations/mcp-server-semantic-analysis/src
+end note
+
+note right of leveldb
+  Storage locations:
+  - Graph: .data/knowledge-graph
+  - Exports: .data/knowledge-export
+  - shared-memory.json REMOVED
+end note
+
 @enduml

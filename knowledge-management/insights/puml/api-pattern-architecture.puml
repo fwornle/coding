@@ -1,47 +1,40 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-!define RECTANGLE class
-
-package "Knowledge Management System" {
-    
-    package "API Layer" {
-        component [VkbApiClient] <<api>>
-        component [ApiPattern] <<core>>
-    }
-    
-    package "Core Services" {
-        component [GraphDatabaseService] <<core>>
-        component [SemanticAnalysisService] <<core>>
-        component [ParallelWorkers] <<core>>
-    }
-    
-    package "Storage Layer" {
-        database [GraphDatabase\n(.data/knowledge-graph)] <<storage>>
-        database [JSONExports\n(.data/knowledge-export)] <<storage>>
-    }
-    
-    package "Command Interface" {
-        component [vkb_command] <<api>>
-        component [graph-sync_command] <<api>>
-    }
+package "Knowledge Management" {
+  component [VkbApiClient] <<api>>
+  component [src/knowledge-management] <<core>>
 }
 
-[ApiPattern] --> [VkbApiClient] : "uses"
-[VkbApiClient] --> [GraphDatabaseService] : "interacts with"
-[GraphDatabaseService] --> [GraphDatabase\n(.data/knowledge-graph)] : "reads/writes"
-[GraphDatabaseService] --> [JSONExports\n(.data/knowledge-export)] : "auto-sync exports"
+package "Unified Knowledge Base" {
+  component [lib/ukb-unified] <<core>>
+}
 
-[SemanticAnalysisService] --> [ParallelWorkers] : "batch processing"
-[ParallelWorkers] --> [GraphDatabaseService] : "updates knowledge"
+package "MCP Integration" {
+  component [integrations/mcp-server-semantic-analysis/src] <<agent>>
+}
 
-[vkb_command] --> [GraphDatabaseService] : "manages operations"
-[graph-sync_command] --> [GraphDatabaseService] : "synchronizes data"
+package "Storage Layer" {
+  component [Graphology] <<storage>>
+  component [LevelDB] <<storage>>
+  database ".data/knowledge-graph" <<storage>>
+}
 
-note top of [ApiPattern] : TransferablePattern\nMicroservices-based architecture\nfor knowledge management
+package "Export Layer" {
+  folder ".data/knowledge-export" <<storage>>
+  note right of ".data/knowledge-export" : JSON exports\n(auto-synced from GraphDB)
+}
 
-note right of [JSONExports\n(.data/knowledge-export)] : Data-driven development\nAuto-synced from GraphDB
+[VkbApiClient] --> [lib/ukb-unified] : API calls
+[src/knowledge-management] --> [VkbApiClient] : uses
+[integrations/mcp-server-semantic-analysis/src] --> [lib/ukb-unified] : semantic analysis
+[lib/ukb-unified] --> [Graphology] : graph operations
+[Graphology] --> [LevelDB] : persistence
+[LevelDB] --> ".data/knowledge-graph" : stores
+".data/knowledge-graph" --> ".data/knowledge-export" : auto-sync
 
-note bottom of [ParallelWorkers] : Batch mode processing\nfor improved performance
+note top of "Knowledge Management" : ApiPattern Implementation\nPattern extracted from codebase analysis\nStored as reusable knowledge entity
+
+note bottom of ".data/knowledge-graph" : Replaces shared-memory.json\n(REMOVED from codebase)
 
 @enduml

@@ -1,103 +1,92 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" <<src/knowledge-management>> {
-    class CodingWorkflow <<workflow>> {
-        -graphDb: GraphDatabase
-        -levelDb: LevelDB
-        -exportPath: string
-        +executeWorkflow(): void
-        +incrementalAnalysis(): void
-        +syncToJson(): void
+package "MCP Agent Layer" {
+    class CodingWorkflow <<MCPAgent>> {
+        +executeWorkflow()
+        +performIncrementalAnalysis()
+        +processSemanticAnalysis()
     }
     
-    class KnowledgeManager <<service>> {
-        -graphStorage: GraphologyAdapter
-        -dataPath: string
-        +storeKnowledge(data: any): void
-        +queryKnowledge(query: string): any
-        +exportToJson(): void
+    interface MCPTools {
+        +execute_workflow()
     }
 }
 
-package "Unified Knowledge Base" <<lib/ukb-unified>> {
-    class GraphDatabase <<database>> {
-        -graphology: Graphology
-        -leveldb: LevelDB
-        -storagePath: string
-        +connect(): void
-        +query(pattern: string): any[]
-        +store(entity: Entity): void
-        +sync(): void
+package "Knowledge Management" {
+    class KnowledgeManager {
+        -graphDb: GraphologyAdapter
+        -levelDb: LevelDBAdapter
+        +storeKnowledge()
+        +retrieveKnowledge()
+        +syncToExport()
     }
     
-    class GraphologyAdapter <<adapter>> {
-        -graph: Graphology
-        +addNode(node: Node): void
-        +addEdge(edge: Edge): void
-        +findPath(from: string, to: string): Path
+    class GraphologyAdapter {
+        -graphInstance: Graphology
+        +createNode()
+        +createEdge()
+        +query()
     }
     
-    class LevelDBAdapter <<adapter>> {
-        -db: LevelDB
-        -path: string
-        +put(key: string, value: any): void
-        +get(key: string): any
-        +batch(operations: Operation[]): void
+    class LevelDBAdapter {
+        -dbPath: String
+        +put()
+        +get()
+        +batch()
     }
 }
 
-package "MCP Semantic Analysis" <<integrations/mcp-server-semantic-analysis/src>> {
-    class MCPServer <<server>> {
-        -tools: Tool[]
-        -workflow: CodingWorkflow
-        +registerTools(): void
-        +handleRequest(request: MCPRequest): MCPResponse
-    }
-    
-    class WorkflowTool <<tool>> {
-        -name: string = "execute_workflow"
-        -workflow: CodingWorkflow
-        +execute(params: any): WorkflowResult
-        +validate(params: any): boolean
-    }
-    
-    class SemanticAnalyzer <<analyzer>> {
-        -knowledgeManager: KnowledgeManager
-        +analyzeCode(source: string): Analysis
-        +extractEntities(content: string): Entity[]
-        +buildRelationships(entities: Entity[]): Relationship[]
-    }
-}
-
-package "Data Storage" <<.data>> {
+package "Storage Layer" {
     class KnowledgeGraph <<file>> {
         +path: ".data/knowledge-graph"
-        +format: "Graphology + LevelDB"
+        +type: "Graphology + LevelDB"
     }
     
     class KnowledgeExport <<file>> {
         +path: ".data/knowledge-export"
-        +format: "JSON"
-        +autoSync: boolean = true
+        +type: "JSON"
+        +autoSynced: true
+    }
+}
+
+package "Implementation Modules" {
+    class SemanticAnalysisModule {
+        +analyzeCode()
+        +extractPatterns()
+        +generateInsights()
+    }
+    
+    class UKBUnifiedLib {
+        +processUnifiedData()
+        +handleIntegration()
+    }
+    
+    class KnowledgeManagementSrc {
+        +manageWorkflow()
+        +coordinateAnalysis()
     }
 }
 
 ' Relationships
+CodingWorkflow --> MCPTools : implements
 CodingWorkflow --> KnowledgeManager : uses
-CodingWorkflow --> GraphDatabase : stores in
-KnowledgeManager --> GraphDatabase : manages
-GraphDatabase --> GraphologyAdapter : uses
-GraphDatabase --> LevelDBAdapter : uses
-GraphDatabase --> KnowledgeGraph : persists to
-KnowledgeManager --> KnowledgeExport : exports to
-MCPServer --> WorkflowTool : contains
-WorkflowTool --> CodingWorkflow : executes
-SemanticAnalyzer --> KnowledgeManager : updates
-GraphologyAdapter --> KnowledgeGraph : reads/writes
-LevelDBAdapter --> KnowledgeGraph : reads/writes
+CodingWorkflow --> SemanticAnalysisModule : orchestrates
 
-' Automatic sync relationship
-KnowledgeGraph ..> KnowledgeExport : auto-synced
+KnowledgeManager --> GraphologyAdapter : uses
+KnowledgeManager --> LevelDBAdapter : uses
+KnowledgeManager --> KnowledgeExport : syncs_to
+
+GraphologyAdapter --> KnowledgeGraph : stores_in
+LevelDBAdapter --> KnowledgeGraph : stores_in
+
+SemanticAnalysisModule --> UKBUnifiedLib : integrates_with
+SemanticAnalysisModule --> KnowledgeManagementSrc : part_of
+
+MCPTools ..> CodingWorkflow : triggers
+
+note right of KnowledgeGraph : "Replaced shared-memory.json\nwith persistent graph storage"
+
+note bottom of CodingWorkflow : "Triggered via MCP tools or\nautomatic incremental analysis"
 
 @enduml

@@ -1,51 +1,58 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+participant "VkbApiClient" as VKB
+participant "Command Interface" as CMD
 participant "Knowledge Management" as KM
-participant "UKB Unified Library" as UKB
-participant "MCP Semantic Analysis" as MCP
-participant "Graphology Engine" as GraphDB
-participant "LevelDB Storage" as LevelDB
-participant "JSON Export System" as JSON
+participant "Semantic Analysis Service" as SAS
+participant "Parallel Worker" as PW
+participant "GraphDatabaseService" as GDS
+participant "GraphKnowledgeExporter" as GKE
+participant "GraphDatabaseAdapter" as GDA
+participant "PersistenceAgent" as PA
+participant "Storage (Graphology + LevelDB)" as STORE
 
-note over KM, JSON : ArchitecturalEvolutionPattern Implementation
+== Knowledge Management Operations ==
+VKB -> CMD: External integration request
+CMD -> KM: Process knowledge operation
+KM -> SAS: Semantic analysis request
+SAS -> PW: Batch mode analysis
 
-KM -> UKB : Initialize pattern recognition
-activate UKB
+opt Parallel Processing
+    PW -> PW: Process batch items
+    PW -> GDS: Update graph data
+end
 
-UKB -> MCP : Request semantic analysis
-activate MCP
+GDS -> STORE: Store in Graphology + LevelDB
+GDS -> GKE: Trigger export
+GKE -> GKE: Auto-sync JSON export
+GKE -> STORE: Save to .data/knowledge-export
 
-MCP -> MCP : Analyze codebase patterns
-note right : Pattern extraction from\nsrc/knowledge-management,\nlib/ukb-unified,\nintegrations/mcp-server-semantic-analysis
+== Command Interface Operations ==
+CMD -> CMD: vkb (visualization)
+CMD -> CMD: coding (development tasks)
+CMD -> CMD: graph-sync (data synchronization)
 
-MCP -> GraphDB : Store pattern entities
-activate GraphDB
+alt Write/Edit Operations
+    CMD -> KM: Content update request
+    KM -> SAS: Incremental constraint validation
+    SAS -> SAS: Update classification
+    SAS -> GDS: Apply changes
+    GDS -> PA: Persist changes
+    PA -> GDA: Database operations
+    GDA -> STORE: Update storage
+else Read Operations
+    CMD -> GDS: Query request
+    GDS -> STORE: Retrieve data
+    STORE -> GDS: Return results
+    GDS -> CMD: Response
+end
 
-GraphDB -> LevelDB : Persist to .data/knowledge-graph
-activate LevelDB
-
-LevelDB --> GraphDB : Storage confirmation
-deactivate LevelDB
-
-GraphDB -> JSON : Auto-sync export
-activate JSON
-
-JSON -> JSON : Generate exports at\n.data/knowledge-export
-note right : JSON exports auto-synced\nfrom GraphDB
-
-JSON --> GraphDB : Export complete
-deactivate JSON
-
-GraphDB --> MCP : Pattern stored
-deactivate GraphDB
-
-MCP --> UKB : Analysis complete
-deactivate MCP
-
-UKB --> KM : Pattern available as\nTransferablePattern
-deactivate UKB
-
-note over KM, JSON : shared-memory.json REMOVED\nKnowledge now persisted in GraphDB+LevelDB
+== Synchronization Process ==
+GDS -> GKE: Periodic sync trigger
+GKE -> STORE: Export knowledge graph
+note right: JSON exports at .data/knowledge-export
+GKE -> GDA: Update adapter layer
+GDA -> PA: Persistence operations
 
 @enduml

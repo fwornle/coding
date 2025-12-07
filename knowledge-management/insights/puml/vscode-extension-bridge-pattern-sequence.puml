@@ -2,77 +2,65 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 participant "VSCode Extension" as VSCode
-participant "VkbApiClient" as ApiClient
+participant "Knowledge Management\n(src/knowledge-management)" as KM
+participant "UKB Unified\n(lib/ukb-unified)" as UKB
+participant "MCP Semantic Server\n(integrations/mcp-server-semantic-analysis)" as MCP
 participant "GraphDatabaseService" as GraphDB
 participant "GraphDatabaseAdapter" as Adapter
-participant "Graphology + LevelDB" as Storage
-participant "GraphKnowledgeExporter" as Exporter
 participant "PersistenceAgent" as Persistence
-participant "MCP Server" as MCP
+database "Graphology + LevelDB\n(.data/knowledge-graph)" as Storage
+database "JSON Export\n(.data/knowledge-export)" as Export
 
-note over VSCode, MCP : VSCodeExtensionBridgePattern - Knowledge Graph Management Flow
+VSCode -> KM: Initialize VSCodeExtensionBridgePattern
+activate KM
 
-VSCode -> ApiClient : vkb command request
-activate ApiClient
+KM -> UKB: Setup unified knowledge base
+activate UKB
 
-ApiClient -> GraphDB : initiate knowledge operation
+UKB -> GraphDB: Initialize graph database service
 activate GraphDB
 
-GraphDB -> Adapter : access graph data
+GraphDB -> Adapter: Create database adapter
 activate Adapter
 
-Adapter -> Storage : query/update .data/knowledge-graph
+Adapter -> Storage: Connect to Graphology + LevelDB
 activate Storage
-Storage --> Adapter : return graph data
-deactivate Storage
 
-Adapter --> GraphDB : processed data
-deactivate Adapter
+note over Storage: Primary storage at\n.data/knowledge-graph
 
-alt Knowledge Visualization
-    GraphDB -> Exporter : prepare export data
-    activate Exporter
-    Exporter -> Storage : validate graph structure
-    Exporter --> GraphDB : export ready
-    deactivate Exporter
-else Knowledge Synchronization  
-    GraphDB -> Persistence : validate data integrity
-    activate Persistence
-    Persistence -> Storage : verify persistence layer
-    Persistence --> GraphDB : validation complete
-    deactivate Persistence
+GraphDB -> Persistence: Initialize persistence agent
+activate Persistence
+
+VSCode -> MCP: Request semantic analysis
+activate MCP
+
+MCP -> GraphDB: Query knowledge entities
+GraphDB -> Adapter: Execute graph query
+Adapter -> Storage: Retrieve data
+Storage --> Adapter: Return graph data
+Adapter --> GraphDB: Formatted results
+GraphDB --> MCP: Knowledge entities
+
+alt Pattern Storage
+    MCP -> GraphDB: Store VSCodeExtensionBridgePattern
+    GraphDB -> Adapter: Persist pattern entity
+    Adapter -> Storage: Store in graph database
+    
+    GraphDB -> Persistence: Trigger auto-sync
+    Persistence -> Export: Export JSON representation
+    activate Export
+    note over Export: Auto-synced JSON exports\nat .data/knowledge-export
 end
 
-GraphDB -> Exporter : auto-sync to JSON
-activate Exporter
-Exporter -> Storage : export to .data/knowledge-export
-Storage --> Exporter : JSON export complete
-deactivate Exporter
+note over KM, MCP: shared-memory.json REMOVED\nfrom codebase - using GraphDB instead
 
-opt Semantic Analysis Integration
-    GraphDB -> MCP : trigger semantic analysis
-    activate MCP
-    MCP -> MCP : automated knowledge extraction\nand classification
-    MCP --> GraphDB : semantic insights
-    deactivate MCP
-end
-
-GraphDB --> ApiClient : operation complete
-deactivate GraphDB
-
-ApiClient -> VSCode : graph-sync command
-VSCode -> ApiClient : synchronization request
-
-ApiClient -> GraphDB : sync knowledge graph
-activate GraphDB
-GraphDB -> Storage : update graph state
-GraphDB --> ApiClient : sync complete
-deactivate GraphDB
-
-ApiClient --> VSCode : operation result
-deactivate ApiClient
-
-note over Storage : Data stored in .data/knowledge-graph\nwith auto-sync to .data/knowledge-export
-note over MCP : integrations/mcp-server-semantic-analysis/src\nenables automated knowledge processing
+VSCode -> KM: Access pattern knowledge
+KM -> UKB: Query bridge pattern
+UKB -> GraphDB: Retrieve pattern components
+GraphDB -> Storage: Fetch pattern data
+Storage --> GraphDB: Pattern architecture
+GraphDB --> UKB: Component relationships
+UKB --> KM: Structured knowledge
+KM --> VSCode: Bridge pattern implementation
 
 @enduml

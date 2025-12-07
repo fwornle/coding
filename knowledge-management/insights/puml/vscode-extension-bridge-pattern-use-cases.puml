@@ -1,54 +1,68 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
-
-actor "Developer" as dev
-actor "VSCode Extension" as vscode
+actor Developer as dev
+actor "VS Code Extension" as vscode
 actor "MCP Server" as mcp
-actor "External System" as ext
+actor "Knowledge System" as ks
 
-package "Knowledge Graph Operations" {
-  usecase "Visualize Knowledge Graph" as UC1
-  usecase "Synchronize Graph Data" as UC2
-  usecase "Export Knowledge" as UC3
-  usecase "Validate Data" as UC4
+package "VSCodeExtensionBridgePattern System" {
+    usecase "Initialize Graph Database" as init
+    usecase "Store Knowledge Entities" as store
+    usecase "Query Graph Data" as query
+    usecase "Export to JSON" as export
+    usecase "Sync Data" as sync
+    usecase "Manage Persistence" as persist
+    
+    package "Core Services" {
+        usecase "Adapt Database Interface" as adapt
+        usecase "Process Graph Operations" as process
+        usecase "Handle Semantic Analysis" as semantic
+    }
+    
+    package "Data Storage" {
+        usecase "Store in LevelDB" as leveldb
+        usecase "Maintain Graph Structure" as graphology
+        usecase "Auto-sync Exports" as autosync
+    }
 }
 
-package "Semantic Analysis" {
-  usecase "Extract Knowledge" as UC5
-  usecase "Classify Information" as UC6
-  usecase "Process Constraints" as UC7
-}
+dev --> init : "Set up system"
+dev --> store : "Add knowledge"
+dev --> query : "Retrieve data"
 
-package "Data Management" {
-  usecase "Store Graph Data" as UC8
-  usecase "Auto-sync to JSON" as UC9
-  usecase "Manage Persistence" as UC10
-}
+vscode --> adapt : "Bridge operations"
+vscode --> process : "Execute commands"
 
-package "API Integration" {
-  usecase "Handle API Communications" as UC11
-  usecase "Bridge Pattern Transfer" as UC12
-}
+mcp --> semantic : "Analyze semantics"
+mcp --> sync : "Synchronize data"
 
-dev --> UC1 : vkb command
-dev --> UC2 : graph-sync
-dev --> UC3
-vscode --> UC12
-mcp --> UC5
-mcp --> UC6
-ext --> UC11
+ks --> persist : "Ensure data integrity"
+ks --> export : "Generate exports"
 
-UC1 ..> UC8 : <<include>>
-UC2 ..> UC9 : <<include>>
-UC3 ..> UC4 : <<include>>
-UC5 ..> UC7 : <<extend>>
-UC8 ..> UC10 : <<include>>
-UC11 ..> UC12 : <<include>>
+init ..> adapt : <<include>>
+store ..> leveldb : <<include>>
+store ..> graphology : <<include>>
+query ..> process : <<include>>
+export ..> autosync : <<include>>
+sync ..> persist : <<include>>
 
-note right of UC8 : "Graphology + LevelDB\n.data/knowledge-graph"
-note right of UC9 : "JSON exports\n.data/knowledge-export"
-note left of UC5 : "integrations/mcp-server-\nsemantic-analysis"
+note right of export
+  Exports stored at:
+  .data/knowledge-export
+end note
+
+note right of leveldb
+  Graph data stored at:
+  .data/knowledge-graph
+end note
+
+note top of "VSCodeExtensionBridgePattern System"
+  Components: GraphDatabaseService,
+  GraphDatabaseAdapter, PersistenceAgent
+  
+  Locations: src/knowledge-management,
+  lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+end note
 
 @enduml

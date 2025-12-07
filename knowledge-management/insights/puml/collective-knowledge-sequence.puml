@@ -1,56 +1,82 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Client" as client
-participant "Knowledge Management\nSystem" as kms
-participant "UKB Unified\nLibrary" as ukb
-participant "MCP Server\nSemantic Analysis" as mcp
-participant "Knowledge Store" as store
+actor User
+participant "VkbApiClient" as VKB
+participant "CollectiveKnowledge\nSystem" as CK
+participant "GraphDatabaseService" as GDS
+participant "GraphDatabaseAdapter" as GDA
+participant "PersistenceAgent" as PA
+participant "GraphKnowledgeExporter" as GKE
+database "Graphology + LevelDB\n(.data/knowledge-graph)" as DB
+database "JSON Export\n(.data/knowledge-export)" as Export
 
-client -> kms: Request knowledge operation
-activate kms
+User -> VKB: Execute vkb command
+activate VKB
 
-kms -> ukb: Initialize unified knowledge base
-activate ukb
+VKB -> CK: Request knowledge operation
+activate CK
 
-alt Knowledge Creation
-    kms -> ukb: Create knowledge entry
-    ukb -> store: Persist knowledge data
-    activate store
-    store --> ukb: Confirmation
-    deactivate store
-    ukb --> kms: Knowledge created
-else Knowledge Query
-    kms -> ukb: Query knowledge base
-    ukb -> store: Retrieve data
-    activate store
-    store --> ukb: Knowledge data
-    deactivate store
-    ukb --> kms: Query results
+CK -> GDS: Process knowledge management
+activate GDS
+
+GDS -> GDA: Database operation request
+activate GDA
+
+GDA -> PA: Persistence operation
+activate PA
+
+PA -> DB: Store/Retrieve data
+activate DB
+DB --> PA: Data response
+deactivate DB
+
+PA --> GDA: Operation result
+deactivate PA
+
+GDA --> GDS: Database response
+deactivate GDA
+
+alt Knowledge Export Required
+    GDS -> GKE: Trigger export
+    activate GKE
+    
+    GKE -> DB: Read knowledge graph
+    activate DB
+    DB --> GKE: Graph data
+    deactivate DB
+    
+    GKE -> Export: Write JSON export
+    activate Export
+    Export --> GKE: Export complete
+    deactivate Export
+    
+    GKE --> GDS: Export synchronized
+    deactivate GKE
 end
 
-kms -> mcp: Request semantic analysis
-activate mcp
+GDS --> CK: Knowledge operation complete
+deactivate GDS
 
-mcp -> mcp: Analyze semantic patterns
-mcp -> store: Update semantic metadata
-activate store
-store --> mcp: Metadata updated
-deactivate store
+CK --> VKB: Response
+deactivate CK
 
-mcp --> kms: Semantic analysis complete
-deactivate mcp
+VKB --> User: Operation result
+deactivate VKB
 
-kms -> ukb: Update knowledge with semantics
-ukb -> store: Store enriched knowledge
-activate store
-store --> ukb: Storage complete
-deactivate store
+note over DB, Export
+Hybrid Storage Architecture:
+- Primary: Graphology + LevelDB
+- Secondary: Automated JSON exports
+- Synchronized for external access
+end note
 
-ukb --> kms: Knowledge updated
-deactivate ukb
-
-kms --> client: Operation complete
-deactivate kms
+note over GDS, GKE
+Core Components:
+- GraphDatabaseService
+- GraphDatabaseAdapter  
+- PersistenceAgent
+- GraphKnowledgeExporter
+end note
 
 @enduml

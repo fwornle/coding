@@ -1,50 +1,54 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Persistence Pattern" {
-  note as AutoNote2
-    Purpose: Store and manage knowledge in a graph database
-  end note
-  component GraphDatabase <<storage>> as "Graph Database"
-  component LevelDB <<storage>> as "LevelDB"
-  component GraphKnowledgeExporter <<core>> as "Graph Knowledge Exporter"
-  component PersistenceAgent <<agent>> as "Persistence Agent"
-  component VkbApiClient <<api>> as "Vkb Api Client"
-  
-  GraphDatabase --* GraphKnowledgeExporter
-  GraphDatabase --* PersistenceAgent
-  LevelDB --* GraphDatabase
-  VkbApiClient --* GraphDatabase
+package "Knowledge Management Infrastructure" {
+    package "src/knowledge-management" {
+        component "GraphDatabaseService" <<core>> as GDS
+        component "EntityStorageSystem" <<core>> as ESS
+    }
+    
+    package "lib/ukb-unified" {
+        component "PersistenceAgent" <<agent>> as PA
+        component "KnowledgeUnificationLayer" <<core>> as KUL
+    }
+    
+    package "integrations/mcp-server-semantic-analysis/src" {
+        component "GraphKnowledgeExporter" <<core>> as GKE
+        component "SemanticAnalysisServer" <<api>> as SAS
+    }
 }
 
-package "Command Line Interface" {
-  component vkb <<api>> as "vkb command"
-  component coding <<api>> as "coding command"
-  component graph_sync <<api>> as "graph-sync command"
-  vkb --* GraphDatabase
-  coding --* GraphDatabase
-  graph_sync --* GraphDatabase
-  graph_sync --* GraphKnowledgeExporter
+package "Storage Layer" {
+    database "Graphology\n(In-Memory Graph)" <<storage>> as GRAPH
+    database "LevelDB\n(.data/knowledge-graph)" <<storage>> as LEVELDB
+    folder "JSON Exports\n(.data/knowledge-export)" <<storage>> as JSON_EXPORT
 }
 
-package "Data Storage" {
-  component knowledge_graph <<storage>> as ".data/knowledge-graph"
-  component knowledge_export <<storage>> as ".data/knowledge-export"
-  
-  GraphDatabase --* knowledge_graph
-  GraphKnowledgeExporter --* knowledge_export
-  knowledge_graph --* knowledge_export
+package "Event System" {
+    queue "entity:stored events" <<event>> as EVENTS
 }
 
-GraphDatabase ..> VkbApiClient : uses
-PersistenceAgent ..> GraphDatabase : persists
-GraphKnowledgeExporter ..> knowledge_export : exports
+' Relationships
+GDS --> GRAPH : manages
+GDS --> LEVELDB : persists to
+ESS --> EVENTS : emits
+EVENTS --> GKE : triggers
+GKE --> JSON_EXPORT : auto-exports
+PA --> GDS : coordinates
+KUL --> PA : utilizes
+SAS --> GKE : integrates
 
-note as AutoNote1
-  Relationships:
-  - GraphDatabase uses VkbApiClient
-  - PersistenceAgent persists GraphDatabase
-  - GraphKnowledgeExporter exports knowledge
+note top of GRAPH
+KnowledgePersistencePattern: 
+Hybrid architecture using Graphology 
+for fast in-memory operations with 
+LevelDB for durable persistence
+end note
+
+note bottom of JSON_EXPORT
+Auto-synced JSON exports 
+provide external access 
+to graph database content
 end note
 
 @enduml

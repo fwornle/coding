@@ -3,54 +3,60 @@
 
 left to right direction
 
-actor "Developer" as Dev
-actor "MCP Client" as Client
-actor "System Administrator" as Admin
+actor "Knowledge Engineer" as KE
+actor "MCP Client" as MCP
+actor "System Administrator" as SA
 
-rectangle "Knowledge Management System" {
-  usecase "Store Knowledge in Graph" as UC1
-  usecase "Export Knowledge to JSON" as UC2
-  usecase "Query Knowledge Graph" as UC3
-  usecase "Manage Graph Database" as UC4
+package "Knowledge Management System" {
+  usecase "Store Knowledge Graph" as UC1
+  usecase "Query Graph Database" as UC2
+  usecase "Export Knowledge Data" as UC3
+  usecase "Import Knowledge Data" as UC4
+  usecase "Manage Graph Schema" as UC5
 }
 
-rectangle "MCP Server Integration" {
-  usecase "Process Semantic Analysis" as UC5
-  usecase "Handle MCP Requests" as UC6
-  usecase "Sync Memory Data" as UC7
+package "MCP Integration" {
+  usecase "Semantic Analysis" as UC6
+  usecase "Memory Pattern Integration" as UC7
+  usecase "Server Communication" as UC8
 }
 
-rectangle "Data Storage Layer" {
-  usecase "Persist Graph Data (LevelDB)" as UC8
-  usecase "Auto-sync JSON Exports" as UC9
-  usecase "Maintain Data Integrity" as UC10
+package "Data Persistence" {
+  usecase "Persist to LevelDB" as UC9
+  usecase "Generate JSON Exports" as UC10
+  usecase "Sync Graph Data" as UC11
 }
 
-rectangle "Pattern Components" {
-  usecase "Adapt Database Operations" as UC11
-  usecase "Export Graph Knowledge" as UC12
-  usecase "Provide Database Services" as UC13
+package "Legacy Migration" {
+  usecase "Remove Shared Memory" as UC12
+  usecase "Migrate to GraphDB" as UC13
 }
 
-Dev --> UC1 : creates/updates
-Dev --> UC3 : queries
-Client --> UC5 : requests analysis
-Client --> UC6 : sends MCP calls
-Admin --> UC4 : configures
-Admin --> UC10 : monitors
+KE --> UC1
+KE --> UC2
+KE --> UC3
+KE --> UC4
+KE --> UC5
 
-UC1 ..> UC8 : <<include>>
-UC2 ..> UC9 : <<include>>
-UC5 ..> UC7 : <<include>>
-UC4 ..> UC13 : <<include>>
+MCP --> UC6
+MCP --> UC7
+MCP --> UC8
 
-UC11 --> UC8 : manages
-UC12 --> UC2 : enables
-UC13 --> UC1 : supports
-UC13 --> UC3 : supports
+SA --> UC9
+SA --> UC10
+SA --> UC11
+SA --> UC12
+SA --> UC13
 
-note right of UC8 : Storage: .data/knowledge-graph\n(Graphology + LevelDB)
-note right of UC9 : Export: .data/knowledge-export\n(Auto-synced JSON)
-note top of UC7 : shared-memory.json\nREMOVED from codebase
+UC1 ..> UC9 : <<include>>
+UC3 ..> UC10 : <<include>>
+UC10 ..> UC11 : <<include>>
+UC7 ..> UC1 : <<include>>
+UC6 ..> UC7 : <<extend>>
+UC13 ..> UC1 : <<include>>
+
+note right of UC12 : "shared-memory.json REMOVED\nfrom codebase"
+
+note bottom of "Data Persistence" : "Storage: .data/knowledge-graph (Graphology + LevelDB)\nExports: .data/knowledge-export (JSON)"
 
 @enduml

@@ -3,65 +3,63 @@
 
 left to right direction
 
-actor "Knowledge Manager" as KM
-actor "API Client" as API
-actor "MCP Client" as MCP
-actor "System Administrator" as Admin
+actor "Developer" as dev
+actor "Knowledge Worker" as kw
+actor "System Administrator" as admin
+actor "External MCP Client" as client
 
-package "Knowledge Management System" {
-  usecase "Process Documents" as UC1
-  usecase "Extract Semantic Concepts" as UC2
-  usecase "Build Knowledge Graph" as UC3
-  usecase "Query Knowledge Base" as UC4
-  usecase "Manage Ontologies" as UC5
+package "Knowledge Management Layer" {
+  usecase "Manage Knowledge Base" as UC1
+  usecase "Query Semantic Data" as UC2
+  usecase "Update Knowledge Graph" as UC3
 }
 
-package "UKB Unified Library" {
-  usecase "Standardize Data Models" as UC6
-  usecase "Validate Semantic Schemas" as UC7
-  usecase "Transform Knowledge Representations" as UC8
-  usecase "Export Knowledge Formats" as UC9
+package "UKB Unified Processing" {
+  usecase "Process Natural Language" as UC4
+  usecase "Extract Semantic Features" as UC5
+  usecase "Generate Embeddings" as UC6
+  usecase "Perform Similarity Analysis" as UC7
 }
 
-package "MCP Semantic Analysis Server" {
-  usecase "Provide MCP Interface" as UC10
-  usecase "Handle Analysis Requests" as UC11
-  usecase "Return Semantic Results" as UC12
-  usecase "Manage Server Resources" as UC13
+package "MCP Server Integration" {
+  usecase "Handle MCP Requests" as UC8
+  usecase "Provide Semantic Analysis API" as UC9
+  usecase "Manage Client Sessions" as UC10
+  usecase "Export Analysis Results" as UC11
+}
+
+package "Core Analysis Engine" {
+  usecase "Execute Semantic Analysis" as UC12
+  usecase "Generate Insights" as UC13
+  usecase "Validate Results" as UC14
 }
 
 ' Actor relationships
-KM --> UC1
-KM --> UC2
-KM --> UC3
-KM --> UC4
-KM --> UC5
+kw --> UC1
+kw --> UC2
+kw --> UC13
 
-API --> UC6
-API --> UC7
-API --> UC8
-API --> UC9
+dev --> UC3
+dev --> UC12
+dev --> UC14
 
-MCP --> UC10
-MCP --> UC11
-MCP --> UC12
+admin --> UC10
+admin --> UC8
 
-Admin --> UC13
-Admin --> UC5
+client --> UC9
+client --> UC11
 
-' Include relationships
-UC1 ..> UC2 : <<include>>
-UC2 ..> UC6 : <<include>>
-UC3 ..> UC8 : <<include>>
-UC4 ..> UC7 : <<include>>
-UC11 ..> UC2 : <<include>>
-UC12 ..> UC9 : <<include>>
+' Use case relationships
+UC2 ..> UC4 : <<include>>
+UC3 ..> UC5 : <<include>>
+UC12 ..> UC6 : <<include>>
+UC12 ..> UC7 : <<include>>
+UC9 ..> UC12 : <<include>>
+UC13 ..> UC7 : <<extend>>
+UC11 ..> UC14 : <<include>>
 
-' Extend relationships
-UC3 ..> UC5 : <<extend>>
-UC8 ..> UC9 : <<extend>>
+note right of UC8 : "Replaces shared-memory.json\nwith direct MCP protocol"
 
-note right of UC2 : "Core semantic analysis\npattern implementation"
-note bottom of UC6 : "Transferable pattern\nacross components"
+note bottom of UC12 : "ComprehensiveSemanticAnalysis\ncore functionality"
 
 @enduml

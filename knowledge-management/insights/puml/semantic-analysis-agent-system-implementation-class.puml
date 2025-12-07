@@ -1,58 +1,135 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "SemanticAnalysisAgentSystemImplementation" {
-  class GraphDatabase <<service>> {
-    - graphology: Graphology
-    - levelDB: LevelDB
-    + storeData(data: String)
-    + retrieveData(): String
-  }
-
-  class GraphDatabaseService <<service>> {
-    - graphDatabase: GraphDatabase
-    + manageDataStorage()
-    + manageDataRetrieval()
-  }
-
-  class GraphKnowledgeExporter <<service>> {
-    - graphDatabase: GraphDatabase
-    + exportKnowledge()
-  }
-
-  class GraphDatabaseAdapter <<service>> {
-    - graphDatabase: GraphDatabase
-    + adaptData()
-  }
-
-  class CLI <<interface>> {
-    + visualize()
-    + knowledgeOperations()
-  }
-
-  class VKBCommand <<class>> {
-    - cli: CLI
-    + executeCommand()
-  }
-
-  class MCPTools <<class>> {
-    - cli: CLI
-    + performOperations()
-  }
-
-  class JSONExporter <<class>> {
-    - graphKnowledgeExporter: GraphKnowledgeExporter
-    + exportToJson()
-  }
-
-  GraphDatabaseService --* GraphDatabase
-  GraphKnowledgeExporter --* GraphDatabase
-  GraphDatabaseAdapter --* GraphDatabase
-  VKBCommand --* CLI
-  MCPTools --* CLI
-  JSONExporter --* GraphKnowledgeExporter
-  GraphDatabaseService ..> GraphKnowledgeExporter
-  GraphDatabaseService ..> GraphDatabaseAdapter
+package "Data Layer" {
+    class GraphDatabaseService <<service>> {
+        -graphologyInstance: Graph
+        -levelDbInstance: LevelDB
+        +query(pattern: string): Result[]
+        +store(data: GraphData): void
+        +sync(): void
+    }
+    
+    class GraphDatabaseAdapter <<adapter>> {
+        -database Service: GraphDatabaseService
+        +connect(): void
+        +disconnect(): void
+        +executeQuery(query: string): Result[]
+        +performBatchOperation(operations: Operation[]): void
+    }
+    
+    class GraphKnowledgeExporter <<service>> {
+        -exportPath: string
+        +exportToJson(): void
+        +autoSync(): void
+        +generateExport(): ExportData
+    }
+    
+    class LevelDBStorage <<file>> {
+        -storagePath: string
+        +read(key: string): any
+        +write(key: string, value: any): void
+        +batch(operations: BatchOperation[]): void
+    }
 }
+
+package "Analysis Engine" {
+    class SemanticAnalysisAgentSystemImplementation <<service>> {
+        -graphDatabase: GraphDatabaseService
+        -parallelWorkers: WorkerPool
+        +performAnalysis(input: string): AnalysisResult
+        +runBatchMode(): void
+        +generateInsights(): Insight[]
+    }
+    
+    class ParallelWorkerPool <<service>> {
+        -maxWorkers: number
+        -activeWorkers: Worker[]
+        +executeParallel(tasks: Task[]): Promise<Result[]>
+        +optimizePerformance(): void
+    }
+    
+    class InsightGenerationAgent <<service>> {
+        -analysisEngine: SemanticAnalysisAgentSystemImplementation
+        +generateInsights(data: GraphData): Insight[]
+        +fixBuggedInsights(): void
+    }
+    
+    class PlantUMLGenerationAgent <<service>> {
+        -templateEngine: TemplateEngine
+        +generateDiagram(analysisData: AnalysisData): string
+        +fixGenerationBugs(): void
+    }
+}
+
+package "CLI Interface" {
+    class VKBCommand <<interface>> {
+        +visualize(options: VisualizationOptions): void
+        +displayGraph(): void
+        +showStatistics(): void
+    }
+    
+    class GraphSyncCommand <<interface>> {
+        +synchronize(): void
+        +validateSync(): boolean
+        +resolveConflicts(): void
+    }
+}
+
+package "Integration Layer" {
+    class MCPServerIntegration <<service>> {
+        -serverPath: string
+        -semanticAnalysisService: SemanticAnalysisAgentSystemImplementation
+        +startServer(): void
+        +handleRequests(): void
+        +processSemanticQueries(): Response
+    }
+    
+    class KnowledgeExportManager <<service>> {
+        -exportDirectory: string
+        -autoSyncEnabled: boolean
+        +maintainJsonExports(): void
+        +removeSharedMemoryDependency(): void
+    }
+}
+
+package "Storage" {
+    class KnowledgeGraphStorage <<file>> {
+        -path: string = ".data/knowledge-graph"
+        +store(graph: Graph): void
+        +retrieve(): Graph
+    }
+    
+    class ExportStorage <<file>> {
+        -path: string = ".data/knowledge-export"
+        +saveJsonExport(data: ExportData): void
+        +loadJsonExport(): ExportData
+    }
+}
+
+' Relationships
+SemanticAnalysisAgentSystemImplementation --> GraphDatabaseService : uses
+GraphDatabaseService --> GraphDatabaseAdapter : implements through
+GraphDatabaseAdapter --> LevelDBStorage : stores in
+GraphDatabaseService --> KnowledgeGraphStorage : persists to
+GraphKnowledgeExporter --> ExportStorage : exports to
+GraphKnowledgeExporter --> GraphDatabaseService : reads from
+
+SemanticAnalysisAgentSystemImplementation --> ParallelWorkerPool : utilizes
+SemanticAnalysisAgentSystemImplementation --> InsightGenerationAgent : manages
+SemanticAnalysisAgentSystemImplementation --> PlantUMLGenerationAgent : manages
+
+VKBCommand --> SemanticAnalysisAgentSystemImplementation : invokes
+GraphSyncCommand --> GraphDatabaseService : synchronizes
+
+MCPServerIntegration --> SemanticAnalysisAgentSystemImplementation : integrates
+KnowledgeExportManager --> GraphKnowledgeExporter : manages
+KnowledgeExportManager --> ExportStorage : maintains
+
+' Notes
+note right of ParallelWorkerPool : Recent implementation\nfor performance optimization
+note right of InsightGenerationAgent : Active bug fixes\nin progress
+note right of PlantUMLGenerationAgent : Bug fixes for\ngeneration issues
+note right of KnowledgeExportManager : Removes dependency on\nshared-memory.json
 
 @enduml

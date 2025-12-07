@@ -1,82 +1,67 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+actor "Developer" as dev
+actor "MCP Client" as client
+actor "System Administrator" as admin
 
-actor "Knowledge Engineer" as KE
-actor "Developer" as DEV
-actor "MCP Client" as MCP
-actor "System Analyst" as SA
+rectangle "Configuration Management" {
+  usecase "Configure Environment Variables" as config_env
+  usecase "Manage Project Config Files" as config_files
+  usecase "Validate Configuration" as validate_config
+}
 
-rectangle "Knowledge Management System" {
-  usecase "Extract Configuration Patterns" as UC1
-  usecase "Store Pattern in GraphDB" as UC2
-  usecase "Query Pattern Knowledge" as UC3
-  usecase "Export Pattern Data" as UC4
-  usecase "Sync Knowledge Graph" as UC5
+rectangle "Knowledge Management" {
+  usecase "Store Knowledge Patterns" as store_patterns
+  usecase "Query Knowledge Graph" as query_graph
+  usecase "Export Knowledge Data" as export_data
+  usecase "Sync GraphDB to JSON" as sync_data
+}
+
+rectangle "MCP Server Operations" {
+  usecase "Process Semantic Analysis" as semantic_analysis
+  usecase "Handle MCP Requests" as handle_requests
+  usecase "Manage Agent Lifecycle" as manage_lifecycle
+}
+
+rectangle "Data Persistence" {
+  usecase "Access Graphology Storage" as access_graphology
+  usecase "Read/Write LevelDB" as leveldb_ops
+  usecase "Generate JSON Exports" as json_exports
 }
 
 rectangle "Pattern Analysis" {
-  usecase "Analyze Codebase Structure" as UC6
-  usecase "Identify Transferable Patterns" as UC7
-  usecase "Generate Pattern Metadata" as UC8
+  usecase "Extract Codebase Patterns" as extract_patterns
+  usecase "Create Reusable Entities" as create_entities
+  usecase "Analyze Configuration Patterns" as analyze_patterns
 }
 
-rectangle "Data Storage" {
-  usecase "Persist in LevelDB" as UC9
-  usecase "Maintain Graph Relations" as UC10
-  usecase "Auto-sync JSON Export" as UC11
-}
+dev --> config_env
+dev --> config_files
+admin --> validate_config
 
-rectangle "Integration Services" {
-  usecase "Serve MCP Requests" as UC12
-  usecase "Provide Semantic Analysis" as UC13
-  usecase "Access UKB Unified Library" as UC14
-}
+client --> handle_requests
+client --> semantic_analysis
 
-' Primary actor relationships
-KE --> UC1
-KE --> UC2
-KE --> UC5
+dev --> store_patterns
+dev --> query_graph
+dev --> extract_patterns
 
-DEV --> UC3
-DEV --> UC6
-DEV --> UC7
+store_patterns ..> access_graphology : <<include>>
+query_graph ..> leveldb_ops : <<include>>
+export_data ..> json_exports : <<include>>
+export_data ..> sync_data : <<include>>
 
-MCP --> UC12
-MCP --> UC13
+handle_requests ..> manage_lifecycle : <<include>>
+semantic_analysis ..> analyze_patterns : <<include>>
+analyze_patterns ..> create_entities : <<extend>>
 
-SA --> UC4
-SA --> UC8
+extract_patterns --> store_patterns
+validate_config --> config_env : <<extend>>
+validate_config --> config_files : <<extend>>
 
-' Use case relationships
-UC1 ..> UC6 : <<include>>
-UC1 ..> UC7 : <<include>>
-UC2 ..> UC9 : <<include>>
-UC2 ..> UC10 : <<include>>
-UC3 ..> UC10 : <<include>>
-UC4 ..> UC11 : <<include>>
-UC5 ..> UC11 : <<include>>
-UC8 ..> UC2 : <<extend>>
-UC12 ..> UC3 : <<include>>
-UC13 ..> UC14 : <<include>>
-
-note right of UC2
-  Uses Graphology + LevelDB
-  Located at .data/knowledge-graph
-end note
-
-note right of UC11
-  JSON exports at 
-  .data/knowledge-export
-end note
-
-note left of UC1
-  ConfigurationPattern implemented
-  across multiple modules:
-  - src/knowledge-management
-  - lib/ukb-unified  
-  - integrations/mcp-server-semantic-analysis
-end note
+note right of sync_data : Auto-synced from GraphDB\nto .data/knowledge-export
+note right of access_graphology : Storage at .data/knowledge-graph
+note bottom of semantic_analysis : Implemented in\nmcp-server-semantic-analysis
 
 @enduml
