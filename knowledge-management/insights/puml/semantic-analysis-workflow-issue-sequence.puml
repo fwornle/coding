@@ -1,0 +1,66 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "Client" as client
+participant "MCP Server\nSemantic Analysis" as mcp
+participant "Knowledge Management\nWorkflow" as km
+participant "UKB Unified\nLibrary" as ukb
+participant "Graphology\nGraph Engine" as graph
+participant "LevelDB\nStorage" as leveldb
+participant "JSON Export\nSync" as export
+
+note over graph, leveldb: Storage Layer at .data/knowledge-graph
+note over export: Auto-sync to .data/knowledge-export
+
+client -> mcp: Request semantic analysis
+activate mcp
+
+mcp -> km: Initialize workflow
+activate km
+
+km -> ukb: Load unified knowledge base
+activate ukb
+
+ukb -> graph: Query graph structure
+activate graph
+
+graph -> leveldb: Read graph data
+activate leveldb
+leveldb --> graph: Return graph nodes/edges
+deactivate leveldb
+
+graph --> ukb: Return semantic relationships
+deactivate graph
+
+ukb --> km: Provide knowledge context
+deactivate ukb
+
+km -> km: Process semantic analysis
+note right: SemanticAnalysisWorkflowIssue\nprocessing logic
+
+km -> graph: Update knowledge graph
+activate graph
+
+graph -> leveldb: Persist updates
+activate leveldb
+leveldb --> graph: Confirm write
+deactivate leveldb
+
+graph -> export: Trigger auto-sync
+activate export
+export -> export: Export to JSON format
+note right: Sync to .data/knowledge-export
+deactivate export
+
+graph --> km: Confirm graph update
+deactivate graph
+
+km --> mcp: Return analysis results
+deactivate km
+
+mcp --> client: Semantic analysis response
+deactivate mcp
+
+note over client, export: Note: shared-memory.json has been REMOVED from codebase
+
+@enduml

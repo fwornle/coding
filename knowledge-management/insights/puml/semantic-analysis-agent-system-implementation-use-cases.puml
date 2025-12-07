@@ -3,41 +3,30 @@
 
 actor User as "User"
 actor CLI as "Command Line Interface"
+actor MCP as "MCP Tools"
 
-usecase "Interact with Graph Database" as (InteractWithGraphDatabase)
-usecase "Export Knowledge Graph" as (ExportKnowledgeGraph)
-usecase "Auto-Sync JSON Exports" as (AutoSyncJSONExports)
-usecase "Access Knowledge Graph via vkb" as (AccessViaVKB)
-usecase "Code with graph-sync" as (CodeWithGraphSync)
+usecase "Visualize Knowledge Graph" as (Visualize Knowledge Graph)
+usecase "Perform Knowledge Operations" as (Perform Knowledge Operations)
+usecase "Access JSON Exports" as (Access JSON Exports)
 
-User -- (InteractWithGraphDatabase)
-User -- (ExportKnowledgeGraph)
-User -- (AccessViaVKB)
-User -- (CodeWithGraphSync)
+User -- (Visualize Knowledge Graph)
+User -- (Perform Knowledge Operations)
+User -- (Access JSON Exports)
 
-CLI -- (InteractWithGraphDatabase)
-CLI -- (AccessViaVKB)
-CLI -- (CodeWithGraphSync)
+CLI -- (Visualize Knowledge Graph)
+MCP -- (Perform Knowledge Operations)
 
-package "Graph Database Components" {
+package "SemanticAnalysisAgentSystemImplementation" {
   component GraphDatabaseService as "Graph Database Service"
   component GraphKnowledgeExporter as "Graph Knowledge Exporter"
   component GraphDatabaseAdapter as "Graph Database Adapter"
+  
+  (Visualize Knowledge Graph) ..> GraphDatabaseService : uses
+  (Perform Knowledge Operations) ..> GraphDatabaseService : uses
+  (Access JSON Exports) ..> GraphKnowledgeExporter : uses
+  
+  GraphDatabaseService -- GraphDatabaseAdapter
+  GraphKnowledgeExporter -- GraphDatabaseAdapter
 }
-
-(InteractWithGraphDatabase) ..> GraphDatabaseService
-(ExportKnowledgeGraph) ..> GraphKnowledgeExporter
-(AutoSyncJSONExports) ..> GraphKnowledgeExporter
-(AccessViaVKB) ..> GraphDatabaseService
-(CodeWithGraphSync) ..> GraphDatabaseAdapter
-
-package "Storage" {
-  storage GraphDatabase as "Graph Database (.data/knowledge-graph)"
-  storage JSONExports as "JSON Exports (.data/knowledge-export)"
-}
-
-GraphDatabaseService ..> GraphDatabase
-GraphKnowledgeExporter ..> GraphDatabase
-GraphKnowledgeExporter ..> JSONExports
 
 @enduml

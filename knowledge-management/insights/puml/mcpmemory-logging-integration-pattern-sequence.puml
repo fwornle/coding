@@ -1,0 +1,95 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "MCP Client" as client
+participant "MCPMemoryLoggingIntegrationPattern" as pattern
+participant "GraphDatabaseService" as graphdb
+participant "GraphKnowledgeExporter" as exporter
+participant "GraphDatabaseAdapter" as adapter
+participant "Graphology + LevelDB" as storage
+participant "JSON Export System" as jsonexport
+
+activate client
+
+client -> pattern : initializeMemoryLogging()
+activate pattern
+
+pattern -> graphdb : initialize()
+activate graphdb
+
+graphdb -> adapter : setupGraphDBConnection()
+activate adapter
+
+adapter -> storage : connectToLevelDB(.data/knowledge-graph)
+activate storage
+storage --> adapter : connection established
+deactivate storage
+
+adapter --> graphdb : adapter ready
+deactivate adapter
+
+graphdb --> pattern : service initialized
+deactivate graphdb
+
+pattern -> exporter : setupExporter()
+activate exporter
+
+exporter -> jsonexport : configureExportPath(.data/knowledge-export)
+activate jsonexport
+jsonexport --> exporter : export path configured
+deactivate jsonexport
+
+exporter --> pattern : exporter ready
+deactivate exporter
+
+pattern --> client : integration pattern ready
+deactivate pattern
+
+note over client, jsonexport : System initialized - shared-memory.json removed from codebase
+
+loop Memory Logging Operations
+    client -> pattern : logMemoryEvent(data)
+    activate pattern
+    
+    pattern -> graphdb : storeKnowledgeNode(data)
+    activate graphdb
+    
+    graphdb -> adapter : writeToGraph(node)
+    activate adapter
+    
+    adapter -> storage : persist(graphData)
+    activate storage
+    storage --> adapter : data persisted
+    deactivate storage
+    
+    adapter --> graphdb : write complete
+    deactivate adapter
+    
+    graphdb --> pattern : node stored
+    deactivate graphdb
+    
+    pattern -> exporter : triggerAutoSync()
+    activate exporter
+    
+    exporter -> storage : readGraphData()
+    activate storage
+    storage --> exporter : graph data
+    deactivate storage
+    
+    exporter -> jsonexport : exportToJSON(data)
+    activate jsonexport
+    jsonexport --> exporter : export complete
+    deactivate jsonexport
+    
+    exporter --> pattern : sync complete
+    deactivate exporter
+    
+    pattern --> client : memory logged
+    deactivate pattern
+end
+
+note over pattern : Components span: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+
+deactivate client
+
+@enduml

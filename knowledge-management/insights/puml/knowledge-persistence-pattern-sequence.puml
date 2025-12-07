@@ -1,27 +1,30 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant GraphDatabase as "Graph Database (Graphology + LevelDB)"
-participant CommandLineInterface as "Command Line Interface (vkb, coding)"
-participant KnowledgeBase as "Knowledge Base"
-participant ThreeTierKBUpdateDetector as "3-Tier KB Update Detector"
+participant KnowledgePersistencePattern as "Knowledge Persistence Pattern"
+participant GraphDatabase as "Graph Database"
+participant VkbApiClient as "VKB API Client"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant PersistenceAgent as "Persistence Agent"
+participant GraphDatabaseService as "Graph Database Service"
 
-CommandLineInterface->>GraphDatabase: Interact with Knowledge Base
-GraphDatabase->>KnowledgeBase: Store and Retrieve Knowledge
-ThreeTierKBUpdateDetector->>GraphDatabase: Ensure Data Consistency and Integrity
-GraphDatabase->>CommandLineInterface: Provide JSON Exports for Backups
+KnowledgePersistencePattern->>GraphDatabase: Initialize graph database
+GraphDatabase->>GraphDatabaseService: Provide graph database services
+GraphDatabaseService->>VkbApiClient: Interact with knowledge base
+VkbApiClient->>GraphKnowledgeExporter: Export knowledge from graph database
+GraphKnowledgeExporter->>GraphDatabase: Export knowledge to JSON
 
-alt Successful Interaction
-    CommandLineInterface->>GraphDatabase: Valid Command
-    GraphDatabase->>CommandLineInterface: Successful Response
-else Failed Interaction
-    CommandLineInterface->>GraphDatabase: Invalid Command
-    GraphDatabase->>CommandLineInterface: Error Response
+alt Synchronizing data
+    GraphDatabaseService->>GraphKnowledgeExporter: Synchronize data with JSON exports
+    GraphKnowledgeExporter->>GraphDatabase: Update graph database with synchronized data
 end
 
-loop Periodic Backup
-    GraphDatabase->>CommandLineInterface: Trigger Backup
-    CommandLineInterface->>GraphDatabase: Export Knowledge to .data/knowledge-export
+loop Coding operations
+    KnowledgePersistencePattern->>GraphDatabase: Perform coding-related operations
+    GraphDatabase->>PersistenceAgent: Persist knowledge in graph database
 end
+
+KnowledgePersistencePattern->>VkbApiClient: Visualize knowledge using VKB API client
+VkbApiClient->>GraphDatabase: Retrieve knowledge from graph database for visualization
 
 @enduml

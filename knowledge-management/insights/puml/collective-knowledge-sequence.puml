@@ -1,0 +1,56 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "Client" as client
+participant "Knowledge Management\nSystem" as kms
+participant "UKB Unified\nLibrary" as ukb
+participant "MCP Server\nSemantic Analysis" as mcp
+participant "Knowledge Store" as store
+
+client -> kms: Request knowledge operation
+activate kms
+
+kms -> ukb: Initialize unified knowledge base
+activate ukb
+
+alt Knowledge Creation
+    kms -> ukb: Create knowledge entry
+    ukb -> store: Persist knowledge data
+    activate store
+    store --> ukb: Confirmation
+    deactivate store
+    ukb --> kms: Knowledge created
+else Knowledge Query
+    kms -> ukb: Query knowledge base
+    ukb -> store: Retrieve data
+    activate store
+    store --> ukb: Knowledge data
+    deactivate store
+    ukb --> kms: Query results
+end
+
+kms -> mcp: Request semantic analysis
+activate mcp
+
+mcp -> mcp: Analyze semantic patterns
+mcp -> store: Update semantic metadata
+activate store
+store --> mcp: Metadata updated
+deactivate store
+
+mcp --> kms: Semantic analysis complete
+deactivate mcp
+
+kms -> ukb: Update knowledge with semantics
+ukb -> store: Store enriched knowledge
+activate store
+store --> ukb: Storage complete
+deactivate store
+
+ukb --> kms: Knowledge updated
+deactivate ukb
+
+kms --> client: Operation complete
+deactivate kms
+
+@enduml

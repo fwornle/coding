@@ -1,0 +1,67 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+actor "Knowledge Manager" as KM
+actor "Developer" as DEV
+actor "MCP Client" as MCP
+actor "External System" as EXT
+
+rectangle "Knowledge Management System" {
+  usecase "Create Semantic Analysis" as UC1
+  usecase "Execute Workflow" as UC2
+  usecase "Store Knowledge Graph" as UC3
+  usecase "Query Graph Database" as UC4
+  usecase "Export Knowledge" as UC5
+  usecase "Manage Graph Nodes" as UC6
+  usecase "Handle Relationships" as UC7
+}
+
+rectangle "Data Storage Layer" {
+  usecase "Write to Graphology" as UC8
+  usecase "Persist with LevelDB" as UC9
+  usecase "Auto-sync Exports" as UC10
+  usecase "Generate JSON Output" as UC11
+}
+
+rectangle "Integration Layer" {
+  usecase "Serve MCP Protocol" as UC12
+  usecase "Handle External Requests" as UC13
+  usecase "Process Semantic Queries" as UC14
+}
+
+rectangle "Workflow Processing" {
+  usecase "Analyze Semantic Issues" as UC15
+  usecase "Track Workflow State" as UC16
+  usecase "Validate Data Integrity" as UC17
+}
+
+KM --> UC1
+KM --> UC2
+KM --> UC5
+KM --> UC6
+
+DEV --> UC4
+DEV --> UC15
+DEV --> UC17
+
+MCP --> UC12
+MCP --> UC14
+
+EXT --> UC13
+
+UC1 ..> UC15 : <<include>>
+UC2 ..> UC16 : <<include>>
+UC3 ..> UC8 : <<include>>
+UC8 ..> UC9 : <<include>>
+UC5 ..> UC10 : <<include>>
+UC10 ..> UC11 : <<include>>
+UC4 ..> UC7 : <<include>>
+UC12 ..> UC14 : <<include>>
+UC6 ..> UC3 : <<extend>>
+UC7 ..> UC3 : <<extend>>
+
+note right of UC8 : "Uses Graphology + LevelDB\nat .data/knowledge-graph"
+note right of UC11 : "Exports to .data/knowledge-export\n(auto-synced from GraphDB)"
+note top of UC15 : "Implemented across:\nsrc/knowledge-management\nlib/ukb-unified\nintegrations/mcp-server-semantic-analysis"
+
+@enduml

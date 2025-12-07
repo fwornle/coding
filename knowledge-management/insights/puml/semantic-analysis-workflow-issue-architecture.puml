@@ -1,0 +1,62 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management" {
+    component [SemanticAnalysisWorkflow] <<core>>
+    component [KnowledgeManager] <<core>>
+}
+
+package "UKB Unified Library" {
+    component [GraphologyEngine] <<storage>>
+    component [LevelDBAdapter] <<storage>>
+    component [KnowledgeGraphAPI] <<api>>
+}
+
+package "MCP Server Integration" {
+    component [MCPSemanticServer] <<api>>
+    component [SemanticAnalysisAgent] <<agent>>
+}
+
+package "Data Storage" {
+    database [KnowledgeGraph\n(.data/knowledge-graph)] <<storage>>
+    folder [JSONExports\n(.data/knowledge-export)] <<storage>>
+}
+
+package "Implementation Locations" {
+    folder [src/knowledge-management] <<source>>
+    folder [lib/ukb-unified] <<source>>
+    folder [integrations/mcp-server-semantic-analysis/src] <<source>>
+}
+
+' Core relationships
+[SemanticAnalysisWorkflow] --> [KnowledgeManager]
+[KnowledgeManager] --> [KnowledgeGraphAPI]
+[KnowledgeGraphAPI] --> [GraphologyEngine]
+[GraphologyEngine] --> [LevelDBAdapter]
+[LevelDBAdapter] --> [KnowledgeGraph\n(.data/knowledge-graph)]
+
+' MCP integration
+[MCPSemanticServer] --> [SemanticAnalysisAgent]
+[SemanticAnalysisAgent] --> [KnowledgeGraphAPI]
+
+' Data flow
+[KnowledgeGraph\n(.data/knowledge-graph)] ..> [JSONExports\n(.data/knowledge-export)] : auto-sync
+
+' Implementation mapping
+[SemanticAnalysisWorkflow] ..> [src/knowledge-management] : implemented in
+[GraphologyEngine] ..> [lib/ukb-unified] : implemented in
+[MCPSemanticServer] ..> [integrations/mcp-server-semantic-analysis/src] : implemented in
+
+note top of [KnowledgeGraph\n(.data/knowledge-graph)]
+  Primary storage using
+  Graphology + LevelDB
+  (shared-memory.json removed)
+end note
+
+note bottom of [JSONExports\n(.data/knowledge-export)]
+  Auto-synced exports
+  from GraphDB for
+  external consumption
+end note
+
+@enduml

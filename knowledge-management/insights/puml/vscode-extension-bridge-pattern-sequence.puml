@@ -1,0 +1,78 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "VSCode Extension" as VSCode
+participant "VkbApiClient" as ApiClient
+participant "GraphDatabaseService" as GraphDB
+participant "GraphDatabaseAdapter" as Adapter
+participant "Graphology + LevelDB" as Storage
+participant "GraphKnowledgeExporter" as Exporter
+participant "PersistenceAgent" as Persistence
+participant "MCP Server" as MCP
+
+note over VSCode, MCP : VSCodeExtensionBridgePattern - Knowledge Graph Management Flow
+
+VSCode -> ApiClient : vkb command request
+activate ApiClient
+
+ApiClient -> GraphDB : initiate knowledge operation
+activate GraphDB
+
+GraphDB -> Adapter : access graph data
+activate Adapter
+
+Adapter -> Storage : query/update .data/knowledge-graph
+activate Storage
+Storage --> Adapter : return graph data
+deactivate Storage
+
+Adapter --> GraphDB : processed data
+deactivate Adapter
+
+alt Knowledge Visualization
+    GraphDB -> Exporter : prepare export data
+    activate Exporter
+    Exporter -> Storage : validate graph structure
+    Exporter --> GraphDB : export ready
+    deactivate Exporter
+else Knowledge Synchronization  
+    GraphDB -> Persistence : validate data integrity
+    activate Persistence
+    Persistence -> Storage : verify persistence layer
+    Persistence --> GraphDB : validation complete
+    deactivate Persistence
+end
+
+GraphDB -> Exporter : auto-sync to JSON
+activate Exporter
+Exporter -> Storage : export to .data/knowledge-export
+Storage --> Exporter : JSON export complete
+deactivate Exporter
+
+opt Semantic Analysis Integration
+    GraphDB -> MCP : trigger semantic analysis
+    activate MCP
+    MCP -> MCP : automated knowledge extraction\nand classification
+    MCP --> GraphDB : semantic insights
+    deactivate MCP
+end
+
+GraphDB --> ApiClient : operation complete
+deactivate GraphDB
+
+ApiClient -> VSCode : graph-sync command
+VSCode -> ApiClient : synchronization request
+
+ApiClient -> GraphDB : sync knowledge graph
+activate GraphDB
+GraphDB -> Storage : update graph state
+GraphDB --> ApiClient : sync complete
+deactivate GraphDB
+
+ApiClient --> VSCode : operation result
+deactivate ApiClient
+
+note over Storage : Data stored in .data/knowledge-graph\nwith auto-sync to .data/knowledge-export
+note over MCP : integrations/mcp-server-semantic-analysis/src\nenables automated knowledge processing
+
+@enduml

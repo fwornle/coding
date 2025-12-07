@@ -2,7 +2,7 @@
 
 **Type:** GraphDatabase
 
-The system uses separate components for graph database services, knowledge exporters, and adapters, which are stored in separate directories such as src/knowledge-management and lib/ukb-unified.
+The system uses the graph-sync command to synchronize data between the graph database and JSON exports as part of its data workflow.
 
 ## What It Is
 
@@ -10,29 +10,28 @@ The system uses separate components for graph database services, knowledge expor
 
 - The system stores knowledge exports at .data/knowledge-export, which are auto-synced from the graph database.
 
-- The system uses a modular architecture with separate components for graph database services, knowledge exporters, and adapters.
+- The system auto-syncs JSON exports from the GraphDB to .data/knowledge-export.
 
-- The system uses Graphology and LevelDB for knowledge storage at .data/knowledge-graph.
-
-
-## How It Works
-
-- The system uses a modular architecture with separate components for graph database services, knowledge exporters, and adapters.
-
-- The system uses Graphology and LevelDB for knowledge storage at .data/knowledge-graph.
-
-- The system uses the PersistenceAgent component to handle persistence-related operations and ensure data consistency and integrity.
-
-- The system uses separate directories for different services, such as lib/ukb-unified and integrations/mcp-server-semantic-analysis/src.
-
-- The system uses the GraphDatabaseService component to provide graph database services.
+- The system uses a microservices architecture with separate components for different services.
 
 
-## Architecture
+## Diagrams
+
+### Architecture
 
 ![KnowledgePersistencePattern Architecture](images/knowledge-persistence-pattern-architecture.png)
 
 
+### Sequence
+
+![KnowledgePersistencePattern Sequence](images/knowledge-persistence-pattern-sequence.png)
+
+
+### Use cases
+
+![KnowledgePersistencePattern Use cases](images/knowledge-persistence-pattern-use-cases.png)
+
+
 ---
 
-*Generated from 16 observations*
+*Generated from 13 observations*

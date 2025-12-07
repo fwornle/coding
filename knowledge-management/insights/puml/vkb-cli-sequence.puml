@@ -1,0 +1,34 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant VkbCli as "VkbCli (TransferablePattern)"
+participant GraphDatabaseService as "Graph Database Service"
+participant PersistenceAgent as "Persistence Agent"
+participant VkbApiClient as "Vkb Api Client"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant Graphology as "Graphology"
+participant LevelDB as "LevelDB"
+
+VkbCli->>VkbApiClient: Request data manipulation
+VkbApiClient->>GraphDatabaseService: Manipulate data in graph database
+GraphDatabaseService->>Graphology: Interact with graph database
+Graphology->>LevelDB: Store and retrieve data
+LevelDB->>Graphology: Provide data storage
+
+alt Successful data manipulation
+    GraphDatabaseService->>VkbApiClient: Confirm data manipulation
+    VkbApiClient->>VkbCli: Return result of data manipulation
+end
+
+opt Data export required
+    VkbCli->>GraphKnowledgeExporter: Request data export
+    GraphKnowledgeExporter->>GraphDatabaseService: Retrieve data from graph database
+    GraphDatabaseService->>GraphKnowledgeExporter: Provide data for export
+    GraphKnowledgeExporter->>VkbCli: Export data to .data/knowledge-export directory
+end
+
+VkbCli->>PersistenceAgent: Request data synchronization
+PersistenceAgent->>GraphDatabaseService: Synchronize data in graph database
+GraphDatabaseService->>PersistenceAgent: Confirm data synchronization
+
+@enduml

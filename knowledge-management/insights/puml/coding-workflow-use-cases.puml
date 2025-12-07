@@ -1,0 +1,69 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Developer" as dev
+actor "MCP Client" as mcp
+actor "System" as sys
+
+package "CodingWorkflow System" {
+  usecase "Execute Workflow" as exec
+  usecase "Trigger Analysis" as trigger
+  usecase "Store Knowledge" as store
+  usecase "Export Data" as export
+  usecase "Query Knowledge Graph" as query
+  usecase "Incremental Analysis" as incremental
+  usecase "Manage Graph Database" as manage
+  usecase "Sync Data" as sync
+}
+
+package "Knowledge Management" {
+  usecase "Build Knowledge Graph" as build
+  usecase "Process Semantic Data" as semantic
+  usecase "Maintain Graph Structure" as maintain
+}
+
+package "Data Storage" {
+  usecase "Store in Graphology+LevelDB" as graphdb
+  usecase "Generate JSON Export" as json_export
+  usecase "Auto-sync Data" as auto_sync
+}
+
+' Actor relationships
+dev --> exec : "Manual execution"
+mcp --> exec : "execute_workflow tool"
+sys --> incremental : "Automatic trigger"
+
+' Main workflow relationships
+exec --> trigger
+exec --> store
+exec --> export
+
+' Include relationships
+trigger ..> build : <<include>>
+trigger ..> semantic : <<include>>
+store ..> graphdb : <<include>>
+export ..> json_export : <<include>>
+export ..> auto_sync : <<include>>
+
+' Extend relationships
+incremental ..> trigger : <<extend>>
+query ..> manage : <<extend>>
+sync ..> auto_sync : <<extend>>
+
+' Knowledge management flows
+build --> maintain
+semantic --> store
+maintain --> manage
+
+' Storage flows
+graphdb --> sync
+json_export --> auto_sync
+
+note right of exec : "Triggered via MCP tools\nor automatic analysis"
+note bottom of graphdb : "Located at:\n.data/knowledge-graph"
+note bottom of json_export : "Located at:\n.data/knowledge-export"
+note top of incremental : "Replaces shared-memory.json\napproach"
+
+@enduml

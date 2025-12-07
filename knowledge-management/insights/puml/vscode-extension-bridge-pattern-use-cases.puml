@@ -1,0 +1,54 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Developer" as dev
+actor "VSCode Extension" as vscode
+actor "MCP Server" as mcp
+actor "External System" as ext
+
+package "Knowledge Graph Operations" {
+  usecase "Visualize Knowledge Graph" as UC1
+  usecase "Synchronize Graph Data" as UC2
+  usecase "Export Knowledge" as UC3
+  usecase "Validate Data" as UC4
+}
+
+package "Semantic Analysis" {
+  usecase "Extract Knowledge" as UC5
+  usecase "Classify Information" as UC6
+  usecase "Process Constraints" as UC7
+}
+
+package "Data Management" {
+  usecase "Store Graph Data" as UC8
+  usecase "Auto-sync to JSON" as UC9
+  usecase "Manage Persistence" as UC10
+}
+
+package "API Integration" {
+  usecase "Handle API Communications" as UC11
+  usecase "Bridge Pattern Transfer" as UC12
+}
+
+dev --> UC1 : vkb command
+dev --> UC2 : graph-sync
+dev --> UC3
+vscode --> UC12
+mcp --> UC5
+mcp --> UC6
+ext --> UC11
+
+UC1 ..> UC8 : <<include>>
+UC2 ..> UC9 : <<include>>
+UC3 ..> UC4 : <<include>>
+UC5 ..> UC7 : <<extend>>
+UC8 ..> UC10 : <<include>>
+UC11 ..> UC12 : <<include>>
+
+note right of UC8 : "Graphology + LevelDB\n.data/knowledge-graph"
+note right of UC9 : "JSON exports\n.data/knowledge-export"
+note left of UC5 : "integrations/mcp-server-\nsemantic-analysis"
+
+@enduml

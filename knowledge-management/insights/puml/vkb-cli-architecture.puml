@@ -1,43 +1,25 @@
-@startuml vkb-cli-architecture
-!theme plain
-skinparam backgroundColor white
-skinparam roundcorner 20
-skinparam shadowing false
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title VKB CLI Server Management Architecture
-
-package "VKB CLI System" {
-  [CLI Interface] as CLI
-  [VKBServer API] as Server
-  [Data Processor] as Data
-  [Web Server] as Web
+package "VkbCli" {
+  component "GraphDatabaseService" as gds <<core>>
+  component "PersistenceAgent" as pa <<agent>>
+  component "VkbApiClient" as vac <<api>>
+  component "GraphKnowledgeExporter" as gke <<core>>
+  component "GraphDatabase (Graphology + LevelDB)" as gdb <<storage>>
+  component "Knowledge Export Directory (.data/knowledge-export)" as ked <<storage>>
 }
 
-package "External Dependencies" {
-  [GraphDB + LevelDB] as JSON
-  [Node.js HTTP] as HTTP
-  [Express Server] as Express
-}
+gds --* gdb : interacts with
+pa --* gdb : interacts with
+vac --* gds : manages client interactions
+gke --* gdb : exports data from
+gke --* ked : exports to
 
-CLI --> Server : command routing
-Server --> Data : data processing
-Server --> Web : server control
-Data --> JSON : read knowledge base
-Web --> HTTP : server management
-Web --> Express : web interface
+note as AutoNote1
 
-note right of Server
-  - Server lifecycle management
-  - Process control and monitoring
-  - Cross-platform compatibility
-  - Error handling and recovery
-end note
+  VkbCli: A TransferablePattern for knowledge storage and management
 
-note right of Data
-  - NDJSON conversion
-  - Entity/relation processing
-  - Insight file linking
-  - Memory data preparation
 end note
 
 @enduml

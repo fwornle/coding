@@ -1,0 +1,54 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management Core" {
+  component [KnowledgeManager] <<core>>
+  component [GraphDatabase] <<storage>>
+  component [SemanticProcessor] <<core>>
+  component [ConceptExtractor] <<core>>
+}
+
+package "Unified Knowledge Base" {
+  component [UKBUnified] <<core>>
+  component [LevelDB] <<storage>>
+  component [IndexManager] <<core>>
+  component [QueryEngine] <<api>>
+}
+
+package "MCP Semantic Analysis" {
+  component [MCPServer] <<api>>
+  component [SemanticAnalyzer] <<agent>>
+  component [NLPProcessor] <<core>>
+  component [EntityRecognizer] <<core>>
+}
+
+package "Integration Layer" {
+  component [APIGateway] <<api>>
+  component [DataBridge] <<core>>
+  component [EventBus] <<core>>
+}
+
+[KnowledgeManager] --> [GraphDatabase] : stores concepts
+[KnowledgeManager] --> [SemanticProcessor] : processes knowledge
+[SemanticProcessor] --> [ConceptExtractor] : extracts concepts
+
+[UKBUnified] --> [LevelDB] : persists data
+[UKBUnified] --> [IndexManager] : manages indices
+[QueryEngine] --> [UKBUnified] : queries knowledge
+
+[MCPServer] --> [SemanticAnalyzer] : semantic analysis
+[SemanticAnalyzer] --> [NLPProcessor] : natural language processing
+[SemanticAnalyzer] --> [EntityRecognizer] : entity recognition
+
+[APIGateway] --> [MCPServer] : external access
+[DataBridge] --> [KnowledgeManager] : knowledge sync
+[DataBridge] --> [UKBUnified] : unified access
+[EventBus] --> [DataBridge] : event coordination
+
+note top of [KnowledgeManager] : Central knowledge management\nwith graph-based storage
+
+note top of [UKBUnified] : Unified knowledge base\nwith LevelDB persistence
+
+note top of [MCPServer] : MCP semantic analysis\nserver for external integration
+
+@enduml

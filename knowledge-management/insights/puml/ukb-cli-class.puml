@@ -1,0 +1,54 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Graph" {
+  class GraphDatabaseService {
+    - graphDatabase: LevelDB
+    + storeKnowledge()
+    + retrieveKnowledge()
+  }
+
+  class GraphKnowledgeExporter {
+    + exportKnowledge()
+  }
+
+  class PersistenceAgent {
+    - graphDatabaseService: GraphDatabaseService
+    + syncExports()
+  }
+
+  GraphDatabaseService --* GraphKnowledgeExporter
+  GraphDatabaseService --* PersistenceAgent
+}
+
+package "API Clients" {
+  class VkbApiClient {
+    + sendRequest()
+    + receiveResponse()
+  }
+
+  class MCPTools {
+    + performOperation()
+  }
+
+  VkbApiClient ..> MCPTools
+}
+
+package "Commands" {
+  class VkbCommand {
+    + visualizeKnowledge()
+  }
+
+  VkbCommand ..> GraphDatabaseService
+}
+
+class UkbCli {
+  - vkbApiClient: VkbApiClient
+  - graphDatabaseService: GraphDatabaseService
+  + executeCommand()
+}
+
+UkbCli --* VkbApiClient
+UkbCli --* GraphDatabaseService
+
+@enduml

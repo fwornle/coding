@@ -1,124 +1,39 @@
-@startuml ukb-cli-architecture
-!include _standard-style.puml
-title UkbCli - Modern Knowledge Management CLI Architecture
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-skinparam component {
-  BackgroundColor #E8F5E8
-  FontSize 11
-  FontColor #000000
-}
-skinparam package {
-  BackgroundColor #F8F8F8
-  BorderColor #888888
-  FontSize 12
-  FontColor #000000
-}
-skinparam note {
-  BackgroundColor #FFFACD
-  FontSize 9
-  FontColor #000000
-}
-skinparam arrow {
-  FontSize 9
-  FontColor #000000
+package "Knowledge Storage" {
+  component GraphDatabase <<storage>> as "Graph Database"
+  component LevelDB <<storage>> as "LevelDB"
+  component "Knowledge Export" <<storage>> as "Knowledge Export (.data/knowledge-export)"
 }
 
-package "UkbCli System" {
-  
-  package "CLI Layer" {
-    [CLI Entry Point] as cli
-    [Argument Parser] as parser
-    [Command Router] as router
-  }
-  
-  package "Core Services" {
-    [Knowledge Manager] as km
-    [Git Analyzer] as git
-    [Insight Extractor] as extractor
-    [Content Validator] as validator
-  }
-  
-  package "Input/Output" {
-    [Interactive Prompts] as prompts
-    [File I/O Handler] as fileio
-    [JSON Processor] as json
-    [Error Handler] as error
-  }
-  
-  package "Validation Layer" {
-    [URL Validator] as urlval
-    [Content Filter] as filter
-    [Schema Validator] as schema
-  }
+package "Knowledge Management" {
+  component GraphDatabaseService <<core>> as "Graph Database Service"
+  component GraphKnowledgeExporter <<agent>> as "Graph Knowledge Exporter"
+  component PersistenceAgent <<agent>> as "Persistence Agent"
 }
 
-package "External Systems" {
-  database "GraphDB + LevelDB" as memory
-  cloud "MCP Memory Server" as mcp
-  [Git Repository] as gitrepo
-  [VKB Visualizer] as vkb
+package "API Clients" {
+  component VkbApiClient <<api>> as "Vkb API Client"
 }
 
-package "Legacy System" {
-  [UKB Bash Script] as ukb_legacy
+package "Tools" {
+  component "MCP Tools" <<tool>> as "MCP Tools"
+  component "Vkb Command" <<tool>> as "Vkb Command"
 }
 
-' CLI Flow
-cli --> parser
-parser --> router
-router --> km
+note as AutoNote1
 
-' Core Service Interactions
-km --> git
-km --> extractor
-km --> validator
-km --> prompts
-km --> fileio
+  UkbCli: A Transferable Pattern for managing knowledge storage and exports.
 
-' Validation Flow
-validator --> urlval
-validator --> filter
-validator --> schema
-
-' Data Flow
-fileio --> json
-json --> memory
-km --> mcp
-memory --> vkb
-
-' Git Integration
-git --> gitrepo
-
-' Error Handling
-error --> cli
-km --> error
-validator --> error
-
-' Legacy Integration
-ukb_legacy ..> cli : "executes via\nnode ukb-cli"
-
-note right of km
-  **Core Responsibilities:**
-  - Entity management
-  - Relationship handling
-  - Insight capture
-  - Cross-session persistence
 end note
 
-note right of validator
-  **Content Quality:**
-  - Marketing language filter
-  - URL validation
-  - Schema compliance
-  - Technical content verification
-end note
-
-note bottom of memory
-  **Data Format:**
-  - Entities with structured observations
-  - Relations with types
-  - Metadata tracking
-  - Enhanced schema support
-end note
+GraphDatabaseService --* GraphDatabase
+GraphKnowledgeExporter --* GraphDatabase
+PersistenceAgent --* GraphDatabase
+GraphKnowledgeExporter --* "Knowledge Export"
+VkbApiClient --* GraphDatabaseService
+"MCP Tools" --* GraphDatabaseService
+"Vkb Command" --* GraphDatabaseService
 
 @enduml

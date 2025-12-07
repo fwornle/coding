@@ -1,0 +1,109 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+abstract class TransferablePattern <<pattern>> {
+  +patternId: string
+  +version: string
+  +extractionDate: Date
+  +validate(): boolean
+  +serialize(): string
+}
+
+class ConfigurationPattern <<transferable>> {
+  -knowledgeGraph: GraphologyInstance
+  -levelDbAdapter: LevelDBAdapter
+  -exportPath: string
+  +extractFromCodebase(): void
+  +storeInGraph(): void
+  +syncToJSON(): void
+  +getConfiguration(): Config
+}
+
+package "Knowledge Management" {
+  class KnowledgeGraphManager <<service>> {
+    -graphInstance: Graphology
+    -persistenceLayer: LevelDB
+    +addPattern(pattern: TransferablePattern): void
+    +queryPatterns(criteria: QueryCriteria): Pattern[]
+    +syncToExport(): void
+  }
+
+  class PatternExtractor <<service>> {
+    -sourceAnalyzer: CodeAnalyzer
+    -patternDetector: PatternDetector
+    +extractConfigurationPatterns(): ConfigurationPattern[]
+    +analyzeCodebase(path: string): AnalysisResult
+  }
+}
+
+package "Storage Layer" {
+  class GraphologyStorage <<storage>> {
+    -graphPath: string
+    -nodes: Map
+    -edges: Map
+    +addNode(node: GraphNode): void
+    +addEdge(edge: GraphEdge): void
+    +query(selector: string): Result[]
+  }
+
+  class LevelDBPersistence <<storage>> {
+    -dbPath: string
+    -connection: LevelDB
+    +store(key: string, value: any): Promise
+    +retrieve(key: string): Promise
+    +batch(operations: Operation[]): Promise
+  }
+
+  class JSONExporter <<file>> {
+    -exportDirectory: string
+    +exportToJSON(data: any): void
+    +autoSync(source: GraphStorage): void
+  }
+}
+
+package "Integration Layer" {
+  class MCPServerAdapter <<service>> {
+    -semanticAnalyzer: SemanticAnalyzer
+    -patternRegistry: PatternRegistry
+    +analyzeSemantics(pattern: ConfigurationPattern): SemanticResult
+    +registerPattern(pattern: TransferablePattern): void
+  }
+
+  class UKBUnifiedLib <<library>> {
+    -patternCatalog: PatternCatalog
+    -knowledgeBase: KnowledgeBase
+    +integratePattern(pattern: ConfigurationPattern): void
+    +queryUnifiedKnowledge(query: string): Result[]
+  }
+}
+
+TransferablePattern <|-- ConfigurationPattern
+ConfigurationPattern --> KnowledgeGraphManager : stores in
+KnowledgeGraphManager --> GraphologyStorage : uses
+KnowledgeGraphManager --> LevelDBPersistence : persists with
+KnowledgeGraphManager --> JSONExporter : exports via
+PatternExtractor --> ConfigurationPattern : creates
+MCPServerAdapter --> ConfigurationPattern : analyzes
+UKBUnifiedLib --> ConfigurationPattern : integrates
+GraphologyStorage --> LevelDBPersistence : backed by
+JSONExporter ..> GraphologyStorage : syncs from
+
+note right of ConfigurationPattern
+  Extracted from:
+  - src/knowledge-management
+  - lib/ukb-unified  
+  - integrations/mcp-server-semantic-analysis/src
+end note
+
+note bottom of GraphologyStorage
+  Storage Location:
+  .data/knowledge-graph
+end note
+
+note bottom of JSONExporter
+  Export Location:
+  .data/knowledge-export
+  (auto-synced from GraphDB)
+end note
+
+@enduml

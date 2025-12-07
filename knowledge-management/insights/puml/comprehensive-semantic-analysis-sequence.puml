@@ -1,0 +1,51 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "Client Application" as Client
+participant "Knowledge Management\nsrc/knowledge-management" as KM
+participant "UKB Unified Library\nlib/ukb-unified" as UKB
+participant "MCP Semantic Server\nintegrations/mcp-server-semantic-analysis" as MCP
+participant "Semantic Analysis Engine" as SAE
+participant "Knowledge Base" as KB
+
+Client -> KM: Request semantic analysis
+activate KM
+
+KM -> UKB: Initialize unified knowledge base
+activate UKB
+UKB -> KB: Load knowledge structures
+KB --> UKB: Knowledge data
+UKB --> KM: Knowledge base ready
+
+KM -> MCP: Establish MCP connection
+activate MCP
+MCP -> SAE: Initialize semantic engine
+activate SAE
+SAE --> MCP: Engine ready
+MCP --> KM: Connection established
+
+KM -> SAE: Process semantic analysis request
+SAE -> UKB: Query knowledge patterns
+UKB -> KB: Retrieve semantic patterns
+KB --> UKB: Pattern data
+UKB --> SAE: Knowledge patterns
+
+SAE -> SAE: Perform comprehensive analysis
+note right: Multi-dimensional semantic\nanalysis with pattern matching
+
+SAE -> MCP: Return analysis results
+MCP -> KM: Deliver processed results
+
+alt Analysis successful
+    KM -> KB: Store analysis insights
+    KM --> Client: Return comprehensive results
+else Analysis failed
+    KM --> Client: Return error response
+end
+
+deactivate SAE
+deactivate MCP
+deactivate UKB
+deactivate KM
+
+@enduml

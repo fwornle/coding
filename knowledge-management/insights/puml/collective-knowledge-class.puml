@@ -1,0 +1,151 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management" {
+    class KnowledgeManager <<service>> {
+        -repository: KnowledgeRepository
+        -indexer: KnowledgeIndexer
+        -validator: KnowledgeValidator
+        +storeKnowledge(data: KnowledgeData): Result
+        +retrieveKnowledge(query: Query): KnowledgeSet
+        +updateKnowledge(id: string, data: KnowledgeData): Result
+        +deleteKnowledge(id: string): Result
+    }
+    
+    class KnowledgeRepository <<interface>> {
+        +save(data: KnowledgeData): Promise<string>
+        +findById(id: string): Promise<KnowledgeData>
+        +findByQuery(query: Query): Promise<KnowledgeData[]>
+        +update(id: string, data: KnowledgeData): Promise<void>
+        +delete(id: string): Promise<void>
+    }
+    
+    class KnowledgeIndexer {
+        -searchEngine: SearchEngine
+        -vectorizer: Vectorizer
+        +indexDocument(doc: Document): void
+        +searchIndex(query: string): SearchResult[]
+        +updateIndex(id: string, doc: Document): void
+        +removeFromIndex(id: string): void
+    }
+    
+    class KnowledgeValidator {
+        -schemaValidator: SchemaValidator
+        -contentAnalyzer: ContentAnalyzer
+        +validateStructure(data: KnowledgeData): ValidationResult
+        +validateContent(data: KnowledgeData): ValidationResult
+        +sanitizeData(data: KnowledgeData): KnowledgeData
+    }
+    
+    class KnowledgeData {
+        +id: string
+        +title: string
+        +content: string
+        +metadata: Metadata
+        +tags: string[]
+        +createdAt: Date
+        +updatedAt: Date
+        +version: number
+    }
+}
+
+package "UKB Unified Library" {
+    class UnifiedKnowledgeBase <<service>> {
+        -knowledgeManager: KnowledgeManager
+        -semanticAnalyzer: SemanticAnalyzer
+        -relationshipMapper: RelationshipMapper
+        +integrateKnowledge(source: string, data: any): Result
+        +queryUnified(query: UnifiedQuery): UnifiedResult
+        +buildRelationships(): void
+        +synchronizeData(): void
+    }
+    
+    class SemanticAnalyzer {
+        -nlpProcessor: NLPProcessor
+        -conceptExtractor: ConceptExtractor
+        +analyzeContent(content: string): SemanticAnalysis
+        +extractEntities(text: string): Entity[]
+        +identifyRelationships(text: string): Relationship[]
+        +generateSummary(content: string): string
+    }
+    
+    class RelationshipMapper {
+        -graphDatabase: GraphDatabase
+        -relationshipEngine: RelationshipEngine
+        +mapRelationships(entities: Entity[]): RelationshipGraph
+        +updateRelationships(graph: RelationshipGraph): void
+        +queryRelationships(entity: Entity): Relationship[]
+    }
+    
+    abstract class DataIntegration {
+        #sourceId: string
+        #transformationRules: Rule[]
+        +{abstract} extractData(): RawData
+        +{abstract} transformData(data: RawData): KnowledgeData
+        +{abstract} validateIntegration(): ValidationResult
+    }
+}
+
+package "MCP Semantic Analysis Server" {
+    class MCPSemanticServer <<service>> {
+        -semanticAnalyzer: SemanticAnalyzer
+        -knowledgeInterface: KnowledgeInterface
+        -requestHandler: RequestHandler
+        +handleAnalysisRequest(request: AnalysisRequest): AnalysisResponse
+        +processSemanticQuery(query: SemanticQuery): SemanticResult
+        +streamAnalysis(data: StreamData): Observable<AnalysisResult>
+    }
+    
+    class SemanticProcessor {
+        -textAnalyzer: TextAnalyzer
+        -contextBuilder: ContextBuilder
+        -inferenceEngine: InferenceEngine
+        +processText(text: string): ProcessingResult
+        +buildContext(data: ContextData): Context
+        +performInference(context: Context): InferenceResult
+    }
+    
+    class KnowledgeInterface <<interface>> {
+        +queryKnowledge(query: string): Promise<KnowledgeResult>
+        +updateKnowledge(data: KnowledgeUpdate): Promise<void>
+        +subscribeToChanges(callback: ChangeCallback): Subscription
+    }
+    
+    class AnalysisRequest {
+        +requestId: string
+        +content: string
+        +analysisType: AnalysisType
+        +parameters: AnalysisParameters
+        +timestamp: Date
+    }
+    
+    class AnalysisResponse {
+        +requestId: string
+        +results: AnalysisResult[]
+        +confidence: number
+        +processingTime: number
+        +metadata: ResponseMetadata
+    }
+}
+
+' Relationships
+KnowledgeManager --> KnowledgeRepository : uses
+KnowledgeManager --> KnowledgeIndexer : uses
+KnowledgeManager --> KnowledgeValidator : uses
+KnowledgeManager --> KnowledgeData : manages
+
+UnifiedKnowledgeBase --> KnowledgeManager : integrates
+UnifiedKnowledgeBase --> SemanticAnalyzer : uses
+UnifiedKnowledgeBase --> RelationshipMapper : uses
+
+MCPSemanticServer --> SemanticProcessor : uses
+MCPSemanticServer --> KnowledgeInterface : implements
+MCPSemanticServer --> AnalysisRequest : processes
+MCPSemanticServer --> AnalysisResponse : generates
+
+SemanticProcessor --> SemanticAnalyzer : extends
+KnowledgeInterface --> UnifiedKnowledgeBase : connects to
+
+DataIntegration --> KnowledgeData : produces
+
+@enduml

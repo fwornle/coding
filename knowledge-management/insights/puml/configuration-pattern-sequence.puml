@@ -1,0 +1,42 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "Knowledge Management" as KM
+participant "UKB Unified" as UKB
+participant "MCP Semantic Server" as MCP
+participant "Graphology Engine" as Graph
+participant "LevelDB Storage" as LevelDB
+participant "JSON Export" as Export
+
+== Configuration Pattern Discovery ==
+KM -> Graph: Store pattern metadata
+Graph -> LevelDB: Persist to .data/knowledge-graph
+KM -> UKB: Register TransferablePattern
+UKB -> MCP: Notify semantic analysis
+
+== Pattern Extraction & Transfer ==
+MCP -> Graph: Query existing patterns
+Graph -> MCP: Return pattern data
+MCP -> UKB: Process ConfigurationPattern
+UKB -> KM: Update knowledge base
+
+== Data Synchronization ==
+loop Auto-sync Process
+    Graph -> Export: Export knowledge data
+    Export -> Export: Write to .data/knowledge-export/*.json
+    Note over Export: Auto-synced from GraphDB
+end
+
+== Pattern Reuse ==
+alt Pattern Found
+    KM -> Graph: Query ConfigurationPattern
+    Graph -> KM: Return cached pattern
+else Pattern Not Found
+    KM -> Graph: Extract new pattern
+    Graph -> LevelDB: Store pattern
+    Graph -> Export: Trigger export sync
+end
+
+Note over KM, Export: shared-memory.json REMOVED from architecture
+Note over Graph, LevelDB: Knowledge stored in Graphology + LevelDB
+@enduml

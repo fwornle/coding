@@ -1,143 +1,41 @@
-@startuml ukb-cli-sequence
-!theme plain
-skinparam backgroundColor white
-skinparam roundcorner 20
-skinparam shadowing false
-title UkbCli - Detailed Workflow Sequence
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor "Developer" as dev
-participant "UKB Script" as ukb
-participant "UkbCli" as cli
-participant "InputParser" as parser
-participant "ContentValidator" as validator
-participant "KnowledgeManager" as km
-participant "EntityBuilder" as builder
-participant "RelationshipManager" as rm
-participant "FileHandler" as fh
-participant "MCPSync" as mcp
-participant "Visualizer" as viz
+participant UkbCli as "UkbCli (TransferablePattern)"
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant PersistenceAgent as "Persistence Agent"
+participant VkbApiClient as "Vkb API Client"
+participant MCPTools as "MCP Tools"
+participant Graphology as "Graphology"
+participant LevelDB as "LevelDB"
 
-== Knowledge Capture Workflow ==
+activate UkbCli
+UkbCli->>GraphDatabaseService: Request knowledge graph data
+GraphDatabaseService->>Graphology: Query graph database
+Graphology->>LevelDB: Retrieve data from LevelDB
+LevelDB->>Graphology: Return data
+Graphology->>GraphDatabaseService: Return query results
+GraphDatabaseService->>UkbCli: Return knowledge graph data
 
-dev -> ukb : ukb --interactive
-activate ukb
+alt Export knowledge graph
+    UkbCli->>GraphKnowledgeExporter: Request export
+    GraphKnowledgeExporter->>GraphDatabaseService: Get knowledge graph data
+    GraphDatabaseService->>GraphKnowledgeExporter: Return data
+    GraphKnowledgeExporter->>PersistenceAgent: Export to JSON
+    PersistenceAgent->>GraphKnowledgeExporter: Confirm export
+    GraphKnowledgeExporter->>UkbCli: Confirm export
+end
 
-ukb -> cli : node ukb-cli --mode interactive
-activate cli
+UkbCli->>VkbApiClient: Use Vkb API for external services
+VkbApiClient->>UkbCli: Return API results
 
-cli -> parser : parseArguments()
-parser --> cli : config{mode: interactive}
+UkbCli->>MCPTools: Perform knowledge operations
+MCPTools->>UkbCli: Return operation results
 
-cli -> cli : initializeSession()
-cli -> dev : "What problem did you face?"
-dev -> cli : "Monolithic bash script maintenance"
+UkbCli->>GraphDatabaseService: Use vkb command for visualization
+GraphDatabaseService->>UkbCli: Return visualization results
 
-cli -> validator : validateInput("Monolithic bash script maintenance")
-activate validator
-validator -> validator : checkTechnicalContent()
-validator -> validator : filterMarketingLanguage()
-validator --> cli : validatedContent
-deactivate validator
-
-cli -> dev : "How did you solve it?"
-dev -> cli : "Refactored to Node.js CLI"
-
-cli -> validator : validateInput("Refactored to Node.js CLI")
-activate validator
-validator --> cli : validatedContent
-deactivate validator
-
-cli -> dev : "Why this approach?"
-dev -> cli : "Better cross-platform support"
-
-cli -> dev : "Technologies involved?"
-dev -> cli : "Node.js, CLI frameworks"
-
-cli -> dev : "Reference URLs?"
-dev -> cli : "https://nodejs.org/docs/cli"
-
-cli -> validator : validateUrls(["https://nodejs.org/docs/cli"])
-activate validator
-validator -> validator : testUrlAccessibility()
-validator --> cli : validatedUrls
-deactivate validator
-
-cli -> km : createInsight(validatedData)
-activate km
-
-km -> builder : buildEntity(data)
-activate builder
-builder -> builder : structureObservations()
-builder -> builder : calculateSignificance()
-builder -> builder : assignEntityType()
-builder --> km : entity
-deactivate builder
-
-km -> rm : createRelationships(entity)
-activate rm
-rm -> rm : identifyParentEntities()
-rm -> rm : establishConnections()
-rm --> km : relationships
-deactivate rm
-
-km -> fh : saveToMemory(entity, relationships)
-activate fh
-fh -> fh : loadExistingMemory()
-fh -> fh : appendNewEntity()
-fh -> fh : updateMetadata()
-fh -> fh : writeAtomically()
-fh --> km : success
-deactivate fh
-
-km -> mcp : syncToMCP(entity)
-activate mcp
-mcp -> mcp : updateMemoryGraph()
-mcp --> km : syncSuccess
-deactivate mcp
-
-km -> viz : updateVisualizer()
-activate viz
-viz -> viz : refreshMemoryJson()
-viz -> viz : triggerReload()
-viz --> km : updateSuccess
-deactivate viz
-
-km --> cli : creationSuccess
-deactivate km
-
-cli -> dev : "✅ Entity 'UkbCli' created successfully"
-cli -> dev : "📊 20 entities, 39 relations"
-cli -> dev : "🔗 Updated visualizer at localhost:8080"
-
-deactivate cli
-
-ukb -> dev : "Knowledge capture complete"
-deactivate ukb
-
-note right of validator
-  **Validation Steps:**
-  1. Technical content check
-  2. Marketing language filter  
-  3. URL accessibility test
-  4. Schema compliance verify
-end note
-
-note right of builder
-  **Entity Structure:**
-  - Problem description
-  - Solution approach
-  - Technical rationale  
-  - Learning insights
-  - Applicability scope
-end note
-
-note right of fh
-  **Atomic Operations:**
-  - Load existing data
-  - Validate schema
-  - Merge new content
-  - Write atomically
-  - Backup on failure
-end note
+deactivate UkbCli
 
 @enduml

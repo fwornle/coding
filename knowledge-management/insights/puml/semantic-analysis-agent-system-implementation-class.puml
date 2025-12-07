@@ -2,53 +2,57 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "SemanticAnalysisAgentSystemImplementation" {
-  class GraphDatabaseService <<service>> {
-    - graphDatabase: GraphDatabase
+  class GraphDatabase <<service>> {
+    - graphology: Graphology
+    - levelDB: LevelDB
     + storeData(data: String)
     + retrieveData(): String
   }
 
-  class GraphKnowledgeExporter {
-    - graphDatabaseService: GraphDatabaseService
-    + exportKnowledge(): JSON
+  class GraphDatabaseService <<service>> {
+    - graphDatabase: GraphDatabase
+    + manageDataStorage()
+    + manageDataRetrieval()
   }
 
-  class GraphDatabaseAdapter <<interface>> {
-    + adaptGraphDatabase(): GraphDatabase
+  class GraphKnowledgeExporter <<service>> {
+    - graphDatabase: GraphDatabase
+    + exportKnowledge()
   }
 
-  class LevelDBAdapter implements GraphDatabaseAdapter {
-    + adaptGraphDatabase(): GraphDatabase
+  class GraphDatabaseAdapter <<service>> {
+    - graphDatabase: GraphDatabase
+    + adaptData()
   }
 
-  class Graphology <<stereotype>> {
-    + graphologyOperations()
+  class CLI <<interface>> {
+    + visualize()
+    + knowledgeOperations()
   }
 
-  GraphDatabaseService --* GraphDatabaseAdapter
-  GraphDatabaseService --* GraphKnowledgeExporter
-  GraphKnowledgeExporter --* GraphDatabaseService
-  GraphDatabaseAdapter --|> Graphology
-  LevelDBAdapter --|> GraphDatabaseAdapter
-}
-
-package "CLI Access" {
-  class VKBCommand <<interface>> {
+  class VKBCommand <<class>> {
+    - cli: CLI
     + executeCommand()
   }
 
-  class CodingCommand <<interface>> {
-    + executeCommand()
+  class MCPTools <<class>> {
+    - cli: CLI
+    + performOperations()
   }
 
-  class GraphSyncCommand <<interface>> {
-    + executeCommand()
+  class JSONExporter <<class>> {
+    - graphKnowledgeExporter: GraphKnowledgeExporter
+    + exportToJson()
   }
 
-  VKBCommand --* GraphDatabaseService
-  CodingCommand --* GraphDatabaseService
-  GraphSyncCommand --* GraphDatabaseService
-  GraphDatabaseService --* GraphKnowledgeExporter
+  GraphDatabaseService --* GraphDatabase
+  GraphKnowledgeExporter --* GraphDatabase
+  GraphDatabaseAdapter --* GraphDatabase
+  VKBCommand --* CLI
+  MCPTools --* CLI
+  JSONExporter --* GraphKnowledgeExporter
+  GraphDatabaseService ..> GraphKnowledgeExporter
+  GraphDatabaseService ..> GraphDatabaseAdapter
 }
 
 @enduml
