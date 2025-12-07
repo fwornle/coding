@@ -853,6 +853,58 @@ else
     print_fixed "Browserbase submodule initialized and built"
 fi
 
+print_check "Browser-access SSE server (for parallel Claude sessions)"
+if dir_exists "$CODING_ROOT/integrations/browser-access"; then
+    print_pass "Browser-access server found"
+
+    print_check "Browser-access dependencies"
+    if [ -d "$CODING_ROOT/integrations/browser-access/node_modules" ]; then
+        print_pass "Browser-access dependencies installed"
+    else
+        print_repair "Installing browser-access dependencies..."
+        cd "$CODING_ROOT/integrations/browser-access" && npm install
+        print_fixed "Browser-access dependencies installed"
+    fi
+
+    print_check "Browser-access build status"
+    if [ -f "$CODING_ROOT/integrations/browser-access/dist/sse-server.js" ] && \
+       [ -f "$CODING_ROOT/integrations/browser-access/dist/stdio-proxy.js" ]; then
+        print_pass "Browser-access server built (SSE + proxy)"
+    else
+        print_repair "Building browser-access server..."
+        cd "$CODING_ROOT/integrations/browser-access" && npm run build
+        print_fixed "Browser-access server built"
+    fi
+
+    print_check "Browser-access management script"
+    if [ -x "$CODING_ROOT/integrations/browser-access/browser-access-server" ]; then
+        print_pass "browser-access-server script is executable"
+    else
+        print_repair "Making browser-access-server executable..."
+        chmod +x "$CODING_ROOT/integrations/browser-access/browser-access-server"
+        print_fixed "browser-access-server made executable"
+    fi
+
+    print_check "Browser-access SSE server status (port 3847)"
+    if lsof -i :3847 -sTCP:LISTEN >/dev/null 2>&1; then
+        print_pass "Browser-access SSE server is running"
+
+        # Test health endpoint
+        HEALTH_RESPONSE=$(curl -s http://localhost:3847/health 2>/dev/null)
+        if echo "$HEALTH_RESPONSE" | grep -q '"status":"ok"'; then
+            SESSIONS=$(echo "$HEALTH_RESPONSE" | grep -o '"sessions":[0-9]*' | cut -d':' -f2)
+            print_pass "Browser-access health check passed (sessions: ${SESSIONS:-0})"
+        else
+            print_warning "Browser-access health endpoint returned unexpected response"
+        fi
+    else
+        print_info "Browser-access SSE server not running (starts automatically with 'coding --claude')"
+    fi
+else
+    print_fail "Browser-access directory not found"
+    print_info "Expected at: $CODING_ROOT/integrations/browser-access"
+fi
+
 print_check "Semantic analysis MCP server (git submodule)"
 if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
     print_pass "Semantic analysis MCP server submodule found"

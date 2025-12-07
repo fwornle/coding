@@ -8,22 +8,27 @@
   "bugs": "https://github.com/modelcontextprotocol/servers/issues",
   "type": "module",
   "bin": {
-    "mcp-server-stagehand": "dist/index.js"
+    "mcp-server-stagehand": "dist/index.js",
+    "mcp-server-stagehand-sse": "dist/sse-server.js",
+    "mcp-server-stagehand-proxy": "dist/stdio-proxy.js"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsc && shx chmod +x dist/*.js",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "start:sse": "node dist/sse-server.js"
   },
   "dependencies": {
     "@browserbasehq/sdk": "^2.0.0",
     "@browserbasehq/stagehand": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.0.3",
-    "@playwright/test": "^1.49.0"
+    "@playwright/test": "^1.49.0",
+    "express": "^4.21.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
     "shx": "^0.3.4",
     "typescript": "^5.8.3"
   }

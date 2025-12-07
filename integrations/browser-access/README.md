@@ -2,37 +2,108 @@
 
 A customized Model Context Protocol (MCP) server that provides AI-powered web automation capabilities using [Stagehand](https://github.com/browserbase/stagehand), configured specifically for Claude Code and Anthropic's Claude models. This server enables Claude to interact with web pages, perform actions, extract data, and observe possible actions in a real browser environment.
 
+## Architecture
+
+The browser-access server uses a **shared SSE architecture** to support multiple parallel Claude Code sessions without conflicts:
+
+![Browser Access Architecture](docs/images/browser-access-architecture.png)
+
+### Key Components
+
+| Component | Description | Transport |
+|-----------|-------------|-----------|
+| `stdio-proxy.js` | Lightweight proxy spawned per Claude session | stdio (to Claude) |
+| `sse-server.js` | Shared server managing all sessions | SSE/HTTP (port 3847) |
+| Stagehand | Browser automation library | Single shared instance |
+| Chrome CDP | Chrome DevTools Protocol | WebSocket (port 9222) |
+
+### Why SSE Architecture?
+
+When multiple Claude Code sessions run simultaneously, each would normally spawn its own MCP server process. This caused conflicts because:
+
+1. Multiple processes competed for the same Chrome DevTools Protocol connection
+2. One session connecting could disrupt another session's browser control
+3. The browser-access server would show as "failed" in subsequent sessions
+
+The SSE architecture solves this by:
+
+- Running a **single shared server** that all sessions connect to
+- Using lightweight **stdio proxies** that Claude Code spawns
+- Maintaining **one Stagehand instance** shared across all sessions
+
 ## Quick Setup
+
+### Automatic (Recommended)
+
+The `coding` launcher automatically starts the browser-access SSE server:
+
+```bash
+# Just use the coding command - it handles everything
+coding --claude
+```
+
+### Manual Setup
 
 1. **Build the server**:
    ```bash
-   # Use the main install script which handles browser-access setup
-   ../install.sh
-   
-   # Or build manually:
    npm install && npm run build
    ```
 
-2. **Set environment variables**:
+2. **Start the SSE server** (run once, shared across all sessions):
    ```bash
-   export ANTHROPIC_API_KEY="your-anthropic-api-key"
-   
-   # For cloud browser (optional):
-   export BROWSERBASE_API_KEY="your-browserbase-api-key"
-   export BROWSERBASE_PROJECT_ID="your-project-id"
-   
-   # For local browser (optional):
-   export LOCAL_CDP_URL="ws://localhost:9222"
+   ./browser-access-server start
    ```
 
-3. **Test the setup**:
+3. **Verify server is running**:
    ```bash
-   # Use the main test approach via claude-mcp
-   ../claude-mcp
-   
-   # Or run the test script:
-   ./test-browser-access.sh
+   curl http://localhost:3847/health
+   # Returns: { "status": "ok", "sessions": 0, ... }
    ```
+
+4. **Start Chrome in debug mode**:
+   ```bash
+   browser  # or ./start-chrome-debug.sh
+   ```
+
+5. **Start Claude Code** - the proxy will connect to the shared server
+
+## Server Management
+
+The `browser-access-server` script manages the shared SSE server:
+
+```bash
+./browser-access-server start    # Start the server (if not running)
+./browser-access-server stop     # Stop the server
+./browser-access-server status   # Check server status and health
+./browser-access-server restart  # Restart the server
+```
+
+### Health Check
+
+```bash
+curl http://localhost:3847/health
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "sessions": 2,
+  "stagehandInitialized": true,
+  "uptime": 3600.5
+}
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BROWSER_ACCESS_PORT` | SSE server port | `3847` |
+| `BROWSER_ACCESS_SSE_URL` | SSE server URL (for proxy) | `http://localhost:3847` |
+| `LOCAL_CDP_URL` | Chrome DevTools Protocol URL | `ws://localhost:9222` |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Stagehand | Required |
+| `BROWSERBASE_API_KEY` | Browserbase cloud API key | Optional |
+| `BROWSERBASE_PROJECT_ID` | Browserbase project ID | Optional |
 
 ## Browser Setup Options
 
@@ -57,52 +128,18 @@ export BROWSERBASE_API_KEY="your-api-key"
 export BROWSERBASE_PROJECT_ID="your-project-id"
 ```
 
-## Chrome Debug Script Features
+## MCP Configuration
 
-The `start-chrome-debug.sh` script (aliased as `browser`) provides:
+The server is configured in `~/.claude.json` to use the proxy:
 
-- ✅ **Auto-detection** of Chrome/Chromium installation
-- ✅ **Port conflict handling** - detects if Chrome debug is already running
-- ✅ **Clean profile** - uses temporary profile for clean debugging
-- ✅ **Optimal flags** - pre-configured for automation compatibility
-- ✅ **URL support** - optionally navigate to a URL on startup
-- ✅ **Cross-platform** - works on macOS, Linux, and WSL
-
-### Usage Examples:
-```bash
-browser                           # Start with blank page
-browser google.com               # Start and go to Google  
-browser https://github.com       # Start and go to GitHub
-browser --help                   # Show help
-```
-
-## Claude Code Integration
-
-### For Claude Desktop
-The MCP server has been automatically configured in Claude Desktop at:
-`~/Library/Application Support/Claude/claude_desktop_config.json`
-
-### For Claude Code CLI
-Use the convenience script to start Claude Code with browser automation:
-
-```bash
-# Quick start with browser tools
-./claude-browser
-
-# Or manually specify the MCP config
-claude code --mcp-config ./claude-code-mcp.json
-```
-
-The MCP configuration includes:
 ```json
 {
   "mcpServers": {
     "browser-access": {
-      "command": "node", 
-      "args": ["$PROJECT_ROOT/browser-access/dist/index.js"],
+      "command": "node",
+      "args": ["/path/to/browser-access/dist/stdio-proxy.js"],
       "env": {
-        "LOCAL_CDP_URL": "ws://localhost:9222",
-        "ANTHROPIC_API_KEY": "your-api-key"
+        "BROWSER_ACCESS_SSE_URL": "http://localhost:3847"
       }
     }
   }
@@ -113,13 +150,13 @@ The MCP configuration includes:
 
 In Claude Code CLI, the tools are prefixed with `mcp__browser-access__`:
 
-- `mcp__browser-access__stagehand_navigate`: Navigate to URLs
-- `mcp__browser-access__stagehand_act`: Perform actions (click, type, etc.)  
-- `mcp__browser-access__stagehand_extract`: Extract data from web pages
-- `mcp__browser-access__stagehand_observe`: Get page information
-- `mcp__browser-access__stagehand_screenshot`: Take screenshots
-
-Note: In Claude Desktop, the tools appear without the MCP prefix.
+| Tool | Description |
+|------|-------------|
+| `stagehand_navigate` | Navigate to URLs |
+| `stagehand_act` | Perform actions (click, type, etc.) |
+| `stagehand_extract` | Extract data from web pages |
+| `stagehand_observe` | Get page information and possible actions |
+| `screenshot` | Take screenshots of the current page |
 
 ## Usage Examples
 
@@ -132,40 +169,85 @@ Once integrated with Claude Code, you can use natural language commands like:
 
 ## Workflow
 
-### For Claude Code CLI:
 1. **Start Chrome**: `browser` (or `browser <url>`)
-2. **Start Claude Code**: `./claude-browser` (from browser-access directory)
+2. **Start Claude Code**: `coding --claude` (auto-starts SSE server)
 3. **Use browser automation** with natural language commands
-4. **Stop Chrome**: `pkill -f 'remote-debugging-port=9222'`
-
-### For Claude Desktop:
-1. **Start Chrome**: `browser` (or `browser <url>`)
-2. **Restart Claude Desktop** (if not done already)
-3. **Use browser automation** with natural language
 4. **Stop Chrome**: `pkill -f 'remote-debugging-port=9222'`
 
 ## Troubleshooting
 
-1. **Build Issues**: Make sure TypeScript is installed and run `npm install`
-2. **Browser Connection**: Ensure Chrome is running with `browser` command
-3. **API Keys**: Verify your ANTHROPIC_API_KEY is valid in the MCP config
-4. **Permissions**: Make sure scripts are executable (`chmod +x *.sh`)
-5. **Command Issues**: Make sure `$PROJECT_ROOT/knowledge-management` is in your PATH
+### Server shows as "failed" in MCP list
 
-## Configuration
+1. Check if SSE server is running: `./browser-access-server status`
+2. Start it if not running: `./browser-access-server start`
+3. Restart Claude Code to reconnect
 
-The server is configured in `src/server.ts` with Claude-specific settings:
-- Model: `claude-3-5-sonnet-20241022`
-- Provider: Anthropic API
-- Base URL: `https://api.anthropic.com`
+### Multiple sessions conflict
+
+This should not happen with the SSE architecture. If it does:
+1. Stop all browser-access processes: `pkill -f browser-access`
+2. Restart the SSE server: `./browser-access-server restart`
+3. Restart Claude Code sessions
+
+### Browser connection issues
+
+1. Ensure Chrome is running with debug port: `browser`
+2. Check CDP port: `lsof -i :9222`
+3. Verify SSE server health: `curl http://localhost:3847/health`
+
+### Build Issues
+
+```bash
+npm install
+npm run build
+```
 
 ## Development
 
-To modify the server:
-1. Edit files in `src/`
-2. Run `npm run build` (or `npx tsc && chmod +x dist/*.js`)
-3. Test with `./test-browser-access.sh`
+### Project Structure
+
+```
+browser-access/
+├── src/
+│   ├── index.ts          # Original stdio server (legacy)
+│   ├── sse-server.ts     # Shared SSE server
+│   ├── stdio-proxy.ts    # Per-session stdio proxy
+│   ├── server.ts         # MCP server implementation
+│   ├── tools.ts          # Tool definitions
+│   └── ...
+├── dist/                 # Compiled JavaScript
+├── docs/
+│   ├── puml/            # PlantUML source files
+│   └── images/          # Generated diagrams
+├── logs/                # Server logs
+├── browser-access-server # Server management script
+└── package.json
+```
+
+### Building
+
+```bash
+npm run build    # Compile TypeScript
+npm run watch    # Watch mode for development
+```
+
+### Testing
+
+```bash
+# Test SSE server health
+curl http://localhost:3847/health
+
+# Test proxy connection
+BROWSER_ACCESS_SSE_URL=http://localhost:3847 node dist/stdio-proxy.js
+```
+
+## Ports Used
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 3847 | SSE Server | Browser-access shared MCP server |
+| 9222 | Chrome CDP | Chrome DevTools Protocol |
 
 ## Credits
 
-Based on the original Stagehand MCP server by Browserbase, modified for Claude Code integration.
+Based on the original Stagehand MCP server by Browserbase, modified for Claude Code integration with SSE architecture for parallel session support.

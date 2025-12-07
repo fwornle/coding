@@ -1,0 +1,123 @@
+#!/bin/bash
+#
+# browser-access-server - Manage the shared browser-access SSE server
+#
+# Usage:
+#   browser-access-server start   - Start the SSE server (if not running)
+#   browser-access-server stop    - Stop the SSE server
+#   browser-access-server status  - Check if server is running
+#   browser-access-server restart - Restart the server
+#
+# The server runs on port 3847 by default (configurable via BROWSER_ACCESS_PORT)
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PID_FILE="${SCRIPT_DIR}/logs/sse-server.pid"
+LOG_FILE="${SCRIPT_DIR}/logs/sse-server.log"
+PORT="${BROWSER_ACCESS_PORT:-3847}"
+
+# Ensure logs directory exists
+mkdir -p "${SCRIPT_DIR}/logs"
+
+is_running() {
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    # Also check by port
+    if lsof -i ":$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+start_server() {
+    if is_running; then
+        echo "Browser access SSE server is already running"
+        return 0
+    fi
+
+    echo "Starting browser access SSE server on port $PORT..."
+
+    # Set required environment variables
+    export LOCAL_CDP_URL="${LOCAL_CDP_URL:-ws://localhost:9222}"
+    export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}"
+    export BROWSER_ACCESS_PORT="$PORT"
+
+    # Start the server in background
+    nohup node "${SCRIPT_DIR}/dist/sse-server.js" >> "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+
+    # Wait a moment and verify
+    sleep 2
+    if is_running; then
+        echo "Server started successfully (PID: $(cat $PID_FILE))"
+        echo "Health check: http://localhost:$PORT/health"
+    else
+        echo "Failed to start server. Check logs: $LOG_FILE"
+        return 1
+    fi
+}
+
+stop_server() {
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "Stopping server (PID: $pid)..."
+            kill "$pid"
+            rm -f "$PID_FILE"
+            echo "Server stopped"
+            return 0
+        fi
+    fi
+
+    # Try to find and kill by port
+    pid=$(lsof -ti ":$PORT" -sTCP:LISTEN 2>/dev/null)
+    if [ -n "$pid" ]; then
+        echo "Stopping server on port $PORT (PID: $pid)..."
+        kill "$pid"
+        rm -f "$PID_FILE"
+        echo "Server stopped"
+        return 0
+    fi
+
+    echo "Server is not running"
+}
+
+status_server() {
+    if is_running; then
+        if [ -f "$PID_FILE" ]; then
+            echo "Browser access SSE server is running (PID: $(cat $PID_FILE))"
+        else
+            pid=$(lsof -ti ":$PORT" -sTCP:LISTEN 2>/dev/null)
+            echo "Browser access SSE server is running (PID: $pid)"
+        fi
+        # Show health check
+        curl -s "http://localhost:$PORT/health" 2>/dev/null | jq . 2>/dev/null || echo "(health check unavailable)"
+    else
+        echo "Browser access SSE server is not running"
+        return 1
+    fi
+}
+
+case "${1:-status}" in
+    start)
+        start_server
+        ;;
+    stop)
+        stop_server
+        ;;
+    restart)
+        stop_server
+        sleep 1
+        start_server
+        ;;
+    status)
+        status_server
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac

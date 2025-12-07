@@ -40,6 +40,9 @@ const CODING_DIR = path.resolve(SCRIPT_DIR, '..');
 const execAsync = promisify(exec);
 const psm = new ProcessStateManager();
 
+// Get target project path from environment (set by bin/coding)
+const TARGET_PROJECT_PATH = process.env.CODING_PROJECT_DIR || CODING_DIR;
+
 // Service configurations
 const SERVICE_CONFIGS = {
   transcriptMonitor: {
@@ -49,16 +52,26 @@ const SERVICE_CONFIGS = {
     timeout: 20000,
     startFn: async () => {
       console.log('[TranscriptMonitor] Starting enhanced transcript monitor...');
+      console.log(`[TranscriptMonitor] Target project: ${TARGET_PROJECT_PATH}`);
 
       // Check if already running globally (parallel session detection)
-      const isRunning = await psm.isServiceRunning('transcript-monitor', 'global');
-      if (isRunning) {
+      const isRunningGlobally = await psm.isServiceRunning('transcript-monitor', 'global');
+      if (isRunningGlobally) {
         console.log('[TranscriptMonitor] Already running globally - using existing instance');
         return { pid: 'already-running', service: 'transcript-monitor', skipRegistration: true };
       }
 
+      // CRITICAL: Check if a per-project monitor is already running for this project
+      // This handles the case where global-lsl-coordinator spawned one
+      const isRunningPerProject = await psm.isServiceRunning('enhanced-transcript-monitor', 'per-project', { projectPath: TARGET_PROJECT_PATH });
+      if (isRunningPerProject) {
+        console.log(`[TranscriptMonitor] Already running for project ${path.basename(TARGET_PROJECT_PATH)} - using existing instance`);
+        return { pid: 'already-running', service: 'transcript-monitor', skipRegistration: true };
+      }
+
       const child = spawn('node', [
-        path.join(SCRIPT_DIR, 'enhanced-transcript-monitor.js')
+        path.join(SCRIPT_DIR, 'enhanced-transcript-monitor.js'),
+        TARGET_PROJECT_PATH  // Pass target project path as argument
       ], {
         detached: true,
         stdio: ['ignore', 'ignore', 'ignore'],
@@ -478,118 +491,49 @@ async function createServicesStatusFile(results) {
 }
 
 /**
- * Wait for a process pattern to be fully terminated
- * Returns true when no more processes match the pattern
- */
-async function waitForProcessTermination(pattern, maxWaitMs = 5000, checkIntervalMs = 200) {
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitMs) {
-    try {
-      const { stdout } = await execAsync(
-        `ps aux | grep "${pattern}" | grep -v grep || true`,
-        { timeout: 2000 }
-      );
-
-      if (!stdout.trim()) {
-        return true; // No more processes found
-      }
-
-      await sleep(checkIntervalMs);
-    } catch (error) {
-      // ps command failed, assume processes are gone
-      return true;
-    }
-  }
-
-  return false; // Timeout - processes may still be running
-}
-
-/**
  * Pre-startup cleanup to remove dangling processes from crashed sessions
+ *
+ * IMPORTANT: We no longer kill ALL transcript monitors globally because:
+ * 1. Other Claude sessions may have their own monitors running
+ * 2. The global-lsl-coordinator spawns per-project monitors
+ * 3. Killing them all causes a race condition where they get respawned
+ *
+ * Instead, we only clean up truly orphaned processes (not registered in PSM)
+ * and rely on the startup logic to reuse existing monitors.
  */
 async function cleanupDanglingProcesses() {
-  console.log('🧹 Pre-startup cleanup: Checking for dangling processes...');
+  console.log('🧹 Pre-startup cleanup: Checking for orphaned processes...');
   console.log('');
 
   try {
-    // Kill dangling transcript monitors
-    const { stdout: transcriptPs } = await execAsync(
-      'ps aux | grep "enhanced-transcript-monitor.js" | grep -v grep || true',
-      { timeout: 5000 }
-    );
-
-    if (transcriptPs.trim()) {
-      const transcriptCount = transcriptPs.trim().split('\n').length;
-      console.log(`   Found ${transcriptCount} dangling transcript monitor process(es)`);
-      console.log('   Terminating dangling transcript monitors...');
-
-      try {
-        // First try graceful SIGTERM
-        await execAsync('pkill -f "enhanced-transcript-monitor.js"', { timeout: 5000 });
-
-        // Wait for processes to actually terminate (up to 3 seconds)
-        const terminated = await waitForProcessTermination('enhanced-transcript-monitor.js', 3000);
-
-        if (!terminated) {
-          // Force kill with SIGKILL if still running
-          console.log('   ⚠️  Graceful termination timed out, forcing kill...');
-          await execAsync('pkill -9 -f "enhanced-transcript-monitor.js"', { timeout: 5000 }).catch(() => {});
-          await waitForProcessTermination('enhanced-transcript-monitor.js', 2000);
-        }
-
-        console.log('   ✅ Cleaned up transcript monitors');
-      } catch (error) {
-        // pkill returns non-zero if no processes found - this is expected on retry
-      }
-    } else {
-      console.log('   ✅ No dangling transcript monitors found');
-    }
-
-    // Kill dangling live-logging coordinators
-    const { stdout: loggingPs } = await execAsync(
-      'ps aux | grep "live-logging-coordinator.js" | grep -v grep || true',
-      { timeout: 5000 }
-    );
-
-    if (loggingPs.trim()) {
-      const loggingCount = loggingPs.trim().split('\n').length;
-      console.log(`   Found ${loggingCount} dangling live-logging coordinator process(es)`);
-      console.log('   Terminating dangling live-logging coordinators...');
-
-      try {
-        // First try graceful SIGTERM
-        await execAsync('pkill -f "live-logging-coordinator.js"', { timeout: 5000 });
-
-        // Wait for processes to actually terminate (up to 3 seconds)
-        const terminated = await waitForProcessTermination('live-logging-coordinator.js', 3000);
-
-        if (!terminated) {
-          // Force kill with SIGKILL if still running
-          console.log('   ⚠️  Graceful termination timed out, forcing kill...');
-          await execAsync('pkill -9 -f "live-logging-coordinator.js"', { timeout: 5000 }).catch(() => {});
-          await waitForProcessTermination('live-logging-coordinator.js', 2000);
-        }
-
-        console.log('   ✅ Cleaned up live-logging coordinators');
-      } catch (error) {
-        // pkill returns non-zero if no processes found - this is expected on retry
-      }
-    } else {
-      console.log('   ✅ No dangling live-logging coordinators found');
-    }
-
-    // Clean up stale PSM entries
+    // Clean up stale PSM entries FIRST - this removes dead PIDs from registry
     console.log('   Cleaning up stale Process State Manager entries...');
     try {
-      await psm.cleanupStaleServices();
-      console.log('   ✅ PSM cleanup complete');
+      const cleanupStats = await psm.cleanupDeadProcesses();
+      if (cleanupStats && cleanupStats.total > 0) {
+        console.log(`   ✅ PSM cleanup: Removed ${cleanupStats.total} dead process entries`);
+      } else {
+        console.log('   ✅ PSM cleanup complete - no stale entries');
+      }
     } catch (error) {
       console.log(`   ⚠️  PSM cleanup warning: ${error.message}`);
     }
 
+    // Check if a transcript monitor is already running for THIS project
+    // If so, we'll reuse it during startup (no need to kill it)
+    const isRunningPerProject = await psm.isServiceRunning('enhanced-transcript-monitor', 'per-project', { projectPath: TARGET_PROJECT_PATH });
+    if (isRunningPerProject) {
+      console.log(`   ℹ️  Transcript monitor already running for ${path.basename(TARGET_PROJECT_PATH)} - will reuse`);
+    }
+
+    // Check for live-logging coordinator
+    const isCoordinatorRunning = await psm.isServiceRunning('live-logging-coordinator', 'global');
+    if (isCoordinatorRunning) {
+      console.log('   ℹ️  Live-logging coordinator already running globally - will reuse');
+    }
+
     console.log('');
-    console.log('✅ Pre-startup cleanup complete - system ready for fresh start');
+    console.log('✅ Pre-startup cleanup complete - system ready');
     console.log('');
   } catch (error) {
     console.log(`⚠️  Pre-startup cleanup warning: ${error.message}`);

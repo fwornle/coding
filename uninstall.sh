@@ -120,17 +120,40 @@ if [[ -d "$CODING_REPO/integrations/serena" ]]; then
     echo "    Git submodule source code preserved"
 fi
 
-# Clean up node_modules in MCP servers (non-submodules)
-for dir in "integrations/browser-access"; do
-    if [[ -d "$CODING_REPO/$dir/node_modules" ]]; then
-        rm -rf "$CODING_REPO/$dir/node_modules"
-        echo "  Removed $dir/node_modules"
+# Clean up browser-access MCP server (SSE architecture)
+if [[ -d "$CODING_REPO/integrations/browser-access" ]]; then
+    echo "  Cleaning browser-access MCP server..."
+
+    # Stop the SSE server if running
+    if lsof -i :3847 -sTCP:LISTEN >/dev/null 2>&1; then
+        echo "    Stopping browser-access SSE server..."
+        "$CODING_REPO/integrations/browser-access/browser-access-server" stop 2>/dev/null || true
     fi
-    if [[ -d "$CODING_REPO/$dir/dist" ]]; then
-        rm -rf "$CODING_REPO/$dir/dist"
-        echo "  Removed $dir/dist"
+
+    # Kill any remaining browser-access processes
+    pkill -f "browser-access.*sse-server" 2>/dev/null || true
+    pkill -f "browser-access.*stdio-proxy" 2>/dev/null || true
+
+    # Remove node_modules
+    if [[ -d "$CODING_REPO/integrations/browser-access/node_modules" ]]; then
+        rm -rf "$CODING_REPO/integrations/browser-access/node_modules"
+        echo "    Removed node_modules"
     fi
-done
+
+    # Remove dist
+    if [[ -d "$CODING_REPO/integrations/browser-access/dist" ]]; then
+        rm -rf "$CODING_REPO/integrations/browser-access/dist"
+        echo "    Removed dist"
+    fi
+
+    # Remove logs
+    if [[ -d "$CODING_REPO/integrations/browser-access/logs" ]]; then
+        rm -rf "$CODING_REPO/integrations/browser-access/logs"
+        echo "    Removed logs"
+    fi
+
+    echo "    Source code preserved"
+fi
 
 # Note: memory-visualizer and mcp-server-semantic-analysis are git submodules
 # and have already been cleaned above
