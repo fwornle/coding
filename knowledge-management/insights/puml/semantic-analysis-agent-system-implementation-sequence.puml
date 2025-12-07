@@ -1,0 +1,36 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant SemanticAnalysisAgentSystemImplementation as "System"
+participant GraphDatabaseService as "Graph DB Service"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant GraphDatabaseAdapter as "Graph DB Adapter"
+participant CLI as "Command Line Interface"
+
+note over SemanticAnalysisAgentSystemImplementation: System Initialization
+SemanticAnalysisAgentSystemImplementation ->> GraphDatabaseService: Initialize Graph Database
+SemanticAnalysisAgentSystemImplementation ->> GraphKnowledgeExporter: Initialize Knowledge Exporter
+SemanticAnalysisAgentSystemImplementation ->> GraphDatabaseAdapter: Initialize Database Adapter
+
+CLI ->> SemanticAnalysisAgentSystemImplementation: vkb command
+SemanticAnalysisAgentSystemImplementation ->> GraphDatabaseService: Query Graph Database
+GraphDatabaseService ->> SemanticAnalysisAgentSystemImplementation: Return query results
+SemanticAnalysisAgentSystemImplementation ->> CLI: Display results
+
+CLI ->> SemanticAnalysisAgentSystemImplementation: coding command
+SemanticAnalysisAgentSystemImplementation ->> GraphDatabaseService: Update Graph Database
+GraphDatabaseService ->> SemanticAnalysisAgentSystemImplementation: Confirm update
+SemanticAnalysisAgentSystemImplementation ->> CLI: Display confirmation
+
+CLI ->> SemanticAnalysisAgentSystemImplementation: graph-sync command
+SemanticAnalysisAgentSystemImplementation ->> GraphDatabaseAdapter: Sync Graph Database
+GraphDatabaseAdapter ->> SemanticAnalysisAgentSystemImplementation: Confirm sync
+SemanticAnalysisAgentSystemImplementation ->> CLI: Display confirmation
+
+alt Auto-Sync JSON Exports
+    SemanticAnalysisAgentSystemImplementation ->> GraphKnowledgeExporter: Export knowledge graph to JSON
+    GraphKnowledgeExporter ->> SemanticAnalysisAgentSystemImplementation: Confirm export
+    SemanticAnalysisAgentSystemImplementation ->> CLI: Display export confirmation
+end
+
+@enduml

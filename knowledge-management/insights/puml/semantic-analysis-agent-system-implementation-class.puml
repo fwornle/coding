@@ -1,0 +1,54 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "SemanticAnalysisAgentSystemImplementation" {
+  class GraphDatabaseService <<service>> {
+    - graphDatabase: GraphDatabase
+    + storeData(data: String)
+    + retrieveData(): String
+  }
+
+  class GraphKnowledgeExporter {
+    - graphDatabaseService: GraphDatabaseService
+    + exportKnowledge(): JSON
+  }
+
+  class GraphDatabaseAdapter <<interface>> {
+    + adaptGraphDatabase(): GraphDatabase
+  }
+
+  class LevelDBAdapter implements GraphDatabaseAdapter {
+    + adaptGraphDatabase(): GraphDatabase
+  }
+
+  class Graphology <<stereotype>> {
+    + graphologyOperations()
+  }
+
+  GraphDatabaseService --* GraphDatabaseAdapter
+  GraphDatabaseService --* GraphKnowledgeExporter
+  GraphKnowledgeExporter --* GraphDatabaseService
+  GraphDatabaseAdapter --|> Graphology
+  LevelDBAdapter --|> GraphDatabaseAdapter
+}
+
+package "CLI Access" {
+  class VKBCommand <<interface>> {
+    + executeCommand()
+  }
+
+  class CodingCommand <<interface>> {
+    + executeCommand()
+  }
+
+  class GraphSyncCommand <<interface>> {
+    + executeCommand()
+  }
+
+  VKBCommand --* GraphDatabaseService
+  CodingCommand --* GraphDatabaseService
+  GraphSyncCommand --* GraphDatabaseService
+  GraphDatabaseService --* GraphKnowledgeExporter
+}
+
+@enduml
