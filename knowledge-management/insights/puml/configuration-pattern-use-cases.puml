@@ -1,0 +1,82 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Knowledge Engineer" as KE
+actor "Developer" as DEV
+actor "MCP Client" as MCP
+actor "System Analyst" as SA
+
+rectangle "Knowledge Management System" {
+  usecase "Extract Configuration Patterns" as UC1
+  usecase "Store Pattern in GraphDB" as UC2
+  usecase "Query Pattern Knowledge" as UC3
+  usecase "Export Pattern Data" as UC4
+  usecase "Sync Knowledge Graph" as UC5
+}
+
+rectangle "Pattern Analysis" {
+  usecase "Analyze Codebase Structure" as UC6
+  usecase "Identify Transferable Patterns" as UC7
+  usecase "Generate Pattern Metadata" as UC8
+}
+
+rectangle "Data Storage" {
+  usecase "Persist in LevelDB" as UC9
+  usecase "Maintain Graph Relations" as UC10
+  usecase "Auto-sync JSON Export" as UC11
+}
+
+rectangle "Integration Services" {
+  usecase "Serve MCP Requests" as UC12
+  usecase "Provide Semantic Analysis" as UC13
+  usecase "Access UKB Unified Library" as UC14
+}
+
+' Primary actor relationships
+KE --> UC1
+KE --> UC2
+KE --> UC5
+
+DEV --> UC3
+DEV --> UC6
+DEV --> UC7
+
+MCP --> UC12
+MCP --> UC13
+
+SA --> UC4
+SA --> UC8
+
+' Use case relationships
+UC1 ..> UC6 : <<include>>
+UC1 ..> UC7 : <<include>>
+UC2 ..> UC9 : <<include>>
+UC2 ..> UC10 : <<include>>
+UC3 ..> UC10 : <<include>>
+UC4 ..> UC11 : <<include>>
+UC5 ..> UC11 : <<include>>
+UC8 ..> UC2 : <<extend>>
+UC12 ..> UC3 : <<include>>
+UC13 ..> UC14 : <<include>>
+
+note right of UC2
+  Uses Graphology + LevelDB
+  Located at .data/knowledge-graph
+end note
+
+note right of UC11
+  JSON exports at 
+  .data/knowledge-export
+end note
+
+note left of UC1
+  ConfigurationPattern implemented
+  across multiple modules:
+  - src/knowledge-management
+  - lib/ukb-unified  
+  - integrations/mcp-server-semantic-analysis
+end note
+
+@enduml

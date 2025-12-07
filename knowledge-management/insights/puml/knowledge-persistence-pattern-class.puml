@@ -2,47 +2,81 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Persistence Pattern" {
-  class KnowledgeBase {
-    + storeKnowledge()
+  class KnowledgePersistencePattern {
+    - graphDatabase: GraphDatabase
+    + persistKnowledge()
     + retrieveKnowledge()
-    + updateKnowledge()
   }
 
   class GraphDatabase {
-    + storeData()
-    + retrieveData()
-    + updateData()
+    - graphology: Graphology
+    - levelDB: LevelDB
+    + storeKnowledge()
+    + retrieveKnowledge()
+  }
+
+  class Graphology {
   }
 
   class LevelDB {
-    + storeData()
-    + retrieveData()
-    + updateData()
+  }
+}
+
+package "Graph Database Service" {
+  class GraphDatabaseService {
+    + provideGraphDatabaseServices()
   }
 
-  class JSONExporter {
-    + exportKnowledge()
+  class GraphDatabaseService --* GraphDatabase
+}
+
+package "Command Line Interface" {
+  class VkbCommand {
+    + visualizeKnowledge()
+    + performMCPToolsOperations()
   }
 
-  class CommandlineInterface {
+  class VkbCommand --* KnowledgePersistencePattern
+}
+
+package "Graph Sync" {
+  class GraphSyncCommand {
+    + synchronizeGraphDatabaseWithJSONExports()
+  }
+
+  class GraphSyncCommand --* GraphDatabase
+}
+
+package "Knowledge Export" {
+  class GraphKnowledgeExporter {
+    + exportKnowledgeFromGraphDatabase()
+  }
+
+  class GraphKnowledgeExporter --* GraphDatabase
+}
+
+package "Vkb Api Client" {
+  class VkbApiClient {
     + interactWithKnowledgeBase()
   }
 
-  class KBUpdateDetector {
-    + detectUpdates()
+  class VkbApiClient --* KnowledgePersistencePattern
+}
+
+package "Persistence Agent" {
+  class PersistenceAgent {
+    + persistKnowledgeInGraphDatabase()
   }
 
-  KnowledgeBase --* GraphDatabase : uses
-  GraphDatabase --* LevelDB : uses
-  KnowledgeBase --* JSONExporter : uses
-  KnowledgeBase --* CommandlineInterface : uses
-  KnowledgeBase --* KBUpdateDetector : uses
+  class PersistenceAgent --* GraphDatabase
 }
 
-class KnowledgePersistencePattern {
-  + applyPattern()
-}
-
-KnowledgePersistencePattern --* KnowledgeBase : implements
+KnowledgePersistencePattern --* GraphDatabaseService
+GraphDatabaseService --* GraphDatabase
+VkbCommand --* GraphDatabaseService
+GraphSyncCommand --* GraphDatabase
+GraphKnowledgeExporter --* GraphDatabase
+VkbApiClient --* KnowledgePersistencePattern
+PersistenceAgent --* GraphDatabase
 
 @enduml

@@ -1,146 +1,33 @@
-@startuml ukb-cli-use-cases
-!theme plain
-skinparam backgroundColor white
-skinparam roundcorner 20
-skinparam shadowing false
-title UkbCli - Use Cases and Workflows
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-skinparam usecase {
-  BackgroundColor #E8F4FD
-  BorderColor #4A90E2
-  FontSize 10
-  FontColor #000000
-}
-skinparam actor {
-  BackgroundColor #FFE8F4
-  BorderColor #E24A90
-  FontSize 12
-  FontColor #000000
-}
-skinparam package {
-  BackgroundColor #F8F8F8
-  BorderColor #888888
-  FontSize 12
-  FontColor #000000
-}
-skinparam note {
-  BackgroundColor #FFFACD
-  FontSize 9
-  FontColor #000000
+title UkbCli Use Case Diagram
+
+actor ExternalServices as "External Services"
+actor User as "User"
+actor MCPTools as "MCP Tools"
+
+usecase "Interact with External Services" as (InteractWithExternalServices)
+usecase "Perform Knowledge Operations" as (PerformKnowledgeOperations)
+usecase "Visualize Knowledge" as (VisualizeKnowledge)
+usecase "Manage Knowledge Storage" as (ManageKnowledgeStorage)
+usecase "Export Knowledge" as (ExportKnowledge)
+
+rectangle KnowledgeManagement {
+  usecase "Manage Knowledge Storage" as (ManageKnowledgeStorage)
+  usecase "Export Knowledge" as (ExportKnowledge)
 }
 
-left to right direction
+User -- (InteractWithExternalServices)
+User -- (PerformKnowledgeOperations)
+User -- (VisualizeKnowledge)
 
-actor "Developer" as dev
-actor "Coding Agent" as agent
-actor "Team Lead" as lead
-actor "CI/CD System" as ci
+ExternalServices -- (InteractWithExternalServices)
 
-package "UkbCli Use Cases" {
-  
-  package "Knowledge Capture" {
-    usecase "Interactive Insight\nCapture" as interactive
-    usecase "Automated Git\nAnalysis" as auto_git
-    usecase "Real-time Pattern\nExtraction" as realtime
-    usecase "Bulk Knowledge\nMigration" as migration
-  }
-  
-  package "Quality Assurance" {
-    usecase "Content Validation" as validation
-    usecase "URL Verification" as url_check
-    usecase "Marketing Filter" as marketing
-    usecase "Schema Compliance" as schema
-  }
-  
-  package "Integration" {
-    usecase "MCP Memory Sync" as mcp_sync
-    usecase "Visualizer Update" as viz_update
-    usecase "Cross-session\nPersistence" as persistence
-    usecase "Legacy Script\nCompatibility" as legacy
-  }
-  
-  package "Team Collaboration" {
-    usecase "Knowledge Export" as export
-    usecase "Pattern Sharing" as sharing
-    usecase "Team Onboarding" as onboarding
-    usecase "Architecture Review" as review
-  }
-}
+MCPTools -- (PerformKnowledgeOperations)
 
-' Developer Use Cases
-dev --> interactive
-dev --> auto_git
-dev --> migration
-dev --> export
-
-' Agent Use Cases  
-agent --> realtime
-agent --> validation
-agent --> mcp_sync
-agent --> persistence
-
-' Team Lead Use Cases
-lead --> sharing
-lead --> onboarding
-lead --> review
-lead --> export
-
-' CI/CD Use Cases
-ci --> auto_git
-ci --> validation
-ci --> export
-ci --> schema
-
-' Quality Flow
-interactive --> validation
-auto_git --> validation
-realtime --> validation
-validation --> url_check
-validation --> marketing
-validation --> schema
-
-' Integration Flow
-validation --> mcp_sync
-mcp_sync --> viz_update
-mcp_sync --> persistence
-interactive --> legacy
-auto_git --> legacy
-
-' Collaboration Flow
-export --> sharing
-sharing --> onboarding
-persistence --> review
-
-note top of interactive
-  **Manual Deep Capture**
-  - Complex architectural decisions
-  - Design trade-offs
-  - Problem-solving journeys
-  - Cross-project patterns
-end note
-
-note top of auto_git
-  **Automated Analysis**
-  - Commit pattern detection
-  - Technology trend analysis
-  - Performance optimization tracking
-  - Incremental knowledge building
-end note
-
-note top of realtime
-  **Agent Integration**
-  - Live coding session capture
-  - Context-aware suggestions
-  - Pattern application guidance
-  - Real-time quality feedback
-end note
-
-note bottom of validation
-  **Quality Gates**
-  - No marketing language
-  - Valid URLs only
-  - Technical accuracy
-  - Structured observations
-end note
+(InteractWithExternalServices) ..> (ManageKnowledgeStorage) : include
+(PerformKnowledgeOperations) ..> (ManageKnowledgeStorage) : include
+(VisualizeKnowledge) ..> (ExportKnowledge) : extend
 
 @enduml

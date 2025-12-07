@@ -1,0 +1,56 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Developer" as Dev
+actor "MCP Client" as Client
+actor "System Administrator" as Admin
+
+rectangle "Knowledge Management System" {
+  usecase "Store Knowledge in Graph" as UC1
+  usecase "Export Knowledge to JSON" as UC2
+  usecase "Query Knowledge Graph" as UC3
+  usecase "Manage Graph Database" as UC4
+}
+
+rectangle "MCP Server Integration" {
+  usecase "Process Semantic Analysis" as UC5
+  usecase "Handle MCP Requests" as UC6
+  usecase "Sync Memory Data" as UC7
+}
+
+rectangle "Data Storage Layer" {
+  usecase "Persist Graph Data (LevelDB)" as UC8
+  usecase "Auto-sync JSON Exports" as UC9
+  usecase "Maintain Data Integrity" as UC10
+}
+
+rectangle "Pattern Components" {
+  usecase "Adapt Database Operations" as UC11
+  usecase "Export Graph Knowledge" as UC12
+  usecase "Provide Database Services" as UC13
+}
+
+Dev --> UC1 : creates/updates
+Dev --> UC3 : queries
+Client --> UC5 : requests analysis
+Client --> UC6 : sends MCP calls
+Admin --> UC4 : configures
+Admin --> UC10 : monitors
+
+UC1 ..> UC8 : <<include>>
+UC2 ..> UC9 : <<include>>
+UC5 ..> UC7 : <<include>>
+UC4 ..> UC13 : <<include>>
+
+UC11 --> UC8 : manages
+UC12 --> UC2 : enables
+UC13 --> UC1 : supports
+UC13 --> UC3 : supports
+
+note right of UC8 : Storage: .data/knowledge-graph\n(Graphology + LevelDB)
+note right of UC9 : Export: .data/knowledge-export\n(Auto-synced JSON)
+note top of UC7 : shared-memory.json\nREMOVED from codebase
+
+@enduml

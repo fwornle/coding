@@ -1,0 +1,65 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management" {
+    component "CodingWorkflow" <<core>> {
+        component "Semantic Analysis" <<agent>>
+        component "Incremental Analysis" <<core>>
+        component "Workflow Executor" <<core>>
+    }
+}
+
+package "Graph Database Infrastructure" {
+    component "Graphology Engine" <<storage>>
+    component "LevelDB" <<storage>>
+    database ".data/knowledge-graph" <<storage>>
+}
+
+package "Export & Sync" {
+    folder ".data/knowledge-export" <<storage>>
+    component "Auto-Sync Service" <<core>>
+}
+
+package "Integration Layer" {
+    component "MCP Server" <<api>>
+    component "execute_workflow" <<api>>
+}
+
+package "Implementation Locations" {
+    folder "src/knowledge-management" <<core>>
+    folder "lib/ukb-unified" <<core>>
+    folder "integrations/mcp-server-semantic-analysis/src" <<core>>
+}
+
+' Workflow Triggers
+[MCP Server] --> [execute_workflow] : "Tool invocation"
+[execute_workflow] --> [CodingWorkflow] : "Manual trigger"
+[Incremental Analysis] --> [CodingWorkflow] : "Auto trigger"
+
+' Core Workflow Processing
+[CodingWorkflow] --> [Semantic Analysis] : "Process code"
+[Workflow Executor] --> [Graphology Engine] : "Store knowledge"
+[Graphology Engine] --> [LevelDB] : "Persist data"
+[LevelDB] --> [.data/knowledge-graph] : "File storage"
+
+' Export and Sync
+[Graphology Engine] --> [Auto-Sync Service] : "Graph changes"
+[Auto-Sync Service] --> [.data/knowledge-export] : "JSON export"
+
+' Implementation Distribution
+[src/knowledge-management] ..> [CodingWorkflow] : "implements"
+[lib/ukb-unified] ..> [CodingWorkflow] : "implements"
+[integrations/mcp-server-semantic-analysis/src] ..> [CodingWorkflow] : "implements"
+
+note top of CodingWorkflow
+  Core semantic analysis workflow for code understanding
+  and knowledge graph population. Replaces deprecated
+  shared-memory.json approach.
+end note
+
+note right of [.data/knowledge-graph]
+  Primary storage: Graphology + LevelDB
+  Replaces shared-memory.json
+end note
+
+@enduml

@@ -1,0 +1,67 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Knowledge Manager" as KM
+actor "API Client" as API
+actor "MCP Client" as MCP
+actor "System Administrator" as Admin
+
+package "Knowledge Management System" {
+  usecase "Process Documents" as UC1
+  usecase "Extract Semantic Concepts" as UC2
+  usecase "Build Knowledge Graph" as UC3
+  usecase "Query Knowledge Base" as UC4
+  usecase "Manage Ontologies" as UC5
+}
+
+package "UKB Unified Library" {
+  usecase "Standardize Data Models" as UC6
+  usecase "Validate Semantic Schemas" as UC7
+  usecase "Transform Knowledge Representations" as UC8
+  usecase "Export Knowledge Formats" as UC9
+}
+
+package "MCP Semantic Analysis Server" {
+  usecase "Provide MCP Interface" as UC10
+  usecase "Handle Analysis Requests" as UC11
+  usecase "Return Semantic Results" as UC12
+  usecase "Manage Server Resources" as UC13
+}
+
+' Actor relationships
+KM --> UC1
+KM --> UC2
+KM --> UC3
+KM --> UC4
+KM --> UC5
+
+API --> UC6
+API --> UC7
+API --> UC8
+API --> UC9
+
+MCP --> UC10
+MCP --> UC11
+MCP --> UC12
+
+Admin --> UC13
+Admin --> UC5
+
+' Include relationships
+UC1 ..> UC2 : <<include>>
+UC2 ..> UC6 : <<include>>
+UC3 ..> UC8 : <<include>>
+UC4 ..> UC7 : <<include>>
+UC11 ..> UC2 : <<include>>
+UC12 ..> UC9 : <<include>>
+
+' Extend relationships
+UC3 ..> UC5 : <<extend>>
+UC8 ..> UC9 : <<extend>>
+
+note right of UC2 : "Core semantic analysis\npattern implementation"
+note bottom of UC6 : "Transferable pattern\nacross components"
+
+@enduml

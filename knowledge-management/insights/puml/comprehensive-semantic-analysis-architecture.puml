@@ -1,0 +1,59 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management" {
+  component [Semantic Analysis Core] <<core>> as SACore
+  component [Knowledge Graph] <<storage>> as KG
+  component [Entity Extractor] <<processor>> as EE
+  component [Relationship Mapper] <<processor>> as RM
+}
+
+package "UKB Unified Library" {
+  component [Unified Knowledge Base] <<storage>> as UKB
+  component [Semantic Vector Store] <<storage>> as SVS
+  component [Context Manager] <<core>> as CM
+  component [Pattern Matcher] <<processor>> as PM
+}
+
+package "MCP Server Integration" {
+  component [MCP Semantic Server] <<api>> as MCP
+  component [Analysis Tools] <<agent>> as AT
+  component [Semantic Protocols] <<api>> as SP
+  component [Transfer Interface] <<api>> as TI
+}
+
+package "External Systems" {
+  component [Client Applications] <<external>> as CA
+  database [Graph Database] <<storage>> as GDB
+  database [Vector Database] <<storage>> as VDB
+}
+
+' Core relationships
+SACore --> KG : manages
+SACore --> EE : uses
+SACore --> RM : coordinates
+KG --> GDB : persists to
+
+' UKB connections
+UKB --> SVS : integrates
+CM --> UKB : accesses
+PM --> SVS : queries
+SACore --> CM : utilizes
+
+' MCP integration
+MCP --> AT : exposes
+MCP --> SP : implements
+TI --> SACore : transfers patterns
+AT --> PM : leverages
+
+' External connections
+CA --> MCP : requests analysis
+SVS --> VDB : stores vectors
+EE --> GDB : writes entities
+RM --> GDB : writes relationships
+
+note top of SACore : TransferablePattern implementation\nacross three main modules
+
+note bottom of MCP : Provides semantic analysis\nas transferable service
+
+@enduml

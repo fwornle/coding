@@ -1,0 +1,55 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Storage" {
+  class GraphDatabase <<service>> {
+    - graph: Graphology
+    - database: LevelDB
+    + storeData(data: JSON)
+    + retrieveData(query: String)
+  }
+  class PersistenceAgent <<service>> {
+    - graphDatabase: GraphDatabase
+    + persistData(data: JSON)
+    + retrievePersistedData(query: String)
+  }
+}
+
+package "Client Interaction" {
+  class VkbApiClient <<service>> {
+    - graphDatabase: GraphDatabase
+    + getClientData(query: String)
+    + updateClientData(data: JSON)
+  }
+}
+
+package "Data Export" {
+  class GraphKnowledgeExporter <<service>> {
+    - graphDatabase: GraphDatabase
+    + exportDataToJSON()
+  }
+}
+
+package "Commands" {
+  class VkbCommand <<service>> {
+    - graphDatabase: GraphDatabase
+    + executeCommand(command: String)
+  }
+  class CodingCommand <<service>> {
+    - graphDatabase: GraphDatabase
+    + executeCommand(command: String)
+  }
+  class GraphSyncCommand <<service>> {
+    - graphDatabase: GraphDatabase
+    + executeCommand(command: String)
+  }
+}
+
+GraphDatabase --* PersistenceAgent : uses
+VkbApiClient --* GraphDatabase : uses
+GraphKnowledgeExporter --* GraphDatabase : uses
+VkbCommand --* GraphDatabase : uses
+CodingCommand --* GraphDatabase : uses
+GraphSyncCommand --* GraphDatabase : uses
+
+@enduml

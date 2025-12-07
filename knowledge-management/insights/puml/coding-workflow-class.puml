@@ -1,0 +1,103 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management" <<src/knowledge-management>> {
+    class CodingWorkflow <<workflow>> {
+        -graphDb: GraphDatabase
+        -levelDb: LevelDB
+        -exportPath: string
+        +executeWorkflow(): void
+        +incrementalAnalysis(): void
+        +syncToJson(): void
+    }
+    
+    class KnowledgeManager <<service>> {
+        -graphStorage: GraphologyAdapter
+        -dataPath: string
+        +storeKnowledge(data: any): void
+        +queryKnowledge(query: string): any
+        +exportToJson(): void
+    }
+}
+
+package "Unified Knowledge Base" <<lib/ukb-unified>> {
+    class GraphDatabase <<database>> {
+        -graphology: Graphology
+        -leveldb: LevelDB
+        -storagePath: string
+        +connect(): void
+        +query(pattern: string): any[]
+        +store(entity: Entity): void
+        +sync(): void
+    }
+    
+    class GraphologyAdapter <<adapter>> {
+        -graph: Graphology
+        +addNode(node: Node): void
+        +addEdge(edge: Edge): void
+        +findPath(from: string, to: string): Path
+    }
+    
+    class LevelDBAdapter <<adapter>> {
+        -db: LevelDB
+        -path: string
+        +put(key: string, value: any): void
+        +get(key: string): any
+        +batch(operations: Operation[]): void
+    }
+}
+
+package "MCP Semantic Analysis" <<integrations/mcp-server-semantic-analysis/src>> {
+    class MCPServer <<server>> {
+        -tools: Tool[]
+        -workflow: CodingWorkflow
+        +registerTools(): void
+        +handleRequest(request: MCPRequest): MCPResponse
+    }
+    
+    class WorkflowTool <<tool>> {
+        -name: string = "execute_workflow"
+        -workflow: CodingWorkflow
+        +execute(params: any): WorkflowResult
+        +validate(params: any): boolean
+    }
+    
+    class SemanticAnalyzer <<analyzer>> {
+        -knowledgeManager: KnowledgeManager
+        +analyzeCode(source: string): Analysis
+        +extractEntities(content: string): Entity[]
+        +buildRelationships(entities: Entity[]): Relationship[]
+    }
+}
+
+package "Data Storage" <<.data>> {
+    class KnowledgeGraph <<file>> {
+        +path: ".data/knowledge-graph"
+        +format: "Graphology + LevelDB"
+    }
+    
+    class KnowledgeExport <<file>> {
+        +path: ".data/knowledge-export"
+        +format: "JSON"
+        +autoSync: boolean = true
+    }
+}
+
+' Relationships
+CodingWorkflow --> KnowledgeManager : uses
+CodingWorkflow --> GraphDatabase : stores in
+KnowledgeManager --> GraphDatabase : manages
+GraphDatabase --> GraphologyAdapter : uses
+GraphDatabase --> LevelDBAdapter : uses
+GraphDatabase --> KnowledgeGraph : persists to
+KnowledgeManager --> KnowledgeExport : exports to
+MCPServer --> WorkflowTool : contains
+WorkflowTool --> CodingWorkflow : executes
+SemanticAnalyzer --> KnowledgeManager : updates
+GraphologyAdapter --> KnowledgeGraph : reads/writes
+LevelDBAdapter --> KnowledgeGraph : reads/writes
+
+' Automatic sync relationship
+KnowledgeGraph ..> KnowledgeExport : auto-synced
+
+@enduml

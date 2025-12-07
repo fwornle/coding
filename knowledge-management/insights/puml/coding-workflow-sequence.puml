@@ -1,40 +1,89 @@
-@startuml CodingWorkflowSequence
-!theme plain
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant Developer
-participant MCP as "MCP Memory"
-participant UKB as "UKB Tool"
-participant VKB as "VKB Server"
-participant Git as "Git Repository"
-participant KB as "Knowledge Base"
+participant "MCP Client" as MCP
+participant "MCP Server\nSemantic Analysis" as MCPSA
+participant "CodingWorkflow\nEngine" as CW
+participant "Knowledge\nManagement" as KM
+participant "Graphology\nGraph DB" as GDB
+participant "LevelDB\nStorage" as LDB
+participant "JSON Export\nSync" as JES
 
-== Session Start ==
-Developer -> MCP: Query existing patterns
-MCP -> Developer: Return relevant patterns
-Developer -> VKB: vkb start
-VKB -> KB: Load visualization
-VKB -> Developer: http://localhost:8080
+note over MCP, JES: CodingWorkflow Sequence - Graph Database Architecture
 
-== Development Work ==
-Developer -> Developer: Code following patterns
-note right: Use Logger.log()\nUse Redux for state\nFollow architectural patterns
+MCP -> MCPSA: execute_workflow(parameters)
+activate MCPSA
 
-== Knowledge Capture ==
-Developer -> Git: Commit changes
-Developer -> UKB: ukb --auto
-UKB -> Git: Analyze recent commits
-UKB -> KB: Extract insights
-UKB -> MCP: Update memory
-UKB -> VKB: Sync visualization
+MCPSA -> CW: initiate_coding_workflow()
+activate CW
 
-== Interactive Insights ==
-Developer -> UKB: ukb --interactive
-UKB -> Developer: Guided questions
-Developer -> UKB: Detailed responses
-UKB -> KB: Store structured insights
-UKB -> VKB: Update visualization
+CW -> KM: load_knowledge_context()
+activate KM
 
-== Knowledge Sharing ==
-Developer -> Git: Push to remote
-note right: Knowledge base\ntravels with code
+KM -> GDB: query_graph_nodes()
+activate GDB
+
+GDB -> LDB: read_persistent_data()
+activate LDB
+LDB --> GDB: graph_data
+deactivate LDB
+
+GDB --> KM: knowledge_nodes
+deactivate GDB
+
+KM --> CW: context_loaded
+deactivate KM
+
+CW -> CW: process_incremental_analysis()
+
+alt Automatic Incremental Analysis
+    CW -> KM: detect_code_changes()
+    KM -> GDB: update_graph_structure()
+    activate GDB
+    GDB -> LDB: persist_changes()
+    activate LDB
+    LDB --> GDB: changes_saved
+    deactivate LDB
+    deactivate GDB
+end
+
+CW -> KM: update_knowledge_graph()
+activate KM
+
+KM -> GDB: add_semantic_relationships()
+activate GDB
+
+GDB -> LDB: store_graph_updates()
+activate LDB
+LDB --> GDB: update_confirmed
+deactivate LDB
+
+GDB --> KM: graph_updated
+deactivate GDB
+
+KM -> JES: trigger_auto_sync()
+activate JES
+
+JES -> GDB: export_graph_data()
+activate GDB
+GDB --> JES: json_data
+deactivate GDB
+
+JES -> JES: write_to_export_directory\n(.data/knowledge-export)
+JES --> KM: sync_completed
+deactivate JES
+
+KM --> CW: knowledge_updated
+deactivate KM
+
+CW --> MCPSA: workflow_results
+deactivate CW
+
+MCPSA --> MCP: analysis_complete
+deactivate MCPSA
+
+note over GDB, LDB: Storage Location: .data/knowledge-graph
+note over JES: Export Location: .data/knowledge-export
+note over MCPSA: Removed: shared-memory.json (legacy)
+
 @enduml

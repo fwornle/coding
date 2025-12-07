@@ -1,0 +1,75 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+' CollectiveKnowledge System Use Cases
+
+left to right direction
+
+actor "Knowledge Worker" as KW
+actor "System Administrator" as SA
+actor "External System" as ES
+actor "MCP Client" as MCP
+
+package "Knowledge Management" {
+    usecase "Store Knowledge" as UC1
+    usecase "Retrieve Knowledge" as UC2
+    usecase "Update Knowledge" as UC3
+    usecase "Search Knowledge" as UC4
+    usecase "Categorize Content" as UC5
+    usecase "Version Control" as UC6
+}
+
+package "Unified Knowledge Base" {
+    usecase "Integrate Data Sources" as UC7
+    usecase "Normalize Knowledge" as UC8
+    usecase "Maintain Consistency" as UC9
+    usecase "Export Knowledge" as UC10
+}
+
+package "Semantic Analysis" {
+    usecase "Analyze Content" as UC11
+    usecase "Extract Entities" as UC12
+    usecase "Generate Insights" as UC13
+    usecase "Provide Semantic API" as UC14
+}
+
+package "System Administration" {
+    usecase "Configure System" as UC15
+    usecase "Monitor Performance" as UC16
+    usecase "Manage Users" as UC17
+    usecase "Backup Data" as UC18
+}
+
+' Actor relationships
+KW --> UC1
+KW --> UC2
+KW --> UC3
+KW --> UC4
+KW --> UC5
+
+SA --> UC15
+SA --> UC16
+SA --> UC17
+SA --> UC18
+
+ES --> UC7
+ES --> UC10
+
+MCP --> UC14
+MCP --> UC11
+
+' Include relationships
+UC1 ..> UC8 : <<include>>
+UC2 ..> UC4 : <<include>>
+UC3 ..> UC6 : <<include>>
+UC11 ..> UC12 : <<include>>
+UC11 ..> UC13 : <<include>>
+
+' Extend relationships
+UC4 ..> UC11 : <<extend>>
+UC2 ..> UC13 : <<extend>>
+
+note right of UC7 : "Integrates with\nmultiple external\nknowledge sources"
+note bottom of UC14 : "MCP server provides\nsemantic analysis\nservices"
+
+@enduml

@@ -1,0 +1,55 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title MCPMemoryLoggingIntegrationPattern Architecture
+
+package "Knowledge Management" {
+  component GraphDatabaseService <<core>>
+  component GraphKnowledgeExporter <<core>>
+  component GraphDatabaseAdapter <<core>>
+}
+
+package "UKB Unified Library" {
+  component UnifiedKnowledgeBase <<api>>
+  component KnowledgeProcessor <<core>>
+}
+
+package "MCP Server Integration" {
+  component MCPSemanticAnalysis <<api>>
+  component MCPTools <<agent>>
+  component LoggingService <<core>>
+}
+
+package "Storage Layer" {
+  database "Graphology\n(.data/knowledge-graph)" as GraphDB <<storage>>
+  database "LevelDB\n(.data/knowledge-graph)" as LevelDB <<storage>>
+  folder "JSON Exports\n(.data/knowledge-export)" as JSONExports <<storage>>
+}
+
+package "Legacy Components" {
+  component SharedMemoryJSON <<deprecated>> #lightgray
+  note right of SharedMemoryJSON : REMOVED from codebase
+}
+
+' Core relationships
+GraphDatabaseService --> GraphDatabaseAdapter
+GraphDatabaseAdapter --> GraphDB
+GraphDatabaseAdapter --> LevelDB
+GraphKnowledgeExporter --> JSONExports
+GraphDatabaseService --> GraphKnowledgeExporter
+
+' Integration relationships
+UnifiedKnowledgeBase --> GraphDatabaseService
+KnowledgeProcessor --> UnifiedKnowledgeBase
+MCPSemanticAnalysis --> KnowledgeProcessor
+MCPTools --> MCPSemanticAnalysis
+LoggingService --> MCPSemanticAnalysis
+
+' Storage relationships
+GraphDB --> JSONExports : auto-sync
+LevelDB --> JSONExports : auto-sync
+
+note top of GraphDB : Primary knowledge storage\nusing Graphology + LevelDB
+note top of JSONExports : Auto-synced exports\nfrom GraphDB
+
+@enduml

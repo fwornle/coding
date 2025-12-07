@@ -1,0 +1,36 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+actor User as "User"
+actor VkbApiClient as "VkbApiClient"
+actor GraphDatabaseService as "GraphDatabaseService"
+actor PersistenceAgent as "PersistenceAgent"
+actor GraphKnowledgeExporter as "GraphKnowledgeExporter"
+
+usecase "Manipulate Data" as (Manipulate Data)
+usecase "Synchronize Data" as (Synchronize Data)
+usecase "Export Data" as (Export Data)
+
+User -- (Manipulate Data)
+User -- (Synchronize Data)
+VkbApiClient -- (Manipulate Data)
+VkbApiClient -- (Synchronize Data)
+GraphDatabaseService -- (Manipulate Data)
+GraphDatabaseService -- (Synchronize Data)
+PersistenceAgent -- (Manipulate Data)
+PersistenceAgent -- (Synchronize Data)
+GraphKnowledgeExporter -- (Export Data)
+
+(Manipulate Data) ..> (Export Data) : include
+(Synchronize Data) ..> (Export Data) : include
+
+package "Data Management" {
+  (Manipulate Data)
+  (Synchronize Data)
+}
+
+package "Data Export" {
+  (Export Data)
+}
+
+@enduml
