@@ -1,74 +1,63 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Architectural Evolution Patterns" {
-  
-  package "Data Management" <<storage>> {
-    component "Temporal Documentation\nArchival" as TDA <<storage>>
-    component "Knowledge Export\nConsolidation" as KEC <<storage>>
-    component "Configuration-Driven\nRedaction System" as CDR <<core>>
-  }
-  
-  package "System Integration" <<api>> {
-    component "API Resource Quota\nManagement" as ARQ <<api>>
-    component "Adaptive Live Logging\nExtraction" as ALLE <<core>>
-    component "Content Validation\nPipeline" as CVP <<core>>
-  }
-  
-  package "Configuration Layer" <<core>> {
-    component "Redaction Patterns\nConfig" as RPC <<storage>>
-    component "Environment\nConfiguration" as EC <<storage>>
-  }
-  
-  package "File System Components" {
-    file ".data/knowledge-export/\ncoding.json" as KEF
-    file ".specstory/history/\n2025-11-29_0900-1000_g9b30a.md" as HSF
-    file ".specstory/config/\nredaction-patterns.json" as RPF
-    file ".env.example" as ENV
-    folder "integrations/mcp-server-\nsemantic-analysis" as MSA
-  }
+package "Knowledge Management" {
+  component KnowledgeManager <<core>>
+  component GraphologyEngine <<storage>>
+  component LevelDBStorage <<storage>>
+  component JSONExporter <<api>>
 }
 
-' Pattern Relationships
-TDA --> HSF : "generates timestamped\nhistory files"
-KEC --> KEF : "exports structured\nknowledge"
-CDR --> RPF : "reads redaction\nrules"
-ARQ --> ENV : "uses environment\nconfiguration"
-CVP --> MSA : "integrates with\nsemantic analysis"
+package "Unified Knowledge Base" {
+  component UKBCore <<core>>
+  component PatternExtractor <<core>>
+  component TransferablePattern <<pattern>>
+}
 
-' Configuration Relationships
-RPC --> CDR : "provides rules"
-EC --> ARQ : "configuration"
+package "MCP Semantic Analysis" {
+  component MCPServer <<api>>
+  component SemanticAnalyzer <<core>>
+  component CodebaseAnalyzer <<agent>>
+}
 
-' Cross-pattern Integration
-ALLE --> CDR : "applies redaction"
-CVP --> KEC : "validates before export"
-ARQ --> ALLE : "quota checking"
+package "Data Storage" {
+  database "GraphDB\n(.data/knowledge-graph)" as GraphDB <<storage>>
+  file "JSON Export\n(.data/knowledge-export)" as JSONStore <<storage>>
+  note right of JSONStore : Auto-synced from GraphDB
+}
 
-note top of TDA
-  **Significance: 8**
-  Timestamp-based organization
-  with branch tracking
-end note
+package "Architecture Patterns" {
+  component ArchitecturalEvolutionPattern <<TransferablePattern>>
+  note as N1
+  Extracted from codebase analysis
+  Stored as reusable knowledge entity
+  Replaces shared-memory.json approach
+  end note
+  ArchitecturalEvolutionPattern .. N1
+}
 
-note top of CDR
-  **Significance: 9**
-  Runtime configurable
-  sensitive data filtering
-end note
+' Relationships
+KnowledgeManager --> GraphologyEngine
+GraphologyEngine --> LevelDBStorage
+GraphologyEngine --> GraphDB
+JSONExporter --> JSONStore
+GraphDB --> JSONStore : auto-sync
 
-note top of ARQ
-  **Significance: 8**
-  Centralized quota validation
-  with admin hooks
-end note
+UKBCore --> KnowledgeManager
+PatternExtractor --> UKBCore
+TransferablePattern --> PatternExtractor
 
-note bottom
-  **Pattern Analysis Summary**
-  Total Patterns: 6 sub-patterns
-  Category: Architecture
-  Average Significance: 7.5
-  Implementation: TypeScript
+MCPServer --> SemanticAnalyzer
+SemanticAnalyzer --> CodebaseAnalyzer
+CodebaseAnalyzer --> PatternExtractor : extracts patterns
+
+ArchitecturalEvolutionPattern --> TransferablePattern : implements
+ArchitecturalEvolutionPattern --> GraphDB : stored in
+
+note top of ArchitecturalEvolutionPattern
+  Evolution from shared-memory.json
+  to Graphology + LevelDB architecture
+  with auto-synced JSON exports
 end note
 
 @enduml

@@ -1,0 +1,73 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "System Administrator" as admin
+actor "Developer" as dev
+actor "Network Service" as network
+actor "Knowledge Analyst" as analyst
+
+package "NetworkAwareInstallationPattern" {
+  usecase "Initialize Graph Database" as init
+  usecase "Configure Network Settings" as config
+  usecase "Install Pattern Components" as install
+  usecase "Validate Network Connectivity" as validate
+  usecase "Setup Storage Layers" as storage
+}
+
+package "Knowledge Management" {
+  usecase "Synchronize Knowledge Graph" as sync
+  usecase "Export JSON Data" as export
+  usecase "Visualize Knowledge Base" as viz
+  usecase "Batch Semantic Analysis" as batch
+  usecase "Incremental Processing" as incremental
+}
+
+package "Development Operations" {
+  usecase "Execute Coding Commands" as coding
+  usecase "Monitor Parallel Workers" as workers
+  usecase "Manage Persistence" as persist
+  usecase "Handle Graph Adapter" as adapter
+}
+
+package "Storage Systems" {
+  usecase "Access LevelDB" as leveldb
+  usecase "Manage Graphology Data" as graphology
+  usecase "Maintain Auto-sync" as autosync
+}
+
+admin --> init
+admin --> config
+admin --> install
+admin --> validate
+
+dev --> coding
+dev --> workers
+dev --> persist
+
+network --> validate
+network --> config
+network --> storage
+
+analyst --> sync
+analyst --> viz
+analyst --> batch
+
+init --> storage : <<include>>
+install --> adapter : <<include>>
+sync --> export : <<include>>
+batch --> workers : <<include>>
+persist --> adapter : <<include>>
+
+storage --> leveldb : <<include>>
+storage --> graphology : <<include>>
+export --> autosync : <<include>>
+
+incremental --> batch : <<extend>>
+
+note right of validate : "Network connectivity required\nfor distributed operations"
+note bottom of batch : "Parallel workers for\nscalable processing"
+note right of storage : "GraphDatabaseService with\nGraphology + LevelDB at\n.data/knowledge-graph"
+
+@enduml

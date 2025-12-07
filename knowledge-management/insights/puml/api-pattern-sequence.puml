@@ -1,60 +1,64 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title ApiPattern External Communication Flow (Confidence: 72%)
+participant "Client" as C
+participant "VKB Command" as VKB
+participant "Graph Sync" as GS
+participant "GraphDatabaseService" as GDS
+participant "Knowledge Graph\n(.data/knowledge-graph)" as KG
+participant "VkbApiClient" as API
+participant "Parallel Workers" as PW
+participant "JSON Export\n(.data/knowledge-export)" as JE
 
-actor "External Client" as Client
-participant "System Health Dashboard" as Dashboard
-participant "API Quota Slice" as QuotaSlice
-participant "Service Starter" as ServiceStarter
-participant "Health Monitor" as HealthMonitor
-participant "Health Verifier" as HealthVerifier
-participant "Knowledge Management" as KnowledgeMgmt
-database "Knowledge Export" as KnowledgeDB
+C -> VKB: Execute vkb command
+activate VKB
 
-Client -> Dashboard: Request system status
-activate Dashboard
+VKB -> GDS: Initialize GraphDatabaseService
+activate GDS
 
-Dashboard -> QuotaSlice: Check API quota
-activate QuotaSlice
-QuotaSlice -> QuotaSlice: Validate quota limits
-QuotaSlice --> Dashboard: Quota status
-deactivate QuotaSlice
+GDS -> KG: Connect to knowledge graph
+activate KG
 
-Dashboard -> HealthMonitor: Get health metrics
-activate HealthMonitor
-
-HealthMonitor -> HealthVerifier: Verify system health
-activate HealthVerifier
-HealthVerifier -> ServiceStarter: Check service status
-activate ServiceStarter
-ServiceStarter --> HealthVerifier: Service health data
-deactivate ServiceStarter
-HealthVerifier --> HealthMonitor: Health verification result
-deactivate HealthVerifier
-
-HealthMonitor --> Dashboard: Health metrics
-deactivate HealthMonitor
-
-alt Knowledge data required
-    Dashboard -> KnowledgeMgmt: Request knowledge insights
-    activate KnowledgeMgmt
-    KnowledgeMgmt -> KnowledgeDB: Query coding patterns
-    activate KnowledgeDB
-    KnowledgeDB --> KnowledgeMgmt: Pattern data
-    deactivate KnowledgeDB
-    KnowledgeMgmt --> Dashboard: Knowledge insights
-    deactivate KnowledgeMgmt
+alt Batch Mode Semantic Analysis
+    VKB -> PW: Deploy parallel workers
+    activate PW
+    
+    loop For each batch
+        PW -> GDS: Process semantic data
+        GDS -> KG: Store knowledge patterns
+    end
+    
+    deactivate PW
 end
 
-Dashboard -> Dashboard: Aggregate system status
-Dashboard --> Client: Complete system health report
-deactivate Dashboard
+VKB -> API: Initialize VkbApiClient
+activate API
 
-note right of Dashboard
-  ApiPattern handles external
-  communication with 72% confidence
-  across multiple system components
-end note
+API -> GDS: Query knowledge data
+GDS -> KG: Retrieve graph data
+KG --> GDS: Return graph results
+GDS --> API: Return processed data
+
+C -> GS: Execute graph-sync command
+activate GS
+
+GS -> GDS: Trigger synchronization
+GDS -> KG: Extract knowledge graph
+KG --> GDS: Return graph data
+
+GDS -> JE: Auto-sync to JSON export
+activate JE
+note right of JE: Data-driven development\napproach with JSON exports
+
+JE --> GDS: Sync confirmation
+GDS --> GS: Sync completed
+GS --> C: Synchronization complete
+
+deactivate JE
+deactivate GS
+deactivate API
+deactivate KG
+deactivate GDS
+deactivate VKB
 
 @enduml

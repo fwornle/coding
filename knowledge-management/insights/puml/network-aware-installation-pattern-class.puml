@@ -1,0 +1,130 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Core Pattern" {
+    abstract class TransferablePattern <<pattern>> {
+        +transfer(): void
+        +validate(): boolean
+    }
+    
+    class NetworkAwareInstallationPattern <<service>> {
+        -networkConfig: NetworkConfig
+        -installationState: InstallationState
+        +executeNetworkAwareInstallation(): void
+        +checkNetworkConnectivity(): boolean
+        +handleOfflineMode(): void
+    }
+}
+
+package "Graph Database Layer" {
+    class GraphDatabaseService <<service>> {
+        -storageAdapter: GraphStorageAdapter
+        -exportPath: string
+        +query(query: string): Result
+        +sync(): void
+        +exportToJSON(): void
+    }
+    
+    class GraphDatabaseAdapter <<adapter>> {
+        -graphology: Graphology
+        -levelDB: LevelDB
+        +connect(): void
+        +executeQuery(): Result
+        +persistData(): void
+    }
+    
+    class PersistenceAgent <<service>> {
+        -dataPath: string
+        -syncEnabled: boolean
+        +saveToGraph(): void
+        +loadFromGraph(): void
+        +autoSync(): void
+    }
+}
+
+package "Storage Components" {
+    class Graphology <<external>> {
+        +addNode(): void
+        +addEdge(): void
+        +getGraph(): Graph
+    }
+    
+    class LevelDB <<external>> {
+        -dbPath: string
+        +put(): void
+        +get(): void
+        +batch(): void
+    }
+}
+
+package "Processing Layer" {
+    class ParallelWorkers <<service>> {
+        -workerPool: WorkerPool
+        -batchSize: number
+        +processBatch(): void
+        +scaleWorkers(): void
+    }
+    
+    class SemanticAnalyzer <<service>> {
+        -analysisConfig: AnalysisConfig
+        +analyzeBatch(): AnalysisResult
+        +processIncremental(): void
+    }
+}
+
+package "Command Interface" {
+    class CommandHandler <<service>> {
+        +executeVKB(): void
+        +executeCoding(): void
+        +executeGraphSync(): void
+    }
+    
+    enum CommandType {
+        VKB
+        CODING
+        GRAPH_SYNC
+    }
+}
+
+package "Configuration" {
+    class NetworkConfig <<config>> {
+        -knowledgeGraphPath: string
+        -exportDirectory: string
+        -syncInterval: number
+        +getStoragePath(): string
+    }
+    
+    class InstallationState <<state>> {
+        -isNetworkAware: boolean
+        -processingMode: ProcessingMode
+        -constraintsEnabled: boolean
+        +updateState(): void
+    }
+}
+
+' Inheritance relationships
+TransferablePattern <|-- NetworkAwareInstallationPattern
+
+' Composition relationships
+NetworkAwareInstallationPattern *-- NetworkConfig
+NetworkAwareInstallationPattern *-- InstallationState
+GraphDatabaseService *-- GraphDatabaseAdapter
+GraphDatabaseService *-- PersistenceAgent
+GraphDatabaseAdapter *-- Graphology
+GraphDatabaseAdapter *-- LevelDB
+ParallelWorkers *-- SemanticAnalyzer
+
+' Dependencies
+NetworkAwareInstallationPattern ..> GraphDatabaseService : uses
+NetworkAwareInstallationPattern ..> ParallelWorkers : delegates to
+GraphDatabaseService ..> CommandHandler : triggered by
+CommandHandler ..> CommandType : handles
+PersistenceAgent ..> NetworkConfig : configures from
+
+' Annotations
+note right of NetworkAwareInstallationPattern : Implements scalable network-aware\ninstallation with graph persistence
+note bottom of GraphDatabaseAdapter : Storage at .data/knowledge-graph\nwith JSON export to .data/knowledge-export
+note top of ParallelWorkers : Batch mode processing\nfor network operations
+note left of PersistenceAgent : Avoids deprecated\nshared-memory.json approach
+
+@enduml

@@ -1,106 +1,114 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Architectural Evolution Pattern System" {
-    
-    package "Temporal Documentation" {
-        class TemporalDocumentationArchival {
-            -timestampFormat: string
-            -branchSuffix: string
-            -sessionId: string
-            +generateTimestamp(): string
-            +createArchive(content: string): void
-            +organizeBranchHistory(): void
-        }
-        
-        class HistoryManager {
-            -historyPath: string
-            -sessionTracker: SessionTracker
-            +archiveSession(session: Session): void
-            +retrieveHistory(dateRange: DateRange): History[]
-        }
+package "Knowledge Management" {
+    abstract class ArchitecturalEvolutionPattern <<TransferablePattern>> {
+        -patternId: String
+        -evolutionStage: String
+        -transferabilityScore: Float
+        +extractPattern(): Pattern
+        +applyPattern(): void
+        +validateTransfer(): Boolean
     }
     
-    package "Content Processing" {
-        class ContentValidationPipeline {
-            -stages: ValidationStage[]
-            -semanticAnalyzer: SemanticAnalyzer
-            +validateContent(content: Content): ValidationResult
-            +processStages(content: Content): ProcessedContent
-        }
-        
-        class ConfigurableRedactor {
-            -redactionRules: RedactionRule[]
-            -configPath: string
-            +loadConfiguration(): void
-            +redactContent(content: string): string
-            +updateRules(rules: RedactionRule[]): void
-        }
+    class KnowledgeManager {
+        -graphStorage: GraphologyAdapter
+        -levelDbStore: LevelDBAdapter
+        -exportPath: String
+        +storePattern(pattern: Pattern): void
+        +retrievePattern(id: String): Pattern
+        +syncToJson(): void
     }
     
-    package "API Management" {
-        class APIQuotaManager {
-            -quotaLimits: QuotaLimit[]
-            -currentUsage: UsageMetrics
-            -adminHooks: AdminHook[]
-            +checkQuota(apiCall: APICall): boolean
-            +updateUsage(usage: UsageData): void
-            +getQuotaStatus(): QuotaStatus
-        }
-        
-        class QuotaChecker {
-            -environmentConfig: EnvConfig
-            +validateRequest(request: APIRequest): boolean
-            +getRemainingQuota(): number
-        }
+    class PatternExtractor {
+        -codebaseAnalyzer: CodebaseAnalyzer
+        -patternTemplates: Map
+        +analyzeCodebase(): List<Pattern>
+        +identifyEvolutionStages(): List<Stage>
+        +extractTransferableElements(): List<Element>
+    }
+}
+
+package "Storage Layer" {
+    class GraphologyAdapter {
+        -graphInstance: Graph
+        -dataPath: String
+        +addNode(node: Node): void
+        +addEdge(edge: Edge): void
+        +query(criteria: QueryCriteria): ResultSet
     }
     
-    package "Data Extraction" {
-        class AdaptiveLiveLoggingExtractor {
-            -extractionLogic: ExtractionRule[]
-            -runtimeConditions: Condition[]
-            +extractLiveData(source: DataSource): ExtractedData
-            +adaptExtractionLogic(conditions: Condition[]): void
-        }
-        
-        class MultiSourceKnowledgeExporter {
-            -knowledgeSources: KnowledgeSource[]
-            -exportCategories: Category[]
-            +consolidateKnowledge(): ConsolidatedKnowledge
-            +exportToJSON(category: string): string
-        }
+    class LevelDBAdapter {
+        -dbConnection: LevelDB
+        -storagePath: String
+        +put(key: String, value: Any): void
+        +get(key: String): Any
+        +batch(operations: List): void
     }
     
-    package "Configuration" {
-        class RedactionPatternConfig {
-            -patterns: RedactionPattern[]
-            -configFile: string
-            +loadPatterns(): RedactionPattern[]
-            +savePatterns(patterns: RedactionPattern[]): void
-        }
-        
-        class EnvironmentConfig {
-            -envFile: string
-            -apiKeys: Map<string, string>
-            +loadEnvironment(): void
-            +getAPIKey(service: string): string
-        }
+    class JsonExporter {
+        -exportPath: String
+        -autoSync: Boolean
+        +exportToJson(data: Any): void
+        +scheduleAutoSync(): void
+        +validateExport(): Boolean
+    }
+}
+
+package "Integration Layer" {
+    class McpSemanticServer {
+        -semanticAnalyzer: SemanticAnalyzer
+        -patternMatcher: PatternMatcher
+        +analyzeSemantics(input: String): Analysis
+        +matchPatterns(analysis: Analysis): List<Match>
+        +serveResults(): Response
+    }
+    
+    class UnifiedKnowledgeBase {
+        -patternRegistry: Map
+        -evolutionTracker: EvolutionTracker
+        +registerPattern(pattern: Pattern): void
+        +trackEvolution(changes: List): void
+        +unifyKnowledge(): KnowledgeGraph
+    }
+}
+
+package "Implementation Sites" {
+    class SourceKnowledgeManagement <<implementation>> {
+        -location: "src/knowledge-management"
+    }
+    
+    class LibUkbUnified <<implementation>> {
+        -location: "lib/ukb-unified"
+    }
+    
+    class McpServerIntegration <<implementation>> {
+        -location: "integrations/mcp-server-semantic-analysis/src"
     }
 }
 
 ' Relationships
-TemporalDocumentationArchival --> HistoryManager : uses
-ContentValidationPipeline --> ConfigurableRedactor : integrates
-ConfigurableRedactor --> RedactionPatternConfig : loads from
-APIQuotaManager --> QuotaChecker : delegates to
-QuotaChecker --> EnvironmentConfig : configures from
-AdaptiveLiveLoggingExtractor --> ConfigurableRedactor : processes through
-MultiSourceKnowledgeExporter --> ContentValidationPipeline : validates with
+ArchitecturalEvolutionPattern --|> KnowledgeManager
+KnowledgeManager --> GraphologyAdapter
+KnowledgeManager --> LevelDBAdapter
+KnowledgeManager --> JsonExporter
+PatternExtractor --> ArchitecturalEvolutionPattern
+McpSemanticServer --> UnifiedKnowledgeBase
+UnifiedKnowledgeBase --> ArchitecturalEvolutionPattern
 
-' Key file associations
-note right of RedactionPatternConfig : ".specstory/config/redaction-patterns.json"
-note right of EnvironmentConfig : ".env.example"
-note right of HistoryManager : ".specstory/history/"
-note right of MultiSourceKnowledgeExporter : ".data/knowledge-export/coding.json"
+' Implementation relationships
+SourceKnowledgeManagement ..|> KnowledgeManager
+LibUkbUnified ..|> UnifiedKnowledgeBase
+McpServerIntegration ..|> McpSemanticServer
+
+' Storage relationships
+GraphologyAdapter --> LevelDBAdapter : "persists to"
+JsonExporter ..> GraphologyAdapter : "exports from"
+
+' Notes
+note right of ArchitecturalEvolutionPattern : "Extracted from codebase analysis\nStored as reusable knowledge entity"
+note bottom of GraphologyAdapter : "Storage: .data/knowledge-graph"
+note bottom of JsonExporter : "Auto-sync: .data/knowledge-export"
+note top of SourceKnowledgeManagement : "shared-memory.json REMOVED"
 
 @enduml

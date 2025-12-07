@@ -1,99 +1,110 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "System Health Dashboard" {
-  class SystemHealthDashboard {
-    +render()
-    +handleHealthCheck()
-    +displayMetrics()
-  }
-  
-  class ApiQuotaSlice {
-    +state: QuotaState
-    +fetchQuota()
-    +updateQuota()
-    +resetQuota()
-  }
+package "Core Patterns" {
+    abstract class TransferablePattern {
+        +patternId: String
+        +metadata: Map
+        +transfer(): void
+        +validate(): boolean
+    }
+    
+    class ApiPattern {
+        -apiEndpoints: List<String>
+        -requestHandlers: Map
+        -responseMappers: Map
+        +processRequest(): Response
+        +mapResponse(): Object
+        +validateApi(): boolean
+    }
 }
 
-package "Service Management" {
-  class ServiceStarter {
-    +startService()
-    +stopService()
-    +restartService()
-    +getServiceStatus()
-  }
-  
-  class HealthVerifier {
-    +verifyHealth()
-    +checkEndpoints()
-    +validateResponse()
-    +reportStatus()
-  }
-  
-  class StatusLineMonitor {
-    +monitorServices()
-    +updateStatusLine()
-    +trackMetrics()
-    +generateReport()
-  }
+package "Microservices Layer" {
+    class GraphDatabaseService <<service>> {
+        -connectionPool: ConnectionPool
+        -queryEngine: QueryEngine
+        +storeKnowledge(): void
+        +retrieveKnowledge(): Knowledge
+        +syncToExport(): void
+        +executeQuery(): ResultSet
+    }
+    
+    class VkbApiClient <<service>> {
+        -apiConfig: Configuration
+        -httpClient: HttpClient
+        +exportKnowledge(): void
+        +syncWithGraph(): void
+        +processCommands(): void
+    }
+    
+    class ParallelWorkerService <<service>> {
+        -workerPool: ThreadPool
+        -taskQueue: Queue
+        +processBatch(): void
+        +analyzeSemantics(): AnalysisResult
+        +distributeWork(): void
+    }
 }
 
-package "Knowledge Management" {
-  class KnowledgeExport {
-    +exportData()
-    +formatCoding()
-    +saveToFile()
-  }
-  
-  class InsightGenerator {
-    +generateDiagrams()
-    +createArchitectureViews()
-    +analyzePatterns()
-  }
+package "Data Management" {
+    class KnowledgeGraph <<file>> {
+        -graphData: GraphStructure
+        -nodes: List<Node>
+        -relationships: List<Edge>
+        +addNode(): void
+        +addRelationship(): void
+        +query(): ResultSet
+    }
+    
+    class JsonExporter <<file>> {
+        -exportPath: String
+        -syncScheduler: Scheduler
+        +autoSync(): void
+        +exportToJson(): void
+        +validateExport(): boolean
+    }
 }
 
-package "ApiPattern <<Design Pattern>>" {
-  abstract class ApiCommunicator {
-    #baseUrl: string
-    #headers: Map
-    +makeRequest()
-    +handleResponse()
-    +handleError()
-  }
-  
-  interface ExternalCommunication {
-    +connect()
-    +disconnect()
-    +sendData()
-    +receiveData()
-  }
-  
-  class ApiClient {
-    -timeout: number
-    -retryCount: number
-    +get()
-    +post()
-    +put()
-    +delete()
-  }
+package "Command Interface" {
+    class VkbCommand {
+        -commandType: CommandType
+        -parameters: Map
+        +execute(): CommandResult
+        +validate(): boolean
+    }
+    
+    class GraphSyncCommand {
+        -syncMode: SyncMode
+        -targetPath: String
+        +syncGraph(): void
+        +validateSync(): boolean
+    }
 }
 
-SystemHealthDashboard --> ApiQuotaSlice : uses
-SystemHealthDashboard --> ApiClient : communicates via
-ServiceStarter --> HealthVerifier : validates with
-StatusLineMonitor --> HealthVerifier : monitors via
-HealthVerifier --> ApiClient : checks endpoints
-ApiClient --|> ApiCommunicator : implements
-ApiClient ..|> ExternalCommunication : realizes
-KnowledgeExport --> InsightGenerator : generates
-InsightGenerator --> SystemHealthDashboard : creates views for
+' Inheritance relationships
+TransferablePattern <|-- ApiPattern
 
-note right of ApiClient
-  Confidence: 72%
-  Significance: 7/10
-  Handles external communication
-  across system components
-end note
+' Service dependencies
+ApiPattern --> GraphDatabaseService : uses
+ApiPattern --> VkbApiClient : integrates
+VkbApiClient --> ParallelWorkerService : delegates
+
+' Data flow relationships
+GraphDatabaseService --> KnowledgeGraph : manages
+GraphDatabaseService --> JsonExporter : triggers
+JsonExporter --> KnowledgeGraph : exports
+
+' Command relationships
+VkbCommand --> VkbApiClient : controls
+GraphSyncCommand --> GraphDatabaseService : syncs
+VkbCommand <|-- GraphSyncCommand
+
+' Storage relationships
+KnowledgeGraph ..> JsonExporter : auto-synced to
+
+note right of ApiPattern : "Main transferable pattern\nfor API-based knowledge operations"
+note bottom of ParallelWorkerService : "Improves performance through\nbatch semantic analysis"
+note left of JsonExporter : "Data stored at:\n.data/knowledge-export"
+note left of KnowledgeGraph : "Graph stored at:\n.data/knowledge-graph"
 
 @enduml

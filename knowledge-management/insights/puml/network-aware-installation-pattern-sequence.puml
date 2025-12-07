@@ -1,0 +1,82 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant Client
+participant NetworkAwareInstallationPattern
+participant GraphDatabaseService
+participant GraphDatabaseAdapter
+participant PersistenceAgent
+participant ParallelWorkers
+participant "Graphology + LevelDB" as Storage
+participant "JSON Export" as JSONExport
+participant FileSystem
+
+Client -> NetworkAwareInstallationPattern: initiate installation
+activate NetworkAwareInstallationPattern
+
+NetworkAwareInstallationPattern -> GraphDatabaseService: initialize database service
+activate GraphDatabaseService
+
+GraphDatabaseService -> GraphDatabaseAdapter: setup adapter
+activate GraphDatabaseAdapter
+
+GraphDatabaseAdapter -> Storage: connect to .data/knowledge-graph
+activate Storage
+
+NetworkAwareInstallationPattern -> PersistenceAgent: initialize persistence
+activate PersistenceAgent
+
+note right of PersistenceAgent
+  Avoids removed shared-memory.json
+  Uses GraphDatabaseAdapter only
+end note
+
+alt scalable processing required
+    NetworkAwareInstallationPattern -> ParallelWorkers: initialize batch processing
+    activate ParallelWorkers
+    
+    ParallelWorkers -> GraphDatabaseService: perform semantic analysis
+    GraphDatabaseService -> Storage: batch operations
+    
+    deactivate ParallelWorkers
+end
+
+NetworkAwareInstallationPattern -> GraphDatabaseService: setup auto-sync
+GraphDatabaseService -> JSONExport: export to .data/knowledge-export
+activate JSONExport
+
+JSONExport -> FileSystem: write JSON files
+activate FileSystem
+
+loop incremental operations
+    NetworkAwareInstallationPattern -> GraphDatabaseService: check edit/write operations only
+    
+    opt content constraints apply
+        GraphDatabaseService -> Storage: validate constraints
+        Storage --> GraphDatabaseService: validation result
+    end
+    
+    GraphDatabaseService -> JSONExport: auto-sync export
+    JSONExport -> FileSystem: update JSON files
+end
+
+NetworkAwareInstallationPattern -> Client: provide vkb command
+NetworkAwareInstallationPattern -> Client: provide coding command  
+NetworkAwareInstallationPattern -> Client: provide graph-sync command
+
+note over Client, FileSystem
+  Commands available:
+  - vkb: visualization
+  - coding: development operations
+  - graph-sync: knowledge synchronization
+end note
+
+deactivate FileSystem
+deactivate JSONExport
+deactivate PersistenceAgent
+deactivate Storage
+deactivate GraphDatabaseAdapter
+deactivate GraphDatabaseService
+deactivate NetworkAwareInstallationPattern
+
+@enduml
