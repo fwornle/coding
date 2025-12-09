@@ -101,7 +101,7 @@ Session activity uses a **graduated green color scheme** that transitions smooth
 
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
-| 🟢 | Active | < 5 minutes | Currently active session |
+| 🟢 | Active | < 90 seconds | Currently active session |
 | 🟩 | Idle | 90s - 5 minutes | Health data fresh, not streaming |
 | 🌲 | Cooling | 5 - 15 minutes | Recently active, cooling down |
 | 🫒 | Fading | 15 min - 1 hour | Session activity fading |
@@ -110,6 +110,11 @@ Session activity uses a **graduated green color scheme** that transitions smooth
 | 💤 | Sleeping | > 24 hours | Long-term dormant session |
 | 🟡 | Warning | Any | Trajectory file missing or stale |
 | ❌ | Error | Any | Health check failed |
+
+**Activity Age Calculation**:
+- Uses `transcriptInfo.ageMs` from health file (actual transcript inactivity)
+- Falls back to health file timestamp if transcript age unavailable
+- For stale health files (>5 min old), uses health file age as minimum to ensure closed sessions aren't falsely shown as active
 
 **Design Rationale**: Projects that aren't actively being worked on should show gradual "cooling" colors rather than alarming red/orange. Red is reserved for actual errors, not inactive sessions.
 
@@ -138,15 +143,22 @@ Session activity uses a **graduated green color scheme** that transitions smooth
 
 ### Session Discovery
 
-The system uses multiple discovery methods to ensure all active sessions are monitored:
+The system uses multiple discovery methods to ensure **only active sessions** (with running transcript monitors) are displayed:
 
 **Discovery Methods**:
-1. **Registry-based Discovery**: Uses Global LSL Registry for registered sessions
-2. **Dynamic Discovery**: Scans Claude transcript directories for unregistered sessions
-3. **Cross-reference Validation**: Verifies monitor processes are alive and healthy
-4. **Live Transcript Scanning**: Finds sessions regardless of activity age
+1. **Running Monitor Detection**: Checks `ps aux` for running `enhanced-transcript-monitor.js` processes
+2. **Registry-based Discovery**: Uses Global LSL Registry for registered sessions
+3. **Dynamic Discovery**: Scans Claude transcript directories for unregistered sessions
+4. **Health File Validation**: Uses centralized health files from `.health/` directory
 
-**Recent Enhancement**: Removed the 1-hour transcript activity filter to ensure dormant sessions like nano-degree are properly discovered and displayed.
+**Key Behavior**:
+- **Only sessions with running transcript monitors are displayed** - closed sessions with stale health files are automatically hidden
+- Sessions are shown regardless of their activity age (dormant, sleeping, etc.) as long as a monitor is running
+- The running transcript monitor IS the signal that a session is active/open
+
+**Example**:
+- `[C🟢 ND💤 UT🟢]` - Shows coding (active), nano-degree (sleeping but monitor running), ui-template (active)
+- Closed sessions like `budapest` or `curriculum-alignment` are NOT shown, even if their health files still exist
 
 ### Smart Abbreviation Engine
 
@@ -344,7 +356,35 @@ cat .lsl/global-registry.json | jq '.'
 cat .lsl/global-registry.json | jq '.sessions[] | {project, last_activity}'
 ```
 
+**Session not showing that should be?**
+```bash
+# Check if transcript monitor is running for that project
+ps aux | grep enhanced-transcript-monitor | grep PROJECT_NAME
+
+# Only sessions with running monitors are shown
+# If no monitor is running, the session won't appear in the status line
+```
+
+**Closed session still showing?**
+
+```bash
+# This shouldn't happen with the new logic - only sessions with running monitors are shown
+# If it does, restart the statusline-health-monitor daemon:
+node scripts/statusline-health-monitor.js --daemon --auto-heal --force
+```
+
+**Session shows wrong activity age (e.g., showing 🟢 when inactive)?**
+
+```bash
+# Check the health file for that project
+cat .health/PROJECT-transcript-monitor-health.json | jq '{transcriptAge: .transcriptInfo.ageMs, timestamp}'
+
+# The transcriptAge should be used (actual transcript inactivity)
+# If health file is stale (>5 min old), file age is used as minimum
+```
+
 **Abbreviations incorrect?**
+
 ```bash
 # Test abbreviation engine
 node scripts/combined-status-line.js --test-abbreviations
@@ -356,18 +396,24 @@ node scripts/combined-status-line.js --test-abbreviations
 ## Key Files
 
 **Core System**:
-- `scripts/combined-status-line.js` - Main status line script
+
+- `scripts/combined-status-line.js` - Main status line script (reads from statusline-health-status.txt)
+- `scripts/statusline-health-monitor.js` - Session health monitor daemon (detects running monitors, writes status)
 - `scripts/health-verifier.js` - Health status provider
 - `src/live-logging/RealTimeTrajectoryAnalyzer.js` - Trajectory state provider
 - `lib/api-quota-checker.js` - API quota provider (shared library)
 - `.lsl/global-registry.json` - LSL session registry
 - `.health/verification-status.json` - Health status cache
+- `.health/*-transcript-monitor-health.json` - Per-project health files (centralized in coding project)
+- `.logs/statusline-health-status.txt` - Rendered status line output
 - `.specstory/trajectory/live-state.json` - Trajectory state
 
 **Configuration**:
+
 - `config/status-line-config.json` - Status line configuration
 
 **Integration**:
+
 - `scripts/health-prompt-hook.js` - Triggers status line updates
 - `integrations/mcp-constraint-monitor/` - Provides compliance data
 
