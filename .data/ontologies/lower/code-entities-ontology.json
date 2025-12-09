@@ -1,0 +1,315 @@
+{
+  "name": "Code Entities Ontology",
+  "version": "1.0.0",
+  "type": "lower",
+  "team": "coding",
+  "extendsOntology": "development-knowledge",
+  "description": "Lower ontology for AST-based code entities extracted from code-graph-rag, including functions, classes, modules, and documentation links",
+  "entities": {
+    "CodeFunction": {
+      "description": "A function or method extracted from source code via AST analysis",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "functionName": {
+          "type": "string",
+          "description": "Name of the function"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Source file path where the function is defined"
+        },
+        "lineNumber": {
+          "type": "number",
+          "description": "Line number where the function definition starts"
+        },
+        "language": {
+          "type": "string",
+          "description": "Programming language",
+          "enum": ["typescript", "javascript", "python", "java", "go", "rust", "c", "cpp"]
+        },
+        "signature": {
+          "type": "string",
+          "description": "Function signature including parameters and return type"
+        },
+        "complexity": {
+          "type": "number",
+          "description": "Cyclomatic complexity score"
+        },
+        "docstring": {
+          "type": "string",
+          "description": "Documentation string or JSDoc comment"
+        },
+        "isAsync": {
+          "type": "boolean",
+          "description": "Whether the function is asynchronous"
+        },
+        "isExported": {
+          "type": "boolean",
+          "description": "Whether the function is exported from its module"
+        }
+      },
+      "requiredProperties": ["functionName", "filePath", "language"],
+      "examples": [
+        "handleToolCall (src/tools.ts:460, async, exported)",
+        "parseMarkdown (lib/parser.js:25, sync)"
+      ]
+    },
+    "CodeClass": {
+      "description": "A class definition extracted from source code via AST analysis",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "className": {
+          "type": "string",
+          "description": "Name of the class"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Source file path where the class is defined"
+        },
+        "lineNumber": {
+          "type": "number",
+          "description": "Line number where the class definition starts"
+        },
+        "language": {
+          "type": "string",
+          "description": "Programming language",
+          "enum": ["typescript", "javascript", "python", "java", "go", "rust", "c", "cpp"]
+        },
+        "extendsClass": {
+          "type": "string",
+          "description": "Parent class name if any"
+        },
+        "implementsInterfaces": {
+          "type": "array",
+          "description": "List of implemented interfaces"
+        },
+        "methodCount": {
+          "type": "number",
+          "description": "Number of methods in the class"
+        },
+        "propertyCount": {
+          "type": "number",
+          "description": "Number of properties in the class"
+        },
+        "docstring": {
+          "type": "string",
+          "description": "Class-level documentation"
+        },
+        "isAbstract": {
+          "type": "boolean",
+          "description": "Whether the class is abstract"
+        },
+        "isExported": {
+          "type": "boolean",
+          "description": "Whether the class is exported"
+        }
+      },
+      "requiredProperties": ["className", "filePath", "language"],
+      "examples": [
+        "CodeGraphAgent (src/agents/code-graph-agent.ts, 8 methods, exported)",
+        "GraphDatabaseService (lib/storage/graph-db.ts, extends BaseService)"
+      ]
+    },
+    "CodeModule": {
+      "description": "A code module or file containing multiple code entities",
+      "extendsEntity": "SystemComponent",
+      "properties": {
+        "modulePath": {
+          "type": "string",
+          "description": "File path of the module"
+        },
+        "moduleName": {
+          "type": "string",
+          "description": "Module name (file name without extension)"
+        },
+        "language": {
+          "type": "string",
+          "description": "Programming language",
+          "enum": ["typescript", "javascript", "python", "java", "go", "rust", "c", "cpp"]
+        },
+        "exportedSymbols": {
+          "type": "array",
+          "description": "List of exported symbols (functions, classes, constants)"
+        },
+        "imports": {
+          "type": "array",
+          "description": "List of imported modules"
+        },
+        "lineCount": {
+          "type": "number",
+          "description": "Total lines of code"
+        },
+        "complexity": {
+          "type": "number",
+          "description": "Average complexity of functions in module"
+        }
+      },
+      "requiredProperties": ["modulePath", "language"],
+      "examples": [
+        "tools.ts (src/tools.ts, 2400 lines, 25 exports)",
+        "coordinator.ts (src/agents/coordinator.ts, 900 lines)"
+      ]
+    },
+    "DocumentationLink": {
+      "description": "A link between documentation (markdown, PlantUML) and code entities",
+      "extendsEntity": "Workflow",
+      "properties": {
+        "documentPath": {
+          "type": "string",
+          "description": "Path to the documentation file"
+        },
+        "documentType": {
+          "type": "string",
+          "description": "Type of documentation",
+          "enum": ["markdown", "plantuml", "mermaid", "jsdoc", "readme"]
+        },
+        "codeReference": {
+          "type": "string",
+          "description": "Name of the referenced code entity"
+        },
+        "referenceType": {
+          "type": "string",
+          "description": "Type of reference",
+          "enum": ["inline_code", "code_block", "class_diagram", "component_diagram", "sequence_diagram", "api_reference"]
+        },
+        "context": {
+          "type": "string",
+          "description": "Surrounding context from the documentation"
+        },
+        "lineNumber": {
+          "type": "number",
+          "description": "Line number in the documentation file"
+        },
+        "confidence": {
+          "type": "number",
+          "description": "Confidence score for the link (0-1)"
+        }
+      },
+      "requiredProperties": ["documentPath", "codeReference", "referenceType"],
+      "examples": [
+        "CLAUDE.md mentions CodeGraphAgent (inline_code, line 45)",
+        "architecture.puml defines CoordinatorAgent (class_diagram)"
+      ]
+    },
+    "CodeRelationship": {
+      "description": "A relationship between code entities (calls, imports, extends)",
+      "extendsEntity": "Workflow",
+      "properties": {
+        "relationshipType": {
+          "type": "string",
+          "description": "Type of relationship",
+          "enum": ["calls", "imports", "extends", "implements", "uses", "defines", "references"]
+        },
+        "sourceEntity": {
+          "type": "string",
+          "description": "Name of the source entity"
+        },
+        "targetEntity": {
+          "type": "string",
+          "description": "Name of the target entity"
+        },
+        "sourceFile": {
+          "type": "string",
+          "description": "File path of the source entity"
+        },
+        "targetFile": {
+          "type": "string",
+          "description": "File path of the target entity"
+        },
+        "callCount": {
+          "type": "number",
+          "description": "Number of times the relationship occurs"
+        },
+        "isDirectCall": {
+          "type": "boolean",
+          "description": "Whether this is a direct call or indirect reference"
+        }
+      },
+      "requiredProperties": ["relationshipType", "sourceEntity", "targetEntity"],
+      "examples": [
+        "CodeGraphAgent calls runCodeGraphCommand (direct, 5 times)",
+        "tools.ts imports CodeGraphAgent (import)"
+      ]
+    }
+  },
+  "relationships": {
+    "calls": {
+      "description": "A function calls another function",
+      "sourceTypes": ["CodeFunction", "CodeClass"],
+      "targetTypes": ["CodeFunction"],
+      "properties": {
+        "callCount": {
+          "type": "number",
+          "description": "Number of call sites"
+        },
+        "isAsync": {
+          "type": "boolean",
+          "description": "Whether the call is awaited"
+        }
+      }
+    },
+    "imports": {
+      "description": "A module imports from another module",
+      "sourceTypes": ["CodeModule"],
+      "targetTypes": ["CodeModule", "CodeClass", "CodeFunction"],
+      "properties": {
+        "importType": {
+          "type": "string",
+          "enum": ["default", "named", "namespace"]
+        }
+      }
+    },
+    "extends": {
+      "description": "A class extends another class",
+      "sourceTypes": ["CodeClass"],
+      "targetTypes": ["CodeClass"],
+      "properties": {}
+    },
+    "implements": {
+      "description": "A class implements an interface",
+      "sourceTypes": ["CodeClass"],
+      "targetTypes": ["CodeClass"],
+      "properties": {}
+    },
+    "documents": {
+      "description": "Documentation describes a code entity",
+      "sourceTypes": ["DocumentationLink"],
+      "targetTypes": ["CodeFunction", "CodeClass", "CodeModule"],
+      "properties": {
+        "confidence": {
+          "type": "number",
+          "description": "Confidence that the link is correct"
+        }
+      }
+    }
+  },
+  "extractionRules": {
+    "CodeFunction": {
+      "namePatterns": ["[a-z][a-zA-Z0-9]*(?:Function|Handler|Callback)?", "handle[A-Z][a-zA-Z]*", "on[A-Z][a-zA-Z]*"],
+      "contextKeywords": ["function", "async function", "const.*=.*=>", "method", "def ", "fn "],
+      "priority": 3
+    },
+    "CodeClass": {
+      "namePatterns": ["[A-Z][a-zA-Z0-9]*(?:Agent|Service|Manager|Factory|Builder|Handler)?"],
+      "contextKeywords": ["class ", "interface ", "type ", "struct "],
+      "priority": 3
+    },
+    "CodeModule": {
+      "namePatterns": ["[a-z][a-z0-9-]*\\.(ts|js|py|java|go|rs)$"],
+      "contextKeywords": ["import", "export", "module", "package"],
+      "priority": 2
+    },
+    "DocumentationLink": {
+      "namePatterns": ["[A-Z][a-zA-Z0-9]*", "`[^`]+`"],
+      "contextKeywords": ["class ", "function ", "component ", "participant "],
+      "priority": 2
+    }
+  },
+  "metadata": {
+    "createdBy": "code-graph-rag integration",
+    "createdAt": "2025-12-09T11:00:00.000Z",
+    "lastUpdated": "2025-12-09T11:00:00.000Z",
+    "sourceSystem": "code-graph-rag + Tree-sitter + Memgraph",
+    "description": "Entity types for AST-based code analysis"
+  }
+}

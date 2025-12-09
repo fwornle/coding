@@ -65,6 +65,11 @@ SEMANTIC_ANALYSIS_CN_HTTPS="https://cc-github.bmwgroup.net/frankwoernle/mcp-serv
 SEMANTIC_ANALYSIS_PUBLIC_SSH="git@github.com:fwornle/mcp-server-semantic-analysis.git"
 SEMANTIC_ANALYSIS_PUBLIC_HTTPS="https://github.com/fwornle/mcp-server-semantic-analysis.git"
 
+# Code Graph RAG (NO CN MIRROR - always use public)
+CODE_GRAPH_RAG_SSH="git@github.com:vitali87/code-graph-rag.git"
+CODE_GRAPH_RAG_HTTPS="https://github.com/vitali87/code-graph-rag.git"
+CODE_GRAPH_RAG_DIR="$CODING_REPO/integrations/code-graph-rag"
+
 # Platform detection
 PLATFORM=""
 SHELL_RC=""
@@ -522,8 +527,9 @@ install_browserbase() {
     cd "$BROWSERBASE_DIR"
 
     # Install dependencies (skip postinstall scripts to avoid mcpvals build issues)
+    # Use --legacy-peer-deps to handle stagehand/zod peer dependency conflicts
     info "Installing browserbase dependencies (includes stagehand)..."
-    npm install --ignore-scripts || error_exit "Failed to install browserbase dependencies"
+    npm install --ignore-scripts --legacy-peer-deps || error_exit "Failed to install browserbase dependencies"
 
     # Fix TypeScript compatibility with newer MCP SDK (@modelcontextprotocol/sdk v1.22+)
     # The McpServer constructor API changed from single object to two parameters
@@ -881,6 +887,97 @@ install_mcp_servers() {
     else
         warning "browser-access directory not found, skipping..."
     fi
+}
+
+# Install code-graph-rag MCP server (AST-based code knowledge graph)
+install_code_graph_rag() {
+    echo -e "\n${CYAN}🔗 Installing code-graph-rag MCP server...${NC}"
+
+    cd "$CODING_REPO"
+
+    # Check for uv package manager
+    if ! command -v uv >/dev/null 2>&1; then
+        warning "uv not found - code-graph-rag requires uv package manager"
+        info "Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+        INSTALLATION_WARNINGS+=("code-graph-rag: uv not installed")
+        return 1
+    fi
+
+    # Clone or update repository
+    if [[ -d "$CODE_GRAPH_RAG_DIR/.git" ]]; then
+        info "code-graph-rag exists, updating..."
+        cd "$CODE_GRAPH_RAG_DIR"
+        timeout 30s git pull origin main 2>/dev/null || warning "Could not update code-graph-rag"
+    else
+        info "Cloning code-graph-rag..."
+        if git clone "$CODE_GRAPH_RAG_HTTPS" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
+            success "Cloned code-graph-rag"
+        elif git clone "$CODE_GRAPH_RAG_SSH" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
+            success "Cloned code-graph-rag via SSH"
+        else
+            warning "Failed to clone code-graph-rag"
+            INSTALLATION_WARNINGS+=("code-graph-rag: Failed to clone")
+            return 1
+        fi
+    fi
+
+    cd "$CODE_GRAPH_RAG_DIR"
+
+    # Install dependencies with uv
+    info "Installing dependencies with uv..."
+    if uv sync --extra treesitter-full 2>/dev/null; then
+        success "code-graph-rag dependencies installed"
+    else
+        warning "Failed to install code-graph-rag dependencies"
+        INSTALLATION_WARNINGS+=("code-graph-rag: uv sync failed")
+        cd "$CODING_REPO"
+        return 1
+    fi
+
+    # Create .env if not exists
+    if [[ ! -f "$CODE_GRAPH_RAG_DIR/.env" ]]; then
+        cat > "$CODE_GRAPH_RAG_DIR/.env" << 'ENVEOF'
+# code-graph-rag configuration
+MEMGRAPH_HOST=localhost
+MEMGRAPH_PORT=7687
+MEMGRAPH_BATCH_SIZE=1000
+CYPHER_PROVIDER=openai
+CYPHER_MODEL=gpt-4o-mini
+ENVEOF
+        info "Created .env configuration"
+    fi
+
+    # Create docker-compose.yaml for Memgraph if not exists
+    if [[ ! -f "$CODE_GRAPH_RAG_DIR/docker-compose.yaml" ]]; then
+        cat > "$CODE_GRAPH_RAG_DIR/docker-compose.yaml" << 'DCEOF'
+# Memgraph database for code-graph-rag
+version: '3.8'
+services:
+  memgraph:
+    image: memgraph/memgraph-platform
+    container_name: code-graph-memgraph
+    ports:
+      - "7687:7687"   # Bolt protocol
+      - "7444:7444"   # HTTPS
+      - "3100:3000"   # Memgraph Lab (UI)
+    volumes:
+      - memgraph_data:/var/lib/memgraph
+    restart: unless-stopped
+    environment:
+      - MEMGRAPH_TELEMETRY_ENABLED=false
+
+volumes:
+  memgraph_data:
+DCEOF
+        info "Created docker-compose.yaml for Memgraph"
+    fi
+
+    success "code-graph-rag installed"
+    info "  - Start Memgraph: cd integrations/code-graph-rag && docker-compose up -d"
+    info "  - Memgraph Lab: http://localhost:3100"
+    info "  - MCP server: uv run graph-code mcp-server"
+
+    cd "$CODING_REPO"
 }
 
 # Create universal command wrappers
@@ -1802,6 +1899,7 @@ main() {
     install_system_health_dashboard
     install_shadcn_mcp
     install_mcp_servers
+    install_code_graph_rag
     create_command_wrappers
     setup_unified_launcher
     configure_shell_environment
