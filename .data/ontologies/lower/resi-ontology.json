@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "ReSi",
-  "extendsOntology": "upper",
+  "extendsOntology": "development-knowledge",
   "description": "Lower ontology for ReSi team, covering embedded C++ virtual target development, data format handling, function orchestration, and local development workflows",
   "entities": {
     "EmbeddedFunction": {

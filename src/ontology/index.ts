@@ -14,7 +14,7 @@
  *
  * const system = await createOntologySystem({
  *   enabled: true,
- *   upperOntologyPath: '.data/ontologies/upper/cluster-reprocessing-ontology.json',
+ *   upperOntologyPath: '.data/ontologies/upper/development-knowledge-ontology.json',
  *   team: 'RaaS',
  *   lowerOntologyPath: '.data/ontologies/lower/raas-ontology.json',
  *   validation: { mode: 'strict' },
@@ -42,6 +42,7 @@ export * from './types.js';
 export * from './OntologyManager.js';
 export * from './OntologyValidator.js';
 export * from './OntologyClassifier.js';
+export * from './OntologyConfigManager.js';
 export * from './heuristics/index.js';
 export * from './metrics.js';
 

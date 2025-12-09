@@ -21,8 +21,12 @@ export type PropertyType = 'string' | 'number' | 'boolean' | 'object' | 'array' 
 
 /**
  * Validation modes for ontology enforcement
+ * - strict: All entities must match ontology classes
+ * - lenient: Entities can have unknown types (logged as warnings)
+ * - disabled: No validation
+ * - auto-extend: Suggest new classes for unmatched patterns
  */
-export type ValidationMode = 'strict' | 'lenient' | 'disabled';
+export type ValidationMode = 'strict' | 'lenient' | 'disabled' | 'auto-extend';
 
 /**
  * Property definition for an entity
@@ -535,6 +539,7 @@ export interface TeamOntologyConfig {
   /** Validation configuration */
   validation?: {
     mode: ValidationMode;
+    failOnError?: boolean;
   };
 
   /** Classification configuration */
