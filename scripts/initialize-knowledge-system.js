@@ -17,8 +17,16 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
-import { EmbeddingGenerator } from '../src/knowledge-management/EmbeddingGenerator.js';
 import { UnifiedInferenceEngine } from '../src/inference/UnifiedInferenceEngine.js';
+
+// EmbeddingGenerator is optional - uses CommonJS format and is loaded lazily
+let EmbeddingGenerator = null;
+try {
+  const module = await import('../src/utils/EmbeddingGenerator.cjs');
+  EmbeddingGenerator = module.default || module.EmbeddingGenerator;
+} catch (e) {
+  // EmbeddingGenerator not available - will use fallback
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -146,15 +154,18 @@ class KnowledgeSystemInitializer {
   async initializeEmbeddings() {
     this.log('Step 3: Initializing embedding generator...');
 
-    this.embeddingGenerator = new EmbeddingGenerator({
-      projectPath: this.projectPath,
-      databaseManager: this.databaseManager,
-      debug: this.verbose
-    });
-
-    // Note: EmbeddingGenerator doesn't need explicit initialization
-    // It will load models on first use
-    this.success('Embedding generator configured');
+    if (EmbeddingGenerator) {
+      this.embeddingGenerator = new EmbeddingGenerator({
+        projectPath: this.projectPath,
+        databaseManager: this.databaseManager,
+        debug: this.verbose
+      });
+      // Note: EmbeddingGenerator doesn't need explicit initialization
+      // It will load models on first use
+      this.success('Embedding generator configured');
+    } else {
+      this.log('⚠️  Embedding generator not available (optional - will use fallback)');
+    }
   }
 
   /**

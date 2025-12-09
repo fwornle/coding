@@ -346,6 +346,68 @@ const SERVICE_CONFIGS = {
     }
   },
 
+  memgraph: {
+    name: 'Memgraph (Code Graph RAG)',
+    required: false, // OPTIONAL - for code-graph-rag AST analysis
+    maxRetries: 2,
+    timeout: 45000, // Memgraph can take time to start
+    startFn: async () => {
+      console.log('[Memgraph] Starting Memgraph Docker container for code-graph-rag...');
+
+      // Check if Docker is running
+      try {
+        await execAsync('docker info', { timeout: 5000 });
+      } catch (error) {
+        throw new Error('Docker not running - required for Memgraph');
+      }
+
+      // Check if code-graph-rag is installed
+      const codeGraphRagDir = path.join(CODING_DIR, 'integrations', 'code-graph-rag');
+      if (!fs.existsSync(codeGraphRagDir)) {
+        throw new Error('code-graph-rag not installed in integrations/ - run install.sh first');
+      }
+
+      // Check for docker-compose.yaml
+      const dockerComposePath = path.join(codeGraphRagDir, 'docker-compose.yaml');
+      if (!fs.existsSync(dockerComposePath)) {
+        throw new Error('docker-compose.yaml not found in code-graph-rag/ - run install.sh to create it');
+      }
+
+      try {
+        await execAsync('docker-compose up -d', {
+          cwd: codeGraphRagDir,
+          timeout: 60000
+        });
+      } catch (error) {
+        throw new Error(`Docker compose failed for Memgraph: ${error.message}`);
+      }
+
+      console.log('[Memgraph] Docker container started successfully');
+      console.log('[Memgraph] Bolt port: 7687, Lab UI: http://localhost:3100');
+
+      return {
+        service: 'memgraph-docker',
+        mode: 'docker-compose',
+        ports: { bolt: 7687, https: 7444, lab: 3100 }
+      };
+    },
+    healthCheckFn: async () => {
+      // Check if Memgraph is listening on Bolt port
+      try {
+        const isListening = await isPortListening(7687);
+        if (!isListening) {
+          console.log('[Memgraph] Health check failed: Bolt port 7687 not listening');
+          return false;
+        }
+        console.log('[Memgraph] Container healthy (Bolt port 7687 listening)');
+        return true;
+      } catch (error) {
+        console.log('[Memgraph] Health check error:', error.message);
+        return false;
+      }
+    }
+  },
+
   systemHealthDashboardAPI: {
     name: 'System Health Dashboard API',
     required: false, // OPTIONAL - system health dashboard
@@ -483,6 +545,17 @@ async function createServicesStatusFile(results) {
       health: results.successful.some(r => r.serviceName === 'System Health Dashboard API')
         ? 'healthy'
         : 'degraded'
+    },
+    memgraph: {
+      status: results.successful.some(r => r.serviceName === 'Memgraph (Code Graph RAG)')
+        ? '✅ OPERATIONAL'
+        : '⚠️ DEGRADED',
+      bolt_port: 7687,
+      lab_port: 3100,
+      health: results.successful.some(r => r.serviceName === 'Memgraph (Code Graph RAG)')
+        ? 'healthy'
+        : 'degraded',
+      purpose: 'AST-based code knowledge graph (code-graph-rag)'
     }
   };
 
@@ -715,6 +788,27 @@ async function startAllServices() {
     await registerWithPSM(systemHealthAPIResult, 'integrations/system-health-dashboard/server.js');
   } else {
     results.degraded.push(systemHealthAPIResult);
+  }
+
+  console.log('');
+
+  // 7. OPTIONAL: Memgraph (Code Graph RAG)
+  const memgraphResult = await startServiceWithRetry(
+    SERVICE_CONFIGS.memgraph.name,
+    SERVICE_CONFIGS.memgraph.startFn,
+    SERVICE_CONFIGS.memgraph.healthCheckFn,
+    {
+      required: SERVICE_CONFIGS.memgraph.required,
+      maxRetries: SERVICE_CONFIGS.memgraph.maxRetries,
+      timeout: SERVICE_CONFIGS.memgraph.timeout
+    }
+  );
+
+  if (memgraphResult.status === 'success') {
+    results.successful.push(memgraphResult);
+    // No PSM registration for Docker-based service
+  } else {
+    results.degraded.push(memgraphResult);
   }
 
   console.log('');
