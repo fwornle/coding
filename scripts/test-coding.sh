@@ -302,7 +302,7 @@ print_check "KNOWLEDGE_BASE_PATH variable"
 if [ -n "$KNOWLEDGE_BASE_PATH" ]; then
     print_pass "KNOWLEDGE_BASE_PATH set to: $KNOWLEDGE_BASE_PATH"
 else
-    print_info "KNOWLEDGE_BASE_PATH not set (will use default: $CODING_ROOT/knowledge-management/insights)"
+    print_info "KNOWLEDGE_BASE_PATH not set (will use default: $CODING_ROOT)"
 fi
 
 print_check "CODING_DOCS_PATH variable"
@@ -926,7 +926,7 @@ if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
         cd "$CODING_ROOT/integrations/mcp-server-semantic-analysis"
 
         # Set environment variables for test
-        export KNOWLEDGE_BASE_PATH="${KNOWLEDGE_BASE_PATH:-$CODING_ROOT/knowledge-management/insights}"
+        export KNOWLEDGE_BASE_PATH="${KNOWLEDGE_BASE_PATH:-$CODING_ROOT}"
         export CODING_DOCS_PATH="${CODING_DOCS_PATH:-$CODING_ROOT/docs}"
         export CODING_TOOLS_PATH="$CODING_ROOT"
 
