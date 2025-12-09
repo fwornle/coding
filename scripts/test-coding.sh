@@ -1046,10 +1046,12 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
                 print_warning "TypeScript configuration missing"
             fi
             
-            # Test Tailwind CSS configuration
+            # Test Tailwind CSS configuration (v4 uses postcss.config.mjs with @tailwindcss/postcss)
             print_check "Tailwind CSS configuration"
             if [ -f "tailwind.config.js" ] || [ -f "tailwind.config.ts" ]; then
-                print_pass "Tailwind CSS configuration found"
+                print_pass "Tailwind CSS configuration found (v3 style)"
+            elif [ -f "postcss.config.mjs" ] && grep -q "@tailwindcss/postcss" "postcss.config.mjs" 2>/dev/null; then
+                print_pass "Tailwind CSS v4 configuration found (via postcss)"
             else
                 print_warning "Tailwind CSS configuration missing"
             fi
@@ -1272,7 +1274,7 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     fi
 
     print_check "Admin API keys for real-time usage stats"
-    local admin_keys_configured=0
+    admin_keys_configured=0
     if [ -n "${ANTHROPIC_ADMIN_API_KEY:-}" ]; then
         print_pass "ANTHROPIC_ADMIN_API_KEY configured for real-time Anthropic usage stats"
         admin_keys_configured=$((admin_keys_configured + 1))
@@ -1480,12 +1482,12 @@ if dir_exists "$SERENA_DIR"; then
     print_check "Serena MCP server functionality"
     if [ -f "$SERENA_DIR/pyproject.toml" ] && [ -d "$SERENA_DIR/.venv" ]; then
         cd "$SERENA_DIR"
-        # Test basic server functionality
+        # Test basic server functionality (module is serena.mcp with SerenaMCPFactory)
         if timeout 10s .venv/bin/python -c "
 import sys
-sys.path.insert(0, '.')
+sys.path.insert(0, 'src')
 try:
-    from serena.mcp_server import main
+    from serena.mcp import SerenaMCPFactory
     print('Serena MCP server module loads successfully')
 except ImportError as e:
     print(f'Import error: {e}')
@@ -1821,7 +1823,8 @@ fi
 
 print_check "Documentation structure"
 DOCS_ISSUES=0
-for dir in "installation" "architecture" "ukb" "logging" "integrations" "reference"; do
+# Updated to match actual documentation structure
+for dir in "architecture" "knowledge-management" "integrations" "health-system" "lsl"; do
     if dir_exists "$CODING_ROOT/docs/$dir"; then
         print_pass "docs/$dir directory found"
     else
@@ -1837,7 +1840,8 @@ else
 fi
 
 print_check "Key documentation files"
-KEY_DOCS=("README.md" "installation/quick-start.md" "ukb/user-guide.md" "integrations/vscode-extension.md" "architecture/system-overview.md")
+# Updated to match actual documentation files
+KEY_DOCS=("README.md" "getting-started.md" "system-overview.md" "knowledge-management/ukb-update.md" "integrations/vscode-extension.md" "architecture/system-overview.md")
 MISSING_DOCS=0
 for doc in "${KEY_DOCS[@]}"; do
     if file_exists "$CODING_ROOT/docs/$doc"; then
