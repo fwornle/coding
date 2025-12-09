@@ -14,7 +14,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -145,14 +145,37 @@ class StatusLineHealthMonitor {
   }
 
   /**
-   * Get active project sessions health
+   * Get list of projects with running transcript monitors
    */
+  async getRunningTranscriptMonitors() {
+    try {
+      const psOutput = execSync('ps aux | grep "enhanced-transcript-monitor.js" | grep -v grep', { encoding: 'utf8' });
+      const runningProjects = new Set();
+
+      for (const line of psOutput.trim().split('\n')) {
+        // Extract project path from command line: .../enhanced-transcript-monitor.js /Users/q284340/Agentic/PROJECT
+        const match = line.match(/enhanced-transcript-monitor\.js\s+\/Users\/q284340\/Agentic\/([^\s]+)/);
+        if (match) {
+          runningProjects.add(match[1]);
+        }
+      }
+
+      return runningProjects;
+    } catch (error) {
+      // No monitors running or grep failed
+      return new Set();
+    }
+  }
+
   /**
    * Get active project sessions health
    */
   async getProjectSessionsHealth() {
     const sessions = {};
-    
+
+    // Get projects with running transcript monitors - only these should be shown
+    const runningMonitors = await this.getRunningTranscriptMonitors();
+
     try {
       // Method 1: Registry-based discovery (preferred when available)
       if (fs.existsSync(this.registryPath)) {
@@ -165,24 +188,28 @@ class StatusLineHealthMonitor {
       }
       
       // Method 2: Dynamic discovery via Claude transcript files (discovers unregistered sessions)
+      // IMPORTANT: Only show sessions with running transcript monitors
       const claudeProjectsDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects');
-      
+
       if (fs.existsSync(claudeProjectsDir)) {
         const projectDirs = fs.readdirSync(claudeProjectsDir).filter(dir => dir.startsWith('-Users-q284340-Agentic-'));
-        
+
         for (const projectDir of projectDirs) {
           const projectDirPath = path.join(claudeProjectsDir, projectDir);
-          
+
           // Extract project name from directory: "-Users-q284340-Agentic-curriculum-alignment" -> "curriculum-alignment"
           const projectName = projectDir.replace(/^-Users-q284340-Agentic-/, '');
-          
+
           // Skip if already found via registry
           if (sessions[projectName]) continue;
-          
+
+          // Skip if no transcript monitor is running for this project
+          if (!runningMonitors.has(projectName)) continue;
+
           // Check if this project has a centralized health file FIRST
           const projectPath = `/Users/q284340/Agentic/${projectName}`;
           const centralizedHealthFile = this.getCentralizedHealthFile(projectPath);
-          
+
           if (fs.existsSync(centralizedHealthFile)) {
             // Has monitor running - use health file data
             sessions[projectName] = await this.getProjectSessionHealthFromFile(centralizedHealthFile, projectPath);
@@ -267,18 +294,22 @@ class StatusLineHealthMonitor {
       }
       
       // Method 3: Fallback hardcoded check for known project directories (using centralized health files)
+      // IMPORTANT: Only show sessions with running transcript monitors
       const commonProjectDirs = [
         this.codingRepoPath, // Current coding directory
         '/Users/q284340/Agentic/curriculum-alignment',
         '/Users/q284340/Agentic/nano-degree'
       ];
-      
+
       for (const projectDir of commonProjectDirs) {
         const projectName = path.basename(projectDir);
-        
+
         // Skip if already found
         if (sessions[projectName]) continue;
-        
+
+        // Skip if no transcript monitor is running for this project
+        if (!runningMonitors.has(projectName)) continue;
+
         if (fs.existsSync(projectDir)) {
           const centralizedHealthFile = this.getCentralizedHealthFile(projectDir);
           if (fs.existsSync(centralizedHealthFile)) {
@@ -485,7 +516,18 @@ class StatusLineHealthMonitor {
       }
 
       const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
-      const age = Date.now() - healthData.timestamp;
+
+      // Check health file freshness - if file hasn't been updated in >5 min, the monitor isn't running
+      const healthFileAge = Date.now() - healthData.timestamp;
+      const isHealthFileStale = healthFileAge > 300000; // 5 minutes
+
+      // Use transcript age (actual inactivity) when available, fall back to health check timestamp
+      // But if health file is stale, use the health file age instead (more accurate)
+      let age = healthData.transcriptInfo?.ageMs ?? healthFileAge;
+      if (isHealthFileStale) {
+        // Health file not being updated - use file age as minimum
+        age = Math.max(age, healthFileAge);
+      }
 
       // If no active transcript/session, show as inactive (black) regardless of health file age
       if (healthData.transcriptInfo?.status === 'not_found' ||
@@ -554,12 +596,18 @@ class StatusLineHealthMonitor {
           icon: '🪨',
           details: 'Session dormant'
         };
-      } else {
-        // > 6 hours: inactive (black)
+      } else if (age < 86400000) { // 6 hours - 24 hours: inactive (black)
         return {
           status: 'inactive',
           icon: '⚫',
           details: 'Session inactive (>6h)'
+        };
+      } else {
+        // > 24 hours: sleeping
+        return {
+          status: 'sleeping',
+          icon: '💤',
+          details: 'Session sleeping (>24h)'
         };
       }
     } catch (error) {
@@ -1306,12 +1354,10 @@ class StatusLineHealthMonitor {
     }
 
     // Project Sessions - show individual session statuses with abbreviations
-    // Filter out old sessions to avoid clutter:
-    // - dormant (1-6h), inactive (>6h), sleeping (>24h) are hidden
-    // - Only show active, healthy, warning, cooling, fading, stale sessions
-    const hiddenStatuses = ['dormant', 'inactive', 'sleeping'];
-    const sessionEntries = Object.entries(sessionHealth)
-      .filter(([, health]) => !hiddenStatuses.includes(health.status));
+    // Since we now only include sessions with running transcript monitors,
+    // we show all sessions regardless of status (dormant, sleeping, etc.)
+    // The running monitor IS the signal that a session is active
+    const sessionEntries = Object.entries(sessionHealth);
 
     if (sessionEntries.length > 0) {
       const sessionStatuses = sessionEntries
