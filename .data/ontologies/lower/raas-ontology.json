@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "RaaS",
-  "extendsOntology": "upper",
+  "extendsOntology": "development-knowledge",
   "description": "Lower ontology for RaaS (Reprocessing as a Service) team, covering cloud orchestration, Kubernetes, Argo Workflows, event-driven architecture, and monitoring",
   "entities": {
     "EventMeshNode": {

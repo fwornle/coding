@@ -1,8 +1,10 @@
 {
   "name": "Cluster Reprocessing Ontology",
   "version": "1.0.0",
-  "type": "upper",
-  "description": "Upper ontology for the Cluster Reprocessing (RPR) ecosystem, covering vehicle data recording, reprocessing, validation, and ADAS function evaluation",
+  "type": "lower",
+  "team": "cluster-reprocessing",
+  "extendsOntology": "development-knowledge",
+  "description": "Lower ontology for the Cluster Reprocessing (RPR) ecosystem, covering vehicle data recording, reprocessing, validation, and ADAS function evaluation. Extends the Development Knowledge upper ontology.",
   "entities": {
     "RecordedData": {
       "description": "Vehicle-recorded sensor and ECU data from test drives",

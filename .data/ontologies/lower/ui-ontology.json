@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "ui",
-  "extendsOntology": "upper",
+  "extendsOntology": "development-knowledge",
   "description": "Lower ontology for the Multi-Agent Curriculum Alignment System (MACAS), covering curriculum analysis, multi-agent workflows, AWS serverless infrastructure, and academic data processing",
   "entities": {
     "AgentInstance": {

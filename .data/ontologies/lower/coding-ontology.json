@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "coding",
-  "extendsOntology": "upper",
+  "extendsOntology": "development-knowledge",
   "description": "Lower ontology for the coding infrastructure project, covering knowledge management, live session logging, constraint monitoring, trajectory generation, and MCP integrations",
   "entities": {
     "LSLSession": {

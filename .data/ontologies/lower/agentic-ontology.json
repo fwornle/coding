@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "agentic",
-  "extendsOntology": "upper",
+  "extendsOntology": "development-knowledge",
   "description": "Lower ontology for the Agentic AI Nanodegree project, covering agent frameworks, RAG systems, communication protocols, and distributed agent architectures",
   "entities": {
     "AgentFramework": {
