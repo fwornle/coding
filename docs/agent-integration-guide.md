@@ -35,7 +35,7 @@ The Coding system is designed to support multiple AI coding assistants through a
 
 ### Agent-Agnostic Design
 
-![Agent-Agnostic Architecture - Components](images/agent-agnostic-architecture-components.png)
+![Agent-Agnostic Architecture - Components](../images/agent-agnostic-architecture-components.png)
 
 The system follows a layered architecture:
 
@@ -47,7 +47,7 @@ The system follows a layered architecture:
 
 ### Integration Flow
 
-![Agent Integration Flow](images/agent-integration-flow.png)
+![Agent Integration Flow](../images/agent-integration-flow.png)
 
 When integrating a new agent:
 1. Agent detection checks availability

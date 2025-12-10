@@ -10,7 +10,7 @@ The Enhanced Health Monitoring System provides comprehensive health tracking and
 
 ### 4-Layer Protection Architecture
 
-![Enhanced Health Monitoring Overview](images/enhanced-health-monitoring-overview.png)
+![Enhanced Health Monitoring Overview](../images/enhanced-health-monitoring-overview.png)
 
 The system implements a robust 4-layer monitoring protection:
 
@@ -54,7 +54,7 @@ The system implements a robust 4-layer monitoring protection:
 
 ## StatusLine Architecture
 
-![StatusLine Architecture](images/statusline-architecture.png)
+![StatusLine Architecture](../images/statusline-architecture.png)
 
 ### Session Discovery Methods
 
@@ -85,7 +85,7 @@ The algorithm handles:
 
 ## Auto-Recovery Mechanisms
 
-![Auto-Recovery Flow](images/auto-recovery-flow.png)
+![Auto-Recovery Flow](../images/auto-recovery-flow.png)
 
 ### Plug'n'Play Behavior
 

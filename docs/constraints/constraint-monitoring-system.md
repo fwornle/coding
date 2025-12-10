@@ -20,7 +20,7 @@ The Constraint Monitoring System provides **real-time enforcement** of coding st
 
 ### Hook Integration Flow
 
-![Constraint Hooks Flow](images/constraint-hooks-flow.png)
+![Constraint Hooks Flow](../images/constraint-hooks-flow.png)
 
 The system uses **two hook types** working together:
 
@@ -125,7 +125,7 @@ integrations/mcp-constraint-monitor/
 
 ## Violation Handling
 
-![Constraint Violation Handling](images/constraint-violation-handling.png)
+![Constraint Violation Handling](../images/constraint-violation-handling.png)
 
 ### Severity Levels & Enforcement
 
@@ -274,7 +274,7 @@ All override usage is logged for audit purposes:
 
 ## Testing Architecture
 
-![Constraint Testing Architecture](images/constraint-testing-architecture.png)
+![Constraint Testing Architecture](../images/constraint-testing-architecture.png)
 
 ### Automated Testing
 
