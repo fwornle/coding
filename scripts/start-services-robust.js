@@ -25,6 +25,7 @@ import {
   createHttpHealthCheck,
   createPidHealthCheck,
   isPortListening,
+  isTcpPortListening,
   isProcessRunning,
   sleep
 } from '../lib/service-starter.js';
@@ -42,6 +43,18 @@ const psm = new ProcessStateManager();
 
 // Get target project path from environment (set by bin/coding)
 const TARGET_PROJECT_PATH = process.env.CODING_PROJECT_DIR || CODING_DIR;
+
+// Port configurations from .env.ports (with defaults)
+const PORTS = {
+  VKB: parseInt(process.env.VKB_PORT || '8080', 10),
+  CONSTRAINT_DASHBOARD: parseInt(process.env.CONSTRAINT_DASHBOARD_PORT || '3030', 10),
+  CONSTRAINT_API: parseInt(process.env.CONSTRAINT_API_PORT || '3031', 10),
+  SYSTEM_HEALTH_DASHBOARD: parseInt(process.env.SYSTEM_HEALTH_DASHBOARD_PORT || '3032', 10),
+  SYSTEM_HEALTH_API: parseInt(process.env.SYSTEM_HEALTH_API_PORT || '3033', 10),
+  MEMGRAPH_BOLT: parseInt(process.env.MEMGRAPH_BOLT_PORT || '7687', 10),
+  MEMGRAPH_HTTPS: parseInt(process.env.MEMGRAPH_HTTPS_PORT || '7444', 10),
+  MEMGRAPH_LAB: parseInt(process.env.MEMGRAPH_LAB_PORT || '3100', 10),
+};
 
 // Service configurations
 const SERVICE_CONFIGS = {
@@ -127,25 +140,25 @@ const SERVICE_CONFIGS = {
     maxRetries: 3,
     timeout: 30000, // VKB can take longer to start
     startFn: async () => {
-      console.log('[VKB] Starting VKB server on port 8080...');
+      console.log(`[VKB] Starting VKB server on port ${PORTS.VKB}...`);
 
       // Check if already running globally (parallel session detection)
       const isRunning = await psm.isServiceRunning('vkb-server', 'global');
       if (isRunning) {
         console.log('[VKB] Already running globally - using existing instance');
         // Check if port is listening
-        if (await isPortListening(8080)) {
-          return { pid: 'already-running', port: 8080, service: 'vkb-server', skipRegistration: true };
+        if (await isPortListening(PORTS.VKB)) {
+          return { pid: 'already-running', port: PORTS.VKB, service: 'vkb-server', skipRegistration: true };
         } else {
-          console.log('[VKB] Warning: PSM shows running but port 8080 not listening - cleaning up PSM entry');
+          console.log(`[VKB] Warning: PSM shows running but port ${PORTS.VKB} not listening - cleaning up PSM entry`);
           // PSM will clean this up automatically on next status check
         }
       }
 
-      // Kill any existing process on port 8080
+      // Kill any existing process on VKB port
       try {
         await new Promise((resolve) => {
-          exec('lsof -ti:8080 | xargs kill -9 2>/dev/null', () => resolve());
+          exec(`lsof -ti:${PORTS.VKB} | xargs kill -9 2>/dev/null`, () => resolve());
         });
         await sleep(1000);
       } catch (error) {
@@ -190,11 +203,11 @@ const SERVICE_CONFIGS = {
         throw new Error(`VKB server process died immediately. Check ${logPath} for errors.`);
       }
 
-      return { pid: child.pid, port: 8080, service: 'vkb-server', logPath };
+      return { pid: child.pid, port: PORTS.VKB, service: 'vkb-server', logPath };
     },
     healthCheckFn: async (result) => {
       if (result.skipRegistration) return true;
-      return createHttpHealthCheck(8080, '/health')(result);
+      return createHttpHealthCheck(PORTS.VKB, '/health')(result);
     }
   },
 
@@ -373,33 +386,44 @@ const SERVICE_CONFIGS = {
         throw new Error('docker-compose.yaml not found in code-graph-rag/ - run install.sh to create it');
       }
 
+      // Pass port configuration via env vars (upstream docker-compose uses MEMGRAPH_PORT, LAB_PORT)
+      // We map from our .env.ports naming to upstream's expected env var names
+      const composeEnv = {
+        ...process.env,
+        MEMGRAPH_PORT: String(PORTS.MEMGRAPH_BOLT),
+        MEMGRAPH_HTTP_PORT: String(PORTS.MEMGRAPH_HTTPS),
+        LAB_PORT: String(PORTS.MEMGRAPH_LAB)
+      };
+
       try {
         await execAsync('docker-compose up -d', {
           cwd: codeGraphRagDir,
-          timeout: 60000
+          timeout: 60000,
+          env: composeEnv
         });
       } catch (error) {
         throw new Error(`Docker compose failed for Memgraph: ${error.message}`);
       }
 
       console.log('[Memgraph] Docker container started successfully');
-      console.log('[Memgraph] Bolt port: 7687, Lab UI: http://localhost:3100');
+      console.log(`[Memgraph] Bolt port: ${PORTS.MEMGRAPH_BOLT}, Lab UI: http://localhost:${PORTS.MEMGRAPH_LAB}`);
 
       return {
         service: 'memgraph-docker',
         mode: 'docker-compose',
-        ports: { bolt: 7687, https: 7444, lab: 3100 }
+        ports: { bolt: PORTS.MEMGRAPH_BOLT, https: PORTS.MEMGRAPH_HTTPS, lab: PORTS.MEMGRAPH_LAB }
       };
     },
     healthCheckFn: async () => {
-      // Check if Memgraph is listening on Bolt port
+      // Check if Memgraph is listening on Bolt port using TCP (not HTTP)
+      // Memgraph uses Bolt protocol, not HTTP, so we need raw TCP socket check
       try {
-        const isListening = await isPortListening(7687);
+        const isListening = await isTcpPortListening(PORTS.MEMGRAPH_BOLT);
         if (!isListening) {
-          console.log('[Memgraph] Health check failed: Bolt port 7687 not listening');
+          console.log(`[Memgraph] Health check failed: Bolt port ${PORTS.MEMGRAPH_BOLT} not listening`);
           return false;
         }
-        console.log('[Memgraph] Container healthy (Bolt port 7687 listening)');
+        console.log(`[Memgraph] Container healthy (Bolt port ${PORTS.MEMGRAPH_BOLT} listening)`);
         return true;
       } catch (error) {
         console.log('[Memgraph] Health check error:', error.message);
@@ -414,24 +438,24 @@ const SERVICE_CONFIGS = {
     maxRetries: 2,
     timeout: 15000,
     startFn: async () => {
-      console.log('[SystemHealthAPI] Starting system health dashboard API on port 3033...');
+      console.log(`[SystemHealthAPI] Starting system health dashboard API on port ${PORTS.SYSTEM_HEALTH_API}...`);
 
       // Check if already running globally (parallel session detection)
       const isRunning = await psm.isServiceRunning('system-health-dashboard-api', 'global');
       if (isRunning) {
         console.log('[SystemHealthAPI] Already running globally - using existing instance');
         // Check if port is listening
-        if (await isPortListening(3033)) {
-          return { pid: 'already-running', port: 3033, service: 'system-health-dashboard-api', skipRegistration: true };
+        if (await isPortListening(PORTS.SYSTEM_HEALTH_API)) {
+          return { pid: 'already-running', port: PORTS.SYSTEM_HEALTH_API, service: 'system-health-dashboard-api', skipRegistration: true };
         } else {
-          console.log('[SystemHealthAPI] Warning: PSM shows running but port 3033 not listening - cleaning up PSM entry');
+          console.log(`[SystemHealthAPI] Warning: PSM shows running but port ${PORTS.SYSTEM_HEALTH_API} not listening - cleaning up PSM entry`);
         }
       }
 
-      // Kill any existing process on port 3033
+      // Kill any existing process on System Health API port
       try {
         await new Promise((resolve) => {
-          exec('lsof -ti:3033 | xargs kill -9 2>/dev/null', () => resolve());
+          exec(`lsof -ti:${PORTS.SYSTEM_HEALTH_API} | xargs kill -9 2>/dev/null`, () => resolve());
         });
         await sleep(500);
       } catch (error) {
@@ -456,11 +480,11 @@ const SERVICE_CONFIGS = {
         throw new Error('System Health Dashboard API process died immediately');
       }
 
-      return { pid: child.pid, port: 3033, service: 'system-health-dashboard-api' };
+      return { pid: child.pid, port: PORTS.SYSTEM_HEALTH_API, service: 'system-health-dashboard-api' };
     },
     healthCheckFn: async (result) => {
       if (result.skipRegistration) return true;
-      return createHttpHealthCheck(3033, '/api/health')(result);
+      return createHttpHealthCheck(PORTS.SYSTEM_HEALTH_API, '/api/health')(result);
     }
   }
 };
@@ -512,8 +536,8 @@ async function createServicesStatusFile(results) {
       status: results.successful.some(r => r.serviceName === 'Constraint Monitor')
         ? '✅ FULLY OPERATIONAL'
         : '⚠️ DEGRADED MODE',
-      dashboard_port: 3030,
-      api_port: 3031,
+      dashboard_port: PORTS.CONSTRAINT_DASHBOARD,
+      api_port: PORTS.CONSTRAINT_API,
       health: results.successful.some(r => r.serviceName === 'Constraint Monitor')
         ? 'healthy'
         : 'degraded',
@@ -527,7 +551,7 @@ async function createServicesStatusFile(results) {
       status: results.successful.some(r => r.serviceName === 'VKB Server')
         ? '✅ OPERATIONAL'
         : '⚠️ DEGRADED',
-      port: 8080,
+      port: PORTS.VKB,
       health: results.successful.some(r => r.serviceName === 'VKB Server')
         ? 'healthy'
         : 'degraded'
@@ -540,8 +564,8 @@ async function createServicesStatusFile(results) {
       status: results.successful.some(r => r.serviceName === 'System Health Dashboard API')
         ? '✅ OPERATIONAL'
         : '⚠️ DEGRADED',
-      port: 3033,
-      dashboard_port: 3032,
+      port: PORTS.SYSTEM_HEALTH_API,
+      dashboard_port: PORTS.SYSTEM_HEALTH_DASHBOARD,
       health: results.successful.some(r => r.serviceName === 'System Health Dashboard API')
         ? 'healthy'
         : 'degraded'
@@ -550,8 +574,8 @@ async function createServicesStatusFile(results) {
       status: results.successful.some(r => r.serviceName === 'Memgraph (Code Graph RAG)')
         ? '✅ OPERATIONAL'
         : '⚠️ DEGRADED',
-      bolt_port: 7687,
-      lab_port: 3100,
+      bolt_port: PORTS.MEMGRAPH_BOLT,
+      lab_port: PORTS.MEMGRAPH_LAB,
       health: results.successful.some(r => r.serviceName === 'Memgraph (Code Graph RAG)')
         ? 'healthy'
         : 'degraded',

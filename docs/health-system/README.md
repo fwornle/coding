@@ -79,6 +79,7 @@ The Health System provides **failsafe monitoring** with automatic verification a
 - **LevelDB** - Knowledge graph storage
 - **Qdrant** - Vector database (port 6333)
 - **SQLite** - Analytics database
+- **Memgraph** - Code graph database (port 7687 Bolt protocol, port 3100 Lab UI)
 
 ### Services
 - **VKB Server** - Knowledge visualization (port 8080)

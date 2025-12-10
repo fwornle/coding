@@ -142,6 +142,28 @@ CODING_TOOLS_PATH=/Users/<username>/Agentic/coding
 CODING_REPO=/Users/<username>/Agentic/coding
 ```
 
+### Port Configuration
+
+All service ports are centralized in `.env.ports`. This is the **single source of truth** for port assignments:
+
+```bash
+# Key ports (see .env.ports for complete list)
+VKB_PORT=8080                    # Knowledge visualization
+CONSTRAINT_DASHBOARD_PORT=3030   # Constraint monitor UI
+CONSTRAINT_API_PORT=3031         # Constraint monitor API
+SYSTEM_HEALTH_DASHBOARD_PORT=3032  # Health dashboard UI
+SYSTEM_HEALTH_API_PORT=3033      # Health dashboard API
+MEMGRAPH_BOLT_PORT=7687          # Memgraph database (Bolt protocol)
+MEMGRAPH_LAB_PORT=3100           # Memgraph Lab UI
+```
+
+The startup scripts (`bin/coding`, `scripts/start-services-robust.js`) automatically read these ports. To customize:
+
+1. Edit `.env.ports` with your preferred ports
+2. Restart services with `bin/coding`
+
+**Note:** Docker services (Memgraph, Constraint Monitor) receive port configuration via environment variables at startup time, ensuring the submodule docker-compose files don't need modification.
+
 **Note:** The system works with ANY coding agent (Claude Code, GitHub CoPilot, Cursor, etc.) and ANY LLM provider. Provider SDKs are installed as optional dependencies - only install what you need:
 
 ```bash
