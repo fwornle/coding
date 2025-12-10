@@ -462,13 +462,14 @@ install_memory_visualizer() {
 
     cd "$CODING_REPO"
 
-    if [[ -d "$MEMORY_VISUALIZER_DIR/.git" ]]; then
+    # Check for both .git directory and .git file (for submodules)
+    if [[ -d "$MEMORY_VISUALIZER_DIR/.git" ]] || [[ -f "$MEMORY_VISUALIZER_DIR/.git" ]]; then
         info "Memory visualizer submodule already exists, updating..."
         cd "$MEMORY_VISUALIZER_DIR"
         if timeout 10s git pull origin main 2>/dev/null; then
             success "Memory visualizer updated"
         else
-            warning "Could not update memory-visualizer, using existing version"
+            info "Could not update memory-visualizer (may be on specific commit)"
         fi
     else
         info "Initializing memory-visualizer submodule..."
@@ -563,13 +564,14 @@ install_semantic_analysis() {
 
     cd "$CODING_REPO"
 
-    if [[ -d "$SEMANTIC_ANALYSIS_DIR/.git" ]]; then
+    # Check for both .git directory and .git file (for submodules)
+    if [[ -d "$SEMANTIC_ANALYSIS_DIR/.git" ]] || [[ -f "$SEMANTIC_ANALYSIS_DIR/.git" ]]; then
         info "mcp-server-semantic-analysis submodule already exists, updating..."
         cd "$SEMANTIC_ANALYSIS_DIR"
         if timeout 10s git pull origin main 2>/dev/null; then
             success "mcp-server-semantic-analysis updated"
         else
-            warning "Could not update mcp-server-semantic-analysis, using existing version"
+            info "Could not update mcp-server-semantic-analysis (may be on specific commit)"
         fi
     else
         info "Initializing mcp-server-semantic-analysis submodule..."
@@ -620,14 +622,14 @@ install_serena() {
         return 1
     fi
 
-    # Install or update Serena submodule
-    if [[ -d "$serena_dir/.git" ]]; then
+    # Install or update Serena submodule (check for both .git directory and .git file)
+    if [[ -d "$serena_dir/.git" ]] || [[ -f "$serena_dir/.git" ]]; then
         info "Serena submodule already exists, updating..."
         cd "$serena_dir"
         if timeout 10s git pull origin main 2>/dev/null; then
             success "Serena updated from repository"
         else
-            warning "Could not update Serena, using existing version"
+            info "Could not update Serena (may be on specific commit)"
         fi
     else
         info "Initializing Serena submodule..."
@@ -675,14 +677,14 @@ install_constraint_monitor() {
 
     local constraint_monitor_dir="$CODING_REPO/integrations/mcp-constraint-monitor"
 
-    # Initialize or update submodule
-    if [[ -d "$constraint_monitor_dir/.git" ]]; then
+    # Initialize or update submodule (check for both .git directory and .git file)
+    if [[ -d "$constraint_monitor_dir/.git" ]] || [[ -f "$constraint_monitor_dir/.git" ]]; then
         info "mcp-constraint-monitor submodule already exists, updating..."
         cd "$constraint_monitor_dir"
         if timeout 10s git pull origin main 2>/dev/null; then
             success "mcp-constraint-monitor updated"
         else
-            warning "Could not update mcp-constraint-monitor, using existing version"
+            info "Could not update mcp-constraint-monitor (may be on specific commit)"
         fi
     else
         info "Initializing mcp-constraint-monitor submodule..."
@@ -903,11 +905,11 @@ install_code_graph_rag() {
         return 1
     fi
 
-    # Clone or update repository
-    if [[ -d "$CODE_GRAPH_RAG_DIR/.git" ]]; then
-        info "code-graph-rag exists, updating..."
+    # Clone or update repository (check for both .git directory and .git file for submodules)
+    if [[ -d "$CODE_GRAPH_RAG_DIR/.git" ]] || [[ -f "$CODE_GRAPH_RAG_DIR/.git" ]]; then
+        info "code-graph-rag exists (submodule), updating..."
         cd "$CODE_GRAPH_RAG_DIR"
-        timeout 30s git pull origin main 2>/dev/null || warning "Could not update code-graph-rag"
+        timeout 30s git pull origin main 2>/dev/null || info "Could not update code-graph-rag (may be on specific commit)"
     else
         info "Cloning code-graph-rag..."
         if git clone "$CODE_GRAPH_RAG_HTTPS" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
