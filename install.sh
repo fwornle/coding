@@ -1740,6 +1740,14 @@ initialize_knowledge_databases() {
         info "To enable Qdrant: docker run -d -p 6333:6333 qdrant/qdrant"
     fi
 
+    # Check if VKB server is running (which locks LevelDB)
+    local vkb_running=false
+    if pgrep -f "vkb-server" >/dev/null 2>&1 || lsof -i :8080 2>/dev/null | grep -q node; then
+        vkb_running=true
+        info "VKB server detected - Graph database will be skipped (this is OK)"
+        info "LevelDB is locked by VKB server, SQLite/Qdrant initialization will proceed"
+    fi
+
     # Initialize knowledge management system (databases + config)
     info "Initializing knowledge management system..."
     if node scripts/initialize-knowledge-system.js --project-path "$CODING_REPO"; then
