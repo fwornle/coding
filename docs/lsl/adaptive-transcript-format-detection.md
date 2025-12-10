@@ -10,7 +10,7 @@ Previously, the LSL system was hardcoded to handle specific transcript formats. 
 
 ## Architecture
 
-![Adaptive LSL System Architecture](images/adaptive-lsl-system.png)
+![Adaptive LSL System Architecture](../images/adaptive-lsl-system.png)
 
 The system consists of four layers:
 1. **Entry Point Layer** (StreamingTranscriptReader) - Entry points with automatic fallback

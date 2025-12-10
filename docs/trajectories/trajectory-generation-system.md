@@ -19,7 +19,7 @@
 
 The Integrated Trajectory Generation System provides comprehensive project analysis and documentation through sophisticated repository scanning, semantic analysis, and automated trajectory reporting. This system works in conjunction with the LSL v3.0 system to create living documentation that captures project evolution, capabilities, and architectural insights.
 
-![Trajectory System Architecture](images/trajectory-system-architecture.png)
+![Trajectory System Architecture](../images/trajectory-system-architecture.png)
 
 > **Integration Focus**: The trajectory generation system provides multi-layered analysis of project repositories to create comprehensive capability documentation and architectural insights.
 
@@ -207,8 +207,8 @@ graph LR
 **After Fix**: Status line shows real-time trajectory states like `⚙️ IMP`, `✅ VER`, etc.
 
 **Architecture Diagrams**:
-- [Status Line Integration](images/status-line-trajectory-integration.png) - Current integration architecture
-- [Real-Time Analysis Flow](images/real-time-trajectory-analysis-flow.png) - Complete trajectory analysis system flow
+- [Status Line Integration](../images/status-line-trajectory-integration.png) - Current integration architecture
+- [Real-Time Analysis Flow](../images/real-time-trajectory-analysis-flow.png) - Complete trajectory analysis system flow
 
 **Implementation**:
 ```javascript

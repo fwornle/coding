@@ -12,7 +12,7 @@ The monitoring system provides unified process tracking, health monitoring, and 
 
 The System Health Dashboard provides real-time visual monitoring of all system components through a web interface accessible at `http://localhost:3032`.
 
-![System Health Dashboard](images/health-monitor.png)
+![System Health Dashboard](../images/health-monitor.png)
 
 **Dashboard Overview** (shown above):
 
@@ -64,7 +64,7 @@ All checks performed 12 minutes ago, showing consistent healthy state across all
 
 ## Architecture
 
-![Monitoring Architecture](images/monitoring-architecture.png)
+![Monitoring Architecture](../images/monitoring-architecture.png)
 
 ### Core Components
 
@@ -118,7 +118,7 @@ All checks performed 12 minutes ago, showing consistent healthy state across all
 
 ## Health Check Flow
 
-![Health Check Sequence](images/monitoring-health-check-sequence.png)
+![Health Check Sequence](../images/monitoring-health-check-sequence.png)
 
 ### Watchdog Health Check (Every 60s)
 ```
@@ -140,7 +140,7 @@ For each managed service:
 
 ## Service Lifecycle
 
-![Service Lifecycle States](images/service-lifecycle-state.png)
+![Service Lifecycle States](../images/service-lifecycle-state.png)
 
 ### State Transitions
 
@@ -170,7 +170,7 @@ await psm.registerService({
 
 ## Session Management
 
-![Service Startup Integration](images/service-startup-integration.png)
+![Service Startup Integration](../images/service-startup-integration.png)
 
 ### Session Lifecycle
 
