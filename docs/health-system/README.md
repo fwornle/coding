@@ -146,16 +146,20 @@ cat .health/verification-status.json | jq '.'
 The status line appears automatically in Claude Code:
 
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
+[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 O○ X$25] | 📋🟠2130-2230(3min) | C ND]
 ```
 
 **Components:**
-- 🏥 95% - System health
-- 🛡️ 94% - Constraint compliance
-- ⚙️ IMP - Trajectory (implementing)
-- [Gq📊🟢95%...] - API quota (Groq 95%, X.AI 85%)
-- 📋🟠2130-2230 - LSL window
-- →coding - Active project
+- 🏥 95% - System health percentage
+- 🛡️ 94% - Constraint compliance percentage
+- ⚙️ IMP - Trajectory state (implementing)
+- [Gq● A$18 O○ X$25] - API quota status:
+  - Gq● - Groq (green dot = available)
+  - A$18 - Anthropic ($18 remaining credit)
+  - O○ - OpenAI (empty dot = unavailable/no key)
+  - X$25 - X.AI ($25 remaining credit)
+- 📋🟠2130-2230 - LSL window (orange = active, time range)
+- C ND - Active projects (C=coding, ND=nano-degree)
 
 See [Status Line System](./status-line.md) for complete documentation.
 
