@@ -444,10 +444,9 @@ integrate_with_uninstall_script() {
         info "uninstall.sh already includes Enhanced LSL cleanup"
         return
     fi
-    
-    # Create backup
-    cp "$CODING_REPO/uninstall.sh" "$CODING_REPO/uninstall.sh.backup-$(date +%Y%m%d-%H%M%S)"
-    
+
+    # No backup file creation - we edit in place per CLAUDE.md rules
+
     # Add Enhanced LSL cleanup section
     sed -i.bak '/# Remove built components/a\
 \

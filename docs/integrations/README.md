@@ -44,6 +44,20 @@ Each integration component:
 
 ### Code Analysis
 
+#### Code Graph RAG
+**Location**: `integrations/code-graph-rag/`
+
+**What it provides:**
+- Graph-based code analysis using Memgraph
+- Semantic code search and relationship mapping
+- Call graph analysis and dependency tracing
+- MCP tools for querying code structure
+- Visual graph exploration via Memgraph Lab
+
+**Ports**: Memgraph (7687), Lab UI (3100) - configured in `.env.ports`
+
+**Documentation**: [code-graph-rag.md](code-graph-rag.md) | [GitHub](https://github.com/anthropics/code-graph-rag)
+
 #### Serena AST Analysis
 **Location**: `integrations/serena/`
 
