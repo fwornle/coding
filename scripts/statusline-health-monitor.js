@@ -146,25 +146,76 @@ class StatusLineHealthMonitor {
 
   /**
    * Get list of projects with running transcript monitors
+   * STABILITY FIX: Uses pgrep for more reliable process detection and caches result
    */
   async getRunningTranscriptMonitors() {
-    try {
-      const psOutput = execSync('ps aux | grep "enhanced-transcript-monitor.js" | grep -v grep', { encoding: 'utf8' });
-      const runningProjects = new Set();
+    const runningProjects = new Set();
 
-      for (const line of psOutput.trim().split('\n')) {
-        // Extract project path from command line: .../enhanced-transcript-monitor.js /Users/q284340/Agentic/PROJECT
-        const match = line.match(/enhanced-transcript-monitor\.js\s+\/Users\/q284340\/Agentic\/([^\s]+)/);
-        if (match) {
-          runningProjects.add(match[1]);
+    try {
+      // Method 1: Use pgrep which is more reliable than grep on ps output
+      // pgrep -f returns PIDs of matching processes, -a also shows full command
+      let psOutput = '';
+      try {
+        psOutput = execSync('pgrep -af "enhanced-transcript-monitor.js"', { encoding: 'utf8', timeout: 5000 });
+      } catch (pgrepError) {
+        // pgrep returns exit code 1 when no matches - this is normal
+        // Only log if it's a different error
+        if (pgrepError.status !== 1) {
+          this.log(`pgrep failed with status ${pgrepError.status}: ${pgrepError.message}`, 'WARN');
         }
       }
 
-      return runningProjects;
+      if (psOutput && psOutput.trim()) {
+        for (const line of psOutput.trim().split('\n')) {
+          // Format: PID enhanced-transcript-monitor.js /Users/q284340/Agentic/PROJECT
+          // Try multiple patterns for robustness
+          const patterns = [
+            /enhanced-transcript-monitor\.js\s+\/Users\/q284340\/Agentic\/([^\s]+)/,
+            /\/Agentic\/([^\s/]+)(?:\s|$)/,  // Fallback: just extract project after /Agentic/
+            /PROJECT_PATH=\/Users\/q284340\/Agentic\/([^\s]+)/  // Handle env var format
+          ];
+
+          for (const pattern of patterns) {
+            const match = line.match(pattern);
+            if (match) {
+              runningProjects.add(match[1]);
+              break;  // Found a match, no need to try other patterns
+            }
+          }
+        }
+      }
+
+      // Method 2: Fallback - check centralized health files for recent updates
+      // If health file was updated within last 30 seconds, monitor is likely running
+      if (runningProjects.size === 0) {
+        try {
+          const healthDir = path.join(this.codingRepoPath, '.health');
+          if (fs.existsSync(healthDir)) {
+            const healthFiles = fs.readdirSync(healthDir)
+              .filter(f => f.endsWith('-transcript-monitor-health.json'));
+
+            for (const file of healthFiles) {
+              const filePath = path.join(healthDir, file);
+              const stats = fs.statSync(filePath);
+              const age = Date.now() - stats.mtime.getTime();
+
+              // If health file updated in last 30 seconds, monitor is running
+              if (age < 30000) {
+                const projectName = file.replace('-transcript-monitor-health.json', '');
+                runningProjects.add(projectName);
+              }
+            }
+          }
+        } catch (fallbackError) {
+          this.log(`Health file fallback check failed: ${fallbackError.message}`, 'WARN');
+        }
+      }
+
     } catch (error) {
-      // No monitors running or grep failed
-      return new Set();
+      this.log(`getRunningTranscriptMonitors error: ${error.message}`, 'ERROR');
     }
+
+    return runningProjects;
   }
 
   /**
@@ -178,10 +229,15 @@ class StatusLineHealthMonitor {
 
     try {
       // Method 1: Registry-based discovery (preferred when available)
+      // STABILITY FIX: Also filter by running monitors to ensure consistency
       if (fs.existsSync(this.registryPath)) {
         const registry = JSON.parse(fs.readFileSync(this.registryPath, 'utf8'));
-        
+
         for (const [projectName, projectInfo] of Object.entries(registry.projects || {})) {
+          // CRITICAL: Skip if no transcript monitor is running for this project
+          // This ensures Method 1 behaves consistently with Methods 2 and 3
+          if (!runningMonitors.has(projectName)) continue;
+
           const sessionHealth = await this.getProjectSessionHealth(projectName, projectInfo);
           sessions[projectName] = sessionHealth;
         }
@@ -1429,8 +1485,11 @@ class StatusLineHealthMonitor {
         this.lastStatus = statusLine;
 
         // Write to status file for Claude Code integration
+        // STABILITY FIX: Use atomic write (write to temp file, then rename) to prevent race conditions
         const statusFile = path.join(this.codingRepoPath, '.logs', 'statusline-health-status.txt');
-        fs.writeFileSync(statusFile, statusLine);
+        const tempFile = statusFile + '.tmp.' + process.pid;
+        fs.writeFileSync(tempFile, statusLine);
+        fs.renameSync(tempFile, statusFile);  // rename is atomic on POSIX filesystems
 
         this.log(`Status updated: ${statusLine}`);
 
