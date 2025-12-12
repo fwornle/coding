@@ -519,6 +519,33 @@ class CombinedStatusLine {
       if (age > 30000) {
         result.status = 'stale';
         result.gcm.status = 'stale';
+
+        // AUTO-CORRECTION: When status file is stale, validate sessions against
+        // actual running processes to prevent showing phantom/crashed sessions
+        const runningMonitors = this.getRunningTranscriptMonitorsSync();
+
+        if (runningMonitors.size > 0) {
+          // Filter sessions to only include those with running monitors
+          const validatedSessions = {};
+          for (const [abbrev, sessionData] of Object.entries(result.sessions)) {
+            // Map abbreviation back to project name for validation
+            const projectNameForAbbrev = this.getProjectNameFromAbbrev(abbrev);
+            if (runningMonitors.has(projectNameForAbbrev) || runningMonitors.has(abbrev)) {
+              validatedSessions[abbrev] = sessionData;
+            }
+          }
+          result.sessions = validatedSessions;
+
+          if (process.env.DEBUG_STATUS) {
+            console.error(`DEBUG: Stale file auto-correction: filtered sessions to ${Object.keys(validatedSessions).join(', ')} based on running monitors: ${[...runningMonitors].join(', ')}`);
+          }
+        } else {
+          // No running monitors found - clear all sessions (crashed state)
+          result.sessions = {};
+          if (process.env.DEBUG_STATUS) {
+            console.error('DEBUG: Stale file auto-correction: cleared all sessions (no running monitors detected)');
+          }
+        }
       }
 
       // CRITICAL: Check for stale trajectory data in CURRENT project only
@@ -1340,6 +1367,91 @@ class CombinedStatusLine {
         }
       }
     }
+  }
+
+  /**
+   * Reverse mapping from abbreviation back to project name
+   * Used for validating sessions against running monitors
+   */
+  getProjectNameFromAbbrev(abbrev) {
+    // Reverse mapping of known abbreviations
+    const reverseMapping = {
+      'C': 'coding',
+      'CA': 'curriculum-alignment',
+      'ND': 'nano-degree',
+      'CU': 'curriculum',
+      'AL': 'alignment',
+      'N': 'nano',
+      'UT': 'ui-template'
+    };
+
+    const upperAbbrev = abbrev.toUpperCase();
+    return reverseMapping[upperAbbrev] || abbrev.toLowerCase();
+  }
+
+  /**
+   * Synchronous check for running transcript monitors
+   * Used for auto-correction when status file is stale
+   */
+  getRunningTranscriptMonitorsSync() {
+    const runningProjects = new Set();
+
+    try {
+      // Use pgrep to find running enhanced-transcript-monitor processes
+      const psOutput = execSync('pgrep -af "enhanced-transcript-monitor.js" 2>/dev/null || true', {
+        encoding: 'utf8',
+        timeout: 5000
+      });
+
+      if (psOutput && psOutput.trim()) {
+        for (const line of psOutput.trim().split('\n')) {
+          // Extract project name from command line
+          // Format: PID node enhanced-transcript-monitor.js /Users/q284340/Agentic/PROJECT
+          const patterns = [
+            /enhanced-transcript-monitor\.js\s+\/Users\/q284340\/Agentic\/([^\s]+)/,
+            /\/Agentic\/([^\s/]+)(?:\s|$)/,
+            /PROJECT_PATH=\/Users\/q284340\/Agentic\/([^\s]+)/
+          ];
+
+          for (const pattern of patterns) {
+            const match = line.match(pattern);
+            if (match) {
+              runningProjects.add(match[1]);
+              break;
+            }
+          }
+        }
+      }
+
+      // Fallback: Check health files if pgrep found nothing
+      // Health files updated in last 30 seconds indicate running monitor
+      if (runningProjects.size === 0) {
+        const healthDir = join(rootDir, '.health');
+        if (existsSync(healthDir)) {
+          const healthFiles = fs.readdirSync(healthDir)
+            .filter(f => f.endsWith('-transcript-monitor-health.json'));
+
+          for (const file of healthFiles) {
+            const filePath = join(healthDir, file);
+            const fileStats = fs.statSync(filePath);
+            const fileAge = Date.now() - fileStats.mtime.getTime();
+
+            // If health file updated in last 30 seconds, monitor is running
+            if (fileAge < 30000) {
+              const projectName = file.replace('-transcript-monitor-health.json', '');
+              runningProjects.add(projectName);
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      if (process.env.DEBUG_STATUS) {
+        console.error(`DEBUG: getRunningTranscriptMonitorsSync error: ${error.message}`);
+      }
+    }
+
+    return runningProjects;
   }
 
   buildCombinedTooltip(constraint, semantic, knowledge) {
