@@ -377,8 +377,37 @@ class StatusLineHealthMonitor {
     } catch (error) {
       this.log(`Error getting project sessions: ${error.message}`, 'ERROR');
     }
-    
-    return sessions;
+
+    // ORPHAN CLEANUP: Remove sessions with extremely stale transcripts (>6 hours)
+    // These indicate orphaned monitors running without an active Claude session
+    // A running monitor process does NOT mean there's an active conversation
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    const cleanedSessions = {};
+
+    for (const [projectName, sessionData] of Object.entries(sessions)) {
+      // Check health file for transcript age
+      const projectPath = `/Users/q284340/Agentic/${projectName}`;
+      const healthFile = this.getCentralizedHealthFile(projectPath);
+
+      if (fs.existsSync(healthFile)) {
+        try {
+          const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+          const transcriptAge = healthData.transcriptInfo?.ageMs || 0;
+
+          // Skip sessions with transcripts older than 6 hours (orphaned monitors)
+          if (transcriptAge > SIX_HOURS_MS) {
+            this.log(`Filtering out orphaned session ${projectName} (transcript age: ${Math.round(transcriptAge / 3600000)}h)`, 'DEBUG');
+            continue;
+          }
+        } catch (readError) {
+          this.log(`Error reading health file for ${projectName}: ${readError.message}`, 'DEBUG');
+        }
+      }
+
+      cleanedSessions[projectName] = sessionData;
+    }
+
+    return cleanedSessions;
   }
 
   /**
