@@ -1,74 +1,72 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+' Coding Project Use Cases Diagram
+
 left to right direction
 
-actor Developer as dev
-actor "System Administrator" as admin
-actor "External System" as ext
+actor "Developer" as dev
+actor "Knowledge Manager" as km
+actor "System Analyst" as sa
+actor "MCP Client" as mcp
 
-package "Knowledge Management System" {
-  usecase "Visualize Knowledge Base" as viz
+package "Knowledge Management" {
+  usecase "Store Knowledge" as store
   usecase "Query Knowledge Graph" as query
-  usecase "Export Knowledge Data" as export
-  usecase "Manage Graph Storage" as storage
-  
-  package "Development Operations" {
-    usecase "Execute Coding Commands" as coding
-    usecase "Run Development Tasks" as devtasks
-    usecase "Manage Project Structure" as project
-  }
-  
-  package "Data Synchronization" {
-    usecase "Sync Graph Database" as sync
-    usecase "Export to JSON" as jsonexport
-    usecase "Batch Semantic Analysis" as semantic
-    usecase "Parallel Processing" as parallel
-  }
-  
-  package "Storage Operations" {
-    usecase "Manage LevelDB Storage" as leveldb
-    usecase "Handle Graph Persistence" as persist
-    usecase "Database Abstraction" as abstraction
-  }
+  usecase "Export Knowledge" as export
+  usecase "Sync GraphDB" as sync
 }
 
-dev --> viz : uses 'vkb' command
-dev --> coding : uses 'coding' command
-dev --> query
-dev --> export
+package "Semantic Analysis" {
+  usecase "Analyze Code Semantics" as analyze
+  usecase "Process MCP Requests" as mcp_process
+  usecase "Generate Insights" as insights
+}
 
-admin --> sync : uses 'graph-sync' command
-admin --> storage
-admin --> leveldb
-admin --> persist
+package "Data Storage" {
+  usecase "Persist to LevelDB" as leveldb
+  usecase "Maintain Graph Structure" as graph
+  usecase "Auto-sync JSON Export" as json_sync
+}
 
-ext --> semantic : requests analysis
-ext --> parallel : batch operations
+package "Integration Services" {
+  usecase "Serve MCP Protocol" as mcp_serve
+  usecase "Handle Client Requests" as handle_req
+}
 
-viz ..> query : <<include>>
-export ..> jsonexport : <<include>>
-sync ..> persist : <<include>>
-semantic ..> parallel : <<extend>>
-storage ..> abstraction : <<include>>
-persist ..> leveldb : <<include>>
+' Actor relationships
+dev --> analyze : initiates
+dev --> query : searches
+dev --> store : adds knowledge
 
-note right of viz
-  Primary interface through
-  'vkb' command for knowledge
-  base visualization
-end note
+km --> export : generates reports
+km --> sync : maintains consistency
+km --> query : explores data
 
-note bottom of sync
-  Automated sync between
-  Graphology + LevelDB and
-  JSON export format
-end note
+sa --> insights : reviews
+sa --> analyze : configures
 
-note right of semantic
-  Recent architectural improvement
-  with parallel worker implementation
-  for batch processing
-end note
+mcp --> mcp_process : sends requests
+mcp --> handle_req : connects
+
+' Use case relationships
+analyze ..> store : <<include>>
+store ..> leveldb : <<include>>
+store ..> graph : <<include>>
+
+export ..> sync : <<include>>
+sync ..> json_sync : <<include>>
+
+mcp_process ..> mcp_serve : <<include>>
+mcp_serve ..> handle_req : <<include>>
+
+query --> graph : accesses
+insights --> analyze : extends
+
+note right of graph : "Uses Graphology + LevelDB\nat .data/knowledge-graph"
+
+note bottom of json_sync : "Auto-synced exports at\n.data/knowledge-export"
+
+note top of mcp_serve : "Located in:\nintegrations/mcp-server-semantic-analysis"
 
 @enduml
