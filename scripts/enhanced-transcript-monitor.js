@@ -2588,7 +2588,13 @@ async function main() {
     }
     
     // Normal monitoring mode
-    const monitor = new EnhancedTranscriptMonitor({ debug: true });
+    // First non-flag argument is the project path (passed by start-services-robust.js)
+    const projectPath = args.find(arg => !arg.startsWith('-') && !arg.startsWith('--'));
+    const config = { debug: true };
+    if (projectPath) {
+      config.projectPath = projectPath;
+    }
+    const monitor = new EnhancedTranscriptMonitor(config);
     await monitor.start();
   } catch (error) {
     console.error('❌ Failed to start transcript monitor:', error.message);
