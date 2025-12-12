@@ -18,7 +18,8 @@ import {
   Clock,
   RefreshCw,
   Zap,
-  ExternalLink
+  ExternalLink,
+  Brain
 } from 'lucide-react'
 import HealthStatusCard from './health-status-card'
 import ViolationsTable from './violations-table'
@@ -30,6 +31,7 @@ export default function SystemHealthDashboard() {
   const healthReport = useAppSelector((state) => state.healthReport)
   const autoHealing = useAppSelector((state) => state.autoHealing)
   const apiQuota = useAppSelector((state) => state.apiQuota)
+  const ukb = useAppSelector((state) => state.ukb)
 
   // Real-time age calculation - updates every second
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -275,6 +277,61 @@ export default function SystemHealthDashboard() {
     return items
   }
 
+  // Build UKB (Knowledge Base Update) items from UKB state
+  const getUKBItems = () => {
+    const items = []
+
+    // Show running workflows
+    if (ukb.running > 0) {
+      items.push({
+        name: 'Running Workflows',
+        status: 'operational' as const,
+        description: `${ukb.running} active`,
+        tooltip: `${ukb.running} UKB workflow(s) currently running with 13-agent analysis`
+      })
+    }
+
+    // Show stale workflows (warning)
+    if (ukb.stale > 0) {
+      items.push({
+        name: 'Stale Workflows',
+        status: 'warning' as const,
+        description: `${ukb.stale} stale`,
+        tooltip: `${ukb.stale} workflow(s) haven't sent heartbeat in ${ukb.config.staleThresholdSeconds}s`
+      })
+    }
+
+    // Show frozen workflows (error)
+    if (ukb.frozen > 0) {
+      items.push({
+        name: 'Frozen Workflows',
+        status: 'error' as const,
+        description: `${ukb.frozen} frozen`,
+        tooltip: `${ukb.frozen} workflow(s) appear frozen (no activity for ${ukb.config.frozenThresholdSeconds}s)`
+      })
+    }
+
+    // If no workflows, show idle status
+    if (ukb.total === 0) {
+      items.push({
+        name: 'Status',
+        status: 'operational' as const,
+        description: 'Idle',
+        tooltip: `No UKB workflows running. Max concurrent: ${ukb.config.maxConcurrent}`
+      })
+    }
+
+    // Show capacity info
+    items.push({
+      name: 'Capacity',
+      status: ukb.total >= ukb.config.maxConcurrent ? 'warning' as const : 'operational' as const,
+      description: `${ukb.total}/${ukb.config.maxConcurrent} slots`,
+      tooltip: `Using ${ukb.total} of ${ukb.config.maxConcurrent} concurrent workflow slots`
+    })
+
+    return items
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -368,7 +425,7 @@ export default function SystemHealthDashboard() {
       )}
 
       {/* Health Status Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <HealthStatusCard
           title="Databases"
           icon={<Database className="h-5 w-5" />}
@@ -388,6 +445,11 @@ export default function SystemHealthDashboard() {
           title="API Quota"
           icon={<Zap className="h-5 w-5" />}
           items={getAPIItems()}
+        />
+        <HealthStatusCard
+          title="UKB Workflows"
+          icon={<Brain className="h-5 w-5" />}
+          items={getUKBItems()}
         />
       </div>
 

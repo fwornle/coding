@@ -14,9 +14,15 @@ import {
   fetchAPIQuotaSuccess,
   fetchAPIQuotaFailure,
 } from '../slices/apiQuotaSlice'
+import {
+  fetchUKBStatusStart,
+  fetchUKBStatusSuccess,
+  fetchUKBStatusFailure,
+} from '../slices/ukbSlice'
 
 const API_PORT = process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}/api/health-verifier`
+const UKB_API_URL = `http://localhost:${API_PORT}/api/ukb`
 
 // Singleton manager for auto-refresh
 class HealthRefreshManager {
@@ -59,6 +65,8 @@ class HealthRefreshManager {
     await this.fetchHealthReport()
     // Fetch API quota data
     await this.fetchAPIQuota()
+    // Fetch UKB process status
+    await this.fetchUKBStatus()
   }
 
   private async fetchHealthStatus() {
@@ -122,6 +130,28 @@ class HealthRefreshManager {
     } catch (error: any) {
       this.store.dispatch(fetchAPIQuotaFailure(error.message))
       console.error('Failed to fetch API quota:', error)
+    }
+  }
+
+  private async fetchUKBStatus() {
+    if (!this.store) return
+
+    try {
+      const response = await fetch(`${UKB_API_URL}/processes`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      if (result.status === 'success' && result.data) {
+        this.store.dispatch(fetchUKBStatusSuccess(result.data))
+      } else {
+        throw new Error(result.message || 'Invalid response format')
+      }
+    } catch (error: any) {
+      this.store.dispatch(fetchUKBStatusFailure(error.message))
+      // Don't log as error - UKB may not always be running
+      // console.error('Failed to fetch UKB status:', error)
     }
   }
 }
