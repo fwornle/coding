@@ -5,6 +5,7 @@ interface HealthStatusState {
   violationCount: number
   criticalCount: number
   lastUpdate: string | null
+  lastFetch: string | null  // When we last fetched data from the API
   autoHealingActive: boolean
   status: 'operational' | 'stale' | 'error' | 'offline'
   ageMs: number
@@ -17,6 +18,7 @@ const initialState: HealthStatusState = {
   violationCount: 0,
   criticalCount: 0,
   lastUpdate: null,
+  lastFetch: null,
   autoHealingActive: false,
   status: 'offline',
   ageMs: 0,
@@ -32,11 +34,12 @@ const healthStatusSlice = createSlice({
       state.loading = true
       state.error = null
     },
-    fetchHealthStatusSuccess(state, action: PayloadAction<Omit<HealthStatusState, 'loading' | 'error'>>) {
+    fetchHealthStatusSuccess(state, action: PayloadAction<Omit<HealthStatusState, 'loading' | 'error' | 'lastFetch'>>) {
       state.overallStatus = action.payload.overallStatus
       state.violationCount = action.payload.violationCount
       state.criticalCount = action.payload.criticalCount
       state.lastUpdate = action.payload.lastUpdate
+      state.lastFetch = new Date().toISOString()  // Track when we fetched
       state.autoHealingActive = action.payload.autoHealingActive
       state.status = action.payload.status
       state.ageMs = action.payload.ageMs

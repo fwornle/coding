@@ -89,6 +89,22 @@ export default function SystemHealthDashboard() {
     return `${hours}h ago`
   }
 
+  // Calculate seconds until next refresh (refresh interval is 5 seconds)
+  const REFRESH_INTERVAL_MS = 5000
+
+  // Calculate age since last fetch (not last verification)
+  const calculateFetchAge = (): number => {
+    if (!healthStatus.lastFetch) return 0
+    const lastFetchTime = new Date(healthStatus.lastFetch).getTime()
+    return currentTime - lastFetchTime
+  }
+
+  const calculateNextUpdate = (): number => {
+    const fetchAge = calculateFetchAge()
+    const nextUpdateIn = REFRESH_INTERVAL_MS - (fetchAge % REFRESH_INTERVAL_MS)
+    return Math.max(1, Math.ceil(nextUpdateIn / 1000))
+  }
+
   // Map check status to UI status
   const mapCheckStatus = (check: any): 'operational' | 'warning' | 'error' | 'offline' => {
     if (check.status === 'passed') return 'operational'
@@ -372,7 +388,9 @@ export default function SystemHealthDashboard() {
                   {healthStatus.overallStatus.charAt(0).toUpperCase() + healthStatus.overallStatus.slice(1)}
                 </CardTitle>
                 <CardDescription>
-                  {healthStatus.lastUpdate ? (
+                  {healthStatus.lastFetch ? (
+                    <>Updated {formatAge(calculateFetchAge())}</>
+                  ) : healthStatus.lastUpdate ? (
                     <>Last verified {formatAge(calculateDynamicAge())}</>
                   ) : (
                     'Waiting for first verification...'
