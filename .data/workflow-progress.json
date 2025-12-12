@@ -1,0 +1,29 @@
+{
+  "workflowName": "complete-analysis",
+  "executionId": "complete-analysis-1765527041579",
+  "status": "running",
+  "startTime": "2025-12-12T08:10:41.579Z",
+  "currentStep": null,
+  "totalSteps": 15,
+  "completedSteps": 12,
+  "failedSteps": 1,
+  "stepsCompleted": [
+    "analyze_git_history",
+    "analyze_vibe_history",
+    "semantic_analysis",
+    "web_search",
+    "generate_insights",
+    "generate_observations",
+    "classify_with_ontology",
+    "index_codebase",
+    "link_documentation",
+    "transform_code_entities",
+    "quality_assurance",
+    "persist_results"
+  ],
+  "stepsFailed": [
+    "persist_code_entities"
+  ],
+  "lastUpdate": "2025-12-12T08:11:15.101Z",
+  "elapsedSeconds": 34
+}

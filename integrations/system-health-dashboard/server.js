@@ -8,7 +8,7 @@
 
 import express from 'express';
 import { createServer } from 'http';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
@@ -101,6 +101,8 @@ class SystemHealthAPIServer {
         this.app.get('/api/ukb/processes', this.handleGetUKBProcesses.bind(this));
         this.app.post('/api/ukb/cleanup', this.handleUKBCleanup.bind(this));
         this.app.post('/api/ukb/start', this.handleStartUKBWorkflow.bind(this));
+        this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
+        this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
 
         // Error handling
         this.app.use(this.handleError.bind(this));
@@ -386,16 +388,48 @@ class SystemHealthAPIServer {
 
     /**
      * Get UKB process status summary
+     * Also checks workflow-progress.json for MCP-triggered workflows that run inline
      */
     async handleGetUKBStatus(req, res) {
         try {
             const ukbManager = new UKBProcessManager();
             const summary = ukbManager.getStatusSummary();
 
+            // Also check workflow-progress.json for MCP-triggered inline workflows
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+            let inlineWorkflowRunning = false;
+            let inlineWorkflowStale = false;
+
+            if (existsSync(progressPath)) {
+                try {
+                    const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                    if (progress.status === 'running') {
+                        const lastUpdate = new Date(progress.lastUpdate).getTime();
+                        const age = Date.now() - lastUpdate;
+                        // Consider stale if no update in 2 minutes
+                        if (age < 120000) {
+                            inlineWorkflowRunning = true;
+                        } else if (age < 300000) {
+                            inlineWorkflowStale = true;
+                        }
+                    }
+                } catch (e) {
+                    // Ignore progress file read errors
+                }
+            }
+
+            // Combine registered processes with inline workflow status
+            const combinedSummary = {
+                running: summary.running + (inlineWorkflowRunning ? 1 : 0),
+                stale: summary.stale + (inlineWorkflowStale ? 1 : 0),
+                frozen: summary.frozen,
+                total: summary.total + (inlineWorkflowRunning || inlineWorkflowStale ? 1 : 0),
+            };
+
             res.json({
                 status: 'success',
                 data: {
-                    ...summary,
+                    ...combinedSummary,
                     timestamp: new Date().toISOString()
                 }
             });
@@ -411,13 +445,14 @@ class SystemHealthAPIServer {
 
     /**
      * Get detailed UKB process list with step-level information
+     * Includes both registered background processes AND inline MCP workflows
      */
     async handleGetUKBProcesses(req, res) {
         try {
             const ukbManager = new UKBProcessManager();
             const detailedStatus = ukbManager.getDetailedStatus();
 
-            // Enhance processes with step-level detail from workflow progress file
+            // Check workflow-progress.json for inline MCP-triggered workflows
             const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
             let workflowProgress = null;
 
@@ -429,9 +464,93 @@ class SystemHealthAPIServer {
                 }
             }
 
-            // If we have progress data and running processes, enrich the process data
+            // Check if the workflow progress represents an inline workflow
+            // that is NOT already in the registered processes list
+            if (workflowProgress) {
+                const lastUpdate = new Date(workflowProgress.lastUpdate).getTime();
+                const age = Date.now() - lastUpdate;
+                const hasFailed = (workflowProgress.stepsFailed?.length || 0) > 0;
+
+                // Check if this workflow is already represented in registered processes
+                const alreadyRegistered = detailedStatus.processes.some(
+                    p => p.workflowName === workflowProgress.workflowName && p.pid !== 'mcp-inline'
+                );
+
+                // Determine the actual status:
+                // - If file says running but hasn't updated in 5+ minutes with failures, mark as failed
+                // - If file says running but hasn't updated in 5+ minutes without failures, check completion
+                let inferredStatus = workflowProgress.status;
+                let health = 'healthy';
+
+                if (workflowProgress.status === 'running') {
+                    if (age > 300000) {
+                        // Stale - hasn't updated in 5+ minutes
+                        if (hasFailed) {
+                            inferredStatus = 'failed';
+                            health = 'dead';
+                        } else if (workflowProgress.completedSteps >= workflowProgress.totalSteps) {
+                            inferredStatus = 'completed';
+                            health = 'dead';
+                        } else {
+                            health = 'frozen';
+                        }
+                    } else if (age > 120000) {
+                        health = 'stale';
+                    }
+                }
+
+                // Only show recent workflows (within last 30 minutes) or still "running"
+                const isRelevant = age < 1800000 || inferredStatus === 'running';
+
+                if (isRelevant && !alreadyRegistered) {
+                    // Add a synthetic process entry for the inline MCP workflow
+                    const inlineProcess = {
+                        pid: 'mcp-inline',
+                        workflowName: workflowProgress.workflowName,
+                        team: workflowProgress.team || 'unknown',
+                        repositoryPath: workflowProgress.repositoryPath || codingRoot,
+                        startTime: workflowProgress.startTime,
+                        lastHeartbeat: workflowProgress.lastUpdate,
+                        status: inferredStatus,
+                        completedSteps: workflowProgress.completedSteps || 0,
+                        totalSteps: workflowProgress.totalSteps || 0,
+                        currentStep: workflowProgress.currentStep,
+                        stepsCompleted: workflowProgress.stepsCompleted || [],
+                        stepsFailed: workflowProgress.stepsFailed || [],
+                        elapsedSeconds: workflowProgress.elapsedSeconds || Math.round((Date.now() - new Date(workflowProgress.startTime).getTime()) / 1000),
+                        logFile: null,
+                        isAlive: inferredStatus === 'running',
+                        health: health,
+                        heartbeatAgeSeconds: Math.round(age / 1000),
+                        progressPercent: workflowProgress.totalSteps > 0
+                            ? Math.round((workflowProgress.completedSteps / workflowProgress.totalSteps) * 100)
+                            : 0,
+                        steps: this.buildStepInfo(workflowProgress),
+                        isInlineMCP: true, // Flag to indicate this is an inline MCP workflow
+                    };
+
+                    detailedStatus.processes.push(inlineProcess);
+
+                    // Update summary counts based on inferred status
+                    if (inferredStatus === 'running' && health === 'healthy') {
+                        detailedStatus.summary.running++;
+                        detailedStatus.summary.total++;
+                    } else if (inferredStatus === 'running' && health === 'stale') {
+                        detailedStatus.summary.stale++;
+                        detailedStatus.summary.total++;
+                    } else if (health === 'frozen') {
+                        detailedStatus.summary.frozen++;
+                        detailedStatus.summary.total++;
+                    }
+                    // Don't count completed/failed in running totals
+                }
+            }
+
+            // Enhance any other running registered processes with progress data
             if (workflowProgress && detailedStatus.processes) {
                 for (const proc of detailedStatus.processes) {
+                    if (proc.isInlineMCP) continue; // Skip inline processes, already enriched
+
                     // Match progress to process based on workflow name
                     if (proc.status === 'running' && workflowProgress.workflowName === proc.workflowName) {
                         proc.completedSteps = workflowProgress.completedSteps || 0;
@@ -463,34 +582,78 @@ class SystemHealthAPIServer {
 
     /**
      * Build step info array from workflow progress for visualization
+     * Uses stepsDetail if available (new format with timing), falls back to basic info
+     * Now includes ALL known workflow steps with their actual status
      */
     buildStepInfo(progress) {
-        const steps = [];
+        // If we have detailed step info, use it directly
+        if (progress.stepsDetail && Array.isArray(progress.stepsDetail)) {
+            return progress.stepsDetail;
+        }
+
+        // Known workflow steps in order (for complete-analysis workflow)
+        const KNOWN_STEPS = [
+            'analyze_git_history',
+            'analyze_vibe_history',
+            'semantic_analysis',
+            'web_search',
+            'generate_insights',
+            'generate_observations',
+            'classify_with_ontology',
+            'index_codebase',
+            'link_documentation',
+            'transform_code_entities',
+            'quality_assurance',
+            'persist_results',
+            'deduplicate_insights',
+            'validate_content',
+        ];
+
         const completed = new Set(progress.stepsCompleted || []);
         const failed = new Set(progress.stepsFailed || []);
+        const currentStep = progress.currentStep;
 
-        // Add completed steps
+        // Build steps array with status for all known steps
+        const steps = [];
+        let reachedCurrent = false;
+
+        for (const stepName of KNOWN_STEPS) {
+            let status = 'pending';
+
+            if (completed.has(stepName)) {
+                status = 'completed';
+            } else if (failed.has(stepName)) {
+                status = 'failed';
+            } else if (currentStep === stepName) {
+                status = 'running';
+                reachedCurrent = true;
+            } else if (!reachedCurrent && !currentStep) {
+                // If no current step set but workflow is still running,
+                // infer which step should be running based on completed count
+                const completedCount = completed.size;
+                const stepIndex = KNOWN_STEPS.indexOf(stepName);
+
+                // The step immediately after all completed steps should be running
+                // (unless workflow is finished or failed)
+                if (stepIndex === completedCount && progress.status === 'running') {
+                    status = 'running';
+                    reachedCurrent = true;
+                }
+            }
+
+            steps.push({ name: stepName, status });
+        }
+
+        // Also add any steps from completed/failed that aren't in KNOWN_STEPS
         for (const stepName of completed) {
-            steps.push({
-                name: stepName,
-                status: 'completed',
-            });
+            if (!KNOWN_STEPS.includes(stepName)) {
+                steps.push({ name: stepName, status: 'completed' });
+            }
         }
-
-        // Add failed steps
         for (const stepName of failed) {
-            steps.push({
-                name: stepName,
-                status: 'failed',
-            });
-        }
-
-        // Add current step
-        if (progress.currentStep && !completed.has(progress.currentStep) && !failed.has(progress.currentStep)) {
-            steps.push({
-                name: progress.currentStep,
-                status: 'running',
-            });
+            if (!KNOWN_STEPS.includes(stepName)) {
+                steps.push({ name: stepName, status: 'failed' });
+            }
         }
 
         return steps;
@@ -543,6 +706,165 @@ class SystemHealthAPIServer {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to start UKB workflow',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get list of historical UKB workflow reports
+     */
+    handleGetUKBHistory(req, res) {
+        try {
+            const reportsDir = join(codingRoot, '.data', 'workflow-reports');
+
+            if (!existsSync(reportsDir)) {
+                return res.json({
+                    status: 'success',
+                    data: []
+                });
+            }
+
+            const files = readdirSync(reportsDir)
+                .filter(f => f.endsWith('.md'))
+                .sort((a, b) => b.localeCompare(a)); // Sort newest first
+
+            const reports = files.map(filename => {
+                const filePath = join(reportsDir, filename);
+                const content = readFileSync(filePath, 'utf8');
+
+                // Parse basic metadata from markdown
+                const workflowMatch = content.match(/\*\*Workflow:\*\*\s*(.+)/);
+                const executionIdMatch = content.match(/\*\*Execution ID:\*\*\s*(.+)/);
+                const statusMatch = content.match(/\*\*Status:\*\*\s*.*?(COMPLETED|FAILED|RUNNING)/i);
+                const startTimeMatch = content.match(/\*\*Start Time:\*\*\s*(.+)/);
+                const endTimeMatch = content.match(/\*\*End Time:\*\*\s*(.+)/);
+                const durationMatch = content.match(/\*\*Duration:\*\*\s*(.+)/);
+                const stepsMatch = content.match(/Steps Completed \| (\d+)\/(\d+)/);
+                const teamMatch = content.match(/"team":\s*"([^"]+)"/);
+                const repoMatch = content.match(/"repositoryPath":\s*"([^"]+)"/);
+
+                return {
+                    id: filename.replace('.md', ''),
+                    filename,
+                    workflowName: workflowMatch?.[1]?.trim() || 'unknown',
+                    executionId: executionIdMatch?.[1]?.trim() || filename.replace('.md', ''),
+                    status: statusMatch?.[1]?.toLowerCase() || 'unknown',
+                    startTime: startTimeMatch?.[1]?.trim() || null,
+                    endTime: endTimeMatch?.[1]?.trim() || null,
+                    duration: durationMatch?.[1]?.trim() || null,
+                    completedSteps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+                    totalSteps: stepsMatch ? parseInt(stepsMatch[2]) : 0,
+                    team: teamMatch?.[1] || 'unknown',
+                    repositoryPath: repoMatch?.[1] || 'unknown'
+                };
+            });
+
+            // Optional filtering
+            const { limit = 50, team, status, workflowName } = req.query;
+            let filteredReports = reports;
+
+            if (team) {
+                filteredReports = filteredReports.filter(r => r.team === team);
+            }
+            if (status) {
+                filteredReports = filteredReports.filter(r => r.status === status.toLowerCase());
+            }
+            if (workflowName) {
+                filteredReports = filteredReports.filter(r => r.workflowName === workflowName);
+            }
+
+            res.json({
+                status: 'success',
+                data: filteredReports.slice(0, parseInt(limit)),
+                total: filteredReports.length
+            });
+        } catch (error) {
+            console.error('Failed to get UKB history:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to get UKB history',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get detailed UKB workflow report by ID
+     */
+    handleGetUKBHistoryDetail(req, res) {
+        try {
+            const { reportId } = req.params;
+            const reportsDir = join(codingRoot, '.data', 'workflow-reports');
+            const filePath = join(reportsDir, `${reportId}.md`);
+
+            if (!existsSync(filePath)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'Report not found'
+                });
+            }
+
+            const content = readFileSync(filePath, 'utf8');
+
+            // Parse full report details
+            const workflowMatch = content.match(/\*\*Workflow:\*\*\s*(.+)/);
+            const executionIdMatch = content.match(/\*\*Execution ID:\*\*\s*(.+)/);
+            const statusMatch = content.match(/\*\*Status:\*\*\s*.*?(COMPLETED|FAILED|RUNNING)/i);
+            const startTimeMatch = content.match(/\*\*Start Time:\*\*\s*(.+)/);
+            const endTimeMatch = content.match(/\*\*End Time:\*\*\s*(.+)/);
+            const durationMatch = content.match(/\*\*Duration:\*\*\s*(.+)/);
+            const stepsMatch = content.match(/Steps Completed \| (\d+)\/(\d+)/);
+            const entitiesCreatedMatch = content.match(/Entities Created \| (\d+)/);
+            const entitiesUpdatedMatch = content.match(/Entities Updated \| (\d+)/);
+            const teamMatch = content.match(/"team":\s*"([^"]+)"/);
+            const repoMatch = content.match(/"repositoryPath":\s*"([^"]+)"/);
+
+            // Parse recommendations
+            const recommendationsSection = content.match(/## Recommendations\n\n([\s\S]*?)(?=\n## |$)/);
+            const recommendations = recommendationsSection?.[1]
+                ?.split('\n')
+                .filter(line => line.match(/^\d+\./))
+                .map(line => line.replace(/^\d+\.\s*/, '').trim()) || [];
+
+            // Parse step details
+            const stepMatches = [...content.matchAll(/### (\d+)\. (\w+)\n\n\*\*Agent:\*\*\s*(\w+)\n\*\*Action:\*\*\s*(\w+)\n\*\*Status:\*\*\s*.*?(success|failed|skipped)\n\*\*Duration:\*\*\s*(.+)/gi)];
+
+            const steps = stepMatches.map(match => ({
+                index: parseInt(match[1]),
+                name: match[2],
+                agent: match[3],
+                action: match[4],
+                status: match[5].toLowerCase(),
+                duration: match[6]
+            }));
+
+            res.json({
+                status: 'success',
+                data: {
+                    id: reportId,
+                    workflowName: workflowMatch?.[1]?.trim() || 'unknown',
+                    executionId: executionIdMatch?.[1]?.trim() || reportId,
+                    status: statusMatch?.[1]?.toLowerCase() || 'unknown',
+                    startTime: startTimeMatch?.[1]?.trim() || null,
+                    endTime: endTimeMatch?.[1]?.trim() || null,
+                    duration: durationMatch?.[1]?.trim() || null,
+                    completedSteps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+                    totalSteps: stepsMatch ? parseInt(stepsMatch[2]) : 0,
+                    entitiesCreated: entitiesCreatedMatch ? parseInt(entitiesCreatedMatch[1]) : 0,
+                    entitiesUpdated: entitiesUpdatedMatch ? parseInt(entitiesUpdatedMatch[1]) : 0,
+                    team: teamMatch?.[1] || 'unknown',
+                    repositoryPath: repoMatch?.[1] || 'unknown',
+                    recommendations,
+                    steps,
+                    rawContent: content
+                }
+            });
+        } catch (error) {
+            console.error('Failed to get UKB history detail:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to get UKB history detail',
                 error: error.message
             });
         }
