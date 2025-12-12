@@ -111,8 +111,9 @@ const WORKFLOW_AGENTS = [
     name: 'Code Graph',
     shortName: 'Code',
     icon: Code,
-    description: 'AST-based code analysis via Memgraph',
-    usesLLM: false,
+    description: 'AST-based code analysis via code-graph-rag MCP',
+    usesLLM: true,
+    llmProvider: 'code-graph-rag',
     row: 3,
     col: 1,
   },
@@ -121,8 +122,9 @@ const WORKFLOW_AGENTS = [
     name: 'Documentation Linker',
     shortName: 'Docs',
     icon: FileText,
-    description: 'Links documentation to code entities',
-    usesLLM: false,
+    description: 'Links documentation to code entities using LLM',
+    usesLLM: true,
+    llmProvider: 'anthropic',
     row: 4,
     col: 1,
   },
@@ -258,8 +260,9 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
       for (const step of process.steps) {
         const agentId = STEP_TO_AGENT[step.name] || step.name
         // If multiple steps map to same agent, prefer the latest status
+        // Create a shallow copy to avoid mutating Redux state
         if (!map[agentId] || step.status === 'running' || (step.status === 'completed' && map[agentId].status !== 'running')) {
-          map[agentId] = step
+          map[agentId] = { ...step }
         }
       }
     }
@@ -268,7 +271,8 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     if (process.currentStep) {
       const currentAgentId = STEP_TO_AGENT[process.currentStep] || process.currentStep
       if (map[currentAgentId]) {
-        map[currentAgentId].status = 'running'
+        // Create a new object with updated status to avoid mutating frozen state
+        map[currentAgentId] = { ...map[currentAgentId], status: 'running' }
       } else {
         map[currentAgentId] = { name: process.currentStep, status: 'running' }
       }
@@ -288,19 +292,19 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     return 'pending'
   }
 
-  const getNodeColor = (status: string, isSelected: boolean) => {
-    const baseClasses = isSelected ? 'ring-2 ring-primary ring-offset-2' : ''
+  // Returns fill and stroke colors for SVG nodes with better contrast
+  const getNodeColors = (status: string, isSelected: boolean): { fill: string; stroke: string; textColor: string } => {
     switch (status) {
       case 'running':
-        return `bg-blue-100 border-blue-500 text-blue-900 ${baseClasses}`
+        return { fill: '#dbeafe', stroke: '#3b82f6', textColor: '#1e3a8a' } // blue-100, blue-500, blue-900
       case 'completed':
-        return `bg-green-100 border-green-500 text-green-900 ${baseClasses}`
+        return { fill: '#166534', stroke: '#15803d', textColor: '#ffffff' } // green-800, green-700, white
       case 'failed':
-        return `bg-red-100 border-red-500 text-red-900 ${baseClasses}`
+        return { fill: '#fee2e2', stroke: '#ef4444', textColor: '#7f1d1d' } // red-100, red-500, red-900
       case 'skipped':
-        return `bg-gray-100 border-gray-300 text-gray-500 ${baseClasses}`
+        return { fill: '#f3f4f6', stroke: '#9ca3af', textColor: '#6b7280' } // gray-100, gray-400, gray-500
       default:
-        return `bg-gray-50 border-gray-300 text-gray-600 ${baseClasses}`
+        return { fill: '#f9fafb', stroke: '#d1d5db', textColor: '#4b5563' } // gray-50, gray-300, gray-600
     }
   }
 
@@ -432,6 +436,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const isSelected = selectedNode === agent.id
               const stepInfo = stepStatusMap[agent.id]
               const Icon = agent.icon
+              const colors = getNodeColors(status, isSelected)
 
               return (
                 <Tooltip key={agent.id}>
@@ -440,16 +445,16 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                       className="cursor-pointer transition-transform hover:scale-105"
                       onClick={() => onNodeClick?.(agent.id)}
                     >
-                      {/* Node background */}
+                      {/* Node background - using direct SVG colors for better control */}
                       <rect
                         x={pos.x}
                         y={pos.y}
                         width={nodeWidth}
                         height={nodeHeight}
                         rx={8}
-                        className={`${getNodeColor(status, isSelected)} stroke-2 transition-all`}
-                        fill="currentColor"
-                        stroke="currentColor"
+                        fill={colors.fill}
+                        stroke={colors.stroke}
+                        strokeWidth={2}
                       />
 
                       {/* Selection ring */}
@@ -489,7 +494,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         width={nodeWidth}
                         height={nodeHeight}
                       >
-                        <div className="flex flex-col items-center justify-center h-full px-2">
+                        <div
+                          className="flex flex-col items-center justify-center h-full px-2"
+                          style={{ color: colors.textColor }}
+                        >
                           <div className="flex items-center gap-1 mb-1">
                             <Icon className="h-4 w-4" />
                             {status === 'running' && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -498,7 +506,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                             {agent.shortName}
                           </span>
                           {agent.usesLLM && (
-                            <span className="text-[10px] opacity-70 flex items-center gap-0.5">
+                            <span className="text-[10px] opacity-80 flex items-center gap-0.5">
                               <Zap className="h-2 w-2" />
                               LLM
                             </span>
@@ -511,11 +519,11 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         cx={pos.x + nodeWidth - 8}
                         cy={pos.y + 8}
                         r={6}
-                        className={
-                          status === 'running' ? 'fill-blue-500' :
-                          status === 'completed' ? 'fill-green-500' :
-                          status === 'failed' ? 'fill-red-500' :
-                          'fill-gray-300'
+                        fill={
+                          status === 'running' ? '#3b82f6' :
+                          status === 'completed' ? '#22c55e' :
+                          status === 'failed' ? '#ef4444' :
+                          '#d1d5db'
                         }
                       />
                     </g>
@@ -562,30 +570,31 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
             })}
           </svg>
 
-          {/* Legend */}
-          <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 border shadow-sm">
-            <div className="text-xs font-medium mb-2">Legend</div>
-            <div className="flex flex-wrap gap-3 text-xs">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-gray-300" />
-                <span>Pending</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-                <span>Running</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span>Completed</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-red-500" />
-                <span>Failed</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Zap className="h-3 w-3 text-yellow-500" />
-                <span>Uses LLM</span>
-              </div>
+        </div>
+
+        {/* Legend - positioned outside graph to avoid overlap */}
+        <div className="flex-shrink-0 w-24 bg-white/90 backdrop-blur-sm rounded-lg p-2 border shadow-sm self-end">
+          <div className="text-xs font-medium mb-2">Legend</div>
+          <div className="flex flex-col gap-2 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
+              <span>Pending</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+              <span>Running</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+              <span>Completed</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+              <span>Failed</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Zap className="h-2.5 w-2.5 text-yellow-500" />
+              <span>Uses LLM</span>
             </div>
           </div>
         </div>
@@ -665,41 +674,62 @@ export function UKBNodeDetailsSidebar({
           </div>
         </div>
 
-        {/* Step Execution Details */}
-        {stepInfo && (
-          <>
-            <Separator />
-            <div className="space-y-3">
-              <h4 className="font-medium text-sm">Execution Details</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Timer className="h-3 w-3" />
-                    Duration
-                  </span>
-                  <span>{stepInfo.duration ? `${(stepInfo.duration / 1000).toFixed(1)}s` : '-'}</span>
-                </div>
-
-                {stepInfo.tokensUsed !== undefined && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <Hash className="h-3 w-3" />
-                      Tokens Used
-                    </span>
-                    <span>{stepInfo.tokensUsed.toLocaleString()}</span>
-                  </div>
-                )}
-
-                {stepInfo.llmProvider && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">LLM Provider</span>
-                    <span>{stepInfo.llmProvider}</span>
-                  </div>
-                )}
-              </div>
+        {/* Step Execution Details - Always show with available data */}
+        <Separator />
+        <div className="space-y-3">
+          <h4 className="font-medium text-sm">Execution Details</h4>
+          <div className="space-y-2 text-sm">
+            {/* Status */}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Status</span>
+              <span className={
+                stepInfo?.status === 'completed' ? 'text-green-600 font-medium' :
+                stepInfo?.status === 'failed' ? 'text-red-600 font-medium' :
+                stepInfo?.status === 'running' ? 'text-blue-600 font-medium' :
+                'text-muted-foreground'
+              }>
+                {stepInfo?.status || 'Pending'}
+              </span>
             </div>
-          </>
-        )}
+
+            {/* Duration - only show if we have it */}
+            {stepInfo?.duration !== undefined && stepInfo.duration > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  Duration
+                </span>
+                <span>{(stepInfo.duration / 1000).toFixed(1)}s</span>
+              </div>
+            )}
+
+            {/* Tokens - only show if we have it */}
+            {stepInfo?.tokensUsed !== undefined && stepInfo.tokensUsed > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Hash className="h-3 w-3" />
+                  Tokens Used
+                </span>
+                <span>{stepInfo.tokensUsed.toLocaleString()}</span>
+              </div>
+            )}
+
+            {/* LLM Provider - show for LLM agents */}
+            {agent.usesLLM && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">LLM Provider</span>
+                <span>{stepInfo?.llmProvider || agent.llmProvider || 'anthropic'}</span>
+              </div>
+            )}
+
+            {/* Show message if no timing data yet */}
+            {!stepInfo?.duration && stepInfo?.status === 'completed' && (
+              <div className="text-xs text-muted-foreground italic">
+                Timing data will be available in next workflow run
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Error Information */}
         {stepInfo?.error && (
@@ -710,7 +740,7 @@ export function UKBNodeDetailsSidebar({
                 <AlertTriangle className="h-4 w-4" />
                 Error
               </h4>
-              <div className="text-xs bg-red-50 border border-red-200 rounded p-2 text-red-800">
+              <div className="text-xs bg-red-50 border border-red-200 rounded p-2 text-red-800 break-words">
                 {stepInfo.error}
               </div>
             </div>
