@@ -107,6 +107,10 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const [historicalWorkflows, setHistoricalWorkflows] = useState<HistoricalWorkflow[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [selectedHistoricalWorkflow, setSelectedHistoricalWorkflow] = useState<HistoricalWorkflow | null>(null)
+  const [historicalWorkflowDetail, setHistoricalWorkflowDetail] = useState<HistoricalWorkflowDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [historicalSelectedNode, setHistoricalSelectedNode] = useState<string | null>(null)
+  const [showHistoricalSidebar, setShowHistoricalSidebar] = useState(false)
 
   const currentProcess = processes[selectedProcessIndex]
 
