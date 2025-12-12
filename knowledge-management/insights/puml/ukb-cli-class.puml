@@ -2,104 +2,52 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Management" {
-    class UkbCli <<service>> {
-        +initialize()
-        +executeCommand(command: String)
-        +processQuery(query: String)
-        +shutdown()
-    }
-    
-    class VkbApiClient <<client>> {
-        -apiEndpoint: String
-        -connectionPool: ConnectionPool
-        +connect()
-        +query(cypher: String)
-        +executeTransaction(commands: List)
-        +disconnect()
-    }
-    
-    interface GraphDatabase <<interface>> {
-        +createNode(properties: Map)
-        +createRelationship(from: Node, to: Node)
-        +executeQuery(query: String)
-        +getSchema()
-    }
+  class UkbCli <<MCPAgent>> {
+    - graphDatabaseService: GraphDatabaseService
+    - graphKnowledgeExporter: GraphKnowledgeExporter
+    + storeKnowledge()
+    + exportKnowledge()
+  }
+
+  class GraphDatabaseService {
+    + storeKnowledgeGraph()
+    + retrieveKnowledgeGraph()
+  }
+
+  class GraphKnowledgeExporter {
+    + exportKnowledgeGraph()
+  }
+
+  UkbCli --* GraphDatabaseService
+  UkbCli --* GraphKnowledgeExporter
 }
 
-package "Unified Knowledge Base" {
-    class KnowledgeGraph <<entity>> {
-        -nodes: Set<Node>
-        -relationships: Set<Relationship>
-        +addNode(node: Node)
-        +addRelationship(rel: Relationship)
-        +findPath(from: Node, to: Node)
-    }
-    
-    class Node <<entity>> {
-        -id: String
-        -labels: Set<String>
-        -properties: Map<String, Object>
-        +getId()
-        +getProperties()
-        +addLabel(label: String)
-    }
-    
-    class Relationship <<entity>> {
-        -id: String
-        -type: String
-        -startNode: Node
-        -endNode: Node
-        -properties: Map<String, Object>
-        +getType()
-        +getNodes()
-    }
+package "Data Storage" {
+  class Graphology <<service>> {
+    + storeGraphData()
+    + retrieveGraphData()
+  }
+
+  class LevelDB <<service>> {
+    + storeData()
+    + retrieveData()
+  }
+
+  GraphDatabaseService --* Graphology
+  GraphDatabaseService --* LevelDB
 }
 
-package "MCP Semantic Analysis" {
-    class SemanticAnalyzer <<service>> {
-        -nlpProcessor: NlpProcessor
-        -contextManager: ContextManager
-        +analyzeText(text: String)
-        +extractEntities(content: String)
-        +buildSemanticGraph(entities: List)
-    }
-    
-    class McpServer <<server>> {
-        -port: Integer
-        -analyzer: SemanticAnalyzer
-        +start()
-        +handleRequest(request: Request)
-        +processSemanticQuery(query: String)
-    }
+package "Commands" {
+  class VkbCommand <<interface>> {
+    + visualizeKnowledge()
+  }
+
+  class GraphSyncCommand <<interface>> {
+    + synchronizeKnowledge()
+  }
+
+  UkbCli --* VkbCommand
+  UkbCli --* GraphSyncCommand
 }
-
-package "Storage Layer" {
-    class ConnectionPool <<utility>> {
-        -maxConnections: Integer
-        -activeConnections: Set<Connection>
-        +getConnection()
-        +releaseConnection(conn: Connection)
-        +closeAll()
-    }
-    
-    note top of ConnectionPool : "shared-memory.json\nhas been REMOVED\nfrom codebase"
-}
-
-' Relationships
-UkbCli --> VkbApiClient : uses
-VkbApiClient ..|> GraphDatabase : implements
-VkbApiClient --> ConnectionPool : manages
-VkbApiClient --> KnowledgeGraph : operates on
-
-KnowledgeGraph *-- Node : contains
-KnowledgeGraph *-- Relationship : contains
-Relationship --> Node : connects
-
-SemanticAnalyzer --> KnowledgeGraph : builds
-McpServer --> SemanticAnalyzer : delegates to
-McpServer --> VkbApiClient : queries through
-
-UkbCli ..> SemanticAnalyzer : coordinates with
-UkbCli ..> McpServer : integrates with
 
 @enduml

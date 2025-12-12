@@ -2,101 +2,126 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Management Core" {
-  class KnowledgeManagementSystem <<service>> {
-    +processContent()
-    +manageKnowledge()
-    +enforceConstraints()
-  }
-  
-  class GraphDatabaseService <<service>> {
-    -graphologyInstance: Graph
-    -leveldbInstance: LevelDB
-    +query()
-    +persist()
-    +synchronize()
-  }
-  
-  class PersistenceAgent <<agent>> {
-    +handleWrite()
-    +handleEdit()
-    +validateConstraints()
-  }
+    class GraphDatabaseService <<service>> {
+        -database Path: String
+        -graphologyInstance: Graphology
+        -levelDbAdapter: LevelDB
+        +initializeGraph(): void
+        +addNode(data: Object): String
+        +addEdge(source: String, target: String): void
+        +queryNodes(filter: Object): Array
+        +queryPaths(start: String, end: String): Array
+        +persistGraph(): void
+    }
+
+    class ArchitecturalEvolutionPattern <<entity>> {
+        -patternId: String
+        -patternType: String
+        -evolutionStage: String
+        -relationships: Array
+        -metadata: Object
+        +analyzeEvolution(): Object
+        +trackChanges(): Array
+        +generateInsights(): Object
+    }
 }
 
-package "Shared Utilities" {
-  class UkbUnified <<library>> {
-    +sharedUtilities()
-    +commonFunctions()
-  }
-  
-  class GraphDatabaseAdapter <<adapter>> {
-    +adaptQuery()
-    +adaptPersistence()
-    +handleSynchronization()
-  }
-}
+package "Data Management" {
+    class GraphKnowledgeExporter <<service>> {
+        -exportPath: String
+        -syncInterval: Number
+        +exportToJson(): void
+        +autoSync(): void
+        +validateExport(): Boolean
+        +scheduleSync(): void
+    }
 
-package "Semantic Analysis Services" {
-  class SemanticAnalysisService <<service>> {
-    +analyzeContent()
-    +classifyUpdates()
-    +processBatch()
-  }
-  
-  class ParallelWorker <<worker>> {
-    -batchMode: boolean
-    +executeBatch()
-    +processInParallel()
-  }
-}
+    class LevelDB <<file>> {
+        -storagePath: String
+        +get(key: String): Object
+        +put(key: String, value: Object): void
+        +batch(operations: Array): void
+        +createIterator(): Iterator
+    }
 
-package "Storage Layer" {
-  class GraphKnowledgeExporter <<exporter>> {
-    -exportPath: string
-    +exportToJson()
-    +autoSync()
-  }
-  
-  class DataStorage <<file>> {
-    +knowledgeGraph: ".data/knowledge-graph"
-    +knowledgeExport: ".data/knowledge-export"
-  }
-}
-
-package "Command Interface" {
-  class CommandInterface <<interface>> {
-    +vkb()
-    +coding()
-    +graphSync()
-  }
+    class Graphology <<service>> {
+        -nodes: Map
+        -edges: Map
+        +addNode(key: String, attributes: Object): void
+        +addEdge(source: String, target: String): void
+        +getNodeAttributes(key: String): Object
+        +neighbors(key: String): Array
+    }
 }
 
 package "External Integration" {
-  class VkbApiClient <<client>> {
-    +integrateExternal()
-    +maintainConnection()
-  }
-  
-  class ArchitecturalEvolutionPattern <<agent>> {
-    +trackEvolution()
-    +analyzePatterns()
-    +generateInsights()
-  }
+    class VkbApiClient <<service>> {
+        -baseUrl: String
+        -apiKey: String
+        +authenticate(): Boolean
+        +syncData(payload: Object): Object
+        +fetchUpdates(): Array
+        +handleErrors(error: Error): void
+    }
+}
+
+package "Command Interface" {
+    class VkbCommand <<interface>> {
+        +execute(args: Array): void
+        +validate(args: Array): Boolean
+    }
+
+    class VisualizationCommand {
+        +execute(args: Array): void
+        +generateVisualization(): Object
+    }
+
+    class CodingCommand {
+        +execute(args: Array): void
+        +processDevelopmentTasks(): void
+    }
+
+    class GraphSyncCommand {
+        +execute(args: Array): void
+        +synchronizeData(): Boolean
+    }
+}
+
+package "Utilities and Analysis" {
+    class UnifiedUtilities <<service>> {
+        +formatData(data: Object): Object
+        +validateStructure(structure: Object): Boolean
+        +generateMetrics(dataset: Object): Object
+    }
+
+    class AnalysisService <<service>> {
+        +analyzePatterns(data: Object): Array
+        +generateReports(analysis: Object): Object
+        +trackEvolution(timeline: Array): Object
+    }
 }
 
 ' Relationships
-KnowledgeManagementSystem --> GraphDatabaseService : uses
-KnowledgeManagementSystem --> PersistenceAgent : coordinates
-GraphDatabaseService --> UkbUnified : depends on
-GraphDatabaseService --> GraphDatabaseAdapter : implements through
-SemanticAnalysisService --> ParallelWorker : utilizes
-SemanticAnalysisService --> GraphDatabaseService : integrates with
-SemanticAnalysisService --> PersistenceAgent : works with
-GraphKnowledgeExporter --> DataStorage : exports to
-GraphDatabaseService --> DataStorage : stores in
-CommandInterface --> GraphDatabaseAdapter : synchronizes via
-VkbApiClient --> ArchitecturalEvolutionPattern : supports
-ArchitecturalEvolutionPattern --> GraphDatabaseService : maintains patterns through
-PersistenceAgent --> SemanticAnalysisService : triggers analysis
+GraphDatabaseService ||--o Graphology
+GraphDatabaseService ||--o LevelDB
+GraphDatabaseService --> ArchitecturalEvolutionPattern : manages
+GraphKnowledgeExporter --> GraphDatabaseService : exports from
+GraphKnowledgeExporter ..> VkbApiClient : uses
+VkbApiClient ..> GraphDatabaseService : syncs to
+
+VkbCommand <|.. VisualizationCommand
+VkbCommand <|.. CodingCommand
+VkbCommand <|.. GraphSyncCommand
+
+VisualizationCommand --> GraphDatabaseService : queries
+CodingCommand --> UnifiedUtilities : uses
+GraphSyncCommand --> GraphKnowledgeExporter : triggers
+
+AnalysisService --> ArchitecturalEvolutionPattern : analyzes
+AnalysisService --> UnifiedUtilities : uses
+
+note right of GraphDatabaseService : "Located at .data/knowledge-graph"
+note right of GraphKnowledgeExporter : "Auto-sync to .data/knowledge-export"
+note bottom of VkbApiClient : "External service integration"
 
 @enduml

@@ -1,78 +1,28 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title VkbCli - Dual-Storage Graph Database Architecture
-
-package "CLI Interface" {
-    [vkb] <<cli>>
-    [coding] <<cli>>
-    [graph-sync] <<cli>>
+package "VkbCli" {
+  component "GraphDatabaseService" as "GraphDatabaseService [Core]" <<core>>
+  component "GraphDatabaseAdapter" as "GraphDatabaseAdapter [Adapter]" <<api>>
+  component "Graphology" as "Graphology [Storage]" <<storage>>
+  component "LevelDB" as "LevelDB [Storage]" <<storage>>
+  component "JSON Export" as "JSON Export [Storage]" <<storage>>
+  component "vkb command" as "vkb command [Agent]" <<agent>>
+  component "MCP tools" as "MCP tools [Agent]" <<agent>>
+  
+  GraphDatabaseService --* GraphDatabaseAdapter
+  GraphDatabaseAdapter --* Graphology
+  GraphDatabaseAdapter --* LevelDB
+  Graphology --* LevelDB
+  LevelDB --* JSON Export
+  GraphDatabaseService --* vkb command
+  GraphDatabaseService --* MCP tools
+  vkb command --* GraphDatabaseService
+  MCP tools --* GraphDatabaseService
+  
+  note as AutoNote1
+  VkbCli: Dual-storage architecture with Graphology + LevelDB for primary storage and auto-synchronized JSON exports
+  end note
 }
-
-package "Core Services" {
-    [GraphDatabaseService] <<core>>
-    [GraphDatabaseAdapter] <<core>>
-    [PersistenceAgent] <<storage>>
-    [VkbApiClient] <<api>>
-    [GraphKnowledgeExporter] <<export>>
-}
-
-package "Primary Storage" {
-    [Graphology] <<storage>>
-    [LevelDB] <<storage>>
-    folder ".data/knowledge-graph" as primaryStorage
-}
-
-package "Export Storage" {
-    folder ".data/knowledge-export" as exportStorage
-    [JSON Exports] <<storage>>
-}
-
-package "Performance Features" {
-    [Parallel Workers] <<worker>>
-    [Batch Semantic Analysis] <<processing>>
-    [Constraint Optimization] <<optimization>>
-    [Activity Indicators] <<ui>>
-}
-
-' CLI to Core Services
-[vkb] --> [GraphDatabaseService]
-[coding] --> [GraphDatabaseService]
-[graph-sync] --> [GraphKnowledgeExporter]
-
-' Core Service Relationships
-[GraphDatabaseService] --> [GraphDatabaseAdapter]
-[GraphDatabaseAdapter] --> [PersistenceAgent]
-[GraphDatabaseService] --> [VkbApiClient]
-[GraphKnowledgeExporter] --> [GraphDatabaseService]
-
-' Storage Relationships
-[PersistenceAgent] --> [Graphology]
-[Graphology] --> primaryStorage
-[LevelDB] --> primaryStorage
-[GraphKnowledgeExporter] --> [JSON Exports]
-[JSON Exports] --> exportStorage
-
-' Performance Features
-[GraphDatabaseService] --> [Parallel Workers]
-[Parallel Workers] --> [Batch Semantic Analysis]
-[GraphDatabaseService] --> [Constraint Optimization]
-[GraphDatabaseService] --> [Activity Indicators]
-
-' Auto-sync relationship
-[GraphKnowledgeExporter] ..> exportStorage : "auto-synchronized"
-primaryStorage ..> exportStorage : "exports to"
-
-note top of [vkb]
-  Dual-storage architecture with Graphology + LevelDB 
-  for primary storage and auto-synchronized JSON exports.
-  Recent focus on performance improvements and 
-  incremental content handling.
-end note
-
-note bottom of [Constraint Optimization]
-  Optimized for incremental content 
-  handling in edit/write operations
-end note
 
 @enduml

@@ -1,59 +1,41 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Knowledge Management\n(src/knowledge-management)" as KM
-participant "UKB Unified\n(lib/ukb-unified)" as UKB
-participant "MCP Server\n(integrations/mcp-server-semantic-analysis)" as MCP
-participant "Graphology Engine" as Graph
-participant "LevelDB Storage\n(.data/knowledge-graph)" as LevelDB
-participant "JSON Export\n(.data/knowledge-export)" as JSONExport
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphDatabaseAdapter as "Graph Database Adapter"
+participant MCPAgent as "MCP Agent"
+participant Graphology as "Graphology"
+participant LevelDB as "LevelDB"
+participant vkb as "VKB Command"
+participant "Graph-Sync Command" as graph-sync
+participant KnowledgeGraph as "Knowledge Graph"
 
-note over KM, JSONExport : DecoratorPattern Implementation in GraphDatabase Architecture
+MCPAgent->>GraphDatabaseService: Request Knowledge Graph Data
+GraphDatabaseService->>GraphDatabaseAdapter: Query Knowledge Graph
+GraphDatabaseAdapter->>Graphology: Use Graphology for Storage
+Graphology->>LevelDB: Store Data in LevelDB
+LevelDB->>Graphology: Retrieve Data from LevelDB
+Graphology->>GraphDatabaseAdapter: Return Data to Adapter
+GraphDatabaseAdapter->>GraphDatabaseService: Return Knowledge Graph Data
+GraphDatabaseService->>MCPAgent: Return Knowledge Graph Data
 
-KM -> UKB : Initialize DecoratorPattern entity
-activate UKB
-
-UKB -> Graph : Create pattern node
-activate Graph
-
-Graph -> LevelDB : Store pattern metadata
-activate LevelDB
-LevelDB --> Graph : Confirm storage
-deactivate LevelDB
-
-Graph --> UKB : Pattern node created
-deactivate Graph
-
-UKB -> MCP : Register for semantic analysis
-activate MCP
-
-MCP -> MCP : Analyze DecoratorPattern\nacross modules
-MCP -> Graph : Update pattern relationships
-activate Graph
-
-Graph -> LevelDB : Persist relationship data
-activate LevelDB
-LevelDB --> Graph : Data persisted
-deactivate LevelDB
-
-Graph --> MCP : Relationships updated
-deactivate Graph
-
-opt Auto-sync enabled
-    Graph -> JSONExport : Export pattern data
-    activate JSONExport
-    JSONExport -> JSONExport : Generate JSON representation
-    JSONExport --> Graph : Export complete
-    deactivate JSONExport
+alt Sync Knowledge Graph
+    graph-sync->>GraphDatabaseService: Sync Knowledge Graph
+    GraphDatabaseService->>GraphDatabaseAdapter: Update Knowledge Graph
+    GraphDatabaseAdapter->>Graphology: Update Graphology Storage
+    Graphology->>LevelDB: Update LevelDB Storage
+    LevelDB->>Graphology: Confirm Update
+    Graphology->>GraphDatabaseAdapter: Confirm Update
+    GraphDatabaseAdapter->>GraphDatabaseService: Confirm Update
+    GraphDatabaseService->>graph-sync: Confirm Sync
 end
 
-MCP --> UKB : Semantic analysis complete
-deactivate MCP
-
-UKB --> KM : DecoratorPattern entity ready
-deactivate UKB
-
-note right of LevelDB : Primary storage:\nGraphology + LevelDB
-note right of JSONExport : Auto-synced from GraphDB\n(shared-memory.json removed)
+opt Visualize Knowledge Graph
+    vkb->>GraphDatabaseService: Request Knowledge Graph Visualization
+    GraphDatabaseService->>GraphDatabaseAdapter: Query Knowledge Graph for Visualization
+    GraphDatabaseAdapter->>Graphology: Use Graphology for Visualization
+    Graphology->>vkb: Return Visualization Data
+    vkb->>MCPAgent: Display Knowledge Graph Visualization
+end
 
 @enduml

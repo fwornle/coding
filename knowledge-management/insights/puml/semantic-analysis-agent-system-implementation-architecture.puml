@@ -1,67 +1,40 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Storage Layer" {
-  component [Graphology] <<storage>>
-  component [LevelDB] <<storage>>
-  folder ".data/knowledge-graph" as KnowledgeGraphDir <<storage>>
-  folder ".data/knowledge-export" as ExportDir <<storage>>
+package "Semantic Analysis Agent System Implementation" {
+  component GraphDatabase <<storage>> as "Graph Database"
+  component LevelDB <<storage>> as "LevelDB"
+  component GraphDatabaseService <<core>> as "Graph Database Service"
+  component GraphDatabaseAdapter <<core>> as "Graph Database Adapter"
+  component GraphKnowledgeExporter <<core>> as "Graph Knowledge Exporter"
+
+  GraphDatabase --* LevelDB
+  GraphDatabaseService -- GraphDatabase
+  GraphDatabaseAdapter -- GraphDatabase
+  GraphKnowledgeExporter -- GraphDatabase
+
+  note as AutoNote1
+  Purpose: Manage knowledge graph storage and synchronization
+  end note
 }
 
-package "Data Access Layer" {
-  component [GraphDatabaseService] <<core>>
-  component [GraphKnowledgeExporter] <<core>>
-  component [GraphDatabaseAdapter] <<core>>
-}
-
-package "Processing Layer" {
-  component [ParallelWorker] <<core>>
-  component [BatchModeAnalysis] <<core>>
-  component [InsightGenerationAgent] <<agent>>
-  component [PlantUMLGenerationAgent] <<agent>>
-}
-
-package "Interface Layer" {
-  component [CLI_vkb] <<api>>
-  component [CLI_graph_sync] <<api>>
-  component [MCPServer] <<api>>
+package "CLI Access" {
+  component vkb <<api>> as "vkb Command"
+  component graph-sync <<api>> as "graph-sync Command"
+  vkb -- GraphDatabase
+  graph-sync -- GraphDatabase
 }
 
 package "Integration" {
-  folder "integrations/mcp-server-semantic-analysis/src" as MCPIntegration <<api>>
+  component MCP_server <<api>> as "MCP Server"
+  component integrations <<core>> as "Integrations"
+  MCP_server -- integrations
+  integrations -- GraphDatabase
 }
 
-[Graphology] --> KnowledgeGraphDir
-[LevelDB] --> KnowledgeGraphDir
-[GraphDatabaseService] --> [Graphology]
-[GraphDatabaseService] --> [LevelDB]
-[GraphDatabaseAdapter] --> [GraphDatabaseService]
-[GraphKnowledgeExporter] --> [GraphDatabaseService]
-[GraphKnowledgeExporter] --> ExportDir
-
-[BatchModeAnalysis] --> [ParallelWorker]
-[ParallelWorker] --> [InsightGenerationAgent]
-[ParallelWorker] --> [PlantUMLGenerationAgent]
-[InsightGenerationAgent] --> [GraphDatabaseAdapter]
-[PlantUMLGenerationAgent] --> [GraphDatabaseAdapter]
-
-[CLI_vkb] --> [GraphDatabaseService] : visualization
-[CLI_graph_sync] --> [GraphKnowledgeExporter] : synchronization
-[MCPServer] --> MCPIntegration
-[MCPIntegration] --> [GraphDatabaseAdapter]
-
-note top of "Storage Layer" : Primary graph storage with\nGraphology + LevelDB backend
-
-note right of [ParallelWorker] : Performance optimization\nfor batch processing
-
-note bottom of ExportDir : Auto-synchronized JSON exports\nreplacing shared-memory.json
-
-note as N1
-  **SemanticAnalysisAgentSystemImplementation**
-  Graph-based knowledge system with semantic analysis capabilities
-  - CLI access for visualization and sync
-  - MCP server integration
-  - Parallel processing for performance
-end note
+package "Export" {
+  component "knowledge-export" <<storage>> as "Knowledge Export"
+  GraphKnowledgeExporter -- "knowledge-export"
+}
 
 @enduml

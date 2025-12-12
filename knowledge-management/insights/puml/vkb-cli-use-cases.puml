@@ -1,65 +1,45 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+actor User as "User"
+actor MCP_Tools as "MCP Tools"
 
-actor "Developer" as dev
-actor "External System" as ext
-actor "CI/CD Pipeline" as ci
+usecase "Visualize Knowledge Graph" as (Visualize_KG)
+usecase "Perform Knowledge Operations" as (Perform_KO)
+usecase "Store Data" as (Store_Data)
+usecase "Export Data" as (Export_Data)
 
-package "VkbCli Knowledge Graph System" {
-    usecase "Manage Knowledge Base" as manage
-    usecase "Execute Coding Operations" as coding
-    usecase "Synchronize Graph Data" as sync
-    
-    package "Data Management" {
-        usecase "Store Graph Data" as store
-        usecase "Export to JSON" as export
-        usecase "Query Knowledge" as query
-        usecase "Batch Semantic Analysis" as batch
-    }
-    
-    package "Performance Operations" {
-        usecase "Parallel Processing" as parallel
-        usecase "Incremental Updates" as incremental
-        usecase "Constraint Optimization" as optimize
-    }
-    
-    package "Monitoring" {
-        usecase "Visual Activity Indicators" as visual
-        usecase "Track Project Changes" as track
-    }
+User -- (Visualize_KG)
+MCP_Tools -- (Perform_KO)
+
+(Visualize_KG) ..> (Store_Data) : uses
+(Perform_KO) ..> (Store_Data) : uses
+(Store_Data) ..> (Export_Data) : triggers
+
+package "VkbCli" {
+  (Visualize_KG)
+  (Perform_KO)
+  (Store_Data)
+  (Export_Data)
 }
 
-package "Storage Layer" {
-    usecase "Access Graphology + LevelDB" as graphdb
-    usecase "Manage JSON Exports" as jsonmgmt
+package "GraphDatabaseService" {
+  (Store_Data)
+  (Export_Data)
 }
 
-' Actor relationships
-dev --> manage : "vkb command"
-dev --> coding : "coding command" 
-dev --> sync : "graph-sync command"
-ci --> batch : "automated analysis"
-ext --> query : "API access"
+package "GraphDatabaseAdapter" {
+  (Store_Data)
+}
 
-' Use case relationships
-manage ..> store : <<include>>
-manage ..> query : <<include>>
-coding ..> incremental : <<include>>
-coding ..> optimize : <<include>>
-sync ..> export : <<include>>
-sync ..> store : <<include>>
+User -- (Perform_KO)
+MCP_Tools -- (Visualize_KG)
 
-store --> graphdb : "primary storage"
-export --> jsonmgmt : "synchronized export"
-batch ..> parallel : <<include>>
-manage ..> visual : <<extend>>
-coding ..> track : <<extend>>
-
-note right of graphdb : ".data/knowledge-graph\n(Graphology + LevelDB)"
-note right of jsonmgmt : ".data/knowledge-export\n(Auto-synchronized JSON)"
-note top of batch : "Performance improvements\nwith parallel workers"
-note bottom of incremental : "Edit/write operations\nwith constraint optimization"
+note "Dual-Storage Architecture" as N1
+(Store_Data) .. N1
+note "Graphology + LevelDB" as N2
+(Store_Data) .. N2
+note "Auto-Synchronized JSON Exports" as N3
+(Export_Data) .. N3
 
 @enduml

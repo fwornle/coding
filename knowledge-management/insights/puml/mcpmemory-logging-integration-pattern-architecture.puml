@@ -1,50 +1,35 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-!define RECTANGLE class
+package "MCPMemoryLoggingIntegrationPattern" {
+  component GraphDatabase <<storage>> as "Graph Database"
+  component LevelDB <<storage>> as "LevelDB"
+  component GraphDatabaseService <<core>> as "Graph Database Service"
+  component GraphKnowledgeExporter <<core>> as "Graph Knowledge Exporter"
+  component PersistenceAgent <<agent>> as "Persistence Agent"
+  component VkbApiClient <<api>> as "Vkb Api Client"
+  component MCPTools <<tool>> as "MCP Tools"
+  component VkbCommand <<tool>> as "Vkb Command"
 
-package "Knowledge Management" {
-    component GraphDatabaseService <<core>>
-    component GraphKnowledgeExporter <<core>>
-    component GraphDatabaseAdapter <<core>>
+  GraphDatabase --* LevelDB
+  GraphDatabaseService -- GraphDatabase
+  GraphKnowledgeExporter -- GraphDatabase
+  PersistenceAgent -- GraphDatabase
+  VkbApiClient -- GraphDatabase
+  MCPTools -- GraphDatabaseService
+  VkbCommand -- GraphDatabaseService
+
+  note as AutoNote1
+  MCPMemoryLoggingIntegrationPattern: Provides a flexible and scalable data structure for knowledge storage and retrieval.
+
+  end note
 }
 
-package "Storage Layer" {
-    component Graphology <<storage>>
-    component LevelDB <<storage>>
-    folder ".data/knowledge-graph" as KnowledgeGraphData <<storage>>
-    folder ".data/knowledge-export" as ExportData <<storage>>
+package "Knowledge Operations" {
+  component KnowledgeExport <<process>> as "Knowledge Export"
+  component KnowledgeVisualization <<process>> as "Knowledge Visualization"
+  KnowledgeExport -- GraphKnowledgeExporter
+  KnowledgeVisualization -- VkbCommand
 }
-
-package "MCP Integration" {
-    component "MCP Server" <<api>>
-    component "Semantic Analysis" <<core>>
-}
-
-package "Implementation Locations" {
-    component "src/knowledge-management" as SrcKM <<source>>
-    component "lib/ukb-unified" as LibUKB <<source>>
-    component "integrations/mcp-server-semantic-analysis/src" as IntMCP <<source>>
-}
-
-note top of GraphDatabaseService : MCPMemoryLoggingIntegrationPattern\nReplaces shared-memory.json with\nGraph-based knowledge storage
-
-GraphDatabaseService --> GraphDatabaseAdapter
-GraphDatabaseAdapter --> Graphology
-Graphology --> LevelDB
-LevelDB --> KnowledgeGraphData
-
-GraphKnowledgeExporter --> ExportData
-GraphDatabaseService --> GraphKnowledgeExporter
-ExportData ..> KnowledgeGraphData : auto-synced
-
-"MCP Server" --> "Semantic Analysis"
-"Semantic Analysis" --> GraphDatabaseService
-
-SrcKM ..> GraphDatabaseService : implements
-LibUKB ..> GraphDatabaseAdapter : implements
-IntMCP ..> "MCP Server" : implements
-
-note bottom : Pattern provides unified knowledge storage\nacross MCP tools and agents using GraphDB
 
 @enduml

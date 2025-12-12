@@ -1,98 +1,33 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "User" as U
-participant "VkbCli" as CLI
-participant "GraphDatabaseService" as GDS
-participant "GraphDatabaseAdapter" as GDA
-participant "PersistenceAgent" as PA
-participant "VkbApiClient" as API
-participant "GraphKnowledgeExporter" as GKE
-participant "Graphology + LevelDB\n(.data/knowledge-graph)" as PRIMARY
-participant "JSON Export\n(.data/knowledge-export)" as EXPORT
+participant VkbCli as "VkbCli (Entity)"
+participant GraphDatabaseService as "GraphDatabaseService"
+participant GraphDatabaseAdapter as "GraphDatabaseAdapter"
+participant Graphology as "Graphology (Graph Database)"
+participant LevelDB as "LevelDB (Graph Database)"
+participant JSON_Export as "JSON Export (.data/knowledge-export)"
+participant vkb_Command as "vkb Command (Visualization)"
+participant MCP_Tools as "MCP Tools (Knowledge Operations)"
 
-U -> CLI: vkb command
-activate CLI
-CLI -> GDS: process request
-activate GDS
-GDS -> GDA: data access operation
-activate GDA
-GDA -> PA: storage operation
-activate PA
-PA -> PRIMARY: read/write graph data
-activate PRIMARY
-PRIMARY --> PA: graph data
-deactivate PRIMARY
-PA --> GDA: operation result
-deactivate PA
-GDA --> GDS: data result
-deactivate GDA
+VkbCli ->> GraphDatabaseService: Request data storage/access
+GraphDatabaseService ->> GraphDatabaseAdapter: Request data access abstraction
+GraphDatabaseAdapter ->> Graphology: Store/Retrieve data from Graphology
+GraphDatabaseAdapter ->> LevelDB: Store/Retrieve data from LevelDB
+Graphology ->> LevelDB: Auto-synchronize data
+LevelDB ->> JSON_Export: Auto-synchronize JSON exports
+VkbCli ->> vkb_Command: Request visualization
+vkb_Command ->> Graphology: Retrieve data for visualization
+VkbCli ->> MCP_Tools: Perform knowledge operations
+MCP_Tools ->> Graphology: Update data after operations
+MCP_Tools ->> JSON_Export: Update JSON exports after operations
 
-opt external API call required
-    GDS -> API: external interaction
-    activate API
-    API --> GDS: API response
-    deactivate API
+alt Success
+    JSON_Export ->> VkbCli: Return updated JSON exports
+    Graphology ->> VkbCli: Return updated graph data
+else Failure
+    JSON_Export ->> VkbCli: Return error message
+    Graphology ->> VkbCli: Return error message
 end
-
-GDS -> GKE: trigger export
-activate GKE
-GKE -> EXPORT: write JSON export
-activate EXPORT
-EXPORT --> GKE: export complete
-deactivate EXPORT
-GKE --> GDS: export result
-deactivate GKE
-
-GDS --> CLI: operation complete
-deactivate GDS
-CLI --> U: response
-deactivate CLI
-
-U -> CLI: coding command
-activate CLI
-note right: Batch semantic analysis\nwith parallel workers
-CLI -> GDS: batch processing
-activate GDS
-GDS -> GDA: incremental content handling
-activate GDA
-GDA -> PA: constraint optimization
-activate PA
-PA -> PRIMARY: optimized write operations
-PRIMARY --> PA: batch results
-PA --> GDA: processing complete
-deactivate PA
-GDA --> GDS: batch complete
-deactivate GDA
-GDS -> GKE: auto-sync export
-activate GKE
-GKE -> EXPORT: synchronized JSON
-EXPORT --> GKE: sync complete
-deactivate EXPORT
-GKE --> GDS: sync result
-deactivate GKE
-GDS --> CLI: batch complete
-deactivate GDS
-CLI --> U: coding results
-deactivate CLI
-
-U -> CLI: graph-sync command
-activate CLI
-CLI -> GDS: manual sync request
-activate GDS
-GDS -> GKE: force export sync
-activate GKE
-GKE -> PRIMARY: read latest graph state
-PRIMARY --> GKE: current data
-GKE -> EXPORT: update JSON exports
-EXPORT --> GKE: sync complete
-GKE --> GDS: manual sync complete
-deactivate GKE
-GDS --> CLI: sync result
-deactivate GDS
-CLI --> U: sync confirmation
-deactivate CLI
-
-note over PRIMARY, EXPORT: Dual-storage architecture\nwith auto-synchronization
 
 @enduml

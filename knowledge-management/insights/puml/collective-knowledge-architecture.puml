@@ -1,54 +1,37 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title CollectiveKnowledge System Architecture
-
-package "Core Commands" {
-  component [vkb] <<command>>
-  component [coding] <<command>>
-  component [graph-sync] <<command>>
-}
-
-package "Knowledge Management Services" {
-  component [GraphDatabaseService] <<core>>
-  component [GraphKnowledgeExporter] <<core>>
-  component [GraphDatabaseAdapter] <<core>>
-  component [PersistenceAgent] <<agent>>
-  component [VkbApiClient] <<api>>
-}
-
-package "Storage Layer" {
-  package ".data/knowledge-graph" {
-    component [Graphology] <<storage>>
-    component [LevelDB] <<storage>>
+package "CollectiveKnowledge" as collectiveKnowledge {
+  note as AutoNote1
+  System for managing collective knowledge
+  end note
+  package "Knowledge Management" as knowledgeManagement {
+    component GraphDatabaseService <<core>> as graphDatabaseService
+    component GraphKnowledgeExporter <<core>> as graphKnowledgeExporter
+    component GraphDatabaseAdapter <<core>> as graphDatabaseAdapter
+    component PersistenceAgent <<agent>> as persistenceAgent
+    component VkbApiClient <<api>> as vkbApiClient
+    graphDatabaseService --> graphKnowledgeExporter : exports knowledge
+    graphDatabaseService --> graphDatabaseAdapter : adapts database
+    graphDatabaseAdapter --> persistenceAgent : persists data
+    persistenceAgent --> vkbApiClient : uses API
   }
-  
-  package ".data/knowledge-export" {
-    component [JSON Exports] <<storage>>
+  package "Storage" as storage {
+    component Graphology <<storage>> as graphology
+    component LevelDB <<storage>> as levelDB
+    component "JSON Export" <<storage>> as jsonExport
+    graphology --> levelDB : combines with
+    levelDB --> jsonExport : synchronizes to
   }
+  package "Tools" as tools {
+    component vkb <<tool>> as vkbTool
+    component "MCP Tools" <<tool>> as mcpTools
+    component graph-sync <<tool>> as graphSync
+    vkbTool --> graphDatabaseService : visualizes
+    mcpTools --> graphDatabaseService : manages knowledge
+    graphSync --> levelDB : synchronizes data
+  }
+  knowledgeManagement --> storage : uses storage
+  tools --> knowledgeManagement : interacts with knowledge management
 }
-
-note as N1
-  Hybrid knowledge management system with graph-based storage
-  and automated synchronization capabilities
-end note
-
-[vkb] --> [GraphDatabaseService]
-[coding] --> [GraphDatabaseService]
-[graph-sync] --> [GraphKnowledgeExporter]
-
-[GraphDatabaseService] --> [GraphDatabaseAdapter]
-[GraphDatabaseAdapter] --> [Graphology]
-[Graphology] --> [LevelDB]
-
-[GraphKnowledgeExporter] --> [JSON Exports]
-[PersistenceAgent] --> [Graphology]
-[PersistenceAgent] --> [JSON Exports]
-
-[VkbApiClient] --> [JSON Exports] : external access
-
-note right of [JSON Exports] : Automated synchronization\nfor external access
-
-note bottom of [Graphology] : Primary storage with\nhybrid architecture
-
 @enduml

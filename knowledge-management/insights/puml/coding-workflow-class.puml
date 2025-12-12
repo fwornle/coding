@@ -1,92 +1,121 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "MCP Agent Layer" {
-    class CodingWorkflow <<MCPAgent>> {
-        +executeWorkflow()
-        +performIncrementalAnalysis()
-        +processSemanticAnalysis()
-    }
-    
-    interface MCPTools {
-        +execute_workflow()
-    }
+package "MCP Server" {
+  class MCPAgent <<service>> {
+    +executeWorkflow(params): Result
+    +handleToolCall(): Response
+  }
+  
+  interface MCPTool {
+    +execute(): Result
+  }
+  
+  class ExecuteWorkflowTool <<tool>> {
+    +execute(): WorkflowResult
+    +validateParams(): boolean
+  }
 }
 
 package "Knowledge Management" {
-    class KnowledgeManager {
-        -graphDb: GraphologyAdapter
-        -levelDb: LevelDBAdapter
-        +storeKnowledge()
-        +retrieveKnowledge()
-        +syncToExport()
-    }
-    
-    class GraphologyAdapter {
-        -graphInstance: Graphology
-        +createNode()
-        +createEdge()
-        +query()
-    }
-    
-    class LevelDBAdapter {
-        -dbPath: String
-        +put()
-        +get()
-        +batch()
-    }
+  class CodingWorkflow <<workflow>> {
+    -workflowId: string
+    -status: WorkflowStatus
+    -analysisSteps: Step[]
+    +execute(): Promise<Result>
+    +incrementalAnalysis(): void
+    +processCodebase(): AnalysisResult
+    +generateInsights(): Insight[]
+  }
+  
+  class KnowledgeManager <<service>> {
+    -graphDB: GraphologyAdapter
+    -levelDB: LevelDBAdapter
+    +storeKnowledge(data): void
+    +retrieveKnowledge(query): Knowledge
+    +exportToJSON(): void
+    +syncToExport(): void
+  }
+  
+  class GraphologyAdapter <<adapter>> {
+    -graph: Graph
+    +addNode(node): void
+    +addEdge(edge): void
+    +query(pattern): Result[]
+    +persist(): void
+  }
+  
+  class LevelDBAdapter <<adapter>> {
+    -dbPath: string
+    +get(key): Value
+    +put(key, value): void
+    +batch(operations): void
+  }
 }
 
 package "Storage Layer" {
-    class KnowledgeGraph <<file>> {
-        +path: ".data/knowledge-graph"
-        +type: "Graphology + LevelDB"
-    }
-    
-    class KnowledgeExport <<file>> {
-        +path: ".data/knowledge-export"
-        +type: "JSON"
-        +autoSynced: true
-    }
+  class KnowledgeGraph <<file>> {
+    +path: ".data/knowledge-graph"
+    +format: "GraphDB + LevelDB"
+  }
+  
+  class KnowledgeExport <<file>> {
+    +path: ".data/knowledge-export"
+    +format: "JSON"
+    +autoSync: boolean
+  }
 }
 
-package "Implementation Modules" {
-    class SemanticAnalysisModule {
-        +analyzeCode()
-        +extractPatterns()
-        +generateInsights()
-    }
-    
-    class UKBUnifiedLib {
-        +processUnifiedData()
-        +handleIntegration()
-    }
-    
-    class KnowledgeManagementSrc {
-        +manageWorkflow()
-        +coordinateAnalysis()
-    }
+package "Analysis Components" {
+  class SemanticAnalyzer <<analyzer>> {
+    +analyzeCode(source): SemanticModel
+    +extractPatterns(): Pattern[]
+    +generateMetadata(): Metadata
+  }
+  
+  abstract class AnalysisStep {
+    #stepName: string
+    +execute(): StepResult
+    +validate(): boolean
+  }
+  
+  class CodebaseAnalysisStep {
+    +scanFiles(): FileInfo[]
+    +analyzeStructure(): Structure
+  }
+  
+  class InsightGenerationStep {
+    +processAnalysis(): Insight[]
+    +categorizeInsights(): Category[]
+  }
 }
 
 ' Relationships
-CodingWorkflow --> MCPTools : implements
-CodingWorkflow --> KnowledgeManager : uses
-CodingWorkflow --> SemanticAnalysisModule : orchestrates
+MCPAgent --> ExecuteWorkflowTool : uses
+ExecuteWorkflowTool ..|> MCPTool : implements
+ExecuteWorkflowTool --> CodingWorkflow : triggers
+
+CodingWorkflow --> KnowledgeManager : manages
+CodingWorkflow --> SemanticAnalyzer : uses
+CodingWorkflow *-- AnalysisStep : contains
 
 KnowledgeManager --> GraphologyAdapter : uses
 KnowledgeManager --> LevelDBAdapter : uses
-KnowledgeManager --> KnowledgeExport : syncs_to
+KnowledgeManager --> KnowledgeExport : exports to
 
-GraphologyAdapter --> KnowledgeGraph : stores_in
-LevelDBAdapter --> KnowledgeGraph : stores_in
+GraphologyAdapter --> KnowledgeGraph : persists to
+LevelDBAdapter --> KnowledgeGraph : stores in
+KnowledgeManager --> KnowledgeExport : auto-syncs
 
-SemanticAnalysisModule --> UKBUnifiedLib : integrates_with
-SemanticAnalysisModule --> KnowledgeManagementSrc : part_of
+AnalysisStep <|-- CodebaseAnalysisStep : extends
+AnalysisStep <|-- InsightGenerationStep : extends
 
-MCPTools ..> CodingWorkflow : triggers
+SemanticAnalyzer --> AnalysisStep : creates
 
-note right of KnowledgeGraph : "Replaced shared-memory.json\nwith persistent graph storage"
+note right of CodingWorkflow : "Distributed across:\n- src/knowledge-management\n- lib/ukb-unified\n- integrations/mcp-server-semantic-analysis"
 
-note bottom of CodingWorkflow : "Triggered via MCP tools or\nautomatic incremental analysis"
+note bottom of KnowledgeGraph : "Replaces removed\nshared-memory.json"
+
+note right of KnowledgeExport : "JSON exports\nauto-synced from GraphDB"
 
 @enduml

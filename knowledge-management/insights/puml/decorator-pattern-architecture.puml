@@ -2,58 +2,38 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Management" {
-  component [src/knowledge-management] <<core>> as KM
-  component [lib/ukb-unified] <<core>> as UKB
+  component GraphDatabaseService <<api>> as "Graph Database Service"
+  component GraphDatabaseAdapter <<api>> as "Graph Database Adapter"
+  component "Knowledge Graph Database" <<storage>> as "Knowledge Graph Database"
+  GraphDatabaseService -- GraphDatabaseAdapter
+  GraphDatabaseAdapter -- "Knowledge Graph Database"
 }
 
-package "Semantic Analysis Integration" {
-  component [integrations/mcp-server-semantic-analysis/src] <<api>> as MCP
+package "Decorator Pattern" {
+  component DecoratorPattern <<core>> as "Decorator Pattern"
+  component MCPAgent <<agent>> as "MCP Agent"
+  DecoratorPattern -- MCPAgent
 }
 
-package "Graph Database Storage" {
-  component [Graphology] <<storage>> as Graph
-  component [LevelDB] <<storage>> as LevelDB
-  database ".data/knowledge-graph" <<storage>> as GraphStorage
+package "Data Storage" {
+  component LevelDB <<storage>> as "LevelDB"
+  component "JSON Exports" <<storage>> as "JSON Exports"
+  "Knowledge Graph Database" -- LevelDB
+  "Knowledge Graph Database" -- "JSON Exports"
 }
 
-package "Export Layer" {
-  component [JSON Export] <<api>> as JSONExport
-  database ".data/knowledge-export" <<storage>> as ExportStorage
+package "Tools and Commands" {
+  component vkb <<api>> as "vkb Command"
+  component "MCP Tools" <<api>> as "MCP Tools"
+  component graph_sync <<api>> as "graph-sync Command"
+  vkb -- DecoratorPattern
+  "MCP Tools" -- DecoratorPattern
+  graph_sync -- "Knowledge Graph Database"
 }
 
-package "DecoratorPattern Implementation" {
-  component [DecoratorPattern Entity] <<core>> as DecoratorEntity
-  note right of DecoratorEntity
-    Extracted from codebase analysis
-    Stored as reusable knowledge entity
-    Part of semantic analysis infrastructure
-  end note
-}
+note as AutoNote1
+  Decorator Pattern: Provides semantic analysis and knowledge management infrastructure
 
-' Core relationships
-KM --> Graph : uses
-UKB --> Graph : integrates with
-MCP --> DecoratorEntity : implements
-Graph --> LevelDB : persisted by
-Graph --> GraphStorage : stores data in
-
-' Export relationships
-GraphStorage --> JSONExport : auto-synced to
-JSONExport --> ExportStorage : exports to
-
-' Pattern implementation relationships
-KM --> DecoratorEntity : manages
-UKB --> DecoratorEntity : utilizes
-MCP --> DecoratorEntity : analyzes
-
-' Data flow
-DecoratorEntity ..> GraphStorage : stored in
-GraphStorage ..> ExportStorage : synced to
-
-note top of "Knowledge Management"
-  DecoratorPattern implementation spans across
-  multiple components for comprehensive
-  semantic analysis and knowledge storage
 end note
 
 @enduml

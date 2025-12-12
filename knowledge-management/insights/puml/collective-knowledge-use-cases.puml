@@ -1,74 +1,34 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+title CollectiveKnowledge System Use Cases
 
-actor "Developer" as dev
-actor "External System" as ext
-actor "Knowledge Worker" as kw
+actor User as "User"
+actor ExternalSystem as "External System"
 
-rectangle "CollectiveKnowledge System" {
-  package "Knowledge Management" {
-    usecase "Execute VKB Commands" as vkb
-    usecase "Perform Coding Operations" as coding
-    usecase "Synchronize Graph Data" as sync
-    usecase "Query Knowledge Graph" as query
-    usecase "Export Knowledge" as export
-    usecase "Manage Graph Database" as manage
-  }
-  
-  package "Storage Operations" {
-    usecase "Store in Graphology+LevelDB" as store
-    usecase "Export to JSON" as jsonExport
-    usecase "Access External Data" as access
-  }
-  
-  package "API Operations" {
-    usecase "Process API Requests" as api
-    usecase "Adapt Database Queries" as adapt
-    usecase "Persist Data" as persist
-  }
+package "Knowledge Management" {
+  usecase "Manage Knowledge Graph" as (Manage Knowledge Graph)
+  usecase "Export Knowledge" as (Export Knowledge)
+  usecase "Visualize Knowledge" as (Visualize Knowledge)
+  usecase "Synchronize Data" as (Synchronize Data)
 }
 
-' Actor relationships
-dev --> vkb
-dev --> coding
-dev --> sync
-kw --> query
-kw --> export
-ext --> access
-ext --> api
+User -- (Manage Knowledge Graph)
+User -- (Visualize Knowledge)
+ExternalSystem -- (Export Knowledge)
 
-' Use case relationships
-vkb .> manage : <<include>>
-coding .> store : <<include>>
-sync .> jsonExport : <<include>>
-export .> jsonExport : <<include>>
-manage .> store : <<include>>
-query .> adapt : <<include>>
-api .> persist : <<include>>
-jsonExport .> access : <<extend>>
+(Manage Knowledge Graph) ..> (Export Knowledge) : include
+(Manage Knowledge Graph) ..> (Synchronize Data) : include
+(Visualize Knowledge) ..> (Manage Knowledge Graph) : extend
 
-' Component annotations
-note right of store
-  Primary storage:
-  .data/knowledge-graph
-  (Graphology + LevelDB)
-end note
+package "Tools" {
+  usecase "vkb" as (vkb)
+  usecase "MCP tools" as (MCP tools)
+  usecase "graph-sync" as (graph-sync)
+}
 
-note right of jsonExport
-  Synchronized exports:
-  .data/knowledge-export
-  (JSON format)
-end note
-
-note bottom of manage
-  Supported by:
-  - GraphDatabaseService
-  - GraphKnowledgeExporter
-  - GraphDatabaseAdapter
-  - PersistenceAgent
-  - VkbApiClient
-end note
+(vkb) -- (Visualize Knowledge)
+(MCP tools) -- (Manage Knowledge Graph)
+(graph-sync) -- (Synchronize Data)
 
 @enduml

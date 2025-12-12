@@ -1,62 +1,38 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+actor Developer as "Developer"
+actor User as "User"
 
-actor "Knowledge Engineer" as KE
-actor "MCP Client" as MCP
-actor "System Administrator" as SA
+usecase "Visualize Knowledge" as (Visualize Knowledge)
+usecase "Perform Knowledge Operations" as (Perform Knowledge Operations)
+usecase "Export Knowledge" as (Export Knowledge)
+usecase "Manage Graph Database" as (Manage Graph Database)
 
-package "Knowledge Management System" {
-  usecase "Store Knowledge Graph" as UC1
-  usecase "Query Graph Database" as UC2
-  usecase "Export Knowledge Data" as UC3
-  usecase "Import Knowledge Data" as UC4
-  usecase "Manage Graph Schema" as UC5
+package "MCPMemoryLoggingIntegrationPattern" {
+  (Visualize Knowledge)
+  (Perform Knowledge Operations)
+  (Export Knowledge)
+  (Manage Graph Database)
 }
 
-package "MCP Integration" {
-  usecase "Semantic Analysis" as UC6
-  usecase "Memory Pattern Integration" as UC7
-  usecase "Server Communication" as UC8
+Developer -- (Visualize Knowledge)
+User -- (Perform Knowledge Operations)
+
+(Visualize Knowledge) ..> (Manage Graph Database) : includes
+(Perform Knowledge Operations) ..> (Manage Graph Database) : includes
+(Export Knowledge) ..> (Manage Graph Database) : includes
+
+package "GraphDatabaseService" {
+  (Manage Graph Database)
 }
 
-package "Data Persistence" {
-  usecase "Persist to LevelDB" as UC9
-  usecase "Generate JSON Exports" as UC10
-  usecase "Sync Graph Data" as UC11
+package "Tools" {
+  (Visualize Knowledge)
+  (Perform Knowledge Operations)
 }
 
-package "Legacy Migration" {
-  usecase "Remove Shared Memory" as UC12
-  usecase "Migrate to GraphDB" as UC13
-}
-
-KE --> UC1
-KE --> UC2
-KE --> UC3
-KE --> UC4
-KE --> UC5
-
-MCP --> UC6
-MCP --> UC7
-MCP --> UC8
-
-SA --> UC9
-SA --> UC10
-SA --> UC11
-SA --> UC12
-SA --> UC13
-
-UC1 ..> UC9 : <<include>>
-UC3 ..> UC10 : <<include>>
-UC10 ..> UC11 : <<include>>
-UC7 ..> UC1 : <<include>>
-UC6 ..> UC7 : <<extend>>
-UC13 ..> UC1 : <<include>>
-
-note right of UC12 : "shared-memory.json REMOVED\nfrom codebase"
-
-note bottom of "Data Persistence" : "Storage: .data/knowledge-graph (Graphology + LevelDB)\nExports: .data/knowledge-export (JSON)"
+(User) -- (Perform Knowledge Operations)
+(Developer) -- (Visualize Knowledge)
 
 @enduml

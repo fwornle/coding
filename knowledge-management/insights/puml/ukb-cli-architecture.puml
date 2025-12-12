@@ -1,33 +1,23 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-  component "UkbCli" <<core>> as UkbCli
-  component "GraphDatabase" <<storage>> as GraphDB
+package "UkbCli" as UkbCli {
+  component "MCPAgent" as MCPAgent <<agent>>
+  component "GraphDatabaseService" as GraphDatabaseService <<storage>>
+  component "GraphKnowledgeExporter" as GraphKnowledgeExporter <<core>>
+  component "Graphology" as Graphology <<storage>>
+  component "LevelDB" as LevelDB <<storage>>
 }
 
-package "Unified Library" {
-  component "VkbApiClient" <<api>> as ApiClient
-  component "Knowledge Base Core" <<core>> as KBCore
-}
+MCPAgent --* GraphDatabaseService : uses
+MCPAgent --* GraphKnowledgeExporter : uses
+GraphDatabaseService --* Graphology : uses
+GraphDatabaseService --* LevelDB : uses
+GraphKnowledgeExporter --* GraphDatabaseService : exports
 
-package "MCP Integration" {
-  component "MCP Server" <<api>> as MCPServer
-  component "Semantic Analysis" <<core>> as SemanticAnalysis
-}
+note as AutoNote1
+  UkbCli: A knowledge entity implemented across multiple directories, providing knowledge storage and export functionalities.
 
-' Core relationships
-UkbCli --> GraphDB : stores/retrieves
-UkbCli --> ApiClient : uses
-ApiClient --> KBCore : interfaces with
-MCPServer --> SemanticAnalysis : processes
-SemanticAnalysis --> KBCore : analyzes
-
-' Cross-package integration
-UkbCli ..> MCPServer : integrates with
-ApiClient ..> SemanticAnalysis : provides data
-
-note top of UkbCli : CLI tool for unified knowledge base\nmanagement across distributed components
-note bottom of GraphDB : Primary storage removed from\nshared-memory.json configuration
+end note
 
 @enduml

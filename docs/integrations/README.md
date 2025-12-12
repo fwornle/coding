@@ -22,8 +22,10 @@ Each integration component:
 **Location**: `integrations/mcp-server-semantic-analysis/`
 
 **What it provides:**
-- 10 specialized AI agents for code analysis
+- 13 specialized AI agents for code analysis (including code graph and ontology)
 - Repository scanning and pattern extraction
+- AST-based code indexing via Memgraph
+- Ontology classification for knowledge entities
 - PlantUML diagram generation
 - Knowledge base synchronization
 - Comprehensive semantic analysis workflows

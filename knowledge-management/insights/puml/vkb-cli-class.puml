@@ -1,124 +1,67 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "CLI Layer" {
-    class VkbCli <<service>> {
-        +executeCommand()
-        +handleVkbCommand()
-        +handleCodingCommand()
-        +handleGraphSyncCommand()
-    }
+package "VkbCli" {
+  class VkbCli {
+    - graphDatabase: GraphDatabase
+    - jsonExport: JSONExport
+    + initialize()
+    + storeData(data: String)
+    + exportData()
+  }
+
+  class GraphDatabase {
+    - graphology: Graphology
+    - levelDB: LevelDB
+    + storeData(data: String)
+    + retrieveData(): String
+  }
+
+  class Graphology {
+    + createGraph()
+    + addNode(node: Node)
+    + addEdge(edge: Edge)
+  }
+
+  class LevelDB {
+    + storeData(data: String)
+    + retrieveData(): String
+  }
+
+  class JSONExport {
+    + exportData(data: String)
+  }
+
+  class GraphDatabaseService {
+    - graphDatabaseAdapter: GraphDatabaseAdapter
+    + processData(data: String)
+  }
+
+  class GraphDatabaseAdapter {
+    - graphDatabase: GraphDatabase
+    + storeData(data: String)
+    + retrieveData(): String
+  }
+
+  VkbCli --* GraphDatabase
+  VkbCli --* JSONExport
+  GraphDatabase --* Graphology
+  GraphDatabase --* LevelDB
+  GraphDatabaseService --* GraphDatabaseAdapter
+  GraphDatabaseAdapter --* GraphDatabase
 }
 
-package "Business Logic" {
-    class GraphDatabaseService <<service>> {
-        +processData()
-        +performSemanticAnalysis()
-        +batchProcessWithWorkers()
-        +handleIncrementalContent()
-        -parallelWorkers: Worker[]
-    }
-    
-    class PersistenceAgent <<service>> {
-        +saveToStorage()
-        +loadFromStorage()
-        +synchronizeData()
-        +optimizeConstraints()
-    }
-    
-    class GraphKnowledgeExporter <<service>> {
-        +exportToJson()
-        +autoSynchronize()
-        -exportPath: string
-    }
-    
-    class VkbApiClient <<service>> {
-        +makeExternalCall()
-        +handleApiResponse()
-        +processRemoteData()
-    }
+package "Tools" {
+  class VkbCommand {
+    + visualizeGraph()
+  }
+
+  class MCPTools {
+    + performKnowledgeOperations()
+  }
+
+  VkbCli --* VkbCommand
+  VkbCli --* MCPTools
 }
-
-package "Data Access" {
-    class GraphDatabaseAdapter <<interface>> {
-        +query()
-        +insert()
-        +update()
-        +delete()
-    }
-    
-    class GraphologyAdapter {
-        +executeGraphQuery()
-        +manageNodes()
-        +manageEdges()
-        -graphInstance: Graphology
-    }
-    
-    class LevelDbAdapter {
-        +read()
-        +write()
-        +batch()
-        -dbInstance: LevelDB
-    }
-}
-
-package "Storage" {
-    class GraphologyStorage <<file>> {
-        -location: ".data/knowledge-graph"
-        -type: "Graphology + LevelDB"
-    }
-    
-    class JsonExportStorage <<file>> {
-        -location: ".data/knowledge-export"
-        -type: "JSON"
-        -synchronized: boolean
-    }
-}
-
-package "Processing" {
-    class ParallelWorker <<service>> {
-        +processBatch()
-        +performSemanticAnalysis()
-        -workerId: string
-    }
-    
-    class VisualIndicator <<service>> {
-        +showProjectActivity()
-        +updateStatus()
-        -activityMetrics: object
-    }
-}
-
-' CLI relationships
-VkbCli --> GraphDatabaseService : uses
-VkbCli --> PersistenceAgent : uses
-
-' Service relationships
-GraphDatabaseService --> GraphDatabaseAdapter : uses
-GraphDatabaseService --> ParallelWorker : creates
-GraphDatabaseService --> VisualIndicator : updates
-
-PersistenceAgent --> GraphDatabaseAdapter : uses
-PersistenceAgent --> GraphKnowledgeExporter : triggers
-
-GraphKnowledgeExporter --> JsonExportStorage : writes to
-
-' Adapter implementations
-GraphDatabaseAdapter <|.. GraphologyAdapter : implements
-GraphDatabaseAdapter <|.. LevelDbAdapter : implements
-
-' Storage connections
-GraphologyAdapter --> GraphologyStorage : persists to
-LevelDbAdapter --> GraphologyStorage : persists to
-
-' External interactions
-VkbApiClient ..> GraphDatabaseService : provides data
-
-' Auto-synchronization
-GraphologyStorage ..> JsonExportStorage : auto-sync
-
-note top of GraphDatabaseService : "Dual-storage architecture with\nperformance optimizations"
-note top of ParallelWorker : "Batch semantic analysis\nwith parallel processing"
-note bottom of JsonExportStorage : "Auto-synchronized exports\nfrom primary storage"
 
 @enduml

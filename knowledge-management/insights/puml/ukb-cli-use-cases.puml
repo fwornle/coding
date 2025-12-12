@@ -1,73 +1,37 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-' UkbCli Graph Database Use Cases
+actor Developer as "Developer"
+actor User as "User"
 
-left to right direction
-
-actor "Knowledge Engineer" as KE
-actor "MCP Client" as MCP
-actor "API Consumer" as API
-actor "System Administrator" as SA
-
-package "UkbCli Graph Database System" {
-    
-    package "Knowledge Management" as KM {
-        usecase "Query Knowledge Graph" as UC1
-        usecase "Update Knowledge Graph" as UC2
-        usecase "Validate Knowledge Structure" as UC3
-        usecase "Export Knowledge Data" as UC4
-    }
-    
-    package "Unified Knowledge Base" as UKB {
-        usecase "Access Unified API" as UC5
-        usecase "Manage Graph Connections" as UC6
-        usecase "Execute Graph Operations" as UC7
-        usecase "Handle Graph Transactions" as UC8
-    }
-    
-    package "Semantic Analysis Integration" as SAI {
-        usecase "Provide MCP Interface" as UC9
-        usecase "Process Semantic Queries" as UC10
-        usecase "Analyze Knowledge Relations" as UC11
-        usecase "Return Structured Results" as UC12
-    }
-    
-    package "System Management" as SM {
-        usecase "Configure Database" as UC13
-        usecase "Monitor Performance" as UC14
-        usecase "Manage Security" as UC15
-    }
+package "UkbCli" {
+  usecase "Visualize Knowledge" as (Visualize Knowledge)
+  usecase "Synchronize Knowledge Exports" as (Synchronize Knowledge Exports)
+  usecase "Store Knowledge" as (Store Knowledge)
+  usecase "Export Knowledge" as (Export Knowledge)
 }
 
-' Actor relationships
-KE --> UC1
-KE --> UC2
-KE --> UC3
-KE --> UC4
+package "GraphDatabaseService" {
+  usecase "Store Knowledge" as (Store Knowledge)
+}
 
-API --> UC5
-API --> UC6
-API --> UC7
+package "GraphKnowledgeExporter" {
+  usecase "Export Knowledge" as (Export Knowledge)
+}
 
-MCP --> UC9
-MCP --> UC10
-MCP --> UC11
-MCP --> UC12
+Developer -- (Visualize Knowledge)
+User -- (Visualize Knowledge)
+Developer -- (Synchronize Knowledge Exports)
+User -- (Synchronize Knowledge Exports)
 
-SA --> UC13
-SA --> UC14
-SA --> UC15
+(Visualize Knowledge) ..> (Store Knowledge) : includes
+(Synchronize Knowledge Exports) ..> (Export Knowledge) : includes
 
-' Use case relationships
-UC5 ..> UC7 : <<include>>
-UC2 ..> UC3 : <<include>>
-UC10 ..> UC11 : <<include>>
-UC9 ..> UC12 : <<include>>
-UC7 ..> UC8 : <<include>>
-
-' Core component annotation
-note right of UKB : Core: VkbApiClient
-note bottom of SAI : No shared-memory.json dependency
+package "Knowledge Storage" {
+  component Graphology as "Graphology"
+  component LevelDB as "LevelDB"
+  (Store Knowledge) ..> Graphology
+  (Store Knowledge) ..> LevelDB
+}
 
 @enduml
