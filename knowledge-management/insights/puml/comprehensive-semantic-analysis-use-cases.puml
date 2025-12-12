@@ -3,63 +3,74 @@
 
 left to right direction
 
-actor "Developer" as dev
-actor "Knowledge Worker" as kw
-actor "System Administrator" as admin
-actor "External MCP Client" as client
+actor "User" as user
+actor "MCP Client" as client
+actor "Knowledge System" as ks
 
-package "Knowledge Management Layer" {
-  usecase "Manage Knowledge Base" as UC1
-  usecase "Query Semantic Data" as UC2
-  usecase "Update Knowledge Graph" as UC3
+rectangle "Semantic Analysis System" {
+  usecase "Analyze Text Semantics" as analyze
+  usecase "Extract Entities" as extract
+  usecase "Build Knowledge Graph" as build
+  usecase "Query Semantic Data" as query
+  usecase "Store Knowledge" as store
+  usecase "Retrieve Context" as retrieve
 }
 
-package "UKB Unified Processing" {
-  usecase "Process Natural Language" as UC4
-  usecase "Extract Semantic Features" as UC5
-  usecase "Generate Embeddings" as UC6
-  usecase "Perform Similarity Analysis" as UC7
+rectangle "Knowledge Management" {
+  usecase "Manage Graph Structure" as manage
+  usecase "Process Semantic Relations" as relations
+  usecase "Update Knowledge Base" as update
 }
 
-package "MCP Server Integration" {
-  usecase "Handle MCP Requests" as UC8
-  usecase "Provide Semantic Analysis API" as UC9
-  usecase "Manage Client Sessions" as UC10
-  usecase "Export Analysis Results" as UC11
+rectangle "MCP Server Operations" {
+  usecase "Handle MCP Requests" as handle
+  usecase "Provide Semantic Tools" as tools
+  usecase "Return Analysis Results" as results
 }
 
-package "Core Analysis Engine" {
-  usecase "Execute Semantic Analysis" as UC12
-  usecase "Generate Insights" as UC13
-  usecase "Validate Results" as UC14
+rectangle "Data Persistence" {
+  usecase "Store in LevelDB" as leveldb
+  usecase "Maintain Graph Topology" as topology
+  usecase "Cache Semantic Data" as cache
 }
 
-' Actor relationships
-kw --> UC1
-kw --> UC2
-kw --> UC13
+user --> analyze
+client --> handle
+ks --> manage
 
-dev --> UC3
-dev --> UC12
-dev --> UC14
+analyze ..> extract : <<include>>
+analyze ..> build : <<include>>
+build --> store
+store --> leveldb
+store --> topology
 
-admin --> UC10
-admin --> UC8
+query --> retrieve
+retrieve --> cache
 
-client --> UC9
-client --> UC11
+handle --> tools
+tools --> analyze
+results --> query
 
-' Use case relationships
-UC2 ..> UC4 : <<include>>
-UC3 ..> UC5 : <<include>>
-UC12 ..> UC6 : <<include>>
-UC12 ..> UC7 : <<include>>
-UC9 ..> UC12 : <<include>>
-UC13 ..> UC7 : <<extend>>
-UC11 ..> UC14 : <<include>>
+manage --> relations
+relations --> update
+update --> store
 
-note right of UC8 : "Replaces shared-memory.json\nwith direct MCP protocol"
+extract --> build
+query --> results
 
-note bottom of UC12 : "ComprehensiveSemanticAnalysis\ncore functionality"
+note right of leveldb
+  Located at .data/knowledge-graph
+  Uses Graphology + LevelDB
+end note
+
+note top of handle
+  Implemented in integrations/
+  mcp-server-semantic-analysis/src
+end note
+
+note left of manage
+  Located in src/
+  knowledge-management
+end note
 
 @enduml

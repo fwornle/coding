@@ -1,51 +1,54 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-    component [SemanticProcessor] <<core>>
-    component [KnowledgeStore] <<storage>>
-    component [ContextManager] <<core>>
+title ComprehensiveSemanticAnalysis Architecture
+
+package "MCP Server Layer" {
+    component [MCP Server Semantic Analysis] <<api>> as MCPServer
+    component [MCP Tools Interface] <<api>> as MCPTools
 }
 
-package "UKB Unified Library" {
-    component [UnifiedKnowledgeBase] <<core>>
-    component [SemanticIndexer] <<core>>
-    component [QueryProcessor] <<api>>
+package "Core Implementation" {
+    component [Knowledge Management Core] <<core>> as KnowledgeCore
+    component [UKB Unified Library] <<core>> as UKBLib
+    component [Semantic Analysis Engine] <<core>> as SemanticEngine
 }
 
-package "MCP Server Integration" {
-    component [MCPSemanticServer] <<api>>
-    component [AnalysisTools] <<agent>>
-    component [SemanticProtocol] <<api>>
+package "Storage Layer" {
+    component [Graphology Graph Engine] <<storage>> as GraphEngine
+    component [LevelDB Storage] <<storage>> as LevelDB
+    database ".data/knowledge-graph" as KnowledgeDB
 }
 
-component [ComprehensiveSemanticAnalysis] <<agent>>
+package "Source Locations" {
+    folder "src/knowledge-management" as SrcKM
+    folder "lib/ukb-unified" as LibUKB
+    folder "integrations/mcp-server-semantic-analysis/src" as IntegrationSrc
+}
 
-[ComprehensiveSemanticAnalysis] --> [SemanticProcessor] : orchestrates
-[ComprehensiveSemanticAnalysis] --> [UnifiedKnowledgeBase] : queries
-[ComprehensiveSemanticAnalysis] --> [MCPSemanticServer] : integrates
+' Relationships
+MCPServer --> MCPTools : "exposes tools"
+MCPTools --> SemanticEngine : "delegates analysis"
+SemanticEngine --> KnowledgeCore : "uses"
+SemanticEngine --> UKBLib : "leverages"
+KnowledgeCore --> GraphEngine : "manages graph data"
+GraphEngine --> LevelDB : "persists to"
+LevelDB --> KnowledgeDB : "stores in"
 
-[SemanticProcessor] --> [KnowledgeStore] : stores/retrieves
-[SemanticProcessor] --> [ContextManager] : manages context
+' Source mapping
+SrcKM ..> KnowledgeCore : "implements"
+LibUKB ..> UKBLib : "implements"
+IntegrationSrc ..> MCPServer : "implements"
 
-[UnifiedKnowledgeBase] --> [SemanticIndexer] : indexes knowledge
-[QueryProcessor] --> [SemanticIndexer] : searches
-
-[MCPSemanticServer] --> [AnalysisTools] : exposes
-[MCPSemanticServer] --> [SemanticProtocol] : implements
-
-[AnalysisTools] ..> [QueryProcessor] : uses
-[ContextManager] ..> [UnifiedKnowledgeBase] : synchronizes
-
-note top of [ComprehensiveSemanticAnalysis]
-MCP Agent providing comprehensive
-semantic analysis capabilities across
-distributed knowledge components
+note right of KnowledgeDB
+  Persistent storage using
+  Graphology + LevelDB
+  (shared-memory.json removed)
 end note
 
-note bottom
-Legacy shared-memory.json removed
-All components now use direct integration
+note top of SemanticEngine
+  ComprehensiveSemanticAnalysis
+  MCPAgent implementation
 end note
 
 @enduml

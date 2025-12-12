@@ -1,67 +1,95 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "MCP Client" as Client
-participant "Semantic Analysis\nMCP Server" as MCPServer
-participant "Knowledge Management\nCore" as KnowledgeCore
-participant "UKB Unified\nLibrary" as UKBLib
-participant "Semantic Processor" as Processor
-participant "Analysis Engine" as Engine
+participant "Client" as client
+participant "MCP Server" as mcp
+participant "ComprehensiveSemanticAnalysis" as csa
+participant "KnowledgeManager" as km
+participant "Graphology Graph" as graph
+participant "LevelDB" as leveldb
+participant "UKB Unified" as ukb
 
-Client -> MCPServer: Initialize semantic analysis request
-activate MCPServer
+client -> mcp: semantic_analysis_request
+activate mcp
 
-MCPServer -> KnowledgeCore: Load knowledge base
-activate KnowledgeCore
-KnowledgeCore -> UKBLib: Access unified knowledge structures
-activate UKBLib
-UKBLib --> KnowledgeCore: Return knowledge graph
-deactivate UKBLib
-KnowledgeCore --> MCPServer: Knowledge base ready
-deactivate KnowledgeCore
+mcp -> csa: analyze(content, options)
+activate csa
 
-MCPServer -> Processor: Start semantic processing
-activate Processor
+csa -> km: initialize_knowledge_store()
+activate km
 
-Processor -> Engine: Analyze semantic patterns
-activate Engine
+km -> graph: create_graph_instance()
+activate graph
+graph --> km: graph_ready
+deactivate graph
 
-alt Complex Analysis Required
-    Engine -> UKBLib: Query semantic relationships
-    activate UKBLib
-    UKBLib --> Engine: Return semantic mappings
-    deactivate UKBLib
-    
-    Engine -> KnowledgeCore: Update knowledge graph
-    activate KnowledgeCore
-    KnowledgeCore --> Engine: Confirm updates
-    deactivate KnowledgeCore
-else Simple Analysis
-    Engine -> Engine: Process locally
+km -> leveldb: connect(.data/knowledge-graph)
+activate leveldb
+leveldb --> km: storage_ready
+deactivate leveldb
+
+km --> csa: knowledge_store_ready
+deactivate km
+
+csa -> ukb: semantic_processing(content)
+activate ukb
+
+ukb -> ukb: extract_entities()
+ukb -> ukb: analyze_relationships()
+ukb -> ukb: compute_embeddings()
+
+ukb --> csa: semantic_results
+deactivate ukb
+
+csa -> km: store_semantic_data(results)
+activate km
+
+km -> graph: add_nodes(entities)
+activate graph
+graph --> km: nodes_added
+deactivate graph
+
+km -> graph: add_edges(relationships)
+activate graph
+graph --> km: edges_added
+deactivate graph
+
+km -> leveldb: persist_graph_state()
+activate leveldb
+leveldb --> km: state_persisted
+deactivate leveldb
+
+km --> csa: data_stored
+deactivate km
+
+opt query_knowledge
+    csa -> km: query_graph(criteria)
+    activate km
+    km -> graph: traverse(query)
+    activate graph
+    graph --> km: results
+    deactivate graph
+    km --> csa: query_results
+    deactivate km
 end
 
-Engine --> Processor: Return analysis results
-deactivate Engine
+csa --> mcp: analysis_complete(results)
+deactivate csa
 
-Processor -> MCPServer: Compile comprehensive results
-deactivate Processor
+mcp --> client: semantic_analysis_response
+deactivate mcp
 
-MCPServer --> Client: Return semantic analysis
-deactivate MCPServer
-
-note right of UKBLib
-  Unified knowledge base
-  replacing shared-memory.json
+note right of leveldb
+  Storage location:
+  .data/knowledge-graph
+  (shared-memory.json removed)
 end note
 
-note left of KnowledgeCore
-  Located in:
-  src/knowledge-management
-end note
-
-note over MCPServer
-  Located in:
-  integrations/mcp-server-semantic-analysis/src
+note right of csa
+  Implementation spans:
+  - src/knowledge-management
+  - lib/ukb-unified
+  - integrations/mcp-server-semantic-analysis/src
 end note
 
 @enduml

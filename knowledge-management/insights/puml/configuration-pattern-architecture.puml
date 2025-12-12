@@ -1,65 +1,72 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Configuration Pattern Architecture" {
-    
-    package "Core Implementation" {
-        component [ConfigurationPattern] <<agent>> as cp
-        component [Environment Variables] <<config>> as env
-        component [Project Config Files] <<config>> as projconfig
-    }
-    
-    package "Knowledge Management Layer" {
-        component [src/knowledge-management] <<core>> as km
-        component [lib/ukb-unified] <<core>> as ukb
-    }
-    
-    package "MCP Integration" {
-        component [integrations/mcp-server-semantic-analysis] <<api>> as mcpserver
-        component [MCP Agent Tools] <<agent>> as mcptools
-    }
-    
-    package "Storage Layer" {
-        component [Graphology Engine] <<storage>> as graphology
-        component [LevelDB] <<storage>> as leveldb
-        database ".data/knowledge-graph" <<storage>> as kgdb
-    }
-    
-    package "Export Layer" {
-        component [JSON Exporter] <<core>> as jsonexp
-        database ".data/knowledge-export" <<storage>> as exportdb
-        note right of exportdb : Auto-synced from GraphDB
-    }
+package "Knowledge Management" {
+    component [GraphDatabaseService] <<core>>
+    component [GraphKnowledgeExporter] <<core>>
+    component [GraphDatabaseAdapter] <<api>>
 }
 
-' Configuration relationships
-cp --> env : reads configuration
-cp --> projconfig : loads settings
+package "Storage Layer" {
+    component [Graphology] <<storage>>
+    component [LevelDB] <<storage>>
+    folder ".data/knowledge-graph" as KGData
+}
 
-' Core implementation relationships
-cp --> km : implements pattern
-cp --> ukb : unified knowledge base
-km --> ukb : manages knowledge
+package "MCP Integration" {
+    component [VkbApiClient] <<api>>
+    component [PersistenceAgent] <<agent>>
+    component [MCP Server] <<core>>
+    component [code-graph-rag] <<core>>
+}
 
-' MCP integration relationships
-cp --> mcpserver : semantic analysis
-mcpserver --> mcptools : agent coordination
+package "Command Interface" {
+    component [vkb command] <<api>>
+    component [coding command] <<api>>
+    component [graph-sync] <<core>>
+}
 
-' Storage relationships
-km --> graphology : graph operations
-graphology --> leveldb : persistent storage
-leveldb --> kgdb : knowledge graph data
+package "Configuration" {
+    file [.env.ports] <<config>>
+    file [.data/knowledge-export] <<storage>>
+}
 
-' Export relationships
-kgdb --> jsonexp : exports data
-jsonexp --> exportdb : synchronized output
+package "Directories" {
+    folder "src/knowledge-management"
+    folder "lib/ukb-unified"
+    folder "integrations/mcp-server-semantic-analysis/src"
+}
 
-' Cross-layer relationships
-mcpserver --> km : pattern extraction
-ukb --> kgdb : stores patterns
+[GraphDatabaseService] --> [Graphology]
+[GraphDatabaseService] --> [LevelDB]
+[GraphDatabaseService] --> KGData
+[GraphKnowledgeExporter] --> [.data/knowledge-export]
+[GraphDatabaseAdapter] --> [GraphDatabaseService]
 
-note top of cp : Pattern extracted from codebase analysis\nand stored as reusable knowledge entity
+[VkbApiClient] --> [GraphDatabaseAdapter]
+[PersistenceAgent] --> [GraphDatabaseService]
+[MCP Server] --> [code-graph-rag]
 
-note bottom of kgdb : Replaced shared-memory.json\nwith GraphDB + LevelDB architecture
+[vkb command] --> [GraphDatabaseService]
+[coding command] --> [GraphDatabaseService]
+[graph-sync] --> [GraphDatabaseService]
+
+[.env.ports] --> [MCP Server]
+[GraphKnowledgeExporter] --> [.data/knowledge-export]
+
+note top of [GraphDatabaseService]
+    Multi-layered architecture with 
+    Graphology + LevelDB storage
+end note
+
+note bottom of [.env.ports]
+    Replaces deprecated 
+    shared-memory.json approach
+end note
+
+note right of [code-graph-rag]
+    Git submodule with resolved
+    race condition handling
+end note
 
 @enduml

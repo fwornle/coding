@@ -1,60 +1,77 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Knowledge Management\nSystem" as KMS
-participant "UKB Unified\nLibrary" as UKB
-participant "MCP Server\nSemantic Analysis" as MCP
-participant "Graphology\nGraph Engine" as Graph
-participant "LevelDB\nStorage" as LevelDB
-participant "JSON Export\nSystem" as Export
+participant "MCPAgent" as MCP
+participant "NetworkAwareInstallationPattern" as NAIP
+participant "KnowledgeManager" as KM
+participant "GraphologyEngine" as GE
+participant "LevelDB" as LDB
+participant "SemanticAnalyzer" as SA
+participant "JSONExporter" as JE
 
-note over KMS, Export : NetworkAwareInstallationPattern Implementation
-
-KMS -> UKB : Initialize pattern analysis
-activate UKB
-
-UKB -> MCP : Request semantic analysis
 activate MCP
+MCP -> NAIP: initialize()
+activate NAIP
 
-MCP -> Graph : Create network-aware nodes
-activate Graph
+NAIP -> KM: setupKnowledgeStorage()
+activate KM
 
-Graph -> LevelDB : Persist graph structure
-activate LevelDB
-LevelDB --> Graph : Storage confirmation
-deactivate LevelDB
+KM -> GE: initializeGraphology()
+activate GE
+GE -> LDB: connect(.data/knowledge-graph)
+activate LDB
+LDB --> GE: connection established
+GE --> KM: graph engine ready
+deactivate GE
 
-Graph --> MCP : Graph structure ready
-deactivate Graph
+KM --> NAIP: storage initialized
+deactivate KM
 
-MCP -> MCP : Extract installation patterns
-MCP -> MCP : Analyze network topology
+NAIP -> SA: analyzeCodebase()
+activate SA
 
-MCP --> UKB : Pattern analysis complete
+loop codebase analysis
+    SA -> SA: extractPatterns(src/knowledge-management)
+    SA -> SA: extractPatterns(lib/ukb-unified)
+    SA -> SA: extractPatterns(integrations/mcp-server-semantic-analysis/src)
+end
+
+SA -> KM: storePattern(NetworkAwareInstallationPattern)
+activate KM
+KM -> GE: addNode(pattern)
+activate GE
+GE -> LDB: persist(pattern)
+LDB --> GE: stored
+GE --> KM: pattern added
+deactivate GE
+KM --> SA: pattern stored
+deactivate KM
+
+SA --> NAIP: analysis complete
+deactivate SA
+
+NAIP -> JE: exportKnowledge()
+activate JE
+JE -> KM: getKnowledgeGraph()
+activate KM
+KM -> GE: exportGraph()
+activate GE
+GE -> LDB: queryAll()
+LDB --> GE: graph data
+GE --> KM: serialized graph
+deactivate GE
+KM --> JE: knowledge data
+deactivate KM
+
+JE -> JE: syncToJSON(.data/knowledge-export)
+JE --> NAIP: export complete
+deactivate JE
+
+note right of LDB: shared-memory.json REMOVED\nUsing LevelDB for persistence
+
+NAIP --> MCP: pattern installation ready
+deactivate NAIP
+deactivate LDB
 deactivate MCP
-
-UKB -> Graph : Store pattern as knowledge entity
-activate Graph
-
-Graph -> LevelDB : Save NetworkAwareInstallationPattern
-activate LevelDB
-LevelDB --> Graph : Pattern stored
-deactivate LevelDB
-
-Graph -> Export : Auto-sync to JSON export
-activate Export
-Export -> Export : Write to .data/knowledge-export
-Export --> Graph : Export complete
-deactivate Export
-
-Graph --> UKB : Pattern entity stored
-deactivate Graph
-
-UKB --> KMS : NetworkAwareInstallationPattern ready
-deactivate UKB
-
-note over Graph, LevelDB : Data stored at .data/knowledge-graph
-note over Export : JSON exports at .data/knowledge-export
-note over KMS, Export : shared-memory.json REMOVED from codebase
 
 @enduml

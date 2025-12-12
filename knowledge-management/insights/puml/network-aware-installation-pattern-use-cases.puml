@@ -3,66 +3,53 @@
 
 left to right direction
 
-actor "Knowledge Engineer" as KE
-actor "Semantic Analyzer" as SA
-actor "MCP Server" as MCP
-actor "Application Developer" as DEV
+actor "Developer" as dev
+actor "MCP Agent" as agent
+actor "Knowledge System" as ks
 
-package "Knowledge Management System" {
-  usecase "Store Pattern Knowledge" as UC1
-  usecase "Query Network Patterns" as UC2
-  usecase "Export Knowledge Data" as UC3
-  usecase "Sync GraphDB to JSON" as UC4
+package "NetworkAwareInstallationPattern System" {
+  usecase "Analyze Codebase" as analyze
+  usecase "Extract Installation Patterns" as extract
+  usecase "Store Knowledge Entity" as store
+  usecase "Generate Semantic Analysis" as semantic
+  usecase "Export Knowledge" as export
+  usecase "Manage Graph Database" as graphdb
+  usecase "Sync Data Storage" as sync
 }
 
-package "Semantic Analysis Infrastructure" {
-  usecase "Analyze Network Installation" as UC5
-  usecase "Extract Patterns" as UC6
-  usecase "Generate Semantic Models" as UC7
+package "Data Storage" {
+  usecase "Access Graphology + LevelDB" as leveldb
+  usecase "Read JSON Exports" as jsonread
+  usecase "Write Knowledge Graph" as writegraph
 }
 
-package "Data Storage Operations" {
-  usecase "Write to Graphology+LevelDB" as UC8
-  usecase "Maintain Graph Structure" as UC9
-  usecase "Auto-sync to Export Format" as UC10
+package "Infrastructure Components" {
+  usecase "Execute Knowledge Management" as km
+  usecase "Run UKB Unified Services" as ukb
+  usecase "Perform MCP Server Operations" as mcpops
 }
 
-package "Integration Services" {
-  usecase "Provide MCP Interface" as UC11
-  usecase "Serve Semantic Analysis" as UC12
-  usecase "Handle Client Requests" as UC13
-}
+dev --> analyze
+agent --> extract
+agent --> semantic
+ks --> store
 
-KE --> UC1
-KE --> UC2
-KE --> UC3
+analyze ..> extract : <<include>>
+extract ..> store : <<include>>
+semantic ..> export : <<include>>
+store ..> graphdb : <<include>>
+export ..> sync : <<include>>
 
-SA --> UC5
-SA --> UC6
-SA --> UC7
+graphdb --> writegraph
+sync --> leveldb
+export --> jsonread
 
-MCP --> UC11
-MCP --> UC12
-MCP --> UC13
+km --> store
+ukb --> semantic
+mcpops --> extract
 
-DEV --> UC2
-DEV --> UC3
-
-UC1 ..> UC8 : <<include>>
-UC2 ..> UC9 : <<include>>
-UC3 ..> UC10 : <<include>>
-
-UC5 ..> UC6 : <<include>>
-UC6 ..> UC1 : <<extend>>
-
-UC8 ..> UC4 : <<include>>
-UC4 ..> UC10 : <<include>>
-
-UC11 ..> UC12 : <<include>>
-UC12 ..> UC7 : <<include>>
-
-note right of UC8 : "Storage at .data/knowledge-graph\nusing Graphology + LevelDB"
-note right of UC10 : "Auto-sync to .data/knowledge-export\nJSON format"
-note top of UC6 : "NetworkAwareInstallationPattern\nextracted from codebase analysis"
+note right of store : "Stored at .data/knowledge-graph\nusing Graphology + LevelDB"
+note right of export : "Auto-synced to .data/knowledge-export\nfrom GraphDB"
+note bottom of analyze : "Pattern extracted from:\nsrc/knowledge-management\nlib/ukb-unified\nintegrations/mcp-server-semantic-analysis/src"
 
 @enduml

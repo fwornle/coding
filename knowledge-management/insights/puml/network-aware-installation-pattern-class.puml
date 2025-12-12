@@ -2,115 +2,112 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Management" {
-    class NetworkAwareInstallationPattern <<pattern>> {
-        -patternId: string
-        -networkConfig: NetworkConfig
-        -installationSteps: InstallationStep[]
-        +analyzeNetworkTopology(): NetworkTopology
-        +generateInstallationPlan(): InstallationPlan
-        +validateConnectivity(): ValidationResult
-        +executeInstallation(): ExecutionResult
-    }
-
-    class KnowledgeManager <<service>> {
-        -graphDb: GraphDatabase
-        -exportManager: ExportManager
-        +storePattern(pattern: Pattern): void
-        +retrievePattern(id: string): Pattern
-        +syncToExport(): void
-    }
-
-    class SemanticAnalyzer <<service>> {
-        -patternExtractor: PatternExtractor
-        -codebaseAnalyzer: CodebaseAnalyzer
-        +extractPatterns(codebase: Codebase): Pattern[]
-        +analyzeSemantics(code: string): SemanticData
-    }
+  class NetworkAwareInstallationPattern <<MCPAgent>> {
+    -patternId: String
+    -networkTopology: Map
+    -installationState: State
+    +analyzeNetwork(): NetworkInfo
+    +planInstallation(): InstallationPlan
+    +executeInstallation(): Result
+    +validateConfiguration(): Boolean
+  }
+  
+  class KnowledgeGraphManager {
+    -graphologyInstance: Graphology
+    -levelDbAdapter: LevelDB
+    +storePattern(pattern: Pattern): void
+    +retrievePattern(id: String): Pattern
+    +updateGraph(data: GraphData): void
+    +exportToJson(): JsonData
+  }
+  
+  class SemanticAnalyzer {
+    -analysisRules: Rule[]
+    -patternExtractor: PatternExtractor
+    +analyzeCodebase(): AnalysisResult
+    +extractPatterns(): Pattern[]
+    +generateKnowledge(): KnowledgeEntity
+  }
 }
 
 package "Storage Layer" {
-    class GraphDatabase <<database>> {
-        -graphology: GraphologyInstance
-        -levelDb: LevelDB
-        -storagePath: string
-        +store(entity: Entity): void
-        +query(criteria: QueryCriteria): Entity[]
-        +connect(): void
-        +disconnect(): void
-    }
-
-    class ExportManager <<service>> {
-        -exportPath: string
-        -autoSync: boolean
-        +exportToJson(data: GraphData): void
-        +scheduleSync(): void
-        +validateExport(): boolean
-    }
-
-    class LevelDB <<persistence>> {
-        -dbPath: string
-        -options: LevelDbOptions
-        +put(key: string, value: any): void
-        +get(key: string): any
-        +delete(key: string): void
-    }
-
-    class GraphologyInstance <<graph>> {
-        -nodes: Node[]
-        -edges: Edge[]
-        +addNode(node: Node): void
-        +addEdge(edge: Edge): void
-        +traverse(strategy: TraversalStrategy): Path[]
-    }
+  class GraphologyStorage <<file>> {
+    -graphPath: String
+    +persistGraph(graph: Graph): void
+    +loadGraph(): Graph
+    +backup(): void
+  }
+  
+  class LevelDBAdapter {
+    -dbConnection: Connection
+    -indexManager: IndexManager
+    +write(key: String, value: Object): void
+    +read(key: String): Object
+    +query(criteria: QueryCriteria): Result[]
+  }
+  
+  class JsonExporter {
+    -exportPath: String
+    -autoSyncEnabled: Boolean
+    +exportGraph(): JsonFile
+    +syncFromGraphDB(): void
+    +scheduleAutoSync(): void
+  }
 }
 
-package "Integration Layer" {
-    class MCPServer <<server>> {
-        -semanticAnalyzer: SemanticAnalyzer
-        -knowledgeManager: KnowledgeManager
-        +handleRequest(request: MCPRequest): MCPResponse
-        +processSemanticAnalysis(code: string): AnalysisResult
-    }
-
-    class UKBUnified <<library>> {
-        -patternRegistry: PatternRegistry
-        +registerPattern(pattern: Pattern): void
-        +getPattern(id: string): Pattern
-        +listPatterns(): Pattern[]
-    }
+package "MCP Server Integration" {
+  interface MCPServerInterface {
+    +processRequest(request: MCPRequest): MCPResponse
+    +validateAgent(agent: MCPAgent): Boolean
+  }
+  
+  class SemanticAnalysisServer {
+    -patternRegistry: PatternRegistry
+    -requestHandler: RequestHandler
+    +handleSemanticQuery(): Response
+    +registerPattern(pattern: Pattern): void
+    +getPatternMetadata(): Metadata
+  }
 }
 
-package "Configuration" {
-    class DataPaths <<config>> {
-        +KNOWLEDGE_GRAPH_PATH: string = ".data/knowledge-graph"
-        +KNOWLEDGE_EXPORT_PATH: string = ".data/knowledge-export"
-        +validatePaths(): boolean
-    }
-
-    class NetworkConfig <<config>> {
-        -topology: NetworkTopology
-        -connectivity: ConnectivityRules
-        -security: SecurityConfig
-    }
+package "Data Locations" {
+  class KnowledgeGraphStorage <<file>> {
+    -location: ".data/knowledge-graph"
+  }
+  
+  class KnowledgeExportStorage <<file>> {
+    -location: ".data/knowledge-export"
+  }
 }
 
 ' Relationships
-NetworkAwareInstallationPattern --* KnowledgeManager : stored by
-KnowledgeManager --> GraphDatabase : uses
-SemanticAnalyzer --> NetworkAwareInstallationPattern : extracts
-GraphDatabase --> GraphologyInstance : contains
-GraphDatabase --> LevelDB : persists with
-GraphDatabase --> ExportManager : exports via
-MCPServer --> SemanticAnalyzer : uses
-MCPServer --> KnowledgeManager : queries
-UKBUnified --> NetworkAwareInstallationPattern : provides
-NetworkAwareInstallationPattern --> NetworkConfig : configured by
-ExportManager --> DataPaths : writes to
-GraphDatabase --> DataPaths : stores at
+NetworkAwareInstallationPattern --> KnowledgeGraphManager : uses
+KnowledgeGraphManager --> GraphologyStorage : persists to
+KnowledgeGraphManager --> LevelDBAdapter : stores in
+KnowledgeGraphManager --> JsonExporter : exports via
+SemanticAnalyzer --> NetworkAwareInstallationPattern : creates
+SemanticAnalysisServer ..|> MCPServerInterface : implements
+SemanticAnalysisServer --> NetworkAwareInstallationPattern : manages
+GraphologyStorage --> KnowledgeGraphStorage : writes to
+JsonExporter --> KnowledgeExportStorage : exports to
+JsonExporter ..> GraphologyStorage : syncs from
 
-' Notes
-note right of GraphDatabase : "Graphology + LevelDB\nat .data/knowledge-graph"
-note right of ExportManager : "JSON exports at\n.data/knowledge-export\n(auto-synced)"
-note bottom of NetworkAwareInstallationPattern : "Pattern extracted from codebase\nanalysis across multiple modules"
+note right of NetworkAwareInstallationPattern
+  Pattern extracted from codebase analysis
+  Distributed across multiple modules:
+  - src/knowledge-management
+  - lib/ukb-unified  
+  - integrations/mcp-server-semantic-analysis
+end note
+
+note bottom of KnowledgeGraphStorage
+  Storage: Graphology + LevelDB
+  Location: .data/knowledge-graph
+end note
+
+note bottom of KnowledgeExportStorage
+  Auto-synced JSON exports
+  Location: .data/knowledge-export
+end note
 
 @enduml

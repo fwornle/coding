@@ -1,67 +1,104 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor "Developer" as dev
-actor "MCP Client" as client
-actor "System Administrator" as admin
+left to right direction
 
-rectangle "Configuration Management" {
-  usecase "Configure Environment Variables" as config_env
-  usecase "Manage Project Config Files" as config_files
-  usecase "Validate Configuration" as validate_config
+actor "Knowledge Worker" as KW
+actor "Developer" as DEV
+actor "System Administrator" as SA
+actor "External System" as EXT
+
+package "Configuration Management" {
+  usecase "Configure Environment Variables" as UC1
+  usecase "Validate Configuration" as UC2
+  usecase "Manage Port Settings" as UC3
 }
 
-rectangle "Knowledge Management" {
-  usecase "Store Knowledge Patterns" as store_patterns
-  usecase "Query Knowledge Graph" as query_graph
-  usecase "Export Knowledge Data" as export_data
-  usecase "Sync GraphDB to JSON" as sync_data
+package "Knowledge Operations" {
+  usecase "Visualize Knowledge Graph" as UC4
+  usecase "Execute Development Tasks" as UC5
+  usecase "Synchronize Graph Database" as UC6
+  usecase "Export Knowledge Data" as UC7
 }
 
-rectangle "MCP Server Operations" {
-  usecase "Process Semantic Analysis" as semantic_analysis
-  usecase "Handle MCP Requests" as handle_requests
-  usecase "Manage Agent Lifecycle" as manage_lifecycle
+package "Data Storage & Access" {
+  usecase "Store Graph Data" as UC8
+  usecase "Query Knowledge Base" as UC9
+  usecase "Export JSON Data" as UC10
+  usecase "Maintain Data Consistency" as UC11
 }
 
-rectangle "Data Persistence" {
-  usecase "Access Graphology Storage" as access_graphology
-  usecase "Read/Write LevelDB" as leveldb_ops
-  usecase "Generate JSON Exports" as json_exports
+package "MCP Server Integration" {
+  usecase "Manage Git Submodules" as UC12
+  usecase "Handle Status Operations" as UC13
+  usecase "Configure MCP Server Ports" as UC14
+  usecase "Integrate Code Graph RAG" as UC15
 }
 
-rectangle "Pattern Analysis" {
-  usecase "Extract Codebase Patterns" as extract_patterns
-  usecase "Create Reusable Entities" as create_entities
-  usecase "Analyze Configuration Patterns" as analyze_patterns
+package "API & Persistence" {
+  usecase "Access VKB API" as UC16
+  usecase "Manage Data Persistence" as UC17
+  usecase "Handle Race Conditions" as UC18
 }
 
-dev --> config_env
-dev --> config_files
-admin --> validate_config
+' Actor relationships
+SA --> UC1
+SA --> UC2
+SA --> UC3
+SA --> UC14
 
-client --> handle_requests
-client --> semantic_analysis
+KW --> UC4
+KW --> UC6
+KW --> UC7
+KW --> UC9
 
-dev --> store_patterns
-dev --> query_graph
-dev --> extract_patterns
+DEV --> UC5
+DEV --> UC12
+DEV --> UC15
+DEV --> UC16
 
-store_patterns ..> access_graphology : <<include>>
-query_graph ..> leveldb_ops : <<include>>
-export_data ..> json_exports : <<include>>
-export_data ..> sync_data : <<include>>
+EXT --> UC10
+EXT --> UC13
+EXT --> UC18
 
-handle_requests ..> manage_lifecycle : <<include>>
-semantic_analysis ..> analyze_patterns : <<include>>
-analyze_patterns ..> create_entities : <<extend>>
+' Include relationships
+UC2 ..> UC1 : <<include>>
+UC6 ..> UC8 : <<include>>
+UC7 ..> UC10 : <<include>>
+UC9 ..> UC11 : <<include>>
+UC13 ..> UC18 : <<include>>
+UC15 ..> UC12 : <<include>>
+UC16 ..> UC17 : <<include>>
 
-extract_patterns --> store_patterns
-validate_config --> config_env : <<extend>>
-validate_config --> config_files : <<extend>>
+' Extend relationships  
+UC3 ..> UC2 : <<extend>>
+UC14 ..> UC3 : <<extend>>
+UC8 ..> UC11 : <<extend>>
 
-note right of sync_data : Auto-synced from GraphDB\nto .data/knowledge-export
-note right of access_graphology : Storage at .data/knowledge-graph
-note bottom of semantic_analysis : Implemented in\nmcp-server-semantic-analysis
+note right of UC1
+  Uses .env.ports file
+  Replaces deprecated 
+  shared-memory.json
+end note
+
+note right of UC4
+  Uses vkb command
+  for visualization
+end note
+
+note right of UC5
+  Uses coding command
+  for development tasks
+end note
+
+note right of UC6
+  Uses graph-sync
+  for database workflows
+end note
+
+note right of UC8
+  Graphology + LevelDB
+  storage backend
+end note
 
 @enduml
