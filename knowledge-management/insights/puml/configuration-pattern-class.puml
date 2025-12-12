@@ -1,123 +1,115 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
+package "ConfigurationPattern" {
     class ConfigurationPattern <<MCPAgent>> {
-        -environmentConfig: Map<String, String>
-        -projectConfig: ProjectConfig
-        -knowledgeGraph: GraphologyDB
-        -exportPath: String
-        +loadConfiguration(): void
-        +validateConfig(): boolean
-        +syncToExport(): void
-        +getConfigValue(key: String): String
-    }
-    
-    class KnowledgeStorage {
-        -graphDb: GraphologyDB
-        -levelDb: LevelDB
-        -dataPath: String
-        +storeEntity(entity: Object): void
-        +retrieveEntity(id: String): Object
-        +exportToJson(): void
-        +syncData(): void
-    }
-    
-    class GraphologyDB {
-        -graphInstance: Graph
-        -dbConnection: LevelDB
-        +addNode(node: Object): void
-        +addEdge(source: String, target: String): void
-        +query(pattern: String): Array
-        +persist(): void
+        +initialize()
+        +validate()
+        +synchronize()
     }
 }
 
-package "Unified Knowledge Base" {
-    class UKBUnified {
-        -patternRegistry: Map<String, Pattern>
-        -configManager: ConfigurationPattern
-        +registerPattern(pattern: Pattern): void
-        +getPattern(id: String): Pattern
-        +exportKnowledge(): void
+package "Knowledge Management" {
+    class GraphDatabaseService {
+        -storage: LevelDB
+        -graphEngine: Graphology
+        +query()
+        +store()
+        +sync()
     }
     
-    abstract class Pattern {
-        #id: String
-        #type: String
-        #metadata: Map<String, Object>
-        +abstract validate(): boolean
-        +export(): Object
+    class GraphKnowledgeExporter {
+        -exportPath: String
+        +exportToJson()
+        +autoSync()
+    }
+    
+    class GraphDatabaseAdapter {
+        +ensureConsistency()
+        +getConnection()
+        +executeQuery()
+    }
+}
+
+package "UKB Unified" {
+    class VkbApiClient {
+        +executeVkbCommand()
+        +visualizeGraph()
+    }
+    
+    class PersistenceAgent {
+        +saveState()
+        +loadState()
+        +manageTransactions()
     }
 }
 
 package "MCP Server Integration" {
-    class MCPServerSemanticAnalysis {
-        -configPattern: ConfigurationPattern
-        -analysisEngine: SemanticEngine
-        +analyzeCode(): AnalysisResult
-        +extractPatterns(): Array<Pattern>
-        +updateKnowledge(): void
+    class McpServerSemanticAnalysis {
+        -port: Integer
+        -gitSubmodule: String
+        +handleRaceConditions()
+        +processStatusOperations()
     }
     
-    class SemanticEngine {
-        -knowledgeBase: UKBUnified
-        +processSource(code: String): void
-        +identifyPatterns(): Array<Pattern>
-        +generateInsights(): InsightData
+    class CodeGraphRag {
+        +analyzeCode()
+        +buildGraph()
+        +provideContext()
     }
 }
 
-package "Data Layer" {
-    class LevelDB <<database>> {
-        -dbPath: String
-        -connection: Connection
-        +put(key: String, value: Object): void
-        +get(key: String): Object
-        +batch(operations: Array): void
-    }
-    
-    class JSONExporter {
-        -exportPath: String
-        -autoSync: boolean
-        +exportData(data: Object): void
-        +scheduleSync(): void
-        +validateExport(): boolean
-    }
-}
-
-package "Configuration Layer" {
+package "Configuration Management" {
     class EnvironmentConfig {
-        -envVars: Map<String, String>
-        +getVar(name: String): String
-        +validateRequired(): boolean
+        -envPortsFile: String
+        +loadEnvironmentVars()
+        +validatePorts()
     }
     
-    class ProjectConfig {
-        -configFile: String
-        -settings: Map<String, Object>
-        +loadFromFile(): void
-        +merge(envConfig: EnvironmentConfig): void
+    class CommandProcessor {
+        +executeVkbCommand()
+        +executeCodingCommand()
+        +executeGraphSync()
+    }
+}
+
+package "Data Storage" {
+    class LevelDBStorage <<file>> {
+        +read()
+        +write()
+        +compact()
+    }
+    
+    class JsonExporter <<file>> {
+        -exportPath: ".data/knowledge-export"
+        +exportData()
+        +ensureInteroperability()
     }
 }
 
 ' Relationships
-ConfigurationPattern --> KnowledgeStorage : manages
-ConfigurationPattern --> EnvironmentConfig : uses
-ConfigurationPattern --> ProjectConfig : uses
-KnowledgeStorage --> GraphologyDB : contains
-KnowledgeStorage --> JSONExporter : exports via
-GraphologyDB --> LevelDB : persists to
-UKBUnified --> ConfigurationPattern : configured by
-UKBUnified --> Pattern : contains
-MCPServerSemanticAnalysis --> ConfigurationPattern : uses
-MCPServerSemanticAnalysis --> SemanticEngine : delegates to
-SemanticEngine --> UKBUnified : updates
-ConfigurationPattern ..|> Pattern : implements
-ProjectConfig --> EnvironmentConfig : merges with
+ConfigurationPattern --> GraphDatabaseService
+ConfigurationPattern --> EnvironmentConfig
+ConfigurationPattern --> McpServerSemanticAnalysis
 
-note right of ConfigurationPattern : "Extracted from codebase analysis\nStored as reusable knowledge entity"
-note bottom of KnowledgeStorage : "Storage at .data/knowledge-graph\nExports to .data/knowledge-export"
-note top of LevelDB : "Replaced shared-memory.json\nPersistent graph storage"
+GraphDatabaseService --> LevelDBStorage
+GraphDatabaseService --> GraphDatabaseAdapter
+GraphKnowledgeExporter --> JsonExporter
+GraphDatabaseService --> GraphKnowledgeExporter
+
+VkbApiClient --> CommandProcessor
+PersistenceAgent --> LevelDBStorage
+
+McpServerSemanticAnalysis --> CodeGraphRag
+McpServerSemanticAnalysis --> EnvironmentConfig
+
+CommandProcessor ..> VkbApiClient
+GraphDatabaseAdapter ..> GraphDatabaseService
+
+' Notes
+note right of GraphDatabaseService : Uses Graphology + LevelDB\nat .data/knowledge-graph
+note right of McpServerSemanticAnalysis : Git submodules for\ncode-graph-rag functionality
+note right of EnvironmentConfig : Replaces deprecated\nshared-memory.json
+note right of JsonExporter : Auto-synchronized exports\nfor interoperability
 
 @enduml

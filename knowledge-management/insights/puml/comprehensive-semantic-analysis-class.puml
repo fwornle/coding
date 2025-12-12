@@ -1,126 +1,135 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-    class SemanticProcessor <<service>> {
-        -analysisEngine: AnalysisEngine
-        -contextManager: ContextManager
-        +processDocument(content: string): Analysis
-        +extractSemantics(text: string): SemanticData
-        +generateInsights(data: SemanticData): Insights
-    }
-    
-    class ContextManager {
-        -contextStore: Map
-        -sessionId: string
-        +createContext(id: string): Context
-        +updateContext(context: Context): void
-        +getContext(id: string): Context
-    }
-    
-    class AnalysisEngine {
-        -algorithms: Algorithm[]
-        -modelAdapter: ModelAdapter
-        +analyze(input: string): AnalysisResult
-        +configure(settings: Config): void
+package "MCP Agent Framework" {
+    abstract class MCPAgent <<agent>> {
+        +name: string
+        +version: string
+        +capabilities: string[]
+        +initialize(): void
+        +process(request: Request): Response
     }
 }
 
-package "UKB Unified Library" {
-    abstract class UnifiedKnowledgeBase {
-        #knowledgeStore: KnowledgeStore
-        #indexManager: IndexManager
-        +{abstract} query(terms: string[]): QueryResult
-        +{abstract} index(content: Content): void
+package "Semantic Analysis Core" {
+    class ComprehensiveSemanticAnalysis <<service>> {
+        -analysisEngine: AnalysisEngine
+        -knowledgeGraph: GraphologyAdapter
+        -contextProcessor: ContextProcessor
+        +analyzeText(input: string): AnalysisResult
+        +extractEntities(): Entity[]
+        +performDeepAnalysis(): SemanticResult
+        +updateKnowledge(): void
     }
     
-    class SemanticKnowledgeBase extends UnifiedKnowledgeBase {
-        -semanticIndex: SemanticIndex
-        -relationshipGraph: Graph
-        +query(terms: string[]): QueryResult
-        +index(content: Content): void
-        +findRelationships(entity: Entity): Relationship[]
+    class AnalysisEngine <<engine>> {
+        -nlpProcessor: NLPProcessor
+        -semanticRules: Rule[]
+        +processInput(text: string): ParsedResult
+        +applySemanticRules(): RuleResult
+        +generateInsights(): Insight[]
     }
     
-    class KnowledgeStore {
-        -storage: StorageAdapter
-        -metadata: MetadataManager
+    class ContextProcessor <<processor>> {
+        -contextMemory: Map
+        -relationshipExtractor: RelationshipExtractor
+        +buildContext(input: string): Context
+        +maintainContext(): void
+        +extractRelationships(): Relationship[]
+    }
+}
+
+package "Knowledge Management" <<folder>> {
+    class GraphologyAdapter <<adapter>> {
+        -graph: GraphologyInstance
+        -levelDbStore: LevelDBStore
+        +addNode(node: Node): void
+        +addEdge(edge: Edge): void
+        +queryGraph(query: GraphQuery): Result[]
+        +persistGraph(): void
+    }
+    
+    class LevelDBStore <<storage>> {
+        -dbPath: string
+        -connection: LevelDBConnection
         +store(key: string, value: any): void
         +retrieve(key: string): any
-        +search(criteria: SearchCriteria): SearchResult[]
+        +delete(key: string): void
+        +createIndex(): void
+    }
+    
+    class KnowledgeGraph <<domain>> {
+        -nodes: Node[]
+        -edges: Edge[]
+        -metadata: GraphMetadata
+        +buildGraph(): void
+        +updateGraph(): void
+        +searchGraph(criteria: SearchCriteria): Result[]
     }
 }
 
-package "MCP Server Integration" {
-    class ComprehensiveSemanticAnalysis <<MCPAgent>> {
-        -processor: SemanticProcessor
-        -knowledgeBase: SemanticKnowledgeBase
-        -mcpAdapter: MCPAdapter
-        +handleRequest(request: MCPRequest): MCPResponse
-        +performAnalysis(content: string): AnalysisReport
-        +initializeAgent(): void
+package "Integration Layer" {
+    class MCPServerSemanticAnalysis <<server>> {
+        -analysisService: ComprehensiveSemanticAnalysis
+        -requestHandler: RequestHandler
+        -responseFormatter: ResponseFormatter
+        +handleRequest(mcpRequest: MCPRequest): MCPResponse
+        +formatResponse(result: AnalysisResult): MCPResponse
     }
     
-    class MCPAdapter {
-        -serverConnection: Connection
-        -messageHandler: MessageHandler
-        +sendResponse(response: MCPResponse): void
-        +receiveRequest(): MCPRequest
-        +establishConnection(): void
+    class RequestHandler <<handler>> {
+        -validator: RequestValidator
+        -parser: RequestParser
+        +validateRequest(request: MCPRequest): boolean
+        +parseRequest(request: MCPRequest): ParsedRequest
     }
     
-    interface MCPAgent {
-        +handleRequest(request: MCPRequest): MCPResponse
-        +initializeAgent(): void
+    class ResponseFormatter <<formatter>> {
+        +formatAnalysisResult(result: AnalysisResult): FormattedResponse
+        +formatError(error: Error): ErrorResponse
     }
 }
 
-package "Core Types" {
-    class SemanticData {
-        +entities: Entity[]
-        +relationships: Relationship[]
-        +concepts: Concept[]
-        +confidence: number
-    }
-    
-    class AnalysisResult {
-        +semanticData: SemanticData
-        +insights: Insights
-        +metadata: Metadata
-        +timestamp: Date
-    }
-    
-    enum AnalysisType {
-        SEMANTIC
-        SYNTACTIC
-        CONTEXTUAL
-        COMPREHENSIVE
+package "Data Storage" {
+    class DataPath <<file>> {
+        +path: ".data/knowledge-graph"
+        +structure: "LevelDB + Graphology"
     }
 }
 
-' Relationships
-ComprehensiveSemanticAnalysis --|> MCPAgent
-ComprehensiveSemanticAnalysis --* SemanticProcessor
-ComprehensiveSemanticAnalysis --* SemanticKnowledgeBase
-ComprehensiveSemanticAnalysis --* MCPAdapter
+' Inheritance relationships
+MCPAgent <|-- ComprehensiveSemanticAnalysis
 
-SemanticProcessor --* ContextManager
-SemanticProcessor --* AnalysisEngine
-SemanticProcessor ..> SemanticData : creates
-SemanticProcessor ..> AnalysisResult : produces
+' Composition relationships
+ComprehensiveSemanticAnalysis *-- AnalysisEngine
+ComprehensiveSemanticAnalysis *-- ContextProcessor
+ComprehensiveSemanticAnalysis *-- GraphologyAdapter
 
-SemanticKnowledgeBase --* KnowledgeStore
-AnalysisEngine ..> AnalysisResult : generates
-AnalysisResult --* SemanticData
+GraphologyAdapter *-- LevelDBStore
+GraphologyAdapter *-- KnowledgeGraph
 
+MCPServerSemanticAnalysis *-- ComprehensiveSemanticAnalysis
+MCPServerSemanticAnalysis *-- RequestHandler
+MCPServerSemanticAnalysis *-- ResponseFormatter
+
+' Dependencies
+LevelDBStore ..> DataPath : stores data in
+GraphologyAdapter ..> KnowledgeGraph : manages
+AnalysisEngine ..> ContextProcessor : collaborates with
+
+' Notes
 note right of ComprehensiveSemanticAnalysis
-  Main MCP Agent implementation
+  Main semantic analysis agent
   Distributed across multiple modules:
   - src/knowledge-management
   - lib/ukb-unified  
-  - integrations/mcp-server-semantic-analysis/src
-  
-  Note: shared-memory.json removed from codebase
+  - integrations/mcp-server-semantic-analysis
+end note
+
+note bottom of DataPath
+  Replaced shared-memory.json
+  Uses Graphology + LevelDB
+  Located at .data/knowledge-graph
 end note
 
 @enduml

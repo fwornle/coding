@@ -1,62 +1,53 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management Infrastructure" {
-  component "NetworkAwareInstallationPattern" as NAIP <<core>>
-  
-  package "src/knowledge-management" {
-    component "KnowledgeManager" as KM <<core>>
-    component "PatternExtractor" as PE <<core>>
-  }
-  
-  package "lib/ukb-unified" {
-    component "UnifiedKnowledgeBase" as UKB <<core>>
-    component "GraphologyEngine" as GE <<core>>
-  }
-  
-  package "integrations/mcp-server-semantic-analysis/src" {
-    component "SemanticAnalysisServer" as SAS <<api>>
-    component "MCPInterface" as MCP <<api>>
-  }
+package "NetworkAwareInstallationPattern Architecture" {
+    
+    package "Knowledge Management" {
+        component "KnowledgeManager" <<core>> as KM
+        component "PatternExtractor" <<core>> as PE
+        database "Graphology" <<storage>> as Graph
+        database "LevelDB" <<storage>> as Level
+    }
+    
+    package "Data Storage" {
+        folder ".data/knowledge-graph" <<storage>> as KGStorage
+        folder ".data/knowledge-export" <<storage>> as KGExport
+        note right of KGExport : Auto-synced from GraphDB
+    }
+    
+    package "MCP Integration" {
+        component "MCPServerSemanticAnalysis" <<api>> as MCPSA
+        component "NetworkAwareInstallationPattern" <<agent>> as NAIP
+        component "UKBUnified" <<core>> as UKB
+    }
+    
+    package "Source Components" {
+        component "src/knowledge-management" <<core>> as SrcKM
+        component "lib/ukb-unified" <<core>> as LibUKB
+        component "integrations/mcp-server-semantic-analysis/src" <<core>> as IntMCP
+    }
+    
+    ' Relationships
+    KM --> Graph : stores patterns
+    KM --> Level : persistent storage
+    Graph --> KGStorage : writes to
+    KGStorage --> KGExport : syncs to
+    
+    PE --> KM : extracts to
+    NAIP --> MCPSA : implements
+    NAIP --> UKB : uses
+    
+    SrcKM --> KM : implements
+    LibUKB --> UKB : provides
+    IntMCP --> MCPSA : contains
+    
+    NAIP ..> PE : triggers analysis
+    PE ..> SrcKM : analyzes codebase
+    
+    note top of NAIP : Pattern extracted from\ncodebase analysis and stored\nas reusable knowledge entity
+    
+    note bottom of KGStorage : Replaces removed\nshared-memory.json
 }
-
-package "Data Storage Layer" {
-  package ".data/knowledge-graph" {
-    database "Graphology + LevelDB" as GraphDB <<storage>>
-  }
-  
-  package ".data/knowledge-export" {
-    database "JSON Exports" as JSONExport <<storage>>
-  }
-  
-  note right of JSONExport
-    Auto-synced from GraphDB
-    Replaces removed shared-memory.json
-  end note
-}
-
-' Relationships
-NAIP --> KM : implements
-NAIP --> UKB : implements
-NAIP --> SAS : implements
-
-KM --> PE : uses
-KM --> GraphDB : stores patterns
-
-UKB --> GE : uses
-GE --> GraphDB : reads/writes
-
-SAS --> MCP : exposes
-SAS --> GraphDB : queries
-
-GraphDB --> JSONExport : auto-sync
-
-PE --> GraphDB : extracts to
-
-note top of NAIP
-  Core pattern for network-aware installation
-  extracted from codebase analysis
-  Enables semantic analysis and knowledge management
-end note
 
 @enduml
