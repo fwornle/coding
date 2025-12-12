@@ -6,6 +6,7 @@ import healthStatusReducer from './slices/healthStatusSlice'
 import healthReportReducer from './slices/healthReportSlice'
 import autoHealingReducer from './slices/autoHealingSlice'
 import apiQuotaReducer from './slices/apiQuotaSlice'
+import ukbReducer from './slices/ukbSlice'
 
 // Import middleware
 import { healthRefreshMiddleware } from './middleware/healthRefreshMiddleware'
@@ -16,6 +17,7 @@ const rootReducer = combineReducers({
   healthReport: healthReportReducer,
   autoHealing: autoHealingReducer,
   apiQuota: apiQuotaReducer,
+  ukb: ukbReducer,
 })
 
 export type RootState = ReturnType<typeof rootReducer>

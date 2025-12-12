@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import cors from 'cors';
 import { spawn, execSync } from 'child_process';
 import { runIfMain } from '../../lib/utils/esm-cli.js';
+import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_REPO || join(__dirname, '../..');
@@ -94,6 +95,12 @@ class SystemHealthAPIServer {
         this.app.get('/api/health-verifier/api-quota', this.handleGetAPIQuota.bind(this));
         this.app.post('/api/health-verifier/verify', this.handleTriggerVerification.bind(this));
         this.app.post('/api/health-verifier/restart-service', this.handleRestartService.bind(this));
+
+        // UKB (Update Knowledge Base) process management endpoints
+        this.app.get('/api/ukb/status', this.handleGetUKBStatus.bind(this));
+        this.app.get('/api/ukb/processes', this.handleGetUKBProcesses.bind(this));
+        this.app.post('/api/ukb/cleanup', this.handleUKBCleanup.bind(this));
+        this.app.post('/api/ukb/start', this.handleStartUKBWorkflow.bind(this));
 
         // Error handling
         this.app.use(this.handleError.bind(this));
@@ -373,6 +380,105 @@ class SystemHealthAPIServer {
                 message: 'Failed to restart service',
                 error: error.message,
                 details: error.stack
+            });
+        }
+    }
+
+    /**
+     * Get UKB process status summary
+     */
+    async handleGetUKBStatus(req, res) {
+        try {
+            const ukbManager = new UKBProcessManager();
+            const summary = ukbManager.getStatusSummary();
+
+            res.json({
+                status: 'success',
+                data: {
+                    ...summary,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        } catch (error) {
+            console.error('Failed to get UKB status:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to retrieve UKB status',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get detailed UKB process list
+     */
+    async handleGetUKBProcesses(req, res) {
+        try {
+            const ukbManager = new UKBProcessManager();
+            const detailedStatus = ukbManager.getDetailedStatus();
+
+            res.json({
+                status: 'success',
+                data: detailedStatus
+            });
+        } catch (error) {
+            console.error('Failed to get UKB processes:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to retrieve UKB processes',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Cleanup stale/frozen UKB processes
+     */
+    async handleUKBCleanup(req, res) {
+        try {
+            const { dryRun = false } = req.body;
+            const ukbManager = new UKBProcessManager();
+            const cleaned = ukbManager.cleanupStaleProcesses(dryRun);
+
+            res.json({
+                status: 'success',
+                data: {
+                    dryRun,
+                    cleaned,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        } catch (error) {
+            console.error('Failed to cleanup UKB processes:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to cleanup UKB processes',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Start a new UKB workflow
+     */
+    async handleStartUKBWorkflow(req, res) {
+        try {
+            const { workflowName = 'complete-analysis', team = 'coding', repositoryPath } = req.body;
+            const repoPath = repositoryPath || codingRoot;
+
+            const ukbManager = new UKBProcessManager();
+            const result = await ukbManager.startWorkflow(workflowName, team, repoPath);
+
+            res.json({
+                status: 'success',
+                data: result
+            });
+        } catch (error) {
+            console.error('Failed to start UKB workflow:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to start UKB workflow',
+                error: error.message
             });
         }
     }

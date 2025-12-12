@@ -11,6 +11,7 @@ import path, { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { getTimeWindow, getShortTimeWindow } from './timezone-utils.js';
+import { UKBProcessManager } from './ukb-process-manager.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = process.env.CODING_REPO || join(__dirname, '..');
@@ -52,6 +53,7 @@ class CombinedStatusLine {
       const redirectStatus = await this.getRedirectStatus();
       const globalHealthStatus = await this.getGlobalHealthStatus();
       const healthVerifierStatus = await this.getHealthVerifierStatus();
+      const ukbStatus = this.getUKBStatus();
 
       // Robust transcript monitor health check and auto-restart
       await this.ensureTranscriptMonitorRunning();
@@ -59,7 +61,7 @@ class CombinedStatusLine {
       // Ensure statusline health monitor daemon is running (global singleton)
       await this.ensureStatuslineHealthMonitorRunning();
 
-      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus);
+      const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus, ukbStatus);
 
       this.statusCache = status;
       this.lastUpdate = now;
@@ -416,6 +418,30 @@ class CombinedStatusLine {
       return { status: 'operational', ...statusData };
     } catch (error) {
       return { status: 'error', error: error.message };
+    }
+  }
+
+  /**
+   * Get UKB (Update Knowledge Base) process status
+   * Shows running/stale/frozen 13-agent workflows
+   */
+  getUKBStatus() {
+    try {
+      const ukbManager = new UKBProcessManager();
+      const summary = ukbManager.getStatusSummary();
+
+      return {
+        status: summary.total > 0 ? 'active' : 'idle',
+        running: summary.running,
+        stale: summary.stale,
+        frozen: summary.frozen,
+        total: summary.total
+      };
+    } catch (error) {
+      if (process.env.DEBUG_STATUS) {
+        console.error(`DEBUG: UKB status check failed: ${error.message}`);
+      }
+      return { status: 'error', running: 0, stale: 0, frozen: 0, total: 0 };
     }
   }
 
@@ -1119,7 +1145,7 @@ class CombinedStatusLine {
     }
   }
 
-  async buildCombinedStatus(constraint, semantic, knowledge, liveLogTarget, redirectStatus, globalHealth, healthVerifier) {
+  async buildCombinedStatus(constraint, semantic, knowledge, liveLogTarget, redirectStatus, globalHealth, healthVerifier, ukbStatus) {
     const parts = [];
     let overallColor = 'green';
 
@@ -1286,6 +1312,26 @@ class CombinedStatusLine {
     } else {
       parts.push('[🏥💤]'); // Offline/not running
     }
+
+    // UKB (Update Knowledge Base) Process Status - shows 13-agent workflow activity
+    if (ukbStatus && ukbStatus.total > 0) {
+      // Active workflows running
+      let ukbPart = `[🧠`;
+      if (ukbStatus.running > 0) {
+        ukbPart += `${ukbStatus.running}⏳`;
+      }
+      if (ukbStatus.stale > 0) {
+        ukbPart += `${ukbStatus.stale}⚠️`;
+        if (overallColor === 'green') overallColor = 'yellow';
+      }
+      if (ukbStatus.frozen > 0) {
+        ukbPart += `${ukbStatus.frozen}🥶`;
+        overallColor = 'red';
+      }
+      ukbPart += ']';
+      parts.push(ukbPart);
+    }
+    // Don't show anything when no UKB processes are running (cleaner status line)
 
     // Add redirect indicator if active (compact)
     if (redirectStatus && redirectStatus.active) {
