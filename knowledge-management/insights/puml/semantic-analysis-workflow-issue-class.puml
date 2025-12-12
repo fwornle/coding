@@ -1,158 +1,132 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+package "MCP Server" {
+  class SemanticAnalysisWorkflowIssue <<MCPAgent>> {
+    -workflowId: string
+    -issueContext: object
+    -analysisState: AnalysisState
+    +processWorkflow(): Promise<void>
+    +generateSemanticAnalysis(): Promise<Analysis>
+    +coordinateAgents(): Promise<void>
+  }
+}
+
 package "Knowledge Management" {
-    class SemanticAnalysisWorkflowIssue <<entity>> {
-        -workflowId: string
-        -issueType: string
-        -semanticContext: Map
-        -analysisResults: AnalysisResult[]
-        +analyzeWorkflow(): void
-        +identifyIssues(): Issue[]
-        +generateRecommendations(): string[]
-    }
-    
-    class KnowledgeGraphManager <<service>> {
-        -graphologyInstance: Graphology
-        -levelDbAdapter: LevelDB
-        +storeEntity(entity: any): void
-        +queryGraph(query: string): any[]
-        +updateRelationships(): void
-        +exportToJson(): void
-    }
-    
-    class SemanticAnalyzer <<service>> {
-        -nlpProcessor: NLPProcessor
-        -contextExtractor: ContextExtractor
-        +processWorkflow(workflow: Workflow): AnalysisResult
-        +extractSemantics(content: string): SemanticData
-        +identifyPatterns(): Pattern[]
-    }
+  class KnowledgeGraph {
+    -graphInstance: Graphology
+    -storage: LevelDB
+    +addNode(data: NodeData): void
+    +addEdge(source: string, target: string): void
+    +query(pattern: string): QueryResult[]
+    +exportToJSON(): void
+  }
+  
+  class KnowledgeExporter {
+    -exportPath: string
+    -autoSync: boolean
+    +syncFromGraphDB(): Promise<void>
+    +exportJSON(): Promise<void>
+  }
 }
 
-package "UKB Unified Library" {
-    abstract class BaseWorkflowProcessor {
-        #workflowData: WorkflowData
-        #analysisConfig: Config
-        +{abstract} process(): ProcessResult
-        +{abstract} validate(): boolean
-    }
-    
-    class WorkflowIssueProcessor extends BaseWorkflowProcessor {
-        -issueDetectionRules: Rule[]
-        -semanticMatcher: SemanticMatcher
-        +process(): ProcessResult
-        +validate(): boolean
-        +detectSemanticIssues(): Issue[]
-    }
-    
-    interface ISemanticProvider {
-        +provideSemantics(input: string): SemanticData
-        +updateContext(context: Context): void
-    }
-    
-    class UnifiedSemanticProvider implements ISemanticProvider {
-        -providers: SemanticProvider[]
-        -aggregator: ResultAggregator
-        +provideSemantics(input: string): SemanticData
-        +updateContext(context: Context): void
-        +aggregateResults(): AggregatedResult
-    }
+package "Multi-Agent Architecture" {
+  abstract class BaseAgent {
+    #agentId: string
+    #status: AgentStatus
+    +abstract execute(): Promise<AgentResult>
+    +reportStatus(): AgentStatus
+  }
+
+  class GitHistoryAgent <<service>> {
+    -repositoryPath: string
+    +analyzeCommitHistory(): Promise<CommitAnalysis>
+    +extractCodeChanges(): Promise<ChangeSet[]>
+  }
+
+  class VibeHistoryAgent <<service>> {
+    -contextWindow: number
+    +analyzeProjectVibe(): Promise<VibeAnalysis>
+    +detectPatterns(): Promise<Pattern[]>
+  }
+
+  class ObservationGenerationAgent <<service>> {
+    -observationRules: Rule[]
+    +generateObservations(): Promise<Observation[]>
+    +validateObservations(): Promise<ValidationResult>
+  }
+
+  class InsightGenerationAgent <<service>> {
+    -insightEngine: InsightEngine
+    +synthesizeInsights(): Promise<Insight[]>
+    +rankInsightsByRelevance(): Promise<RankedInsight[]>
+  }
+
+  class ContentValidationAgent <<service>> {
+    -validationCriteria: Criteria[]
+    +validateContent(): Promise<ValidationReport>
+    +suggestImprovements(): Promise<Improvement[]>
+  }
+
+  class QualityAssuranceAgent <<service>> {
+    -qualityMetrics: Metric[]
+    +assessQuality(): Promise<QualityReport>
+    +enforceStandards(): Promise<ComplianceResult>
+  }
 }
 
-package "MCP Server Integration" {
-    class MCPSemanticAnalysisServer <<service>> {
-        -serverInstance: MCPServer
-        -analysisHandlers: Handler[]
-        +startServer(): void
-        +handleAnalysisRequest(request: Request): Response
-        +registerHandlers(): void
-    }
-    
-    class SemanticAnalysisHandler <<handler>> {
-        -workflowProcessor: WorkflowIssueProcessor
-        -responseFormatter: ResponseFormatter
-        +handleRequest(request: AnalysisRequest): AnalysisResponse
-        +formatResponse(result: ProcessResult): Response
-    }
+package "Storage Layer" {
+  class GraphologyAdapter {
+    -graph: Graphology
+    +createNode(): Node
+    +createEdge(): Edge
+    +traverse(): Iterator
+  }
+
+  class LevelDBAdapter {
+    -dbPath: string
+    +put(key: string, value: any): Promise<void>
+    +get(key: string): Promise<any>
+    +batch(): Promise<void>
+  }
+
+  class JSONExportStore <<file>> {
+    -exportDirectory: string
+    +writeExport(data: object): Promise<void>
+    +readExport(): Promise<object>
+  }
 }
 
-package "Data Storage" {
-    class GraphDatabase <<database>> {
-        -graphologyEngine: Graphology
-        -persistenceLayer: LevelDB
-        -dataPath: string = ".data/knowledge-graph"
-        +connect(): void
-        +store(data: GraphData): void
-        +query(cypher: string): ResultSet
-        +exportSnapshot(): void
-    }
-    
-    class JSONExporter <<service>> {
-        -exportPath: string = ".data/knowledge-export"
-        -syncScheduler: Scheduler
-        +exportFromGraph(graph: GraphData): void
-        +scheduleAutoSync(): void
-        +syncToFileSystem(): void
-    }
-    
-    class LevelDBAdapter <<adapter>> {
-        -dbInstance: LevelDB
-        -serializer: DataSerializer
-        +put(key: string, value: any): void
-        +get(key: string): any
-        +batch(operations: Operation[]): void
-    }
-}
-
-package "Core Models" {
-    class Workflow {
-        -id: string
-        -steps: WorkflowStep[]
-        -metadata: Metadata
-        +execute(): ExecutionResult
-        +validate(): ValidationResult
-    }
-    
-    class AnalysisResult {
-        -workflowId: string
-        -issues: Issue[]
-        -recommendations: Recommendation[]
-        -confidence: number
-        +toJson(): string
-        +merge(other: AnalysisResult): AnalysisResult
-    }
-    
-    enum IssueType {
-        SEMANTIC_AMBIGUITY
-        WORKFLOW_INCONSISTENCY
-        CONTEXT_MISMATCH
-        DEPENDENCY_CONFLICT
-    }
+package "Unified Knowledge Base" {
+  class UKBUnified {
+    -knowledgeGraph: KnowledgeGraph
+    -agents: BaseAgent[]
+    +integrateAgentResults(): Promise<void>
+    +queryUnifiedKnowledge(): Promise<KnowledgeResult>
+  }
 }
 
 ' Relationships
-SemanticAnalysisWorkflowIssue --> KnowledgeGraphManager : uses
-SemanticAnalysisWorkflowIssue --> SemanticAnalyzer : analyzes_with
-SemanticAnalysisWorkflowIssue --> AnalysisResult : produces
-SemanticAnalysisWorkflowIssue --> IssueType : categorizes
+SemanticAnalysisWorkflowIssue --> UKBUnified : coordinates
+SemanticAnalysisWorkflowIssue --> BaseAgent : manages
+UKBUnified --> KnowledgeGraph : uses
+KnowledgeGraph --> GraphologyAdapter : delegates to
+KnowledgeGraph --> LevelDBAdapter : persists with
+KnowledgeExporter --> JSONExportStore : exports to
+KnowledgeExporter --> KnowledgeGraph : syncs from
 
-WorkflowIssueProcessor --> SemanticAnalysisWorkflowIssue : processes
-UnifiedSemanticProvider --> SemanticAnalyzer : provides_to
+BaseAgent <|-- GitHistoryAgent
+BaseAgent <|-- VibeHistoryAgent  
+BaseAgent <|-- ObservationGenerationAgent
+BaseAgent <|-- InsightGenerationAgent
+BaseAgent <|-- ContentValidationAgent
+BaseAgent <|-- QualityAssuranceAgent
 
-MCPSemanticAnalysisServer --> SemanticAnalysisHandler : contains
-SemanticAnalysisHandler --> WorkflowIssueProcessor : delegates_to
-
-KnowledgeGraphManager --> GraphDatabase : manages
-GraphDatabase --> LevelDBAdapter : persists_with
-GraphDatabase --> JSONExporter : exports_via
-JSONExporter ..> GraphDatabase : auto_sync
-
-SemanticAnalyzer --> Workflow : analyzes
-AnalysisResult --> IssueType : contains
-
-note right of GraphDatabase : "Replaces shared-memory.json\nwith persistent graph storage"
-
-note bottom of JSONExporter : "Auto-synced exports for\nbackward compatibility"
+GitHistoryAgent --> KnowledgeGraph : feeds data
+VibeHistoryAgent --> KnowledgeGraph : feeds data
+ObservationGenerationAgent --> KnowledgeGraph : feeds data
+InsightGenerationAgent --> KnowledgeGraph : feeds data
+ContentValidationAgent --> KnowledgeGraph : feeds data
+QualityAssuranceAgent --> KnowledgeGraph : feeds data
 
 @enduml

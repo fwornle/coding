@@ -1,67 +1,84 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor "Knowledge Manager" as KM
-actor "Developer" as DEV
-actor "MCP Client" as MCP
-actor "External System" as EXT
+actor "Developer" as dev
+actor "MCP Client" as client
+actor "System Administrator" as admin
 
-rectangle "Knowledge Management System" {
-  usecase "Create Semantic Analysis" as UC1
-  usecase "Execute Workflow" as UC2
-  usecase "Store Knowledge Graph" as UC3
-  usecase "Query Graph Database" as UC4
-  usecase "Export Knowledge" as UC5
-  usecase "Manage Graph Nodes" as UC6
-  usecase "Handle Relationships" as UC7
+package "Semantic Analysis System" {
+  usecase "Analyze Code Semantics" as analyze
+  usecase "Generate Insights" as insights
+  usecase "Validate Content" as validate
+  usecase "Export Knowledge" as export
+  usecase "Store Graph Data" as store
+  usecase "Query Knowledge Graph" as query
+  usecase "Track Git History" as git_history
+  usecase "Monitor Vibe Changes" as vibe_history
+  usecase "Generate Observations" as observations
+  usecase "Quality Assurance" as qa
 }
 
-rectangle "Data Storage Layer" {
-  usecase "Write to Graphology" as UC8
-  usecase "Persist with LevelDB" as UC9
-  usecase "Auto-sync Exports" as UC10
-  usecase "Generate JSON Output" as UC11
+package "Agent Workflows" {
+  usecase "Git History Analysis" as git_agent
+  usecase "Vibe History Analysis" as vibe_agent  
+  usecase "Observation Generation" as obs_agent
+  usecase "Insight Generation" as insight_agent
+  usecase "Content Validation" as content_agent
+  usecase "Quality Assurance Check" as qa_agent
 }
 
-rectangle "Integration Layer" {
-  usecase "Serve MCP Protocol" as UC12
-  usecase "Handle External Requests" as UC13
-  usecase "Process Semantic Queries" as UC14
+package "Storage Management" {
+  usecase "Manage GraphDB" as graphdb
+  usecase "Sync to JSON Export" as json_sync
+  usecase "LevelDB Operations" as leveldb
 }
 
-rectangle "Workflow Processing" {
-  usecase "Analyze Semantic Issues" as UC15
-  usecase "Track Workflow State" as UC16
-  usecase "Validate Data Integrity" as UC17
-}
+' Actor relationships
+dev --> analyze
+dev --> insights
+dev --> query
+client --> analyze
+client --> export
+admin --> store
+admin --> graphdb
 
-KM --> UC1
-KM --> UC2
-KM --> UC5
-KM --> UC6
+' Use case relationships
+analyze ..> git_history : <<include>>
+analyze ..> vibe_history : <<include>>
+analyze ..> observations : <<include>>
 
-DEV --> UC4
-DEV --> UC15
-DEV --> UC17
+insights ..> insight_agent : <<include>>
+validate ..> content_agent : <<include>>
+qa ..> qa_agent : <<include>>
 
-MCP --> UC12
-MCP --> UC14
+store ..> graphdb : <<include>>
+store ..> leveldb : <<include>>
+export ..> json_sync : <<include>>
 
-EXT --> UC13
+git_history --> git_agent
+vibe_history --> vibe_agent
+observations --> obs_agent
+insights --> insight_agent
+validate --> content_agent
+qa --> qa_agent
 
-UC1 ..> UC15 : <<include>>
-UC2 ..> UC16 : <<include>>
-UC3 ..> UC8 : <<include>>
-UC8 ..> UC9 : <<include>>
-UC5 ..> UC10 : <<include>>
-UC10 ..> UC11 : <<include>>
-UC4 ..> UC7 : <<include>>
-UC12 ..> UC14 : <<include>>
-UC6 ..> UC3 : <<extend>>
-UC7 ..> UC3 : <<extend>>
+graphdb --> leveldb
+json_sync --> graphdb : "auto-sync"
 
-note right of UC8 : "Uses Graphology + LevelDB\nat .data/knowledge-graph"
-note right of UC11 : "Exports to .data/knowledge-export\n(auto-synced from GraphDB)"
-note top of UC15 : "Implemented across:\nsrc/knowledge-management\nlib/ukb-unified\nintegrations/mcp-server-semantic-analysis"
+note right of export
+  JSON exports at 
+  .data/knowledge-export
+  (auto-synced from GraphDB)
+end note
+
+note right of store
+  Uses Graphology + LevelDB
+  at .data/knowledge-graph
+end note
+
+note bottom of "Agent Workflows"
+  Multi-agent architecture with
+  specialized workflow agents
+end note
 
 @enduml
