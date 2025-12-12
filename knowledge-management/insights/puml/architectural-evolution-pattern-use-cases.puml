@@ -1,62 +1,53 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+left to right direction
+
 actor "Developer" as dev
 actor "System Administrator" as admin
-actor "External System" as ext
+actor "External API" as api
 
-package "Knowledge Management" {
-    usecase "Manage Domain Logic" as manage_domain
-    usecase "Perform Semantic Analysis" as semantic_analysis
-    usecase "Execute Batch Processing" as batch_process
-    usecase "Track Content Changes" as track_changes
+rectangle "Knowledge Management System" {
+  usecase "Manage Graph Database" as manage_db
+  usecase "Visualize Knowledge Graph" as visualize
+  usecase "Develop and Code" as develop
+  usecase "Synchronize Data" as sync
+  usecase "Export Knowledge" as export
+  usecase "Query Graph Data" as query
+  usecase "Store Graph Data" as store
+  usecase "Integrate External Services" as integrate
 }
 
-package "Data Operations" {
-    usecase "Store Graph Data" as store_graph
-    usecase "Export Knowledge" as export_knowledge
-    usecase "Synchronize Data" as sync_data
-    usecase "Persist Knowledge" as persist_knowledge
+rectangle "Core Components" {
+  usecase "GraphDatabaseService" as gdb_service
+  usecase "GraphKnowledgeExporter" as exporter
+  usecase "VkbApiClient" as api_client
 }
 
-package "Command Interface" {
-    usecase "Visualize Knowledge (vkb)" as visualize
-    usecase "Execute Development Tasks" as dev_tasks
-    usecase "Sync Graph Data" as graph_sync
-}
+dev --> visualize : uses vkb command
+dev --> develop : uses coding command
+admin --> sync : uses graph-sync command
+admin --> manage_db
 
-package "Integration Services" {
-    usecase "Connect External APIs" as external_api
-    usecase "Manage MCP Server" as mcp_server
-}
+manage_db ..> gdb_service : <<include>>
+export ..> exporter : <<include>>
+integrate ..> api_client : <<include>>
 
-' Actor relationships
-dev --> visualize
-dev --> dev_tasks
-dev --> manage_domain
-dev --> semantic_analysis
+gdb_service --> store
+gdb_service --> query
+exporter --> export
+api_client --> integrate
 
-admin --> graph_sync
-admin --> sync_data
-admin --> export_knowledge
+manage_db --> store : stores at .data/knowledge-graph
+export --> sync : auto-sync to .data/knowledge-export
+integrate --> api : communicates with
 
-ext --> external_api
-ext --> mcp_server
+visualize --> query
+develop --> query
+sync --> store
 
-' Use case relationships
-semantic_analysis ..> batch_process : <<include>>
-manage_domain ..> track_changes : <<include>>
-store_graph ..> persist_knowledge : <<include>>
-export_knowledge ..> sync_data : <<extend>>
-
-visualize --> store_graph
-dev_tasks --> manage_domain
-graph_sync --> sync_data
-semantic_analysis --> store_graph
-external_api --> persist_knowledge
-
-note right of semantic_analysis : "Parallel worker implementation\nwith incremental constraints"
-note bottom of store_graph : "Graphology + LevelDB\nat .data/knowledge-graph"
-note right of export_knowledge : "Auto-synchronized JSON\nat .data/knowledge-export"
+note right of manage_db : Uses Graphology + LevelDB
+note right of export : Auto-synchronizes JSON exports
+note right of integrate : Component-based architecture
 
 @enduml

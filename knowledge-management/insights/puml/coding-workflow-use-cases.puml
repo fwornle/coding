@@ -3,62 +3,50 @@
 
 left to right direction
 
-actor "Developer" as dev
-actor "MCP Client" as mcp
-actor "System" as sys
+actor "Developer" as DEV
+actor "MCP Client" as MCP
+actor "System Scheduler" as SYS
 
-rectangle "Knowledge Management" {
-    usecase "Store Knowledge" as store
-    usecase "Query Knowledge Graph" as query
-    usecase "Export Knowledge" as export
-    usecase "Sync Data" as sync
+rectangle "Knowledge Management System" {
+  usecase "Execute Workflow" as UC1
+  usecase "Incremental Analysis" as UC2
+  usecase "Store Knowledge Graph" as UC3
+  usecase "Export JSON Data" as UC4
+  usecase "Semantic Analysis" as UC5
 }
 
-rectangle "Semantic Analysis" {
-    usecase "Execute Workflow" as execute
-    usecase "Analyze Code" as analyze
-    usecase "Generate Insights" as insights
-    usecase "Incremental Analysis" as incremental
+rectangle "Data Storage" {
+  usecase "Manage Graphology DB" as UC6
+  usecase "Persist to LevelDB" as UC7
+  usecase "Auto-sync Exports" as UC8
 }
 
-rectangle "Data Persistence" {
-    usecase "Persist to LevelDB" as leveldb
-    usecase "Manage Graph Data" as graphdata
-    usecase "Auto-sync Exports" as autosync
+rectangle "CodingWorkflow Components" {
+  usecase "Process Code Files" as UC9
+  usecase "Generate Insights" as UC10
+  usecase "Update Knowledge Base" as UC11
 }
 
-dev --> execute : triggers via MCP tools
-mcp --> execute : execute_workflow
-sys --> incremental : automatic trigger
+DEV --> UC1 : triggers via MCP tools
+MCP --> UC1 : execute_workflow command
+SYS --> UC2 : automatic trigger
 
-execute ..> analyze : <<include>>
-execute ..> store : <<include>>
-analyze --> insights : generates
-analyze --> query : accesses
+UC1 --> UC5 : <<include>>
+UC2 --> UC5 : <<include>>
+UC5 --> UC9 : <<include>>
+UC5 --> UC10 : <<include>>
 
-store --> leveldb : persists to
-store --> graphdata : manages via Graphology
-query --> graphdata : reads from
+UC9 --> UC3 : <<include>>
+UC10 --> UC11 : <<include>>
+UC11 --> UC3 : <<include>>
 
-export --> autosync : triggers
-autosync --> sync : performs
-sync --> graphdata : syncs from GraphDB
+UC3 --> UC6 : <<include>>
+UC6 --> UC7 : <<include>>
+UC3 --> UC4 : <<extend>>
+UC4 --> UC8 : <<include>>
 
-note right of execute
-  Implemented across:
-  - src/knowledge-management
-  - lib/ukb-unified  
-  - integrations/mcp-server-semantic-analysis/src
-end note
-
-note bottom of graphdata
-  Storage: .data/knowledge-graph
-  Uses: Graphology + LevelDB
-end note
-
-note bottom of export
-  Location: .data/knowledge-export
-  Auto-synced from GraphDB
-end note
+note right of UC3 : "Stored at .data/knowledge-graph\nUsing Graphology + LevelDB"
+note right of UC4 : "Exported to .data/knowledge-export\nAuto-synced from GraphDB"
+note top of UC1 : "shared-memory.json REMOVED\nfrom codebase"
 
 @enduml

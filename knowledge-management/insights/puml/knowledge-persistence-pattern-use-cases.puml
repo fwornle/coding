@@ -1,54 +1,35 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title Knowledge Persistence Pattern - Use Cases
+actor System as "System"
+actor User as "User"
 
-actor "Developer" as dev
-actor "System" as sys
-actor "Knowledge Manager" as km
-actor "MCP Server" as mcp
+package "Knowledge Persistence Pattern" {
+  usecase "Store Knowledge" as Store
+  usecase "Retrieve Knowledge" as Retrieve
+  usecase "Export JSON" as Export
+  usecase "Sync JSON" as Sync
 
-package "Knowledge Management" {
-  usecase "Store Knowledge Entity" as store
-  usecase "Export to JSON" as export
-  usecase "Query Knowledge Graph" as query
-  usecase "Persist to LevelDB" as persist
-  usecase "Load from GraphDB" as load
-  usecase "Sync Data" as sync
+  component GraphDatabaseService as "Graph DB Service"
+  component GraphKnowledgeExporter as "Graph Exporter"
+  component PersistenceAgent as "Persistence Agent"
+
+  GraphDatabaseService --> Store : interacts
+  GraphDatabaseService --> Retrieve : interacts
+  GraphKnowledgeExporter --> Export : triggers
+  PersistenceAgent --> Store : persists
+
+  Store --> Export : triggers
+  Export --> Sync : triggers
 }
 
-package "Graph Database Operations" {
-  usecase "Maintain In-Memory Graph" as memory
-  usecase "Handle Entity Events" as events
-  usecase "Auto-Export on Storage" as autoexport
-}
+System --> Store
+User --> Retrieve
 
-package "File System Operations" {
-  usecase "Write to .data/knowledge-graph" as writedb
-  usecase "Write to .data/knowledge-export" as writejson
-  usecase "Remove shared-memory.json" as cleanup
-}
+note "Environment Variables" as envNote
+envNote --> GraphDatabaseService : configures
 
-dev --> store : creates knowledge
-dev --> query : retrieves data
-km --> export : manual export
-sys --> events : triggers entity:stored
-mcp --> load : semantic analysis
-
-store --> persist : includes
-store --> events : triggers
-events --> autoexport : includes
-autoexport --> export : extends
-export --> writejson : includes
-persist --> writedb : includes
-memory --> persist : includes
-query --> memory : includes
-load --> memory : includes
-sync --> export : includes
-
-note right of autoexport : Listens to entity:stored events
-note bottom of writedb : Graphology + LevelDB storage
-note bottom of writejson : Auto-synced from GraphDB
-note top of cleanup : Legacy file removed from codebase
+note "Entity Events" as entity Events
+entity Events --> Export : triggers
 
 @enduml

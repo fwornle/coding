@@ -1,107 +1,67 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" <<system>> {
-    abstract class Component <<interface>> {
-        +operation(): void
-    }
-    
-    class ConcreteComponent <<core>> {
-        +operation(): void
-        -data: any
-    }
-    
-    abstract class Decorator <<pattern>> {
-        -component: Component
-        +operation(): void
-        +setComponent(component: Component): void
-    }
-    
-    class SemanticAnalysisDecorator <<decorator>> {
-        +operation(): void
-        +analyzeSemantics(): void
-        -analysisEngine: AnalysisEngine
-    }
-    
-    class KnowledgeStorageDecorator <<decorator>> {
-        +operation(): void
-        +storeKnowledge(): void
-        -graphDatabase: GraphDatabase
-    }
-    
-    class ExportDecorator <<decorator>> {
-        +operation(): void
-        +exportToJson(): void
-        -exportPath: string
-    }
+package "Knowledge Management" {
+  class GraphDatabaseService <<service>> {
+    - graphDatabase: GraphDatabase
+    + syncGraphDatabase()
+    + queryGraphDatabase()
+  }
+
+  class GraphDatabaseAdapter <<interface>> {
+    + adaptGraphDatabase()
+  }
+
+  class KnowledgeGraph <<file>> {
+    - graphData: GraphData
+  }
+
+  GraphDatabaseService --* GraphDatabaseAdapter
+  GraphDatabaseAdapter ..> GraphDatabase
+  GraphDatabaseService --* KnowledgeGraph
 }
 
-package "Storage Layer" <<infrastructure>> {
-    class GraphDatabase <<database>> {
-        +store(data: any): void
-        +query(pattern: string): any[]
-        +getGraph(): Graph
-        -graphology: Graphology
-        -levelDB: LevelDB
-    }
-    
-    class Graphology <<library>> {
-        +addNode(id: string): void
-        +addEdge(source: string, target: string): void
-        +export(): object
-    }
-    
-    class LevelDB <<storage>> {
-        +put(key: string, value: any): void
-        +get(key: string): any
-        +createReadStream(): Stream
-    }
-    
-    class JsonExporter <<service>> {
-        +export(graph: Graph): void
-        +autoSync(): void
-        -exportDirectory: string
-    }
+package "MCP Agent" {
+  class MCPAgent <<service>> {
+    - mcpTools: MCPTools
+    + performKnowledgeOperations()
+  }
+
+  class MCPTools <<interface>> {
+    + executeMCPCommand()
+  }
+
+  MCPAgent --* MCPTools
 }
 
-package "Integration Layer" <<service>> {
-    class McpSemanticServer <<server>> {
-        +processRequest(request: any): any
-        +initializeDecorators(): void
-        -decoratorChain: Decorator[]
-    }
-    
-    class UkbUnifiedLib <<library>> {
-        +createDecoratorChain(): Decorator[]
-        +configureComponents(): void
-    }
+package "Decorator Pattern" {
+  abstract class DecoratorPattern <<stereotype>> {
+    + decorate()
+  }
+
+  class SemanticAnalysisDecorator {
+    - decoratorPattern: DecoratorPattern
+    + analyzeSemantics()
+  }
+
+  DecoratorPattern <|-- SemanticAnalysisDecorator
 }
 
-' Decorator Pattern Relationships
-Component <|-- ConcreteComponent
-Component <|-- Decorator
-Decorator <|-- SemanticAnalysisDecorator
-Decorator <|-- KnowledgeStorageDecorator
-Decorator <|-- ExportDecorator
+package "Visualization" {
+  class VKBCommand <<interface>> {
+    + visualizeGraph()
+  }
 
-Decorator o-- Component : decorates
+  class GraphSyncCommand <<interface>> {
+    + syncGraphDatabase()
+  }
 
-' Storage Relationships
-GraphDatabase *-- Graphology
-GraphDatabase *-- LevelDB
-KnowledgeStorageDecorator --> GraphDatabase : uses
-ExportDecorator --> JsonExporter : uses
-JsonExporter --> GraphDatabase : reads from
+  VKBCommand ..> GraphDatabase
+  GraphSyncCommand ..> GraphDatabase
+}
 
-' Integration Relationships
-McpSemanticServer --> Decorator : manages
-UkbUnifiedLib --> Decorator : creates
-SemanticAnalysisDecorator --> McpSemanticServer : integrates with
-
-' Annotations
-note right of Decorator : "Core decorator pattern\nimplementation"
-note bottom of GraphDatabase : "Located at:\n.data/knowledge-graph"
-note bottom of JsonExporter : "Auto-synced exports at:\n.data/knowledge-export"
-note top of McpSemanticServer : "MCP server for\nsemantic analysis"
+GraphDatabaseService --* MCPAgent
+MCPAgent --* DecoratorPattern
+DecoratorPattern --* KnowledgeGraph
 
 @enduml

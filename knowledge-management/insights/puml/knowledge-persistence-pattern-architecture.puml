@@ -1,54 +1,28 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management Infrastructure" {
-    package "src/knowledge-management" {
-        component "GraphDatabaseService" <<core>> as GDS
-        component "EntityStorageSystem" <<core>> as ESS
-    }
-    
-    package "lib/ukb-unified" {
-        component "PersistenceAgent" <<agent>> as PA
-        component "KnowledgeUnificationLayer" <<core>> as KUL
-    }
-    
-    package "integrations/mcp-server-semantic-analysis/src" {
-        component "GraphKnowledgeExporter" <<core>> as GKE
-        component "SemanticAnalysisServer" <<api>> as SAS
-    }
+package "Knowledge Persistence Pattern" {
+  component GraphDatabase as "Graph Database <<storage>>" 
+  component LevelDB as "LevelDB <<storage>>"
+  component GraphDatabaseService as "Graph Database Service <<core>>"
+  component GraphKnowledgeExporter as "Graph Knowledge Exporter <<agent>>"
+  component PersistenceAgent as "Persistence Agent <<agent>>"
+
+  note as AutoNote1
+  Provides scalable and maintainable solution for knowledge storage and retrieval
+
+  end note
+  GraphDatabaseService --* GraphDatabase : interacts with
+  GraphKnowledgeExporter --* GraphDatabase : exports from
+  PersistenceAgent --* GraphDatabase : persists to
+  GraphKnowledgeExporter --* PersistenceAgent : triggers auto-export
+  GraphDatabaseService --* GraphKnowledgeExporter : configures
+  GraphDatabaseService --* PersistenceAgent : configures
 }
 
-package "Storage Layer" {
-    database "Graphology\n(In-Memory Graph)" <<storage>> as GRAPH
-    database "LevelDB\n(.data/knowledge-graph)" <<storage>> as LEVELDB
-    folder "JSON Exports\n(.data/knowledge-export)" <<storage>> as JSON_EXPORT
+package "File System" {
+  component knowledge_export_directory as ".data/knowledge-export <<storage>>"
+  GraphKnowledgeExporter --* knowledge_export_directory : exports to
 }
-
-package "Event System" {
-    queue "entity:stored events" <<event>> as EVENTS
-}
-
-' Relationships
-GDS --> GRAPH : manages
-GDS --> LEVELDB : persists to
-ESS --> EVENTS : emits
-EVENTS --> GKE : triggers
-GKE --> JSON_EXPORT : auto-exports
-PA --> GDS : coordinates
-KUL --> PA : utilizes
-SAS --> GKE : integrates
-
-note top of GRAPH
-KnowledgePersistencePattern: 
-Hybrid architecture using Graphology 
-for fast in-memory operations with 
-LevelDB for durable persistence
-end note
-
-note bottom of JSON_EXPORT
-Auto-synced JSON exports 
-provide external access 
-to graph database content
-end note
 
 @enduml

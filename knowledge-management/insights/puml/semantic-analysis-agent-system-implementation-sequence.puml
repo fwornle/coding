@@ -1,77 +1,39 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "CLI User" as User
-participant "VKB Command" as VKB
-participant "Graph-Sync Command" as Sync
-participant "MCP Server" as MCP
-participant "Semantic Analysis Agent" as Agent
-participant "Parallel Worker Pool" as Workers
-participant "GraphDatabaseService" as GDS
-participant "GraphDatabaseAdapter" as GDA
-participant "GraphKnowledgeExporter" as GKE
-participant "Graphology + LevelDB" as Storage
-participant "Knowledge Export\n(.data/knowledge-export)" as Export
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphDatabaseAdapter as "Graph Database Adapter"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant vkb as "vkb Command"
+participant graph-sync as "graph-sync Command"
+participant MCP_server as "MCP Server"
+participant LevelDB as "LevelDB Storage"
+participant JSON_Export as "JSON Export"
 
-note over Storage : Primary storage at\n.data/knowledge-graph
-note over Export : Auto-synchronized JSON exports\nreplaces shared-memory.json
+note over GraphDatabaseService: Initialization
+GraphDatabaseService ->> LevelDB: Initialize Graph Storage
+GraphDatabaseAdapter ->> LevelDB: Configure Storage Adapter
+GraphKnowledgeExporter ->> LevelDB: Register Exporter
 
-User -> VKB : vkb visualization request
-activate VKB
-VKB -> GDS : query graph data
-activate GDS
-GDS -> GDA : fetch graph structure
-activate GDA
-GDA -> Storage : read from LevelDB
-Storage -> GDA : return graph data
-GDA -> GDS : structured data
-GDS -> VKB : visualization data
-VKB -> User : display visualization
+vkb ->> GraphDatabaseService: Request Visualization
+graph-sync ->> GraphDatabaseService: Request Synchronization
 
-User -> Sync : graph-sync command
-activate Sync
-Sync -> GDS : synchronization request
-GDS -> GKE : trigger export
-activate GKE
-GKE -> Storage : read latest graph state
-Storage -> GKE : current graph data
-GKE -> Export : write JSON exports
-GKE -> Sync : sync complete
-deactivate GKE
-Sync -> User : sync confirmation
-deactivate Sync
+GraphDatabaseService ->> GraphDatabaseAdapter: Fetch Graph Data
+GraphDatabaseAdapter ->> LevelDB: Retrieve Data
+LevelDB ->> GraphDatabaseAdapter: Return Data
+GraphDatabaseAdapter ->> GraphDatabaseService: Return Fetched Data
 
-MCP -> Agent : semantic analysis request
-activate Agent
-alt batch mode processing
-    Agent -> Workers : distribute batch tasks
-    activate Workers
-    loop for each batch item
-        Workers -> GDS : process semantic data
-        GDS -> GDA : update graph
-        GDA -> Storage : persist changes
-    end
-    Workers -> Agent : batch results
-    deactivate Workers
-else single item processing
-    Agent -> GDS : process single item
-    GDS -> GDA : update graph
-    GDA -> Storage : persist changes
-end
+GraphDatabaseService ->> GraphKnowledgeExporter: Export Knowledge
+GraphKnowledgeExporter ->> JSON_Export: Export to JSON
+JSON_Export ->> GraphKnowledgeExporter: Confirm Export
 
-Agent -> GKE : trigger auto-export
-activate GKE
-GKE -> Export : update JSON exports
-deactivate GKE
+graph-sync ->> GraphDatabaseService: Sync Request
+GraphDatabaseService ->> MCP_server: Sync with MCP Server
+MCP_server ->> GraphDatabaseService: Return Sync Response
+GraphDatabaseService ->> graph-sync: Return Sync Result
 
-Agent -> MCP : analysis complete
-deactivate Agent
-
-note over Workers : Recent implementation\nwith active bug fixes
-note over Agent, GKE : Component reference issues\nindicate dependency management\nneeds improvement
-
-deactivate GDA
-deactivate GDS
-deactivate VKB
+note over GraphDatabaseService: Auto-Sync
+GraphKnowledgeExporter ->> JSON_Export: Auto-Export Knowledge
+JSON_Export ->> GraphKnowledgeExporter: Confirm Auto-Export
 
 @enduml

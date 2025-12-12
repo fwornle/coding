@@ -1,0 +1,159 @@
+@startuml semantic-analysis-agent-system
+!include _standard-style.puml
+
+title "13-Agent Semantic Analysis System"
+
+top to bottom direction
+
+package "AI Coding Assistants" {
+  [Claude Code\n(MCP Integration)] <<external>> as claude
+}
+
+package "MCP Interface Layer" {
+  [MCP Server\n(14 Tools)] <<api>> as mcp
+}
+
+package "Orchestration" <<frame>> {
+  rectangle "CoordinatorAgent" <<agent>> as coordinator {
+    [Workflow Management] <<core>>
+    [Step Dependencies] <<core>>
+    [Data Flow Templating] <<core>>
+    [Error Recovery] <<core>>
+  }
+}
+
+package "Analysis Agents (6)" <<frame>> {
+  rectangle "GitHistoryAgent" <<agent>> as git {
+    [Commit Analysis] <<core>>
+    [Architectural Decisions] <<core>>
+  }
+
+  rectangle "VibeHistoryAgent" <<agent>> as vibe {
+    [Conversation Processing] <<core>>
+    [Context Extraction] <<core>>
+  }
+
+  rectangle "WebSearchAgent" <<agent>> as web {
+    [DuckDuckGo Search] <<util>>
+    [Pattern Research] <<util>>
+  }
+
+  rectangle "ObservationGenerationAgent" <<agent>> as obs {
+    [UKB Observations] <<core>>
+    [Entity Structuring] <<core>>
+  }
+
+  rectangle "PersistenceAgent" <<agent>> as persist {
+    [Graphology+LevelDB] <<storage>>
+    [Entity CRUD] <<core>>
+  }
+
+  rectangle "ContentValidationAgent" <<agent>> as validate {
+    [Staleness Detection] <<util>>
+    [Entity Refresh] <<util>>
+  }
+}
+
+package "LLM-Powered Agents (3)" <<frame>> {
+  rectangle "SemanticAnalysisAgent" <<agent>> as semantic {
+    [Deep Code Analysis] <<core>>
+    [3-Tier LLM Chain] <<core>>
+  }
+
+  rectangle "InsightGenerationAgent" <<agent>> as insight {
+    [Insight Reports] <<core>>
+    [PlantUML Diagrams] <<util>>
+  }
+
+  rectangle "QualityAssuranceAgent" <<agent>> as qa {
+    [Output Validation] <<util>>
+    [Auto-Correction] <<util>>
+  }
+}
+
+package "Infrastructure Agents (2)" <<frame>> {
+  rectangle "DeduplicationAgent" <<agent>> as dedup {
+    [Similarity Detection] <<util>>
+    [Entity Merging] <<util>>
+  }
+
+  rectangle "OntologyClassificationAgent" <<agent>> as ontology {
+    [Ontology Mapping] <<core>>
+    [Class Assignment] <<core>>
+  }
+}
+
+package "Code Analysis Agents (2)" <<frame>> {
+  rectangle "CodeGraphAgent" <<agent>> as codegraph {
+    [AST Indexing] <<core>>
+    [Memgraph Integration] <<storage>>
+  }
+
+  rectangle "DocumentationLinkerAgent" <<agent>> as doclink {
+    [Doc-Code Linking] <<util>>
+    [Reference Mapping] <<util>>
+  }
+}
+
+package "External Services" {
+  cloud "Custom LLM\n(Primary)" <<external>> as custom
+  cloud "Anthropic Claude\n(Secondary)" <<external>> as anthropic
+  cloud "OpenAI GPT\n(Fallback)" <<external>> as openai
+  cloud "DuckDuckGo" <<external>> as ddg
+  database "Memgraph\n(Code Graph)" <<storage>> as memgraph
+}
+
+package "Storage" {
+  database "Graphology\n+ LevelDB\n(.data/knowledge-graph/)" <<storage>> as graphdb
+  database "JSON Export\n(.data/knowledge-export/)" <<storage>> as exports
+}
+
+' User connections
+claude --> mcp : "MCP Protocol"
+
+' Interface to coordinator
+mcp --> coordinator : "execute_workflow"
+
+' Coordinator orchestrates all agents
+coordinator --> git : "1. analyze_git_history"
+coordinator --> vibe : "2. analyze_vibe_history"
+coordinator --> semantic : "3. semantic_analysis"
+coordinator --> web : "4. web_search"
+coordinator --> insight : "5. generate_insights"
+coordinator --> obs : "6. generate_observations"
+coordinator --> ontology : "7. classify_with_ontology"
+coordinator --> codegraph : "8. index_codebase"
+coordinator --> doclink : "9. link_documentation"
+coordinator --> qa : "10. quality_assurance"
+coordinator --> persist : "11. persist_results"
+coordinator --> dedup : "12. deduplicate"
+coordinator --> validate : "13. validate_content"
+
+' External service connections
+semantic ..> custom : "Primary"
+semantic ..> anthropic : "Secondary"
+semantic ..> openai : "Fallback"
+insight ..> custom
+qa ..> custom
+web ..> ddg
+
+' Storage connections
+persist --> graphdb
+persist --> exports
+codegraph ..> memgraph
+
+note bottom of coordinator
+  **Workflow Engine**
+  Steps execute in dependency order
+  Results flow via templating:
+  {{step_name.result}}
+end note
+
+note right of semantic
+  **3-Tier LLM Chain**
+  Custom LLM (Primary)
+  Anthropic (Secondary)
+  OpenAI (Fallback)
+end note
+
+@enduml

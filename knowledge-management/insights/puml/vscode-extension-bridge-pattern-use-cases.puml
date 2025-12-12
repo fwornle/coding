@@ -1,68 +1,60 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor Developer as dev
-actor "VS Code Extension" as vscode
-actor "MCP Server" as mcp
-actor "Knowledge System" as ks
+left to right direction
 
-package "VSCodeExtensionBridgePattern System" {
-    usecase "Initialize Graph Database" as init
-    usecase "Store Knowledge Entities" as store
-    usecase "Query Graph Data" as query
-    usecase "Export to JSON" as export
-    usecase "Sync Data" as sync
-    usecase "Manage Persistence" as persist
-    
-    package "Core Services" {
-        usecase "Adapt Database Interface" as adapt
-        usecase "Process Graph Operations" as process
-        usecase "Handle Semantic Analysis" as semantic
-    }
-    
-    package "Data Storage" {
-        usecase "Store in LevelDB" as leveldb
-        usecase "Maintain Graph Structure" as graphology
-        usecase "Auto-sync Exports" as autosync
-    }
+actor "VSCode Developer" as dev
+actor "Extension User" as user
+actor "MCP Server" as mcp
+actor "Graph Database" as gdb
+
+package "Knowledge Management" {
+  usecase "Store Knowledge Entity" as store
+  usecase "Query Graph Database" as query
+  usecase "Export Knowledge" as export
+  usecase "Sync Data" as sync
 }
 
-dev --> init : "Set up system"
-dev --> store : "Add knowledge"
-dev --> query : "Retrieve data"
+package "Bridge Pattern Implementation" {
+  usecase "Initialize GraphDatabaseService" as init
+  usecase "Adapt Database Interface" as adapt
+  usecase "Manage Persistence" as persist
+  usecase "Handle Cross-Module Communication" as comm
+}
 
-vscode --> adapt : "Bridge operations"
-vscode --> process : "Execute commands"
+package "Semantic Analysis" {
+  usecase "Analyze Code Patterns" as analyze
+  usecase "Extract Architecture Components" as extract
+  usecase "Generate Semantic Models" as generate
+}
 
-mcp --> semantic : "Analyze semantics"
-mcp --> sync : "Synchronize data"
+package "Data Storage" {
+  usecase "Use Graphology + LevelDB" as graphology
+  usecase "Maintain .data/knowledge-graph" as kgraph
+  usecase "Auto-sync JSON Exports" as jsonsync
+}
 
-ks --> persist : "Ensure data integrity"
-ks --> export : "Generate exports"
+dev --> store
+dev --> query
+dev --> analyze
+user --> query
+user --> export
+mcp --> comm
+mcp --> analyze
+gdb --> persist
+gdb --> sync
 
-init ..> adapt : <<include>>
-store ..> leveldb : <<include>>
-store ..> graphology : <<include>>
-query ..> process : <<include>>
-export ..> autosync : <<include>>
-sync ..> persist : <<include>>
+store ..> init : <<include>>
+query ..> adapt : <<include>>
+export ..> jsonsync : <<include>>
+persist ..> graphology : <<include>>
+sync ..> kgraph : <<include>>
+analyze ..> extract : <<include>>
+extract ..> generate : <<include>>
+comm ..> adapt : <<extend>>
 
-note right of export
-  Exports stored at:
-  .data/knowledge-export
-end note
-
-note right of leveldb
-  Graph data stored at:
-  .data/knowledge-graph
-end note
-
-note top of "VSCodeExtensionBridgePattern System"
-  Components: GraphDatabaseService,
-  GraphDatabaseAdapter, PersistenceAgent
-  
-  Locations: src/knowledge-management,
-  lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
-end note
+note right of store : Pattern extracted from\nsrc/knowledge-management,\nlib/ukb-unified,\nintegrations/mcp-server-semantic-analysis
+note bottom of graphology : Replaces shared-memory.json\nwith persistent graph storage
+note top of jsonsync : Auto-synced from GraphDB\nto .data/knowledge-export
 
 @enduml

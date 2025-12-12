@@ -1,53 +1,33 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Client" as client
-participant "UkbCli" as ukbcli
-participant "VkbApiClient" as vkbapi
-participant "Knowledge Management" as km
-participant "UKB Unified" as ukb
-participant "MCP Semantic Analysis" as mcp
-database "Graph Database" as graphdb
+participant UkbCli as "UkbCli (MCPAgent)"
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant Graphology as "Graphology"
+participant LevelDB as "LevelDB"
 
-client -> ukbcli : initialize()
-activate ukbcli
+UkbCli->>GraphDatabaseService: Request knowledge storage
+GraphDatabaseService->>Graphology: Store knowledge in graph
+Graphology->>LevelDB: Persist graph data
+LevelDB->>Graphology: Confirm data persistence
 
-ukbcli -> vkbapi : createClient()
-activate vkbapi
+UkbCli->>GraphKnowledgeExporter: Request knowledge export
+GraphKnowledgeExporter->>GraphDatabaseService: Retrieve knowledge from graph
+GraphDatabaseService->>GraphKnowledgeExporter: Provide knowledge for export
+GraphKnowledgeExporter->>UkbCli: Export knowledge
 
-ukbcli -> km : loadKnowledgeComponents()
-activate km
-km -> graphdb : queryNodes()
-km -> graphdb : queryRelationships()
-km --> ukbcli : knowledgeData
-deactivate km
+alt Visualization
+    UkbCli->>GraphDatabaseService: Request knowledge for visualization
+    GraphDatabaseService->>Graphology: Retrieve graph for visualization
+    Graphology->>UkbCli: Provide graph for vkb command
+end
 
-ukbcli -> ukb : initializeUnifiedLayer()
-activate ukb
-ukb -> graphdb : establishConnections()
-ukb --> ukbcli : unifiedInterface
-deactivate ukb
-
-client -> ukbcli : executeQuery(query)
-ukbcli -> vkbapi : processQuery(query)
-vkbapi -> mcp : semanticAnalysis(query)
-activate mcp
-mcp -> graphdb : analyzeSemantics()
-mcp --> vkbapi : analyzedQuery
-deactivate mcp
-
-vkbapi -> ukb : executeUnifiedQuery(analyzedQuery)
-ukb -> graphdb : executeGraphQuery()
-graphdb --> ukb : results
-ukb --> vkbapi : processedResults
-vkbapi --> ukbcli : queryResults
-deactivate vkbapi
-
-ukbcli --> client : formattedResults
-deactivate ukbcli
-
-note over graphdb : Core graph database storage\nNo shared-memory.json dependency
-
-note over ukbcli, mcp : Distributed across:\n- src/knowledge-management\n- lib/ukb-unified\n- integrations/mcp-server-semantic-analysis/src
+opt Synchronization
+    UkbCli->>GraphKnowledgeExporter: Request knowledge synchronization
+    GraphKnowledgeExporter->>GraphDatabaseService: Retrieve knowledge for sync
+    GraphDatabaseService->>GraphKnowledgeExporter: Provide knowledge for sync
+    GraphKnowledgeExporter->>UkbCli: Confirm knowledge synchronization
+end
 
 @enduml

@@ -1,95 +1,55 @@
 @startuml
-!include ./_standard-style.puml
-```
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-### **Structural Improvements:**
+title VSCodeExtensionBridgePattern - Graph Database Architecture
 
-1. **Add Error Handling Components:**
-```plantuml
-component ErrorHandler <<util>>
-component RetryManager <<util>>
-```
+package "Knowledge Management" {
+    component [GraphDatabaseService] as GDS <<core>>
+    component [GraphDatabaseAdapter] as GDA <<api>>
+    component [PersistenceAgent] as PA <<agent>>
+}
 
-2. **Include Caching Layer:**
-```plantuml
-component CacheManager <<cache>>
-GraphDatabaseAdapter --> CacheManager : caches via
-```
+package "Unified Knowledge Base" {
+    component [UKB-Unified] as UKB <<core>>
+}
 
-3. **Add Configuration Management:**
-```plantuml
-component ConfigManager <<config>>
-PersistenceAgent --> ConfigManager : configured by
-```
+package "MCP Server Integration" {
+    component [SemanticAnalysis] as SA <<api>>
+    component [MCPServer] as MCP <<core>>
+}
 
-### **Documentation Enhancements:**
-- Add version information to components
-- Include data flow directions
-- Specify API contracts between layers
-- Document error handling strategies
+package "Storage Layer" {
+    database [Graphology\nGraph Engine] as GE <<storage>>
+    database [LevelDB\nPersistence] as LDB <<storage>>
+    folder [.data/knowledge-graph] as KGData <<storage>>
+}
 
-### **Security Hardening:**
-- Use environment-based configuration
-- Implement proper access controls
-- Add audit logging components
-- Encrypt sensitive data paths
-
-### **Corrected Code:**
-```plantuml
-@startuml
-!include ./_standard-style.puml
-
-package "VSCode Extension Bridge Pattern" {
-    package "src/knowledge-management" {
-        component GraphDatabaseService <<core>>
-        component GraphDatabaseAdapter <<api>>
-        component PersistenceAgent <<agent>>
-    }
-    
-    package "lib/ukb-unified" {
-        component UnifiedKnowledgeBase <<core>>
-        component KnowledgeManager <<core>>
-    }
-    
-    package "integrations/mcp-server-semantic-analysis/src" {
-        component MCPServer <<api>>
-        component SemanticAnalyzer <<core>>
-    }
-    
-    package "Storage Layer" {
-        database "Graphology\n+ LevelDB" <<storage>> as GraphDB
-        folder ".data/knowledge-graph" <<storage>> as KnowledgeStorage
-        folder ".data/knowledge-export" <<storage>> as JSONExport
-    }
+package "Export Layer" {
+    folder [.data/knowledge-export] as Export <<storage>>
+    component [JSONExporter] as JE <<agent>>
 }
 
 ' Core relationships
-GraphDatabaseService --> GraphDatabaseAdapter : uses
-GraphDatabaseAdapter --> PersistenceAgent : delegates to
-PersistenceAgent --> GraphDB : persists to
-GraphDB --> KnowledgeStorage : stored at
+GDS --> GDA : uses
+GDA --> PA : coordinates
+PA --> GE : manages graph operations
+GE --> LDB : persists to
+LDB --> KGData : stores at
 
-' Knowledge management flow
-UnifiedKnowledgeBase --> GraphDatabaseService : manages via
-KnowledgeManager --> UnifiedKnowledgeBase : coordinates
+' Integration relationships  
+UKB --> GDS : integrates with
+SA --> GDS : queries
+MCP --> SA : serves
 
-' MCP integration
-MCPServer --> SemanticAnalyzer : processes via
-SemanticAnalyzer --> GraphDatabaseService : stores analysis in
+' Export flow
+GDS --> JE : triggers export
+JE --> Export : auto-syncs to
+Export --> Export : JSON files
 
-' Export synchronization
-GraphDB --> JSONExport : auto-syncs to
-JSONExport : JSON exports for external access
+' Data flow
+KGData --> Export : synced data
 
-note top of "VSCode Extension Bridge Pattern"
-  Bridge Pattern implementation for VSCode extensions
-  Replaces shared-memory.json with graph database
-  Provides unified knowledge management across components
-end note
-
-note bottom of GraphDB
-  Primary storage: Graphology + LevelDB
-  Location: .data/knowledge-graph
-end note
+note top of GDS : Core bridge component connecting\nVSCode extension to graph database
+note bottom of KGData : Removed: shared-memory.json\nReplaced with persistent graph storage
 
 @enduml

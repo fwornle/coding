@@ -1,67 +1,36 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Knowledge Management" as KM
-participant "GraphDatabaseService" as GDS
-participant "GraphKnowledgeExporter" as GKE
-participant "GraphDatabaseAdapter" as GDA
-participant "Graphology + LevelDB" as GraphDB
-participant "JSON Export System" as JSON
-participant "MCP Server" as MCP
+participant MCPMemoryLoggingIntegrationPattern as "MCPMemoryLoggingIntegrationPattern"
+participant GraphDatabaseService as "GraphDatabaseService"
+participant GraphKnowledgeExporter as "GraphKnowledgeExporter"
+participant PersistenceAgent as "PersistenceAgent"
+participant VkbApiClient as "VkbApiClient"
+participant Graphology as "Graphology"
+participant LevelDB as "LevelDB"
+participant VkbCommand as "VkbCommand"
+participant MCPTools as "MCPTools"
 
-activate KM
-KM -> GDS: Initialize graph database
-activate GDS
+MCPMemoryLoggingIntegrationPattern ->> GraphDatabaseService : Request Knowledge Storage
+GraphDatabaseService ->> Graphology : Store Knowledge in Graphology
+Graphology ->> LevelDB : Use LevelDB for Storage
+LevelDB ->> Graphology : Store Knowledge
 
-GDS -> GDA: Create database adapter
-activate GDA
+GraphDatabaseService ->> GraphKnowledgeExporter : Request Knowledge Export
+GraphKnowledgeExporter ->> .data/knowledge-export : Export Knowledge to File
 
-GDA -> GraphDB: Connect to .data/knowledge-graph
-activate GraphDB
-GraphDB --> GDA: Connection established
-GDA --> GDS: Adapter ready
-deactivate GDA
+MCPMemoryLoggingIntegrationPattern ->> PersistenceAgent : Interact with Graph Database
+PersistenceAgent ->> GraphDatabaseService : Perform Knowledge Operations
+GraphDatabaseService ->> VkbApiClient : Visualize Knowledge with Vkb
 
-opt Knowledge Storage
-    KM -> GDS: Store knowledge entity
-    GDS -> GraphDB: Write graph data
-    GraphDB --> GDS: Data stored
-    GDS --> KM: Storage confirmed
+VkbApiClient ->> VkbCommand : Use Vkb Command for Visualization
+VkbCommand ->> MCPTools : Perform Knowledge Operations with MCP Tools
+MCPTools ->> MCPMemoryLoggingIntegrationPattern : Update Knowledge Entity
+
+alt Successful Knowledge Storage
+    GraphDatabaseService ->> MCPMemoryLoggingIntegrationPattern : Confirm Knowledge Stored
+else Knowledge Storage Failed
+    GraphDatabaseService ->> MCPMemoryLoggingIntegrationPattern : Report Storage Error
 end
-
-loop Auto-sync Process
-    GDS -> GKE: Trigger export
-    activate GKE
-    GKE -> GraphDB: Read graph data
-    GraphDB --> GKE: Return graph data
-    GKE -> JSON: Write to .data/knowledge-export
-    activate JSON
-    JSON --> GKE: Export complete
-    deactivate JSON
-    GKE --> GDS: Sync completed
-    deactivate GKE
-end
-
-alt MCP Integration
-    MCP -> KM: Request semantic analysis
-    activate MCP
-    KM -> GDS: Query knowledge graph
-    GDS -> GraphDB: Execute query
-    GraphDB --> GDS: Return results
-    GDS --> KM: Knowledge data
-    KM --> MCP: Analysis complete
-    deactivate MCP
-end
-
-note over GraphDB, JSON
-Migration complete:
-- shared-memory.json REMOVED
-- Graphology + LevelDB active
-- JSON exports auto-synced
-end note
-
-deactivate GraphDB
-deactivate GDS
-deactivate KM
 
 @enduml

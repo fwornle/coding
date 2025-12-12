@@ -1,104 +1,43 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-    class KnowledgePersistencePattern <<pattern>> {
-        +type: GraphDatabase
-        +storageLocation: string
-        +exportLocation: string
-        +initialize()
-        +persist()
-        +export()
-    }
-    
-    class GraphDatabaseService <<service>> {
-        -graphologyInstance: Graphology
-        -levelDbAdapter: LevelDB
-        -storagePath: string
-        +store(entity: KnowledgeEntity)
-        +retrieve(id: string)
-        +persist()
-        +load()
-    }
-    
-    class GraphKnowledgeExporter <<service>> {
-        -exportPath: string
-        -eventListener: EventListener
-        +exportToJson()
-        +onEntityStored(event: EntityStoredEvent)
-        +autoSync()
-    }
-    
-    class PersistenceAgent <<agent>> {
-        -database Service: GraphDatabaseService
-        -exporter: GraphKnowledgeExporter
-        +manageKnowledge()
-        +handlePersistence()
-    }
+package "Knowledge Persistence Pattern" {
+  class GraphDatabaseService <<service>> {
+    + interactWithGraphDatabase()
+  }
+
+  class GraphKnowledgeExporter <<service>> {
+    + autoExportJSONData()
+  }
+
+  class PersistenceAgent <<service>> {
+    + persistKnowledgeData()
+  }
+
+  class KnowledgePersistencePattern <<interface>> {
+    {method}
+    + storeKnowledge()
+    + retrieveKnowledge()
+  }
+
+  GraphDatabaseService --* GraphKnowledgeExporter : uses
+  GraphKnowledgeExporter --* PersistenceAgent : triggers
+  PersistenceAgent --* GraphDatabaseService : uses
+  KnowledgePersistencePattern --|> GraphDatabaseService : implements
+  KnowledgePersistencePattern --|> GraphKnowledgeExporter : implements
+  KnowledgePersistencePattern --|> PersistenceAgent : implements
 }
 
-package "Storage Infrastructure" {
-    class Graphology <<library>> {
-        +addNode(data: any)
-        +addEdge(source: string, target: string)
-        +getNode(id: string)
-        +serialize()
-    }
-    
-    class LevelDB <<database>> {
-        +put(key: string, value: any)
-        +get(key: string)
-        +batch(operations: any[])
-    }
+package "Utilities" {
+  class EnvironmentVariables <<interface>> {
+    {method}
+    + getPort()
+    + getStoragePath()
+  }
+
+  GraphDatabaseService ..> EnvironmentVariables : uses
+  GraphKnowledgeExporter ..> EnvironmentVariables : uses
+  PersistenceAgent ..> EnvironmentVariables : uses
 }
-
-package "File System" {
-    class KnowledgeGraphStorage <<file>> {
-        +path: ".data/knowledge-graph"
-        +type: "LevelDB"
-    }
-    
-    class JsonExportStorage <<file>> {
-        +path: ".data/knowledge-export"
-        +type: "JSON"
-        +autoSynced: boolean
-    }
-}
-
-package "Event System" {
-    class EntityStoredEvent <<event>> {
-        +entity Id: string
-        +timestamp: Date
-        +data: any
-    }
-}
-
-' Relationships
-KnowledgePersistencePattern --> GraphDatabaseService : implements
-KnowledgePersistencePattern --> GraphKnowledgeExporter : uses
-KnowledgePersistencePattern --> PersistenceAgent : orchestrates
-
-GraphDatabaseService --> Graphology : uses
-GraphDatabaseService --> LevelDB : persists to
-GraphDatabaseService --> KnowledgeGraphStorage : stores in
-
-GraphKnowledgeExporter --> JsonExportStorage : exports to
-GraphKnowledgeExporter --> EntityStoredEvent : listens to
-
-PersistenceAgent --> GraphDatabaseService : manages
-PersistenceAgent --> GraphKnowledgeExporter : coordinates
-
-EntityStoredEvent ..> GraphKnowledgeExporter : triggers
-
-note right of KnowledgePersistencePattern
-  Pattern extracted from codebase analysis
-  Replaces shared-memory.json approach
-  Auto-syncs GraphDB to JSON exports
-end note
-
-note bottom of GraphKnowledgeExporter
-  Listens to entity:stored events
-  Auto-exports to .data/knowledge-export
-end note
 
 @enduml

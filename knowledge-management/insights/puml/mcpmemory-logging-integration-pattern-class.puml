@@ -2,113 +2,63 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Management" {
-    class MCPMemoryLoggingIntegrationPattern <<pattern>> {
-        -graphologyInstance: GraphDatabase
-        -levelDBPath: string
-        -exportPath: string
-        +initializePattern(): void
-        +storeKnowledgeEntity(): void
-        +syncToExport(): void
-    }
-    
-    class GraphDatabaseService <<service>> {
-        -graphDatabase: GraphDatabase
-        -dataPath: string
-        +connect(): void
-        +storeNode(entity: KnowledgeEntity): void
-        +queryNodes(criteria: QueryCriteria): Node[]
-        +createRelationship(from: Node, to: Node): void
-    }
-    
-    class GraphKnowledgeExporter <<service>> {
-        -exportPath: string
-        -syncInterval: number
-        +exportToJSON(): void
-        +autoSyncFromGraphDB(): void
-        +generateExport(format: string): string
-    }
-    
-    class GraphDatabaseAdapter <<adapter>> {
-        -graphology: GraphologyInstance
-        -levelDB: LevelDBInstance
-        +adaptQuery(query: string): GraphQuery
-        +adaptResult(result: GraphResult): StandardResult
-        +migrateFromSharedMemory(): void
-    }
+  class MCPMemoryLoggingIntegrationPattern <<service>> {
+    - graphDatabase: GraphDatabase
+    - knowledgeExporter: GraphKnowledgeExporter
+    + storeKnowledge()
+    + retrieveKnowledge()
+  }
+
+  class GraphDatabase <<file>> {
+    - graphology: Graphology
+    - levelDB: LevelDB
+    + storeData()
+    + retrieveData()
+  }
+
+  class GraphKnowledgeExporter <<service>> {
+    - exportKnowledge()
+  }
+
+  MCPMemoryLoggingIntegrationPattern --* GraphDatabase
+  MCPMemoryLoggingIntegrationPattern --* GraphKnowledgeExporter
 }
 
-package "Storage Layer" {
-    class GraphologyInstance <<database>> {
-        -nodes: Map<string, Node>
-        -edges: Map<string, Edge>
-        +addNode(node: Node): void
-        +addEdge(edge: Edge): void
-        +findPath(start: Node, end: Node): Path[]
-    }
-    
-    class LevelDBInstance <<database>> {
-        -dbPath: string
-        -persistence: boolean
-        +put(key: string, value: any): void
-        +get(key: string): any
-        +batch(operations: Operation[]): void
-    }
+package "Graph Database Components" {
+  abstract class PersistenceAgent <<service>> {
+    + interactWithGraphDatabase()
+  }
+
+  class VkbApiClient <<service>> {
+    + performKnowledgeOperations()
+  }
+
+  class Graphology <<interface>> {
+    + storeData()
+    + retrieveData()
+  }
+
+  class LevelDB <<interface>> {
+    + storeData()
+    + retrieveData()
+  }
+
+  PersistenceAgent --|> VkbApiClient
+  VkbApiClient --* Graphology
+  VkbApiClient --* LevelDB
 }
 
-package "Export System" {
-    class JSONExporter <<file>> {
-        -outputPath: string
-        -autoSync: boolean
-        +exportGraph(): JSONStructure
-        +writeToFile(data: JSONStructure): void
-    }
-    
-    class KnowledgeEntity <<entity>> {
-        +id: string
-        +type: string
-        +metadata: Map<string, any>
-        +relationships: Relationship[]
-        +createdAt: timestamp
-        +updatedAt: timestamp
-    }
+package "Tools and Visualization" {
+  class VkbCommand <<service>> {
+    + visualizeKnowledge()
+  }
+
+  class MCPTools <<service>> {
+    + performKnowledgeOperations()
+  }
+
+  VkbCommand --* MCPMemoryLoggingIntegrationPattern
+  MCPTools --* MCPMemoryLoggingIntegrationPattern
 }
-
-package "Integration Layer" {
-    class MCPServerIntegration <<integration>> {
-        -semanticAnalysis: boolean
-        -serverEndpoint: string
-        +analyzePattern(): AnalysisResult
-        +extractComponents(): Component[]
-        +storeAsKnowledgeEntity(): void
-    }
-}
-
-' Relationships
-MCPMemoryLoggingIntegrationPattern --> GraphDatabaseService : uses
-MCPMemoryLoggingIntegrationPattern --> GraphKnowledgeExporter : exports via
-MCPMemoryLoggingIntegrationPattern --> GraphDatabaseAdapter : adapts through
-
-GraphDatabaseService --> GraphDatabaseAdapter : delegates to
-GraphDatabaseAdapter --> GraphologyInstance : manages
-GraphDatabaseAdapter --> LevelDBInstance : persists with
-
-GraphKnowledgeExporter --> JSONExporter : exports using
-GraphKnowledgeExporter --> KnowledgeEntity : processes
-JSONExporter --> KnowledgeEntity : serializes
-
-MCPServerIntegration --> MCPMemoryLoggingIntegrationPattern : creates
-MCPServerIntegration --> KnowledgeEntity : generates
-
-' Notes
-note right of MCPMemoryLoggingIntegrationPattern
-  Storage: .data/knowledge-graph
-  Export: .data/knowledge-export
-  shared-memory.json REMOVED
-end note
-
-note bottom of GraphDatabaseAdapter
-  Migration path from removed
-  shared-memory.json system
-end note
 
 @enduml

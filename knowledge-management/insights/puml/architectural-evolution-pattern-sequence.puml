@@ -1,58 +1,85 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "VkbApiClient" as VKB
-participant "Command Interface" as CMD
-participant "Knowledge Management" as KM
-participant "Semantic Analysis Service" as SAS
-participant "Parallel Worker" as PW
+participant "User" as U
+participant "VKB CLI" as CLI
 participant "GraphDatabaseService" as GDS
+participant "Graphology + LevelDB" as DB
 participant "GraphKnowledgeExporter" as GKE
-participant "GraphDatabaseAdapter" as GDA
-participant "PersistenceAgent" as PA
-participant "Storage (Graphology + LevelDB)" as STORE
+participant "VkbApiClient" as API
+participant "External Services" as EXT
 
-== Knowledge Management Operations ==
-VKB -> CMD: External integration request
-CMD -> KM: Process knowledge operation
-KM -> SAS: Semantic analysis request
-SAS -> PW: Batch mode analysis
+U -> CLI: Execute vkb command
+activate CLI
 
-opt Parallel Processing
-    PW -> PW: Process batch items
-    PW -> GDS: Update graph data
+CLI -> GDS: Request graph operations
+activate GDS
+
+GDS -> DB: Query/Store data
+note right: Located at .data/knowledge-graph
+activate DB
+DB --> GDS: Return graph data
+deactivate DB
+
+GDS --> CLI: Return processed data
+deactivate GDS
+
+alt Visualization Command
+    CLI -> GDS: Request visualization data
+    activate GDS
+    GDS -> DB: Retrieve graph structure
+    activate DB
+    DB --> GDS: Graph topology
+    deactivate DB
+    GDS --> CLI: Formatted visualization
+    deactivate GDS
+    CLI --> U: Display graph visualization
 end
 
-GDS -> STORE: Store in Graphology + LevelDB
-GDS -> GKE: Trigger export
-GKE -> GKE: Auto-sync JSON export
-GKE -> STORE: Save to .data/knowledge-export
-
-== Command Interface Operations ==
-CMD -> CMD: vkb (visualization)
-CMD -> CMD: coding (development tasks)
-CMD -> CMD: graph-sync (data synchronization)
-
-alt Write/Edit Operations
-    CMD -> KM: Content update request
-    KM -> SAS: Incremental constraint validation
-    SAS -> SAS: Update classification
-    SAS -> GDS: Apply changes
-    GDS -> PA: Persist changes
-    PA -> GDA: Database operations
-    GDA -> STORE: Update storage
-else Read Operations
-    CMD -> GDS: Query request
-    GDS -> STORE: Retrieve data
-    STORE -> GDS: Return results
-    GDS -> CMD: Response
+alt Development Task (coding)
+    CLI -> GDS: Process development request
+    activate GDS
+    GDS -> DB: Update knowledge graph
+    activate DB
+    DB --> GDS: Confirmation
+    deactivate DB
+    GDS --> CLI: Development result
+    deactivate GDS
 end
 
-== Synchronization Process ==
-GDS -> GKE: Periodic sync trigger
-GKE -> STORE: Export knowledge graph
-note right: JSON exports at .data/knowledge-export
-GKE -> GDA: Update adapter layer
-GDA -> PA: Persistence operations
+alt Graph Synchronization
+    U -> CLI: Execute graph-sync
+    CLI -> GKE: Trigger export process
+    activate GKE
+    
+    GKE -> GDS: Request current graph state
+    activate GDS
+    GDS -> DB: Fetch complete graph
+    activate DB
+    DB --> GDS: Full graph data
+    deactivate DB
+    GDS --> GKE: Structured data
+    deactivate GDS
+    
+    GKE -> GKE: Generate JSON export
+    note right: Auto-sync to .data/knowledge-export
+    
+    GKE -> API: Sync with external services
+    activate API
+    API -> EXT: Send synchronized data
+    activate EXT
+    EXT --> API: Confirmation
+    deactivate EXT
+    API --> GKE: Sync status
+    deactivate API
+    
+    GKE --> CLI: Export completed
+    deactivate GKE
+end
+
+CLI --> U: Command completed
+deactivate CLI
+
+note over U, EXT: Component-based architecture with\nseparate knowledge management,\nunified utilities, and analysis services
 
 @enduml

@@ -1,66 +1,45 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+title DecoratorPattern Use Case Diagram
 
-actor "Knowledge Engineer" as KE
-actor "Semantic Analyzer" as SA
-actor "MCP Client" as MCP
-actor "Application Developer" as DEV
+actor MCPUser as "MCP User"
+actor VKBCommand as "VKB Command"
+actor GraphSyncCommand as "Graph Sync Command"
+actor MCPTools as "MCP Tools"
 
-package "Knowledge Management System" {
-  usecase "Store Pattern Knowledge" as UC1
-  usecase "Query Decorator Patterns" as UC2
-  usecase "Extract Pattern Features" as UC3
-  usecase "Validate Pattern Structure" as UC4
+usecase "Visualize Knowledge Graph" as (VisualizeKnowledgeGraph)
+usecase "Perform Knowledge Operations" as (PerformKnowledgeOperations)
+usecase "Auto-Sync Graph Database" as (AutoSyncGraphDatabase)
+usecase "Access Knowledge Graph Database" as (AccessKnowledgeGraphDatabase)
+
+MCPUser -- (VisualizeKnowledgeGraph)
+MCPUser -- (PerformKnowledgeOperations)
+VKBCommand -- (VisualizeKnowledgeGraph)
+MCPTools -- (PerformKnowledgeOperations)
+GraphSyncCommand -- (AutoSyncGraphDatabase)
+
+package "Knowledge Management" {
+  usecase "Semantic Analysis" as (SemanticAnalysis)
+  usecase "Knowledge Management Infrastructure" as (KnowledgeManagementInfrastructure)
+  
+  (SemanticAnalysis) ..> (AccessKnowledgeGraphDatabase) : include
+  (KnowledgeManagementInfrastructure) ..> (AccessKnowledgeGraphDatabase) : include
 }
 
-package "Graph Database Operations" {
-  usecase "Persist to GraphDB" as UC5
-  usecase "Sync to JSON Export" as UC6
-  usecase "Query Knowledge Graph" as UC7
-  usecase "Maintain Graph Integrity" as UC8
+package "Graph Database" {
+  usecase "Store Knowledge Graph" as (StoreKnowledgeGraph)
+  usecase "Query Knowledge Graph" as (QueryKnowledgeGraph)
+  
+  (StoreKnowledgeGraph) ..> (AccessKnowledgeGraphDatabase) : include
+  (QueryKnowledgeGraph) ..> (AccessKnowledgeGraphDatabase) : include
 }
 
-package "Semantic Analysis" {
-  usecase "Analyze Code Patterns" as UC9
-  usecase "Generate Pattern Metadata" as UC10
-  usecase "Classify Design Patterns" as UC11
-}
+(AutoSyncGraphDatabase) ..> (StoreKnowledgeGraph) : extend
 
-package "MCP Server Integration" {
-  usecase "Serve Pattern Data" as UC12
-  usecase "Handle MCP Requests" as UC13
-  usecase "Export Pattern Knowledge" as UC14
-}
+note as AutoNote1
+  DecoratorPattern is used in semantic analysis and knowledge management infrastructure.
 
-KE --> UC1
-KE --> UC2
-KE --> UC4
-
-SA --> UC9
-SA --> UC10
-SA --> UC11
-
-MCP --> UC12
-MCP --> UC13
-MCP --> UC14
-
-DEV --> UC2
-DEV --> UC7
-
-UC1 ..> UC5 : <<include>>
-UC1 ..> UC10 : <<include>>
-UC2 ..> UC7 : <<include>>
-UC3 ..> UC11 : <<include>>
-UC5 ..> UC6 : <<include>>
-UC5 ..> UC8 : <<include>>
-UC9 ..> UC3 : <<extend>>
-UC12 ..> UC7 : <<include>>
-UC14 ..> UC6 : <<include>>
-
-note right of UC5 : "Graphology + LevelDB\n.data/knowledge-graph"
-note right of UC6 : "Auto-sync to\n.data/knowledge-export"
-note top of UC9 : "Processes files in:\nsrc/knowledge-management\nlib/ukb-unified\nintegrations/mcp-server-semantic-analysis"
+end note
 
 @enduml

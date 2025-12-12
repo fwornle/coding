@@ -1,111 +1,60 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Command Layer" {
-  class VkbCommand <<command>> {
-    +execute(): void
-    +validateInput(): boolean
-  }
-  
-  class CodingCommand <<command>> {
-    +execute(): void
-    +processCode(): void
-  }
-  
-  class GraphSyncCommand <<command>> {
-    +execute(): void
-    +synchronize(): void
-  }
-}
-
-package "Knowledge Management Services" {
+package "Knowledge Management" {
   class GraphDatabaseService <<service>> {
-    -adapter: GraphDatabaseAdapter
-    +query(query: string): Result
-    +store(data: KnowledgeNode): void
-    +retrieve(id: string): KnowledgeNode
+    - graphDatabase: GraphDatabase
+    + manageKnowledgeGraph()
+    + performQuery(query: String)
   }
   
-  class GraphKnowledgeExporter <<service>> {
-    -persistenceAgent: PersistenceAgent
-    +exportToJson(): void
-    +scheduleAutoExport(): void
-    +validateExport(): boolean
+  class GraphKnowledgeExporter {
+    - graphDatabase: GraphDatabase
+    + exportKnowledgeGraph()
   }
   
-  class VkbApiClient <<service>> {
-    -baseUrl: string
-    +sendRequest(endpoint: string): Response
-    +authenticate(): void
+  class GraphDatabaseAdapter {
+    - graphDatabase: GraphDatabase
+    + adaptGraphDatabase()
   }
+  
+  class PersistenceAgent {
+    - graphDatabase: GraphDatabase
+    + persistData()
+  }
+  
+  class VkbApiClient {
+    - apiClient: ApiClient
+    + sendDataToVkb()
+  }
+  
+  GraphDatabaseService --* GraphDatabaseAdapter
+  GraphDatabaseService --* GraphKnowledgeExporter
+  GraphDatabaseAdapter --* GraphDatabase
+  GraphKnowledgeExporter --* GraphDatabase
+  PersistenceAgent --* GraphDatabase
+  VkbApiClient --* GraphDatabaseService
 }
 
-package "Data Access Layer" {
-  class GraphDatabaseAdapter <<adapter>> {
-    -graphologyInstance: Graphology
-    -levelDbConnection: LevelDB
-    +connect(): void
-    +executeQuery(query: string): Result
-    +persistNode(node: KnowledgeNode): void
+package "Storage" {
+  class Graphology <<file>> {
+    - data: String
   }
   
-  class PersistenceAgent <<agent>> {
-    -exportPath: string
-    +writeToFile(data: Object, path: string): void
-    +ensureDirectory(path: string): void
-    +synchronizeFiles(): void
-  }
-}
-
-package "Storage Infrastructure" {
-  class Graphology <<external>> {
-    +addNode(id: string, attributes: Object): void
-    +addEdge(source: string, target: string): void
-    +getNodeAttributes(id: string): Object
+  class LevelDB <<file>> {
+    - data: String
   }
   
-  class LevelDB <<external>> {
-    +put(key: string, value: string): void
-    +get(key: string): string
-    +batch(operations: Array): void
-  }
-}
-
-package "Data Models" {
-  class KnowledgeNode {
-    -id: string
-    -content: string
-    -metadata: Object
-    -relationships: Array
-    +getId(): string
-    +getContent(): string
+  class JSONExporter <<file>> {
+    - data: String
   }
   
-  class CollectiveKnowledge <<system>> {
-    -storageLocation: string
-    -exportLocation: string
-    +initialize(): void
-    +processKnowledge(): void
-  }
+  Graphology --o LevelDB
+  LevelDB --o JSONExporter
 }
 
-' Relationships
-VkbCommand --> GraphDatabaseService : uses
-CodingCommand --> GraphDatabaseService : uses
-GraphSyncCommand --> GraphKnowledgeExporter : triggers
-
-GraphDatabaseService --> GraphDatabaseAdapter : depends on
-GraphKnowledgeExporter --> PersistenceAgent : uses
-GraphKnowledgeExporter --> GraphDatabaseService : reads from
-
-GraphDatabaseAdapter --> Graphology : utilizes
-GraphDatabaseAdapter --> LevelDB : utilizes
-GraphDatabaseAdapter --> KnowledgeNode : manages
-
-PersistenceAgent ..> "exports to\n.data/knowledge-export" : <<file system>>
-GraphDatabaseAdapter ..> "stores in\n.data/knowledge-graph" : <<file system>>
-
-CollectiveKnowledge *-- GraphDatabaseService : contains
-CollectiveKnowledge *-- GraphKnowledgeExporter : contains
+GraphDatabaseService ..> Graphology
+GraphDatabaseService ..> LevelDB
+GraphKnowledgeExporter ..> JSONExporter
 
 @enduml

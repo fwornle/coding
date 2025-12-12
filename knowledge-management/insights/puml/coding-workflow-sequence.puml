@@ -1,61 +1,33 @@
 @startuml
-!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+!include /relative/path/to/_standard-style.puml
 
-participant "MCP Client" as client
-participant "MCP Server" as server
-participant "CodingWorkflow" as workflow
-participant "Knowledge Manager" as km
-participant "Graphology DB" as graph
-participant "LevelDB" as level
-participant "JSON Export" as export
+title CodingWorkflow MCP Agent Architecture
 
-client -> server: execute_workflow(CodingWorkflow)
-activate server
+actor Developer as dev
+boundary "MCP Client" as mcp
+control "CodingWorkflow Agent" as cwa
 
-server -> workflow: trigger()
-activate workflow
+box "Knowledge Layer" #LightBlue
+    control "Knowledge Management" as km
+    entity "Semantic Analysis" as sa
+end box
 
-workflow -> km: initializeKnowledgeStorage()
-activate km
+box "Data Layer" #LightGray  
+    database "GraphDB" as gdb
+    folder "JSON Exports" as json
+end box
 
-km -> graph: connect(.data/knowledge-graph)
-activate graph
-graph --> km: connection established
+dev -> mcp: Request workflow execution
+mcp -> cwa: execute_workflow(params)
+activate cwa
 
-km -> level: initialize(.data/knowledge-graph)
-activate level
-level --> km: storage ready
+cwa -> km: Initialize context
+km -> gdb: Load graph
+gdb --> km: Graph data
 
-km --> workflow: storage initialized
+note over sa,ukb: Async processing recommended here
 
-workflow -> workflow: performSemanticAnalysis()
-
-alt incremental analysis
-    workflow -> km: getExistingKnowledge()
-    km -> graph: query(existing_entities)
-    graph --> km: current_state
-    km --> workflow: knowledge_delta
-else full analysis
-    workflow -> workflow: analyzeFullCodebase()
-end
-
-workflow -> km: storeAnalysisResults(results)
-km -> graph: updateNodes(entities)
-km -> graph: updateEdges(relationships)
-graph --> km: stored
-
-workflow -> km: exportKnowledge()
-km -> export: syncToJSON(.data/knowledge-export)
-activate export
-export --> km: export_complete
-
-workflow -> server: analysisComplete(results)
-deactivate workflow
-
-server -> client: workflow_executed(success)
-deactivate server
-
-note over graph, level: Knowledge persisted in\nGraphology + LevelDB
-note over export: Auto-synced JSON exports\nfor external consumption
-
+cwa --> mcp: Workflow results  
+mcp --> dev: Analysis output
+deactivate cwa
 @enduml

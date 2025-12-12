@@ -1,82 +1,45 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor User
-participant "VkbApiClient" as VKB
-participant "CollectiveKnowledge\nSystem" as CK
-participant "GraphDatabaseService" as GDS
-participant "GraphDatabaseAdapter" as GDA
-participant "PersistenceAgent" as PA
-participant "GraphKnowledgeExporter" as GKE
-database "Graphology + LevelDB\n(.data/knowledge-graph)" as DB
-database "JSON Export\n(.data/knowledge-export)" as Export
+participant CollectiveKnowledge as "CollectiveKnowledge System"
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant GraphDatabaseAdapter as "Graph Database Adapter"
+participant PersistenceAgent as "Persistence Agent"
+participant VkbApiClient as "VKB API Client"
+participant User as "User"
 
-User -> VKB: Execute vkb command
-activate VKB
+activate CollectiveKnowledge
+note over CollectiveKnowledge: Hybrid storage architecture: Graphology and LevelDB at .data/knowledge-graph
+note over CollectiveKnowledge: Automated JSON exports to .data/knowledge-export
 
-VKB -> CK: Request knowledge operation
-activate CK
+User->>CollectiveKnowledge: Request knowledge management operation
+CollectiveKnowledge->>GraphDatabaseService: Manage knowledge graph
+GraphDatabaseService->>GraphDatabaseAdapter: Interact with graph database
+GraphDatabaseAdapter->>GraphDatabaseService: Provide graph data
+GraphDatabaseService->>GraphKnowledgeExporter: Export knowledge graph
+GraphKnowledgeExporter->>CollectiveKnowledge: Exported knowledge graph
 
-CK -> GDS: Process knowledge management
-activate GDS
-
-GDS -> GDA: Database operation request
-activate GDA
-
-GDA -> PA: Persistence operation
-activate PA
-
-PA -> DB: Store/Retrieve data
-activate DB
-DB --> PA: Data response
-deactivate DB
-
-PA --> GDA: Operation result
-deactivate PA
-
-GDA --> GDS: Database response
-deactivate GDA
-
-alt Knowledge Export Required
-    GDS -> GKE: Trigger export
-    activate GKE
-    
-    GKE -> DB: Read knowledge graph
-    activate DB
-    DB --> GKE: Graph data
-    deactivate DB
-    
-    GKE -> Export: Write JSON export
-    activate Export
-    Export --> GKE: Export complete
-    deactivate Export
-    
-    GKE --> GDS: Export synchronized
-    deactivate GKE
+alt Successful export
+    CollectiveKnowledge->>User: Return exported knowledge graph
+else Export failed
+    CollectiveKnowledge->>User: Return error message
 end
 
-GDS --> CK: Knowledge operation complete
-deactivate GDS
+loop Data synchronization
+    CollectiveKnowledge->>GraphDatabaseService: Synchronize data using graph-sync
+    GraphDatabaseService->>GraphDatabaseAdapter: Synchronize graph data
+    GraphDatabaseAdapter->>GraphDatabaseService: Confirm synchronization
+end
 
-CK --> VKB: Response
-deactivate CK
+User->>CollectiveKnowledge: Visualize knowledge graph using vkb
+CollectiveKnowledge->>VkbApiClient: Request visualization
+VkbApiClient->>CollectiveKnowledge: Return visualization
 
-VKB --> User: Operation result
-deactivate VKB
+User->>CollectiveKnowledge: Perform knowledge operation using MCP tools
+CollectiveKnowledge->>PersistenceAgent: Manage knowledge operation
+PersistenceAgent->>CollectiveKnowledge: Confirm operation
 
-note over DB, Export
-Hybrid Storage Architecture:
-- Primary: Graphology + LevelDB
-- Secondary: Automated JSON exports
-- Synchronized for external access
-end note
-
-note over GDS, GKE
-Core Components:
-- GraphDatabaseService
-- GraphDatabaseAdapter  
-- PersistenceAgent
-- GraphKnowledgeExporter
-end note
+deactivate CollectiveKnowledge
 
 @enduml

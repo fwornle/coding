@@ -1,88 +1,42 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Knowledge Management" as KM
-participant "PersistenceAgent" as PA
-participant "GraphDatabaseService" as GDS
-participant "Graphology (In-Memory)" as Graph
-participant "LevelDB" as LDB
-participant "GraphKnowledgeExporter" as GKE
-participant "Event System" as Events
-participant "JSON Export" as JSON
+participant KnowledgePersistencePattern as "Knowledge Persistence Pattern"
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant PersistenceAgent as "Persistence Agent"
+participant EnvironmentVariables as "Environment Variables"
 
-== Knowledge Storage Process ==
+activate KnowledgePersistencePattern
+KnowledgePersistencePattern ->> GraphDatabaseService: Initialize Graph Database
+GraphDatabaseService ->> KnowledgePersistencePattern: Confirm Initialization
 
-KM -> PA: Store knowledge entity
-activate PA
-
-PA -> GDS: persist(entity)
-activate GDS
-
-GDS -> Graph: addNode/addEdge(entity)
-activate Graph
-Graph --> GDS: success
-deactivate Graph
-
-GDS -> LDB: write(.data/knowledge-graph)
-activate LDB
-LDB --> GDS: persisted
-deactivate LDB
-
-GDS --> PA: stored
-deactivate GDS
-
-PA -> Events: emit("entity:stored", entity)
-activate Events
-
-Events -> GKE: notify(entity:stored)
-activate GKE
-
-GKE -> JSON: export(.data/knowledge-export)
-activate JSON
-JSON --> GKE: exported
-deactivate JSON
-
-GKE --> Events: export complete
-deactivate GKE
-deactivate Events
-
-PA --> KM: persistence complete
-deactivate PA
-
-== Knowledge Retrieval Process ==
-
-KM -> GDS: query(criteria)
-activate GDS
-
-alt In-memory cache available
-    GDS -> Graph: search(criteria)
-    activate Graph
-    Graph --> GDS: results
-    deactivate Graph
-else Cache miss
-    GDS -> LDB: read(.data/knowledge-graph)
-    activate LDB
-    LDB --> GDS: data
-    deactivate LDB
-    
-    GDS -> Graph: load(data)
-    activate Graph
-    Graph --> GDS: loaded
-    deactivate Graph
+alt Successful Initialization
+    KnowledgePersistencePattern ->> PersistenceAgent: Persist Knowledge Data
+    PersistenceAgent ->> GraphDatabaseService: Store Knowledge Data
+    GraphDatabaseService ->> PersistenceAgent: Confirm Storage
+    activate GraphKnowledgeExporter
+    GraphKnowledgeExporter ->> GraphDatabaseService: Request JSON Data
+    GraphDatabaseService ->> GraphKnowledgeExporter: Provide JSON Data
+    GraphKnowledgeExporter ->> GraphKnowledgeExporter: Auto-Export JSON Data
+    GraphKnowledgeExporter ->> EnvironmentVariables: Configure Export Directory (.data/knowledge-export)
+    EnvironmentVariables ->> GraphKnowledgeExporter: Confirm Configuration
+    GraphKnowledgeExporter ->> GraphKnowledgeExporter: Export JSON Data to Directory
+    deactivate GraphKnowledgeExporter
 end
 
-GDS --> KM: knowledge entities
-deactivate GDS
+opt Auto-Syncing JSON Data
+    KnowledgePersistencePattern ->> GraphKnowledgeExporter: Trigger Auto-Export (entity:stored)
+    GraphKnowledgeExporter ->> GraphDatabaseService: Request Updated JSON Data
+    GraphDatabaseService ->> GraphKnowledgeExporter: Provide Updated JSON Data
+    GraphKnowledgeExporter ->> GraphKnowledgeExporter: Auto-Export Updated JSON Data
+    GraphKnowledgeExporter ->> EnvironmentVariables: Update Export Directory (.data/knowledge-export)
+    EnvironmentVariables ->> GraphKnowledgeExporter: Confirm Update
+end
 
-note right of GDS
-  Dual persistence:
-  - Graphology for fast queries
-  - LevelDB for durability
-end note
+KnowledgePersistencePattern ->> GraphDatabaseService: Retrieve Knowledge Data
+GraphDatabaseService ->> KnowledgePersistencePattern: Provide Knowledge Data
 
-note right of GKE
-  Auto-sync JSON exports
-  triggered by entity:stored events
-end note
+deactivate KnowledgePersistencePattern
 
 @enduml

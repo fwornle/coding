@@ -2,7 +2,7 @@
 
 **Component**: [mcp-server-semantic-analysis](../../integrations/mcp-server-semantic-analysis/)
 **Type**: MCP Server (Node.js)
-**Purpose**: AI-powered code analysis with 10 specialized agents and Graphology+LevelDB persistence
+**Purpose**: AI-powered code analysis with 13 specialized agents, code graph analysis, and Graphology+LevelDB persistence
 
 ---
 
@@ -10,31 +10,37 @@
 
 The MCP Semantic Analysis Server is a standalone Node.js application that provides comprehensive AI-powered code analysis through the Model Context Protocol.
 
-### 10 Intelligent Agents
+### 13 Intelligent Agents
 
 **Orchestration (1 agent):**
-10. **CoordinatorAgent** - Orchestrates ALL agents via workflow definitions with step dependencies, data flow, and GraphDB integration
+1. **CoordinatorAgent** - Orchestrates ALL agents via workflow definitions with step dependencies, data flow, and GraphDB integration
 
-**Analysis Agents (5 agents - No LLM):**
-1. **GitHistoryAgent** - Analyzes git commits and architectural decisions
-2. **VibeHistoryAgent** - Processes conversation files for context
+**Analysis Agents (6 agents - No LLM):**
+2. **GitHistoryAgent** - Analyzes git commits and architectural decisions
+3. **VibeHistoryAgent** - Processes conversation files for context
 4. **WebSearchAgent** - External pattern research via DuckDuckGo (No LLM)
-6. **ObservationGenerationAgent** - Creates structured UKB-compatible observations
-8. **PersistenceAgent** - Persists entities to Graphology+LevelDB graph database
+5. **ObservationGenerationAgent** - Creates structured UKB-compatible observations
+6. **PersistenceAgent** - Persists entities to Graphology+LevelDB graph database
+7. **ContentValidationAgent** - Validates and refreshes stale knowledge entities
 
 **LLM-Powered Agents (3 agents):**
-3. **SemanticAnalysisAgent** - Deep code analysis using 3-tier LLM chain
-5. **InsightGenerationAgent** - Generates insights with PlantUML diagrams using LLMs
-7. **QualityAssuranceAgent** - Validates outputs with auto-correction using LLMs
+8. **SemanticAnalysisAgent** - Deep code analysis using 3-tier LLM chain
+9. **InsightGenerationAgent** - Generates insights with PlantUML diagrams using LLMs
+10. **QualityAssuranceAgent** - Validates outputs with auto-correction using LLMs
 
-**Infrastructure Agents (1 agent):**
-9. **DeduplicationAgent** - Semantic duplicate detection and merging
+**Infrastructure Agents (2 agents):**
+11. **DeduplicationAgent** - Semantic duplicate detection and merging
+12. **OntologyClassificationAgent** - Classifies observations against project ontology
+
+**Code Analysis Agents (2 agents):**
+13. **CodeGraphAgent** - AST-based code indexing via Memgraph (requires code-graph-rag)
+14. **DocumentationLinkerAgent** - Links documentation to code entities
 
 **Note**: SynchronizationAgent has been removed - GraphDatabaseService handles all persistence automatically via Graphology (in-memory) + LevelDB (persistent storage)
 
 **LLM Provider Chain:** Custom LLM (primary) → Anthropic Claude (secondary) → OpenAI GPT (fallback)
 
-### 12 MCP Tools
+### 14 MCP Tools
 
 - `heartbeat` - Connection health monitoring
 - `test_connection` - Server connectivity verification
@@ -47,7 +53,9 @@ The MCP Semantic Analysis Server is a standalone Node.js application that provid
 - `generate_documentation` - Automated documentation generation
 - `create_insight_report` - Detailed analysis reports
 - `generate_plantuml_diagrams` - Architecture diagram generation
-- `generate_lessons_learned` - Lessons learned document creation
+- `reset_analysis_checkpoint` - Reset analysis checkpoints
+- `refresh_entity` - Refresh specific knowledge entity
+- `analyze_code_graph` - AST-based code analysis via Memgraph
 
 ---
 
@@ -58,7 +66,7 @@ The MCP Semantic Analysis Server is a standalone Node.js application that provid
 The MCP server integrates with Claude Code through the Model Context Protocol:
 
 ```
-Claude Code → MCP Protocol → Semantic Analysis Server → CoordinatorAgent → 10 Worker Agents → Analysis Results
+Claude Code → MCP Protocol → Semantic Analysis Server → CoordinatorAgent → 13 Worker Agents → Analysis Results
 ```
 
 ### Agent Coordination Model
@@ -76,7 +84,7 @@ Claude Code → MCP Protocol → Semantic Analysis Server → CoordinatorAgent �
    - Stores results for dependent steps
 4. Returns final aggregated results
 
-**Example Data Flow:**
+**Example Data Flow (complete-analysis workflow):**
 
 ```text
 Step 1: GitHistory.analyze() → {{git_results}}
@@ -84,7 +92,14 @@ Step 2: VibeHistory.analyze() → {{vibe_results}}
 Step 3: Semantic.analyze({{git_results}}, {{vibe_results}}) → {{semantic_results}}
 Step 4: WebSearch.research({{semantic_results}}) → {{web_results}}
 Step 5: Insights.generate({{semantic_results}}, {{web_results}}) → {{insights}}
-...
+Step 6: Observations.generate({{insights}}) → {{observations}}
+Step 7: Ontology.classify({{observations}}) → {{ontology_results}}
+Step 8: CodeGraph.index() → {{code_graph_results}}
+Step 9: DocLinker.analyze() → {{doc_links}}
+Step 10: QA.validate({{all_results}}) → {{qa_results}}
+Step 11: Persistence.save({{all_results}}) → saved
+Step 12: Deduplication.merge() → deduplicated
+Step 13: ContentValidation.refresh() → validated
 ```
 
 ### Configuration
