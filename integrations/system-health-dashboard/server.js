@@ -410,12 +410,42 @@ class SystemHealthAPIServer {
     }
 
     /**
-     * Get detailed UKB process list
+     * Get detailed UKB process list with step-level information
      */
     async handleGetUKBProcesses(req, res) {
         try {
             const ukbManager = new UKBProcessManager();
             const detailedStatus = ukbManager.getDetailedStatus();
+
+            // Enhance processes with step-level detail from workflow progress file
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+            let workflowProgress = null;
+
+            if (existsSync(progressPath)) {
+                try {
+                    workflowProgress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                } catch (e) {
+                    // Ignore progress file read errors
+                }
+            }
+
+            // If we have progress data and running processes, enrich the process data
+            if (workflowProgress && detailedStatus.processes) {
+                for (const proc of detailedStatus.processes) {
+                    // Match progress to process based on workflow name
+                    if (proc.status === 'running' && workflowProgress.workflowName === proc.workflowName) {
+                        proc.completedSteps = workflowProgress.completedSteps || 0;
+                        proc.totalSteps = workflowProgress.totalSteps || 0;
+                        proc.currentStep = workflowProgress.currentStep;
+                        proc.stepsCompleted = workflowProgress.stepsCompleted || [];
+                        proc.stepsFailed = workflowProgress.stepsFailed || [];
+                        proc.elapsedSeconds = workflowProgress.elapsedSeconds || 0;
+
+                        // Build step info array for the graph visualization
+                        proc.steps = this.buildStepInfo(workflowProgress);
+                    }
+                }
+            }
 
             res.json({
                 status: 'success',
@@ -429,6 +459,41 @@ class SystemHealthAPIServer {
                 error: error.message
             });
         }
+    }
+
+    /**
+     * Build step info array from workflow progress for visualization
+     */
+    buildStepInfo(progress) {
+        const steps = [];
+        const completed = new Set(progress.stepsCompleted || []);
+        const failed = new Set(progress.stepsFailed || []);
+
+        // Add completed steps
+        for (const stepName of completed) {
+            steps.push({
+                name: stepName,
+                status: 'completed',
+            });
+        }
+
+        // Add failed steps
+        for (const stepName of failed) {
+            steps.push({
+                name: stepName,
+                status: 'failed',
+            });
+        }
+
+        // Add current step
+        if (progress.currentStep && !completed.has(progress.currentStep) && !failed.has(progress.currentStep)) {
+            steps.push({
+                name: progress.currentStep,
+                status: 'running',
+            });
+        }
+
+        return steps;
     }
 
     /**
