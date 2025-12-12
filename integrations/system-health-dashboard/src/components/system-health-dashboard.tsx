@@ -24,10 +24,12 @@ import {
 import HealthStatusCard from './health-status-card'
 import ViolationsTable from './violations-table'
 import SystemChecksTable from './system-checks-table'
+import UKBWorkflowModal from './ukb-workflow-modal'
 
 export default function SystemHealthDashboard() {
   const dispatch = useAppDispatch()
   const healthStatus = useAppSelector((state) => state.healthStatus)
+  const [ukbModalOpen, setUkbModalOpen] = useState(false)
   const healthReport = useAppSelector((state) => state.healthReport)
   const autoHealing = useAppSelector((state) => state.autoHealing)
   const apiQuota = useAppSelector((state) => state.apiQuota)
@@ -468,6 +470,8 @@ export default function SystemHealthDashboard() {
           title="UKB Workflows"
           icon={<Brain className="h-5 w-5" />}
           items={getUKBItems()}
+          clickable={true}
+          onClick={() => setUkbModalOpen(true)}
         />
       </div>
 
@@ -516,6 +520,13 @@ export default function SystemHealthDashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* UKB Workflow Modal */}
+      <UKBWorkflowModal
+        open={ukbModalOpen}
+        onOpenChange={setUkbModalOpen}
+        processes={ukb.processes || []}
+      />
     </div>
   )
 }

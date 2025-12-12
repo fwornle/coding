@@ -16,9 +16,11 @@ interface HealthStatusCardProps {
   title: string
   icon: React.ReactNode
   items: StatusItem[]
+  onClick?: () => void
+  clickable?: boolean
 }
 
-export default function HealthStatusCard({ title, icon, items }: HealthStatusCardProps) {
+export default function HealthStatusCard({ title, icon, items, onClick, clickable }: HealthStatusCardProps) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'operational':
@@ -46,11 +48,17 @@ export default function HealthStatusCard({ title, icon, items }: HealthStatusCar
   }
 
   return (
-    <Card>
+    <Card
+      className={clickable ? 'cursor-pointer hover:border-primary/50 transition-colors' : ''}
+      onClick={onClick}
+    >
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           {icon}
           {title}
+          {clickable && (
+            <span className="ml-auto text-xs text-muted-foreground font-normal">Click to expand</span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
