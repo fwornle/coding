@@ -1,0 +1,66 @@
+@startuml semantic-analysis-agent-system
+!include _standard-style.puml
+
+title "13-Agent Semantic Analysis System"
+
+left to right direction
+
+[Claude Code] <<external>> as claude
+[MCP Server] <<api>> as mcp
+[Coordinator] <<agent>> as coord
+
+package "Analysis" {
+  [Git History] <<agent>> as git
+  [Vibe History] <<agent>> as vibe
+  [Web Search] <<agent>> as web
+  [Observations] <<agent>> as obs
+  [Persistence] <<storage>> as persist
+  [Validation] <<agent>> as validate
+}
+
+package "LLM-Powered" {
+  [Semantic Analysis] <<agent>> as semantic
+  [Insights] <<agent>> as insight
+  [QA] <<agent>> as qa
+}
+
+package "Infrastructure" {
+  [Deduplication] <<agent>> as dedup
+  [Ontology] <<agent>> as ontology
+}
+
+package "Code Analysis" {
+  [Code Graph] <<agent>> as codegraph
+  [Doc Linker] <<agent>> as doclink
+}
+
+cloud "LLM Providers" <<external>> as llm
+database "Knowledge Graph" <<storage>> as db
+
+claude --> mcp
+mcp --> coord
+
+coord --> git
+coord --> vibe
+coord --> web
+coord --> obs
+coord --> persist
+coord --> validate
+
+coord --> semantic
+coord --> insight
+coord --> qa
+
+coord --> dedup
+coord --> ontology
+
+coord --> codegraph
+coord --> doclink
+
+semantic --> llm
+insight --> llm
+qa --> llm
+
+persist --> db
+
+@enduml

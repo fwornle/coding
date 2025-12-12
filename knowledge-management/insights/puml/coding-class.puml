@@ -1,125 +1,99 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Commands" {
-    class VkbCommand <<service>> {
-        +execute()
-        +visualizeKnowledgeBase()
+package "Knowledge Management" {
+    class KnowledgeManager <<service>> {
+        -graphDatabase: GraphologyAdapter
+        -levelDbAdapter: LevelDBAdapter
+        +storeKnowledge(data: any): Promise<void>
+        +queryKnowledge(query: string): Promise<any>
+        +exportToJson(): Promise<void>
     }
     
-    class CodingCommand <<service>> {
-        +execute()
-        +developmentOperations()
+    class GraphologyAdapter <<adapter>> {
+        -graph: Graph
+        +addNode(id: string, data: any): void
+        +addEdge(source: string, target: string): void
+        +findPaths(from: string, to: string): Path[]
     }
     
-    class GraphSyncCommand <<service>> {
-        +execute()
-        +synchronizeDatabase()
+    class LevelDBAdapter <<adapter>> {
+        -db: LevelDB
+        +put(key: string, value: any): Promise<void>
+        +get(key: string): Promise<any>
+        +batch(operations: Operation[]): Promise<void>
     }
 }
 
-package "Core Knowledge Management" {
-    class GraphDatabaseService <<service>> {
-        -graphAdapter: GraphDatabaseAdapter
-        +queryGraph()
-        +updateNodes()
-        +performDataOperations()
+package "Semantic Analysis" {
+    class SemanticAnalyzer <<service>> {
+        -knowledgeManager: KnowledgeManager
+        +analyzeCode(source: string): Promise<Analysis>
+        +extractSemantics(ast: AST): SemanticData
+        +buildKnowledgeGraph(semantics: SemanticData): void
     }
     
-    class GraphKnowledgeExporter <<service>> {
-        -persistenceAgent: PersistenceAgent
-        +exportToJson()
-        +syncData()
-        +generateExport()
-    }
-    
-    class GraphDatabaseAdapter <<interface>> {
-        +connect()
-        +query()
-        +update()
-        +abstractDataOperations()
-    }
-    
-    class PersistenceAgent <<service>> {
-        -levelDbPath: String
-        -exportPath: String
-        +manageStorage()
-        +persistData()
-        +loadData()
-    }
-    
-    class VkbApiClient <<service>> {
-        -baseUrl: String
-        +performApiInteractions()
-        +fetchKnowledgeData()
-        +submitUpdates()
+    class McpServerAdapter <<adapter>> {
+        -semanticAnalyzer: SemanticAnalyzer
+        +handleRequest(request: McpRequest): Promise<McpResponse>
+        +processSemanticQuery(query: string): Promise<any>
     }
 }
 
-package "Storage Layer" {
-    class GraphologyStorage <<file>> {
-        -graphData: Object
-        +storeGraph()
-        +retrieveGraph()
+package "Unified Library" {
+    class UkbUnifiedCore <<core>> {
+        -knowledgeManager: KnowledgeManager
+        -semanticAnalyzer: SemanticAnalyzer
+        +initialize(): Promise<void>
+        +processProject(path: string): Promise<void>
+        +exportKnowledge(): Promise<void>
     }
     
-    class LevelDBStorage <<file>> {
-        -dbPath: String
-        +persistentStorage()
-        +queryData()
-    }
-    
-    class JsonExportStorage <<file>> {
-        -exportPath: String
-        +syncedJsonData()
-        +automatedExport()
+    interface KnowledgeStorage <<interface>> {
+        +store(key: string, value: any): Promise<void>
+        +retrieve(key: string): Promise<any>
+        +query(pattern: string): Promise<any[]>
     }
 }
 
-package "Semantic Analysis Integration" {
-    class ParallelWorker <<service>> {
-        -batchSize: Integer
-        +processBatchAnalysis()
-        +executeParallel()
+package "Data Storage" {
+    class KnowledgeGraphStore <<file>> {
+        +location: ".data/knowledge-graph"
+        +type: "LevelDB + Graphology"
     }
     
-    class SemanticAnalysisService <<service>> {
-        -workers: ParallelWorker[]
-        +performSemanticAnalysis()
-        +integrateResults()
+    class JsonExportStore <<file>> {
+        +location: ".data/knowledge-export"
+        +autoSync: boolean
+        +format: "JSON"
     }
 }
 
-package "Libraries" {
-    class UkbUnifiedLibrary <<interface>> {
-        +provideUnifiedInterface()
-        +commonUtilities()
+package "Coding Project" {
+    class CodingProject <<entity>> {
+        -srcPath: "src/knowledge-management"
+        -libPath: "lib/ukb-unified"
+        -mcpPath: "integrations/mcp-server-semantic-analysis/src"
+        +analyze(): Promise<ProjectAnalysis>
+        +buildKnowledgeBase(): Promise<void>
     }
 }
 
 ' Relationships
-GraphDatabaseService --> GraphDatabaseAdapter : uses
-GraphDatabaseService --> PersistenceAgent : manages
-GraphKnowledgeExporter --> PersistenceAgent : uses
-GraphKnowledgeExporter --> JsonExportStorage : exports to
+UkbUnifiedCore --> KnowledgeManager : uses
+UkbUnifiedCore --> SemanticAnalyzer : uses
+SemanticAnalyzer --> KnowledgeManager : stores results
+McpServerAdapter --> SemanticAnalyzer : delegates to
+KnowledgeManager --> GraphologyAdapter : delegates to
+KnowledgeManager --> LevelDBAdapter : delegates to
+KnowledgeManager --> KnowledgeGraphStore : persists to
+KnowledgeManager --> JsonExportStore : exports to
+GraphologyAdapter ..|> KnowledgeStorage : implements
+LevelDBAdapter ..|> KnowledgeStorage : implements
+CodingProject --> UkbUnifiedCore : orchestrates
 
-GraphDatabaseAdapter --> GraphologyStorage : implements with
-GraphDatabaseAdapter --> LevelDBStorage : persists to
-
-PersistenceAgent --> GraphologyStorage : manages
-PersistenceAgent --> LevelDBStorage : manages
-
-VkbCommand --> GraphDatabaseService : visualizes
-CodingCommand --> GraphDatabaseService : operates on
-GraphSyncCommand --> GraphKnowledgeExporter : triggers
-
-SemanticAnalysisService --> ParallelWorker : coordinates
-SemanticAnalysisService --> GraphDatabaseService : integrates with
-
-GraphDatabaseService --> UkbUnifiedLibrary : utilizes
-VkbApiClient --> UkbUnifiedLibrary : utilizes
-
-JsonExportStorage ..> GraphologyStorage : synced from
-ParallelWorker ..> GraphDatabaseService : batch updates
+' Notes
+note right of KnowledgeGraphStore : "Replaced shared-memory.json\nwith persistent storage"
+note bottom of JsonExportStore : "Auto-synced from GraphDB"
 
 @enduml

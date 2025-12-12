@@ -1,73 +1,51 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor User
-participant "CLI Interface" as CLI
-participant "VkbApiClient" as API
-participant "GraphDatabaseService" as GDS
-participant "GraphDatabaseAdapter" as GDA
-participant "PersistenceAgent" as PA
-participant "GraphKnowledgeExporter" as GKE
-participant "Semantic Analysis\nWorker Pool" as SAW
-database "Graphology + LevelDB\n(.data/knowledge-graph)" as DB
-database "JSON Export\n(.data/knowledge-export)" as JSON
+participant "Knowledge Management\n(src/knowledge-management)" as KM
+participant "UKB Unified Library\n(lib/ukb-unified)" as UKB
+participant "MCP Semantic Analysis\n(integrations/mcp-server-semantic-analysis/src)" as MCP
+participant "Graphology + LevelDB\n(.data/knowledge-graph)" as GraphDB
+participant "JSON Export\n(.data/knowledge-export)" as JSONExport
 
-User -> CLI: Execute command ('vkb', 'coding', 'graph-sync')
+== Coding Project Initialization ==
+KM -> UKB: Initialize coding project
+UKB -> GraphDB: Setup knowledge storage
+GraphDB --> UKB: Storage ready
+UKB --> KM: Project initialized
 
-alt vkb command
-    CLI -> API: Initialize VkbApiClient
-    API -> GDS: Request knowledge base data
-    GDS -> GDA: Query graph database
-    GDA -> PA: Access storage layer
-    PA -> DB: Retrieve graph data
-    DB --> PA: Return graph data
-    PA --> GDA: Return formatted data
-    GDA --> GDS: Return database results
-    GDS --> API: Return knowledge data
-    API --> CLI: Return visualization data
-    CLI --> User: Display knowledge base
+== Semantic Analysis Flow ==
+MCP -> UKB: Request semantic analysis
+UKB -> KM: Process coding entities
+KM -> GraphDB: Store knowledge nodes
+GraphDB --> KM: Nodes stored
+KM --> UKB: Analysis complete
+UKB --> MCP: Return semantic results
 
-else coding command
-    CLI -> GDS: Execute development operations
-    GDS -> SAW: Initialize parallel workers
-    loop Batch Processing
-        SAW -> GDA: Process semantic analysis
-        GDA -> PA: Store analysis results
-        PA -> DB: Persist to graph database
-    end
-    GDS --> CLI: Operation complete
-    CLI --> User: Development operation result
-
-else graph-sync command
-    CLI -> GKE: Trigger export process
-    GKE -> GDS: Request graph data
-    GDS -> GDA: Query complete graph
-    GDA -> PA: Access full dataset
-    PA -> DB: Retrieve all graph data
-    DB --> PA: Return complete dataset
-    PA --> GDA: Return full graph data
-    GDA --> GDS: Return database snapshot
-    GDS --> GKE: Provide export data
-    GKE -> JSON: Sync to JSON export
-    GKE --> CLI: Export complete
-    CLI --> User: Synchronization result
+== Knowledge Management ==
+loop Continuous Sync
+    GraphDB -> JSONExport: Auto-sync knowledge data
+    JSONExport --> GraphDB: Sync complete
 end
 
-note right of SAW
-Parallel worker implementation
-for batch semantic analysis
-(recent architectural improvement)
+== Data Access ==
+alt Knowledge Query
+    KM -> GraphDB: Query knowledge graph
+    GraphDB --> KM: Return graph data
+else Export Request
+    KM -> JSONExport: Access exported data
+    JSONExport --> KM: Return JSON data
+end
+
+note over GraphDB
+  Legacy shared-memory.json
+  has been REMOVED
+  Replaced with Graphology + LevelDB
 end note
 
-note right of DB
-Primary storage:
-Graphology + LevelDB
-at .data/knowledge-graph
-end note
-
-note right of JSON
-Automated JSON export sync
-replaces shared-memory.json
+note over JSONExport
+  Auto-synced exports
+  from GraphDB for
+  external access
 end note
 
 @enduml
