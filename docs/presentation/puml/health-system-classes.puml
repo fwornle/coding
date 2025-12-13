@@ -1,0 +1,81 @@
+@startuml
+!include _standard-style.puml
+
+title Health System Classes - 9 Core Components
+
+left to right direction
+
+rectangle "Layer 0\nFailsafe" as L0 {
+  class SystemMonitorWatchdog <<infra>> {
+    cron/launchd
+    ensures GSC runs
+  }
+}
+
+rectangle "Layer 1\nService Mgmt" as L1 {
+  class GlobalServiceCoordinator <<core>> {
+    15s health checks
+    manages services
+  }
+  class GlobalLSLCoordinator <<core>> {
+    30s health checks
+    multi-project LSL
+  }
+}
+
+rectangle "Layer 2\nPre-Session" as L2 {
+  class MonitoringVerifier <<infra>> {
+    exit 0/1/2
+    pre-Claude check
+  }
+}
+
+rectangle "Layer 3\nVerification" as L3 {
+  class HealthVerifier <<core>> {
+    60s checks
+    auto-healing
+  }
+}
+
+rectangle "Layer 4\nPresentation" as L4 {
+  class StatusLineHealthMonitor <<core>> {
+    15s updates
+    aggregates health
+  }
+}
+
+rectangle "Layer 5\nPer-Project" as L5 {
+  class EnhancedTranscriptMonitor <<core>> {
+    2s interval
+    health files
+  }
+  class LiveLoggingCoordinator <<util>> {
+    LSL files
+    multi-user
+  }
+}
+
+rectangle "Core\nInfrastructure" as Core {
+  class ProcessStateManager <<storage>> {
+    atomic locking
+    singleton mgmt
+  }
+}
+
+' Relationships
+SystemMonitorWatchdog --> GlobalServiceCoordinator
+GlobalServiceCoordinator --> GlobalLSLCoordinator
+GlobalLSLCoordinator --> EnhancedTranscriptMonitor
+MonitoringVerifier ..> HealthVerifier
+HealthVerifier --> StatusLineHealthMonitor
+StatusLineHealthMonitor --> EnhancedTranscriptMonitor
+EnhancedTranscriptMonitor --> LiveLoggingCoordinator
+
+' PSM is central
+ProcessStateManager -up-|> SystemMonitorWatchdog
+ProcessStateManager -up-|> GlobalServiceCoordinator
+ProcessStateManager -up-|> HealthVerifier
+ProcessStateManager -up-|> StatusLineHealthMonitor
+ProcessStateManager -up-|> EnhancedTranscriptMonitor
+
+@enduml

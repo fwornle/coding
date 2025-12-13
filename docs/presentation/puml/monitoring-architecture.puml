@@ -1,57 +1,55 @@
 @startuml
 !include _standard-style.puml
 
-title Process Monitoring Architecture
+title Health System - 6-Layer Architecture (9 Classes)
 
 left to right direction
 
-left to right direction
-
-left to right direction
-
-top to bottom direction
-
-package "Session Management" {
-  component [launch-claude.sh] as LaunchClaude <<cli>>
-  component [Session Cleanup] as Cleanup <<util>>
+package "Layer 0" {
+  component [System\nWatchdog] as SMW <<infra>>
 }
 
-package "Service Management Layer" {
-  component [Global Service\nCoordinator] as Coordinator <<core>>
-  component [start-services.sh] as StartScript <<cli>>
+package "Layer 1" {
+  component [Global Service\nCoordinator] as GSC <<core>>
+  component [Global LSL\nCoordinator] as GLC <<core>>
 }
 
-package "Process State Manager (PSM)" <<Database>> {
-  component [Process Registry\n.live-process-registry.json] as PSM_Registry <<storage>>
-  component [Lock Manager\n(proper-lockfile)] as Lock <<util>>
-
-  PSM_Registry -down-> Lock : atomic operations
+package "Layer 2" {
+  component [Monitoring\nVerifier] as MV <<infra>>
 }
 
-package "Monitoring Layer" {
-  component [System Monitor\nWatchdog] as Watchdog <<infra>>
-  component [Monitoring\nVerifier] as Verifier <<infra>>
+package "Layer 3" {
+  component [Health\nVerifier] as HV <<infra>>
 }
 
-package "Running Services" {
-  component [Constraint\nDashboard] as Dashboard <<api>>
-  component [Enhanced\nTranscript Monitor] as TranscriptMon <<core>>
-  component [VKB Server] as VKB <<api>>
+package "Layer 4" {
+  component [StatusLine\nHealth Monitor] as SHM <<core>>
 }
 
-' Connections from top to center
-LaunchClaude -down-> PSM_Registry : register session
-Cleanup -down-> PSM_Registry : cleanup session services
-Coordinator -down-> PSM_Registry : register/query/unregister
-StartScript -down-> PSM_Registry : register services
+package "Layer 5" {
+  component [Enhanced\nTranscript Monitor] as ETM <<core>>
+  component [Live Logging\nCoordinator] as LLC <<util>>
+}
 
-' Connections from center to bottom
-Watchdog -up-> PSM_Registry : check coordinator health
-Verifier -up-> PSM_Registry : verify system health
+package "Core" {
+  component [Process State\nManager] as PSM <<storage>>
+}
 
-' Service management
-Dashboard -up-> Coordinator : managed by
-TranscriptMon -up-> Coordinator : managed by
-VKB -up-> StartScript : started by
+' Layer flow (left to right)
+SMW CONTROL_LINE GSC
+GSC CONTROL_LINE GLC
+GLC CONTROL_LINE ETM
+MV ..> HV
+HV DATA_LINE SHM
+SHM SYNC_LINE ETM
+ETM ..> LLC
+
+' PSM connections
+PSM -up-> SMW
+PSM -up-> GSC
+PSM -up-> GLC
+PSM -up-> HV
+PSM -up-> SHM
+PSM -up-> ETM
 
 @enduml
