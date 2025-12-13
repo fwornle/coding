@@ -317,7 +317,7 @@ class GlobalLSLCoordinator {
         const ProcessStateManager = (await import('./process-state-manager.js')).default;
         const psm = new ProcessStateManager();
         await psm.initialize();
-        await psm.unregisterService('enhanced-transcript-monitor', 'per-project', projectPath);
+        await psm.unregisterService('enhanced-transcript-monitor', 'per-project', { projectPath });
         this.log(`Monitor unregistered from PSM (PID: ${monitorPid})`);
       } catch (psmError) {
         this.log(`Failed to unregister monitor from PSM: ${psmError.message}`);
