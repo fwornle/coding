@@ -234,9 +234,11 @@ class StatusLineHealthMonitor {
         const registry = JSON.parse(fs.readFileSync(this.registryPath, 'utf8'));
 
         for (const [projectName, projectInfo] of Object.entries(registry.projects || {})) {
-          // CRITICAL: Skip if no transcript monitor is running for this project
-          // This ensures Method 1 behaves consistently with Methods 2 and 3
-          if (!runningMonitors.has(projectName)) continue;
+          // CRITICAL: Only show sessions with running transcript monitors
+          // Sessions without monitors should NOT appear in status line at all
+          if (!runningMonitors.has(projectName)) {
+            continue; // Skip - don't show sessions without running monitors
+          }
 
           const sessionHealth = await this.getProjectSessionHealth(projectName, projectInfo);
           sessions[projectName] = sessionHealth;
@@ -259,8 +261,11 @@ class StatusLineHealthMonitor {
           // Skip if already found via registry
           if (sessions[projectName]) continue;
 
-          // Skip if no transcript monitor is running for this project
-          if (!runningMonitors.has(projectName)) continue;
+          // CRITICAL: Only show sessions with running transcript monitors
+          // Sessions without monitors should NOT appear in status line at all
+          if (!runningMonitors.has(projectName)) {
+            continue; // Skip - don't show sessions without running monitors
+          }
 
           // Check if this project has a centralized health file FIRST
           const projectPath = `/Users/q284340/Agentic/${projectName}`;
@@ -353,6 +358,7 @@ class StatusLineHealthMonitor {
       // IMPORTANT: Only show sessions with running transcript monitors
       const commonProjectDirs = [
         this.codingRepoPath, // Current coding directory
+        '/Users/q284340/Agentic/ui-template',
         '/Users/q284340/Agentic/curriculum-alignment',
         '/Users/q284340/Agentic/nano-degree'
       ];
@@ -363,8 +369,11 @@ class StatusLineHealthMonitor {
         // Skip if already found
         if (sessions[projectName]) continue;
 
-        // Skip if no transcript monitor is running for this project
-        if (!runningMonitors.has(projectName)) continue;
+        // CRITICAL: Only show sessions with running transcript monitors
+        // Sessions without monitors should NOT appear in status line at all
+        if (!runningMonitors.has(projectName)) {
+          continue; // Skip - don't show sessions without running monitors
+        }
 
         if (fs.existsSync(projectDir)) {
           const centralizedHealthFile = this.getCentralizedHealthFile(projectDir);

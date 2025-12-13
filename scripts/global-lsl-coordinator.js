@@ -168,9 +168,10 @@ class GlobalLSLCoordinator {
       // Kill any existing monitors for this project first
       // CRITICAL FIX: Pass project path as argument so pkill can find it
       exec(`pkill -f "enhanced-transcript-monitor.js ${projectPath}"`, () => {
-
-        // CRITICAL FIX: Add project path as argument so pkill pattern can match
-        const child = spawn('node', [monitorScript, projectPath], {
+        // RACE CONDITION FIX: Wait for old process to fully terminate before spawning new one
+        setTimeout(() => {
+          // CRITICAL FIX: Add project path as argument so pkill pattern can match
+          const child = spawn('node', [monitorScript, projectPath], {
           cwd: projectPath,
           detached: true,
           stdio: ['ignore', 'ignore', 'ignore'],
@@ -221,6 +222,7 @@ class GlobalLSLCoordinator {
             resolve(null);
           }
         }, 1000);
+        }, 500);  // End of race condition fix setTimeout
       });
     });
   }

@@ -74,6 +74,37 @@ To show remaining dollars, set `prepaidCredits` in `config/live-logging-config.j
 - Anthropic: `ANTHROPIC_ADMIN_API_KEY` - Get at console.anthropic.com → Settings → Admin API Keys
 - OpenAI: `OPENAI_ADMIN_API_KEY` - Get at platform.openai.com/settings/organization/admin-keys
 
+### Health Verifier Status Indicators
+
+The `[🏥...]` section shows the health verifier system status:
+
+| Display | Meaning | Action |
+|---------|---------|--------|
+| `[🏥✅]` | Health verifier operational, no violations | None needed |
+| `[🏥🟡]` | Degraded - some issues detected | Review health dashboard |
+| `[🏥⏰]` | **Stale** - verification data >2 minutes old | Health verifier may have crashed/stuck |
+| `[🏥❌]` | Error reading health status | Check health verifier process |
+| `[🏥⚠️X]` | X violations detected | Review violations in dashboard |
+
+**Common Causes of `[🏥⏰]` (Stale)**:
+- Health verifier process crashed or was killed
+- System under heavy load (verifier couldn't run)
+- Health status file locked by another process
+
+**To Fix Stale Status**:
+```bash
+# Check if health verifier is running
+ps aux | grep health-verifier
+
+# Manually trigger verification
+node scripts/health-verifier.js
+
+# Or restart all services
+coding --restart-services
+```
+
+The health verifier runs every 60 seconds. If the status file is older than 2 minutes, it's considered stale.
+
 ### Trajectory States
 
 - `🔍 EX` (Exploring) - Information gathering and analysis
