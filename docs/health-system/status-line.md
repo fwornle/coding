@@ -151,6 +151,12 @@ Session activity uses a **graduated green color scheme** that transitions smooth
 
 ## Architecture
 
+The Status Line is part of the **6-Layer Health System** with 9 core classes:
+
+![Health System Classes](../images/health-system-classes.png)
+
+The StatusLineHealthMonitor (Layer 4) aggregates health from all other layers and outputs to the Combined Status Line display.
+
 ![StatusLine Architecture](../images/statusline-architecture.png)
 
 ### Core Components

@@ -1,99 +1,127 @@
 @startuml
 !include _standard-style.puml
 
-title Enhanced Health Monitoring System Overview
+title Enhanced Health Monitoring System - 6-Layer Architecture
 
 top to bottom direction
 
-package "4-Layer Protection Architecture" {
-  component [Global Watchdog] as GW <<layer4>> 
-  component [Global LSL Coordinator] as GLC <<layer3>>
-  component [StatusLine Health Monitor] as SHM <<layer2>>
-  component [Enhanced Transcript Monitors] as ETM <<layer1>>
+package "Layer 0: System Failsafe" {
+  component [SystemMonitorWatchdog] as SMW <<layer0>>
 }
 
-package "Session Health Displays" {
+package "Layer 1: Service Management" {
+  component [GlobalServiceCoordinator] as GSC <<layer1>>
+  component [GlobalLSLCoordinator] as GLC <<layer1>>
+}
+
+package "Layer 2: Pre-Session Verification" {
+  component [MonitoringVerifier] as MV <<layer2>>
+}
+
+package "Layer 3: Health Verification" {
+  component [HealthVerifier] as HV <<layer3>>
+}
+
+package "Layer 4: Presentation" {
+  component [StatusLineHealthMonitor] as SHM <<layer4>>
   component [Combined Status Line] as CSL <<display>>
-  note right of CSL
-    **Example Output:**
-    ✅C:🟢 CA:🟢 ND:🟢 🛡️ 8.5 🔍EX 🧠 ✅ 📋9-10
-    
-    ✅ = Global Coding Monitor healthy
-    C:🟢 = Coding session healthy  
-    CA:🟢 = Curriculum-Alignment healthy
-    ND:🟢 = Nano-Degree healthy
-    🛡️ 8.5 = Constraint monitor (severity)
-    🔍EX = Semantic analysis active
-    🧠 ✅ = Memory service healthy
-    📋9-10 = Time window monitor
-  end note
+}
+
+package "Layer 5: Per-Project Monitoring" {
+  component [EnhancedTranscriptMonitor] as ETM <<layer5>>
+  component [LiveLoggingCoordinator] as LLC <<layer5>>
+}
+
+package "Core Infrastructure" {
+  component [ProcessStateManager] as PSM <<core>>
+  database [.live-process-registry.json] as LPR <<storage>>
 }
 
 package "Health Data Storage" {
-  database [.transcript-monitor-health] as Health_Files <<per_project>>
+  database [.health/*.json] as Health_Files <<per_project>>
   database [.global-lsl-registry.json] as LSL_Registry <<central>>
-  database [.global-service-registry.json] as Service_Registry <<central>>
+  database [.health/verification-status.json] as Verify_Status <<central>>
 }
 
-package "Multi-Session Projects" {
-  component [Coding Session] as Coding_Session <<project>>
-  component [Curriculum-Alignment] as CA_Session <<project>>
-  component [Nano-Degree] as ND_Session <<project>>
-  component [Additional Projects] as Other_Sessions <<project>>
-}
-
-' Health monitoring flow
-GW CONTROL_LINE GLC : monitors & restarts
+' Layer relationships
+SMW CONTROL_LINE GSC : monitors & restarts
+GSC CONTROL_LINE GLC : coordinates
 GLC CONTROL_LINE ETM : ensures & recovers
-ETM DATA_LINE Health_Files : writes health data
-SHM SYNC_LINE Health_Files : aggregates health
-SHM ASYNC_LINE LSL_Registry : discovers sessions
-SHM ASYNC_LINE Service_Registry : monitors services
 
-' Status line generation
-CSL SYNC_LINE SHM : queries health status
-CSL SYNC_LINE ETM : reads individual health
+' Verification chain
+MV ..> SMW : verifies
+MV ..> GSC : verifies
+MV ..> HV : triggers
 
-' Session monitoring
-ETM SYNC_LINE Coding_Session : monitors
-ETM SYNC_LINE CA_Session : monitors  
-ETM SYNC_LINE ND_Session : monitors
-ETM SYNC_LINE Other_Sessions : monitors
+' Health flow
+HV DATA_LINE Verify_Status : writes reports
+SHM SYNC_LINE Health_Files : aggregates
+SHM SYNC_LINE Verify_Status : reads status
+CSL SYNC_LINE SHM : queries
+
+' Per-project monitoring
+ETM DATA_LINE Health_Files : writes health
+ETM ..> LLC : uses
+
+' PSM is central
+PSM DATA_LINE LPR : manages
+SMW --> PSM : uses
+GSC --> PSM : uses
+GLC --> PSM : uses
+MV --> PSM : uses
+HV --> PSM : uses
+SHM --> PSM : uses
+ETM --> PSM : uses
 
 ' Registry updates
 GLC ASYNC_LINE LSL_Registry : maintains
-GW ASYNC_LINE Service_Registry : updates
 
-note right of GW
-  **Layer 4: Global Watchdog**
-  - Monitors all coordinator processes
-  - 15-second health checks
-  - Auto-restarts failed coordinators
-  - Maintains service registry
+note right of SMW
+  **Layer 0: Ultimate Failsafe**
+  - Runs via cron/launchd (60s)
+  - Ensures GSC always runs
+  - Cannot be killed by user
 end note
 
-note right of GLC
-  **Layer 3: Global LSL Coordinator**
-  - 30-second health checks on all projects
-  - Auto-recovery of dead monitors
-  - Cross-project session discovery
-  - Maintains LSL registry
+note right of GSC
+  **Layer 1: Service Daemon**
+  - 15s health checks
+  - Exponential backoff
+  - Manages MCP servers
+end note
+
+note right of MV
+  **Layer 2: Pre-Session**
+  - Exit 0=OK, 1=FAIL, 2=WARN
+  - Must pass before Claude
+end note
+
+note right of HV
+  **Layer 3: Verification**
+  - 60s periodic checks
+  - Auto-healing triggers
+  - DB/Service/Process checks
 end note
 
 note right of SHM
-  **Layer 2: StatusLine Health Monitor**
-  - Dynamic session discovery via Claude transcripts
-  - Smart project name abbreviations
-  - Individual session status reporting
-  - Health aggregation across projects
+  **Layer 4: Aggregation**
+  - 15s updates
+  - Only running monitors shown
+  - Outputs status line text
 end note
 
 note right of ETM
-  **Layer 1: Enhanced Transcript Monitors**
-  - Real-time transcript monitoring per project
-  - Health file generation (5-second intervals)
-  - Process metrics and activity tracking
-  - Streaming status and error detection
+  **Layer 5: Per-Project**
+  - 2s check interval
+  - Centralized health files
+  - LSL generation
+end note
+
+note bottom of PSM
+  **Core Infrastructure**
+  Used by ALL other classes
+  Atomic file locking
+  Singleton management
 end note
 
 @enduml

@@ -2,51 +2,96 @@
 
 ## Overview
 
-The Enhanced Health Monitoring System provides comprehensive health tracking and status reporting across all Claude Code sessions. This system includes individual session monitoring, smart abbreviation generation, auto-recovery mechanisms, multi-project coordination through a 4-layer protection architecture, and real-time API quota monitoring for LLM providers.
+The Enhanced Health Monitoring System provides comprehensive health tracking and status reporting across all Claude Code sessions. This system includes individual session monitoring, smart abbreviation generation, auto-recovery mechanisms, multi-project coordination through a 6-layer protection architecture with 9 core classes, and real-time API quota monitoring for LLM providers.
 
 ![System Health Dashboard](../images/health-monitor.png)
 
 ## System Architecture
 
-### 4-Layer Protection Architecture
+### 6-Layer Protection Architecture
 
 ![Enhanced Health Monitoring Overview](../images/enhanced-health-monitoring-overview.png)
 
-The system implements a robust 4-layer monitoring protection:
+The system implements a robust 6-layer monitoring protection with 9 core classes:
 
-1. **Layer 1: Watchdog** - Global service monitoring and recovery
-2. **Layer 2: Coordinator** - Multi-project session coordination 
-3. **Layer 3: Verifier** - Health verification and reporting
-4. **Layer 4: Monitor** - Individual session transcript monitoring
+| Layer | Class | Purpose |
+|-------|-------|---------|
+| **Layer 0** | SystemMonitorWatchdog | Ultimate failsafe - runs via cron/launchd, ensures GSC always runs |
+| **Layer 1** | GlobalServiceCoordinator | Self-healing daemon managing all critical services |
+| **Layer 1** | GlobalLSLCoordinator | Multi-project transcript monitoring manager |
+| **Layer 2** | MonitoringVerifier | Pre-session verification (exit 0=OK, 1=FAIL, 2=WARN) |
+| **Layer 3** | HealthVerifier | Core verification engine with auto-healing |
+| **Layer 4** | StatusLineHealthMonitor | Health aggregation for Claude Code status bar |
+| **Layer 5** | EnhancedTranscriptMonitor | Real-time per-project transcript monitoring |
+| **Layer 5** | LiveLoggingCoordinator | Logging orchestration with multi-user support |
+| **Core** | ProcessStateManager | Unified registry with atomic file locking (used by all) |
 
-### Core Components
+![Health System Classes](../images/health-system-classes.png)
 
-#### 1. Enhanced Transcript Monitor (`scripts/enhanced-transcript-monitor.js`)
-- Individual session monitoring with health metrics
-- Real-time activity tracking and suspicious behavior detection
-- Memory, CPU, and process health monitoring
-- Transcript file size and age tracking
+### Core Components (9 Classes by Layer)
 
-#### 2. StatusLine Health Monitor (`scripts/statusline-health-monitor.js`)
-- Dynamic session discovery from Claude transcript directories
-- Smart project name abbreviation generation
-- Individual session status reporting
-- Integration with Combined Status Line system
+#### Core Infrastructure: ProcessStateManager (`scripts/process-state-manager.js`)
+- Unified registry for all system processes (`.live-process-registry.json`)
+- Atomic file operations via proper-lockfile
+- Session-aware process tracking (global, per-project, per-session)
+- Used by ALL other health system classes
 
-#### 3. Global LSL Coordinator (`scripts/global-lsl-coordinator.js`)
-- Multi-project session management
-- Auto-recovery mechanisms for dead monitors
-- Health check coordination across all sessions
-- "Plug'n'play" behavior for seamless session management
+#### Layer 0: SystemMonitorWatchdog (`scripts/system-monitor-watchdog.js`)
+- Ultimate failsafe "monitor monitoring the monitor"
+- Runs via system cron/launchd every minute
+- Ensures GlobalServiceCoordinator is always running
+- Cannot be killed by user processes
 
-#### 4. Combined Status Line (`scripts/combined-status-line.js`)
+#### Layer 1: GlobalServiceCoordinator (`scripts/global-service-coordinator.js`)
+- Self-healing service management daemon
+- 15-second health checks with exponential backoff recovery
+- Manages: constraint API, constraint dashboard, MCP servers
+- Service registry maintenance
+
+#### Layer 1: GlobalLSLCoordinator (`scripts/global-lsl-coordinator.js`)
+- Multi-project transcript monitoring manager
+- 30-second health checks on all registered projects
+- Auto-recovery of dead Enhanced Transcript Monitors
+- Maintains: `.global-lsl-registry.json`
+
+#### Layer 2: MonitoringVerifier (`scripts/monitoring-verifier.js`)
+- Pre-session verification of all monitoring systems
+- Exit codes: 0=OK, 1=Critical failure (MUST NOT START), 2=Warning
+- Validates: watchdog, coordinator, project registration, service health
+
+#### Layer 3: HealthVerifier (`scripts/health-verifier.js`)
+- Core verification engine with 60-second periodic checks
+- Checks databases (LevelDB, Qdrant, SQLite, Memgraph), services, processes
+- Generates health scores (0-100) per service
+- Triggers auto-healing via HealthRemediationActions
+
+#### Layer 4: StatusLineHealthMonitor (`scripts/statusline-health-monitor.js`)
+- Health aggregation for Claude Code status bar
+- 15-second update interval with auto-healing
+- **Only shows sessions with running transcript monitors**
+- Outputs to: `.logs/statusline-health-status.txt`
+
+#### Layer 5: EnhancedTranscriptMonitor (`scripts/enhanced-transcript-monitor.js`)
+- Real-time per-project transcript monitoring
+- 2-second check interval for prompt detection
+- Writes health files to centralized `.health/` directory
+- Generates LSL files in `.specstory/history/`
+
+#### Layer 5: LiveLoggingCoordinator (`scripts/live-logging-coordinator.js`)
+- Orchestrates live logging components
+- Manages LSLFileManager and operational logging
+- Multi-user support with user hash tracking
+- Performance metrics collection
+
+### Supporting Components
+
+#### Combined Status Line (`scripts/combined-status-line.js`)
+- Reads from StatusLineHealthMonitor output
 - Unified status display across all Claude Code sessions
 - Individual session status with smart abbreviations
 - Integration with constraint monitoring and semantic analysis
-- Real-time health status updates
-- API quota monitoring via `lib/api-quota-checker.js`
 
-#### 5. API Quota Checker (`lib/api-quota-checker.js`)
+#### API Quota Checker (`lib/api-quota-checker.js`)
 - Shared library for checking LLM provider quotas
 - Multi-provider support (Groq, Google, Anthropic, OpenAI, X.AI)
 - Two-tier caching strategy (30s real-time, 5min estimated)
