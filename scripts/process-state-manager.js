@@ -389,58 +389,6 @@ class ProcessStateManager {
   }
 
   /**
-   * Cleanup dead processes from registry
-   */
-  async cleanupDeadProcesses() {
-    return this.withLock(async () => {
-      const registry = await this.readRegistry();
-      let cleaned = 0;
-
-      // Check global services
-      for (const [name, service] of Object.entries(registry.services.global)) {
-        if (!this.isProcessAlive(service.pid)) {
-          delete registry.services.global[name];
-          cleaned++;
-        }
-      }
-
-      // Check per-project services
-      for (const [projectPath, services] of Object.entries(registry.services.projects)) {
-        for (const [name, service] of Object.entries(services)) {
-          if (!this.isProcessAlive(service.pid)) {
-            delete services[name];
-            cleaned++;
-          }
-        }
-        // Clean up empty project entries
-        if (Object.keys(services).length === 0) {
-          delete registry.services.projects[projectPath];
-        }
-      }
-
-      // Check session services
-      for (const [sessionId, session] of Object.entries(registry.sessions)) {
-        for (const [name, service] of Object.entries(session.services)) {
-          if (!this.isProcessAlive(service.pid)) {
-            delete session.services[name];
-            cleaned++;
-          }
-        }
-        // Clean up empty sessions
-        if (Object.keys(session.services).length === 0) {
-          delete registry.sessions[sessionId];
-        }
-      }
-
-      if (cleaned > 0) {
-        await this.writeRegistry(registry);
-      }
-
-      return cleaned;
-    });
-  }
-
-  /**
    * Alias for cleanupDeadProcesses - removes stale service entries
    */
   async cleanupStaleServices() {
