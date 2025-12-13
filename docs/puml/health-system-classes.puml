@@ -1,0 +1,204 @@
+@startuml
+!include _standard-style.puml
+
+title Health System - 9 Core Classes Architecture
+
+top to bottom direction
+
+package "Layer 0: System Failsafe" {
+  class SystemMonitorWatchdog <<watchdog>> {
+    +codingRepoPath: string
+    +psm: ProcessStateManager
+    --
+    +isCoordinatorAlive(): Promise<boolean>
+    +startCoordinator(): Promise<void>
+    +runWatchdogCheck(): Promise<void>
+    +installLaunchd(): void
+    --
+    **Purpose:** Ultimate failsafe
+    Runs via cron/launchd
+    Ensures GSC always runs
+  }
+}
+
+package "Layer 1: Service Management" {
+  class GlobalServiceCoordinator <<daemon>> {
+    +psm: ProcessStateManager
+    +registry: ServiceRegistry
+    +healthCheckInterval: 15s
+    --
+    +startDaemon(): Promise<void>
+    +healthCheck(): Promise<void>
+    +restartService(name): Promise<void>
+    +registerProject(path): void
+    --
+    **Purpose:** Self-healing daemon
+    Manages: LSL, trajectory,
+    constraint monitor, MCP servers
+  }
+
+  class GlobalLSLCoordinator <<daemon>> {
+    +psm: ProcessStateManager
+    +registryPath: string
+    +healthCheckInterval: 30s
+    --
+    +registerProject(path): void
+    +ensureMonitor(project): Promise<void>
+    +recoverDeadMonitors(): Promise<void>
+    +getProjectStatus(name): Status
+    --
+    **Purpose:** Multi-project
+    transcript monitoring manager
+  }
+}
+
+package "Layer 2: Pre-Session Verification" {
+  class MonitoringVerifier <<verifier>> {
+    +codingRepoPath: string
+    +projectPath: string
+    +strict: boolean
+    --
+    +verifySystemWatchdog(): Promise<Result>
+    +verifyCoordinator(): Promise<Result>
+    +verifyProjectRegistration(): Promise<Result>
+    +verifyServiceHealth(): Promise<Result>
+    +verifyAll(): Promise<Result>
+    --
+    **Purpose:** Pre-session check
+    Exit 0=OK, 1=FAIL, 2=WARN
+    Must pass before Claude starts
+  }
+}
+
+package "Layer 3: Health Verification" {
+  class HealthVerifier <<verifier>> {
+    +psm: ProcessStateManager
+    +remediation: HealthRemediationActions
+    +autoHealingEnabled: boolean
+    --
+    +verify(): Promise<Report>
+    +checkDatabases(): Promise<Result>
+    +checkServices(): Promise<Result>
+    +checkProcesses(): Promise<Result>
+    +triggerHealing(action): Promise<void>
+    --
+    **Purpose:** Core verification
+    Periodic checks (60s default)
+    Auto-healing capabilities
+  }
+}
+
+package "Layer 4: Presentation" {
+  class StatusLineHealthMonitor <<daemon>> {
+    +psm: ProcessStateManager
+    +updateInterval: 15s
+    +autoHealEnabled: boolean
+    --
+    +aggregateHealth(): Promise<Status>
+    +getRunningMonitors(): Set<string>
+    +getProjectSessionHealth(name): Status
+    +writeStatusFile(): void
+    --
+    **Purpose:** Health aggregation
+    Displays in Claude Code status bar
+    Only shows running monitors
+  }
+}
+
+package "Layer 5: Per-Project Monitoring" {
+  class EnhancedTranscriptMonitor <<monitor>> {
+    +psm: ProcessStateManager
+    +transcriptPath: string
+    +healthFile: string
+    +checkInterval: 2s
+    --
+    +start(): Promise<void>
+    +processExchanges(): Promise<void>
+    +writeHealthFile(): void
+    +generateLSL(): Promise<void>
+    --
+    **Purpose:** Real-time per-project
+    Writes to .health/ directory
+    Generates LSL files
+  }
+
+  class LiveLoggingCoordinator <<coordinator>> {
+    +fileManager: LSLFileManager
+    +operationalLogger: Logger
+    +userHash: string
+    --
+    +initialize(): Promise<void>
+    +logExchange(data): Promise<void>
+    +getSessionId(): string
+    +getPerformanceMetrics(): Metrics
+    --
+    **Purpose:** Orchestrates logging
+    File management + ops logging
+    Multi-user support
+  }
+}
+
+package "Core Infrastructure" {
+  class ProcessStateManager <<singleton>> {
+    +registryPath: string
+    +lockOptions: LockConfig
+    --
+    +withLock(operation): Promise<T>
+    +registerService(name, type): Promise<void>
+    +isServiceRunning(name, type): Promise<boolean>
+    +getService(name, type): Promise<Service>
+    +cleanupStale(): Promise<void>
+    --
+    **Purpose:** Unified registry
+    Atomic file operations
+    Singleton management
+  }
+}
+
+' Relationships - Layer dependencies
+SystemMonitorWatchdog ..> GlobalServiceCoordinator : monitors & restarts
+GlobalServiceCoordinator ..> GlobalLSLCoordinator : coordinates
+GlobalServiceCoordinator ..> EnhancedTranscriptMonitor : manages
+
+' Health chain
+HealthVerifier ..> ProcessStateManager : checks processes
+StatusLineHealthMonitor ..> HealthVerifier : reads status
+StatusLineHealthMonitor ..> EnhancedTranscriptMonitor : reads health files
+
+' PSM usage (all classes use PSM)
+SystemMonitorWatchdog --> ProcessStateManager : uses
+GlobalServiceCoordinator --> ProcessStateManager : uses
+GlobalLSLCoordinator --> ProcessStateManager : uses
+MonitoringVerifier --> ProcessStateManager : uses
+HealthVerifier --> ProcessStateManager : uses
+StatusLineHealthMonitor --> ProcessStateManager : uses
+EnhancedTranscriptMonitor --> ProcessStateManager : uses
+
+' Verification chain
+MonitoringVerifier ..> SystemMonitorWatchdog : verifies
+MonitoringVerifier ..> GlobalServiceCoordinator : verifies
+MonitoringVerifier ..> HealthVerifier : verifies
+
+' Logging coordination
+EnhancedTranscriptMonitor ..> LiveLoggingCoordinator : uses
+
+note bottom of ProcessStateManager
+  **Central to all components**
+  Storage: .live-process-registry.json
+  Prevents duplicate instances
+  Atomic operations via file locking
+end note
+
+note right of SystemMonitorWatchdog
+  **Ultimate Failsafe**
+  Runs every minute via launchd
+  Cannot be killed by user
+end note
+
+note right of StatusLineHealthMonitor
+  **Session Filtering**
+  Only shows sessions with
+  running transcript monitors
+end note
+
+@enduml

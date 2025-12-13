@@ -66,9 +66,27 @@ All checks performed 12 minutes ago, showing consistent healthy state across all
 
 ![Monitoring Architecture](../images/monitoring-architecture.png)
 
-### Core Components
+### 9 Core Health System Classes
 
-#### 1. Process State Manager (PSM)
+The monitoring system is built on 9 interconnected classes across 6 architectural layers:
+
+![Health System Classes](../images/health-system-classes.png)
+
+| Layer | Class | File | Purpose |
+|-------|-------|------|---------|
+| Core | **ProcessStateManager** | `process-state-manager.js` | Unified registry with atomic locking |
+| 0 | **SystemMonitorWatchdog** | `system-monitor-watchdog.js` | Ultimate failsafe (cron/launchd) |
+| 1 | **GlobalServiceCoordinator** | `global-service-coordinator.js` | Service management daemon |
+| 1 | **GlobalLSLCoordinator** | `global-lsl-coordinator.js` | Multi-project LSL manager |
+| 2 | **MonitoringVerifier** | `monitoring-verifier.js` | Pre-session verification |
+| 3 | **HealthVerifier** | `health-verifier.js` | Core verification with auto-healing |
+| 4 | **StatusLineHealthMonitor** | `statusline-health-monitor.js` | Health aggregation daemon |
+| 5 | **EnhancedTranscriptMonitor** | `enhanced-transcript-monitor.js` | Per-project monitoring |
+| 5 | **LiveLoggingCoordinator** | `live-logging-coordinator.js` | Logging orchestration |
+
+### Core Components (Detailed)
+
+#### Core: Process State Manager (PSM)
 **File**: `scripts/process-state-manager.js`
 **Purpose**: Centralized process registry with atomic operations and health tracking
 **Registry**: `.live-process-registry.json`
@@ -78,28 +96,88 @@ All checks performed 12 minutes ago, showing consistent healthy state across all
 - Session-aware service tracking (global, per-project, per-session)
 - Automatic dead process cleanup
 - Health check timestamp management
+- **Used by ALL other health system classes**
 
-#### 2. Global Service Coordinator
+#### Layer 0: System Monitor Watchdog
+**File**: `scripts/system-monitor-watchdog.js`
+**Purpose**: Ultimate failsafe - monitors the monitor
+**Execution**: Via launchd every 60 seconds
+
+**Features**:
+- Monitors GlobalServiceCoordinator via PSM queries
+- Restarts coordinator if dead or stale
+- Registers restarts with PSM
+- Cannot be killed by user processes
+
+#### Layer 1: Global Service Coordinator
 **File**: `scripts/global-service-coordinator.js`
 **Purpose**: Service lifecycle management (start/stop/restart/health checks)
 
 **Features**:
 - Spawns and manages service processes
-- Automatic restart on failure with exponential backoff
+- 15-second health checks with exponential backoff recovery
 - Integrates with PSM for all state tracking
-- Self-registration with PSM for monitoring
+- Manages: constraint API, constraint dashboard, MCP servers
 
-#### 3. System Monitor Watchdog
-**File**: `scripts/system-monitor-watchdog.js`
-**Purpose**: Failsafe monitor for coordinator health
-**Execution**: Via launchd every 60 seconds
+#### Layer 1: Global LSL Coordinator
+**File**: `scripts/global-lsl-coordinator.js`
+**Purpose**: Multi-project transcript monitoring manager
 
 **Features**:
-- Monitors coordinator via PSM queries
-- Restarts coordinator if dead or stale
-- Registers restarts with PSM
+- 30-second health checks on all registered projects
+- Auto-recovery of dead Enhanced Transcript Monitors
+- Maintains: `.global-lsl-registry.json`
+- "Plug'n'play" behavior for seamless session management
 
-#### 4. Session Management
+#### Layer 2: Monitoring Verifier
+**File**: `scripts/monitoring-verifier.js`
+**Purpose**: Pre-session verification of all monitoring systems
+
+**Features**:
+- Runs before Claude session starts
+- Exit codes: 0=OK, 1=Critical (MUST NOT START), 2=Warning
+- Validates: watchdog, coordinator, project registration, service health
+
+#### Layer 3: Health Verifier
+**File**: `scripts/health-verifier.js`
+**Purpose**: Core verification engine with auto-healing
+
+**Features**:
+- 60-second periodic health checks
+- Checks: databases, services, processes
+- Generates health scores (0-100) per service
+- Triggers auto-healing via HealthRemediationActions
+
+#### Layer 4: StatusLine Health Monitor
+**File**: `scripts/statusline-health-monitor.js`
+**Purpose**: Health aggregation for Claude Code status bar
+
+**Features**:
+- 15-second update interval
+- **Only shows sessions with running transcript monitors**
+- Outputs to: `.logs/statusline-health-status.txt`
+- Auto-healing capabilities
+
+#### Layer 5: Enhanced Transcript Monitor
+**File**: `scripts/enhanced-transcript-monitor.js`
+**Purpose**: Real-time per-project transcript monitoring
+
+**Features**:
+- 2-second check interval for prompt detection
+- Writes health files to centralized `.health/` directory
+- Generates LSL files in `.specstory/history/`
+- Process state registration with PSM
+
+#### Layer 5: Live Logging Coordinator
+**File**: `scripts/live-logging-coordinator.js`
+**Purpose**: Orchestrates live logging components
+
+**Features**:
+- Manages LSLFileManager and operational logging
+- Multi-user support with user hash tracking
+- Performance metrics collection
+
+### Session Management
 **Files**: `scripts/launch-claude.sh`, `scripts/psm-register-session.js`, `scripts/psm-session-cleanup.js`
 **Purpose**: Automatic service lifecycle tied to Claude sessions
 
