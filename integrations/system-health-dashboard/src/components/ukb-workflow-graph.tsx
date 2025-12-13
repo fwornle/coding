@@ -31,6 +31,8 @@ import {
 } from 'lucide-react'
 
 // Agent definitions for the 13-agent workflow
+// LLM info verified via Serena analysis of mcp-server-semantic-analysis
+// Priority: Groq > Gemini > Anthropic > OpenAI (auto-fallback based on API key availability)
 const WORKFLOW_AGENTS = [
   {
     id: 'git_history',
@@ -39,6 +41,7 @@ const WORKFLOW_AGENTS = [
     icon: GitBranch,
     description: 'Analyzes git commit history using native git commands',
     usesLLM: false,
+    llmModel: null,
     techStack: 'Git CLI',
     row: 0,
     col: 0,
@@ -48,8 +51,10 @@ const WORKFLOW_AGENTS = [
     name: 'Vibe History',
     shortName: 'Vibe',
     icon: MessageSquare,
-    description: 'Analyzes LSL conversation history using LLM for pattern extraction',
+    description: 'Analyzes LSL conversation history for pattern extraction',
     usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'SemanticAnalyzer',
     row: 0,
     col: 1,
   },
@@ -60,6 +65,8 @@ const WORKFLOW_AGENTS = [
     icon: Brain,
     description: 'Deep semantic analysis for code understanding and insights',
     usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'Direct LLM clients',
     row: 1,
     col: 0.5,
   },
@@ -70,6 +77,8 @@ const WORKFLOW_AGENTS = [
     icon: Search,
     description: 'Searches for similar patterns using LLM-generated queries',
     usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'SemanticAnalyzer',
     row: 2,
     col: 0.5,
   },
@@ -80,6 +89,8 @@ const WORKFLOW_AGENTS = [
     icon: Lightbulb,
     description: 'Generates comprehensive knowledge insights from analysis',
     usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'SemanticAnalyzer',
     row: 3,
     col: 0,
   },
@@ -90,6 +101,8 @@ const WORKFLOW_AGENTS = [
     icon: Eye,
     description: 'Creates structured observations for knowledge base entities',
     usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'SemanticAnalyzer',
     row: 4,
     col: 0,
   },
@@ -98,9 +111,10 @@ const WORKFLOW_AGENTS = [
     name: 'Ontology Classification',
     shortName: 'Ontology',
     icon: Tags,
-    description: 'Classifies entities using heuristics, falls back to LLM if needed',
-    usesLLM: true,
-    techStack: 'Heuristics + LLM fallback',
+    description: 'Classifies entities using keyword heuristics (no LLM)',
+    usesLLM: false,
+    llmModel: null,
+    techStack: 'OntologyClassifier (Heuristics)',
     row: 5,
     col: 0,
   },
@@ -109,9 +123,10 @@ const WORKFLOW_AGENTS = [
     name: 'Code Graph',
     shortName: 'Code',
     icon: Code,
-    description: 'AST parsing + LLM for Cypher query generation',
-    usesLLM: true,
-    techStack: 'Tree-sitter + Memgraph + LLM',
+    description: 'AST parsing via Tree-sitter, stores in Memgraph',
+    usesLLM: false,
+    llmModel: null,
+    techStack: 'Tree-sitter + Memgraph',
     row: 3,
     col: 1,
   },
@@ -122,7 +137,8 @@ const WORKFLOW_AGENTS = [
     icon: FileText,
     description: 'Links docs to code entities via pattern matching',
     usesLLM: false,
-    techStack: 'Regex + AST matching',
+    llmModel: null,
+    techStack: 'Regex + glob patterns',
     row: 4,
     col: 1,
   },
@@ -131,8 +147,10 @@ const WORKFLOW_AGENTS = [
     name: 'Quality Assurance',
     shortName: 'QA',
     icon: Shield,
-    description: 'Validates entity quality and coherence using LLM',
+    description: 'Validates entity quality and coherence',
     usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'SemanticAnalyzer',
     row: 6,
     col: 0.5,
   },
@@ -143,6 +161,7 @@ const WORKFLOW_AGENTS = [
     icon: Database,
     description: 'Persists entities to knowledge graph',
     usesLLM: false,
+    llmModel: null,
     techStack: 'LevelDB + Graphology',
     row: 7,
     col: 0.5,
@@ -154,7 +173,8 @@ const WORKFLOW_AGENTS = [
     icon: Copy,
     description: 'Detects duplicates using embedding similarity',
     usesLLM: false,
-    techStack: 'Embeddings (MiniLM / text-embedding-3)',
+    llmModel: null,
+    techStack: 'OpenAI text-embedding-3-small',
     row: 8,
     col: 0.5,
   },
@@ -163,8 +183,10 @@ const WORKFLOW_AGENTS = [
     name: 'Content Validation',
     shortName: 'Validate',
     icon: CheckCircle2,
-    description: 'Validates and refreshes stale entities using LLM',
+    description: 'Validates and refreshes stale entities',
     usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'SemanticAnalyzer',
     row: 9,
     col: 0.5,
   },
@@ -580,12 +602,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                                 <span>{formatTokens(stepInfo.tokensUsed)}</span>
                               </div>
                             )}
-                            {agent.usesLLM && (
-                              <div className="flex justify-between">
-                                <span>LLM:</span>
-                                <span>{stepInfo.llmProvider || agent.llmProvider || 'anthropic'}</span>
-                              </div>
-                            )}
+                            <div className="flex justify-between">
+                              <span>LLM:</span>
+                              <span className="text-right max-w-[120px] truncate">{agent.llmModel || 'none'}</span>
+                            </div>
                           </div>
                         </>
                       )}
@@ -699,17 +719,15 @@ export function UKBNodeDetailsSidebar({
                 <Zap className="h-3 w-3" />
                 LLM
               </span>
-              <span>
-                {agent.usesLLM
-                  ? (stepInfo?.llmProvider || '----')
-                  : 'none'}
+              <span className="text-right max-w-[160px] text-xs">
+                {agent.llmModel || 'none'}
               </span>
             </div>
 
             {agent.techStack && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground text-xs">Stack</span>
-                <span className="text-xs text-right max-w-[140px]">{agent.techStack}</span>
+                <span className="text-xs text-right max-w-[160px]">{agent.techStack}</span>
               </div>
             )}
           </div>
