@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useCallback, useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -37,8 +37,9 @@ const WORKFLOW_AGENTS = [
     name: 'Git History',
     shortName: 'Git',
     icon: GitBranch,
-    description: 'Analyzes git commit history for patterns and changes',
+    description: 'Analyzes git commit history using native git commands',
     usesLLM: false,
+    techStack: 'Git CLI',
     row: 0,
     col: 0,
   },
@@ -47,8 +48,8 @@ const WORKFLOW_AGENTS = [
     name: 'Vibe History',
     shortName: 'Vibe',
     icon: MessageSquare,
-    description: 'Analyzes conversation/session history from LSL files',
-    usesLLM: false,
+    description: 'Analyzes LSL conversation history using LLM for pattern extraction',
+    usesLLM: true,
     row: 0,
     col: 1,
   },
@@ -57,9 +58,8 @@ const WORKFLOW_AGENTS = [
     name: 'Semantic Analysis',
     shortName: 'Semantic',
     icon: Brain,
-    description: 'Performs deep semantic analysis using LLM',
+    description: 'Deep semantic analysis for code understanding and insights',
     usesLLM: true,
-    llmProvider: 'anthropic',
     row: 1,
     col: 0.5,
   },
@@ -68,8 +68,8 @@ const WORKFLOW_AGENTS = [
     name: 'Web Search',
     shortName: 'Web',
     icon: Search,
-    description: 'Searches for similar patterns and best practices',
-    usesLLM: false,
+    description: 'Searches for similar patterns using LLM-generated queries',
+    usesLLM: true,
     row: 2,
     col: 0.5,
   },
@@ -78,9 +78,8 @@ const WORKFLOW_AGENTS = [
     name: 'Insight Generation',
     shortName: 'Insights',
     icon: Lightbulb,
-    description: 'Generates comprehensive insights using LLM',
+    description: 'Generates comprehensive knowledge insights from analysis',
     usesLLM: true,
-    llmProvider: 'anthropic',
     row: 3,
     col: 0,
   },
@@ -89,9 +88,8 @@ const WORKFLOW_AGENTS = [
     name: 'Observation Generation',
     shortName: 'Observations',
     icon: Eye,
-    description: 'Creates structured observations from insights',
+    description: 'Creates structured observations for knowledge base entities',
     usesLLM: true,
-    llmProvider: 'anthropic',
     row: 4,
     col: 0,
   },
@@ -100,9 +98,9 @@ const WORKFLOW_AGENTS = [
     name: 'Ontology Classification',
     shortName: 'Ontology',
     icon: Tags,
-    description: 'Classifies entities against project ontology',
+    description: 'Classifies entities using heuristics, falls back to LLM if needed',
     usesLLM: true,
-    llmProvider: 'anthropic',
+    techStack: 'Heuristics + LLM fallback',
     row: 5,
     col: 0,
   },
@@ -111,9 +109,9 @@ const WORKFLOW_AGENTS = [
     name: 'Code Graph',
     shortName: 'Code',
     icon: Code,
-    description: 'AST-based code analysis via code-graph-rag MCP',
+    description: 'AST parsing + LLM for Cypher query generation',
     usesLLM: true,
-    llmProvider: 'code-graph-rag',
+    techStack: 'Tree-sitter + Memgraph + LLM',
     row: 3,
     col: 1,
   },
@@ -122,9 +120,9 @@ const WORKFLOW_AGENTS = [
     name: 'Documentation Linker',
     shortName: 'Docs',
     icon: FileText,
-    description: 'Links documentation to code entities using LLM',
-    usesLLM: true,
-    llmProvider: 'anthropic',
+    description: 'Links docs to code entities via pattern matching',
+    usesLLM: false,
+    techStack: 'Regex + AST matching',
     row: 4,
     col: 1,
   },
@@ -133,9 +131,8 @@ const WORKFLOW_AGENTS = [
     name: 'Quality Assurance',
     shortName: 'QA',
     icon: Shield,
-    description: 'Validates workflow outputs for quality',
+    description: 'Validates entity quality and coherence using LLM',
     usesLLM: true,
-    llmProvider: 'anthropic',
     row: 6,
     col: 0.5,
   },
@@ -146,6 +143,7 @@ const WORKFLOW_AGENTS = [
     icon: Database,
     description: 'Persists entities to knowledge graph',
     usesLLM: false,
+    techStack: 'LevelDB + Graphology',
     row: 7,
     col: 0.5,
   },
@@ -154,9 +152,9 @@ const WORKFLOW_AGENTS = [
     name: 'Deduplication',
     shortName: 'Dedup',
     icon: Copy,
-    description: 'Removes duplicate entities and merges similar ones',
-    usesLLM: true,
-    llmProvider: 'anthropic',
+    description: 'Detects duplicates using embedding similarity',
+    usesLLM: false,
+    techStack: 'Embeddings (MiniLM / text-embedding-3)',
     row: 8,
     col: 0.5,
   },
@@ -165,9 +163,8 @@ const WORKFLOW_AGENTS = [
     name: 'Content Validation',
     shortName: 'Validate',
     icon: CheckCircle2,
-    description: 'Validates and refreshes stale entities',
+    description: 'Validates and refreshes stale entities using LLM',
     usesLLM: true,
-    llmProvider: 'anthropic',
     row: 9,
     col: 0.5,
   },
@@ -252,6 +249,31 @@ interface UKBWorkflowGraphProps {
 }
 
 export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }: UKBWorkflowGraphProps) {
+  // Track which node is currently wiggling
+  const [wigglingNode, setWigglingNode] = useState<string | null>(null)
+  const wiggleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleNodeMouseEnter = useCallback((agentId: string) => {
+    // Clear any existing timeout
+    if (wiggleTimeoutRef.current) {
+      clearTimeout(wiggleTimeoutRef.current)
+    }
+    // Start wiggling
+    setWigglingNode(agentId)
+    // Stop after 2 wiggles (0.3s × 2 = 0.6s)
+    wiggleTimeoutRef.current = setTimeout(() => {
+      setWigglingNode(null)
+    }, 600)
+  }, [])
+
+  const handleNodeMouseLeave = useCallback(() => {
+    // Clear timeout and stop wiggling
+    if (wiggleTimeoutRef.current) {
+      clearTimeout(wiggleTimeoutRef.current)
+    }
+    setWigglingNode(null)
+  }, [])
+
   // Build step status map from process data
   const stepStatusMap = useMemo(() => {
     const map: Record<string, StepInfo> = {}
@@ -355,13 +377,13 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
 
   return (
     <TooltipProvider>
-      <div className="flex gap-4 h-full">
-        {/* Graph Container */}
-        <div className="flex-1 relative overflow-auto bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border">
+      <div className="flex gap-4 w-full">
+        {/* Graph Container - contains scrollable SVG */}
+        <div className="flex-1 relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border">
           <svg
             width={gridWidth + padding * 2}
             height={gridHeight + padding * 2}
-            className="min-w-full"
+            className="block"
           >
             <defs>
               <marker
@@ -442,8 +464,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                 <Tooltip key={agent.id}>
                   <TooltipTrigger asChild>
                     <g
-                      className="cursor-pointer transition-transform hover:scale-105"
+                      className={`cursor-pointer ${wigglingNode === agent.id ? 'animate-wiggle' : ''}`}
                       onClick={() => onNodeClick?.(agent.id)}
+                      onMouseEnter={() => handleNodeMouseEnter(agent.id)}
+                      onMouseLeave={handleNodeMouseLeave}
                     >
                       {/* Node background - using direct SVG colors for better control */}
                       <rect
@@ -455,6 +479,8 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         fill={colors.fill}
                         stroke={colors.stroke}
                         strokeWidth={2}
+                        className="transition-all duration-150 group-hover:stroke-[3px]"
+                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
                       />
 
                       {/* Selection ring */}
@@ -619,6 +645,18 @@ export function UKBNodeDetailsSidebar({
   const Icon = agent.icon
   const stepInfo = process.steps?.find(s => STEP_TO_AGENT[s.name] === agentId || s.name === agentId)
 
+  // Use same fallback logic as getNodeStatus in the graph
+  const getInferredStatus = (): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
+    if (stepInfo?.status) return stepInfo.status as any
+    // Infer status from completedSteps if step data not available
+    const agentIndex = WORKFLOW_AGENTS.findIndex(a => a.id === agentId)
+    if (agentIndex < process.completedSteps) return 'completed'
+    if (agentIndex === process.completedSteps) return 'running'
+    return 'pending'
+  }
+
+  const inferredStatus = getInferredStatus()
+
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'running':
@@ -642,7 +680,7 @@ export function UKBNodeDetailsSidebar({
             <Icon className="h-5 w-5" />
             <CardTitle className="text-lg">{agent.name}</CardTitle>
           </div>
-          {getStatusBadge(stepInfo?.status)}
+          {getStatusBadge(inferredStatus)}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -654,22 +692,25 @@ export function UKBNodeDetailsSidebar({
 
         {/* Agent Properties */}
         <div className="space-y-3">
-          <h4 className="font-medium text-sm">Properties</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Zap className="h-3 w-3" />
-              <span>Uses LLM</span>
+          <h4 className="font-medium text-sm">Technology</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                LLM
+              </span>
+              <span>
+                {agent.usesLLM
+                  ? (stepInfo?.llmProvider || '----')
+                  : 'none'}
+              </span>
             </div>
-            <div>{agent.usesLLM ? 'Yes' : 'No'}</div>
 
-            {agent.usesLLM && (
-              <>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Brain className="h-3 w-3" />
-                  <span>Provider</span>
-                </div>
-                <div>{agent.llmProvider || 'anthropic'}</div>
-              </>
+            {agent.techStack && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground text-xs">Stack</span>
+                <span className="text-xs text-right max-w-[140px]">{agent.techStack}</span>
+              </div>
             )}
           </div>
         </div>
@@ -683,12 +724,12 @@ export function UKBNodeDetailsSidebar({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Status</span>
               <span className={
-                stepInfo?.status === 'completed' ? 'text-green-600 font-medium' :
-                stepInfo?.status === 'failed' ? 'text-red-600 font-medium' :
-                stepInfo?.status === 'running' ? 'text-blue-600 font-medium' :
+                inferredStatus === 'completed' ? 'text-green-600 font-medium' :
+                inferredStatus === 'failed' ? 'text-red-600 font-medium' :
+                inferredStatus === 'running' ? 'text-blue-600 font-medium' :
                 'text-muted-foreground'
               }>
-                {stepInfo?.status || 'Pending'}
+                {inferredStatus.charAt(0).toUpperCase() + inferredStatus.slice(1)}
               </span>
             </div>
 
@@ -714,16 +755,8 @@ export function UKBNodeDetailsSidebar({
               </div>
             )}
 
-            {/* LLM Provider - show for LLM agents */}
-            {agent.usesLLM && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">LLM Provider</span>
-                <span>{stepInfo?.llmProvider || agent.llmProvider || 'anthropic'}</span>
-              </div>
-            )}
-
             {/* Show message if no timing data yet */}
-            {!stepInfo?.duration && stepInfo?.status === 'completed' && (
+            {!stepInfo?.duration && inferredStatus === 'completed' && (
               <div className="text-xs text-muted-foreground italic">
                 Timing data will be available in next workflow run
               </div>

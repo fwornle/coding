@@ -827,17 +827,31 @@ class SystemHealthAPIServer {
                 .filter(line => line.match(/^\d+\./))
                 .map(line => line.replace(/^\d+\.\s*/, '').trim()) || [];
 
-            // Parse step details
-            const stepMatches = [...content.matchAll(/### (\d+)\. (\w+)\n\n\*\*Agent:\*\*\s*(\w+)\n\*\*Action:\*\*\s*(\w+)\n\*\*Status:\*\*\s*.*?(success|failed|skipped)\n\*\*Duration:\*\*\s*(.+)/gi)];
+            // Parse step details - split content by step sections
+            const stepSections = content.split(/(?=### \d+\. )/);
+            const steps = [];
 
-            const steps = stepMatches.map(match => ({
-                index: parseInt(match[1]),
-                name: match[2],
-                agent: match[3],
-                action: match[4],
-                status: match[5].toLowerCase(),
-                duration: match[6]
-            }));
+            for (const section of stepSections) {
+                const headerMatch = section.match(/### (\d+)\. (\w+)\n\n\*\*Agent:\*\*\s*(\w+)\n\*\*Action:\*\*\s*(\w+)\n\*\*Status:\*\*\s*.*?(success|failed|skipped)\n\*\*Duration:\*\*\s*(.+)/i);
+                if (headerMatch) {
+                    // Extract errors if present
+                    const errorsMatch = section.match(/#### Errors\n\n([\s\S]*?)(?=\n---|\n###|$)/);
+                    const errors = errorsMatch?.[1]
+                        ?.split('\n')
+                        .filter(line => line.startsWith('- '))
+                        .map(line => line.replace(/^- /, '').trim()) || [];
+
+                    steps.push({
+                        index: parseInt(headerMatch[1]),
+                        name: headerMatch[2],
+                        agent: headerMatch[3],
+                        action: headerMatch[4],
+                        status: headerMatch[5].toLowerCase(),
+                        duration: headerMatch[6],
+                        errors: errors.length > 0 ? errors : undefined
+                    });
+                }
+            }
 
             res.json({
                 status: 'success',

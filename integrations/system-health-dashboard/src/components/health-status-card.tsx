@@ -56,9 +56,6 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
         <CardTitle className="flex items-center gap-2 text-lg">
           {icon}
           {title}
-          {clickable && (
-            <span className="ml-auto text-xs text-muted-foreground font-normal">Click to expand</span>
-          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -82,6 +79,9 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
             </div>
           ))}
         </div>
+        {clickable && (
+          <div className="text-xs text-muted-foreground text-center mt-4 pt-2 border-t">Click to expand</div>
+        )}
       </CardContent>
     </Card>
   )

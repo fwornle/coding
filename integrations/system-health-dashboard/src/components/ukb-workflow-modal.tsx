@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useEffect } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import {
   Dialog,
   DialogContent,
@@ -10,10 +11,10 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Brain,
@@ -33,118 +34,110 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import UKBWorkflowGraph, { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
-
-interface ProcessInfo {
-  pid: number
-  workflowName: string
-  team: string
-  repositoryPath: string
-  startTime: string
-  lastHeartbeat: string
-  status: string
-  completedSteps: number
-  totalSteps: number
-  currentStep: string | null
-  logFile: string | null
-  isAlive: boolean
-  health: 'healthy' | 'stale' | 'frozen' | 'dead'
-  heartbeatAgeSeconds: number
-  progressPercent: number
-  steps?: Array<{
-    name: string
-    status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
-    duration?: number
-    tokensUsed?: number
-    llmProvider?: string
-    error?: string
-    outputs?: Record<string, any>
-  }>
-}
-
-interface HistoricalWorkflow {
-  id: string
-  filename: string
-  workflowName: string
-  executionId: string
-  status: string
-  startTime: string | null
-  endTime: string | null
-  duration: string | null
-  completedSteps: number
-  totalSteps: number
-  team: string
-  repositoryPath: string
-}
-
-interface HistoricalStep {
-  index: number
-  name: string
-  agent: string
-  action: string
-  status: string
-  duration: string
-}
-
-interface HistoricalWorkflowDetail extends HistoricalWorkflow {
-  entitiesCreated: number
-  entitiesUpdated: number
-  recommendations: string[]
-  steps: HistoricalStep[]
-}
+import type { RootState } from '@/store'
+import {
+  setActiveTab,
+  setSelectedProcessIndex,
+  setSelectedNode,
+  fetchHistoryStart,
+  fetchHistorySuccess,
+  fetchHistoryFailure,
+  selectHistoricalWorkflow,
+  fetchDetailStart,
+  fetchDetailSuccess,
+  fetchDetailFailure,
+  selectCurrentProcess,
+  selectHistoricalProcessInfo,
+  type HistoricalWorkflow,
+  type UKBProcess,
+} from '@/store/slices/ukbSlice'
 
 interface UKBWorkflowModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  processes: ProcessInfo[]
+  processes: UKBProcess[]
   apiBaseUrl?: string
 }
 
 export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBaseUrl = 'http://localhost:3033' }: UKBWorkflowModalProps) {
-  const [selectedProcessIndex, setSelectedProcessIndex] = useState(0)
-  const [selectedNode, setSelectedNode] = useState<string | null>(null)
-  const [showSidebar, setShowSidebar] = useState(false)
-  const [activeTab, setActiveTab] = useState('active')
-  const [historicalWorkflows, setHistoricalWorkflows] = useState<HistoricalWorkflow[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [selectedHistoricalWorkflow, setSelectedHistoricalWorkflow] = useState<HistoricalWorkflow | null>(null)
-  const [historicalWorkflowDetail, setHistoricalWorkflowDetail] = useState<HistoricalWorkflowDetail | null>(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-  const [historicalSelectedNode, setHistoricalSelectedNode] = useState<string | null>(null)
-  const [showHistoricalSidebar, setShowHistoricalSidebar] = useState(false)
+  const dispatch = useDispatch()
 
-  const currentProcess = processes[selectedProcessIndex]
+  // Redux state
+  const selectedProcessIndex = useSelector((state: RootState) => state.ukb.selectedProcessIndex)
+  const selectedNode = useSelector((state: RootState) => state.ukb.selectedNode)
+  const activeTab = useSelector((state: RootState) => state.ukb.activeTab)
+  const historicalWorkflows = useSelector((state: RootState) => state.ukb.historicalWorkflows)
+  const loadingHistory = useSelector((state: RootState) => state.ukb.loadingHistory)
+  const selectedHistoricalWorkflowState = useSelector((state: RootState) => state.ukb.selectedHistoricalWorkflow)
+  const historicalWorkflowDetail = useSelector((state: RootState) => state.ukb.historicalWorkflowDetail)
+  const loadingDetail = useSelector((state: RootState) => state.ukb.loadingDetail)
+
+  // Memoized selectors
+  const currentProcess = useSelector(selectCurrentProcess)
+  const historicalProcessInfo = useSelector(selectHistoricalProcessInfo)
+
+  // Derived state
+  const showSidebar = selectedNode !== null && activeTab === 'active'
+  const showHistoricalSidebar = selectedNode !== null && activeTab === 'history'
 
   // Fetch historical workflows when history tab is selected
   useEffect(() => {
     if (open && activeTab === 'history') {
-      fetchHistoricalWorkflows()
+      loadHistoricalWorkflows()
     }
   }, [open, activeTab])
 
-  const fetchHistoricalWorkflows = async () => {
-    setLoadingHistory(true)
+  const loadHistoricalWorkflows = async () => {
+    dispatch(fetchHistoryStart())
     try {
       const response = await fetch(`${apiBaseUrl}/api/ukb/history?limit=50`)
       const result = await response.json()
       if (result.status === 'success') {
-        setHistoricalWorkflows(result.data)
+        dispatch(fetchHistorySuccess(result.data))
+      } else {
+        dispatch(fetchHistoryFailure('Failed to load workflows'))
       }
     } catch (error) {
       console.error('Failed to fetch historical workflows:', error)
-    } finally {
-      setLoadingHistory(false)
+      dispatch(fetchHistoryFailure(String(error)))
     }
   }
 
+  const loadHistoricalWorkflowDetail = async (workflowId: string) => {
+    dispatch(fetchDetailStart())
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/ukb/history/${workflowId}`)
+      const result = await response.json()
+      if (result.status === 'success') {
+        dispatch(fetchDetailSuccess(result.data))
+      } else {
+        dispatch(fetchDetailFailure('Failed to load workflow detail'))
+      }
+    } catch (error) {
+      console.error('Failed to fetch workflow detail:', error)
+      dispatch(fetchDetailFailure(String(error)))
+    }
+  }
+
+  // Fetch detail when a historical workflow is selected
+  useEffect(() => {
+    if (selectedHistoricalWorkflowState) {
+      loadHistoricalWorkflowDetail(selectedHistoricalWorkflowState.id)
+      dispatch(setSelectedNode(null))
+    }
+  }, [selectedHistoricalWorkflowState])
+
   const handleNodeClick = (agentId: string) => {
-    setSelectedNode(agentId)
-    setShowSidebar(true)
+    dispatch(setSelectedNode(agentId))
   }
 
   const handleCloseSidebar = () => {
-    setShowSidebar(false)
-    setSelectedNode(null)
+    dispatch(setSelectedNode(null))
   }
+
+  // Both active and historical use the same handler now via Redux
+  const handleHistoricalNodeClick = handleNodeClick
+  const handleCloseHistoricalSidebar = handleCloseSidebar
 
   const getHealthBadge = (health: string) => {
     switch (health) {
@@ -239,7 +232,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setSelectedProcessIndex(Math.max(0, selectedProcessIndex - 1))}
+              onClick={() => dispatch(setSelectedProcessIndex(Math.max(0, selectedProcessIndex - 1)))}
               disabled={selectedProcessIndex === 0}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -250,7 +243,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setSelectedProcessIndex(Math.min(processes.length - 1, selectedProcessIndex + 1))}
+              onClick={() => dispatch(setSelectedProcessIndex(Math.min(processes.length - 1, selectedProcessIndex + 1)))}
               disabled={selectedProcessIndex === processes.length - 1}
             >
               <ChevronRight className="h-4 w-4" />
@@ -418,84 +411,91 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
 
     // If a workflow is selected, show its details
-    if (selectedHistoricalWorkflow) {
+    if (selectedHistoricalWorkflowState) {
       return (
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Header Bar - fixed height */}
+          <div className="flex-shrink-0 flex items-center gap-2 mb-2">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSelectedHistoricalWorkflow(null)}
+              onClick={() => {
+                dispatch(selectHistoricalWorkflow(null))
+              }}
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back to list
             </Button>
             <Separator orientation="vertical" className="h-6" />
-            <span className="text-sm font-medium">{selectedHistoricalWorkflow.executionId}</span>
+            <span className="text-sm font-medium truncate">{selectedHistoricalWorkflowState.executionId}</span>
+            <div className="ml-auto">{getStatusBadge(selectedHistoricalWorkflowState.status)}</div>
           </div>
 
-          <Card className="flex-shrink-0 mb-4">
-            <CardContent className="pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Workflow</div>
-                  <div className="font-medium">{getWorkflowDisplayName(selectedHistoricalWorkflow.workflowName)}</div>
+          {/* Compact Info Row - fixed height */}
+          <div className="flex-shrink-0 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground mb-2 px-1">
+            <span><strong>Workflow:</strong> {getWorkflowDisplayName(selectedHistoricalWorkflowState.workflowName)}</span>
+            <span><strong>Team:</strong> {selectedHistoricalWorkflowState.team}</span>
+            <span><strong>Duration:</strong> {selectedHistoricalWorkflowState.duration || '-'}</span>
+            <span><strong>Steps:</strong> {selectedHistoricalWorkflowState.completedSteps}/{selectedHistoricalWorkflowState.totalSteps}</span>
+            <span><strong>Started:</strong> {formatDate(selectedHistoricalWorkflowState.startTime)}</span>
+          </div>
+
+          {/* Workflow Graph - Main Content - takes remaining space */}
+          <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
+            {loadingDetail ? (
+              <div className="flex-1 flex items-center justify-center border rounded-lg bg-muted/20">
+                <div className="text-center space-y-2">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Loading workflow details...</p>
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Team</div>
-                  <div className="font-medium">{selectedHistoricalWorkflow.team}</div>
+              </div>
+            ) : historicalProcessInfo ? (
+              <>
+                {/* Workflow Graph - scrollable */}
+                <div className="flex-1 min-w-0 min-h-0 overflow-auto border rounded-lg bg-gradient-to-br from-slate-50 to-slate-100">
+                  <UKBWorkflowGraph
+                    process={historicalProcessInfo}
+                    onNodeClick={handleHistoricalNodeClick}
+                    selectedNode={selectedNode}
+                  />
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Status</div>
-                  {getStatusBadge(selectedHistoricalWorkflow.status)}
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Duration</div>
-                  <div className="font-medium">{selectedHistoricalWorkflow.duration || '-'}</div>
-                </div>
-                <div className="col-span-2">
-                  <div className="text-xs text-muted-foreground mb-1">Repository</div>
-                  <div className="font-medium text-sm truncate" title={selectedHistoricalWorkflow.repositoryPath}>
-                    {selectedHistoricalWorkflow.repositoryPath}
+
+                {/* Details Sidebar */}
+                {showHistoricalSidebar && selectedNode && (
+                  <div className="w-80 flex-shrink-0 overflow-auto border rounded-lg bg-background">
+                    <UKBNodeDetailsSidebar
+                      agentId={selectedNode}
+                      process={historicalProcessInfo}
+                      onClose={handleCloseHistoricalSidebar}
+                    />
                   </div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Start Time</div>
-                  <div className="font-medium text-sm">{formatDate(selectedHistoricalWorkflow.startTime)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">End Time</div>
-                  <div className="font-medium text-sm">{formatDate(selectedHistoricalWorkflow.endTime)}</div>
+                )}
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center border rounded-lg bg-muted/20">
+                <div className="text-center space-y-2">
+                  <AlertTriangle className="h-8 w-8 mx-auto text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Unable to load workflow details</p>
+                  <p className="text-xs text-muted-foreground">Report ID: {selectedHistoricalWorkflowState.id}</p>
                 </div>
               </div>
-              <div className="mt-4">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">
-                    Steps: {selectedHistoricalWorkflow.completedSteps} / {selectedHistoricalWorkflow.totalSteps}
-                  </span>
-                  <span className="font-medium">
-                    {Math.round((selectedHistoricalWorkflow.completedSteps / selectedHistoricalWorkflow.totalSteps) * 100)}%
-                  </span>
-                </div>
-                <Progress
-                  value={(selectedHistoricalWorkflow.completedSteps / selectedHistoricalWorkflow.totalSteps) * 100}
-                  className="h-2"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex-1 overflow-auto rounded-lg border bg-muted/30 p-4">
-            <div className="text-xs text-muted-foreground mb-2">Report ID: {selectedHistoricalWorkflow.id}</div>
-            <div className="text-sm">
-              <p className="text-muted-foreground">
-                Detailed step-by-step execution data is available in the report file.
-              </p>
-              <p className="text-xs mt-2 font-mono text-muted-foreground">
-                .data/workflow-reports/{selectedHistoricalWorkflow.filename}
-              </p>
-            </div>
+            )}
           </div>
+
+          {/* Recommendations (if any) - at bottom, fixed height */}
+          {historicalWorkflowDetail?.recommendations && historicalWorkflowDetail.recommendations.length > 0 && (
+            <div className="flex-shrink-0 mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg max-h-24 overflow-auto">
+              <div className="text-xs font-medium text-yellow-800 mb-1 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Recommendations ({historicalWorkflowDetail.recommendations.length})
+              </div>
+              <ul className="text-xs text-yellow-700 space-y-0.5">
+                {historicalWorkflowDetail.recommendations.map((rec, i) => (
+                  <li key={i}>• {rec}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )
     }
@@ -507,7 +507,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           <div className="text-sm text-muted-foreground">
             {historicalWorkflows.length} workflow{historicalWorkflows.length !== 1 ? 's' : ''} found
           </div>
-          <Button variant="outline" size="sm" onClick={fetchHistoricalWorkflows}>
+          <Button variant="outline" size="sm" onClick={loadHistoricalWorkflows}>
             <RefreshCw className="h-3 w-3 mr-1" />
             Refresh
           </Button>
@@ -519,7 +519,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               <Card
                 key={workflow.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => setSelectedHistoricalWorkflow(workflow)}
+                onClick={() => dispatch(selectHistoricalWorkflow(workflow))}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -554,8 +554,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] grid grid-rows-[auto_auto_1fr] gap-4 overflow-hidden">
+        <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5" />
             UKB Workflow Monitor
@@ -565,7 +565,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <Tabs value={activeTab} onValueChange={(v) => dispatch(setActiveTab(v as 'active' | 'history'))} className="contents">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="active" className="flex items-center gap-2">
               <Loader2 className={`h-4 w-4 ${processes.length > 0 ? 'animate-spin' : ''}`} />
@@ -581,15 +581,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               History
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="active" className="flex-1 flex flex-col min-h-0 mt-4">
-            {renderActiveContent()}
-          </TabsContent>
-
-          <TabsContent value="history" className="flex-1 flex flex-col min-h-0 mt-4">
-            {renderHistoryContent()}
-          </TabsContent>
         </Tabs>
+
+        <div className="min-h-0 overflow-hidden flex flex-col">
+          {activeTab === 'active' ? renderActiveContent() : renderHistoryContent()}
+        </div>
       </DialogContent>
     </Dialog>
   )
