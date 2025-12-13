@@ -39,10 +39,10 @@ const WORKFLOW_AGENTS = [
     name: 'Git History',
     shortName: 'Git',
     icon: GitBranch,
-    description: 'Analyzes git commit history using native git commands',
+    description: 'Extracts commit history via git CLI. Provides raw commit data (files, stats, messages) to downstream agents. NOTE: Contains legacy keyword heuristics for flagging commits - proper semantic analysis delegated to InsightGenerationAgent.',
     usesLLM: false,
     llmModel: null,
-    techStack: 'Git CLI',
+    techStack: 'Git CLI (heuristics deprecated)',
     row: 0,
     col: 0,
   },
@@ -51,7 +51,7 @@ const WORKFLOW_AGENTS = [
     name: 'Vibe History',
     shortName: 'Vibe',
     icon: MessageSquare,
-    description: 'Analyzes LSL conversation history for pattern extraction',
+    description: 'Parses LSL session files to identify problem-solution pairs, extract development contexts, and discover workflow patterns from human-AI conversations.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
@@ -63,7 +63,7 @@ const WORKFLOW_AGENTS = [
     name: 'Semantic Analysis',
     shortName: 'Semantic',
     icon: Brain,
-    description: 'Deep semantic analysis for code understanding and insights',
+    description: 'Deep code analysis to detect patterns (MVC, Factory, Observer, etc.), assess quality metrics, identify anti-patterns, and generate LLM-powered insights on architecture.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'Direct LLM clients',
@@ -75,10 +75,10 @@ const WORKFLOW_AGENTS = [
     name: 'Web Search',
     shortName: 'Web',
     icon: Search,
-    description: 'Searches for similar patterns using LLM-generated queries',
-    usesLLM: true,
-    llmModel: 'Groq: llama-3.3-70b-versatile',
-    techStack: 'SemanticAnalyzer',
+    description: 'Searches for similar patterns, code examples, and documentation using DuckDuckGo/Google. Uses keyword-based relevance scoring for fast pattern matching.',
+    usesLLM: false,
+    llmModel: null,
+    techStack: 'DuckDuckGo/Google APIs',
     row: 2,
     col: 0.5,
   },
@@ -87,7 +87,7 @@ const WORKFLOW_AGENTS = [
     name: 'Insight Generation',
     shortName: 'Insights',
     icon: Lightbulb,
-    description: 'Generates comprehensive knowledge insights from analysis',
+    description: 'Generates comprehensive insights, PlantUML architecture diagrams, design pattern documentation, and knowledge synthesis from analysis results.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
@@ -99,7 +99,7 @@ const WORKFLOW_AGENTS = [
     name: 'Observation Generation',
     shortName: 'Observations',
     icon: Eye,
-    description: 'Creates structured observations for knowledge base entities',
+    description: 'Creates structured observations for entities: pattern observations, problem-solution pairs, architectural decisions, and contextual metadata.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
@@ -111,7 +111,7 @@ const WORKFLOW_AGENTS = [
     name: 'Ontology Classification',
     shortName: 'Ontology',
     icon: Tags,
-    description: 'Classifies entities using keyword heuristics (no LLM)',
+    description: 'Maps entities to ontology classes (upper/lower) using keyword heuristics. Assigns categories, properties, and confidence scores for taxonomy alignment.',
     usesLLM: false,
     llmModel: null,
     techStack: 'OntologyClassifier (Heuristics)',
@@ -123,10 +123,10 @@ const WORKFLOW_AGENTS = [
     name: 'Code Graph',
     shortName: 'Code',
     icon: Code,
-    description: 'AST parsing via Tree-sitter, stores in Memgraph',
-    usesLLM: false,
-    llmModel: null,
-    techStack: 'Tree-sitter + Memgraph',
+    description: 'Builds AST-based knowledge graph using Tree-sitter parsing. Uses LLM (via code-graph-rag MCP) for Cypher query generation and RAG orchestration. Indexes functions, classes, imports, and call relationships into Memgraph.',
+    usesLLM: true,
+    llmModel: 'Provider: configurable (OpenAI/Anthropic/Ollama)',
+    techStack: 'Tree-sitter + Memgraph + pydantic_ai',
     row: 3,
     col: 1,
   },
@@ -135,7 +135,7 @@ const WORKFLOW_AGENTS = [
     name: 'Documentation Linker',
     shortName: 'Docs',
     icon: FileText,
-    description: 'Links docs to code entities via pattern matching',
+    description: 'Links markdown docs and PlantUML diagrams to code entities. Extracts inline code references, parses class/component diagrams, and builds doc-to-code mappings.',
     usesLLM: false,
     llmModel: null,
     techStack: 'Regex + glob patterns',
@@ -147,7 +147,7 @@ const WORKFLOW_AGENTS = [
     name: 'Quality Assurance',
     shortName: 'QA',
     icon: Shield,
-    description: 'Validates entity quality and coherence',
+    description: 'Validates generated insights, PlantUML syntax, entity coherence, and observation quality. Ensures knowledge base integrity and consistency.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
@@ -159,7 +159,7 @@ const WORKFLOW_AGENTS = [
     name: 'Persistence',
     shortName: 'Persist',
     icon: Database,
-    description: 'Persists entities to knowledge graph',
+    description: 'Manages entity CRUD operations, checkpoint tracking, and bi-temporal staleness detection. Writes entities with ontology metadata to LevelDB graph storage.',
     usesLLM: false,
     llmModel: null,
     techStack: 'LevelDB + Graphology',
@@ -171,7 +171,7 @@ const WORKFLOW_AGENTS = [
     name: 'Deduplication',
     shortName: 'Dedup',
     icon: Copy,
-    description: 'Detects duplicates using embedding similarity',
+    description: 'Detects duplicate entities using cosine/semantic similarity on embeddings. Merges similar entities, removes duplicate observations, and consolidates patterns.',
     usesLLM: false,
     llmModel: null,
     techStack: 'OpenAI text-embedding-3-small',
@@ -183,7 +183,7 @@ const WORKFLOW_AGENTS = [
     name: 'Content Validation',
     shortName: 'Validate',
     icon: CheckCircle2,
-    description: 'Validates and refreshes stale entities',
+    description: 'Validates entity accuracy against current codebase. Detects git-based staleness, verifies file/command references, and regenerates stale entity content.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
@@ -329,11 +329,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     const stepInfo = stepStatusMap[agentId]
     if (stepInfo) return stepInfo.status
 
-    // Infer status from completedSteps
-    const agentIndex = WORKFLOW_AGENTS.findIndex(a => a.id === agentId)
-    if (agentIndex < process.completedSteps) return 'completed'
-    if (agentIndex === process.completedSteps) return 'running'
-    return 'pending'
+    // If no step info exists for this agent, it's not part of the current workflow
+    // Don't infer from completedSteps index - that's unreliable for varying workflows
+    // Instead, mark as 'skipped' to indicate it's not in this workflow
+    return 'skipped'
   }
 
   // Returns fill and stroke colors for SVG nodes with better contrast
@@ -668,11 +667,9 @@ export function UKBNodeDetailsSidebar({
   // Use same fallback logic as getNodeStatus in the graph
   const getInferredStatus = (): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
     if (stepInfo?.status) return stepInfo.status as any
-    // Infer status from completedSteps if step data not available
-    const agentIndex = WORKFLOW_AGENTS.findIndex(a => a.id === agentId)
-    if (agentIndex < process.completedSteps) return 'completed'
-    if (agentIndex === process.completedSteps) return 'running'
-    return 'pending'
+    // If no step info exists for this agent, it's not part of the current workflow
+    // Don't infer from completedSteps index - that's unreliable for varying workflows
+    return 'skipped'
   }
 
   const inferredStatus = getInferredStatus()
@@ -798,21 +795,47 @@ export function UKBNodeDetailsSidebar({
           </>
         )}
 
-        {/* Output Summary */}
-        {stepInfo?.outputs && Object.keys(stepInfo.outputs).length > 0 && (
+        {/* Results Summary - show stats and key outcomes */}
+        {stepInfo?.outputs && Object.keys(stepInfo.outputs).filter(k => !k.startsWith('_')).length > 0 && (
           <>
             <Separator />
             <div className="space-y-2">
-              <h4 className="font-medium text-sm">Output Summary</h4>
-              <div className="text-xs bg-slate-50 border rounded p-2 space-y-1">
-                {Object.entries(stepInfo.outputs).slice(0, 5).map(([key, value]) => (
-                  <div key={key} className="flex justify-between">
-                    <span className="text-muted-foreground">{key}:</span>
-                    <span className="truncate ml-2">
-                      {typeof value === 'number' ? value.toLocaleString() : String(value).slice(0, 30)}
-                    </span>
-                  </div>
-                ))}
+              <h4 className="font-medium text-sm flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                Results
+              </h4>
+              <div className="text-xs bg-slate-50 border rounded p-2 space-y-1.5">
+                {Object.entries(stepInfo.outputs)
+                  .filter(([key]) => !key.startsWith('_'))
+                  .slice(0, 8)
+                  .map(([key, value]) => {
+                    // Format key: commitsAnalyzed -> Commits Analyzed
+                    const formattedKey = key
+                      .replace(/([A-Z])/g, ' $1')
+                      .replace(/^./, s => s.toUpperCase())
+                      .trim()
+
+                    // Format value based on type
+                    let displayValue: string
+                    if (typeof value === 'number') {
+                      displayValue = value.toLocaleString()
+                    } else if (typeof value === 'boolean') {
+                      displayValue = value ? '✓' : '✗'
+                    } else if (Array.isArray(value)) {
+                      displayValue = `${value.length} items`
+                    } else if (typeof value === 'string' && value.length > 40) {
+                      displayValue = value.slice(0, 40) + '...'
+                    } else {
+                      displayValue = String(value)
+                    }
+
+                    return (
+                      <div key={key} className="flex justify-between items-center">
+                        <span className="text-muted-foreground">{formattedKey}</span>
+                        <span className="font-medium tabular-nums">{displayValue}</span>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           </>
