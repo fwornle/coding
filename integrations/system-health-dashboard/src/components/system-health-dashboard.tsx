@@ -391,7 +391,7 @@ export default function SystemHealthDashboard() {
                 </CardTitle>
                 <CardDescription>
                   {healthStatus.lastFetch ? (
-                    <>Updated {formatAge(calculateFetchAge())}</>
+                    <>Updated {formatAge(calculateFetchAge())} · Next: {calculateNextUpdate()}s</>
                   ) : healthStatus.lastUpdate ? (
                     <>Last verified {formatAge(calculateDynamicAge())}</>
                   ) : (

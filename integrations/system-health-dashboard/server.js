@@ -712,57 +712,100 @@ class SystemHealthAPIServer {
     }
 
     /**
+     * Get list of known project paths that may contain workflow reports
+     * Scans the Agentic directory for projects with .data/workflow-reports
+     */
+    getKnownProjectPaths() {
+        const agenticRoot = join(codingRoot, '..');
+        const projectPaths = [codingRoot]; // Always include coding
+
+        try {
+            const entries = readdirSync(agenticRoot, { withFileTypes: true });
+            for (const entry of entries) {
+                if (entry.isDirectory() && entry.name !== 'coding') {
+                    const projectPath = join(agenticRoot, entry.name);
+                    const reportsDir = join(projectPath, '.data', 'workflow-reports');
+                    if (existsSync(reportsDir)) {
+                        projectPaths.push(projectPath);
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to scan for project paths:', error.message);
+        }
+
+        return projectPaths;
+    }
+
+    /**
      * Get list of historical UKB workflow reports
+     * Aggregates reports from ALL known projects, not just coding
      */
     handleGetUKBHistory(req, res) {
         try {
-            const reportsDir = join(codingRoot, '.data', 'workflow-reports');
+            const allReports = [];
+            const projectPaths = this.getKnownProjectPaths();
 
-            if (!existsSync(reportsDir)) {
-                return res.json({
-                    status: 'success',
-                    data: []
-                });
+            for (const projectPath of projectPaths) {
+                const reportsDir = join(projectPath, '.data', 'workflow-reports');
+                const projectName = projectPath.split('/').pop();
+
+                if (!existsSync(reportsDir)) continue;
+
+                const files = readdirSync(reportsDir)
+                    .filter(f => f.endsWith('.md'));
+
+                for (const filename of files) {
+                    try {
+                        const filePath = join(reportsDir, filename);
+                        const content = readFileSync(filePath, 'utf8');
+
+                        // Parse basic metadata from markdown
+                        const workflowMatch = content.match(/\*\*Workflow:\*\*\s*(.+)/);
+                        const executionIdMatch = content.match(/\*\*Execution ID:\*\*\s*(.+)/);
+                        const statusMatch = content.match(/\*\*Status:\*\*\s*.*?(COMPLETED|FAILED|RUNNING)/i);
+                        const startTimeMatch = content.match(/\*\*Start Time:\*\*\s*(.+)/);
+                        const endTimeMatch = content.match(/\*\*End Time:\*\*\s*(.+)/);
+                        const durationMatch = content.match(/\*\*Duration:\*\*\s*(.+)/);
+                        const stepsMatch = content.match(/Steps Completed \| (\d+)\/(\d+)/);
+                        const teamMatch = content.match(/"team":\s*"([^"]+)"/);
+                        const repoMatch = content.match(/"repositoryPath":\s*"([^"]+)"/);
+
+                        allReports.push({
+                            id: filename.replace('.md', ''),
+                            filename,
+                            project: projectName, // Add source project for clarity
+                            workflowName: workflowMatch?.[1]?.trim() || 'unknown',
+                            executionId: executionIdMatch?.[1]?.trim() || filename.replace('.md', ''),
+                            status: statusMatch?.[1]?.toLowerCase() || 'unknown',
+                            startTime: startTimeMatch?.[1]?.trim() || null,
+                            endTime: endTimeMatch?.[1]?.trim() || null,
+                            duration: durationMatch?.[1]?.trim() || null,
+                            completedSteps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+                            totalSteps: stepsMatch ? parseInt(stepsMatch[2]) : 0,
+                            team: teamMatch?.[1] || projectName,
+                            repositoryPath: repoMatch?.[1] || projectPath
+                        });
+                    } catch (parseError) {
+                        console.warn(`Failed to parse report ${filename}:`, parseError.message);
+                    }
+                }
             }
 
-            const files = readdirSync(reportsDir)
-                .filter(f => f.endsWith('.md'))
-                .sort((a, b) => b.localeCompare(a)); // Sort newest first
-
-            const reports = files.map(filename => {
-                const filePath = join(reportsDir, filename);
-                const content = readFileSync(filePath, 'utf8');
-
-                // Parse basic metadata from markdown
-                const workflowMatch = content.match(/\*\*Workflow:\*\*\s*(.+)/);
-                const executionIdMatch = content.match(/\*\*Execution ID:\*\*\s*(.+)/);
-                const statusMatch = content.match(/\*\*Status:\*\*\s*.*?(COMPLETED|FAILED|RUNNING)/i);
-                const startTimeMatch = content.match(/\*\*Start Time:\*\*\s*(.+)/);
-                const endTimeMatch = content.match(/\*\*End Time:\*\*\s*(.+)/);
-                const durationMatch = content.match(/\*\*Duration:\*\*\s*(.+)/);
-                const stepsMatch = content.match(/Steps Completed \| (\d+)\/(\d+)/);
-                const teamMatch = content.match(/"team":\s*"([^"]+)"/);
-                const repoMatch = content.match(/"repositoryPath":\s*"([^"]+)"/);
-
-                return {
-                    id: filename.replace('.md', ''),
-                    filename,
-                    workflowName: workflowMatch?.[1]?.trim() || 'unknown',
-                    executionId: executionIdMatch?.[1]?.trim() || filename.replace('.md', ''),
-                    status: statusMatch?.[1]?.toLowerCase() || 'unknown',
-                    startTime: startTimeMatch?.[1]?.trim() || null,
-                    endTime: endTimeMatch?.[1]?.trim() || null,
-                    duration: durationMatch?.[1]?.trim() || null,
-                    completedSteps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
-                    totalSteps: stepsMatch ? parseInt(stepsMatch[2]) : 0,
-                    team: teamMatch?.[1] || 'unknown',
-                    repositoryPath: repoMatch?.[1] || 'unknown'
+            // Sort all reports by timestamp (newest first), ignoring workflow type
+            // Filename format: {workflow-type}-{timestamp}.md
+            // Extract timestamp for sorting: 2025-12-12T08-06-36-145Z
+            allReports.sort((a, b) => {
+                const extractTimestamp = (filename) => {
+                    const match = filename.match(/(\d{4}-\d{2}-\d{2}T[\d-]+Z)/);
+                    return match ? match[1] : '';
                 };
+                return extractTimestamp(b.filename).localeCompare(extractTimestamp(a.filename));
             });
 
             // Optional filtering
-            const { limit = 50, team, status, workflowName } = req.query;
-            let filteredReports = reports;
+            const { limit = 50, team, status, workflowName, project } = req.query;
+            let filteredReports = allReports;
 
             if (team) {
                 filteredReports = filteredReports.filter(r => r.team === team);
@@ -773,11 +816,15 @@ class SystemHealthAPIServer {
             if (workflowName) {
                 filteredReports = filteredReports.filter(r => r.workflowName === workflowName);
             }
+            if (project) {
+                filteredReports = filteredReports.filter(r => r.project === project);
+            }
 
             res.json({
                 status: 'success',
                 data: filteredReports.slice(0, parseInt(limit)),
-                total: filteredReports.length
+                total: filteredReports.length,
+                projectsScanned: projectPaths.map(p => p.split('/').pop())
             });
         } catch (error) {
             console.error('Failed to get UKB history:', error);
@@ -791,17 +838,30 @@ class SystemHealthAPIServer {
 
     /**
      * Get detailed UKB workflow report by ID
+     * Searches across all known project paths
      */
     handleGetUKBHistoryDetail(req, res) {
         try {
             const { reportId } = req.params;
-            const reportsDir = join(codingRoot, '.data', 'workflow-reports');
-            const filePath = join(reportsDir, `${reportId}.md`);
+            const projectPaths = this.getKnownProjectPaths();
 
-            if (!existsSync(filePath)) {
+            // Find the report file across all project paths
+            let filePath = null;
+            let projectName = null;
+            for (const projectPath of projectPaths) {
+                const candidatePath = join(projectPath, '.data', 'workflow-reports', `${reportId}.md`);
+                if (existsSync(candidatePath)) {
+                    filePath = candidatePath;
+                    projectName = projectPath.split('/').pop();
+                    break;
+                }
+            }
+
+            if (!filePath) {
                 return res.status(404).json({
                     status: 'error',
-                    message: 'Report not found'
+                    message: 'Report not found',
+                    projectsSearched: projectPaths.map(p => p.split('/').pop())
                 });
             }
 
