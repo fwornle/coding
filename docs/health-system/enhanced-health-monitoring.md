@@ -60,10 +60,11 @@ The system implements a robust 6-layer monitoring protection with 9 core classes
 - Validates: watchdog, coordinator, project registration, service health
 
 #### Layer 3: HealthVerifier (`scripts/health-verifier.js`)
-- Core verification engine with 60-second periodic checks
+- Core verification engine with 15-second periodic checks
 - Checks databases (LevelDB, Qdrant, SQLite, Memgraph), services, processes
 - Generates health scores (0-100) per service
 - Triggers auto-healing via HealthRemediationActions
+- **Daemon Robustness**: Heartbeat mechanism, error handlers, and external watchdog
 
 #### Layer 4: StatusLineHealthMonitor (`scripts/statusline-health-monitor.js`)
 - Health aggregation for Claude Code status bar
@@ -162,6 +163,109 @@ The system provides seamless recovery without requiring user intervention:
 - Process CPU monitoring via `ps` command parsing
 - Automatic detection of high CPU usage processes
 - Integration with global monitoring to catch issues that previously went unnoticed
+
+## Daemon Robustness Mechanism
+
+The HealthVerifier daemon implements a defense-in-depth approach to ensure continuous, uninterrupted health monitoring. This addresses scenarios where Node.js daemons can fail silently (e.g., setInterval timers stopping without error).
+
+![Daemon Robustness Architecture](../images/daemon-robustness-architecture.png)
+
+### Heartbeat Mechanism
+
+The daemon writes a heartbeat file every verification cycle to prove liveness:
+
+**Location**: `.health/verifier-heartbeat.json`
+
+```json
+{
+  "pid": 64832,
+  "timestamp": "2025-12-14T07:32:42.292Z",
+  "uptime": 30.98,
+  "memoryUsage": 11647584,
+  "cycleCount": 2
+}
+```
+
+**Key Fields**:
+- `pid`: Process ID for external verification
+- `timestamp`: Last heartbeat time (detects stale daemons)
+- `cycleCount`: Number of completed verification cycles
+- `uptime`: Process uptime in seconds
+
+### Error Handlers
+
+Global error handlers prevent silent failures:
+
+```javascript
+process.on('uncaughtException', (error) => {
+  this.log(`UNCAUGHT EXCEPTION: ${error.message}`, 'ERROR');
+  // Log but don't exit - attempt recovery
+});
+
+process.on('unhandledRejection', (reason) => {
+  this.log(`UNHANDLED REJECTION: ${reason}`, 'ERROR');
+  // Log but don't exit - attempt recovery
+});
+```
+
+### Timer Self-Check
+
+A secondary interval monitors the main timer:
+
+```javascript
+this.timerCheckInterval = setInterval(() => {
+  if (!this.timer) {
+    this.log('Main timer cleared unexpectedly! Restarting...', 'ERROR');
+    this.timer = setInterval(runCycle, interval);
+  }
+}, interval * 2);
+```
+
+### API Server Watchdog
+
+The System Health API server (`server.js`) includes a watchdog that monitors the daemon:
+
+**Watchdog Flow**:
+1. On every `/api/health-verifier/status` request, check daemon heartbeat
+2. If heartbeat is stale (>60s) or process is dead, restart daemon
+3. Log watchdog actions for debugging
+
+**Key Methods**:
+- `checkDaemonHeartbeat()`: Reads heartbeat file, checks process liveness via `kill(pid, 0)`
+- `restartDaemon()`: Stops existing daemon (if any) and spawns new one
+
+```javascript
+checkDaemonHeartbeat() {
+  const heartbeat = JSON.parse(readFileSync(heartbeatPath));
+  const age = Date.now() - new Date(heartbeat.timestamp).getTime();
+
+  // Check if process is alive
+  try {
+    process.kill(heartbeat.pid, 0);  // Signal 0 = check existence
+    processAlive = true;
+  } catch (e) {
+    processAlive = false;
+  }
+
+  return {
+    alive: processAlive && age < 60000,
+    staleMs: age,
+    pid: heartbeat.pid,
+    reason: !processAlive ? 'process dead' : (age >= 60000 ? 'heartbeat stale' : 'ok')
+  };
+}
+```
+
+### Defense-in-Depth Summary
+
+| Layer | Mechanism | Protection |
+|-------|-----------|------------|
+| Internal | Error Handlers | Catches uncaught exceptions/rejections |
+| Internal | Timer Self-Check | Detects if setInterval stops |
+| External | Heartbeat File | Proves daemon is alive and cycling |
+| External | API Watchdog | Auto-restarts stale/dead daemons |
+
+This multi-layer approach ensures the health verification daemon remains operational even in adverse conditions like memory pressure, unhandled errors, or mysterious timer failures.
 
 ## Health Dashboard
 
