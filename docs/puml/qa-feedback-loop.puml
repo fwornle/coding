@@ -1,0 +1,68 @@
+@startuml qa-feedback-loop
+!include _standard-style.puml
+
+title "Quality Assurance Feedback Loop"
+
+top to bottom direction
+
+rectangle "Coordinator" <<agent>> as coord {
+  [Workflow Execution] <<core>>
+  [Retry Management] <<core>>
+}
+
+rectangle "QualityAssuranceAgent" <<agent>> as qa {
+  [Semantic Value Filter] <<core>>
+  [Entity Validation] <<util>>
+  [LLM Evaluation] <<core>>
+}
+
+rectangle "Worker Agents" <<frame>> as workers {
+  [InsightGeneration] <<agent>>
+  [ObservationGeneration] <<agent>>
+  [Other Agents...] <<agent>>
+}
+
+cloud "LLM Provider" <<external>> as llm
+
+database "Knowledge Graph" <<storage>> as kb
+
+' Main flow
+coord --> workers : "Execute Step"
+workers --> qa : "Results"
+qa --> coord : "QA Report"
+
+' Feedback loop
+coord --> workers : "Retry with\nEnhanced Params\n(if QA fails)"
+
+' LLM connection for semantic evaluation
+qa ..> llm : "Evaluate\nEntity Value"
+
+' Final persistence
+workers --> kb : "Persist\n(after QA pass)"
+
+note right of qa
+  **Semantic Value Criteria**
+  1. Specificity (not generic)
+  2. Actionability (useful)
+  3. Evidence (concrete refs)
+  4. Uniqueness (not duplicate)
+  5. Naming (correct type)
+end note
+
+note bottom of coord
+  **Progressive Iterations**
+  Iter 1: Standard params
+  Iter 2: Stricter requirements
+  Iter 3: Max quality threshold
+  (Max 3 iterations)
+end note
+
+legend right
+  |= Component |= Purpose |
+  | Coordinator | Orchestrates retry loops |
+  | QA Agent | Filters low-value entities |
+  | LLM | Evaluates semantic value |
+  | Workers | Retry with feedback |
+end legend
+
+@enduml

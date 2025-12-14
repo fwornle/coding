@@ -15,26 +15,27 @@ The MCP Semantic Analysis Server is a standalone Node.js application that provid
 **Orchestration (1 agent):**
 1. **CoordinatorAgent** - Orchestrates ALL agents via workflow definitions with step dependencies, data flow, and GraphDB integration
 
-**Analysis Agents (6 agents - No LLM):**
-2. **GitHistoryAgent** - Analyzes git commits and architectural decisions
-3. **VibeHistoryAgent** - Processes conversation files for context
-4. **WebSearchAgent** - External pattern research via DuckDuckGo (No LLM)
-5. **ObservationGenerationAgent** - Creates structured UKB-compatible observations
-6. **PersistenceAgent** - Persists entities to Graphology+LevelDB graph database
-7. **ContentValidationAgent** - Validates and refreshes stale knowledge entities
+**LLM-Powered Agents (10 agents - via SemanticAnalyzer):**
+2. **SemanticAnalysisAgent** - Deep code analysis using 3-tier LLM chain
+3. **InsightGenerationAgent** - Generates insights with PlantUML diagrams using LLMs
+4. **QualityAssuranceAgent** - Enhanced validation with:
+    - LLM-powered semantic value filtering (removes low-value entities)
+    - Quality-based feedback loops (up to 3 iterations with progressive strictness)
+    - Entity evaluation on 5 criteria: Specificity, Actionability, Evidence, Uniqueness, Naming
+5. **VibeHistoryAgent** - Processes conversation files using LLM for context extraction
+6. **ObservationGenerationAgent** - Creates UKB-compatible observations using LLM structuring
+7. **ContentValidationAgent** - LLM-powered staleness detection and entity refresh
+8. **GitHistoryAgent** - LLM-powered commit pattern analysis, code evolution extraction, and theme identification
+9. **WebSearchAgent** - External research via DuckDuckGo with optional LLM summarization and result ranking
+10. **OntologyClassificationAgent** - LLM-powered ontology classification with semantic inference
+11. **DocumentationLinkerAgent** - Links documentation to code entities with LLM-powered semantic matching
 
-**LLM-Powered Agents (3 agents):**
-8. **SemanticAnalysisAgent** - Deep code analysis using 3-tier LLM chain
-9. **InsightGenerationAgent** - Generates insights with PlantUML diagrams using LLMs
-10. **QualityAssuranceAgent** - Validates outputs with auto-correction using LLMs
+**Embedding/External LLM Agents (2 agents):**
+12. **DeduplicationAgent** - Semantic duplicate detection using OpenAI embeddings (text-embedding-3-small)
+13. **CodeGraphAgent** - AST-based code indexing via Memgraph with LLM queries (requires code-graph-rag)
 
-**Infrastructure Agents (2 agents):**
-11. **DeduplicationAgent** - Semantic duplicate detection and merging
-12. **OntologyClassificationAgent** - Classifies observations against project ontology
-
-**Code Analysis Agents (2 agents):**
-13. **CodeGraphAgent** - AST-based code indexing via Memgraph (requires code-graph-rag)
-14. **DocumentationLinkerAgent** - Links documentation to code entities
+**Non-LLM Agent (1 agent):**
+14. **PersistenceAgent** - Persists entities to Graphology+LevelDB (no LLM needed - pure data storage)
 
 **Note**: SynchronizationAgent has been removed - GraphDatabaseService handles all persistence automatically via Graphology (in-memory) + LevelDB (persistent storage)
 
@@ -149,6 +150,27 @@ extract_patterns {
 - All entities stored to GraphDB: `.data/knowledge-graph/` (Graphology + LevelDB)
 - Auto-export to `shared-memory-coding.json` every 30 seconds
 - Insight `.md` files written to `knowledge-management/insights/`
+
+### Quality-Based Feedback Loops
+
+The QA agent implements intelligent quality loops that ensure high-value knowledge entities:
+
+![QA Feedback Loop](../images/qa-feedback-loop.png)
+
+**Semantic Value Filtering:**
+- LLM evaluates each entity on 5 criteria: Specificity, Actionability, Evidence, Uniqueness, Naming
+- Entities scoring below threshold are automatically removed (e.g., generic "ArchitecturalEvolutionPattern")
+- Low-value entities flagged for improvement or removal
+
+**Progressive Retry Mechanism:**
+1. **Iteration 1**: Standard parameters, initial quality check
+2. **Iteration 2**: Stricter requirements, rejects generic patterns
+3. **Iteration 3**: Maximum quality threshold, requires concrete evidence
+
+**Coordinator Integration:**
+- Failed QA triggers retry with enhanced parameters per iteration
+- Feedback provided to agents about what needs improvement
+- Maximum 3 iterations before workflow fails (prevents infinite loops)
 
 ---
 

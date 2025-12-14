@@ -39,10 +39,10 @@ const WORKFLOW_AGENTS = [
     name: 'Git History',
     shortName: 'Git',
     icon: GitBranch,
-    description: 'Extracts commit history via git CLI. Provides raw commit data (files, stats, messages) to downstream agents. NOTE: Contains legacy keyword heuristics for flagging commits - proper semantic analysis delegated to InsightGenerationAgent.',
-    usesLLM: false,
-    llmModel: null,
-    techStack: 'Git CLI (heuristics deprecated)',
+    description: 'Analyzes commit history via git CLI with LLM-powered pattern extraction. Identifies code evolution patterns, development themes, architectural decisions, and technical debt from commit messages and file changes.',
+    usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'Git CLI + SemanticAnalyzer',
     row: 0,
     col: 0,
   },
@@ -75,10 +75,10 @@ const WORKFLOW_AGENTS = [
     name: 'Web Search',
     shortName: 'Web',
     icon: Search,
-    description: 'Searches for similar patterns, code examples, and documentation using DuckDuckGo/Google. Uses keyword-based relevance scoring for fast pattern matching.',
-    usesLLM: false,
-    llmModel: null,
-    techStack: 'DuckDuckGo/Google APIs',
+    description: 'Searches for similar patterns, code examples, and documentation using DuckDuckGo/Google. Optional LLM-powered result summarization and intelligent ranking of top results.',
+    usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile (optional)',
+    techStack: 'DuckDuckGo/Google APIs + SemanticAnalyzer',
     row: 2,
     col: 0.5,
   },
@@ -111,10 +111,10 @@ const WORKFLOW_AGENTS = [
     name: 'Ontology Classification',
     shortName: 'Ontology',
     icon: Tags,
-    description: 'Maps entities to ontology classes (upper/lower) using keyword heuristics. Assigns categories, properties, and confidence scores for taxonomy alignment.',
-    usesLLM: false,
-    llmModel: null,
-    techStack: 'OntologyClassifier (Heuristics)',
+    description: 'Maps entities to ontology classes (upper/lower) using LLM-powered semantic inference. Assigns categories, properties, and confidence scores with intelligent taxonomy alignment.',
+    usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'OntologyClassifier + SemanticAnalyzer',
     row: 5,
     col: 0,
   },
@@ -123,9 +123,9 @@ const WORKFLOW_AGENTS = [
     name: 'Code Graph',
     shortName: 'Code',
     icon: Code,
-    description: 'Builds AST-based knowledge graph using Tree-sitter parsing. Uses LLM (via code-graph-rag MCP) for Cypher query generation and RAG orchestration. Indexes functions, classes, imports, and call relationships into Memgraph.',
+    description: 'Builds AST-based knowledge graph using Tree-sitter parsing. Uses external LLM (via code-graph-rag MCP) for Cypher query generation and RAG orchestration. Indexes functions, classes, imports, and call relationships into Memgraph.',
     usesLLM: true,
-    llmModel: 'Provider: configurable (OpenAI/Anthropic/Ollama)',
+    llmModel: 'External: code-graph-rag (OpenAI/Anthropic/Ollama)',
     techStack: 'Tree-sitter + Memgraph + pydantic_ai',
     row: 3,
     col: 1,
@@ -135,10 +135,10 @@ const WORKFLOW_AGENTS = [
     name: 'Documentation Linker',
     shortName: 'Docs',
     icon: FileText,
-    description: 'Links markdown docs and PlantUML diagrams to code entities. Extracts inline code references, parses class/component diagrams, and builds doc-to-code mappings.',
-    usesLLM: false,
-    llmModel: null,
-    techStack: 'Regex + glob patterns',
+    description: 'Links markdown docs and PlantUML diagrams to code entities. Uses LLM-powered semantic matching to resolve unresolved references and build intelligent doc-to-code mappings.',
+    usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'Regex + glob patterns + SemanticAnalyzer',
     row: 4,
     col: 1,
   },
@@ -147,10 +147,10 @@ const WORKFLOW_AGENTS = [
     name: 'Quality Assurance',
     shortName: 'QA',
     icon: Shield,
-    description: 'Validates generated insights, PlantUML syntax, entity coherence, and observation quality. Ensures knowledge base integrity and consistency.',
+    description: 'Validates insights, PlantUML syntax, entity coherence. NEW: LLM-powered semantic value filtering removes low-value entities. Quality-based feedback loops (up to 3 iterations) with progressive parameter tightening.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
-    techStack: 'SemanticAnalyzer',
+    techStack: 'SemanticAnalyzer + Semantic Value Filter',
     row: 6,
     col: 0.5,
   },
@@ -171,10 +171,10 @@ const WORKFLOW_AGENTS = [
     name: 'Deduplication',
     shortName: 'Dedup',
     icon: Copy,
-    description: 'Detects duplicate entities using cosine/semantic similarity on embeddings. Merges similar entities, removes duplicate observations, and consolidates patterns.',
+    description: 'Detects duplicate entities using cosine/semantic similarity on embeddings. Merges similar entities, removes duplicate observations, and consolidates patterns. Uses OpenAI embeddings API (not generative LLM).',
     usesLLM: false,
-    llmModel: null,
-    techStack: 'OpenAI text-embedding-3-small',
+    llmModel: 'Embeddings: text-embedding-3-small',
+    techStack: 'OpenAI Embeddings API',
     row: 8,
     col: 0.5,
   },
@@ -268,6 +268,240 @@ interface UKBWorkflowGraphProps {
   process: ProcessInfo
   onNodeClick?: (agentId: string) => void
   selectedNode?: string | null
+}
+
+/**
+ * Generates a semantic summary of step results based on the agent type.
+ * Shows meaningful, human-readable descriptions of what the step produced.
+ */
+function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Record<string, any> }) {
+  const getSummary = (): string | null => {
+    switch (agentId) {
+      case 'git_history':
+        const commits = outputs.commitsAnalyzed || outputs.commits?.length || 0
+        const files = outputs.filesAnalyzed || outputs.files?.length || 0
+        return `Analyzed ${commits} commits affecting ${files} files`
+
+      case 'vibe_history':
+        const sessions = outputs.sessionsAnalyzed || outputs.sessions?.length || 0
+        const problemSolutions = outputs.problemSolutionPairs || outputs.pairs?.length || 0
+        return `Processed ${sessions} sessions, found ${problemSolutions} problem-solution pairs`
+
+      case 'semantic_analysis':
+        const patterns = outputs.patternsFound || outputs.patterns?.length || 0
+        const insights = outputs.insights?.length || outputs.insightsGenerated || 0
+        return `Identified ${patterns} patterns with ${insights} semantic insights`
+
+      case 'insight_generation':
+        const patternCount = outputs.patterns?.length || outputs.patternsGenerated || 0
+        const diagrams = outputs.diagramsGenerated || outputs.diagrams?.length || 0
+        return `Generated ${patternCount} patterns and ${diagrams} architecture diagrams`
+
+      case 'observation_generation':
+        const entities = outputs.entitiesCreated || outputs.entities?.length || 0
+        const observations = outputs.observationsCreated || outputs.totalObservations || 0
+        const filtered = outputs.filteredBySemanticValue || 0
+        return filtered > 0
+          ? `Created ${entities} entities (${filtered} low-value removed), ${observations} observations`
+          : `Created ${entities} entities with ${observations} observations`
+
+      case 'quality_assurance':
+        const passed = outputs.passed || outputs.validationsPassed || 0
+        const failed = outputs.failed || outputs.validationsFailed || 0
+        const qaIterations = outputs.qaIterations || 1
+        return qaIterations > 1
+          ? `QA: ${passed} passed, ${failed} failed (after ${qaIterations} iterations)`
+          : `QA: ${passed} passed, ${failed} failed`
+
+      case 'persistence':
+        const persisted = outputs.entitiesPersisted || outputs.entities?.length || 0
+        const updated = outputs.entitiesUpdated || 0
+        return `Persisted ${persisted} entities, updated ${updated}`
+
+      case 'deduplication':
+        const duplicates = outputs.duplicatesFound || outputs.duplicates?.length || 0
+        const merged = outputs.entitiesMerged || 0
+        return `Found ${duplicates} duplicates, merged ${merged} entities`
+
+      default:
+        return null
+    }
+  }
+
+  const summary = getSummary()
+  if (!summary) return null
+
+  return (
+    <div className="text-xs bg-blue-50 border border-blue-200 rounded p-2 text-blue-800">
+      {summary}
+    </div>
+  )
+}
+
+/**
+ * Expandable details view for step outputs.
+ * Shows arrays with expandable item lists and handles nested objects.
+ */
+function StepResultDetails({ outputs }: { outputs: Record<string, any> }) {
+  const [expandedKeys, setExpandedKeys] = React.useState<Set<string>>(new Set())
+
+  const toggleExpand = (key: string) => {
+    const newExpanded = new Set(expandedKeys)
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key)
+    } else {
+      newExpanded.add(key)
+    }
+    setExpandedKeys(newExpanded)
+  }
+
+  const renderValue = (key: string, value: any, depth: number = 0): React.ReactNode => {
+    // Format key: commitsAnalyzed -> Commits Analyzed
+    const formattedKey = key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, s => s.toUpperCase())
+      .trim()
+
+    if (typeof value === 'number') {
+      return (
+        <div key={key} className="flex justify-between items-center">
+          <span className="text-muted-foreground">{formattedKey}</span>
+          <span className="font-medium tabular-nums">{value.toLocaleString()}</span>
+        </div>
+      )
+    }
+
+    if (typeof value === 'boolean') {
+      return (
+        <div key={key} className="flex justify-between items-center">
+          <span className="text-muted-foreground">{formattedKey}</span>
+          <span className={value ? 'text-green-600' : 'text-red-600'}>{value ? 'Yes' : 'No'}</span>
+        </div>
+      )
+    }
+
+    if (typeof value === 'string') {
+      if (value.length > 60) {
+        const isExpanded = expandedKeys.has(key)
+        return (
+          <div key={key} className="space-y-1">
+            <div
+              className="flex justify-between items-center cursor-pointer hover:bg-slate-100 rounded px-1"
+              onClick={() => toggleExpand(key)}
+            >
+              <span className="text-muted-foreground">{formattedKey}</span>
+              <ChevronRight className={`h-3 w-3 text-blue-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            </div>
+            {isExpanded && (
+              <div className="text-xs bg-slate-100 rounded p-2 break-words ml-2">
+                {value}
+              </div>
+            )}
+          </div>
+        )
+      }
+      return (
+        <div key={key} className="flex justify-between items-center">
+          <span className="text-muted-foreground">{formattedKey}</span>
+          <span className="font-medium">{value}</span>
+        </div>
+      )
+    }
+
+    if (Array.isArray(value)) {
+      const isExpanded = expandedKeys.has(key)
+      const displayItems = value.slice(0, 10)  // Show up to 10 items when expanded
+
+      return (
+        <div key={key} className="space-y-1">
+          <div
+            className="flex justify-between items-center cursor-pointer hover:bg-slate-100 rounded px-1"
+            onClick={() => toggleExpand(key)}
+          >
+            <span className="text-muted-foreground">{formattedKey}</span>
+            <span className="font-medium tabular-nums flex items-center gap-1">
+              {value.length} items
+              <ChevronRight className={`h-3 w-3 text-blue-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            </span>
+          </div>
+          {isExpanded && (
+            <div className="text-xs bg-slate-100 rounded p-2 ml-2 space-y-1 max-h-40 overflow-y-auto">
+              {displayItems.map((item, idx) => {
+                if (typeof item === 'object' && item !== null) {
+                  // For objects, show name or first property
+                  const displayText = item.name || item.pattern || item.entityName ||
+                    Object.values(item)[0] || JSON.stringify(item).slice(0, 50)
+                  return (
+                    <div key={idx} className="flex items-center gap-1 text-slate-700">
+                      <span className="text-slate-400">{idx + 1}.</span>
+                      <span className="truncate">{String(displayText)}</span>
+                    </div>
+                  )
+                }
+                return (
+                  <div key={idx} className="flex items-center gap-1 text-slate-700">
+                    <span className="text-slate-400">{idx + 1}.</span>
+                    <span className="truncate">{String(item)}</span>
+                  </div>
+                )
+              })}
+              {value.length > 10 && (
+                <div className="text-slate-400 italic">...and {value.length - 10} more</div>
+              )}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    if (typeof value === 'object' && value !== null) {
+      const isExpanded = expandedKeys.has(key)
+      const entries = Object.entries(value).filter(([k]) => !k.startsWith('_'))
+
+      return (
+        <div key={key} className="space-y-1">
+          <div
+            className="flex justify-between items-center cursor-pointer hover:bg-slate-100 rounded px-1"
+            onClick={() => toggleExpand(key)}
+          >
+            <span className="text-muted-foreground">{formattedKey}</span>
+            <span className="font-medium tabular-nums flex items-center gap-1">
+              {entries.length} props
+              <ChevronRight className={`h-3 w-3 text-blue-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            </span>
+          </div>
+          {isExpanded && (
+            <div className="text-xs bg-slate-100 rounded p-2 ml-2 space-y-1">
+              {entries.slice(0, 8).map(([k, v]) => {
+                const nestedKey = `${key}.${k}`
+                return renderValue(k, v, depth + 1)
+              })}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div key={key} className="flex justify-between items-center">
+        <span className="text-muted-foreground">{formattedKey}</span>
+        <span className="font-medium">{String(value)}</span>
+      </div>
+    )
+  }
+
+  const entries = Object.entries(outputs).filter(([key]) => !key.startsWith('_'))
+
+  return (
+    <div className="text-xs bg-slate-50 border rounded p-2 space-y-1.5">
+      {entries.slice(0, 12).map(([key, value]) => renderValue(key, value))}
+      {entries.length > 12 && (
+        <div className="text-muted-foreground italic pt-1">
+          ...and {entries.length - 12} more properties
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }: UKBWorkflowGraphProps) {
@@ -804,39 +1038,10 @@ export function UKBNodeDetailsSidebar({
                 <Zap className="h-3 w-3" />
                 Results
               </h4>
-              <div className="text-xs bg-slate-50 border rounded p-2 space-y-1.5">
-                {Object.entries(stepInfo.outputs)
-                  .filter(([key]) => !key.startsWith('_'))
-                  .slice(0, 8)
-                  .map(([key, value]) => {
-                    // Format key: commitsAnalyzed -> Commits Analyzed
-                    const formattedKey = key
-                      .replace(/([A-Z])/g, ' $1')
-                      .replace(/^./, s => s.toUpperCase())
-                      .trim()
-
-                    // Format value based on type
-                    let displayValue: string
-                    if (typeof value === 'number') {
-                      displayValue = value.toLocaleString()
-                    } else if (typeof value === 'boolean') {
-                      displayValue = value ? '✓' : '✗'
-                    } else if (Array.isArray(value)) {
-                      displayValue = `${value.length} items`
-                    } else if (typeof value === 'string' && value.length > 40) {
-                      displayValue = value.slice(0, 40) + '...'
-                    } else {
-                      displayValue = String(value)
-                    }
-
-                    return (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-muted-foreground">{formattedKey}</span>
-                        <span className="font-medium tabular-nums">{displayValue}</span>
-                      </div>
-                    )
-                  })}
-              </div>
+              {/* Semantic Summary based on agent type */}
+              <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} />
+              {/* Detailed Results with expandable sections */}
+              <StepResultDetails outputs={stepInfo.outputs} />
             </div>
           </>
         )}
