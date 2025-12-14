@@ -14,7 +14,7 @@
 
 ## Current System: MCP Semantic Analysis
 
-**When you type "ukb" in Claude chat**, Claude detects your intent and calls the MCP semantic-analysis server to execute a comprehensive 10-agent workflow.
+**When you type "ukb" in Claude chat**, Claude detects your intent and calls the MCP semantic-analysis server to execute a comprehensive 13-agent workflow (12 agents with LLM support).
 
 ### Quick Start
 
@@ -43,7 +43,7 @@ User: "ukb"
 ### New System (Current)
 - `ukb` is a **keyword in Claude chat**
 - Claude decides: incremental or full analysis
-- **10-agent workflow** with semantic analysis
+- **13-agent workflow** with LLM-powered semantic analysis (12 of 13 agents use LLM)
 - **MCP tool integration**: `mcp__semantic-analysis__execute_workflow`
 - **Team synchronization** via git-tracked checkpoint files
 
@@ -63,7 +63,7 @@ Claude will:
 1. Detect knowledge update request
 2. Decide: incremental or full analysis
 3. Call MCP semantic-analysis tool
-4. Execute 10-agent workflow
+4. Execute 13-agent workflow (12 with LLM)
 5. Store to GraphDB → LevelDB → JSON export
 6. Show you a summary
 
@@ -85,20 +85,31 @@ Claude checks the checkpoint and reports new commits/sessions since last run.
 
 ---
 
-## 10-Agent Workflow
+## 13-Agent Workflow
 
 When triggered, the MCP semantic-analysis server executes:
 
-1. **GitHistoryAgent** - Analyzes git commits since last checkpoint
-2. **VibeHistoryAgent** - Analyzes session logs (.specstory/history/)
-3. **SemanticAnalysisAgent** - Deep semantic analysis with LLM fallback chain
-4. **WebSearchAgent** - Researches technical patterns (DuckDuckGo)
-5. **InsightGenerationAgent** - Creates structured insights
-6. **ObservationGenerationAgent** - Adds observations to entities
-7. **QualityAssuranceAgent** - Validates insight quality
-8. **PersistenceAgent** - Stores entities to GraphDB
-9. **DeduplicationAgent** - Prevents duplicate entities
-10. **CoordinatorAgent** - Orchestrates all agents
+**Orchestration:**
+1. **CoordinatorAgent** - Orchestrates all agents via workflow definitions
+
+**LLM-Powered Agents (10 agents):**
+2. **SemanticAnalysisAgent** - Deep semantic analysis with 3-tier LLM chain
+3. **InsightGenerationAgent** - Creates structured insights with PlantUML diagrams
+4. **QualityAssuranceAgent** - LLM-powered semantic value filtering and validation
+5. **VibeHistoryAgent** - Analyzes session logs with LLM context extraction
+6. **ObservationGenerationAgent** - Adds observations using LLM structuring
+7. **ContentValidationAgent** - LLM-powered staleness detection and entity refresh
+8. **GitHistoryAgent** - LLM-powered commit pattern analysis and evolution extraction
+9. **WebSearchAgent** - Researches patterns with optional LLM result ranking
+10. **OntologyClassificationAgent** - LLM-powered ontology classification
+11. **DocumentationLinkerAgent** - LLM-powered semantic doc-to-code matching
+
+**Embedding/External LLM Agents (2 agents):**
+12. **DeduplicationAgent** - Semantic duplicate detection using OpenAI embeddings
+13. **CodeGraphAgent** - AST-based indexing via Memgraph with LLM queries
+
+**Non-LLM Agent (1 agent):**
+14. **PersistenceAgent** - Stores entities to GraphDB (no LLM needed)
 
 ---
 
@@ -172,7 +183,7 @@ If you were using the old UKB CLI system:
 ### What to Start Doing
 - ✅ Type "ukb" in Claude chat
 - ✅ Let Claude call MCP semantic-analysis tool
-- ✅ Trust the 10-agent workflow
+- ✅ Trust the 13-agent workflow (12 with LLM)
 - ✅ Review auto-generated insights
 - ✅ Commit .data/knowledge-export/*.json and .data/ukb-last-run.json
 
@@ -196,11 +207,11 @@ If you were using the old UKB CLI system:
 The migration from CLI to MCP integration provides:
 
 ✅ **AI-Driven Analysis**: Claude makes intelligent decisions about analysis scope
-✅ **Semantic Understanding**: 10-agent workflow extracts deep insights
+✅ **Semantic Understanding**: 13-agent workflow with 12 LLM-powered agents extracts deep insights
 ✅ **Zero Manual Effort**: Just type "ukb" - no command-line arguments
 ✅ **Better Integration**: Seamless Claude Code workflow
 ✅ **Team Synchronization**: Git-tracked checkpoint ensures no duplicate work
-✅ **Richer Insights**: LLM-powered semantic analysis vs. simple pattern matching
+✅ **Richer Insights**: LLM-powered semantic analysis across all agents (Git, Web, Ontology, Docs)
 
 ---
 

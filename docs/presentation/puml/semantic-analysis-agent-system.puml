@@ -3,64 +3,83 @@
 
 title "13-Agent Semantic Analysis System"
 
-left to right direction
+top to bottom direction
 
 [Claude Code] <<external>> as claude
 [MCP Server] <<api>> as mcp
 [Coordinator] <<agent>> as coord
 
-package "Analysis" {
+package "Phase 1: Collection" {
   [Git History] <<agent>> as git
   [Vibe History] <<agent>> as vibe
+}
+
+package "Phase 2: Analysis" {
+  [Semantic] <<agent>> as semantic
   [Web Search] <<agent>> as web
+}
+
+package "Phase 3: Generation" {
+  [Insights] <<agent>> as insight
   [Observations] <<agent>> as obs
-  [Persistence] <<storage>> as persist
+}
+
+package "Phase 4: Classification" {
+  [Ontology] <<agent>> as ontology
+  [Doc Linker] <<agent>> as doclink
+  [Code Graph] <<agent>> as codegraph
+}
+
+package "Phase 5: Quality" {
+  [QA + Filter] <<agent>> as qa
   [Validation] <<agent>> as validate
 }
 
-package "LLM-Powered" {
-  [Semantic Analysis] <<agent>> as semantic
-  [Insights] <<agent>> as insight
-  [QA] <<agent>> as qa
-}
-
-package "Infrastructure" {
+package "Phase 6: Storage" {
+  [Persistence] <<storage>> as persist
   [Deduplication] <<agent>> as dedup
-  [Ontology] <<agent>> as ontology
 }
 
-package "Code Analysis" {
-  [Code Graph] <<agent>> as codegraph
-  [Doc Linker] <<agent>> as doclink
-}
-
-cloud "LLM Providers" <<external>> as llm
-database "Knowledge Graph" <<storage>> as db
+cloud "LLM Chain" <<external>> as llm
+cloud "Embeddings" <<external>> as embed
+database "GraphDB" <<storage>> as db
 
 claude --> mcp
 mcp --> coord
 
 coord --> git
 coord --> vibe
-coord --> web
-coord --> obs
-coord --> persist
-coord --> validate
+git --> semantic
+vibe --> semantic
+semantic --> web
+web --> insight
+insight --> obs
+obs --> ontology
+ontology --> doclink
+semantic --> codegraph
+codegraph --> doclink
+doclink --> qa
+qa --> persist
+persist --> dedup
+dedup --> validate
 
-coord --> semantic
-coord --> insight
-coord --> qa
-
-coord --> dedup
-coord --> ontology
-
-coord --> codegraph
-coord --> doclink
-
+git --> llm
+vibe --> llm
 semantic --> llm
+web --> llm
 insight --> llm
+obs --> llm
+ontology --> llm
+doclink --> llm
 qa --> llm
+validate --> llm
 
+dedup --> embed
 persist --> db
+
+note right of coord
+  13 agents, 6 phases
+  12 use LLM
+end note
 
 @enduml

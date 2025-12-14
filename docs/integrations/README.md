@@ -110,11 +110,11 @@ The core systems communicate with integrations through different protocols:
 
 **LSL System**:
 - Uses fast LLM providers (Groq/OpenAI) for Layer 4 semantic classification
-- Does NOT use the 10-agent MCP Semantic Analysis server (that's for deep analysis)
+- Does NOT use the 13-agent MCP Semantic Analysis server (that's for deep analysis)
 - Classification happens in milliseconds with budget-conscious models
 
 **Trajectory Generation**:
-- Uses MCP Semantic Analysis (10 agents) for deep repository insights
+- Uses MCP Semantic Analysis (13 agents, 12 with LLM) for deep repository insights
 - Uses Serena AST for code structure analysis
 - Comprehensive architectural pattern extraction
 

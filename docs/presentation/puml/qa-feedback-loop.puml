@@ -1,0 +1,23 @@
+@startuml qa-feedback-loop
+!include _standard-style.puml
+
+title "QA Feedback Loop"
+
+left to right direction
+
+[Coordinator] <<agent>> as coord
+[QA + Filter] <<agent>> as qa
+[Worker Agents] <<agent>> as workers
+cloud "LLM" <<external>> as llm
+database "Knowledge Graph" <<storage>> as kb
+
+coord --> workers : Execute
+workers --> qa : Results
+qa --> coord : Report
+
+coord --> workers : Retry
+
+qa ..> llm : Evaluate
+workers --> kb : Persist
+
+@enduml
