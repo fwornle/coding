@@ -45,13 +45,6 @@ export default function SystemHealthDashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  // Calculate dynamic age based on lastUpdate timestamp
-  const calculateDynamicAge = (): number => {
-    if (!healthStatus.lastUpdate) return 0
-    const lastUpdateTime = new Date(healthStatus.lastUpdate).getTime()
-    return currentTime - lastUpdateTime
-  }
-
   const handleTriggerVerification = () => {
     dispatch(triggerVerificationStart())
   }
@@ -82,29 +75,16 @@ export default function SystemHealthDashboard() {
     }
   }
 
-  const formatAge = (ageMs: number) => {
-    const seconds = Math.floor(ageMs / 1000)
-    if (seconds < 60) return `${seconds}s ago`
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m ago`
-    const hours = Math.floor(minutes / 60)
-    return `${hours}h ago`
-  }
-
-  // Calculate seconds until next refresh (refresh interval is 5 seconds)
+  // Refresh happens every 5 seconds - show countdown
   const REFRESH_INTERVAL_MS = 5000
 
-  // Calculate age since last fetch (not last verification)
-  const calculateFetchAge = (): number => {
-    if (!healthStatus.lastFetch) return 0
+  // Calculate countdown to next refresh (5, 4, 3, 2, 1, 0)
+  const calculateCountdown = (): number => {
+    if (!healthStatus.lastFetch) return 5
     const lastFetchTime = new Date(healthStatus.lastFetch).getTime()
-    return currentTime - lastFetchTime
-  }
-
-  const calculateNextUpdate = (): number => {
-    const fetchAge = calculateFetchAge()
-    const nextUpdateIn = REFRESH_INTERVAL_MS - (fetchAge % REFRESH_INTERVAL_MS)
-    return Math.max(1, Math.ceil(nextUpdateIn / 1000))
+    const elapsed = currentTime - lastFetchTime
+    const remaining = REFRESH_INTERVAL_MS - (elapsed % REFRESH_INTERVAL_MS)
+    return Math.ceil(remaining / 1000)
   }
 
   // Map check status to UI status
@@ -391,11 +371,9 @@ export default function SystemHealthDashboard() {
                 </CardTitle>
                 <CardDescription>
                   {healthStatus.lastFetch ? (
-                    <>Updated {formatAge(calculateFetchAge())} · Next: {calculateNextUpdate()}s</>
-                  ) : healthStatus.lastUpdate ? (
-                    <>Last verified {formatAge(calculateDynamicAge())}</>
+                    <>Refreshing in {calculateCountdown()}s</>
                   ) : (
-                    'Waiting for first verification...'
+                    'Connecting...'
                   )}
                 </CardDescription>
               </div>
@@ -407,10 +385,10 @@ export default function SystemHealthDashboard() {
                   Auto-Healing Active
                 </Badge>
               )}
-              {healthStatus.status === 'stale' && (
+              {healthStatus.status === 'stale' && healthStatus.ageMs > 120000 && (
                 <Badge variant="destructive" className="h-fit">
                   <Clock className="h-3 w-3 mr-1" />
-                  Stale Data
+                  Verifier Stale ({Math.floor(healthStatus.ageMs / 60000)}m)
                 </Badge>
               )}
             </div>

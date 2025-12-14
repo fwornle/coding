@@ -177,7 +177,89 @@ class SystemHealthAPIServer {
     }
 
     /**
+     * Check if the health-verifier daemon is alive via heartbeat file
+     * Returns: { alive: boolean, staleMs: number, pid: number|null }
+     */
+    checkDaemonHeartbeat() {
+        const heartbeatPath = join(codingRoot, '.health/verifier-heartbeat.json');
+
+        try {
+            if (!existsSync(heartbeatPath)) {
+                return { alive: false, staleMs: Infinity, pid: null, reason: 'no heartbeat file' };
+            }
+
+            const heartbeat = JSON.parse(readFileSync(heartbeatPath, 'utf8'));
+            const age = Date.now() - new Date(heartbeat.timestamp).getTime();
+
+            // Check if process is still running
+            let processAlive = false;
+            if (heartbeat.pid) {
+                try {
+                    process.kill(heartbeat.pid, 0); // Signal 0 = check if process exists
+                    processAlive = true;
+                } catch (e) {
+                    processAlive = false;
+                }
+            }
+
+            // Daemon is alive if: process exists AND heartbeat is fresh (<60s)
+            const isAlive = processAlive && age < 60000;
+
+            return {
+                alive: isAlive,
+                staleMs: age,
+                pid: heartbeat.pid,
+                cycleCount: heartbeat.cycleCount,
+                reason: !processAlive ? 'process dead' : (age >= 60000 ? 'heartbeat stale' : 'ok')
+            };
+        } catch (error) {
+            return { alive: false, staleMs: Infinity, pid: null, reason: error.message };
+        }
+    }
+
+    /**
+     * Restart the health-verifier daemon
+     */
+    restartDaemon() {
+        const verifierScript = join(codingRoot, 'scripts/health-verifier.js');
+
+        if (!existsSync(verifierScript)) {
+            console.warn('⚠️ Health verifier script not found:', verifierScript);
+            return false;
+        }
+
+        console.log('🔄 Restarting health-verifier daemon...');
+
+        try {
+            // First try to stop any existing daemon
+            execSync(`node "${verifierScript}" stop`, {
+                cwd: codingRoot,
+                timeout: 5000,
+                stdio: 'ignore'
+            });
+        } catch (e) {
+            // Ignore stop errors
+        }
+
+        try {
+            // Start new daemon
+            const daemonProcess = spawn('node', [verifierScript, 'start'], {
+                cwd: codingRoot,
+                detached: true,
+                stdio: 'ignore'
+            });
+            daemonProcess.unref();
+            console.log('✅ Health-verifier daemon restarted');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to restart daemon:', error.message);
+            return false;
+        }
+    }
+
+    /**
      * Trigger health verification in the background (non-blocking)
+     * Now includes watchdog: restarts daemon if heartbeat is stale
      */
     triggerBackgroundVerification() {
         const verifierScript = join(codingRoot, 'scripts/health-verifier.js');
@@ -187,6 +269,16 @@ class SystemHealthAPIServer {
             return;
         }
 
+        // WATCHDOG: Check daemon heartbeat before triggering verification
+        const heartbeatStatus = this.checkDaemonHeartbeat();
+
+        if (!heartbeatStatus.alive) {
+            console.log(`🚨 WATCHDOG: Daemon not healthy (${heartbeatStatus.reason}). Restarting...`);
+            this.restartDaemon();
+            return; // Daemon restart will run verification
+        }
+
+        // Daemon is alive, just trigger a one-time verification
         try {
             const verifyProcess = spawn('node', [verifierScript, 'verify'], {
                 cwd: codingRoot,
