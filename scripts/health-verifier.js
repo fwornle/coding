@@ -758,7 +758,26 @@ class HealthVerifier extends EventEmitter {
   }
 
   /**
-   * Start daemon mode
+   * Write heartbeat file to prove daemon is alive and timer is firing
+   */
+  async writeHeartbeat() {
+    const heartbeatPath = path.join(this.codingRoot, '.health', 'verifier-heartbeat.json');
+    const heartbeat = {
+      pid: process.pid,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage().heapUsed,
+      cycleCount: this.cycleCount || 0
+    };
+    try {
+      await fs.writeFile(heartbeatPath, JSON.stringify(heartbeat, null, 2));
+    } catch (error) {
+      this.log(`Failed to write heartbeat: ${error.message}`, 'ERROR');
+    }
+  }
+
+  /**
+   * Start daemon mode with robust error handling
    */
   async start() {
     if (this.running) {
@@ -776,7 +795,19 @@ class HealthVerifier extends EventEmitter {
     }
 
     this.running = true;
+    this.cycleCount = 0;
     this.log('Starting health verifier daemon mode');
+
+    // Install global error handlers to prevent silent failures
+    process.on('uncaughtException', (error) => {
+      this.log(`UNCAUGHT EXCEPTION: ${error.message}\n${error.stack}`, 'ERROR');
+      // Don't exit - try to keep running
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      this.log(`UNHANDLED REJECTION: ${reason}`, 'ERROR');
+      // Don't exit - try to keep running
+    });
 
     // Register this instance with PSM
     try {
@@ -793,16 +824,40 @@ class HealthVerifier extends EventEmitter {
 
     // Run initial verification
     await this.verify();
+    await this.writeHeartbeat();
 
-    // Schedule periodic verification
+    // Schedule periodic verification with robust error handling
     const interval = this.rules.verification.interval_seconds * 1000;
-    this.timer = setInterval(async () => {
+
+    const runCycle = async () => {
+      this.cycleCount++;
+      const cycleStart = Date.now();
+
       try {
+        // Write heartbeat BEFORE verify to prove timer fired
+        await this.writeHeartbeat();
+        this.log(`Timer cycle ${this.cycleCount} started`);
+
         await this.verify();
+
+        const cycleDuration = Date.now() - cycleStart;
+        this.log(`Timer cycle ${this.cycleCount} completed in ${cycleDuration}ms`);
       } catch (error) {
-        this.log(`Verification error: ${error.message}`, 'ERROR');
+        this.log(`Verification error in cycle ${this.cycleCount}: ${error.message}\n${error.stack}`, 'ERROR');
+        // Write heartbeat even on error to prove we're still running
+        await this.writeHeartbeat().catch(() => {});
       }
-    }, interval);
+    };
+
+    this.timer = setInterval(runCycle, interval);
+
+    // Additional safety: use setInterval reference check
+    this.timerCheckInterval = setInterval(() => {
+      if (!this.timer) {
+        this.log('CRITICAL: Main timer was cleared unexpectedly! Restarting...', 'ERROR');
+        this.timer = setInterval(runCycle, interval);
+      }
+    }, interval * 2); // Check every 2 cycles
 
     this.log(`Health verifier running (interval: ${this.rules.verification.interval_seconds}s)`);
   }
@@ -821,6 +876,11 @@ class HealthVerifier extends EventEmitter {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+
+    if (this.timerCheckInterval) {
+      clearInterval(this.timerCheckInterval);
+      this.timerCheckInterval = null;
     }
 
     // Unregister from PSM
