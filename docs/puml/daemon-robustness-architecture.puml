@@ -1,0 +1,64 @@
+@startuml
+!include _standard-style.puml
+
+title Daemon Robustness Architecture
+
+skinparam componentStyle rectangle
+
+package "Health Verifier Daemon" as Daemon {
+  component "Main Timer\n(15s interval)" as MainTimer
+  component "Timer Self-Check\n(30s interval)" as TimerCheck
+  component "Error Handlers" as ErrorHandlers
+  component "Heartbeat Writer" as HeartbeatWriter
+}
+
+package "API Server" as APIServer {
+  component "Watchdog" as Watchdog
+  component "/api/health-verifier/status" as StatusEndpoint
+}
+
+database ".health/verifier-heartbeat.json" as HeartbeatFile
+
+cloud "Dashboard\n(Browser)" as Dashboard
+
+' Internal daemon flow
+MainTimer -down-> HeartbeatWriter : Every cycle
+HeartbeatWriter -down-> HeartbeatFile : Write heartbeat
+
+TimerCheck -right-> MainTimer : Monitor &\nrestart if dead
+
+ErrorHandlers -up-> MainTimer : Catch errors\nprevent crash
+
+' External watchdog flow
+StatusEndpoint -down-> Watchdog : Trigger check
+Watchdog -left-> HeartbeatFile : Read heartbeat
+Watchdog -up-> Daemon : Restart if stale\nor dead
+
+' Dashboard interaction
+Dashboard -down-> StatusEndpoint : Poll status
+
+note right of HeartbeatFile
+  {
+    "pid": 64832,
+    "timestamp": "...",
+    "cycleCount": 2,
+    "uptime": 30.98
+  }
+end note
+
+note bottom of Watchdog
+  Checks:
+  1. Heartbeat age < 60s
+  2. Process alive (kill -0)
+  3. Auto-restart if stale
+end note
+
+legend right
+  |= Layer |= Mechanism |= Protection |
+  | Internal | Error Handlers | Catch exceptions |
+  | Internal | Timer Self-Check | Detect stopped timer |
+  | External | Heartbeat File | Prove liveness |
+  | External | API Watchdog | Auto-restart |
+end legend
+
+@enduml
