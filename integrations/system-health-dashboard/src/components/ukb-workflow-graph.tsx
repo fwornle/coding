@@ -278,12 +278,14 @@ function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Rec
   const getSummary = (): string | null => {
     switch (agentId) {
       case 'git_history':
-        const commits = outputs.commitsAnalyzed || outputs.commits?.length || 0
-        const files = outputs.filesAnalyzed || outputs.files?.length || 0
+        // Check all possible property names: commitsCount (coordinator summary), commitsAnalyzed (agent), commits array
+        const commits = outputs.commitsCount || outputs.commitsAnalyzed || outputs.commits?.length || 0
+        const files = outputs.filesCount || outputs.filesAnalyzed || outputs.files?.length || 0
         return `Analyzed ${commits} commits affecting ${files} files`
 
       case 'vibe_history':
-        const sessions = outputs.sessionsAnalyzed || outputs.sessions?.length || 0
+        // Check all possible property names: sessionsCount (coordinator summary), sessionsAnalyzed (agent), sessions array
+        const sessions = outputs.sessionsCount || outputs.sessionsAnalyzed || outputs.sessions?.length || 0
         const problemSolutions = outputs.problemSolutionPairs || outputs.pairs?.length || 0
         return `Processed ${sessions} sessions, found ${problemSolutions} problem-solution pairs`
 
@@ -298,8 +300,10 @@ function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Rec
         return `Generated ${patternCount} patterns and ${diagrams} architecture diagrams`
 
       case 'observation_generation':
-        const entities = outputs.entitiesCreated || outputs.entities?.length || 0
-        const observations = outputs.observationsCreated || outputs.totalObservations || 0
+        // Check all possible property names: entitiesCount (summary), entitiesCreated (agent)
+        const entities = outputs.entitiesCount || outputs.entitiesCreated || outputs.entities?.length || 0
+        // Check all possible property names: observationsCount (summary), observationsCreated (agent)
+        const observations = outputs.observationsCount || outputs.observationsCreated || outputs.totalObservations || 0
         const filtered = outputs.filteredBySemanticValue || 0
         return filtered > 0
           ? `Created ${entities} entities (${filtered} low-value removed), ${observations} observations`
