@@ -128,19 +128,18 @@ The health verifier runs every 60 seconds. If the status file is older than 2 mi
 
 ### Session Activity Indicators
 
-Session activity uses a **graduated green color scheme** that transitions smoothly from active to inactive, avoiding jarring orange/red colors that imply errors:
+Session activity uses a **unified graduated color scheme** that transitions smoothly from active to inactive, avoiding jarring orange/red colors that imply errors:
 
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
-| 🟢 | Active | < 90 seconds | Currently active session |
-| 🟩 | Idle | 90s - 5 minutes | Health data fresh, not streaming |
-| 🌲 | Cooling | 5 - 15 minutes | Recently active, cooling down |
-| 🫒 | Fading | 15 min - 1 hour | Session activity fading |
-| 🪨 | Dormant | 1 - 6 hours | Session dormant but trackable |
-| ⚫ | Inactive | 6 - 24 hours | Session idle |
-| 💤 | Sleeping | > 24 hours | Long-term dormant session |
+| 🟢 | Active | < 5 minutes | Active session with recent activity |
+| 🌲 | Cooling | 5 - 15 minutes | Session cooling down |
+| 🫒 | Fading | 15 min - 1 hour | Session fading, still tracked |
+| 🪨 | Dormant | 1 - 6 hours | Session dormant but alive |
+| ⚫ | Inactive | 6 - 24 hours | Session inactive, may be orphaned |
+| 💤 | Sleeping | > 24 hours | Session sleeping, consider cleanup |
 | 🟡 | Warning | Any | Trajectory file missing or stale |
-| ❌ | Error | Any | Health check failed |
+| ❌ | Error | Any | Health check failed or service crash |
 
 **Activity Age Calculation**:
 - Uses `transcriptInfo.ageMs` from health file (actual transcript inactivity)

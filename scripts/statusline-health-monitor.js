@@ -292,8 +292,8 @@ class StatusLineHealthMonitor {
                 const mostRecent = transcriptFiles[0];
                 const age = Date.now() - mostRecent.stats.mtime.getTime();
 
-                // Use graduated green shades for declining activity
-                // 🟢 bright green → 🟩 medium → 🌲 dark → 🫒 olive → 🪨 rock → ⚫ black
+                // UNIFIED session activity icon progression:
+                // 🟢 Active (<5m) → 🌲 Cooling (5-15m) → 🫒 Fading (15m-1h) → 🪨 Dormant (1-6h) → ⚫ Inactive (6-24h) → 💤 Sleeping (>24h)
                 if (age < 300000) { // Active within 5 minutes
                   // Downgrade to amber if trajectory missing/stale
                   if (trajectoryStatus.status !== 'fresh') {
@@ -640,39 +640,30 @@ class StatusLineHealthMonitor {
       }
 
       // Determine health based on age and status
-      // Use graduated green shades for declining activity instead of orange/red
-      // 🟢 bright green → 🌲 dark green → ⚫ black (inactive)
-      if (age < 90000) { // < 90 seconds
-        if (healthData.status === 'running' && healthData.streamingActive) {
-          // Check trajectory - downgrade to amber if missing/stale
-          if (trajectoryStatus && trajectoryStatus.status !== 'fresh') {
-            return {
-              status: 'warning',
-              icon: '🟡',
-              details: trajectoryStatus.status === 'missing' ? 'no tr' : 'stale tr'
-            };
-          }
-
+      // UNIFIED icon progression (same as getProjectSessionsHealth):
+      // 🟢 Active (< 5 min) → 🌲 Cooling (5-15 min) → 🫒 Fading (15min-1h) →
+      // 🪨 Dormant (1-6h) → ⚫ Inactive (6-24h) → 💤 Sleeping (>24h)
+      if (age < 300000) { // < 5 minutes: Active
+        // Check trajectory - downgrade to amber if missing/stale
+        if (trajectoryStatus && trajectoryStatus.status !== 'fresh') {
           return {
-            status: 'healthy',
-            icon: '🟢',
-            details: `${healthData.activity?.exchangeCount || 0} exchanges`
-          };
-        } else {
-          // Not streaming but health data fresh - use graduated green
-          return {
-            status: 'idle',
-            icon: '🟩',
-            details: 'Not streaming'
+            status: 'warning',
+            icon: '🟡',
+            details: trajectoryStatus.status === 'missing' ? 'no tr' : 'stale tr'
           };
         }
-      } else if (age < 300000) { // 90s - 5min: slightly stale (medium green)
+
+        // All active sessions (< 5 min) use 🟢 regardless of streaming state
+        const details = healthData.status === 'running' && healthData.streamingActive
+          ? `${healthData.activity?.exchangeCount || 0} exchanges`
+          : 'Active session';
+
         return {
-          status: 'stale',
-          icon: '🟩',
-          details: 'Recently active'
+          status: 'active',
+          icon: '🟢',
+          details
         };
-      } else if (age < 900000) { // 5min - 15min: stale (darker green)
+      } else if (age < 900000) { // 5min - 15min: Cooling (darker green)
         return {
           status: 'cooling',
           icon: '🌲',
@@ -1738,10 +1729,15 @@ The monitor aggregates health data from:
 Status Line Format:
   [GCM:✅] [Sessions: coding:🟢 curriculum-alignment:🟡] [Guards:✅]
 
-Health Indicators (graduated green for session activity):
-  🟢 Active     🟩 Idle       🌲 Cooling      🫒 Fading
-  🪨 Dormant    ⚫ Inactive   💤 Sleeping     🟡 Warning
-  ❌ Failed
+Session Activity Icons (unified progression):
+  🟢 Active   (< 5 min)     Active session with recent activity
+  🌲 Cooling  (5-15 min)    Session cooling down
+  🫒 Fading   (15min-1h)    Session fading, still tracked
+  🪨 Dormant  (1-6 hours)   Session dormant but alive
+  ⚫ Inactive (6-24 hours)  Session inactive, may be orphaned
+  💤 Sleeping (> 24 hours)  Session sleeping, consider cleanup
+  🟡 Warning                Trajectory file missing or stale
+  ❌ Failed                 Service error or crash
 
 Auto-Healing:
   When --auto-heal is enabled, the monitor will automatically:
