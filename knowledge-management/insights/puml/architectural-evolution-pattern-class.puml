@@ -1,127 +1,120 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management Core" {
-    class GraphDatabaseService <<service>> {
-        -database Path: String
-        -graphologyInstance: Graphology
-        -levelDbAdapter: LevelDB
-        +initializeGraph(): void
-        +addNode(data: Object): String
-        +addEdge(source: String, target: String): void
-        +queryNodes(filter: Object): Array
-        +queryPaths(start: String, end: String): Array
-        +persistGraph(): void
+package "Coordination Patterns" {
+    class MultiAgentCoordinationPattern <<pattern>> {
+        -significance: int = 8
+        -category: String = "Coordination"
+        +coordinateAgents(): void
+        +manageTaskDistribution(): void
+        +ensureSeamlessIntegration(): void
     }
-
-    class ArchitecturalEvolutionPattern <<entity>> {
-        -patternId: String
-        -patternType: String
-        -evolutionStage: String
-        -relationships: Array
-        -metadata: Object
-        +analyzeEvolution(): Object
-        +trackChanges(): Array
-        +generateInsights(): Object
+    
+    class ParallelProcessingPattern <<pattern>> {
+        -significance: int = 8
+        -category: String = "Processing"
+        +executeParallelTasks(): void
+        +optimizeBatchMode(): void
+        +manageWorkerThreads(): void
     }
 }
 
-package "Data Management" {
-    class GraphKnowledgeExporter <<service>> {
-        -exportPath: String
-        -syncInterval: Number
-        +exportToJson(): void
-        +autoSync(): void
-        +validateExport(): Boolean
-        +scheduleSync(): void
+package "Knowledge Management Patterns" {
+    class OntologyClassificationWorkflow <<pattern>> {
+        -significance: int = 9
+        -category: String = "Knowledge"
+        +classifyKnowledge(): void
+        +organizeData(): void
+        +facilitateAnalysis(): void
     }
-
-    class LevelDB <<file>> {
-        -storagePath: String
-        +get(key: String): Object
-        +put(key: String, value: Object): void
-        +batch(operations: Array): void
-        +createIterator(): Iterator
+    
+    class GraphDatabasePersistencePattern <<pattern>> {
+        -significance: int = 8
+        -category: String = "Persistence"
+        +persistInterconnectedData(): void
+        +queryComplexRelationships(): void
+        +enhanceDataRetrieval(): void
     }
-
-    class Graphology <<service>> {
-        -nodes: Map
-        -edges: Map
-        +addNode(key: String, attributes: Object): void
-        +addEdge(source: String, target: String): void
-        +getNodeAttributes(key: String): Object
-        +neighbors(key: String): Array
+    
+    class KnowledgeExportPattern <<pattern>> {
+        -significance: int = 7
+        -category: String = "Export"
+        +exportKnowledge(): void
+        +generateReports(): void
+        +facilitateExternalAnalysis(): void
     }
 }
 
-package "External Integration" {
-    class VkbApiClient <<service>> {
-        -baseUrl: String
-        -apiKey: String
-        +authenticate(): Boolean
-        +syncData(payload: Object): Object
-        +fetchUpdates(): Array
-        +handleErrors(error: Error): void
+package "User Interface Patterns" {
+    class BrowserBasedServerAccessPattern <<pattern>> {
+        -significance: int = 7
+        -category: String = "Interface"
+        +provideWebInterface(): void
+        +handleSSEConnections(): void
+        +manageProxyAccess(): void
+    }
+    
+    class StatusLineDisplayPattern <<pattern>> {
+        -significance: int = 6
+        -category: String = "Display"
+        +displayProjectActivity(): void
+        +showSystemStatus(): void
+        +renderVisualCues(): void
+    }
+    
+    class DiffHandlingPattern <<pattern>> {
+        -significance: int = 7
+        -category: String = "Versioning"
+        +trackDataChanges(): void
+        +manageVersionDiffs(): void
+        +visualizeDifferences(): void
     }
 }
 
-package "Command Interface" {
-    class VkbCommand <<interface>> {
-        +execute(args: Array): void
-        +validate(args: Array): Boolean
+package "Quality Assurance Patterns" {
+    class ConstraintMonitoringPattern <<pattern>> {
+        -significance: int = 8
+        -category: String = "Monitoring"
+        +enforceConstraints(): void
+        +monitorDataIntegrity(): void
+        +ensureConsistency(): void
     }
-
-    class VisualizationCommand {
-        +execute(args: Array): void
-        +generateVisualization(): Object
-    }
-
-    class CodingCommand {
-        +execute(args: Array): void
-        +processDevelopmentTasks(): void
-    }
-
-    class GraphSyncCommand {
-        +execute(args: Array): void
-        +synchronizeData(): Boolean
+    
+    class ContentValidationPattern <<pattern>> {
+        -significance: int = 8
+        -category: String = "Validation"
+        +validateContent(): void
+        +ensureDataQuality(): void
+        +checkStandards(): void
     }
 }
 
-package "Utilities and Analysis" {
-    class UnifiedUtilities <<service>> {
-        +formatData(data: Object): Object
-        +validateStructure(structure: Object): Boolean
-        +generateMetrics(dataset: Object): Object
-    }
-
-    class AnalysisService <<service>> {
-        +analyzePatterns(data: Object): Array
-        +generateReports(analysis: Object): Object
-        +trackEvolution(timeline: Array): Object
-    }
+class ArchitecturalEvolutionPattern <<main>> {
+    -totalPatterns: int = 10
+    -avgSignificance: double = 7.6
+    -category: String = "Architecture"
+    +analyzeEvolution(): void
+    +identifyPatterns(): void
+    +generateInsights(): void
 }
 
 ' Relationships
-GraphDatabaseService ||--o Graphology
-GraphDatabaseService ||--o LevelDB
-GraphDatabaseService --> ArchitecturalEvolutionPattern : manages
-GraphKnowledgeExporter --> GraphDatabaseService : exports from
-GraphKnowledgeExporter ..> VkbApiClient : uses
-VkbApiClient ..> GraphDatabaseService : syncs to
+ArchitecturalEvolutionPattern --> MultiAgentCoordinationPattern : contains
+ArchitecturalEvolutionPattern --> OntologyClassificationWorkflow : contains
+ArchitecturalEvolutionPattern --> GraphDatabasePersistencePattern : contains
+ArchitecturalEvolutionPattern --> BrowserBasedServerAccessPattern : contains
+ArchitecturalEvolutionPattern --> ParallelProcessingPattern : contains
+ArchitecturalEvolutionPattern --> StatusLineDisplayPattern : contains
+ArchitecturalEvolutionPattern --> KnowledgeExportPattern : contains
+ArchitecturalEvolutionPattern --> ConstraintMonitoringPattern : contains
+ArchitecturalEvolutionPattern --> DiffHandlingPattern : contains
+ArchitecturalEvolutionPattern --> ContentValidationPattern : contains
 
-VkbCommand <|.. VisualizationCommand
-VkbCommand <|.. CodingCommand
-VkbCommand <|.. GraphSyncCommand
-
-VisualizationCommand --> GraphDatabaseService : queries
-CodingCommand --> UnifiedUtilities : uses
-GraphSyncCommand --> GraphKnowledgeExporter : triggers
-
-AnalysisService --> ArchitecturalEvolutionPattern : analyzes
-AnalysisService --> UnifiedUtilities : uses
-
-note right of GraphDatabaseService : "Located at .data/knowledge-graph"
-note right of GraphKnowledgeExporter : "Auto-sync to .data/knowledge-export"
-note bottom of VkbApiClient : "External service integration"
+' Inter-pattern dependencies
+OntologyClassificationWorkflow ..> GraphDatabasePersistencePattern : uses
+MultiAgentCoordinationPattern ..> ParallelProcessingPattern : leverages
+KnowledgeExportPattern ..> OntologyClassificationWorkflow : depends on
+BrowserBasedServerAccessPattern ..> StatusLineDisplayPattern : displays
+ConstraintMonitoringPattern ..> ContentValidationPattern : collaborates
 
 @enduml

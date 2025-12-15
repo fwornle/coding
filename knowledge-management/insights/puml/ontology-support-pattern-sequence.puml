@@ -1,0 +1,34 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "System Architect" as SA
+participant "Pattern Analyzer" as PA
+participant "Ontology Engine" as OE
+participant "Pattern Catalog" as PC
+participant "Implementation Monitor" as IM
+
+SA -> PA: Initiate pattern analysis
+PA -> OE: Request ontology support analysis
+activate OE
+
+OE -> PC: Query existing patterns
+PC --> OE: Return pattern instances (8 occurrences)
+
+OE -> OE: Analyze pattern significance
+note right: Significance score: 4/5\nCategory: Implementation
+
+OE -> IM: Check usage trends
+IM --> OE: Report increasing trend
+
+OE --> PA: Return analysis results
+note left: OntologySupportPattern\n8 occurrences\nIncreasing trend
+
+deactivate OE
+
+PA -> PC: Update pattern catalog
+PC --> PA: Confirm catalog update
+
+PA --> SA: Deliver pattern analysis report
+note over SA: Total patterns: 1\nAvg significance: 4\nTop pattern: OntologySupportPattern
+
+@enduml

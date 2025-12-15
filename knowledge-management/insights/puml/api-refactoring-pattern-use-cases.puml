@@ -1,0 +1,47 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "API Developer" as dev
+actor "System Architect" as architect
+actor "Quality Assurance" as qa
+actor "DevOps Engineer" as devops
+
+rectangle "API Refactoring System" {
+  usecase "Identify Refactoring Opportunities" as identify
+  usecase "Analyze API Patterns" as analyze
+  usecase "Execute Refactoring" as execute
+  usecase "Validate Changes" as validate
+  usecase "Monitor Pattern Usage" as monitor
+  usecase "Track Decreasing Trends" as track
+  usecase "Generate Reports" as report
+}
+
+rectangle "Implementation Category" {
+  usecase "Apply Implementation Patterns" as implement
+  usecase "Code Transformation" as transform
+}
+
+dev --> identify
+dev --> execute
+architect --> analyze
+architect --> implement
+qa --> validate
+devops --> monitor
+devops --> track
+
+analyze ..> identify : <<include>>
+execute ..> analyze : <<include>>
+validate ..> execute : <<include>>
+monitor ..> validate : <<include>>
+track ..> monitor : <<include>>
+report ..> track : <<include>>
+
+implement ..> transform : <<include>>
+execute ..> implement : <<include>>
+
+note right of track : "Trend: decreasing\n5 occurrences\nSignificance: 3"
+note top of implement : "Category: Implementation\nPattern Usage Declining"
+
+@enduml

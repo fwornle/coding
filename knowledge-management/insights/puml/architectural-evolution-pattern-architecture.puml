@@ -1,68 +1,36 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title ArchitecturalEvolutionPattern - Graph Database Knowledge Management System
+package "Architecture Patterns" {
+  component "ArchitecturalEvolutionPattern" as "Architectural Evolution Pattern" <<core>>
+  component "MultiAgentCoordin" as "Multi Agent Coordination Pattern" <<agent>>
+  component "OntologyClassificationWorkflow" as "Ontology Classification Workflow" <<api>>
+  component "GraphDatabasePersistencePattern" as "Graph Database Persistence Pattern" <<storage>>
+  component "BrowserBasedServerAccessPattern" as "Browser Based Server Access Pattern" <<api>>
+  component "ParallelProcessingPattern" as "Parallel Processing Pattern" <<core>>
+  component "StatusLineDisplayPattern" as "Status Line Display Pattern" <<api>>
+  component "KnowledgeExportPattern" as "Knowledge Export Pattern" <<api>>
+  component "ConstraintMonitoringPattern" as "Constraint Monitoring Pattern" <<core>>
+  component "DiffHandlingPattern" as "Diff Handling Pattern" <<core>>
+  component "ContentValidationPattern" as "Content Validation Pattern" <<core>>
 
-package "Knowledge Management Layer" {
-    component [GraphDatabaseService] <<core>>
-    component [GraphKnowledgeExporter] <<core>>
-    note as kmNote
-  Efficient data management
-  and retrieval using
-  graph database architecture
-    end note
+  ArchitecturalEvolutionPattern --* MultiAgentCoordin
+  ArchitecturalEvolutionPattern --* OntologyClassificationWorkflow
+  ArchitecturalEvolutionPattern --* GraphDatabasePersistencePattern
+  ArchitecturalEvolutionPattern --* BrowserBasedServerAccessPattern
+  ArchitecturalEvolutionPattern --* ParallelProcessingPattern
+  ArchitecturalEvolutionPattern --* StatusLineDisplayPattern
+  ArchitecturalEvolutionPattern --* KnowledgeExportPattern
+  ArchitecturalEvolutionPattern --* ConstraintMonitoringPattern
+  ArchitecturalEvolutionPattern --* DiffHandlingPattern
+  ArchitecturalEvolutionPattern --* ContentValidationPattern
+
+  note as summary
+  Summary:
+  Total Patterns: 10
+  Average Significance: 7.8
+  Top Pattern: ArchitecturalEvolutionPattern
+  end note
 }
-
-package "Storage Layer" {
-    database [Graphology + LevelDB] <<storage>> as GraphDB
-    folder [.data/knowledge-graph] <<storage>> as KnowledgeStorage
-    folder [.data/knowledge-export] <<storage>> as ExportStorage
-    note as storageNote
-  Data stored and retrieved
-  efficiently using graph database
-    end note
-}
-
-package "Command Interface Layer" {
-    component [vkb] <<api>>
-    component [coding] <<api>>
-    component [graph-sync] <<api>>
-}
-
-package "External Integration" {
-    component [VkbApiClient] <<api>>
-    cloud [External Services] <<external>>
-}
-
-package "Service Components" {
-    component [Knowledge Management] <<core>>
-    component [Unified Utilities] <<core>>
-    component [Analysis Services] <<core>>
-}
-
-' Storage relationships
-[GraphDatabaseService] --> GraphDB : manages
-GraphDB --> KnowledgeStorage : persists to
-[GraphKnowledgeExporter] --> ExportStorage : auto-synchronizes JSON
-
-' Command relationships
-[vkb] --> [GraphDatabaseService] : visualization
-[coding] --> [Knowledge Management] : development tasks
-[graph-sync] --> [GraphKnowledgeExporter] : data synchronization
-
-' External integration
-[VkbApiClient] --> [External Services] : integrates with
-[VkbApiClient] --> [GraphDatabaseService] : provides data
-
-' Service relationships
-[Knowledge Management] --> [GraphDatabaseService] : uses
-[Analysis Services] --> [GraphDatabaseService] : queries
-[Unified Utilities] --> [GraphDatabaseService] : utilities
-
-' Component interactions
-[GraphDatabaseService] --> [GraphKnowledgeExporter] : triggers export
-[GraphKnowledgeExporter] --> [graph-sync] : notifies
-
-note bottom of ExportStorage : Auto-synchronized JSON exports\nfor external consumption
 
 @enduml

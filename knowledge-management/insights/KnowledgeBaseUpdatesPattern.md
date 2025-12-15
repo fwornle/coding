@@ -1,8 +1,8 @@
-# ArchitecturalEvolutionPattern
+# KnowledgeBaseUpdatesPattern
 
 **Type:** Technical Pattern
 
-Multi-agent architecture complexity in semantic analysis system
+Repository-specific development challenge identified through code analysis
 
 ## Implementation
 
@@ -19,12 +19,12 @@ Configuration-driven development approach
 - JSON Schema validation
 - Environment variable management
 - Configuration templating
-- Documentation
 - TypeScript/JavaScript
+- Documentation
 
 ## Architecture
 
-![Architecture](images/architectural-evolution-pattern-architecture.png)
+![Architecture](images/knowledge-base-updates-pattern-architecture.png)
 
 
 ---

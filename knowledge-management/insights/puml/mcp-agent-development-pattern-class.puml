@@ -1,0 +1,83 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "MCP Agent Development Architecture" {
+    
+    abstract class McpAgentDevelopmentPattern <<pattern>> {
+        -category: Implementation
+        -significance: 8
+        -occurrences: 15
+        -trend: increasing
+        +implement(): void
+        +analyze(): PatternResult
+        +getEvidence(): List<Evidence>
+    }
+    
+    class PatternCatalog <<service>> {
+        -totalPatterns: int
+        -avgSignificance: double
+        +addPattern(pattern: McpAgentDevelopmentPattern): void
+        +getPatternsByCategory(category: String): List<Pattern>
+        +getTopPatterns(): List<Pattern>
+        +calculateSignificance(): double
+    }
+    
+    class ImplementationPattern <<concrete>> {
+        -language: String
+        -usageNotes: List<String>
+        +execute(): void
+        +getImplementationDetails(): Map<String, Object>
+    }
+    
+    class Evidence <<data>> {
+        -occurrenceCount: int
+        -trend: String
+        +validate(): boolean
+        +getTrendDirection(): TrendType
+    }
+    
+    class PatternSummary <<data>> {
+        -totalPatterns: int
+        -byCategory: Map<String, Integer>
+        -avgSignificance: double
+        -topPatterns: List<String>
+        +generateReport(): String
+        +getCategoryBreakdown(): Map<String, Integer>
+    }
+    
+    enum TrendType {
+        INCREASING
+        DECREASING
+        STABLE
+    }
+    
+    interface PatternAnalyzer <<interface>> {
+        +analyzePattern(content: String): PatternResult
+        +extractSignificance(): int
+    }
+    
+    class PatternResult <<data>> {
+        -name: String
+        -category: String
+        -description: String
+        -relatedComponents: List<Component>
+        +isValid(): boolean
+        +getMetrics(): PatternMetrics
+    }
+}
+
+' Relationships
+PatternCatalog *-- McpAgentDevelopmentPattern : contains
+McpAgentDevelopmentPattern <|-- ImplementationPattern : extends
+McpAgentDevelopmentPattern *-- Evidence : has
+PatternCatalog --> PatternSummary : generates
+Evidence --> TrendType : uses
+PatternAnalyzer ..> PatternResult : creates
+ImplementationPattern ..> PatternAnalyzer : implements
+PatternResult --> McpAgentDevelopmentPattern : describes
+
+' Notes
+note right of McpAgentDevelopmentPattern : "15 occurrences\nTrend: increasing\nSignificance: 8/10"
+note top of PatternCatalog : "Central registry for\nall MCP patterns"
+
+@enduml

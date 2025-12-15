@@ -1,0 +1,54 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title API Refactoring Pattern Analysis Sequence
+
+actor "Developer" as dev
+participant "Legacy API" as legacy
+participant "Refactoring Engine" as engine
+participant "Pattern Analyzer" as analyzer
+participant "New API" as newapi
+database "Pattern Repository" as repo
+
+dev -> analyzer: Analyze existing API
+activate analyzer
+
+analyzer -> legacy: Scan API endpoints
+activate legacy
+legacy --> analyzer: Return API structure
+deactivate legacy
+
+analyzer -> repo: Query refactoring patterns
+activate repo
+repo --> analyzer: ApiRefactoringPattern (5 occurrences)
+deactivate repo
+
+analyzer -> analyzer: Calculate significance score: 3
+note right: Implementation category\nDecreasing trend detected
+
+analyzer --> dev: Analysis complete\n(1 pattern found, avg significance: 3)
+deactivate analyzer
+
+alt Pattern application decreasing
+    dev -> engine: Apply refactoring with caution
+    activate engine
+    
+    engine -> legacy: Extract existing functionality
+    activate legacy
+    legacy --> engine: API contracts & data
+    deactivate legacy
+    
+    engine -> newapi: Generate refactored API
+    activate newapi
+    newapi --> engine: Updated implementation
+    deactivate newapi
+    
+    engine --> dev: Refactoring complete
+    deactivate engine
+    
+    note over dev, newapi: Pattern usage trending down\nMonitor implementation effectiveness
+else Skip refactoring
+    dev -> dev: Consider alternative approaches
+end
+
+@enduml

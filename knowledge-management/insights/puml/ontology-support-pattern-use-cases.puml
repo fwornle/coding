@@ -1,0 +1,54 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Ontology Support Pattern - Use Cases
+
+actor "System Architect" as SA
+actor "Developer" as DEV
+actor "Knowledge Engineer" as KE
+actor "Data Analyst" as DA
+
+rectangle "Ontology Support System" {
+    usecase "Define Ontology Structure" as UC1
+    usecase "Implement Ontology Pattern" as UC2
+    usecase "Validate Ontology Rules" as UC3
+    usecase "Query Ontology Data" as UC4
+    usecase "Maintain Ontology Consistency" as UC5
+    usecase "Monitor Pattern Usage" as UC6
+    usecase "Analyze Usage Trends" as UC7
+    usecase "Generate Pattern Reports" as UC8
+}
+
+rectangle "Core Implementation" {
+    usecase "Initialize Pattern Framework" as INIT
+    usecase "Handle Pattern Occurrences" as HANDLE
+}
+
+SA --> UC1
+SA --> UC2
+SA --> UC6
+
+DEV --> UC2
+DEV --> UC3
+DEV --> UC5
+
+KE --> UC1
+KE --> UC3
+KE --> UC4
+KE --> UC5
+
+DA --> UC4
+DA --> UC7
+DA --> UC8
+
+UC2 ..> INIT : <<include>>
+UC6 ..> HANDLE : <<include>>
+UC7 ..> HANDLE : <<include>>
+
+UC5 ..> UC3 : <<extend>>
+UC8 ..> UC7 : <<extend>>
+
+note right of UC6 : "8 occurrences detected\nTrend: increasing"
+note right of UC2 : "Significance level: 4\nImplementation category"
+
+@enduml
