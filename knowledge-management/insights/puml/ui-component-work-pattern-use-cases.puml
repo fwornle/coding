@@ -1,0 +1,64 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Frontend Developer" as dev
+actor "UI Designer" as designer
+actor "End User" as user
+actor "System Administrator" as admin
+
+rectangle "UI Component Work Pattern System" {
+  usecase "Implement UI Components" as implement
+  usecase "Design Component Architecture" as design
+  usecase "Manage Component Lifecycle" as lifecycle
+  usecase "Monitor Component Performance" as monitor
+  usecase "Maintain Component Stability" as maintain
+  usecase "Analyze Component Usage" as analyze
+  usecase "Update Component Patterns" as update
+  usecase "Interact with UI Components" as interact
+  usecase "Configure Component Settings" as configure
+  
+  usecase "Track Usage Patterns" as track
+  usecase "Generate Component Reports" as report
+}
+
+' Actor relationships
+dev --> implement
+dev --> lifecycle
+dev --> maintain
+dev --> update
+
+designer --> design
+designer --> implement
+
+user --> interact
+
+admin --> configure
+admin --> monitor
+admin --> analyze
+
+' Include relationships
+implement ..> track : <<include>>
+monitor ..> report : <<include>>
+analyze ..> track : <<include>>
+maintain ..> monitor : <<include>>
+
+' Extend relationships
+update ..> analyze : <<extend>>
+maintain ..> update : <<extend>>
+
+note right of implement
+  Pattern: UiComponentWorkPattern
+  Occurrences: 12
+  Trend: stable
+  Significance: 6/10
+end note
+
+note bottom of "UI Component Work Pattern System"
+  Implementation Category Pattern
+  Total Patterns: 1
+  Average Significance: 6
+end note
+
+@enduml

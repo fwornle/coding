@@ -1,0 +1,91 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "UI Component Work Pattern Architecture" {
+    
+    abstract class UiComponent <<pattern>> {
+        -component Id: String
+        -state: ComponentState
+        -properties: Map<String, Object>
+        +render(): void
+        +update(): void
+        +handleEvent(event: Event): void
+        +getState(): ComponentState
+        +setState(state: ComponentState): void
+    }
+    
+    class UiComponentWorkPattern <<implementation>> {
+        -occurrences: Integer = 12
+        -trend: String = "stable"
+        -significance: Integer = 6
+        -category: String = "Implementation"
+        +execute(): void
+        +analyze(): PatternAnalysis
+        +getOccurrences(): Integer
+        +getTrend(): String
+        +getSignificance(): Integer
+    }
+    
+    enum ComponentState {
+        INITIALIZED
+        RENDERED
+        UPDATED
+        DESTROYED
+    }
+    
+    class PatternAnalysis <<service>> {
+        -totalPatterns: Integer = 1
+        -avgSignificance: Double = 6.0
+        -topPatterns: List<String>
+        +generateReport(): AnalysisReport
+        +calculateMetrics(): Map<String, Object>
+        +getByCategory(category: String): List<Pattern>
+    }
+    
+    class AnalysisReport <<data>> {
+        -content: String
+        -name: String
+        -timestamp: Date
+        +export(): String
+        +validate(): Boolean
+    }
+    
+    interface Pattern {
+        +getName(): String
+        +getCategory(): String
+        +getDescription(): String
+        +getSignificance(): Integer
+    }
+    
+    class PatternCatalog <<service>> {
+        -patterns: List<Pattern>
+        -summary: CatalogSummary
+        +addPattern(pattern: Pattern): void
+        +removePattern(name: String): void
+        +findPattern(name: String): Pattern
+        +getSummary(): CatalogSummary
+    }
+    
+    class CatalogSummary <<data>> {
+        -totalPatterns: Integer
+        -byCategory: Map<String, Integer>
+        -avgSignificance: Double
+        -topPatterns: List<String>
+    }
+}
+
+' Relationships
+UiComponent --|> Pattern : implements
+UiComponentWorkPattern --|> Pattern : implements
+UiComponent --> ComponentState : uses
+UiComponentWorkPattern --> PatternAnalysis : creates
+PatternAnalysis --> AnalysisReport : generates
+PatternCatalog o-- Pattern : contains
+PatternCatalog --> CatalogSummary : maintains
+UiComponentWorkPattern ..> UiComponent : "works with\n(12 occurrences)"
+
+note top of UiComponentWorkPattern : Significance: 6/10\nTrend: Stable\nCategory: Implementation
+
+note right of PatternAnalysis : Analyzes UI component\nwork patterns and\ngenerates insights
+
+@enduml

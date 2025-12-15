@@ -1,0 +1,32 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "MCP Agent Development Pattern" {
+  actor "Developer" as dev
+  usecase "MCP Agent Development" as mcpDev
+  usecase "Trend Analysis" as trend
+  dev -- mcpDev
+  mcpDev ..> trend : includes
+  note as AutoNote1
+  15 occurrences
+  Trend: increasing
+end note
+  mcpDev ..> note1
+}
+
+package "Pattern Catalog" {
+  actor "Analyst" as anal
+  usecase "Pattern Analysis" as patternAnal
+  usecase "Summary Generation" as summaryGen
+  anal -- patternAnal
+  patternAnal ..> summaryGen : extends
+  note as AutoNote2
+  1 pattern
+  Category: Implementation
+end note
+  patternAnal ..> note2
+}
+
+dev -- patternAnal : uses
+
+@enduml

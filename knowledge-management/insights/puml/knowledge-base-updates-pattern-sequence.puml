@@ -1,0 +1,38 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant KnowledgeBase as "Knowledge Base"
+participant TrendAnalyzer as "Trend Analyzer"
+participant PatternDetector as "Pattern Detector"
+
+activate KnowledgeBase
+KnowledgeBase->>TrendAnalyzer: Send updates (10 occurrences)
+activate TrendAnalyzer
+TrendAnalyzer->>PatternDetector: Identify trend (increasing)
+activate PatternDetector
+PatternDetector->>KnowledgeBase: Update pattern (KnowledgeBaseUpdatesPattern)
+deactivate PatternDetector
+deactivate TrendAnalyzer
+deactivate KnowledgeBase
+
+alt Occurrences increasing
+    KnowledgeBase->>TrendAnalyzer: Send updates
+    activate TrendAnalyzer
+    TrendAnalyzer->>PatternDetector: Update trend
+    activate PatternDetector
+    PatternDetector->>KnowledgeBase: Update pattern significance (5)
+    deactivate PatternDetector
+    deactivate TrendAnalyzer
+end
+
+loop Every update
+    KnowledgeBase->>TrendAnalyzer: Send updates
+    activate TrendAnalyzer
+    TrendAnalyzer->>PatternDetector: Update trend
+    activate PatternDetector
+    PatternDetector->>KnowledgeBase: Update pattern
+    deactivate PatternDetector
+    deactivate TrendAnalyzer
+end
+
+@enduml

@@ -1,12 +1,14 @@
 {
   "workflowName": "complete-analysis",
-  "executionId": "complete-analysis-1765527041579",
-  "status": "running",
-  "startTime": "2025-12-12T08:10:41.579Z",
+  "executionId": "complete-analysis-1765732046965",
+  "status": "completed",
+  "team": "coding",
+  "repositoryPath": "/Users/q284340/Agentic/coding",
+  "startTime": "2025-12-14T17:07:26.965Z",
   "currentStep": null,
-  "totalSteps": 15,
-  "completedSteps": 12,
-  "failedSteps": 1,
+  "totalSteps": 14,
+  "completedSteps": 13,
+  "failedSteps": 0,
   "stepsCompleted": [
     "analyze_git_history",
     "analyze_vibe_history",
@@ -15,15 +17,185 @@
     "generate_insights",
     "generate_observations",
     "classify_with_ontology",
-    "index_codebase",
     "link_documentation",
     "transform_code_entities",
     "quality_assurance",
-    "persist_results"
+    "persist_results",
+    "deduplicate_insights",
+    "validate_content"
   ],
-  "stepsFailed": [
-    "persist_code_entities"
+  "stepsFailed": [],
+  "stepsDetail": [
+    {
+      "name": "analyze_git_history",
+      "status": "completed",
+      "duration": 7438,
+      "outputs": {
+        "commitsCount": 706,
+        "filesCount": 5964,
+        "timing": {
+          "duration": 7438,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "analyze_vibe_history",
+      "status": "completed",
+      "duration": 2908,
+      "outputs": {
+        "sessionsCount": 1,
+        "timing": {
+          "duration": 2908,
+          "timeout": 120
+        }
+      }
+    },
+    {
+      "name": "semantic_analysis",
+      "status": "completed",
+      "duration": 1927,
+      "outputs": {
+        "timing": {
+          "duration": 1927,
+          "timeout": 180
+        }
+      }
+    },
+    {
+      "name": "web_search",
+      "status": "completed",
+      "duration": 163,
+      "outputs": {
+        "timing": {
+          "duration": 163,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "generate_insights",
+      "status": "completed",
+      "duration": 24933,
+      "outputs": {
+        "timing": {
+          "duration": 24933,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "generate_observations",
+      "status": "completed",
+      "duration": 2867,
+      "outputs": {
+        "observationsCount": 1023,
+        "timing": {
+          "duration": 2867,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "classify_with_ontology",
+      "status": "completed",
+      "duration": 14,
+      "outputs": {
+        "timing": {
+          "duration": 14,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "index_codebase",
+      "status": "skipped",
+      "duration": 2068,
+      "outputs": {
+        "entitiesCount": 0,
+        "timing": {
+          "duration": 2068,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "link_documentation",
+      "status": "completed",
+      "duration": 1646,
+      "outputs": {
+        "timing": {
+          "duration": 1646,
+          "timeout": 120
+        }
+      }
+    },
+    {
+      "name": "transform_code_entities",
+      "status": "completed",
+      "duration": 0,
+      "outputs": {
+        "timing": {
+          "duration": 0,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "quality_assurance",
+      "status": "completed",
+      "duration": 2345,
+      "outputs": {
+        "timing": {
+          "duration": 2345,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "persist_results",
+      "status": "completed",
+      "duration": 16577,
+      "outputs": {
+        "entitiesCreated": 5,
+        "entitiesUpdated": 0,
+        "filesCreated": [
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/McpAgentDevelopmentPattern.md",
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/UiComponentWorkPattern.md",
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/KnowledgeBaseUpdatesPattern.md",
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/OntologySupportPattern.md",
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/ApiRefactoringPattern.md"
+        ],
+        "errorsCount": 0,
+        "timing": {
+          "duration": 16577,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "deduplicate_insights",
+      "status": "completed",
+      "duration": 0,
+      "outputs": {
+        "timing": {
+          "duration": 0,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "validate_content",
+      "status": "completed",
+      "duration": 32957,
+      "outputs": {
+        "timing": {
+          "duration": 32957,
+          "timeout": 120
+        }
+      }
+    }
   ],
-  "lastUpdate": "2025-12-12T08:11:15.101Z",
-  "elapsedSeconds": 34
+  "lastUpdate": "2025-12-14T17:09:02.967Z",
+  "elapsedSeconds": 96
 }

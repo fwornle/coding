@@ -1,0 +1,47 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant "User" as User
+participant "UI Component" as UI
+participant "Pattern Analyzer" as Analyzer
+participant "Work Handler" as Handler
+participant "State Manager" as State
+
+User -> UI: Initialize Component
+activate UI
+
+UI -> Analyzer: Analyze Component Pattern
+activate Analyzer
+note right: UiComponentWorkPattern\n12 occurrences detected
+
+Analyzer -> Handler: Create Work Pattern
+activate Handler
+
+loop 12 occurrences
+    Handler -> State: Update Component State
+    activate State
+    State --> Handler: State Updated
+    deactivate State
+    
+    Handler -> UI: Apply Pattern Implementation
+    UI -> UI: Render Component
+end
+
+Handler --> Analyzer: Pattern Applied
+deactivate Handler
+
+Analyzer --> UI: Analysis Complete
+note left: Pattern Significance: 6\nTrend: Stable
+deactivate Analyzer
+
+UI --> User: Component Ready
+deactivate UI
+
+note over User, State
+UI Component Work Pattern
+Category: Implementation
+Status: Stable with 12 occurrences
+Average Significance: 6
+end note
+
+@enduml

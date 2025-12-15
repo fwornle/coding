@@ -1,53 +1,60 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+package "Architectural Patterns" {
+  actor "Developer" as dev
+  actor "System" as sys
 
-actor "Developer" as dev
-actor "System Administrator" as admin
-actor "External API" as api
+  usecase "MultiAgentCoordinationPattern" as macp
+  usecase "OntologyClassificationWorkflow" as ocw
+  usecase "GraphDatabasePersistencePattern" as gdpp
+  usecase "BrowserBasedServerAccessPattern" as bbsap
+  usecase "ParallelProcessingPattern" as ppp
+  usecase "StatusLineDisplayPattern" as sldp
+  usecase "KnowledgeExportPattern" as kep
+  usecase "ConstraintMonitoringPattern" as cmp
+  usecase "DiffHandlingPattern" as dhp
+  usecase "ContentValidationPattern" as cvp
 
-rectangle "Knowledge Management System" {
-  usecase "Manage Graph Database" as manage_db
-  usecase "Visualize Knowledge Graph" as visualize
-  usecase "Develop and Code" as develop
-  usecase "Synchronize Data" as sync
-  usecase "Export Knowledge" as export
-  usecase "Query Graph Data" as query
-  usecase "Store Graph Data" as store
-  usecase "Integrate External Services" as integrate
+  dev -- macp
+  dev -- ocw
+  dev -- gdpp
+  dev -- bbsap
+  dev -- ppp
+  dev -- sldp
+  dev -- kep
+  dev -- cmp
+  dev -- dhp
+  dev -- cvp
+
+  sys -- macp
+  sys -- ocw
+  sys -- gdpp
+  sys -- bbsap
+  sys -- ppp
+  sys -- sldp
+  sys -- kep
+  sys -- cmp
+  sys -- dhp
+  sys -- cvp
+
+  macp ..> ocw : include
+  ocw ..> gdpp : extend
+  bbsap ..> ppp : include
+  ppp ..> sldp : extend
+  kep ..> cmp : include
+  cmp ..> dhp : extend
+  dhp ..> cvp : include
+
+  package "Related Components" {
+    component ".specstory/history/2025-12-14_0800-0900_g9b30a.md" as history1
+    component ".specstory/history/2025-12-14_0900-1000_g9b30a.md" as history2
+    component ".specstory/logs/classification/2025-12-14_0800-0900_g9b30a_from-ui-template.md" as logs
+
+    history1 -- macp
+    history2 -- ocw
+    logs -- gdpp
+  }
 }
-
-rectangle "Core Components" {
-  usecase "GraphDatabaseService" as gdb_service
-  usecase "GraphKnowledgeExporter" as exporter
-  usecase "VkbApiClient" as api_client
-}
-
-dev --> visualize : uses vkb command
-dev --> develop : uses coding command
-admin --> sync : uses graph-sync command
-admin --> manage_db
-
-manage_db ..> gdb_service : <<include>>
-export ..> exporter : <<include>>
-integrate ..> api_client : <<include>>
-
-gdb_service --> store
-gdb_service --> query
-exporter --> export
-api_client --> integrate
-
-manage_db --> store : stores at .data/knowledge-graph
-export --> sync : auto-sync to .data/knowledge-export
-integrate --> api : communicates with
-
-visualize --> query
-develop --> query
-sync --> store
-
-note right of manage_db : Uses Graphology + LevelDB
-note right of export : Auto-synchronizes JSON exports
-note right of integrate : Component-based architecture
 
 @enduml

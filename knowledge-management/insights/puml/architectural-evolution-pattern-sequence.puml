@@ -1,85 +1,84 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "User" as U
-participant "VKB CLI" as CLI
-participant "GraphDatabaseService" as GDS
-participant "Graphology + LevelDB" as DB
-participant "GraphKnowledgeExporter" as GKE
-participant "VkbApiClient" as API
-participant "External Services" as EXT
+participant "Developer" as Dev
+participant "Multi-Agent System" as MAS
+participant "Ontology Engine" as OE
+participant "Graph Database" as GDB
+participant "Browser Interface" as BI
+participant "Parallel Processor" as PP
+participant "Knowledge Exporter" as KE
+participant "Constraint Monitor" as CM
+participant "Content Validator" as CV
 
-U -> CLI: Execute vkb command
-activate CLI
+Dev -> MAS: Initialize multi-agent coordination
+activate MAS
 
-CLI -> GDS: Request graph operations
-activate GDS
+MAS -> OE: Request ontology classification
+activate OE
+OE -> OE: Process knowledge taxonomy
+OE -> GDB: Store classified entities
+activate GDB
+GDB --> OE: Confirm persistence
+OE --> MAS: Classification complete
+deactivate OE
 
-GDS -> DB: Query/Store data
-note right: Located at .data/knowledge-graph
-activate DB
-DB --> GDS: Return graph data
-deactivate DB
+MAS -> PP: Execute batch semantic analysis
+activate PP
+PP -> PP: Spawn parallel workers
+PP -> GDB: Query interconnected data
+GDB --> PP: Return graph results
+PP --> MAS: Analysis complete
+deactivate PP
 
-GDS --> CLI: Return processed data
-deactivate GDS
-
-alt Visualization Command
-    CLI -> GDS: Request visualization data
-    activate GDS
-    GDS -> DB: Retrieve graph structure
-    activate DB
-    DB --> GDS: Graph topology
-    deactivate DB
-    GDS --> CLI: Formatted visualization
-    deactivate GDS
-    CLI --> U: Display graph visualization
+alt Browser Access Request
+    Dev -> BI: Access server via SSE proxy
+    activate BI
+    BI -> MAS: Forward user requests
+    MAS --> BI: Return system status
+    BI --> Dev: Display status with green indicators
+    deactivate BI
 end
 
-alt Development Task (coding)
-    CLI -> GDS: Process development request
-    activate GDS
-    GDS -> DB: Update knowledge graph
-    activate DB
-    DB --> GDS: Confirmation
-    deactivate DB
-    GDS --> CLI: Development result
-    deactivate GDS
+MAS -> CM: Monitor system constraints
+activate CM
+CM -> CV: Validate content integrity
+activate CV
+CV -> GDB: Check data consistency
+GDB --> CV: Return validation results
+CV --> CM: Content validation complete
+deactivate CV
+CM --> MAS: Constraints satisfied
+deactivate CM
+
+opt Knowledge Export Required
+    MAS -> KE: Export knowledge base
+    activate KE
+    KE -> GDB: Extract graph data
+    GDB --> KE: Return structured data
+    KE -> KE: Generate UKB reports
+    KE --> MAS: Export complete
+    deactivate KE
 end
 
-alt Graph Synchronization
-    U -> CLI: Execute graph-sync
-    CLI -> GKE: Trigger export process
-    activate GKE
-    
-    GKE -> GDS: Request current graph state
-    activate GDS
-    GDS -> DB: Fetch complete graph
-    activate DB
-    DB --> GDS: Full graph data
-    deactivate DB
-    GDS --> GKE: Structured data
-    deactivate GDS
-    
-    GKE -> GKE: Generate JSON export
-    note right: Auto-sync to .data/knowledge-export
-    
-    GKE -> API: Sync with external services
-    activate API
-    API -> EXT: Send synchronized data
-    activate EXT
-    EXT --> API: Confirmation
-    deactivate EXT
-    API --> GKE: Sync status
-    deactivate API
-    
-    GKE --> CLI: Export completed
-    deactivate GKE
-end
+MAS -> MAS: Update architectural evolution
+MAS --> Dev: System coordination complete
+deactivate MAS
+deactivate GDB
 
-CLI --> U: Command completed
-deactivate CLI
-
-note over U, EXT: Component-based architecture with\nseparate knowledge management,\nunified utilities, and analysis services
+note right of MAS
+  Architectural Evolution Pattern
+  Coordinates 10 identified patterns:
+  - MultiAgentCoordination
+  - OntologyClassification
+  - GraphDatabasePersistence
+  - BrowserBasedServerAccess
+  - ParallelProcessing
+  - StatusLineDisplay
+  - KnowledgeExport
+  - ConstraintMonitoring
+  - DiffHandling
+  - ContentValidation
+end note
 
 @enduml

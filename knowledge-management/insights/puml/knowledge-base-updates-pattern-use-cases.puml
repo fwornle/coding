@@ -1,0 +1,49 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Knowledge Manager" as KM
+actor "System Administrator" as SA
+actor "Data Analyst" as DA
+actor "External System" as ES
+
+rectangle "Knowledge Base Updates System" {
+  usecase "Update Knowledge Base" as UC1
+  usecase "Monitor Update Trends" as UC2
+  usecase "Validate Knowledge Updates" as UC3
+  usecase "Schedule Automated Updates" as UC4
+  usecase "Track Update Frequency" as UC5
+  usecase "Generate Update Reports" as UC6
+  usecase "Manage Update Patterns" as UC7
+  usecase "Configure Update Rules" as UC8
+  usecase "Handle Update Failures" as UC9
+  usecase "Audit Update History" as UC10
+}
+
+KM --> UC1
+KM --> UC3
+KM --> UC7
+
+SA --> UC4
+SA --> UC8
+SA --> UC9
+
+DA --> UC2
+DA --> UC5
+DA --> UC6
+DA --> UC10
+
+ES --> UC1
+ES --> UC4
+
+UC1 ..> UC3 : <<include>>
+UC2 ..> UC5 : <<include>>
+UC4 ..> UC8 : <<include>>
+UC6 ..> UC10 : <<include>>
+UC9 ..> UC10 : <<extend>>
+
+note right of UC2 : "Trend: increasing\n10 occurrences detected"
+note bottom of UC1 : "Implementation Pattern:\nKnowledgeBaseUpdatesPattern"
+
+@enduml

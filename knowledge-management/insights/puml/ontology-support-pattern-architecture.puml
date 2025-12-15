@@ -1,0 +1,49 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Ontology Support Pattern Architecture
+
+package "Implementation Patterns" {
+    component "Ontology Support\nPattern" as osp <<core>>
+}
+
+package "Supporting Components" {
+    component "Knowledge Graph\nEngine" as kge <<storage>>
+    component "Semantic\nProcessor" as sp <<api>>
+    component "Ontology\nValidator" as ov <<core>>
+    database "RDF Store" as rdf
+    database "Schema Repository" as schema
+}
+
+package "Client Applications" {
+    component "Query Interface" as qi <<api>>
+    component "Reasoning Engine" as re <<core>>
+}
+
+' Core relationships
+osp --> kge : "manages"
+osp --> sp : "processes through"
+osp --> ov : "validates with"
+kge --> rdf : "stores in"
+ov --> schema : "references"
+qi --> osp : "uses"
+re --> osp : "leverages"
+sp ..> rdf : "queries"
+
+note top of osp
+**Pattern Details:**
+- Occurrences: 8
+- Trend: Increasing
+- Significance: 4/5
+- Category: Implementation
+end note
+
+note bottom
+**Architecture Summary:**
+- Total Patterns: 1
+- Implementation Category: 1 pattern
+- Average Significance: 4.0
+- Top Pattern: OntologySupportPattern
+end note
+
+@enduml

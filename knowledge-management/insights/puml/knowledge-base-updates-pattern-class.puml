@@ -1,0 +1,76 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Base Architecture" {
+    
+    abstract class Pattern <<pattern>> {
+        -name: String
+        -category: String
+        -description: String
+        -significance: int
+        +getEvidence(): List<String>
+        +getImplementation(): Implementation
+    }
+    
+    class KnowledgeBaseUpdatesPattern <<implementation>> {
+        -occurrences: int = 10
+        -trend: String = "increasing"
+        +updateKnowledgeBase(): void
+        +trackOccurrences(): int
+        +analyzeTrend(): String
+    }
+    
+    class Implementation <<value>> {
+        -language: String
+        -usageNotes: List<String>
+        +getUsageNotes(): List<String>
+        +setLanguage(lang: String): void
+    }
+    
+    class PatternCatalog <<service>> {
+        -patterns: List<Pattern>
+        -totalPatterns: int
+        -avgSignificance: double
+        +addPattern(pattern: Pattern): void
+        +getPatternsByCategory(category: String): List<Pattern>
+        +getTopPatterns(): List<String>
+        +calculateAverageSignificance(): double
+    }
+    
+    class Evidence <<value>> {
+        -occurrenceCount: int
+        -trendDirection: String
+        +validateEvidence(): boolean
+        +formatEvidence(): String
+    }
+    
+    enum PatternCategory <<enumeration>> {
+        IMPLEMENTATION
+        DESIGN
+        ARCHITECTURAL
+        BEHAVIORAL
+    }
+    
+    class AnalysisData <<entity>> {
+        -content: String
+        -name: String
+        -patternCatalog: PatternCatalog
+        +generateDiagram(): void
+        +analyzePatterns(): void
+    }
+}
+
+' Relationships
+Pattern <|-- KnowledgeBaseUpdatesPattern
+Pattern --> Implementation : contains
+Pattern --> Evidence : has
+PatternCatalog *-- Pattern : manages
+PatternCatalog --> PatternCategory : categorizes by
+AnalysisData *-- PatternCatalog : contains
+KnowledgeBaseUpdatesPattern --> Evidence : generates
+
+' Notes
+note right of KnowledgeBaseUpdatesPattern : "10 occurrences\nTrend: increasing\nSignificance: 5"
+note top of PatternCatalog : "Manages architectural patterns\nProvides analysis summary"
+
+@enduml
