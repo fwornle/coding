@@ -28,11 +28,29 @@ import {
   Zap,
   Timer,
   Hash,
+  RefreshCw,
+  Play,
 } from 'lucide-react'
+
+// Orchestrator node - represents the coordinator that manages all agents
+const ORCHESTRATOR_NODE = {
+  id: 'orchestrator',
+  name: 'Orchestrator',
+  shortName: 'Coordinator',
+  icon: Play,
+  description: 'DAG-based workflow coordinator. Manages parallel execution with max 3 concurrent steps, handles dependencies, retries failed steps, and aggregates results.',
+  usesLLM: false,
+  llmModel: null,
+  techStack: 'TypeScript DAG executor',
+  row: -1,  // Above all other nodes
+  col: 1.125,  // Centered
+}
 
 // Agent definitions for the 13-agent workflow
 // LLM info verified via Serena analysis of mcp-server-semantic-analysis
 // Priority: Groq > Gemini > Anthropic > OpenAI (auto-fallback based on API key availability)
+// Grid layout: row/col positions reflect actual DAG structure from coordinator.ts
+// Phase 1 (row 0): git_history, vibe_history, code_graph, documentation_linker (all parallel entry points)
 const WORKFLOW_AGENTS = [
   {
     id: 'git_history',
@@ -56,7 +74,31 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
     row: 0,
-    col: 1,
+    col: 0.75,
+  },
+  {
+    id: 'code_graph',
+    name: 'Code Graph',
+    shortName: 'Code',
+    icon: Code,
+    description: 'Builds AST-based knowledge graph using Tree-sitter parsing. Uses external LLM (via code-graph-rag MCP) for Cypher query generation and RAG orchestration. Indexes functions, classes, imports, and call relationships into Memgraph.',
+    usesLLM: true,
+    llmModel: 'External: code-graph-rag (OpenAI/Anthropic/Ollama)',
+    techStack: 'Tree-sitter + Memgraph + pydantic_ai',
+    row: 0,
+    col: 1.5,
+  },
+  {
+    id: 'documentation_linker',
+    name: 'Documentation Linker',
+    shortName: 'Docs',
+    icon: FileText,
+    description: 'Links markdown docs and PlantUML diagrams to code entities. Uses LLM-powered semantic matching to resolve unresolved references and build intelligent doc-to-code mappings.',
+    usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'Regex + glob patterns + SemanticAnalyzer',
+    row: 0,
+    col: 2.25,
   },
   {
     id: 'semantic_analysis',
@@ -68,7 +110,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'Direct LLM clients',
     row: 1,
-    col: 0.5,
+    col: 0.375,
   },
   {
     id: 'web_search',
@@ -80,7 +122,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile (optional)',
     techStack: 'DuckDuckGo/Google APIs + SemanticAnalyzer',
     row: 2,
-    col: 0.5,
+    col: 0.375,
   },
   {
     id: 'insight_generation',
@@ -92,7 +134,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
     row: 3,
-    col: 0,
+    col: 0.75,
   },
   {
     id: 'observation_generation',
@@ -104,7 +146,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
     row: 4,
-    col: 0,
+    col: 0.75,
   },
   {
     id: 'ontology_classification',
@@ -116,31 +158,19 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'OntologyClassifier + SemanticAnalyzer',
     row: 5,
-    col: 0,
+    col: 0.75,
   },
   {
-    id: 'code_graph',
-    name: 'Code Graph',
-    shortName: 'Code',
-    icon: Code,
-    description: 'Builds AST-based knowledge graph using Tree-sitter parsing. Uses external LLM (via code-graph-rag MCP) for Cypher query generation and RAG orchestration. Indexes functions, classes, imports, and call relationships into Memgraph.',
-    usesLLM: true,
-    llmModel: 'External: code-graph-rag (OpenAI/Anthropic/Ollama)',
-    techStack: 'Tree-sitter + Memgraph + pydantic_ai',
-    row: 3,
-    col: 1,
-  },
-  {
-    id: 'documentation_linker',
-    name: 'Documentation Linker',
-    shortName: 'Docs',
+    id: 'documentation_semantics',
+    name: 'Documentation Semantics',
+    shortName: 'DocSem',
     icon: FileText,
-    description: 'Links markdown docs and PlantUML diagrams to code entities. Uses LLM-powered semantic matching to resolve unresolved references and build intelligent doc-to-code mappings.',
+    description: 'LLM-powered semantic analysis of docstrings and documentation prose. Extracts purpose, parameters, usage patterns, warnings, and related entities from code documentation.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
-    techStack: 'Regex + glob patterns + SemanticAnalyzer',
-    row: 4,
-    col: 1,
+    techStack: 'SemanticAnalyzer + Batch Processing',
+    row: 5.5,
+    col: 1.875,
   },
   {
     id: 'quality_assurance',
@@ -152,7 +182,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer + Semantic Value Filter',
     row: 6,
-    col: 0.5,
+    col: 1.125,
   },
   {
     id: 'persistence',
@@ -164,7 +194,7 @@ const WORKFLOW_AGENTS = [
     llmModel: null,
     techStack: 'LevelDB + Graphology',
     row: 7,
-    col: 0.5,
+    col: 1.125,
   },
   {
     id: 'deduplication',
@@ -176,7 +206,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Embeddings: text-embedding-3-small',
     techStack: 'OpenAI Embeddings API',
     row: 8,
-    col: 0.5,
+    col: 1.125,
   },
   {
     id: 'content_validation',
@@ -188,7 +218,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
     row: 9,
-    col: 0.5,
+    col: 1.125,
   },
 ]
 
@@ -209,6 +239,8 @@ const STEP_TO_AGENT: Record<string, string> = {
   'transform_code_entities': 'code_graph',
   'transform_code_entities_incremental': 'code_graph',
   'link_documentation': 'documentation_linker',
+  'analyze_documentation_semantics': 'documentation_semantics',
+  'analyze_documentation_semantics_incremental': 'documentation_semantics',
   'quality_assurance': 'quality_assurance',
   'validate_incremental_qa': 'quality_assurance',
   'persist_results': 'persistence',
@@ -221,20 +253,51 @@ const STEP_TO_AGENT: Record<string, string> = {
 }
 
 // Edge definitions showing data flow between agents
-const WORKFLOW_EDGES = [
+// IMPORTANT: Must match actual workflow dependencies in coordinator.ts
+// Phase 1 (Parallel entry points - no incoming edges): git_history, vibe_history, code_graph, documentation_linker
+// Edge types: 'dependency' (solid) = must complete before next, 'dataflow' (dashed) = passes data/parameters
+const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'dataflow' }> = [
+  // Orchestrator dispatches to all entry points (dataflow - sends parameters)
+  { from: 'orchestrator', to: 'git_history', type: 'dataflow' },
+  { from: 'orchestrator', to: 'vibe_history', type: 'dataflow' },
+  { from: 'orchestrator', to: 'code_graph', type: 'dataflow' },
+  { from: 'orchestrator', to: 'documentation_linker', type: 'dataflow' },
+
+  // Phase 1 -> Phase 2: All 4 parallel sources feed into Semantic Analysis
   { from: 'git_history', to: 'semantic_analysis' },
   { from: 'vibe_history', to: 'semantic_analysis' },
+  { from: 'code_graph', to: 'semantic_analysis' },  // index_codebase result now feeds semantic
+  { from: 'documentation_linker', to: 'semantic_analysis' },  // link_documentation result now feeds semantic
+
+  // Phase 2 -> Phase 3: Semantic feeds Web Search
   { from: 'semantic_analysis', to: 'web_search' },
-  { from: 'web_search', to: 'insight_generation' },
+
+  // Phase 3 -> Phase 4: Semantic + Web feed Insights (code_graph already processed by semantic)
   { from: 'semantic_analysis', to: 'insight_generation' },
+  { from: 'web_search', to: 'insight_generation' },
+
+  // Phase 4 -> Phase 5: Insights -> Observations
   { from: 'insight_generation', to: 'observation_generation' },
+
+  // Phase 5 -> Phase 6: Observations -> Ontology Classification
   { from: 'observation_generation', to: 'ontology_classification' },
-  { from: 'semantic_analysis', to: 'code_graph' },
-  { from: 'code_graph', to: 'documentation_linker' },
+
+  // Documentation Semantics - LLM analysis of docstrings and docs prose
+  // Depends on: transform_code_entities (code_graph), link_documentation (documentation_linker)
+  { from: 'code_graph', to: 'documentation_semantics' },  // transform_code_entities result
+  { from: 'documentation_linker', to: 'documentation_semantics' },  // link_documentation result
+
+  // Phase 6 + Doc Semantics -> Phase 7: All feed QA
   { from: 'ontology_classification', to: 'quality_assurance' },
-  { from: 'documentation_linker', to: 'quality_assurance' },
+  { from: 'documentation_semantics', to: 'quality_assurance' },  // doc semantics feeds QA
+
+  // Phase 7 -> Phase 8: QA -> Persistence
   { from: 'quality_assurance', to: 'persistence' },
+
+  // Phase 8 -> Phase 9: Persistence -> Deduplication
   { from: 'persistence', to: 'deduplication' },
+
+  // Phase 9 -> Phase 10: Deduplication -> Content Validation
   { from: 'deduplication', to: 'content_validation' },
 ]
 
@@ -620,17 +683,22 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   }
 
   // Calculate SVG dimensions based on grid
-  const nodeWidth = 120
-  const nodeHeight = 60
-  const horizontalGap = 40
-  const verticalGap = 20
-  const gridWidth = nodeWidth * 2 + horizontalGap
-  const gridHeight = (nodeHeight + verticalGap) * 10
-  const padding = 40
+  // Layout: Orchestrator at row -1, then 4 parallel entry nodes in row 0, then converging down
+  const nodeWidth = 100
+  const nodeHeight = 55
+  const horizontalGap = 30
+  const verticalGap = 15
+  // Grid width: 3 columns (col 0, 1.125, 2.25) = max col 2.25 + 1 node width
+  const gridWidth = nodeWidth * 3.5 + horizontalGap * 2.5
+  // Add extra row at top for orchestrator (row -1 becomes row 0 in rendering)
+  const gridHeight = (nodeHeight + verticalGap) * 11  // 11 rows: -1 to 9
+  const padding = 30
+  const orchestratorOffset = nodeHeight + verticalGap  // Offset to account for row -1
 
-  const getNodePosition = (agent: typeof WORKFLOW_AGENTS[0]) => {
+  const getNodePosition = (agent: { row: number; col: number }) => {
     const x = padding + agent.col * (nodeWidth + horizontalGap)
-    const y = padding + agent.row * (nodeHeight + verticalGap)
+    // Shift all rows down by 1 to make room for orchestrator at row -1
+    const y = padding + (agent.row + 1) * (nodeHeight + verticalGap)
     return { x, y }
   }
 
@@ -665,11 +733,24 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               >
                 <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
               </marker>
+              <marker
+                id="arrowhead-dataflow"
+                markerWidth="10"
+                markerHeight="7"
+                refX="9"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon points="0 0, 10 3.5, 0 7" fill="#a855f7" />
+              </marker>
             </defs>
 
             {/* Edges */}
             {WORKFLOW_EDGES.map((edge, idx) => {
-              const fromAgent = WORKFLOW_AGENTS.find(a => a.id === edge.from)
+              // Handle orchestrator as source
+              const fromAgent = edge.from === 'orchestrator'
+                ? ORCHESTRATOR_NODE
+                : WORKFLOW_AGENTS.find(a => a.id === edge.from)
               const toAgent = WORKFLOW_AGENTS.find(a => a.id === edge.to)
               if (!fromAgent || !toAgent) return null
 
@@ -683,14 +764,19 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const toY = toPos.y
 
               // Determine if this edge is active (current data flow)
-              const fromStatus = getNodeStatus(edge.from)
+              const fromStatus = edge.from === 'orchestrator'
+                ? (process.status === 'running' ? 'running' : 'completed')
+                : getNodeStatus(edge.from)
               const toStatus = getNodeStatus(edge.to)
               const isActive = fromStatus === 'completed' && toStatus === 'running'
               const isCompleted = fromStatus === 'completed' && toStatus === 'completed'
 
-              const strokeColor = isActive ? '#3b82f6' : isCompleted ? '#22c55e' : '#cbd5e1'
+              // Different colors for dependency vs dataflow edges
+              const isDataflow = edge.type === 'dataflow'
+              const strokeColor = isActive ? '#3b82f6' : isCompleted ? '#22c55e' : isDataflow ? '#a855f7' : '#cbd5e1'
               const strokeWidth = isActive ? 2 : 1.5
-              const markerEnd = isActive ? 'url(#arrowhead-active)' : 'url(#arrowhead)'
+              const markerEnd = isActive ? 'url(#arrowhead-active)' : isDataflow ? 'url(#arrowhead-dataflow)' : 'url(#arrowhead)'
+              const strokeDasharray = isDataflow ? '4,2' : undefined
 
               // Create curved path for better visualization
               const midY = (fromY + toY) / 2
@@ -703,12 +789,129 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                     fill="none"
                     stroke={strokeColor}
                     strokeWidth={strokeWidth}
+                    strokeDasharray={strokeDasharray}
                     markerEnd={markerEnd}
                     className={isActive ? 'animate-pulse' : ''}
                   />
                 </g>
               )
             })}
+
+            {/* Orchestrator Node */}
+            {(() => {
+              const pos = getNodePosition(ORCHESTRATOR_NODE)
+              const orchestratorWidth = nodeWidth * 1.5
+              const isRunning = process.status === 'running'
+              const isFailed = process.status === 'failed'
+              const isCompleted = process.status === 'completed'
+              const Icon = ORCHESTRATOR_NODE.icon
+              const progressPercent = process.totalSteps > 0
+                ? Math.round((process.completedSteps / process.totalSteps) * 100)
+                : 0
+
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <g className="cursor-pointer">
+                      {/* Orchestrator background - wider than regular nodes */}
+                      <rect
+                        x={pos.x - (orchestratorWidth - nodeWidth) / 2}
+                        y={pos.y}
+                        width={orchestratorWidth}
+                        height={nodeHeight}
+                        rx={8}
+                        fill={isFailed ? '#fee2e2' : isCompleted ? '#166534' : isRunning ? '#dbeafe' : '#f9fafb'}
+                        stroke={isFailed ? '#ef4444' : isCompleted ? '#15803d' : isRunning ? '#3b82f6' : '#d1d5db'}
+                        strokeWidth={2}
+                        style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
+                      />
+
+                      {/* Progress bar inside orchestrator */}
+                      <rect
+                        x={pos.x - (orchestratorWidth - nodeWidth) / 2 + 4}
+                        y={pos.y + nodeHeight - 8}
+                        width={(orchestratorWidth - 8) * (progressPercent / 100)}
+                        height={4}
+                        rx={2}
+                        fill={isFailed ? '#ef4444' : isCompleted ? '#22c55e' : '#3b82f6'}
+                      />
+                      <rect
+                        x={pos.x - (orchestratorWidth - nodeWidth) / 2 + 4}
+                        y={pos.y + nodeHeight - 8}
+                        width={orchestratorWidth - 8}
+                        height={4}
+                        rx={2}
+                        fill="none"
+                        stroke={isFailed ? '#fca5a5' : isCompleted ? '#4ade80' : '#93c5fd'}
+                        strokeWidth={0.5}
+                      />
+
+                      {/* Orchestrator content */}
+                      <foreignObject
+                        x={pos.x - (orchestratorWidth - nodeWidth) / 2}
+                        y={pos.y}
+                        width={orchestratorWidth}
+                        height={nodeHeight - 10}
+                      >
+                        <div
+                          className="flex flex-col items-center justify-center h-full px-2"
+                          style={{ color: isFailed ? '#7f1d1d' : isCompleted ? '#ffffff' : isRunning ? '#1e3a8a' : '#4b5563' }}
+                        >
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <Icon className="h-4 w-4" />
+                            {isRunning && <Loader2 className="h-3 w-3 animate-spin" />}
+                          </div>
+                          <span className="text-xs font-semibold">{process.workflowName || 'Workflow'}</span>
+                          <span className="text-[10px] opacity-80">
+                            {process.completedSteps}/{process.totalSteps} steps
+                          </span>
+                        </div>
+                      </foreignObject>
+
+                      {/* Status indicator */}
+                      <circle
+                        cx={pos.x + (orchestratorWidth + nodeWidth) / 2 - 8}
+                        cy={pos.y + 8}
+                        r={6}
+                        fill={
+                          isRunning ? '#3b82f6' :
+                          isCompleted ? '#22c55e' :
+                          isFailed ? '#ef4444' :
+                          '#d1d5db'
+                        }
+                      />
+                    </g>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    <div className="space-y-1">
+                      <div className="font-medium">{ORCHESTRATOR_NODE.name}</div>
+                      <div className="text-xs text-muted-foreground">{ORCHESTRATOR_NODE.description}</div>
+                      <Separator className="my-1" />
+                      <div className="text-xs space-y-0.5">
+                        <div className="flex justify-between">
+                          <span>Workflow:</span>
+                          <span className="font-medium">{process.workflowName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Team:</span>
+                          <span>{process.team}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Progress:</span>
+                          <span>{progressPercent}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Status:</span>
+                          <Badge variant="outline" className="text-[10px] h-4">
+                            {process.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            })()}
 
             {/* Nodes */}
             {WORKFLOW_AGENTS.map((agent) => {
@@ -811,6 +1014,33 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                           '#d1d5db'
                         }
                       />
+
+                      {/* QA Retry iteration badge - shows loop count for QA agent */}
+                      {agent.id === 'quality_assurance' && stepInfo?.outputs?.qaIterations && stepInfo.outputs.qaIterations > 1 && (
+                        <g>
+                          <rect
+                            x={pos.x - 4}
+                            y={pos.y + nodeHeight - 14}
+                            width={28}
+                            height={14}
+                            rx={7}
+                            fill="#f59e0b"
+                            stroke="#d97706"
+                            strokeWidth={1}
+                          />
+                          <foreignObject
+                            x={pos.x - 4}
+                            y={pos.y + nodeHeight - 14}
+                            width={28}
+                            height={14}
+                          >
+                            <div className="flex items-center justify-center h-full">
+                              <RefreshCw className="h-2 w-2 text-white mr-0.5" />
+                              <span className="text-[9px] font-bold text-white">{stepInfo.outputs.qaIterations}</span>
+                            </div>
+                          </foreignObject>
+                        </g>
+                      )}
                     </g>
                   </TooltipTrigger>
                   <TooltipContent side="right" className="max-w-xs">
@@ -856,7 +1086,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
         </div>
 
         {/* Legend - positioned outside graph to avoid overlap */}
-        <div className="flex-shrink-0 w-24 bg-white/90 backdrop-blur-sm rounded-lg p-2 border shadow-sm self-end">
+        <div className="flex-shrink-0 w-28 bg-white/90 backdrop-blur-sm rounded-lg p-2 border shadow-sm self-end">
           <div className="text-xs font-medium mb-2">Legend</div>
           <div className="flex flex-col gap-2 text-xs">
             <div className="flex items-center gap-1.5">
@@ -875,9 +1105,23 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
               <span>Failed</span>
             </div>
+            <Separator className="my-1" />
             <div className="flex items-center gap-1.5">
               <Zap className="h-2.5 w-2.5 text-yellow-500" />
               <span>Uses LLM</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <RefreshCw className="h-2.5 w-2.5 text-amber-500" />
+              <span>QA Retries</span>
+            </div>
+            <Separator className="my-1" />
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-0.5 bg-slate-400" />
+              <span>Dependency</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-0.5 border-t-2 border-dashed border-purple-500" />
+              <span>Data Flow</span>
             </div>
           </div>
         </div>
