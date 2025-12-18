@@ -1,0 +1,66 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title React Component Development Pattern - Use Cases
+
+' Define actors
+actor Developer as dev
+actor "React Developer" as reactdev
+actor "UI Designer" as designer
+actor "Project Manager" as pm
+
+' Define system boundary
+rectangle "React Component Development System" {
+  
+  ' Core development use cases
+  usecase "Create Component" as UC1
+  usecase "Implement Component Logic" as UC2
+  usecase "Design Component Interface" as UC3
+  usecase "Test Component" as UC4
+  usecase "Refactor Component" as UC5
+  usecase "Document Component" as UC6
+  
+  ' Supporting use cases
+  usecase "Validate Props" as UC7
+  usecase "Handle State Management" as UC8
+  usecase "Implement Event Handlers" as UC9
+  usecase "Apply Styling" as UC10
+  
+  ' Management use cases
+  usecase "Review Component Quality" as UC11
+  usecase "Track Development Progress" as UC12
+}
+
+' Actor relationships
+reactdev --> UC1 : initiates
+reactdev --> UC2 : implements
+reactdev --> UC4 : executes
+reactdev --> UC5 : performs
+reactdev --> UC6 : creates
+
+designer --> UC3 : defines
+designer --> UC10 : specifies
+
+pm --> UC11 : conducts
+pm --> UC12 : monitors
+
+dev --> UC1 : participates
+dev --> UC2 : codes
+
+' Include relationships
+UC2 ..> UC7 : <<include>>
+UC2 ..> UC8 : <<include>>
+UC2 ..> UC9 : <<include>>
+
+UC1 ..> UC3 : <<include>>
+
+' Extend relationships
+UC5 ..> UC4 : <<extend>>
+UC11 ..> UC4 : <<extend>>
+
+' Notes for pattern details
+note right of UC1 : Pattern Occurrences: 6\nTrend: Stable\nSignificance: High (3/5)
+
+note bottom of "React Component Development System" : Implementation Category Pattern\nArchitectural Analysis Context
+
+@enduml

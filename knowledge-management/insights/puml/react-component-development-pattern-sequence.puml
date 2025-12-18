@@ -1,0 +1,28 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant ReactComponent as "React Component"
+participant Developer as "Developer"
+participant TrendAnalyzer as "Trend Analyzer"
+
+activate ReactComponent
+ReactComponent ->> Developer: Develop React Component
+Developer ->> ReactComponent: Implement React Component
+ReactComponent ->> TrendAnalyzer: Send Occurrence Data
+TrendAnalyzer ->> TrendAnalyzer: Analyze Trend (stable)
+TrendAnalyzer ->> Developer: Report Trend Analysis
+
+alt Occurrences > 5
+    ReactComponent ->> Developer: Refine Component
+    Developer ->> ReactComponent: Implement Refinements
+end
+
+loop Every 6 occurrences
+    ReactComponent ->> TrendAnalyzer: Send Occurrence Data
+    TrendAnalyzer ->> TrendAnalyzer: Analyze Trend (stable)
+    TrendAnalyzer ->> Developer: Report Trend Analysis
+end
+
+deactivate ReactComponent
+
+@enduml

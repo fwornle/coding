@@ -1,0 +1,44 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Knowledge Base & Ontology Management Architecture
+
+package "Implementation Patterns" {
+    component "Knowledge Base\nStorage Layer" as kbStorage <<storage>>
+    component "Ontology\nManagement Engine" as ontologyEngine <<core>>
+    component "Knowledge\nRetrieval API" as retrievalAPI <<api>>
+    component "Semantic\nQuery Processor" as queryProcessor <<core>>
+    component "Ontology\nValidator" as validator <<core>>
+}
+
+database "Knowledge\nRepository" as kbRepo
+database "Ontology\nSchema Store" as ontologyDB
+
+cloud "External\nKnowledge Sources" as externalSources <<external>>
+
+' Core relationships
+ontologyEngine --> kbStorage : "manages structure"
+retrievalAPI --> queryProcessor : "processes queries"
+queryProcessor --> kbStorage : "retrieves data"
+ontologyEngine --> validator : "validates schemas"
+validator --> ontologyDB : "checks consistency"
+
+' Data flow
+kbStorage --> kbRepo : "persists knowledge"
+ontologyEngine --> ontologyDB : "stores schemas"
+externalSources --> kbStorage : "feeds data"
+
+' API interactions
+retrievalAPI --> ontologyEngine : "uses ontology"
+
+note right of ontologyEngine
+  **Pattern Analysis Summary**
+  • Total Patterns: 1
+  • Category: Implementation
+  • Significance: 4/5
+  • Occurrences: 7 (increasing trend)
+  • Focus: Knowledge management
+    and ontology processing
+end note
+
+@enduml

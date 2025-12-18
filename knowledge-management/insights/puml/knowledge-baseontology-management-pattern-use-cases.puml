@@ -1,0 +1,57 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Knowledge Engineer" as KE
+actor "System Administrator" as SA
+actor "Application Developer" as AD
+actor "End User" as EU
+
+package "Knowledge Base & Ontology Management System" {
+  usecase "Create Ontology" as UC1
+  usecase "Update Ontology Structure" as UC2
+  usecase "Manage Knowledge Base" as UC3
+  usecase "Query Knowledge Base" as UC4
+  usecase "Validate Ontology" as UC5
+  usecase "Import External Data" as UC6
+  usecase "Export Knowledge" as UC7
+  usecase "Monitor System Performance" as UC8
+  usecase "Configure Access Rights" as UC9
+  usecase "Integrate with Applications" as UC10
+}
+
+' Knowledge Engineer interactions
+KE --> UC1
+KE --> UC2
+KE --> UC3
+KE --> UC5
+KE --> UC6
+KE --> UC7
+
+' System Administrator interactions
+SA --> UC8
+SA --> UC9
+SA --> UC3
+
+' Application Developer interactions
+AD --> UC10
+AD --> UC4
+AD --> UC7
+
+' End User interactions
+EU --> UC4
+
+' Include relationships
+UC3 ..> UC5 : <<include>>
+UC6 ..> UC5 : <<include>>
+UC2 ..> UC5 : <<include>>
+
+' Extend relationships
+UC4 <.. UC7 : <<extend>>
+UC3 <.. UC8 : <<extend>>
+
+note right of UC1 : "Significance: 4/5\nTrend: Increasing\n7 occurrences"
+note bottom of "Knowledge Base & Ontology Management System" : "Implementation Pattern\nCategory: Implementation"
+
+@enduml

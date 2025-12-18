@@ -1,0 +1,36 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Implementation Patterns" {
+    component "MCP Server Integration & Management" as mcpServerPattern <<core>>
+}
+
+package "System Components" {
+    component "MCP Server" as mcpServer <<api>>
+    component "Integration Layer" as integrationLayer <<core>>
+    component "Management Interface" as managementInterface <<api>>
+    component "Client Applications" as clientApps <<external>>
+}
+
+package "Supporting Infrastructure" {
+    database "Configuration Store" as configStore
+    component "Monitoring & Analytics" as monitoring <<storage>>
+}
+
+' Pattern relationships
+mcpServerPattern --> mcpServer : "manages"
+mcpServerPattern --> integrationLayer : "implements"
+mcpServerPattern --> managementInterface : "provides"
+
+' System component relationships
+integrationLayer --> mcpServer : "integrates with"
+managementInterface --> mcpServer : "controls"
+clientApps --> integrationLayer : "uses"
+mcpServer --> configStore : "reads config"
+monitoring --> mcpServerPattern : "tracks usage"
+
+note top of mcpServerPattern : Pattern Significance: 8/10\nOccurrences: 15\nTrend: Increasing
+
+note bottom : Architecture Analysis Summary\n• Total Patterns: 1\n• Average Significance: 8.0\n• Top Category: Implementation
+
+@enduml

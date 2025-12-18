@@ -1,23 +1,26 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+title UI Component Work Pattern Architecture
+
 package "Implementation Patterns" {
-    component "UI Component Work Pattern" as uiPattern <<core>>
+  component "UI Component Work Pattern" as uiPattern <<core>>
 }
 
 note right of uiPattern
-    **Pattern Details:**
-    - Occurrences: 12
-    - Trend: Stable
-    - Significance: 6/10
-    - Category: Implementation
+  **Pattern Details:**
+  • Occurrences: 10
+  • Trend: Stable
+  • Significance: 5/10
+  • Category: Implementation
 end note
 
-note top
-    **Architecture Summary**
-    Total Patterns: 1
-    Average Significance: 6
-    Primary Category: Implementation
+note bottom
+  **Architecture Summary:**
+  • Total Patterns: 1
+  • Implementation Category: 1 pattern
+  • Average Significance: 5
+  • Analysis: ui-component-work-pattern
 end note
 
 @enduml

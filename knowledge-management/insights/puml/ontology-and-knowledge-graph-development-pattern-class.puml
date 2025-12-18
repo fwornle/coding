@@ -1,0 +1,100 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Pattern Catalog System" {
+    
+    class PatternCatalog {
+        -patterns: List<Pattern>
+        -summary: CatalogSummary
+        +getTotalPatterns(): int
+        +getPatternsByCategory(category: String): List<Pattern>
+        +getTopPatterns(): List<String>
+        +getAverageSignificance(): double
+    }
+    
+    abstract class Pattern {
+        -name: String
+        -category: String
+        -description: String
+        -significance: int
+        -evidence: List<String>
+        -relatedComponents: List<Component>
+        +getName(): String
+        +getCategory(): String
+        +getSignificance(): int
+        +getEvidence(): List<String>
+    }
+    
+    class OntologyAndKnowledgeGraphDevelopmentPattern {
+        -occurrences: int
+        -trend: String
+        -implementation: Implementation
+        +getOccurrences(): int
+        +getTrend(): String
+        +getImplementation(): Implementation
+        +analyzeTrendGrowth(): boolean
+    }
+    
+    class Implementation {
+        -language: String
+        -usageNotes: List<String>
+        +getLanguage(): String
+        +getUsageNotes(): List<String>
+        +addUsageNote(note: String): void
+    }
+    
+    class CatalogSummary {
+        -totalPatterns: int
+        -byCategory: Map<String, Integer>
+        -avgSignificance: double
+        -topPatterns: List<String>
+        +getTotalPatterns(): int
+        +getCategoryDistribution(): Map<String, Integer>
+        +getAverageSignificance(): double
+        +getTopPatterns(): List<String>
+    }
+    
+    interface Component {
+        +getName(): String
+        +getType(): String
+        +getRelationships(): List<Relationship>
+    }
+    
+    enum PatternCategory {
+        IMPLEMENTATION
+        ARCHITECTURAL
+        BEHAVIORAL
+        CREATIONAL
+    }
+    
+    class AnalysisData {
+        -patternCatalog: PatternCatalog
+        -content: String
+        -name: String
+        +getPatternCatalog(): PatternCatalog
+        +getContent(): String
+        +getName(): String
+        +generateReport(): String
+    }
+}
+
+PatternCatalog ||--o{ Pattern : contains
+Pattern <|-- OntologyAndKnowledgeGraphDevelopmentPattern
+Pattern ||--|| Implementation : has
+Pattern }|--|| PatternCategory : categorized_by
+Pattern }o--o{ Component : relates_to
+PatternCatalog ||--|| CatalogSummary : summarized_by
+AnalysisData ||--|| PatternCatalog : analyzes
+
+note right of OntologyAndKnowledgeGraphDevelopmentPattern
+  Occurrences: 8
+  Trend: increasing
+  Significance: 4
+end note
+
+note bottom of PatternCatalog
+  Current catalog contains 1 pattern
+  Average significance: 4.0
+end note
+
+@enduml

@@ -1,0 +1,63 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Multi-Agent System Architecture Pattern - Sequence Diagram
+
+participant "System Coordinator" as SC
+participant "Agent Manager" as AM
+participant "Agent A" as A1
+participant "Agent B" as A2
+participant "Communication Hub" as CH
+participant "Knowledge Base" as KB
+participant "Task Dispatcher" as TD
+
+note over SC : Pattern Significance: 4\n8 Occurrences (Increasing Trend)
+
+SC -> AM : initialize_agents()
+activate AM
+
+AM -> A1 : create_agent(config)
+activate A1
+AM -> A2 : create_agent(config)
+activate A2
+
+A1 -> KB : register_capabilities()
+A2 -> KB : register_capabilities()
+
+AM -> SC : agents_initialized()
+deactivate AM
+
+SC -> TD : start_task_processing()
+activate TD
+
+loop Multi-Agent Coordination Cycle
+    TD -> KB : get_available_agents()
+    KB -> TD : agent_list
+    
+    TD -> A1 : assign_task(task_id)
+    TD -> A2 : assign_task(task_id)
+    
+    alt Collaborative Task
+        A1 -> CH : request_collaboration(A2)
+        CH -> A2 : collaboration_request(A1)
+        A2 -> CH : accept_collaboration()
+        CH -> A1 : collaboration_accepted()
+        
+        A1 <-> A2 : exchange_data()
+        A1 <-> A2 : coordinate_actions()
+    end
+    
+    A1 -> TD : task_completed(results)
+    A2 -> TD : task_completed(results)
+    
+    TD -> KB : update_agent_status()
+end
+
+note right of CH : Communication Hub facilitates\ninter-agent messaging and coordination
+
+TD -> SC : processing_complete()
+deactivate TD
+deactivate A1
+deactivate A2
+
+@enduml

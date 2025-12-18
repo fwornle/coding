@@ -1,0 +1,105 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Multi-Agent System Architecture" {
+    
+    abstract class Agent {
+        -agentId: String
+        -state: AgentState
+        -beliefs: BeliefSet
+        -goals: GoalSet
+        +perceive(): Perception
+        +reason(): Decision
+        +act(): Action
+        +communicate(): Message
+    }
+    
+    class AutonomousAgent {
+        -decisionEngine: DecisionEngine
+        -learningModule: LearningModule
+        +makeDecision(): Decision
+        +updateBelief(): void
+        +learn(): void
+    }
+    
+    class ReactiveAgent {
+        -reactionRules: RuleSet
+        +reactToStimulus(): Action
+    }
+    
+    class CognitiveAgent {
+        -reasoningEngine: ReasoningEngine
+        -knowledgeBase: KnowledgeBase
+        +deliberate(): Plan
+        +planActions(): ActionSequence
+    }
+    
+    interface CommunicationProtocol {
+        +sendMessage(): boolean
+        +receiveMessage(): Message
+        +negotiateProtocol(): Protocol
+    }
+    
+    class MessageBroker {
+        -messageQueue: Queue
+        -subscribers: AgentList
+        +routeMessage(): void
+        +broadcast(): void
+        +subscribe(): boolean
+    }
+    
+    class Environment {
+        -environmentState: State
+        -resources: ResourcePool
+        +updateState(): void
+        +getPercepts(): PerceptList
+        +applyActions(): void
+    }
+    
+    class CoordinationService {
+        -coordinationStrategy: Strategy
+        -agentRegistry: Registry
+        +coordinateAgents(): void
+        +resolveConflicts(): Resolution
+        +allocateResources(): Allocation
+    }
+    
+    enum AgentState {
+        IDLE
+        ACTIVE
+        COMMUNICATING
+        LEARNING
+        PLANNING
+    }
+    
+    class MultiAgentSystem <<system>> {
+        -agents: AgentCollection
+        -environment: Environment
+        -coordinator: CoordinationService
+        +initialize(): void
+        +execute(): void
+        +monitor(): SystemStatus
+    }
+}
+
+Agent <|-- AutonomousAgent
+Agent <|-- ReactiveAgent
+Agent <|-- CognitiveAgent
+Agent ..> AgentState : uses
+Agent ..|> CommunicationProtocol : implements
+Agent --> Environment : perceives
+Agent --> MessageBroker : communicates
+
+MultiAgentSystem *-- Agent : contains
+MultiAgentSystem *-- Environment : contains
+MultiAgentSystem *-- CoordinationService : contains
+MultiAgentSystem --> MessageBroker : uses
+
+CoordinationService --> Agent : coordinates
+MessageBroker ..> CommunicationProtocol : uses
+
+note top of MultiAgentSystem : Pattern Significance: 4/5\n8 occurrences detected\nTrend: increasing
+
+note right of Agent : Core abstraction for\nautonomous entities in\nthe system architecture
+
+@enduml

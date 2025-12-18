@@ -1,0 +1,47 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Status Line and Health Monitoring Pattern - Sequence Diagram
+
+participant "Client Application" as Client
+participant "Health Monitor" as Monitor
+participant "Status Line Handler" as StatusHandler
+participant "Service Instance" as Service
+participant "Metrics Collector" as Metrics
+participant "Alert Manager" as Alerts
+
+== Health Check Initialization ==
+Client -> Monitor: initiate_health_check()
+Monitor -> StatusHandler: register_status_endpoint()
+StatusHandler -> Service: configure_health_endpoint()
+
+== Continuous Monitoring Loop ==
+loop Every monitoring interval (12 occurrences pattern)
+    Monitor -> Service: ping_health_endpoint()
+    Service -> Service: check_internal_state()
+    Service --> Monitor: health_status_response
+    
+    Monitor -> Metrics: record_health_metrics(status)
+    Metrics -> Metrics: update_trend_data()
+    
+    alt Health Status Degraded
+        Monitor -> StatusHandler: update_status_line(degraded)
+        StatusHandler -> Alerts: trigger_alert(health_issue)
+        Alerts -> Client: send_notification(alert)
+    else Health Status Normal
+        Monitor -> StatusHandler: update_status_line(healthy)
+    end
+end
+
+== Status Line Updates ==
+Client -> StatusHandler: request_current_status()
+StatusHandler -> Metrics: get_latest_metrics()
+Metrics --> StatusHandler: current_health_data
+StatusHandler --> Client: formatted_status_response
+
+note over Monitor, Metrics
+  Pattern shows increasing trend with 
+  12 occurrences and significance level 6
+end note
+
+@enduml

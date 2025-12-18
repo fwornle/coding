@@ -1,47 +1,43 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+title API Refactoring Pattern Use Cases
 
-actor "API Developer" as dev
-actor "System Architect" as architect
-actor "Quality Assurance" as qa
-actor "DevOps Engineer" as devops
+actor "Developer" as dev
+actor "API Client" as client
+actor "System Administrator" as admin
 
-rectangle "API Refactoring System" {
-  usecase "Identify Refactoring Opportunities" as identify
-  usecase "Analyze API Patterns" as analyze
-  usecase "Execute Refactoring" as execute
-  usecase "Validate Changes" as validate
-  usecase "Monitor Pattern Usage" as monitor
-  usecase "Track Decreasing Trends" as track
-  usecase "Generate Reports" as report
+package "API Refactoring System" {
+    usecase "Identify API Changes" as identify
+    usecase "Analyze Impact" as analyze
+    usecase "Execute Refactoring" as execute
+    usecase "Validate Changes" as validate
+    usecase "Monitor Usage Trends" as monitor
 }
 
-rectangle "Implementation Category" {
-  usecase "Apply Implementation Patterns" as implement
-  usecase "Code Transformation" as transform
+package "Implementation Support" {
+    usecase "Generate Migration Guide" as migrate
+    usecase "Update Documentation" as docs
+    usecase "Maintain Backward Compatibility" as compat
 }
 
 dev --> identify
+dev --> analyze
 dev --> execute
-architect --> analyze
-architect --> implement
-qa --> validate
-devops --> monitor
-devops --> track
+admin --> monitor
+admin --> validate
 
-analyze ..> identify : <<include>>
-execute ..> analyze : <<include>>
-validate ..> execute : <<include>>
-monitor ..> validate : <<include>>
-track ..> monitor : <<include>>
-report ..> track : <<include>>
+client --> compat
+client --> migrate
 
-implement ..> transform : <<include>>
-execute ..> implement : <<include>>
+identify ..> analyze : <<include>>
+analyze ..> execute : <<include>>
+execute ..> validate : <<include>>
+execute ..> migrate : <<extend>>
+execute ..> docs : <<extend>>
+validate ..> compat : <<include>>
 
-note right of track : "Trend: decreasing\n5 occurrences\nSignificance: 3"
-note top of implement : "Category: Implementation\nPattern Usage Declining"
+note right of monitor : "5 occurrences detected\nTrend: decreasing"
+note top of execute : "Implementation Category\nSignificance: 3/5"
 
 @enduml

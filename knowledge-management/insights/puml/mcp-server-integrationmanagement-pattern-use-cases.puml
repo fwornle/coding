@@ -1,0 +1,67 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title MCP Server Integration & Management Pattern - Use Cases
+
+' Actors
+actor "System Administrator" as admin
+actor "Application Developer" as dev
+actor "End User" as user
+actor "External System" as external
+
+' MCP Server Management Package
+package "MCP Server Management" {
+    usecase "Configure MCP Server" as UC1
+    usecase "Monitor Server Health" as UC2
+    usecase "Manage Server Lifecycle" as UC3
+    usecase "Handle Server Errors" as UC4
+}
+
+' MCP Integration Package
+package "MCP Integration" {
+    usecase "Establish MCP Connection" as UC5
+    usecase "Send MCP Messages" as UC6
+    usecase "Receive MCP Responses" as UC7
+    usecase "Validate Message Protocol" as UC8
+    usecase "Handle Protocol Upgrades" as UC9
+}
+
+' Application Interface Package
+package "Application Interface" {
+    usecase "Process User Requests" as UC10
+    usecase "Route to MCP Server" as UC11
+    usecase "Transform Data Format" as UC12
+    usecase "Return Processed Results" as UC13
+}
+
+' Actor relationships
+admin --> UC1
+admin --> UC2
+admin --> UC3
+admin --> UC4
+
+dev --> UC5
+dev --> UC8
+dev --> UC9
+
+user --> UC10
+
+external --> UC6
+external --> UC7
+
+' Use case relationships
+UC10 ..> UC11 : <<include>>
+UC11 ..> UC5 : <<include>>
+UC6 ..> UC8 : <<include>>
+UC7 ..> UC8 : <<include>>
+UC11 ..> UC12 : <<include>>
+UC12 ..> UC13 : <<include>>
+
+UC4 ..> UC2 : <<extend>>
+UC9 ..> UC5 : <<extend>>
+
+' Notes
+note right of UC1 : High significance pattern\n(8/10) with increasing trend
+note bottom of UC8 : 15 occurrences identified\nin implementation analysis
+
+@enduml

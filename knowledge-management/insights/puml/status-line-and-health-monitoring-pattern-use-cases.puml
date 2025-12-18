@@ -1,0 +1,53 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "System Administrator" as admin
+actor "Operations Team" as ops
+actor "Monitoring Service" as monitor
+actor "End User" as user
+
+rectangle "Status Line and Health Monitoring System" {
+  usecase "Monitor System Health" as UC1
+  usecase "Display Status Line" as UC2
+  usecase "Generate Health Reports" as UC3
+  usecase "Configure Monitoring Rules" as UC4
+  usecase "Send Health Alerts" as UC5
+  usecase "View System Status" as UC6
+  usecase "Track Performance Metrics" as UC7
+  usecase "Manage Thresholds" as UC8
+}
+
+rectangle "Health Check Components" {
+  usecase "Perform Health Checks" as UC9
+  usecase "Collect Metrics" as UC10
+  usecase "Validate System State" as UC11
+}
+
+admin --> UC4
+admin --> UC8
+admin --> UC3
+
+ops --> UC1
+ops --> UC6
+ops --> UC3
+ops --> UC5
+
+monitor --> UC9
+monitor --> UC10
+monitor --> UC7
+
+user --> UC2
+user --> UC6
+
+UC1 ..> UC9 : <<include>>
+UC1 ..> UC10 : <<include>>
+UC2 ..> UC11 : <<include>>
+UC3 ..> UC7 : <<include>>
+UC5 ..> UC1 : <<extend>>
+
+note top of UC1 : 12 occurrences\nTrend: increasing
+note right of "Status Line and Health Monitoring System" : Implementation Pattern\nSignificance: 6/10
+
+@enduml

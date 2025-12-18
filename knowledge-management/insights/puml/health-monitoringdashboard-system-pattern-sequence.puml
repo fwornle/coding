@@ -1,0 +1,69 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Health Monitoring & Dashboard System - Interaction Flow
+
+participant "User" as U
+participant "Dashboard Web UI" as UI
+participant "API Gateway" as GW
+participant "Health Monitor Service" as HMS
+participant "Metrics Collector" as MC
+participant "Data Store" as DS
+participant "Alert Manager" as AM
+participant "Notification Service" as NS
+
+U -> UI: Access Health Dashboard
+activate UI
+
+UI -> GW: Request System Status
+activate GW
+
+GW -> HMS: Get Health Metrics
+activate HMS
+
+HMS -> MC: Collect Current Metrics
+activate MC
+
+MC -> DS: Query Health Data
+activate DS
+DS --> MC: Return Metrics Data
+deactivate DS
+
+MC --> HMS: Aggregated Metrics
+deactivate MC
+
+HMS -> HMS: Analyze Health Status
+
+alt Critical Issue Detected
+    HMS -> AM: Trigger Alert
+    activate AM
+    AM -> NS: Send Notification
+    activate NS
+    NS -> U: Alert Notification
+    deactivate NS
+    deactivate AM
+end
+
+HMS --> GW: Health Status Response
+deactivate HMS
+
+GW --> UI: System Status Data
+deactivate GW
+
+UI -> UI: Render Dashboard View
+UI --> U: Display Health Dashboard
+deactivate UI
+
+loop Continuous Monitoring (Every 30s)
+    MC -> DS: Collect New Metrics
+    MC -> HMS: Update Health Status
+    HMS -> UI: Push Real-time Updates
+end
+
+note right of HMS
+Pattern Significance: 6/10
+Occurrences: 12
+Trend: Increasing
+end note
+
+@enduml

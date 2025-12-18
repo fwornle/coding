@@ -1,47 +1,51 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "User" as User
-participant "UI Component" as UI
-participant "Pattern Analyzer" as Analyzer
-participant "Work Handler" as Handler
-participant "State Manager" as State
+title UI Component Work Pattern Sequence
 
-User -> UI: Initialize Component
-activate UI
+actor "User" as user
+participant "UI Controller" as controller
+participant "Component Manager" as manager
+participant "UI Component" as component
+participant "Work Handler" as handler
+database "Component State" as state
 
-UI -> Analyzer: Analyze Component Pattern
-activate Analyzer
-note right: UiComponentWorkPattern\n12 occurrences detected
+user -> controller: initiate UI interaction
+activate controller
 
-Analyzer -> Handler: Create Work Pattern
-activate Handler
+controller -> manager: request component work
+activate manager
 
-loop 12 occurrences
-    Handler -> State: Update Component State
-    activate State
-    State --> Handler: State Updated
-    deactivate State
+loop 10 occurrences (stable trend)
+    manager -> component: execute work pattern
+    activate component
     
-    Handler -> UI: Apply Pattern Implementation
-    UI -> UI: Render Component
+    component -> handler: process component work
+    activate handler
+    
+    handler -> state: update component state
+    activate state
+    state --> handler: state updated
+    deactivate state
+    
+    handler --> component: work completed
+    deactivate handler
+    
+    component --> manager: pattern execution complete
+    deactivate component
 end
 
-Handler --> Analyzer: Pattern Applied
-deactivate Handler
+manager --> controller: component work finished
+deactivate manager
 
-Analyzer --> UI: Analysis Complete
-note left: Pattern Significance: 6\nTrend: Stable
-deactivate Analyzer
+controller --> user: UI interaction complete
+deactivate controller
 
-UI --> User: Component Ready
-deactivate UI
-
-note over User, State
-UI Component Work Pattern
-Category: Implementation
-Status: Stable with 12 occurrences
-Average Significance: 6
+note over component, handler
+  UiComponentWorkPattern
+  - Category: Implementation
+  - Significance: 5/10
+  - Status: Stable trend
 end note
 
 @enduml

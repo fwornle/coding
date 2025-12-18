@@ -1,0 +1,74 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Ontology and Knowledge Graph Development Pattern - Sequence Flow
+
+participant "Domain Expert" as DE
+participant "Ontology Engineer" as OE
+participant "Knowledge Graph Builder" as KGB
+participant "Data Sources" as DS
+participant "Ontology Repository" as OR
+participant "Knowledge Graph Store" as KGS
+participant "Validation Engine" as VE
+
+note over DE, VE
+  Pattern Significance: 4/5
+  Occurrences: 8 (Increasing Trend)
+  Category: Implementation
+end note
+
+DE -> OE: Define domain requirements
+activate OE
+
+OE -> OE: Analyze domain concepts
+OE -> OR: Check existing ontologies
+
+alt Existing ontology found
+    OR -> OE: Return compatible ontology
+else New ontology needed
+    OE -> OE: Design new ontology structure
+    OE -> OR: Store new ontology
+end
+
+OE -> KGB: Provide ontology schema
+activate KGB
+
+KGB -> DS: Extract structured data
+activate DS
+DS -> KGB: Return data entities
+deactivate DS
+
+loop For each data entity
+    KGB -> KGB: Map to ontology concepts
+    KGB -> KGS: Store knowledge triples
+end
+
+KGB -> VE: Request validation
+activate VE
+
+VE -> KGS: Query knowledge graph
+KGS -> VE: Return graph structure
+
+VE -> VE: Validate consistency
+VE -> VE: Check completeness
+
+alt Validation successful
+    VE -> KGB: Confirm successful validation
+    VE -> DE: Notify completion
+else Validation failed
+    VE -> KGB: Report validation errors
+    KGB -> OE: Request ontology refinement
+    OE -> OR: Update ontology
+end
+
+deactivate VE
+deactivate KGB
+deactivate OE
+
+note right of KGS
+  Knowledge Graph grows
+  with each iteration
+  (8 occurrences, increasing trend)
+end note
+
+@enduml

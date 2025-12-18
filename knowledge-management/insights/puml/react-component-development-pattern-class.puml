@@ -1,0 +1,72 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "React Component Development Pattern" {
+    abstract class ReactComponentPattern <<pattern>> {
+        +name: String
+        +category: String
+        +significance: Integer
+        +occurrences: Integer
+        +trend: String
+        +getImplementationDetails()
+        +analyzeUsage()
+    }
+
+    class ReactComponentDevelopmentPattern <<Implementation>> {
+        -language: String
+        -usageNotes: List<String>
+        -evidence: List<String>
+        -relatedComponents: List<Component>
+        +getDevelopmentGuidelines()
+        +trackOccurrences()
+        +maintainStability()
+    }
+
+    class PatternCatalog <<service>> {
+        -totalPatterns: Integer
+        -avgSignificance: Double
+        -topPatterns: List<String>
+        +categorizePatterns()
+        +generateSummary()
+        +getPatternsByCategory()
+    }
+
+    class PatternAnalyzer <<service>> {
+        -analysisData: Map<String, Object>
+        -content: String
+        +analyzePatterns()
+        +calculateSignificance()
+        +identifyTrends()
+    }
+
+    enum PatternCategory {
+        IMPLEMENTATION
+        ARCHITECTURAL
+        DESIGN
+        BEHAVIORAL
+    }
+
+    class Evidence <<value>> {
+        -occurrenceCount: Integer
+        -trendAnalysis: String
+        +validateEvidence()
+    }
+
+    class ImplementationDetails <<value>> {
+        -language: String
+        -usageNotes: List<String>
+        +getUsageGuidelines()
+    }
+}
+
+ReactComponentPattern <|-- ReactComponentDevelopmentPattern
+PatternCatalog *-- ReactComponentDevelopmentPattern
+PatternAnalyzer ..> PatternCatalog : analyzes
+ReactComponentDevelopmentPattern --> PatternCategory
+ReactComponentDevelopmentPattern *-- Evidence
+ReactComponentDevelopmentPattern *-- ImplementationDetails
+
+note top of ReactComponentDevelopmentPattern : "6 occurrences\nTrend: stable\nSignificance: 3"
+note right of PatternCatalog : "Manages pattern collection\nTracks categories and metrics"
+
+@enduml

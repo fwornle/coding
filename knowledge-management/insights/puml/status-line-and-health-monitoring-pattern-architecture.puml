@@ -1,0 +1,23 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Implementation Patterns" {
+    component "Status Line\nand Health\nMonitoring" as statusmon <<core>>
+}
+
+component "System Health\nDashboard" as dashboard <<api>>
+component "Application\nServices" as services <<core>>
+database "Health Metrics\nStorage" as storage <<storage>>
+cloud "External\nMonitoring" as external <<external>>
+
+services --> statusmon : "reports health"
+statusmon --> storage : "stores metrics"
+statusmon --> dashboard : "provides status"
+statusmon --> external : "sends alerts"
+dashboard --> storage : "queries metrics"
+
+note top of statusmon : **12 occurrences**\nTrend: increasing\nSignificance: 6/10
+
+note bottom : **Pattern Analysis Summary**\nTotal Patterns: 1\nCategory: Implementation\nAverage Significance: 6
+
+@enduml
