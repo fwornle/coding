@@ -1,0 +1,60 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Multi-Agent System Architecture Pattern
+
+package "Implementation Patterns" {
+    component "Multi-Agent System\nArchitecture Pattern" as masap <<core>>
+    
+    component "Agent Controller" as controller <<agent>>
+    component "Agent Communication\nLayer" as comm <<api>>
+    component "Knowledge Base" as kb <<storage>>
+    component "Task Scheduler" as scheduler <<core>>
+    component "Agent Registry" as registry <<storage>>
+}
+
+package "Agent Types" {
+    component "Coordinator Agent" as coord <<agent>>
+    component "Worker Agent" as worker <<agent>>
+    component "Monitor Agent" as monitor <<agent>>
+}
+
+package "External Systems" {
+    cloud "External Services" as external <<external>>
+    database "Shared Storage" as db <<storage>>
+}
+
+' Core relationships
+masap --> controller : "orchestrates"
+controller --> comm : "uses"
+controller --> scheduler : "manages"
+controller --> registry : "maintains"
+
+' Agent communication
+comm --> coord : "coordinates"
+comm --> worker : "dispatches tasks"
+comm --> monitor : "observes"
+
+coord --> scheduler : "plans"
+worker --> kb : "accesses"
+monitor --> registry : "updates"
+
+' External dependencies
+kb --> db : "persists"
+comm --> external : "integrates"
+
+note top of masap
+**Pattern Analysis Summary**
+• Occurrences: 8 (increasing trend)
+• Significance: 4/5
+• Category: Implementation Pattern
+• Total Patterns Identified: 1
+end note
+
+note bottom of db
+Multi-agent systems require
+shared storage for coordination
+and knowledge sharing
+end note
+
+@enduml

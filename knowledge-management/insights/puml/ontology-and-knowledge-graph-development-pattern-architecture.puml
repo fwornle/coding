@@ -1,0 +1,43 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title "Ontology and Knowledge Graph Development Architecture"
+
+package "Implementation Patterns" {
+  component "Ontology Development" as ontology <<core>>
+  component "Knowledge Graph Builder" as kgbuilder <<core>>
+  database "Knowledge Graph Storage" as kgstore <<storage>>
+  component "Graph Query Engine" as queryengine <<api>>
+  component "Semantic Reasoner" as reasoner <<core>>
+}
+
+package "External Systems" {
+  cloud "Data Sources" as datasources <<external>>
+  component "Validation Services" as validation <<external>>
+}
+
+datasources --> ontology : "provides domain data"
+ontology --> kgbuilder : "defines structure"
+kgbuilder --> kgstore : "populates"
+kgstore --> queryengine : "serves data"
+kgstore --> reasoner : "infers relationships"
+reasoner --> kgstore : "updates with inferences"
+queryengine --> validation : "validates queries"
+
+note top of ontology
+  **Pattern: OntologyAndKnowledgeGraphDevelopmentPattern**
+  • Significance: 4/5
+  • Occurrences: 8
+  • Trend: Increasing
+  • Category: Implementation
+end note
+
+note bottom
+  **Architecture Summary**
+  • Total Patterns: 1
+  • Implementation Category: 1 pattern
+  • Average Significance: 4.0
+  • Top Pattern: Ontology & Knowledge Graph Development
+end note
+
+@enduml

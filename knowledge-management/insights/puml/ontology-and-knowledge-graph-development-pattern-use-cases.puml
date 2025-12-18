@@ -1,0 +1,72 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Ontology and Knowledge Graph Development Pattern - Use Cases
+
+left to right direction
+
+actor "Domain Expert" as DE
+actor "Data Scientist" as DS
+actor "Knowledge Engineer" as KE
+actor "Application Developer" as AD
+actor "System Administrator" as SA
+
+package "Ontology Development" {
+    usecase "Define Domain Concepts" as UC1
+    usecase "Model Relationships" as UC2
+    usecase "Create Taxonomies" as UC3
+    usecase "Validate Ontology" as UC4
+}
+
+package "Knowledge Graph Management" {
+    usecase "Import Data Sources" as UC5
+    usecase "Map Data to Ontology" as UC6
+    usecase "Generate Knowledge Graph" as UC7
+    usecase "Query Knowledge Graph" as UC8
+    usecase "Visualize Graph Structure" as UC9
+}
+
+package "System Operations" {
+    usecase "Monitor Performance" as UC10
+    usecase "Maintain Data Quality" as UC11
+    usecase "Backup Knowledge Base" as UC12
+    usecase "Scale Infrastructure" as UC13
+}
+
+DE --> UC1
+DE --> UC2
+DE --> UC4
+
+KE --> UC1
+KE --> UC2
+KE --> UC3
+KE --> UC4
+KE --> UC6
+
+DS --> UC5
+DS --> UC6
+DS --> UC7
+DS --> UC8
+DS --> UC9
+
+AD --> UC8
+AD --> UC9
+
+SA --> UC10
+SA --> UC11
+SA --> UC12
+SA --> UC13
+
+UC2 ..> UC1 : <<include>>
+UC3 ..> UC1 : <<include>>
+UC6 ..> UC4 : <<include>>
+UC7 ..> UC6 : <<include>>
+UC8 ..> UC7 : <<include>>
+
+note right of UC1
+  Pattern Significance: 4/5
+  Trend: Increasing
+  Total Occurrences: 8
+end note
+
+@enduml

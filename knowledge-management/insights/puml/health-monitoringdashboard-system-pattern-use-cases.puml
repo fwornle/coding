@@ -1,0 +1,63 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Health Monitoring & Dashboard System - Use Cases
+
+left to right direction
+
+actor "System Administrator" as admin
+actor "Healthcare Professional" as doctor
+actor "Patient" as patient
+actor "Monitoring Device" as device
+actor "Alert System" as alerts
+
+package "Health Monitoring System" {
+    usecase "Monitor Vital Signs" as UC1
+    usecase "Collect Health Data" as UC2
+    usecase "Generate Health Reports" as UC3
+    usecase "Configure Monitoring Rules" as UC4
+    usecase "Send Health Alerts" as UC5
+    usecase "View Patient Dashboard" as UC6
+    usecase "Analyze Health Trends" as UC7
+    usecase "Manage User Access" as UC8
+    usecase "Export Health Data" as UC9
+    usecase "Set Alert Thresholds" as UC10
+    usecase "View Historical Data" as UC11
+    usecase "System Health Check" as UC12
+}
+
+' Actor relationships
+admin --> UC4 : configures
+admin --> UC8 : manages
+admin --> UC10 : sets thresholds
+admin --> UC12 : monitors system
+
+doctor --> UC3 : generates
+doctor --> UC6 : views
+doctor --> UC7 : analyzes
+doctor --> UC9 : exports
+doctor --> UC11 : reviews
+
+patient --> UC6 : accesses own data
+patient --> UC11 : views own history
+
+device --> UC1 : provides data
+device --> UC2 : transmits
+
+alerts --> UC5 : delivers
+
+' Use case relationships
+UC2 .> UC1 : <<include>>
+UC3 .> UC2 : <<include>>
+UC5 .> UC4 : <<include>>
+UC6 .> UC2 : <<include>>
+UC7 .> UC3 : <<extend>>
+UC11 .> UC2 : <<include>>
+
+note right of UC1
+12 occurrences identified
+Trend: increasing usage
+High significance (6/10)
+end note
+
+@enduml

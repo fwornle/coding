@@ -1,0 +1,47 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title React Component Development Architecture
+
+package "Implementation Patterns" {
+    component "React Component\nDevelopment Pattern" as reactComp <<core>>
+}
+
+package "Development Environment" {
+    component "React Framework" as react <<external>>
+    component "Component Library" as compLib <<storage>>
+    component "Development Tools" as devTools <<cli>>
+}
+
+package "Runtime Environment" {
+    component "Browser Runtime" as browser <<external>>
+    component "Component Registry" as registry <<storage>>
+}
+
+' Dependencies
+reactComp --> react : "uses framework"
+reactComp --> compLib : "stores components"
+reactComp --> devTools : "development support"
+reactComp --> registry : "registers components"
+reactComp --> browser : "renders in"
+
+react ..> browser : "executes in"
+compLib --> registry : "provides to"
+
+note top of reactComp
+  **Pattern Statistics:**
+  • Occurrences: 6
+  • Trend: Stable
+  • Significance: 3/5
+  • Category: Implementation
+end note
+
+note bottom
+  **Architecture Summary:**
+  • Total Patterns: 1
+  • Implementation Patterns: 1
+  • Average Significance: 3.0
+  • Top Pattern: ReactComponentDevelopmentPattern
+end note
+
+@enduml

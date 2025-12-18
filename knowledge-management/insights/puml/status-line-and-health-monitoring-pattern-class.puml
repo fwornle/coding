@@ -1,0 +1,104 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Status Line and Health Monitoring Pattern" {
+    
+    abstract class HealthMonitor <<service>> {
+        -monitoringInterval: int
+        -healthStatus: HealthStatus
+        -alertThreshold: double
+        +startMonitoring(): void
+        +stopMonitoring(): void
+        +checkHealth(): HealthStatus
+        +getStatusLine(): StatusInfo
+    }
+    
+    class SystemHealthMonitor {
+        -systemMetrics: MetricCollection
+        -cpuUsage: double
+        -memoryUsage: double
+        +collectSystemMetrics(): void
+        +evaluateSystemHealth(): HealthStatus
+    }
+    
+    class ApplicationHealthMonitor {
+        -applicationMetrics: MetricCollection
+        -responseTime: long
+        -errorRate: double
+        +collectAppMetrics(): void
+        +evaluateAppHealth(): HealthStatus
+    }
+    
+    class StatusLineManager <<service>> {
+        -statusProviders: List<StatusProvider>
+        -displayFormat: DisplayFormat
+        -updateFrequency: int
+        +registerStatusProvider(provider: StatusProvider): void
+        +generateStatusLine(): String
+        +updateDisplay(): void
+    }
+    
+    interface StatusProvider {
+        +getStatus(): StatusInfo
+        +isHealthy(): boolean
+        +getPriority(): int
+    }
+    
+    class StatusInfo {
+        -component Name: String
+        -status: HealthStatus
+        -message: String
+        -timestamp: long
+        -metadata: Map<String,Object>
+        +formatForDisplay(): String
+    }
+    
+    enum HealthStatus {
+        HEALTHY
+        DEGRADED
+        UNHEALTHY
+        UNKNOWN
+    }
+    
+    class MetricCollection {
+        -metrics: Map<String,Metric>
+        -collectionTime: long
+        +addMetric(name: String, value: Object): void
+        +getMetric(name: String): Metric
+        +getAllMetrics(): Map<String,Metric>
+    }
+    
+    class HealthAlert {
+        -alertLevel: AlertLevel
+        -message: String
+        -timestamp: long
+        -source: String
+        +trigger(): void
+        +acknowledge(): void
+    }
+    
+    enum AlertLevel {
+        INFO
+        WARNING
+        CRITICAL
+    }
+}
+
+' Relationships
+HealthMonitor <|-- SystemHealthMonitor
+HealthMonitor <|-- ApplicationHealthMonitor
+HealthMonitor ..|> StatusProvider
+StatusLineManager o-- StatusProvider : manages
+StatusProvider --> StatusInfo : provides
+StatusInfo --> HealthStatus : contains
+HealthMonitor --> MetricCollection : uses
+HealthMonitor --> HealthAlert : generates
+HealthAlert --> AlertLevel : has
+StatusLineManager --> StatusInfo : aggregates
+
+' Notes
+note top of HealthMonitor : "12 occurrences\nTrend: increasing\nSignificance: 6"
+note right of StatusLineManager : "Aggregates status from\nmultiple providers"
+note bottom of StatusProvider : "Interface for pluggable\nstatus reporting"
+
+@enduml

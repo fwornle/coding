@@ -1,0 +1,67 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title MCP Server Integration & Management Pattern Sequence
+
+participant "Client Application" as Client
+participant "MCP Manager" as Manager
+participant "MCP Server" as Server
+participant "Transport Layer" as Transport
+participant "Resource Provider" as Resource
+
+note over Client, Resource : MCP Server Integration & Management Pattern (Significance: 8/10, 15 occurrences)
+
+Client -> Manager : initialize()
+activate Manager
+
+Manager -> Transport : createConnection()
+activate Transport
+
+Transport -> Server : establishConnection()
+activate Server
+
+Server -> Resource : registerResources()
+activate Resource
+Resource --> Server : resourceList
+deactivate Resource
+
+Server --> Transport : connectionReady
+deactivate Server
+
+Transport --> Manager : connectionEstablished
+deactivate Transport
+
+Manager --> Client : initializationComplete
+deactivate Manager
+
+group MCP Integration Loop [Increasing Trend Pattern]
+    Client -> Manager : requestResource(resourceId)
+    activate Manager
+    
+    Manager -> Server : getResource(resourceId)
+    activate Server
+    
+    Server -> Resource : fetchData(resourceId)
+    activate Resource
+    Resource --> Server : resourceData
+    deactivate Resource
+    
+    Server --> Manager : resourceResponse
+    deactivate Server
+    
+    Manager --> Client : resourceData
+    deactivate Manager
+end
+
+note right of Manager : Pattern shows increasing\nusage trend with\n15 total occurrences
+
+Client -> Manager : cleanup()
+activate Manager
+Manager -> Server : disconnect()
+activate Server
+Server --> Manager : disconnected
+deactivate Server
+Manager --> Client : cleanupComplete
+deactivate Manager
+
+@enduml

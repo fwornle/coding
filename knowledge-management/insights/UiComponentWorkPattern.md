@@ -19,8 +19,8 @@ Configuration-driven development approach
 - JSON Schema validation
 - Environment variable management
 - Configuration templating
-- TypeScript/JavaScript
 - Documentation
+- TypeScript/JavaScript
 
 ## Architecture
 

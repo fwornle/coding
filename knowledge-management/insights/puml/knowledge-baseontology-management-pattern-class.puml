@@ -1,0 +1,97 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management System" {
+    
+    abstract class KnowledgeManagementPattern <<pattern>> {
+        +name: String
+        +category: String
+        +significance: int
+        +occurrences: int
+        +trend: String
+        +getPatternDetails()
+        +trackUsage()
+        +analyzeSignificance()
+    }
+    
+    class KnowledgeBaseOntologyManagementPattern <<implementation>> {
+        -occurrences: int = 7
+        -trend: String = "increasing"
+        -significance: int = 4
+        -usageNotes: List<String>
+        +manageOntology()
+        +updateKnowledgeBase()
+        +trackOccurrences()
+        +analyzeTrends()
+    }
+    
+    interface OntologyManager {
+        +createOntology()
+        +updateOntology()
+        +validateStructure()
+        +queryKnowledge()
+    }
+    
+    interface KnowledgeRepository {
+        +store(knowledge: Object)
+        +retrieve(query: String)
+        +update(knowledge: Object)
+        +delete(id: String)
+    }
+    
+    class PatternCatalog <<service>> {
+        -totalPatterns: int = 1
+        -avgSignificance: double = 4.0
+        -topPatterns: List<String>
+        +addPattern(pattern: KnowledgeManagementPattern)
+        +getPatternsByCategory(category: String)
+        +calculateAverageSignificance()
+        +getTopPatterns()
+    }
+    
+    class ImplementationCategory <<enum>> {
+        IMPLEMENTATION
+        BEHAVIORAL
+        STRUCTURAL
+        CREATIONAL
+    }
+    
+    class PatternEvidence <<entity>> {
+        -evidenceType: String
+        -value: String
+        -timestamp: Date
+        +validate()
+        +getMetrics()
+    }
+    
+    class AnalysisResult <<data>> {
+        -content: String
+        -name: String
+        -analysisTimestamp: Date
+        +generateReport()
+        +exportData()
+    }
+}
+
+' Relationships
+KnowledgeManagementPattern <|-- KnowledgeBaseOntologyManagementPattern
+KnowledgeBaseOntologyManagementPattern ..|> OntologyManager
+KnowledgeBaseOntologyManagementPattern ..|> KnowledgeRepository
+PatternCatalog *-- KnowledgeManagementPattern : contains
+KnowledgeManagementPattern --> ImplementationCategory : categorized by
+KnowledgeManagementPattern *-- PatternEvidence : has evidence
+PatternCatalog --> AnalysisResult : generates
+
+' Annotations
+note right of KnowledgeBaseOntologyManagementPattern
+  Significance: 4/5
+  Occurrences: 7 (increasing)
+  Category: Implementation
+end note
+
+note top of PatternCatalog
+  Manages catalog of 1 pattern
+  Average significance: 4.0
+end note
+
+@enduml

@@ -1,0 +1,145 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Health Monitoring & Dashboard System" {
+    
+    abstract class HealthMonitoringPattern <<pattern>> {
+        +patternName: String
+        +category: String
+        +significance: Integer
+        +occurrences: Integer
+        +trend: String
+        +analyze()
+        +monitor()
+        +report()
+    }
+    
+    class HealthMonitoringDashboardSystemPattern <<implementation>> {
+        -occurrences: Integer = 12
+        -trend: String = "increasing"
+        -significance: Integer = 6
+        -category: String = "Implementation"
+        +implementPattern()
+        +trackOccurrences()
+        +updateTrend()
+        +generateEvidence()
+    }
+    
+    package "Monitoring Components" {
+        
+        interface MonitoringService <<service>> {
+            +collectMetrics()
+            +validateHealth()
+            +generateAlerts()
+        }
+        
+        class HealthMonitor <<service>> {
+            -monitoringInterval: Integer
+            -healthThresholds: Map
+            +startMonitoring()
+            +stopMonitoring()
+            +checkSystemHealth()
+            +collectHealthData()
+        }
+        
+        class MetricsCollector <<service>> {
+            -metricTypes: List
+            -collectionFrequency: Integer
+            +collectPerformanceMetrics()
+            +collectAvailabilityMetrics()
+            +aggregateMetrics()
+        }
+        
+        class AlertManager <<service>> {
+            -alertRules: List
+            -notificationChannels: List
+            +processAlerts()
+            +sendNotifications()
+            +manageAlertRules()
+        }
+    }
+    
+    package "Dashboard Components" {
+        
+        interface DashboardService <<service>> {
+            +renderDashboard()
+            +updateVisualizations()
+            +handleUserInteractions()
+        }
+        
+        class DashboardController <<service>> {
+            -dashboardConfig: Configuration
+            -userSessions: Map
+            +initializeDashboard()
+            +updateDashboardData()
+            +handleUserRequests()
+        }
+        
+        class VisualizationEngine <<service>> {
+            -chartTypes: List
+            -renderingOptions: Map
+            +createCharts()
+            +updateVisualizations()
+            +exportDashboards()
+        }
+        
+        class DataProcessor <<service>> {
+            -processingRules: List
+            -dataCache: Cache
+            +processHealthData()
+            +transformMetrics()
+            +cacheResults()
+        }
+    }
+    
+    package "Data Management" {
+        
+        class HealthDataRepository <<repository>> {
+            -connectionString: String
+            -queryTimeout: Integer
+            +storeHealthData()
+            +retrieveHistoricalData()
+            +queryMetrics()
+        }
+        
+        class ConfigurationManager <<service>> {
+            -configurationFiles: Map
+            -defaultSettings: Properties
+            +loadConfiguration()
+            +updateSettings()
+            +validateConfiguration()
+        }
+    }
+}
+
+' Inheritance relationships
+HealthMonitoringPattern <|-- HealthMonitoringDashboardSystemPattern
+
+' Implementation relationships
+MonitoringService <|.. HealthMonitor
+MonitoringService <|.. MetricsCollector
+MonitoringService <|.. AlertManager
+
+DashboardService <|.. DashboardController
+DashboardService <|.. VisualizationEngine
+
+' Composition and dependency relationships
+HealthMonitoringDashboardSystemPattern --> HealthMonitor : uses
+HealthMonitoringDashboardSystemPattern --> DashboardController : manages
+
+HealthMonitor --> MetricsCollector : delegates to
+HealthMonitor --> AlertManager : notifies
+HealthMonitor --> HealthDataRepository : stores data
+
+DashboardController --> VisualizationEngine : uses
+DashboardController --> DataProcessor : processes data
+DataProcessor --> HealthDataRepository : queries
+
+AlertManager --> ConfigurationManager : gets rules
+DashboardController --> ConfigurationManager : loads settings
+
+' Notes
+note top of HealthMonitoringDashboardSystemPattern : Occurrences: 12\nTrend: increasing\nSignificance: 6
+note bottom of HealthDataRepository : Stores health metrics\nand historical data
+
+@enduml

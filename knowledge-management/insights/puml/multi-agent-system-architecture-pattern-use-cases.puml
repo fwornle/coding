@@ -1,0 +1,59 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "System Administrator" as admin
+actor "Agent Developer" as dev
+actor "End User" as user
+actor "External System" as external
+
+rectangle "Multi-Agent System Architecture Pattern" {
+  usecase "Deploy Agent System" as deploy
+  usecase "Configure Agent Behavior" as config
+  usecase "Monitor Agent Performance" as monitor
+  usecase "Scale Agent Network" as scale
+  usecase "Develop Agent Logic" as develop
+  usecase "Test Agent Interactions" as test
+  usecase "Debug Agent Communication" as debug
+  usecase "Request Agent Services" as request
+  usecase "Receive Agent Responses" as receive
+  usecase "Integrate with Agents" as integrate
+  usecase "Manage Agent Lifecycle" as lifecycle
+  usecase "Handle Agent Failures" as failures
+  usecase "Coordinate Agent Tasks" as coordinate
+}
+
+admin --> deploy
+admin --> config
+admin --> monitor
+admin --> scale
+admin --> lifecycle
+admin --> failures
+
+dev --> develop
+dev --> test
+dev --> debug
+dev --> config
+
+user --> request
+user --> receive
+
+external --> integrate
+external --> request
+
+deploy ..> coordinate : <<include>>
+config ..> coordinate : <<include>>
+scale ..> monitor : <<extend>>
+failures ..> monitor : <<extend>>
+test ..> debug : <<extend>>
+integrate ..> coordinate : <<include>>
+
+note right of "Multi-Agent System Architecture Pattern"
+  Implementation Pattern
+  Significance: 4/5
+  Occurrences: 8
+  Trend: Increasing
+end note
+
+@enduml

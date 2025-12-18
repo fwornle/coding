@@ -3,89 +3,98 @@
 
 package "UI Component Work Pattern Architecture" {
     
-    abstract class UiComponent <<pattern>> {
-        -component Id: String
-        -state: ComponentState
-        -properties: Map<String, Object>
-        +render(): void
-        +update(): void
-        +handleEvent(event: Event): void
-        +getState(): ComponentState
-        +setState(state: ComponentState): void
+    abstract class PatternBase <<pattern>> {
+        +name: String
+        +category: String
+        +description: String
+        +significance: Integer
+        +evidence: List<String>
+        --
+        +analyze(): AnalysisResult
+        +getOccurrences(): Integer
+        +getTrend(): String
     }
     
     class UiComponentWorkPattern <<implementation>> {
-        -occurrences: Integer = 12
+        -occurrences: Integer = 10
         -trend: String = "stable"
-        -significance: Integer = 6
-        -category: String = "Implementation"
-        +execute(): void
-        +analyze(): PatternAnalysis
-        +getOccurrences(): Integer
-        +getTrend(): String
-        +getSignificance(): Integer
-    }
-    
-    enum ComponentState {
-        INITIALIZED
-        RENDERED
-        UPDATED
-        DESTROYED
-    }
-    
-    class PatternAnalysis <<service>> {
-        -totalPatterns: Integer = 1
-        -avgSignificance: Double = 6.0
-        -topPatterns: List<String>
-        +generateReport(): AnalysisReport
-        +calculateMetrics(): Map<String, Object>
-        +getByCategory(category: String): List<Pattern>
-    }
-    
-    class AnalysisReport <<data>> {
-        -content: String
-        -name: String
-        -timestamp: Date
-        +export(): String
-        +validate(): Boolean
-    }
-    
-    interface Pattern {
-        +getName(): String
-        +getCategory(): String
-        +getDescription(): String
-        +getSignificance(): Integer
+        -language: String = "Unknown"
+        -usageNotes: List<String>
+        --
+        +processComponent(): ComponentResult
+        +validatePattern(): Boolean
+        +getImplementationDetails(): Implementation
+        +trackOccurrences(): Integer
     }
     
     class PatternCatalog <<service>> {
         -patterns: List<Pattern>
-        -summary: CatalogSummary
+        -totalPatterns: Integer = 1
+        -avgSignificance: Double = 5.0
+        -topPatterns: List<String>
+        --
         +addPattern(pattern: Pattern): void
-        +removePattern(name: String): void
-        +findPattern(name: String): Pattern
-        +getSummary(): CatalogSummary
+        +getPatternsByCategory(category: String): List<Pattern>
+        +calculateSummary(): Summary
+        +getTopPatterns(): List<String>
     }
     
-    class CatalogSummary <<data>> {
+    class Implementation <<value object>> {
+        -language: String
+        -usageNotes: List<String>
+        --
+        +getLanguage(): String
+        +addUsageNote(note: String): void
+        +validateImplementation(): Boolean
+    }
+    
+    class PatternSummary <<data>> {
         -totalPatterns: Integer
         -byCategory: Map<String, Integer>
         -avgSignificance: Double
         -topPatterns: List<String>
+        --
+        +generateReport(): String
+        +getCategoryDistribution(): Map<String, Integer>
     }
+    
+    enum PatternCategory <<enumeration>> {
+        IMPLEMENTATION
+        BEHAVIORAL
+        STRUCTURAL
+        CREATIONAL
+    }
+    
+    class AnalysisData <<aggregate root>> {
+        -patternCatalog: PatternCatalog
+        -content: String
+        -name: String
+        --
+        +performAnalysis(): AnalysisResult
+        +exportData(): String
+        +validateData(): Boolean
+    }
+    
+    ' Relationships
+    PatternBase <|-- UiComponentWorkPattern
+    PatternCatalog *-- PatternBase : contains
+    PatternCatalog *-- PatternSummary : generates
+    UiComponentWorkPattern *-- Implementation : has
+    UiComponentWorkPattern --> PatternCategory : categorized by
+    AnalysisData *-- PatternCatalog : contains
+    
+    ' Notes
+    note right of UiComponentWorkPattern
+        10 occurrences detected
+        Trend: stable
+        Category: Implementation
+        Significance: 5/10
+    end note
+    
+    note top of PatternCatalog
+        Manages collection of
+        architectural patterns
+        Total patterns: 1
+    end note
 }
-
-' Relationships
-UiComponent --|> Pattern : implements
-UiComponentWorkPattern --|> Pattern : implements
-UiComponent --> ComponentState : uses
-UiComponentWorkPattern --> PatternAnalysis : creates
-PatternAnalysis --> AnalysisReport : generates
-PatternCatalog o-- Pattern : contains
-PatternCatalog --> CatalogSummary : maintains
-UiComponentWorkPattern ..> UiComponent : "works with\n(12 occurrences)"
-
-note top of UiComponentWorkPattern : Significance: 6/10\nTrend: Stable\nCategory: Implementation
-
-note right of PatternAnalysis : Analyzes UI component\nwork patterns and\ngenerates insights
-
 @enduml

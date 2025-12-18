@@ -3,62 +3,46 @@
 
 left to right direction
 
-actor "Frontend Developer" as dev
-actor "UI Designer" as designer
-actor "End User" as user
-actor "System Administrator" as admin
+actor "UI Developer" as dev
+actor "Frontend Architect" as arch
+actor "System User" as user
 
-rectangle "UI Component Work Pattern System" {
+package "UI Component Work Pattern System" {
   usecase "Implement UI Components" as implement
-  usecase "Design Component Architecture" as design
-  usecase "Manage Component Lifecycle" as lifecycle
-  usecase "Monitor Component Performance" as monitor
-  usecase "Maintain Component Stability" as maintain
-  usecase "Analyze Component Usage" as analyze
-  usecase "Update Component Patterns" as update
-  usecase "Interact with UI Components" as interact
-  usecase "Configure Component Settings" as configure
-  
-  usecase "Track Usage Patterns" as track
-  usecase "Generate Component Reports" as report
+  usecase "Apply Work Patterns" as apply
+  usecase "Monitor Pattern Usage" as monitor
+  usecase "Analyze Pattern Trends" as analyze
+  usecase "Maintain Pattern Stability" as maintain
+  usecase "Document Pattern Implementation" as document
+  usecase "Validate Component Architecture" as validate
 }
 
-' Actor relationships
+package "Pattern Management" {
+  usecase "Track Pattern Occurrences" as track
+  usecase "Assess Pattern Significance" as assess
+  usecase "Generate Pattern Reports" as report
+}
+
 dev --> implement
-dev --> lifecycle
-dev --> maintain
-dev --> update
+dev --> apply
+dev --> document
 
-designer --> design
-designer --> implement
+arch --> validate
+arch --> analyze
+arch --> assess
 
-user --> interact
+user --> monitor
 
-admin --> configure
-admin --> monitor
-admin --> analyze
-
-' Include relationships
 implement ..> track : <<include>>
+apply ..> track : <<include>>
 monitor ..> report : <<include>>
-analyze ..> track : <<include>>
-maintain ..> monitor : <<include>>
+analyze ..> assess : <<include>>
 
-' Extend relationships
-update ..> analyze : <<extend>>
-maintain ..> update : <<extend>>
+maintain ..> monitor : <<extend>>
+validate ..> analyze : <<extend>>
 
-note right of implement
-  Pattern: UiComponentWorkPattern
-  Occurrences: 12
-  Trend: stable
-  Significance: 6/10
-end note
-
-note bottom of "UI Component Work Pattern System"
-  Implementation Category Pattern
-  Total Patterns: 1
-  Average Significance: 6
-end note
+note right of implement : 10 occurrences recorded
+note right of maintain : Trend: stable
+note right of assess : Significance level: 5
 
 @enduml

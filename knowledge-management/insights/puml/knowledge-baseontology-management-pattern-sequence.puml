@@ -1,0 +1,65 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Knowledge Base & Ontology Management Pattern Sequence
+
+actor "System User" as User
+participant "Knowledge Manager" as KM
+participant "Ontology Engine" as OE
+participant "Knowledge Base" as KB
+participant "Pattern Analyzer" as PA
+database "Ontology Store" as OS
+
+User -> KM: Initialize knowledge management
+activate KM
+
+KM -> OE: Load ontology definitions
+activate OE
+OE -> OS: Retrieve ontology schemas
+OS --> OE: Return ontology data
+OE --> KM: Ontology loaded
+
+KM -> KB: Initialize knowledge base
+activate KB
+KB -> OS: Connect to storage
+OS --> KB: Connection established
+KB --> KM: Knowledge base ready
+
+loop Pattern Analysis (7 occurrences detected)
+    KM -> PA: Analyze knowledge patterns
+    activate PA
+    PA -> KB: Query knowledge entities
+    KB --> PA: Return entity data
+    PA -> OE: Validate against ontology
+    OE --> PA: Validation results
+    PA --> KM: Pattern analysis complete
+    deactivate PA
+end
+
+alt Pattern Significance >= 4
+    KM -> KB: Store high-significance pattern
+    KB -> OS: Persist pattern data
+    OS --> KB: Storage confirmed
+    KB --> KM: Pattern stored
+else Low Significance Pattern
+    KM -> KM: Log pattern for review
+end
+
+KM -> OE: Update ontology mappings
+OE -> OS: Save updated mappings
+OS --> OE: Update confirmed
+OE --> KM: Mappings synchronized
+
+deactivate OE
+deactivate KB
+KM --> User: Knowledge management complete
+deactivate KM
+
+note right of PA
+  Implementation Pattern:
+  - 7 occurrences detected
+  - Increasing trend
+  - Significance: 4/5
+end note
+
+@enduml
