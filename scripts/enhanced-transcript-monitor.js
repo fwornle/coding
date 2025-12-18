@@ -1634,6 +1634,17 @@ class EnhancedTranscriptMonitor {
     // await this.updateComprehensiveTrajectory(targetProject);
 
     console.log(`📋 Completed user prompt set: ${meaningfulExchanges.length}/${completedSet.length} exchanges → ${path.basename(sessionFile)}`);
+
+    // CRITICAL: Update lastProcessedUuid ONLY when prompt set is successfully written
+    // This ensures incomplete exchanges are re-processed on subsequent cycles until
+    // they have full content (assistant response + tool calls)
+    const writtenLastExchange = completedSet[completedSet.length - 1];
+    if (writtenLastExchange && writtenLastExchange.id) {
+      this.lastProcessedUuid = writtenLastExchange.id;
+      this.saveLastProcessedUuid();
+      this.debug(`✅ Updated lastProcessedUuid to ${writtenLastExchange.id} after successful write`);
+    }
+
     return true;  // Successfully written
   }
 
@@ -1972,56 +1983,71 @@ class EnhancedTranscriptMonitor {
         const userMessageText = typeof exchange.userMessage === 'string' ? exchange.userMessage : JSON.stringify(exchange.userMessage);
         console.log(`🔵 USER PROMPT ${userPromptCount}: ${userMessageText?.substring(0, 100)}...`);
         // New user prompt detected
-        
-        // Check if we crossed session boundary
-        if (this.isNewSessionBoundary(currentTranche, this.lastTranche)) {
 
-          // Complete previous user prompt set if exists
-          if (this.currentUserPromptSet.length > 0) {
-            const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
-            if (targetProject !== null) {
-              // FIX: Use tranche from the FIRST exchange in the set being written
-              const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-              const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
-              // Only clear if successfully written, otherwise keep accumulating
-              if (wasWritten) {
-                this.currentUserPromptSet = [];
-              }
-            } else {
-              // Skip non-relevant exchanges
-              this.currentUserPromptSet = [];
-            }
-          }
+        // CRITICAL FIX: Check if this is the SAME exchange we're already holding
+        // (re-processed with updated content like tool calls)
+        const isSameExchangeReprocessed = this.currentUserPromptSet.length > 0 &&
+          this.currentUserPromptSet[0].id === exchange.id;
 
-          // NO LONGER CREATE EMPTY FILES AT SESSION BOUNDARIES
-          // Files are only created when processUserPromptSetCompletion has content to write
-          this.lastTranche = currentTranche;
-          this.debug('🕒 Session boundary crossed, but not creating empty files');
-
+        if (isSameExchangeReprocessed) {
+          // Same exchange re-processed with more content - UPDATE the exchange in the set
+          // This allows tool calls to be added to an initially incomplete exchange
+          this.debug(`🔄 Updating exchange ${exchange.id} in current prompt set (toolCalls: ${exchange.toolCalls?.length || 0})`);
+          this.currentUserPromptSet[0] = exchange;
+          // Don't complete or start new - just update and continue
         } else {
-          // Same session - complete current user prompt set
-          if (this.currentUserPromptSet.length > 0) {
-            const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
-            if (targetProject !== null) {
-              // FIX: Use tranche from the FIRST exchange in the set being written
-              const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-              const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
-              // Only clear if successfully written
-              if (wasWritten) {
+          // Different exchange - proceed with normal completion logic
+
+          // Check if we crossed session boundary
+          if (this.isNewSessionBoundary(currentTranche, this.lastTranche)) {
+
+            // Complete previous user prompt set if exists
+            if (this.currentUserPromptSet.length > 0) {
+              const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+              if (targetProject !== null) {
+                // FIX: Use tranche from the FIRST exchange in the set being written
+                const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+                const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+                // Only clear if successfully written, otherwise keep accumulating
+                if (wasWritten) {
+                  this.currentUserPromptSet = [];
+                }
+              } else {
+                // Skip non-relevant exchanges
                 this.currentUserPromptSet = [];
               }
-            } else {
-              // Skip non-relevant exchanges
-              this.currentUserPromptSet = [];
             }
 
-            // Note: Redirect detection now handled by conversation-based analysis in status line
+            // NO LONGER CREATE EMPTY FILES AT SESSION BOUNDARIES
+            // Files are only created when processUserPromptSetCompletion has content to write
+            this.lastTranche = currentTranche;
+            this.debug('🕒 Session boundary crossed, but not creating empty files');
+
+          } else {
+            // Same session - complete current user prompt set
+            if (this.currentUserPromptSet.length > 0) {
+              const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+              if (targetProject !== null) {
+                // FIX: Use tranche from the FIRST exchange in the set being written
+                const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+                const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+                // Only clear if successfully written
+                if (wasWritten) {
+                  this.currentUserPromptSet = [];
+                }
+              } else {
+                // Skip non-relevant exchanges
+                this.currentUserPromptSet = [];
+              }
+
+              // Note: Redirect detection now handled by conversation-based analysis in status line
+            }
           }
+
+          // Start new user prompt set
+          this.currentUserPromptSet = [exchange];
+          this.lastUserPromptTime = exchange.timestamp;
         }
-        
-        // Start new user prompt set
-        this.currentUserPromptSet = [exchange];
-        this.lastUserPromptTime = exchange.timestamp;
         
       } else {
         nonUserPromptCount++;
@@ -2030,13 +2056,16 @@ class EnhancedTranscriptMonitor {
           this.currentUserPromptSet.push(exchange);
         }
       }
-      
-      this.lastProcessedUuid = exchange.id;
+
+      // REMOVED: Don't update lastProcessedUuid here - it causes incomplete exchanges
+      // to be skipped on subsequent cycles. lastProcessedUuid is now updated in
+      // processUserPromptSetCompletion when the prompt set is successfully written.
+      // this.lastProcessedUuid = exchange.id;  // DISABLED
       this.exchangeCount++;
     }
 
-    // Save state after processing all exchanges to prevent re-processing on restart
-    this.saveLastProcessedUuid();
+    // REMOVED: Save moved to processUserPromptSetCompletion
+    // this.saveLastProcessedUuid();  // DISABLED
 
     console.log(`📊 EXCHANGE SUMMARY: ${userPromptCount} user prompts, ${nonUserPromptCount} non-user prompts (total: ${exchanges.length})`);
 
@@ -2048,21 +2077,19 @@ class EnhancedTranscriptMonitor {
       });
     }
 
-    // Process any remaining user prompt set
+    // CRITICAL FIX: Do NOT process remaining prompt set immediately!
+    // The currentUserPromptSet likely contains just the user message without the assistant's
+    // response (including tool calls). Writing it now would create incomplete "Text-only exchange"
+    // entries in the LSL files.
+    //
+    // The prompt set will be completed when:
+    // 1. A NEW user prompt arrives (triggering completion of the previous set)
+    // 2. On graceful shutdown (handled in the shutdown handler)
+    //
+    // This allows the assistant response and tool calls to accumulate in subsequent monitoring
+    // cycles before the exchange is written to the LSL file.
     if (this.currentUserPromptSet.length > 0) {
-      console.log(`🔄 Processing final user prompt set with ${this.currentUserPromptSet.length} exchanges`);
-      const currentTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
-      const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
-      console.log(`🎯 Final target project: ${targetProject}`);
-      if (targetProject !== null) {
-        const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, currentTranche);
-        // Only clear if successfully written
-        if (wasWritten) {
-          this.currentUserPromptSet = [];
-        }
-      } else {
-        this.currentUserPromptSet = [];
-      }
+      this.debug(`⏳ Holding ${this.currentUserPromptSet.length} exchanges in prompt set - waiting for assistant response/completion`);
     }
   }
 
