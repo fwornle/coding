@@ -9,7 +9,7 @@ skinparam packageFontSize 16
 skinparam componentFontSize 13
 skinparam ArrowThickness 2
 
-title MCP Semantic Analysis - 13-Agent Architecture
+title MCP Semantic Analysis - 14-Agent Architecture
 
 left to right direction
 
@@ -21,9 +21,10 @@ package "MCP Server" as SERVER {
     component "Coordinator" as COORDINATOR <<agent>>
   }
 
-  package "Core Analysis (5)" as ANALYSIS_PKG #E6F3FF {
+  package "Core Analysis (6)" as ANALYSIS_PKG #E6F3FF {
     component "Git\nHistory" as GIT <<agent>>
     component "Vibe\nHistory" as VIBE <<agent>>
+    component "Code\nIntelligence" as INTEL <<agent>>
     component "Semantic\nAnalysis" as SEMANTIC <<agent>>
     component "Web\nSearch" as WEB <<agent>>
     component "Insight\nGeneration" as INSIGHT <<agent>>
@@ -61,6 +62,7 @@ COORDINATOR --> GIT
 COORDINATOR --> VIBE
 COORDINATOR --> SEMANTIC
 COORDINATOR --> WEB
+COORDINATOR --> INTEL
 COORDINATOR --> INSIGHT
 COORDINATOR --> OBS
 COORDINATOR --> QA
@@ -72,6 +74,7 @@ COORDINATOR ..> GRAPHDB : "Init"
 
 ' LLM connections
 VIBE ..> ANALYZER
+INTEL ..> ANALYZER
 SEMANTIC ..> ANALYZER
 WEB ..> ANALYZER
 INSIGHT ..> ANALYZER

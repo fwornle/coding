@@ -1,7 +1,7 @@
 @startuml semantic-analysis-agent-system
 !include _standard-style.puml
 
-title "13-Agent Semantic Analysis System"
+title "14-Agent Semantic Analysis System"
 
 top to bottom direction
 
@@ -12,6 +12,10 @@ top to bottom direction
 package "Phase 1: Collection" {
   [Git History] <<agent>> as git
   [Vibe History] <<agent>> as vibe
+}
+
+package "Phase 1.5: Intelligence" {
+  [Code Intel] <<agent>> as intel
 }
 
 package "Phase 2: Analysis" {
@@ -49,8 +53,11 @@ mcp --> coord
 
 coord --> git
 coord --> vibe
-git --> semantic
-vibe --> semantic
+git --> intel
+vibe --> intel
+codegraph --> intel
+intel --> semantic
+intel --> insight
 semantic --> web
 web --> insight
 insight --> obs
@@ -65,6 +72,7 @@ dedup --> validate
 
 git --> llm
 vibe --> llm
+intel --> llm
 semantic --> llm
 web --> llm
 insight --> llm
@@ -78,8 +86,8 @@ dedup --> embed
 persist --> db
 
 note right of coord
-  13 agents, 6 phases
-  12 use LLM
+  14 agents, 6 phases
+  13 use LLM
 end note
 
 @enduml

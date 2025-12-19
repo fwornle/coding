@@ -7,7 +7,7 @@ skinparam defaultFontSize 14
 skinparam titleFontSize 20
 skinparam ArrowThickness 2
 
-title 13-Agent Workflow
+title 14-Agent Workflow
 
 participant "Claude" as CLAUDE
 participant "Coordinator" as COORD #FFE6CC

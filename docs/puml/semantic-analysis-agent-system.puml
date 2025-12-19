@@ -1,7 +1,7 @@
 @startuml semantic-analysis-agent-system
 !include _standard-style.puml
 
-title "13-Agent Semantic Analysis System"
+title "14-Agent Semantic Analysis System"
 
 top to bottom direction
 skinparam linetype ortho
@@ -27,6 +27,14 @@ package "Phase 1: Data Collection" <<frame>> {
   }
   rectangle "VibeHistoryAgent" <<agent>> as vibe {
     [LLM Context Extraction] <<core>>
+  }
+}
+
+' Phase 1.5: Code Intelligence (LLM-Powered)
+package "Phase 1.5: Code Intelligence" <<frame>> {
+  rectangle "CodeIntelligenceAgent" <<agent>> as intelligence {
+    [NL→Cypher Queries] <<core>>
+    [Context-Aware Q&A] <<core>>
   }
 }
 
@@ -99,8 +107,11 @@ mcp --> coordinator
 
 coordinator --> git
 coordinator --> vibe
-git --> semantic
-vibe --> semantic
+git --> intelligence
+vibe --> intelligence
+codegraph --> intelligence
+intelligence --> semantic
+intelligence --> insight
 semantic --> web
 web --> insight
 semantic --> insight
@@ -117,6 +128,7 @@ dedup --> validate
 ' LLM connections (simplified)
 git ..> llm
 vibe ..> llm
+intelligence ..> llm
 semantic ..> llm
 web ..> llm
 insight ..> llm
@@ -133,9 +145,9 @@ codegraph ..> memgraph
 
 note right of coordinator
   **Workflow Engine**
-  13 agents in 6 phases
+  14 agents in 6 phases
   Quality loops: up to 3 iterations
-  12 agents use LLM
+  13 agents use LLM
 end note
 
 note right of qa

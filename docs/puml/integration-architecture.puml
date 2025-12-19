@@ -12,7 +12,7 @@ package "Coding Core System" as core #E8F5E8 {
 }
 
 package "MCP Integration Layer" as mcp #E0E7FF {
-  [Semantic\nAnalysis\n(13 Agents)] as semantic <<mcp>>
+  [Semantic\nAnalysis\n(14 Agents)] as semantic <<mcp>>
   [Serena\nAST] as serena <<mcp>>
   [Constraint\nMonitor] as monitor <<mcp>>
 }
@@ -45,7 +45,7 @@ note right of lsl
   5-layer system with fast
   semantic analysis (Layer 4)
   using Groq/Gemini/Anthropic/OpenAI
-  (NOT the 13-agent MCP server)
+  (NOT the 14-agent MCP server)
 end note
 
 note right of trajectory

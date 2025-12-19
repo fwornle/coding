@@ -81,15 +81,26 @@
         "auto_heal_action": "restart_dashboard_server"
       },
       "health_dashboard_api": {
-        "enabled": false,
+        "enabled": true,
         "severity": "error",
         "check_type": "http_health",
         "endpoint": "http://localhost:3033/api/health",
         "timeout_ms": 3000,
-        "description": "System Health Dashboard API server (self-monitoring) - NOT DEPLOYED YET",
+        "description": "System Health Dashboard API server for health verification data",
         "auto_heal": true,
         "auto_heal_action": "restart_health_api",
         "expected_status": "critical"
+      },
+      "health_dashboard_frontend": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "port_listening",
+        "port": 3032,
+        "timeout_ms": 3000,
+        "description": "System Health Dashboard frontend (Vite dev server)",
+        "auto_heal": true,
+        "auto_heal_action": "restart_health_frontend",
+        "expected_status": "optional"
       },
       "enhanced_transcript_monitor": {
         "enabled": true,
