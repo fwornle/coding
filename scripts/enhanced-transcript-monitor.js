@@ -114,6 +114,11 @@ class EnhancedTranscriptMonitor {
     this.lastProcessedUuid = this.loadLastProcessedUuid();
     this.exchangeCount = 0;
     this.lastFileSize = 0;
+
+    // Idle timeout: auto-exit if no transcript activity for this duration
+    // This prevents orphaned monitors when Claude sessions are force-quit
+    this.idleTimeout = config.idleTimeout || 1800000; // 30 minutes default
+    this.lastActivityTime = Date.now(); // Track when we last saw transcript activity
     
     // Initialize adaptive exchange extractor for streaming processing
     this.adaptiveExtractor = new AdaptiveExchangeExtractor();
@@ -2105,6 +2110,12 @@ class EnhancedTranscriptMonitor {
       const stats = fs.statSync(this.transcriptPath);
       const hasNew = stats.size !== this.lastFileSize;
       this.lastFileSize = stats.size;
+
+      // Update activity time when we see new content
+      if (hasNew) {
+        this.lastActivityTime = Date.now();
+      }
+
       return hasNew;
     } catch (error) {
       return false;
@@ -2223,6 +2234,48 @@ class EnhancedTranscriptMonitor {
 
           console.log(`   ✅ Now monitoring: ${path.basename(this.transcriptPath)}`);
           console.log(`   📌 Continuing from last processed UUID to prevent duplicates`);
+
+          // Reset activity time on transcript switch (new session started)
+          this.lastActivityTime = Date.now();
+        }
+      }
+
+      // IDLE TIMEOUT CHECK: Auto-exit if no transcript activity for too long
+      // This prevents orphaned monitors when Claude sessions are force-quit
+      const idleTime = Date.now() - this.lastActivityTime;
+      if (idleTime > this.idleTimeout) {
+        const idleMinutes = Math.round(idleTime / 60000);
+        console.log(`⏰ Idle timeout reached: no transcript activity for ${idleMinutes} minutes`);
+        console.log(`   Auto-exiting to prevent orphaned monitor process...`);
+
+        // Graceful shutdown
+        if (this.intervalId) clearInterval(this.intervalId);
+        if (this.healthIntervalId) clearInterval(this.healthIntervalId);
+        await this.stop();
+        process.exit(0);
+      }
+
+      // CRITICAL FIX: Check for hourly boundary crossing even without new content
+      // This ensures held prompt sets are written when the hour changes, not just
+      // when a new user prompt arrives. Without this, exchanges accumulate indefinitely
+      // when conversations span hour boundaries without new prompts.
+      if (this.currentUserPromptSet.length > 0 && this.lastTranche) {
+        const currentTranche = this.getCurrentTimetranche();
+        if (this.isNewSessionBoundary(currentTranche, this.lastTranche)) {
+          console.log(`⏰ Hour boundary crossed while holding ${this.currentUserPromptSet.length} exchanges - completing to previous window`);
+          const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
+          if (targetProject !== null) {
+            // Use tranche from the FIRST exchange in the set (previous hour's window)
+            const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+            const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
+            if (wasWritten) {
+              this.currentUserPromptSet = [];
+              this.lastTranche = currentTranche;  // Update to current hour
+            }
+          } else {
+            this.currentUserPromptSet = [];
+            this.lastTranche = currentTranche;
+          }
         }
       }
 
