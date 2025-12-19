@@ -128,6 +128,9 @@ export class HealthRemediationActions {
         case 'restart_health_api':
           result = await this.restartHealthAPI(issueDetails);
           break;
+        case 'restart_health_frontend':
+          result = await this.restartHealthFrontend(issueDetails);
+          break;
         case 'start_qdrant':
           result = await this.startQdrant(issueDetails);
           break;
@@ -402,6 +405,58 @@ export class HealthRemediationActions {
         success: response.ok,
         message: response.ok ? 'Health API server restarted' : 'Failed to verify restart'
       };
+
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Restart System Health Dashboard Frontend (Vite dev server)
+   */
+  async restartHealthFrontend(details) {
+    try {
+      this.log('Restarting System Health Dashboard frontend...');
+
+      // Find and kill existing process on port 3032
+      try {
+        const { stdout } = await execAsync('lsof -ti:3032');
+        const pid = parseInt(stdout.trim());
+        if (pid) {
+          process.kill(pid, 'SIGTERM');
+          await this.sleep(1000);
+        }
+      } catch (error) {
+        // Port not in use, that's fine
+      }
+
+      // Start frontend via npm run dev
+      const healthDashboardDir = join(this.codingRoot, 'integrations/system-health-dashboard');
+      const cmd = `cd ${healthDashboardDir} && npm run dev > /dev/null 2>&1 &`;
+
+      await execAsync(cmd, {
+        shell: '/bin/bash',
+        timeout: 5000,
+        env: {
+          ...process.env,
+          SYSTEM_HEALTH_DASHBOARD_PORT: '3032',
+          SYSTEM_HEALTH_API_PORT: '3033'
+        }
+      });
+
+      await this.sleep(3000);
+
+      // Verify it's running by checking if port is listening
+      try {
+        const { stdout } = await execAsync('lsof -ti:3032');
+        const isRunning = stdout.trim().length > 0;
+        return {
+          success: isRunning,
+          message: isRunning ? 'Health Dashboard frontend restarted' : 'Failed to verify restart'
+        };
+      } catch (error) {
+        return { success: false, message: 'Port 3032 not listening after restart' };
+      }
 
     } catch (error) {
       return { success: false, message: error.message };

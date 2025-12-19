@@ -486,6 +486,74 @@ const SERVICE_CONFIGS = {
       if (result.skipRegistration) return true;
       return createHttpHealthCheck(PORTS.SYSTEM_HEALTH_API, '/api/health')(result);
     }
+  },
+
+  systemHealthDashboardFrontend: {
+    name: 'System Health Dashboard Frontend',
+    required: false, // OPTIONAL - frontend dashboard
+    maxRetries: 2,
+    timeout: 20000,
+    startFn: async () => {
+      console.log(`[SystemHealthFrontend] Starting system health dashboard frontend on port ${PORTS.SYSTEM_HEALTH_DASHBOARD}...`);
+
+      // Check if already running globally (parallel session detection)
+      const isRunning = await psm.isServiceRunning('system-health-dashboard-frontend', 'global');
+      if (isRunning) {
+        console.log('[SystemHealthFrontend] Already running globally - using existing instance');
+        // Check if port is listening
+        if (await isPortListening(PORTS.SYSTEM_HEALTH_DASHBOARD)) {
+          return { pid: 'already-running', port: PORTS.SYSTEM_HEALTH_DASHBOARD, service: 'system-health-dashboard-frontend', skipRegistration: true };
+        } else {
+          console.log(`[SystemHealthFrontend] Warning: PSM shows running but port ${PORTS.SYSTEM_HEALTH_DASHBOARD} not listening - cleaning up PSM entry`);
+        }
+      }
+
+      // Kill any existing process on System Health Dashboard port
+      try {
+        await new Promise((resolve) => {
+          exec(`lsof -ti:${PORTS.SYSTEM_HEALTH_DASHBOARD} | xargs kill -9 2>/dev/null`, () => resolve());
+        });
+        await sleep(500);
+      } catch (error) {
+        // Ignore errors
+      }
+
+      const dashboardDir = path.join(CODING_DIR, 'integrations/system-health-dashboard');
+
+      // Check if node_modules exists, if not skip this service
+      if (!fs.existsSync(path.join(dashboardDir, 'node_modules'))) {
+        console.log('[SystemHealthFrontend] Warning: node_modules not found - run npm install in integrations/system-health-dashboard');
+        throw new Error('node_modules not found - npm install required');
+      }
+
+      const child = spawn('npm', ['run', 'dev'], {
+        detached: true,
+        stdio: ['ignore', 'ignore', 'ignore'],
+        cwd: dashboardDir,
+        env: {
+          ...process.env,
+          SYSTEM_HEALTH_DASHBOARD_PORT: String(PORTS.SYSTEM_HEALTH_DASHBOARD),
+          SYSTEM_HEALTH_API_PORT: String(PORTS.SYSTEM_HEALTH_API)
+        }
+      });
+
+      child.unref();
+
+      // Brief wait for process to start
+      await sleep(2000);
+
+      // Check if process is still running
+      if (!isProcessRunning(child.pid)) {
+        throw new Error('System Health Dashboard Frontend process died immediately');
+      }
+
+      return { pid: child.pid, port: PORTS.SYSTEM_HEALTH_DASHBOARD, service: 'system-health-dashboard-frontend' };
+    },
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      // Vite dev server responds on the port
+      return isPortListening(PORTS.SYSTEM_HEALTH_DASHBOARD);
+    }
   }
 };
 
@@ -812,6 +880,27 @@ async function startAllServices() {
     await registerWithPSM(systemHealthAPIResult, 'integrations/system-health-dashboard/server.js');
   } else {
     results.degraded.push(systemHealthAPIResult);
+  }
+
+  console.log('');
+
+  // 6b. OPTIONAL: System Health Dashboard Frontend (depends on API being available)
+  const systemHealthFrontendResult = await startServiceWithRetry(
+    SERVICE_CONFIGS.systemHealthDashboardFrontend.name,
+    SERVICE_CONFIGS.systemHealthDashboardFrontend.startFn,
+    SERVICE_CONFIGS.systemHealthDashboardFrontend.healthCheckFn,
+    {
+      required: SERVICE_CONFIGS.systemHealthDashboardFrontend.required,
+      maxRetries: SERVICE_CONFIGS.systemHealthDashboardFrontend.maxRetries,
+      timeout: SERVICE_CONFIGS.systemHealthDashboardFrontend.timeout
+    }
+  );
+
+  if (systemHealthFrontendResult.status === 'success') {
+    results.successful.push(systemHealthFrontendResult);
+    await registerWithPSM(systemHealthFrontendResult, 'integrations/system-health-dashboard/vite-frontend');
+  } else {
+    results.degraded.push(systemHealthFrontendResult);
   }
 
   console.log('');
