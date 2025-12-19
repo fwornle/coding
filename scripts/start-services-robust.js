@@ -41,6 +41,38 @@ const CODING_DIR = path.resolve(SCRIPT_DIR, '..');
 const execAsync = promisify(exec);
 const psm = new ProcessStateManager();
 
+/**
+ * Check if any process matching the script pattern is running at OS level
+ * This catches orphaned processes that PSM doesn't know about
+ */
+async function isProcessRunningByScript(scriptPattern) {
+  try {
+    const { stdout } = await execAsync(`pgrep -lf "${scriptPattern}" 2>/dev/null || true`, {
+      timeout: 5000
+    });
+
+    const lines = stdout.trim().split('\n').filter(line => line.trim());
+    for (const line of lines) {
+      const match = line.match(/^(\d+)\s+(.+)$/);
+      if (match) {
+        const pid = parseInt(match[1], 10);
+        const command = match[2];
+
+        // Skip self, grep/pgrep processes
+        if (pid === process.pid) continue;
+        if (command.includes('pgrep') || command.includes('grep')) continue;
+
+        // Found a running process
+        return { running: true, pid, command };
+      }
+    }
+    return { running: false };
+  } catch (error) {
+    // If pgrep fails, assume not running (fail open)
+    return { running: false };
+  }
+}
+
 // Get target project path from environment (set by bin/coding)
 const TARGET_PROJECT_PATH = process.env.CODING_PROJECT_DIR || CODING_DIR;
 
@@ -67,19 +99,38 @@ const SERVICE_CONFIGS = {
       console.log('[TranscriptMonitor] Starting enhanced transcript monitor...');
       console.log(`[TranscriptMonitor] Target project: ${TARGET_PROJECT_PATH}`);
 
-      // Check if already running globally (parallel session detection)
+      // Check if already running globally (parallel session detection) via PSM
       const isRunningGlobally = await psm.isServiceRunning('transcript-monitor', 'global');
       if (isRunningGlobally) {
-        console.log('[TranscriptMonitor] Already running globally - using existing instance');
+        console.log('[TranscriptMonitor] Already running globally (PSM) - using existing instance');
         return { pid: 'already-running', service: 'transcript-monitor', skipRegistration: true };
       }
 
-      // CRITICAL: Check if a per-project monitor is already running for this project
+      // CRITICAL: Check if a per-project monitor is already running for this project via PSM
       // This handles the case where global-lsl-coordinator spawned one
       const isRunningPerProject = await psm.isServiceRunning('enhanced-transcript-monitor', 'per-project', { projectPath: TARGET_PROJECT_PATH });
       if (isRunningPerProject) {
-        console.log(`[TranscriptMonitor] Already running for project ${path.basename(TARGET_PROJECT_PATH)} - using existing instance`);
+        console.log(`[TranscriptMonitor] Already running for project ${path.basename(TARGET_PROJECT_PATH)} (PSM) - using existing instance`);
         return { pid: 'already-running', service: 'transcript-monitor', skipRegistration: true };
+      }
+
+      // ALSO check OS-level to catch orphaned processes PSM doesn't know about
+      const osCheck = await isProcessRunningByScript('enhanced-transcript-monitor.js');
+      if (osCheck.running) {
+        console.log(`[TranscriptMonitor] Already running at OS level (PID: ${osCheck.pid}) - using existing instance`);
+        console.log(`[TranscriptMonitor] Note: Re-registering orphaned process with PSM`);
+        // Re-register this orphan with PSM so future checks work
+        try {
+          await psm.registerService({
+            name: 'transcript-monitor',
+            pid: osCheck.pid,
+            type: 'global',
+            script: 'scripts/enhanced-transcript-monitor.js'
+          });
+        } catch (e) {
+          console.log(`[TranscriptMonitor] Warning: Could not re-register with PSM: ${e.message}`);
+        }
+        return { pid: osCheck.pid, service: 'transcript-monitor', skipRegistration: true };
       }
 
       const child = spawn('node', [
@@ -109,11 +160,30 @@ const SERVICE_CONFIGS = {
     startFn: async () => {
       console.log('[LiveLogging] Starting live logging coordinator...');
 
-      // Check if already running globally (parallel session detection)
+      // Check if already running globally (parallel session detection) via PSM
       const isRunning = await psm.isServiceRunning('live-logging-coordinator', 'global');
       if (isRunning) {
-        console.log('[LiveLogging] Already running globally - using existing instance');
+        console.log('[LiveLogging] Already running globally (PSM) - using existing instance');
         return { pid: 'already-running', service: 'live-logging-coordinator', skipRegistration: true };
+      }
+
+      // ALSO check OS-level to catch orphaned processes PSM doesn't know about
+      const osCheck = await isProcessRunningByScript('live-logging-coordinator.js');
+      if (osCheck.running) {
+        console.log(`[LiveLogging] Already running at OS level (PID: ${osCheck.pid}) - using existing instance`);
+        console.log(`[LiveLogging] Note: Re-registering orphaned process with PSM`);
+        // Re-register this orphan with PSM so future checks work
+        try {
+          await psm.registerService({
+            name: 'live-logging-coordinator',
+            pid: osCheck.pid,
+            type: 'global',
+            script: 'scripts/live-logging-coordinator.js'
+          });
+        } catch (e) {
+          console.log(`[LiveLogging] Warning: Could not re-register with PSM: ${e.message}`);
+        }
+        return { pid: osCheck.pid, service: 'live-logging-coordinator', skipRegistration: true };
       }
 
       const child = spawn('node', [

@@ -37,6 +37,8 @@ class SystemMonitorWatchdog {
     this.watchdogLogPath = path.join(this.codingRepoPath, '.logs', 'system-watchdog.log');
     this.coordinatorScript = path.join(this.codingRepoPath, 'scripts', 'global-service-coordinator.js');
     this.launchdPlistPath = `${process.env.HOME}/Library/LaunchAgents/com.coding.system-watchdog.plist`;
+    // Legacy registry path for cleanup (now using PSM instead)
+    this.registryPath = path.join(this.codingRepoPath, '.global-service-registry.json');
 
     // Initialize Process State Manager for unified tracking
     this.psm = new ProcessStateManager(this.codingRepoPath);
