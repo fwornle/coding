@@ -15,6 +15,7 @@ import crypto from 'crypto';
 import zlib from 'zlib';
 import { promisify } from 'util';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import ProcessStateManager from './process-state-manager.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const gzip = promisify(zlib.gzip);
@@ -1129,7 +1130,25 @@ export function destroyGlobalCoordinator() {
 }
 
 // CLI execution
-runIfMain(import.meta.url, () => {
+runIfMain(import.meta.url, async () => {
+  // Robust singleton check before starting
+  const psm = new ProcessStateManager();
+  await psm.initialize();
+
+  const serviceName = 'Live Logging Coordinator';
+  const scriptPattern = 'live-logging-coordinator.js';
+
+  const singletonCheck = await psm.robustSingletonCheck(serviceName, scriptPattern, 'global');
+
+  if (!singletonCheck.canStart) {
+    console.error(`❌ Cannot start ${serviceName}: ${singletonCheck.reason}`);
+    if (singletonCheck.existingPids.length > 0) {
+      console.error(`   Existing PIDs: ${singletonCheck.existingPids.join(', ')}`);
+      console.error(`   To fix: kill ${singletonCheck.existingPids.join(' ')}`);
+    }
+    process.exit(1);
+  }
+
   const coordinator = new LiveLoggingCoordinator({
     debug: process.argv.includes('--debug'),
     enableFileManager: !process.argv.includes('--no-file-manager'),
@@ -1137,31 +1156,42 @@ runIfMain(import.meta.url, () => {
     enablePerformanceMonitoring: !process.argv.includes('--no-performance-monitoring'),
     enableMultiUserSupport: !process.argv.includes('--no-multi-user')
   });
-  
+
+  // Register with PSM
+  await psm.registerService({
+    name: serviceName,
+    type: 'global',
+    pid: process.pid,
+    script: 'scripts/live-logging-coordinator.js',
+    metadata: {}
+  });
+  console.log(`✅ ${serviceName} registered (PID: ${process.pid})`);
+
   // Graceful shutdown handlers
   const shutdown = async (signal) => {
     console.log(`\nReceived ${signal}, shutting down gracefully...`);
+    await psm.unregisterService(serviceName, 'global');
     await coordinator.cleanup();
     process.exit(0);
   };
-  
+
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
-  
+
   // Keep alive with status updates
   setInterval(async () => {
     const stats = coordinator.getSessionStats();
     if (stats.bufferSize > 0 || stats.performance.totalExchanges % 10 === 0) {
       console.log(`📊 Session stats: ${stats.bufferSize} buffered, ${stats.performance.totalExchanges} total exchanges`);
     }
-    
+
     // Health check every 5 minutes
     if (Date.now() % 300000 < 30000) { // Roughly every 5 minutes
       const health = await coordinator.getSystemHealth();
       console.log(`🏥 System health: ${health.systemHealth.status}`);
     }
   }, 30000); // Every 30 seconds
-  
+
   console.log('🚀 Enhanced Live Logging Coordinator running...');
   console.log('   Press Ctrl+C to gracefully shutdown');
 });
