@@ -368,19 +368,22 @@ class GlobalLSLCoordinator {
     // Initialize process state manager
     await this.processStateManager.initialize();
 
-    // Clean up dead PIDs before checking for duplicates
-    const cleanupStats = await this.processStateManager.cleanupDeadProcesses();
-    if (cleanupStats.total > 0) {
-      this.log(`🧹 Cleaned up ${cleanupStats.total} dead process(es) from registry`);
-    }
-
-    // Check for existing coordinator instance
+    // Robust singleton check - OS-level + PSM combined
     const serviceName = 'global-lsl-coordinator';
-    const existingService = await this.processStateManager.getService(serviceName, 'global');
-    if (existingService && this.processStateManager.isProcessAlive(existingService.pid)) {
-      console.error(`❌ Another instance of ${serviceName} is already running`);
-      console.error(`   PID: ${existingService.pid}, Started: ${new Date(existingService.startTime).toISOString()}`);
-      console.error(`   To fix: Kill the existing instance with: kill ${existingService.pid}`);
+    const scriptPattern = 'global-lsl-coordinator.js';
+
+    const singletonCheck = await this.processStateManager.robustSingletonCheck(
+      serviceName,
+      scriptPattern,
+      'global'
+    );
+
+    if (!singletonCheck.canStart) {
+      console.error(`❌ Cannot start ${serviceName}: ${singletonCheck.reason}`);
+      if (singletonCheck.existingPids.length > 0) {
+        console.error(`   Existing PIDs: ${singletonCheck.existingPids.join(', ')}`);
+        console.error(`   To fix: kill ${singletonCheck.existingPids.join(' ')}`);
+      }
       process.exit(1);
     }
 
