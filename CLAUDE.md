@@ -56,6 +56,28 @@ Use Skill tool with command: "documentation-style"
 - **File Operations**: Use standard Edit/Write tools, NEVER Serena for editing
 - **Memory**: `.serena/memories/` for context persistence
 
+### Code Graph Analysis
+
+For complex code analysis, understanding call graphs, or finding related code:
+
+**Tool:** `mcp__semantic-analysis__analyze_code_graph`
+
+**Actions:**
+- `nl_query` + `question`: Natural language query - "What functions call PSM?"
+- `query` + `query`: Search entities by name pattern
+- `call_graph` + `entity_name`: Get function dependency graph
+- `similar` + `code_snippet`: Find similar code patterns
+
+**When to use:**
+- Understanding unfamiliar code areas
+- Finding all callers/callees of a function
+- Locating related implementations
+- Debugging complex call chains
+
+**Prerequisite:** Memgraph must be running (`docker ps | grep memgraph`)
+
+**Auto-update:** Code graph is incrementally updated during `ukb` runs.
+
 ---
 
 ## 🎯 DEVELOPMENT PRACTICES

@@ -14,7 +14,7 @@
 
 ## Current System: MCP Semantic Analysis
 
-**When you type "ukb" in Claude chat**, Claude detects your intent and calls the MCP semantic-analysis server to execute a comprehensive 13-agent workflow (12 agents with LLM support).
+**When you type "ukb" in Claude chat**, Claude detects your intent and calls the MCP semantic-analysis server to execute a comprehensive 14-agent workflow (13 agents with LLM support).
 
 ### Quick Start
 
@@ -43,7 +43,7 @@ User: "ukb"
 ### New System (Current)
 - `ukb` is a **keyword in Claude chat**
 - Claude decides: incremental or full analysis
-- **13-agent workflow** with LLM-powered semantic analysis (12 of 13 agents use LLM)
+- **14-agent workflow** with LLM-powered semantic analysis (13 of 14 agents use LLM)
 - **MCP tool integration**: `mcp__semantic-analysis__execute_workflow`
 - **Team synchronization** via git-tracked checkpoint files
 
@@ -63,7 +63,7 @@ Claude will:
 1. Detect knowledge update request
 2. Decide: incremental or full analysis
 3. Call MCP semantic-analysis tool
-4. Execute 13-agent workflow (12 with LLM)
+4. Execute 14-agent workflow (13 with LLM)
 5. Store to GraphDB → LevelDB → JSON export
 6. Show you a summary
 
@@ -85,28 +85,28 @@ Claude checks the checkpoint and reports new commits/sessions since last run.
 
 ---
 
-## 13-Agent Workflow
+## 14-Agent Workflow
 
 When triggered, the MCP semantic-analysis server executes:
 
 **Orchestration:**
 1. **CoordinatorAgent** - Orchestrates all agents via workflow definitions
 
-**LLM-Powered Agents (10 agents):**
-2. **SemanticAnalysisAgent** - Deep semantic analysis with 3-tier LLM chain
-3. **InsightGenerationAgent** - Creates structured insights with PlantUML diagrams
-4. **QualityAssuranceAgent** - LLM-powered semantic value filtering and validation
-5. **VibeHistoryAgent** - Analyzes session logs with LLM context extraction
-6. **ObservationGenerationAgent** - Adds observations using LLM structuring
-7. **ContentValidationAgent** - LLM-powered staleness detection and entity refresh
-8. **GitHistoryAgent** - LLM-powered commit pattern analysis and evolution extraction
-9. **WebSearchAgent** - Researches patterns with optional LLM result ranking
+**LLM-Powered Analysis Agents (11 agents):**
+2. **GitHistoryAgent** - LLM-powered commit pattern analysis and evolution extraction
+3. **VibeHistoryAgent** - Analyzes session logs with LLM context extraction
+4. **CodeGraphAgent** - AST-based indexing via Memgraph
+5. **CodeIntelligenceAgent** - Context-aware NL→Cypher queries for evidence-backed insights
+6. **SemanticAnalysisAgent** - Deep semantic analysis with 3-tier LLM chain
+7. **WebSearchAgent** - Researches patterns with optional LLM result ranking
+8. **InsightGenerationAgent** - Creates structured insights with PlantUML diagrams
+9. **ObservationGenerationAgent** - Adds observations using LLM structuring
 10. **OntologyClassificationAgent** - LLM-powered ontology classification
 11. **DocumentationLinkerAgent** - LLM-powered semantic doc-to-code matching
+12. **QualityAssuranceAgent** - LLM-powered semantic value filtering and validation
 
-**Embedding/External LLM Agents (2 agents):**
-12. **DeduplicationAgent** - Semantic duplicate detection using OpenAI embeddings
-13. **CodeGraphAgent** - AST-based indexing via Memgraph with LLM queries
+**Embedding Agent (1 agent):**
+13. **DeduplicationAgent** - Semantic duplicate detection using OpenAI embeddings
 
 **Non-LLM Agent (1 agent):**
 14. **PersistenceAgent** - Stores entities to GraphDB (no LLM needed)
@@ -183,7 +183,7 @@ If you were using the old UKB CLI system:
 ### What to Start Doing
 - ✅ Type "ukb" in Claude chat
 - ✅ Let Claude call MCP semantic-analysis tool
-- ✅ Trust the 13-agent workflow (12 with LLM)
+- ✅ Trust the 14-agent workflow (13 with LLM)
 - ✅ Review auto-generated insights
 - ✅ Commit .data/knowledge-export/*.json and .data/ukb-last-run.json
 
@@ -207,7 +207,7 @@ If you were using the old UKB CLI system:
 The migration from CLI to MCP integration provides:
 
 ✅ **AI-Driven Analysis**: Claude makes intelligent decisions about analysis scope
-✅ **Semantic Understanding**: 13-agent workflow with 12 LLM-powered agents extracts deep insights
+✅ **Semantic Understanding**: 14-agent workflow with 13 LLM-powered agents extracts deep insights
 ✅ **Zero Manual Effort**: Just type "ukb" - no command-line arguments
 ✅ **Better Integration**: Seamless Claude Code workflow
 ✅ **Team Synchronization**: Git-tracked checkpoint ensures no duplicate work
