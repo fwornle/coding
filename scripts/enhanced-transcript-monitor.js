@@ -933,13 +933,43 @@ class EnhancedTranscriptMonitor {
     let userMessageCount = 0;
     let filteredUserMessageCount = 0;
 
+    // FIX: Handle continuation from mid-conversation (when first message isn't a user prompt)
+    // This occurs when lastProcessedUuid points to a user prompt that was already written,
+    // but subsequent assistant/tool_result messages still need to be captured.
+    if (messages.length > 0) {
+      const firstMessage = messages[0];
+      const isFirstMessageUserPrompt = firstMessage.type === 'user' &&
+        firstMessage.message?.role === 'user' &&
+        !this.isToolResultMessage(firstMessage);
+
+      if (!isFirstMessageUserPrompt) {
+        // Create a continuation exchange to collect assistant responses and tool results
+        // that belong to the previous (already-written) exchange
+        currentExchange = {
+          id: firstMessage.uuid || `continuation_${Date.now()}`, // Use REAL UUID for tracking
+          timestamp: firstMessage.timestamp || new Date().toISOString(),
+          userMessage: '', // No user message for continuation
+          claudeResponse: '',
+          toolCalls: [],
+          toolResults: [],
+          isUserPrompt: false,  // Mark as NOT a user prompt (continuation)
+          isComplete: true,  // FIX: Continuation exchanges ARE complete - they contain accumulated content
+          stopReason: 'continuation',
+          isContinuation: true,  // Flag for special handling
+          lastMessageUuid: firstMessage.uuid  // Track actual last message for accurate lastProcessedUuid
+        };
+        this.debug(`📎 Created continuation exchange for mid-conversation messages (id: ${currentExchange.id})`);
+      }
+    }
+
     for (const message of messages) {
       // Skip tool result messages - they are NOT user prompts
       if (message.type === 'user' && message.message?.role === 'user' && 
           !this.isToolResultMessage(message)) {
         // New user prompt - complete previous exchange and start new one
         if (currentExchange) {
-          currentExchange.isUserPrompt = true;
+          // FIX: Don't override isUserPrompt - preserve continuation exchanges as non-user-prompts
+          // Previous: currentExchange.isUserPrompt = true; (WRONG - destroyed continuation flag)
           exchanges.push(currentExchange);
         }
         
@@ -952,7 +982,8 @@ class EnhancedTranscriptMonitor {
           toolResults: [],
           isUserPrompt: true,
           isComplete: false,  // NEW: Track completion status
-          stopReason: null    // NEW: Track stop reason
+          stopReason: null,    // NEW: Track stop reason
+          lastMessageUuid: message.uuid  // Track actual last message for accurate lastProcessedUuid
         };
       } else if (message.type === 'assistant' && currentExchange) {
         if (message.message?.content) {
@@ -972,6 +1003,10 @@ class EnhancedTranscriptMonitor {
             currentExchange.claudeResponse = message.message.content;
           }
         }
+        // Track the actual last message UUID for accurate resumption
+        if (message.uuid) {
+          currentExchange.lastMessageUuid = message.uuid;
+        }
 
         // NEW: Mark exchange as complete when stop_reason is present
         if (message.message?.stop_reason !== null && message.message?.stop_reason !== undefined) {
@@ -987,6 +1022,10 @@ class EnhancedTranscriptMonitor {
               is_error: item.is_error || false
             });
           }
+        }
+        // Track the actual last message UUID for accurate resumption
+        if (message.uuid && currentExchange) {
+          currentExchange.lastMessageUuid = message.uuid;
         }
       }
     }
@@ -1084,15 +1123,94 @@ class EnhancedTranscriptMonitor {
     const exchanges = await this.extractExchanges(messages);
 
     // Filter to unprocessed exchanges
+    // FIX: ALWAYS use message-based filtering to ensure we capture assistant responses
+    // that came after lastProcessedUuid, even if they're part of a previous exchange
     let unprocessed;
+    let lastProcessedMsgIndex = -1;
+
     if (!this.lastProcessedUuid) {
       unprocessed = exchanges.slice(-10);
     } else {
-      const lastIndex = exchanges.findIndex(ex => ex.id === this.lastProcessedUuid);
-      if (lastIndex >= 0) {
-        unprocessed = exchanges.slice(lastIndex + 1);
+      // CRITICAL FIX: Always filter by MESSAGE index, not exchange index
+      // This ensures assistant responses after lastProcessedUuid are captured,
+      // even if they belong to the same exchange as the user prompt
+      lastProcessedMsgIndex = messages.findIndex(msg => msg.uuid === this.lastProcessedUuid);
+      if (lastProcessedMsgIndex >= 0) {
+        // Extract exchanges only from messages after this point
+        const remainingMessages = messages.slice(lastProcessedMsgIndex + 1);
+        if (remainingMessages.length > 0) {
+          this.debug(`🔍 Extracting from ${remainingMessages.length} messages after lastProcessedUuid (msg index ${lastProcessedMsgIndex})`);
+          unprocessed = await this.extractExchanges(remainingMessages);
+        } else {
+          unprocessed = [];
+        }
       } else {
+        // UUID not found in messages, fall back to last 10 exchanges
+        this.debug(`⚠️ lastProcessedUuid not found in messages, using last 10 exchanges`);
         unprocessed = exchanges.slice(-10);
+      }
+    }
+
+    // FIX: If unprocessed is empty but there are messages after lastProcessedUuid,
+    // create a continuation exchange to capture assistant responses and tool results
+    if (unprocessed.length === 0 && lastProcessedMsgIndex >= 0) {
+      const messagesAfter = messages.slice(lastProcessedMsgIndex + 1);
+      if (messagesAfter.length > 0) {
+        const firstMsgAfter = messagesAfter[0];
+        const isUserPrompt = firstMsgAfter.type === 'user' &&
+          firstMsgAfter.message?.role === 'user' &&
+          !this.isToolResultMessage(firstMsgAfter);
+
+        if (!isUserPrompt) {
+          // Create continuation exchange manually
+          const continuationExchange = {
+            id: firstMsgAfter.uuid || `continuation_${Date.now()}`,
+            timestamp: firstMsgAfter.timestamp || new Date().toISOString(),
+            userMessage: '',
+            claudeResponse: '',
+            toolCalls: [],
+            toolResults: [],
+            isUserPrompt: false,
+            isComplete: true,  // FIX: Continuation exchanges ARE complete - they contain accumulated content
+            stopReason: 'continuation',
+            isContinuation: true,
+            lastMessageUuid: firstMsgAfter.uuid
+          };
+
+          // Accumulate content from all messages after lastProcessedUuid
+          for (const msg of messagesAfter) {
+            if (msg.type === 'assistant' && msg.message?.content) {
+              if (Array.isArray(msg.message.content)) {
+                for (const item of msg.message.content) {
+                  if (item.type === 'text') {
+                    continuationExchange.claudeResponse += item.text + '\n';
+                  } else if (item.type === 'tool_use') {
+                    continuationExchange.toolCalls.push({
+                      name: item.name,
+                      input: item.input,
+                      id: item.id
+                    });
+                  }
+                }
+              }
+              if (msg.uuid) continuationExchange.lastMessageUuid = msg.uuid;
+            } else if (msg.type === 'user' && msg.message?.content && Array.isArray(msg.message.content)) {
+              for (const item of msg.message.content) {
+                if (item.type === 'tool_result') {
+                  continuationExchange.toolResults.push({
+                    tool_use_id: item.tool_use_id,
+                    content: item.content,
+                    is_error: item.is_error || false
+                  });
+                }
+              }
+              if (msg.uuid) continuationExchange.lastMessageUuid = msg.uuid;
+            }
+          }
+
+          this.debug(`📎 Created continuation exchange from ${messagesAfter.length} messages after lastProcessedUuid`);
+          unprocessed = [continuationExchange];
+        }
       }
     }
 
@@ -1643,11 +1761,14 @@ class EnhancedTranscriptMonitor {
     // CRITICAL: Update lastProcessedUuid ONLY when prompt set is successfully written
     // This ensures incomplete exchanges are re-processed on subsequent cycles until
     // they have full content (assistant response + tool calls)
+    // FIX: Use lastMessageUuid (actual last message) instead of id (user prompt)
+    // This prevents re-processing of already-handled assistant/tool_result messages
     const writtenLastExchange = completedSet[completedSet.length - 1];
-    if (writtenLastExchange && writtenLastExchange.id) {
-      this.lastProcessedUuid = writtenLastExchange.id;
+    const lastUuid = writtenLastExchange?.lastMessageUuid || writtenLastExchange?.id;
+    if (lastUuid) {
+      this.lastProcessedUuid = lastUuid;
       this.saveLastProcessedUuid();
-      this.debug(`✅ Updated lastProcessedUuid to ${writtenLastExchange.id} after successful write`);
+      this.debug(`✅ Updated lastProcessedUuid to ${lastUuid} after successful write`);
     }
 
     return true;  // Successfully written
@@ -2059,6 +2180,12 @@ class EnhancedTranscriptMonitor {
         // Add to current user prompt set
         if (this.currentUserPromptSet.length > 0) {
           this.currentUserPromptSet.push(exchange);
+        } else if (exchange.isContinuation) {
+          // FIX: Start a new prompt set for continuation exchanges
+          // This handles the case where previous prompt set was written at hour boundary
+          // but subsequent tool calls/responses need to be captured
+          this.currentUserPromptSet = [exchange];
+          this.debug(`📎 Started prompt set with continuation exchange`);
         }
       }
 
@@ -2259,14 +2386,17 @@ class EnhancedTranscriptMonitor {
       // This ensures held prompt sets are written when the hour changes, not just
       // when a new user prompt arrives. Without this, exchanges accumulate indefinitely
       // when conversations span hour boundaries without new prompts.
-      if (this.currentUserPromptSet.length > 0 && this.lastTranche) {
+      if (this.currentUserPromptSet.length > 0) {
         const currentTranche = this.getCurrentTimetranche();
-        if (this.isNewSessionBoundary(currentTranche, this.lastTranche)) {
-          console.log(`⏰ Hour boundary crossed while holding ${this.currentUserPromptSet.length} exchanges - completing to previous window`);
+        // FIX: Also handle case where lastTranche is null (startup or after reset)
+        // In that case, use the first exchange's timestamp to determine if we're in a different hour
+        const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
+        const shouldWrite = !this.lastTranche || this.isNewSessionBoundary(currentTranche, setTranche);
+
+        if (shouldWrite && (currentTranche.timeString !== setTranche.timeString || currentTranche.date !== setTranche.date)) {
+          console.log(`⏰ Hour boundary crossed while holding ${this.currentUserPromptSet.length} exchanges - completing to ${setTranche.timeString} window`);
           const targetProject = await this.determineTargetProject(this.currentUserPromptSet[0]);
           if (targetProject !== null) {
-            // Use tranche from the FIRST exchange in the set (previous hour's window)
-            const setTranche = this.getCurrentTimetranche(this.currentUserPromptSet[0].timestamp);
             const wasWritten = await this.processUserPromptSetCompletion(this.currentUserPromptSet, targetProject, setTranche);
             if (wasWritten) {
               this.currentUserPromptSet = [];
