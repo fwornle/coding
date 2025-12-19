@@ -180,6 +180,101 @@ class ProcessStateManager {
   }
 
   /**
+   * Find running processes matching a script pattern (OS-level check)
+   * This is critical for robust singleton enforcement - it catches processes
+   * that may not be registered in PSM (e.g., after crashes)
+   *
+   * @param {string} scriptPattern - Pattern to match in process command line (e.g., "live-logging-coordinator.js")
+   * @param {Object} options - Options for filtering
+   * @param {number} [options.excludePid] - Exclude this PID from results (typically process.pid)
+   * @returns {Promise<Array<{pid: number, command: string}>>} Array of matching processes
+   */
+  async findRunningProcessesByScript(scriptPattern, options = {}) {
+    const { execSync } = await import('child_process');
+    const excludePid = options.excludePid || process.pid;
+
+    try {
+      // Use pgrep to find matching processes
+      const output = execSync(`pgrep -lf "${scriptPattern}" 2>/dev/null || true`, {
+        encoding: 'utf8',
+        timeout: 5000
+      });
+
+      const processes = [];
+      const lines = output.trim().split('\n').filter(line => line.trim());
+
+      for (const line of lines) {
+        const match = line.match(/^(\d+)\s+(.+)$/);
+        if (match) {
+          const pid = parseInt(match[1], 10);
+          const command = match[2];
+
+          // Skip self and excluded PIDs
+          if (pid === process.pid || pid === excludePid) continue;
+
+          // Skip grep/pgrep processes
+          if (command.includes('pgrep') || command.includes('grep')) continue;
+
+          processes.push({ pid, command });
+        }
+      }
+
+      return processes;
+    } catch (error) {
+      // If pgrep fails, return empty (fail open)
+      console.error(`Warning: OS-level process check failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Robust singleton check - combines OS-level and PSM checks
+   * Use this to ensure only one instance of a service runs, even after crashes
+   *
+   * @param {string} serviceName - Service identifier for PSM
+   * @param {string} scriptPattern - Pattern to match in process command line
+   * @param {string} type - Service type ('global', 'per-project', 'per-session')
+   * @param {Object} context - Context for per-project/per-session services
+   * @returns {Promise<{canStart: boolean, reason: string, existingPids: number[]}>}
+   */
+  async robustSingletonCheck(serviceName, scriptPattern, type = 'global', context = {}) {
+    // Step 1: Clean up stale PSM entries first
+    await this.cleanupDeadProcesses();
+
+    // Step 2: OS-level check for any matching processes
+    const runningProcesses = await this.findRunningProcessesByScript(scriptPattern);
+
+    if (runningProcesses.length > 0) {
+      return {
+        canStart: false,
+        reason: `OS-level: Found ${runningProcesses.length} running process(es) matching "${scriptPattern}"`,
+        existingPids: runningProcesses.map(p => p.pid),
+        processes: runningProcesses
+      };
+    }
+
+    // Step 3: PSM check (belt-and-suspenders)
+    const isRunning = await this.isServiceRunning(serviceName, type, context);
+
+    if (isRunning) {
+      const service = await this.getService(serviceName, type, context);
+      return {
+        canStart: false,
+        reason: `PSM: Service "${serviceName}" already registered and running`,
+        existingPids: service ? [service.pid] : [],
+        processes: service ? [{ pid: service.pid, command: service.script }] : []
+      };
+    }
+
+    return {
+      canStart: true,
+      reason: 'No existing instance found',
+      existingPids: [],
+      processes: []
+    };
+  }
+
+  /**
    * Get service information
    */
   async getService(name, type, context = {}) {

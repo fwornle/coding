@@ -513,6 +513,21 @@ class GlobalServiceCoordinator extends EventEmitter {
    * Start daemon mode
    */
   async startDaemon() {
+    // Robust singleton check - OS-level + PSM combined
+    const serviceName = 'global-service-coordinator';
+    const scriptPattern = 'global-service-coordinator.js';
+
+    const singletonCheck = await this.psm.robustSingletonCheck(serviceName, scriptPattern, 'global');
+
+    if (!singletonCheck.canStart) {
+      console.error(`❌ Cannot start ${serviceName}: ${singletonCheck.reason}`);
+      if (singletonCheck.existingPids.length > 0) {
+        console.error(`   Existing PIDs: ${singletonCheck.existingPids.join(', ')}`);
+        console.error(`   To fix: kill ${singletonCheck.existingPids.join(' ')}`);
+      }
+      process.exit(1);
+    }
+
     this.log('🚀 Starting Global Service Coordinator daemon...');
 
     // Register coordinator with PSM
