@@ -89,6 +89,18 @@ const WORKFLOW_AGENTS = [
     col: 1.5,
   },
   {
+    id: 'code_intelligence',
+    name: 'Code Intelligence',
+    shortName: 'Intel',
+    icon: Zap,
+    description: 'Generates context-aware questions about the codebase based on git changes, commit themes, and session patterns. Queries the code graph via NL→Cypher to discover hotspots, circular dependencies, inheritance structures, and change impact.',
+    usesLLM: true,
+    llmModel: 'Groq: llama-3.3-70b-versatile',
+    techStack: 'NL→Cypher + Memgraph + SemanticAnalyzer',
+    row: 0.5,
+    col: 1.125,
+  },
+  {
     id: 'documentation_linker',
     name: 'Documentation Linker',
     shortName: 'Docs',
@@ -238,6 +250,7 @@ const STEP_TO_AGENT: Record<string, string> = {
   'index_recent_code': 'code_graph',
   'transform_code_entities': 'code_graph',
   'transform_code_entities_incremental': 'code_graph',
+  'query_code_intelligence': 'code_intelligence',
   'link_documentation': 'documentation_linker',
   'analyze_documentation_semantics': 'documentation_semantics',
   'analyze_documentation_semantics_incremental': 'documentation_semantics',
@@ -263,18 +276,25 @@ const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'd
   { from: 'orchestrator', to: 'code_graph', type: 'dataflow' },
   { from: 'orchestrator', to: 'documentation_linker', type: 'dataflow' },
 
-  // Phase 1 -> Phase 2: All 4 parallel sources feed into Semantic Analysis
+  // Phase 1 -> Code Intelligence: Git, Vibe, and Code Graph feed intelligent queries
+  { from: 'git_history', to: 'code_intelligence' },
+  { from: 'vibe_history', to: 'code_intelligence' },
+  { from: 'code_graph', to: 'code_intelligence' },  // After indexing, query for patterns
+
+  // Phase 1 + Code Intel -> Phase 2: All sources + intelligence feed Semantic Analysis
   { from: 'git_history', to: 'semantic_analysis' },
   { from: 'vibe_history', to: 'semantic_analysis' },
-  { from: 'code_graph', to: 'semantic_analysis' },  // index_codebase result now feeds semantic
-  { from: 'documentation_linker', to: 'semantic_analysis' },  // link_documentation result now feeds semantic
+  { from: 'code_graph', to: 'semantic_analysis' },  // index_codebase result feeds semantic
+  { from: 'code_intelligence', to: 'semantic_analysis' },  // intelligent query results
+  { from: 'documentation_linker', to: 'semantic_analysis' },  // link_documentation result feeds semantic
 
   // Phase 2 -> Phase 3: Semantic feeds Web Search
   { from: 'semantic_analysis', to: 'web_search' },
 
-  // Phase 3 -> Phase 4: Semantic + Web feed Insights (code_graph already processed by semantic)
+  // Phase 3 -> Phase 4: Semantic + Web + Code Intel feed Insights
   { from: 'semantic_analysis', to: 'insight_generation' },
   { from: 'web_search', to: 'insight_generation' },
+  { from: 'code_intelligence', to: 'insight_generation' },  // Evidence-backed patterns
 
   // Phase 4 -> Phase 5: Insights -> Observations
   { from: 'insight_generation', to: 'observation_generation' },
