@@ -13,6 +13,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import { spawn, execSync } from 'child_process';
+import { parse as parseYaml } from 'yaml';
 import { runIfMain } from '../../lib/utils/esm-cli.js';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
 
@@ -103,6 +104,10 @@ class SystemHealthAPIServer {
         this.app.post('/api/ukb/start', this.handleStartUKBWorkflow.bind(this));
         this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
         this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
+
+        // Workflow definitions endpoint (Single Source of Truth)
+        this.app.get('/api/workflows/definitions', this.handleGetWorkflowDefinitions.bind(this));
+        this.app.get('/api/workflows/definitions/:workflowName', this.handleGetWorkflowDefinition.bind(this));
 
         // Error handling
         this.app.use(this.handleError.bind(this));
@@ -1081,6 +1086,122 @@ class SystemHealthAPIServer {
                 resolve();
             }
         });
+    }
+
+    /**
+     * Get workflow definitions from YAML (Single Source of Truth)
+     * Returns agents and workflow for dashboard DAG visualization
+     */
+    async handleGetWorkflowDefinitions(req, res) {
+        try {
+            const configDir = join(codingRoot, 'integrations/mcp-server-semantic-analysis/config');
+
+            // Load agents.yaml
+            const agentsPath = join(configDir, 'agents.yaml');
+            if (!existsSync(agentsPath)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'agents.yaml not found',
+                    path: agentsPath
+                });
+            }
+
+            const agentsYaml = parseYaml(readFileSync(agentsPath, 'utf-8'));
+
+            // Load available workflows
+            const workflowsDir = join(configDir, 'workflows');
+            const workflows = [];
+
+            if (existsSync(workflowsDir)) {
+                const files = readdirSync(workflowsDir).filter(f => f.endsWith('.yaml'));
+                for (const file of files) {
+                    const workflowPath = join(workflowsDir, file);
+                    const workflowYaml = parseYaml(readFileSync(workflowPath, 'utf-8'));
+                    workflows.push({
+                        name: file.replace('.yaml', ''),
+                        ...workflowYaml
+                    });
+                }
+            }
+
+            res.json({
+                status: 'success',
+                data: {
+                    orchestrator: agentsYaml.orchestrator,
+                    agents: agentsYaml.agents,
+                    stepMappings: agentsYaml.step_mappings,
+                    workflows: workflows
+                }
+            });
+        } catch (error) {
+            console.error('Failed to load workflow definitions:', error);
+            res.status(500).json({
+                status: 'error',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * Get a specific workflow definition by name
+     */
+    async handleGetWorkflowDefinition(req, res) {
+        try {
+            const { workflowName } = req.params;
+            const configDir = join(codingRoot, 'integrations/mcp-server-semantic-analysis/config');
+
+            // Load agents.yaml for context
+            const agentsPath = join(configDir, 'agents.yaml');
+            if (!existsSync(agentsPath)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'agents.yaml not found'
+                });
+            }
+
+            const agentsYaml = parseYaml(readFileSync(agentsPath, 'utf-8'));
+
+            // Load specific workflow
+            const workflowPath = join(configDir, 'workflows', `${workflowName}.yaml`);
+            if (!existsSync(workflowPath)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: `Workflow '${workflowName}' not found`,
+                    availableWorkflows: this.getAvailableWorkflows(configDir)
+                });
+            }
+
+            const workflowYaml = parseYaml(readFileSync(workflowPath, 'utf-8'));
+
+            res.json({
+                status: 'success',
+                data: {
+                    orchestrator: agentsYaml.orchestrator,
+                    agents: agentsYaml.agents,
+                    stepMappings: agentsYaml.step_mappings,
+                    workflow: workflowYaml
+                }
+            });
+        } catch (error) {
+            console.error('Failed to load workflow definition:', error);
+            res.status(500).json({
+                status: 'error',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * Get list of available workflow names
+     */
+    getAvailableWorkflows(configDir) {
+        const workflowsDir = join(configDir, 'workflows');
+        if (!existsSync(workflowsDir)) {
+            return [];
+        }
+        return readdirSync(workflowsDir)
+            .filter(f => f.endsWith('.yaml'))
+            .map(f => f.replace('.yaml', ''));
     }
 }
 

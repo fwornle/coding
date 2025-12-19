@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -321,6 +321,122 @@ const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'd
   { from: 'deduplication', to: 'content_validation' },
 ]
 
+// Icon mapping for dynamic agent definitions from YAML
+const ICON_MAP: Record<string, typeof GitBranch> = {
+  GitBranch,
+  MessageSquare,
+  Brain,
+  Search,
+  Lightbulb,
+  Eye,
+  Tags,
+  Code,
+  FileText,
+  Shield,
+  Database,
+  Copy,
+  CheckCircle2,
+  Zap,
+  Play,
+}
+
+// Types for API response
+interface AgentDefinitionAPI {
+  id: string
+  name: string
+  shortName: string
+  icon: string
+  description: string
+  usesLLM: boolean
+  llmModel: string | null
+  techStack: string
+  row: number
+  col: number
+  phase?: number
+}
+
+interface EdgeDefinitionAPI {
+  from: string
+  to: string
+  type?: 'dependency' | 'dataflow'
+}
+
+interface WorkflowDefinitionsAPI {
+  status: string
+  data: {
+    orchestrator: AgentDefinitionAPI
+    agents: AgentDefinitionAPI[]
+    stepMappings: Record<string, string>
+    workflows: Array<{
+      name: string
+      workflow: { name: string; version: string; description: string }
+      edges: EdgeDefinitionAPI[]
+    }>
+  }
+}
+
+// Hook to fetch workflow definitions from API
+function useWorkflowDefinitions() {
+  const [agents, setAgents] = useState(WORKFLOW_AGENTS)
+  const [orchestrator, setOrchestrator] = useState(ORCHESTRATOR_NODE)
+  const [edges, setEdges] = useState(WORKFLOW_EDGES)
+  const [stepToAgent, setStepToAgent] = useState(STEP_TO_AGENT)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchDefinitions() {
+      try {
+        // Try to get API port from environment or use default
+        const apiPort = 3033
+        const response = await fetch(`http://localhost:${apiPort}/api/workflows/definitions`)
+
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}`)
+        }
+
+        const data: WorkflowDefinitionsAPI = await response.json()
+
+        if (data.status === 'success' && data.data) {
+          // Transform agents to include icon component
+          const transformedAgents = data.data.agents.map(agent => ({
+            ...agent,
+            icon: ICON_MAP[agent.icon] || Code,
+          }))
+          setAgents(transformedAgents as any)
+
+          // Transform orchestrator
+          setOrchestrator({
+            ...data.data.orchestrator,
+            icon: ICON_MAP[data.data.orchestrator.icon] || Play,
+          } as any)
+
+          // Update step mappings
+          setStepToAgent(data.data.stepMappings)
+
+          // Get edges from the first workflow (incremental-analysis by default)
+          const incrementalWorkflow = data.data.workflows.find(w => w.name === 'incremental-analysis')
+          if (incrementalWorkflow?.edges) {
+            setEdges(incrementalWorkflow.edges)
+          }
+
+          console.log('✅ Loaded workflow definitions from API (Single Source of Truth)')
+        }
+      } catch (err) {
+        console.warn('⚠️ Failed to fetch workflow definitions, using fallback:', err)
+        setError(err instanceof Error ? err.message : 'Unknown error')
+        // Keep using the hardcoded defaults
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDefinitions()
+  }, [])
+
+  return { agents, orchestrator, edges, stepToAgent, isLoading, error }
+}
+
 interface StepInfo {
   name: string
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -592,6 +708,9 @@ function StepResultDetails({ outputs }: { outputs: Record<string, any> }) {
 }
 
 export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }: UKBWorkflowGraphProps) {
+  // Fetch workflow definitions from API (Single Source of Truth)
+  const { agents: WORKFLOW_AGENTS, orchestrator: ORCHESTRATOR_NODE, edges: WORKFLOW_EDGES, stepToAgent: STEP_TO_AGENT, isLoading: definitionsLoading } = useWorkflowDefinitions()
+
   // Track which node is currently wiggling
   const [wigglingNode, setWigglingNode] = useState<string | null>(null)
   const wiggleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -644,7 +763,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     }
 
     return map
-  }, [process.steps, process.currentStep])
+  }, [process.steps, process.currentStep, STEP_TO_AGENT])
 
   const getNodeStatus = (agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
     const stepInfo = stepStatusMap[agentId]
