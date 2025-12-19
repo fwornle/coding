@@ -1,43 +1,50 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title API Refactoring Pattern Use Cases
+left to right direction
 
-actor "Developer" as dev
-actor "API Client" as client
-actor "System Administrator" as admin
+actor "API Developer" as dev
+actor "System Architect" as architect
+actor "Legacy System" as legacy
+actor "Client Applications" as clients
 
 package "API Refactoring System" {
-    usecase "Identify API Changes" as identify
-    usecase "Analyze Impact" as analyze
-    usecase "Execute Refactoring" as execute
-    usecase "Validate Changes" as validate
-    usecase "Monitor Usage Trends" as monitor
+  usecase "Analyze API Structure" as analyze
+  usecase "Identify Refactoring Opportunities" as identify
+  usecase "Apply Refactoring Patterns" as apply
+  usecase "Validate API Changes" as validate
+  usecase "Monitor API Usage" as monitor
+  usecase "Generate Migration Plans" as migrate
+  usecase "Track Pattern Occurrences" as track
+  usecase "Assess Pattern Significance" as assess
 }
 
-package "Implementation Support" {
-    usecase "Generate Migration Guide" as migrate
-    usecase "Update Documentation" as docs
-    usecase "Maintain Backward Compatibility" as compat
+package "Implementation Patterns" {
+  usecase "Execute API Refactoring Pattern" as execute
+  usecase "Decrease Pattern Usage" as decrease
 }
 
-dev --> identify
 dev --> analyze
-dev --> execute
-admin --> monitor
-admin --> validate
+dev --> apply
+dev --> validate
+architect --> identify
+architect --> assess
+architect --> migrate
 
-client --> compat
-client --> migrate
+legacy --> analyze
+clients --> monitor
+clients --> validate
 
-identify ..> analyze : <<include>>
-analyze ..> execute : <<include>>
-execute ..> validate : <<include>>
-execute ..> migrate : <<extend>>
-execute ..> docs : <<extend>>
-validate ..> compat : <<include>>
+analyze ..> identify : <<include>>
+identify ..> apply : <<include>>
+apply ..> validate : <<include>>
+apply --> execute
+monitor --> track
+assess --> track
 
-note right of monitor : "5 occurrences detected\nTrend: decreasing"
-note top of execute : "Implementation Category\nSignificance: 3/5"
+execute --> decrease : <<extend>>
+
+note right of execute : "5 occurrences\nTrend: decreasing\nSignificance: 3"
+note top of decrease : "Pattern usage trending downward"
 
 @enduml

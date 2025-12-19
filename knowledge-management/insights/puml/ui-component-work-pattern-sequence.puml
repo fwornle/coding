@@ -1,51 +1,48 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title UI Component Work Pattern Sequence
+title UI Component Work Pattern - Sequence Diagram
 
-actor "User" as user
-participant "UI Controller" as controller
-participant "Component Manager" as manager
-participant "UI Component" as component
-participant "Work Handler" as handler
-database "Component State" as state
+participant "User Interface" as UI
+participant "Component Manager" as CM
+participant "UI Component" as UC
+participant "Pattern Analyzer" as PA
+participant "Metrics Collector" as MC
 
-user -> controller: initiate UI interaction
-activate controller
+activate UI
+activate CM
+activate UC
+activate PA
+activate MC
 
-controller -> manager: request component work
-activate manager
+note over UI, MC : UI Component Work Pattern Analysis (12 occurrences, increasing trend)
 
-loop 10 occurrences (stable trend)
-    manager -> component: execute work pattern
-    activate component
+UI -> CM : Request component work
+CM -> UC : Initialize component
+
+loop 12 times (increasing trend)
+    UC -> PA : Report pattern usage
+    PA -> MC : Record occurrence
+    MC -> PA : Update significance (6)
     
-    component -> handler: process component work
-    activate handler
+    alt Component work required
+        CM -> UC : Execute work pattern
+        UC -> UI : Update interface
+    end
     
-    handler -> state: update component state
-    activate state
-    state --> handler: state updated
-    deactivate state
-    
-    handler --> component: work completed
-    deactivate handler
-    
-    component --> manager: pattern execution complete
-    deactivate component
+    PA -> MC : Analyze trend data
+    MC -> PA : Confirm increasing trend
 end
 
-manager --> controller: component work finished
-deactivate manager
+note over PA, MC : Pattern Significance: 6/10\nCategory: Implementation\nTotal Patterns Identified: 1
 
-controller --> user: UI interaction complete
-deactivate controller
+PA -> CM : Pattern analysis complete
+CM -> UI : Component work finished
 
-note over component, handler
-  UiComponentWorkPattern
-  - Category: Implementation
-  - Significance: 5/10
-  - Status: Stable trend
-end note
+deactivate MC
+deactivate PA
+deactivate UC
+deactivate CM
+deactivate UI
 
 @enduml

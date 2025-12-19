@@ -1441,14 +1441,14 @@
       "name": "McpAgentDevelopmentPattern",
       "entityType": "MCPAgent",
       "observations": [
-        "Implementation: Configuration-driven development approach - Standardize configuration management across 22 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
+        "Implementation: Configuration-driven development approach - Standardize configuration management across 17 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
         "Applies to: Applicable to knowledge management and similar domain challenges",
         "Details: http://localhost:8080/knowledge-management/insights/McpAgentDevelopmentPattern.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.893Z",
-        "last_updated": "2025-12-14T17:08:29.893Z"
+        "last_updated": "2025-12-18T17:40:23.617Z"
       },
       "id": "mc4flkg1q2w7a8"
     },
@@ -1456,14 +1456,14 @@
       "name": "ApiRefactoringPattern",
       "entityType": "TransferablePattern",
       "observations": [
-        "Implementation: Configuration-driven development approach - Standardize configuration management across 22 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
+        "Implementation: Configuration-driven development approach - Standardize configuration management across 17 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
         "Applies to: Applicable to knowledge management and similar domain challenges",
         "Details: http://localhost:8080/knowledge-management/insights/ApiRefactoringPattern.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.901Z",
-        "last_updated": "2025-12-14T17:08:29.901Z"
+        "last_updated": "2025-12-18T17:40:23.687Z"
       },
       "id": "mc4flkg4snood2"
     },
@@ -1486,14 +1486,14 @@
       "name": "OntologySupportPattern",
       "entityType": "TransferablePattern",
       "observations": [
-        "Implementation: Configuration-driven development approach - Standardize configuration management across 22 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
+        "Implementation: Configuration-driven development approach - Standardize configuration management across 17 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
         "Applies to: Applicable to knowledge management and similar domain challenges",
         "Details: http://localhost:8080/knowledge-management/insights/OntologySupportPattern.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.912Z",
-        "last_updated": "2025-12-14T17:08:29.912Z"
+        "last_updated": "2025-12-18T17:40:23.734Z"
       },
       "id": "mc4flkg2a2h3ww"
     },
@@ -1501,14 +1501,14 @@
       "name": "UiComponentWorkPattern",
       "entityType": "TransferablePattern",
       "observations": [
-        "Implementation: Configuration-driven development approach - Standardize configuration management across 22 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
+        "Implementation: Configuration-driven development approach - Standardize configuration management across 17 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
         "Applies to: Applicable to knowledge management and similar domain challenges",
         "Details: http://localhost:8080/knowledge-management/insights/UiComponentWorkPattern.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.917Z",
-        "last_updated": "2025-12-14T17:08:29.917Z"
+        "last_updated": "2025-12-18T17:40:23.776Z"
       },
       "id": "mc4flkgk7p8ly"
     }
@@ -2034,13 +2034,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-12-14T17:08:42.002Z",
+    "exported_at": "2025-12-18T17:40:28.788Z",
     "total_entities": 21,
     "total_relations": 86,
-    "description": "Coding project infrastructure and patterns",
-    "lastSuccessfulWorkflowCompletion": "2025-12-08T14:36:11.269Z",
-    "last_updated": "2025-12-15T14:36:11.272Z",
-    "checkpointResetAt": "2025-12-15T14:36:11.272Z",
-    "checkpointResetReason": "7 days ago (2025-12-08T14:36:11.269Z)"
+    "description": "Coding project infrastructure and patterns"
   }
 }

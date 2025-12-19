@@ -1,34 +1,38 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "System Architect" as SA
+participant "System Architecture" as SA
 participant "Pattern Analyzer" as PA
-participant "Ontology Engine" as OE
-participant "Pattern Catalog" as PC
+participant "Ontology Support Pattern" as OSP
 participant "Implementation Monitor" as IM
+database "Pattern Catalog" as PC
 
-SA -> PA: Initiate pattern analysis
-PA -> OE: Request ontology support analysis
-activate OE
+SA -> PA: Analyze architectural patterns
+activate PA
 
-OE -> PC: Query existing patterns
-PC --> OE: Return pattern instances (8 occurrences)
+PA -> PC: Query existing patterns
+PC --> PA: Return pattern data
 
-OE -> OE: Analyze pattern significance
-note right: Significance score: 4/5\nCategory: Implementation
+PA -> OSP: Identify ontology support instances
+activate OSP
+note right of OSP: Category: Implementation\nSignificance: 3\nOccurrences: 6
 
-OE -> IM: Check usage trends
-IM --> OE: Report increasing trend
+loop Pattern Detection (6 occurrences)
+    OSP -> IM: Monitor implementation usage
+    activate IM
+    IM --> OSP: Report increasing trend
+    deactivate IM
+end
 
-OE --> PA: Return analysis results
-note left: OntologySupportPattern\n8 occurrences\nIncreasing trend
-
-deactivate OE
+OSP --> PA: Pattern analysis complete
+deactivate OSP
 
 PA -> PC: Update pattern catalog
-PC --> PA: Confirm catalog update
+note over PC: Total Patterns: 1\nImplementation Category: 1\nAvg Significance: 3
 
-PA --> SA: Deliver pattern analysis report
-note over SA: Total patterns: 1\nAvg significance: 4\nTop pattern: OntologySupportPattern
+PA --> SA: Return analysis results
+deactivate PA
+
+note over SA: Top Pattern: OntologySupportPattern\nTrend: Increasing usage
 
 @enduml

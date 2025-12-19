@@ -1,74 +1,31 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title MCP Agent Development Pattern - Use Cases
+title McpAgentDevelopmentPattern Use Case Diagram
 
-' Actors
-actor "Developer" as dev
-actor "System Architect" as arch
-actor "DevOps Engineer" as devops
-actor "End User" as user
+actor Developer as "Developer"
+actor System as "System"
 
-' System boundary
-rectangle "MCP Agent Development System" {
-    ' Core development use cases
-    usecase "Implement MCP Agent" as UC1
-    usecase "Design Agent Architecture" as UC2
-    usecase "Configure Agent Patterns" as UC3
-    usecase "Deploy Agent" as UC4
-    usecase "Monitor Agent Performance" as UC5
-    usecase "Maintain Agent Code" as UC6
-    
-    ' Supporting use cases
-    usecase "Validate Pattern Implementation" as UC7
-    usecase "Optimize Agent Behavior" as UC8
-    usecase "Handle Agent Communication" as UC9
-    usecase "Manage Agent Lifecycle" as UC10
+usecase "MCP Agent Development" as (MCP_Agent_Development)
+usecase "Implementation" as (Implementation)
+usecase "Analysis" as (Analysis)
+
+Developer -- (MCP_Agent_Development)
+System -- (MCP_Agent_Development)
+
+(MCP_Agent_Development) ..> (Implementation) : include
+(MCP_Agent_Development) ..> (Analysis) : extend
+
+package "McpAgentDevelopmentPattern" {
+  (MCP_Agent_Development)
+  (Implementation)
+  (Analysis)
 }
 
-rectangle "Pattern Management" {
-    usecase "Catalog Pattern Usage" as UC11
-    usecase "Track Pattern Trends" as UC12
-    usecase "Analyze Pattern Significance" as UC13
-}
-
-' Actor relationships
-dev --> UC1 : develops
-dev --> UC3 : configures
-dev --> UC6 : maintains
-dev --> UC7 : validates
-
-arch --> UC2 : designs
-arch --> UC8 : optimizes
-arch --> UC13 : analyzes
-
-devops --> UC4 : deploys
-devops --> UC5 : monitors
-devops --> UC10 : manages
-
-user --> UC9 : interacts with
-
-' Include relationships
-UC1 .> UC3 : <<include>>
-UC2 .> UC11 : <<include>>
-UC5 .> UC12 : <<include>>
-UC6 .> UC7 : <<include>>
-
-' Extend relationships
-UC8 ..> UC1 : <<extend>>
-UC10 ..> UC4 : <<extend>>
-
-note right of UC1
-  Pattern: McpAgentDevelopmentPattern
-  Occurrences: 15
-  Trend: Increasing
-  Significance: 8/10
+note as AutoNote1
+  15 occurrences
+  Trend: increasing
 end note
-
-note bottom of "Pattern Management"
-  Implementation Category
-  Average Significance: 8
-  Total Patterns: 1
-end note
+(MCP_Agent_Development) .. Occurrences
 
 @enduml

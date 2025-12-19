@@ -1,0 +1,66 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Pattern Catalog" {
+    class PatternCatalog {
+        -patterns: Pattern[]
+        -summary: PatternSummary
+        +getTotalPatterns(): int
+        +getPatternsByCategory(category: String): Pattern[]
+        +getTopPatterns(): String[]
+    }
+
+    class PatternSummary {
+        -totalPatterns: int
+        -byCategory: Map<String, Integer>
+        -avgSignificance: double
+        -topPatterns: String[]
+        +calculateAverageSignificance(): double
+        +getCategoryCount(category: String): int
+    }
+
+    abstract class Pattern {
+        -name: String
+        -category: String
+        -description: String
+        -significance: int
+        -evidence: String[]
+        -relatedComponents: Component[]
+        +getSignificance(): int
+        +getEvidence(): String[]
+    }
+
+    class ApiRefactoringPattern <<Implementation>> {
+        -occurrences: int
+        -trend: String
+        -implementation: Implementation
+        +getTrend(): String
+        +getOccurrences(): int
+        +isDecreasing(): boolean
+    }
+
+    class Implementation {
+        -language: String
+        -usageNotes: String[]
+        +getUsageNotes(): String[]
+        +setLanguage(lang: String): void
+    }
+
+    class Component {
+        -name: String
+        -type: String
+        +getName(): String
+        +getType(): String
+    }
+}
+
+PatternCatalog *-- "1..*" Pattern : contains
+PatternCatalog *-- "1" PatternSummary : summarizes
+Pattern <|-- ApiRefactoringPattern : extends
+ApiRefactoringPattern *-- "1" Implementation : has
+Pattern o-- "0..*" Component : relates to
+
+note right of ApiRefactoringPattern : "5 occurrences\nTrend: decreasing\nSignificance: 3"
+note top of PatternCatalog : "Analysis: api-refactoring-pattern\narchitectural analysis"
+
+@enduml

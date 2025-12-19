@@ -4,45 +4,48 @@
 left to right direction
 
 actor "UI Developer" as dev
-actor "Frontend Architect" as arch
 actor "System User" as user
+actor "Component Library" as lib
 
 package "UI Component Work Pattern System" {
-  usecase "Implement UI Components" as implement
-  usecase "Apply Work Patterns" as apply
-  usecase "Monitor Pattern Usage" as monitor
-  usecase "Analyze Pattern Trends" as analyze
-  usecase "Maintain Pattern Stability" as maintain
-  usecase "Document Pattern Implementation" as document
-  usecase "Validate Component Architecture" as validate
+    usecase "Design UI Components" as design
+    usecase "Implement Component Logic" as implement
+    usecase "Test Component Behavior" as test
+    usecase "Integrate Components" as integrate
+    usecase "Manage Component State" as state
+    usecase "Handle User Interactions" as interactions
+    usecase "Render UI Elements" as render
+    usecase "Update Component Properties" as update
+    usecase "Validate Component Data" as validate
+    usecase "Monitor Component Performance" as monitor
+    usecase "Maintain Component Lifecycle" as lifecycle
+    usecase "Optimize Component Rendering" as optimize
 }
 
-package "Pattern Management" {
-  usecase "Track Pattern Occurrences" as track
-  usecase "Assess Pattern Significance" as assess
-  usecase "Generate Pattern Reports" as report
-}
-
+dev --> design
 dev --> implement
-dev --> apply
-dev --> document
+dev --> test
+dev --> integrate
+dev --> state
+dev --> lifecycle
+dev --> optimize
 
-arch --> validate
-arch --> analyze
-arch --> assess
+user --> interactions
+user --> render
+user --> update
 
-user --> monitor
+lib --> validate
+lib --> monitor
 
-implement ..> track : <<include>>
-apply ..> track : <<include>>
-monitor ..> report : <<include>>
-analyze ..> assess : <<include>>
+design ..> implement : <<include>>
+implement ..> test : <<include>>
+integrate ..> state : <<include>>
+interactions ..> update : <<include>>
+render ..> optimize : <<extend>>
+state ..> validate : <<include>>
+lifecycle ..> monitor : <<include>>
 
-maintain ..> monitor : <<extend>>
-validate ..> analyze : <<extend>>
-
-note right of implement : 10 occurrences recorded
-note right of maintain : Trend: stable
-note right of assess : Significance level: 5
+note top of design : "Pattern Significance: 6\n12 Occurrences\nTrend: Increasing"
+note bottom of "UI Component Work Pattern System" : "Implementation Category\nArchitectural Analysis Focus"
 
 @enduml

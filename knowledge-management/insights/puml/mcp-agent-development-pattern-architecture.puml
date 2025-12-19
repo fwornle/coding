@@ -1,32 +1,12 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Implementation Patterns" {
-  component "MCP Agent Development" as mcpAgent <<agent>>
+package "Implementation" {
+  component "McpAgentDevelopmentPattern" as madp <<agent>>
 }
 
-component "MCP Protocol" as mcpProtocol <<core>>
-component "Agent Runtime" as runtime <<core>>
-component "Development Tools" as devTools <<cli>>
-database "Pattern Repository" as patternRepo
+note "Summary: 1 pattern, avg significance: 8" as summary
 
-mcpAgent --> mcpProtocol : "implements"
-mcpAgent --> runtime : "executes on"
-mcpAgent --> devTools : "built with"
-mcpAgent --> patternRepo : "stores patterns"
-
-note top of mcpAgent
-**Pattern Analysis Summary**
-- Total Patterns: 1
-- Category: Implementation
-- Significance: 8/10
-- Occurrences: 15 (increasing trend)
-end note
-
-note bottom of patternRepo
-Architectural patterns for
-MCP agent development
-with growing adoption
-end note
+madp --> summary : relates to
 
 @enduml

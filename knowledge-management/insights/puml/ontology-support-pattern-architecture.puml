@@ -1,49 +1,45 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title Ontology Support Pattern Architecture
+!define DIRECTION top to bottom direction
 
 package "Implementation Patterns" {
-    component "Ontology Support\nPattern" as osp <<core>>
+    component "Ontology Support Pattern" as osp <<core>>
 }
 
-package "Supporting Components" {
-    component "Knowledge Graph\nEngine" as kge <<storage>>
-    component "Semantic\nProcessor" as sp <<api>>
-    component "Ontology\nValidator" as ov <<core>>
-    database "RDF Store" as rdf
-    database "Schema Repository" as schema
+package "Supporting Infrastructure" {
+    database "Knowledge Base" as kb <<storage>>
+    component "Ontology Engine" as oe <<api>>
+    component "Semantic Processor" as sp <<core>>
 }
 
-package "Client Applications" {
-    component "Query Interface" as qi <<api>>
-    component "Reasoning Engine" as re <<core>>
+package "External Systems" {
+    cloud "Ontology Services" as os <<external>>
+    database "RDF Store" as rdf <<storage>>
 }
 
-' Core relationships
-osp --> kge : "manages"
-osp --> sp : "processes through"
-osp --> ov : "validates with"
-kge --> rdf : "stores in"
-ov --> schema : "references"
-qi --> osp : "uses"
-re --> osp : "leverages"
-sp ..> rdf : "queries"
+' Pattern relationships
+osp --> oe : "utilizes"
+osp --> sp : "processes with"
+osp --> kb : "accesses"
 
-note top of osp
-**Pattern Details:**
-- Occurrences: 8
-- Trend: Increasing
-- Significance: 4/5
-- Category: Implementation
+' Infrastructure relationships
+oe --> rdf : "stores in"
+oe --> os : "integrates with"
+sp --> kb : "reads from"
+
+' Summary information
+note right of osp
+  **Pattern Analysis Summary**
+  • Total Patterns: 1
+  • Significance Level: 3/5
+  • Occurrences: 6 (increasing trend)
+  • Category: Implementation
 end note
 
-note bottom
-**Architecture Summary:**
-- Total Patterns: 1
-- Implementation Category: 1 pattern
-- Average Significance: 4.0
-- Top Pattern: OntologySupportPattern
+note bottom of kb
+  Supports semantic data
+  and ontology definitions
 end note
 
 @enduml

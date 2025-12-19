@@ -1,109 +1,36 @@
 {
-  "workflowName": "complete-analysis",
-  "executionId": "complete-analysis-1766043691556",
-  "status": "failed",
+  "workflowName": "incremental-analysis",
+  "executionId": "incremental-analysis-1766127742418",
+  "status": "running",
   "team": "coding",
   "repositoryPath": "/Users/q284340/Agentic/coding",
-  "startTime": "2025-12-18T07:41:31.556Z",
-  "currentStep": null,
-  "totalSteps": 14,
-  "completedSteps": 5,
-  "failedSteps": 1,
+  "startTime": "2025-12-19T07:02:22.418Z",
+  "currentStep": "index_recent_code",
+  "totalSteps": 13,
+  "completedSteps": 0,
+  "failedSteps": 0,
   "skippedSteps": 0,
-  "stepsCompleted": [
-    "analyze_git_history",
-    "analyze_vibe_history",
-    "link_documentation",
-    "semantic_analysis",
-    "web_search"
-  ],
-  "stepsFailed": [
-    "index_codebase"
-  ],
+  "stepsCompleted": [],
+  "stepsFailed": [],
   "stepsSkipped": [],
   "stepsDetail": [
     {
-      "name": "analyze_git_history",
-      "status": "completed",
-      "duration": 8038,
-      "outputs": {
-        "commitsCount": 710,
-        "filesCount": 5969,
-        "timing": {
-          "duration": 8038,
-          "timeout": 300
-        }
-      }
-    },
-    {
-      "name": "analyze_vibe_history",
-      "status": "completed",
-      "duration": 3899,
-      "outputs": {
-        "sessionsCount": 200,
-        "timing": {
-          "duration": 3899,
-          "timeout": 300
-        }
-      }
-    },
-    {
-      "name": "link_documentation",
-      "status": "completed",
-      "duration": 1884,
-      "outputs": {
-        "codeGraphStats": {},
-        "timing": {
-          "duration": 1884,
-          "timeout": 120
-        }
-      }
-    },
-    {
-      "name": "semantic_analysis",
-      "status": "completed",
-      "duration": 3461,
-      "outputs": {
-        "timing": {
-          "duration": 3461,
-          "timeout": 180
-        }
-      }
-    },
-    {
-      "name": "web_search",
-      "status": "completed",
-      "duration": 132,
-      "outputs": {
-        "timing": {
-          "duration": 132,
-          "timeout": 90
-        }
-      }
-    },
-    {
-      "name": "index_codebase",
-      "status": "failed",
-      "error": "Step timeout after 300s",
-      "outputs": {
-        "error": "Step timeout after 300s"
-      }
+      "name": "index_recent_code",
+      "status": "running"
     }
   ],
   "summary": {
-    "totalCommits": 710,
-    "totalFiles": 5969,
-    "totalSessions": 200,
+    "totalCommits": 0,
+    "totalFiles": 0,
+    "totalSessions": 0,
     "totalObservations": 0,
     "totalInsights": 0,
     "totalPatterns": 0,
     "insightsGenerated": [],
     "patternsFound": [],
-    "codeGraphStats": {
-      "languages": []
-    },
+    "codeGraphStats": null,
     "skippedReasons": {}
   },
-  "lastUpdate": "2025-12-18T08:16:20.255Z",
-  "elapsedSeconds": 2089
+  "lastUpdate": "2025-12-19T07:02:24.150Z",
+  "elapsedSeconds": 2
 }
