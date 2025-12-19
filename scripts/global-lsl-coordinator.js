@@ -331,8 +331,13 @@ class GlobalLSLCoordinator {
    * Perform health check on all registered projects
    */
   async performHealthCheck() {
+    // CRITICAL: Reload registry from disk before each health check
+    // This ensures we pick up projects registered by temporary `ensure` calls
+    // from other processes (e.g., coding/bin/coding startup scripts)
+    this.registry = this.loadRegistry();
+
     this.log(`Performing global health check...`);
-    
+
     const projects = Object.keys(this.registry.projects);
     let healthyCount = 0;
     let recoveredCount = 0;

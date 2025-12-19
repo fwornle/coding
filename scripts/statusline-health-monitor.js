@@ -220,13 +220,101 @@ class StatusLineHealthMonitor {
   }
 
   /**
+   * Get running Claude sessions via process detection
+   * Detects Claude processes and their working directories using lsof
+   * This catches sessions even if transcript monitors haven't started yet
+   */
+  async getRunningClaudeSessions() {
+    const claudeSessions = new Set();
+
+    try {
+      // Method 1: Find Claude process PIDs and get their working directories
+      // Use ps instead of pgrep - pgrep has reliability issues on macOS (misses some processes)
+      let claudePids = '';
+      try {
+        // ps -eo pid,comm finds all processes; awk filters for exact 'claude' match
+        claudePids = execSync('ps -eo pid,comm | awk \'$2 == "claude" {print $1}\'', { encoding: 'utf8', timeout: 5000 });
+      } catch (psError) {
+        this.log(`ps for claude failed: ${psError.message}`, 'WARN');
+      }
+
+      if (claudePids && claudePids.trim()) {
+        for (const pidStr of claudePids.trim().split('\n')) {
+          const pid = pidStr.trim();
+          if (!pid) continue;
+
+          try {
+            // Use lsof to get the current working directory of the Claude process
+            const lsofOutput = execSync(`lsof -p ${pid} 2>/dev/null | grep cwd`, { encoding: 'utf8', timeout: 5000 });
+
+            if (lsofOutput && lsofOutput.trim()) {
+              // Format: claude PID user cwd DIR ... /path/to/project
+              const parts = lsofOutput.trim().split(/\s+/);
+              const cwdPath = parts[parts.length - 1]; // Last column is the path
+
+              // Extract project name from path like /Users/q284340/Agentic/nano-degree
+              const agenticMatch = cwdPath.match(/\/Agentic\/([^/\s]+)/);
+              if (agenticMatch) {
+                claudeSessions.add(agenticMatch[1]);
+              }
+            }
+          } catch (lsofError) {
+            // Process might have exited between pgrep and lsof
+          }
+        }
+      }
+
+      // Method 2: Alternative - check parent launcher processes
+      // The claude-mcp-launcher.sh processes know which project they're in
+      let launcherOutput = '';
+      try {
+        launcherOutput = execSync('pgrep -lf "claude-mcp-launcher.sh"', { encoding: 'utf8', timeout: 5000 });
+      } catch (pgrepError) {
+        if (pgrepError.status !== 1) {
+          this.log(`pgrep for launcher failed: ${pgrepError.message}`, 'WARN');
+        }
+      }
+
+      if (launcherOutput && launcherOutput.trim()) {
+        for (const line of launcherOutput.trim().split('\n')) {
+          // Extract PID and get its cwd
+          const pidMatch = line.match(/^(\d+)/);
+          if (pidMatch) {
+            try {
+              const lsofOutput = execSync(`lsof -p ${pidMatch[1]} 2>/dev/null | grep cwd`, { encoding: 'utf8', timeout: 5000 });
+              if (lsofOutput && lsofOutput.trim()) {
+                const parts = lsofOutput.trim().split(/\s+/);
+                const cwdPath = parts[parts.length - 1];
+                const agenticMatch = cwdPath.match(/\/Agentic\/([^/\s]+)/);
+                if (agenticMatch) {
+                  claudeSessions.add(agenticMatch[1]);
+                }
+              }
+            } catch (lsofError) {
+              // Process might have exited
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      this.log(`getRunningClaudeSessions error: ${error.message}`, 'ERROR');
+    }
+
+    return claudeSessions;
+  }
+
+  /**
    * Get active project sessions health
    */
   async getProjectSessionsHealth() {
     const sessions = {};
 
-    // Get projects with running transcript monitors - only these should be shown
+    // Get projects with running transcript monitors
     const runningMonitors = await this.getRunningTranscriptMonitors();
+
+    // Get projects with running Claude sessions (even without monitors)
+    const claudeSessions = await this.getRunningClaudeSessions();
 
     try {
       // Method 1: Registry-based discovery (preferred when available)
@@ -386,6 +474,24 @@ class StatusLineHealthMonitor {
       
     } catch (error) {
       this.log(`Error getting project sessions: ${error.message}`, 'ERROR');
+    }
+
+    // Method 4: Add Claude sessions without monitors (detected via process)
+    // These are sessions where Claude is running but no transcript monitor has started yet
+    // (e.g., user opened session but hasn't typed anything, or monitor crashed)
+    for (const projectName of claudeSessions) {
+      // Skip if already found via other methods
+      if (sessions[projectName]) continue;
+
+      // This session has Claude running but no monitor - show as warning
+      sessions[projectName] = {
+        status: 'warning',
+        icon: '🟡',
+        details: 'no mon',
+        reason: 'no mon' // For backward compatibility with status line display
+      };
+
+      this.log(`Detected Claude session without monitor: ${projectName}`, 'DEBUG');
     }
 
     // ORPHAN CLEANUP: Remove sessions with extremely stale transcripts (>6 hours)
