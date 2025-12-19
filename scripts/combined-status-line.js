@@ -1444,7 +1444,8 @@ class CombinedStatusLine {
 
     try {
       // Use pgrep to find running enhanced-transcript-monitor processes
-      const psOutput = execSync('pgrep -af "enhanced-transcript-monitor.js" 2>/dev/null || true', {
+      // NOTE: On macOS, -lf shows full command; -af only shows PIDs (different from Linux)
+      const psOutput = execSync('pgrep -lf "enhanced-transcript-monitor.js" 2>/dev/null || true', {
         encoding: 'utf8',
         timeout: 5000
       });

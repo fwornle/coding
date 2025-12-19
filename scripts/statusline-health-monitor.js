@@ -153,10 +153,11 @@ class StatusLineHealthMonitor {
 
     try {
       // Method 1: Use pgrep which is more reliable than grep on ps output
-      // pgrep -f returns PIDs of matching processes, -a also shows full command
+      // pgrep -lf: -l shows process name with full command, -f matches full argument list
+      // NOTE: On macOS, -a means "include ancestors" NOT "show args" (Linux behavior)
       let psOutput = '';
       try {
-        psOutput = execSync('pgrep -af "enhanced-transcript-monitor.js"', { encoding: 'utf8', timeout: 5000 });
+        psOutput = execSync('pgrep -lf "enhanced-transcript-monitor.js"', { encoding: 'utf8', timeout: 5000 });
       } catch (pgrepError) {
         // pgrep returns exit code 1 when no matches - this is normal
         // Only log if it's a different error
