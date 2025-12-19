@@ -1,54 +1,42 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "API Client" as client
-participant "Legacy API" as legacy
-participant "Refactoring Engine" as engine
-participant "New API" as newapi
-participant "Pattern Analyzer" as analyzer
+title API Refactoring Pattern Analysis Sequence
 
-client -> legacy: Initial API Request
-activate legacy
+participant "Pattern Analyzer" as PA
+participant "API Refactoring Pattern" as ARP
+participant "Implementation Monitor" as IM
+participant "Trend Tracker" as TT
+participant "Pattern Catalog" as PC
 
-legacy -> engine: Trigger Refactoring Process
-activate engine
+PA -> ARP: Analyze pattern occurrences
+activate ARP
 
-engine -> analyzer: Analyze Current Pattern
-activate analyzer
-note right: ApiRefactoringPattern\nSignificance: 3\nOccurrences: 5
+ARP -> IM: Check implementation status
+activate IM
+IM --> ARP: Language: Unknown\nCategory: Implementation
+deactivate IM
 
-analyzer -> analyzer: Evaluate Pattern Usage
-note right: Trend: Decreasing\nCategory: Implementation
+ARP -> TT: Track usage trend
+activate TT
+TT --> ARP: 5 occurrences\nTrend: decreasing
+deactivate TT
 
-analyzer --> engine: Pattern Analysis Results
-deactivate analyzer
+ARP -> ARP: Calculate significance
+note right: Significance level: 3
 
-alt Pattern Refactoring Required
-    engine -> newapi: Create Improved API Structure
-    activate newapi
-    
-    engine -> newapi: Apply Refactoring Pattern
-    note right: Implementation improvements\nbased on analysis
-    
-    newapi --> engine: Refactored API Ready
-    deactivate newapi
-    
-    engine --> legacy: Migration Path Available
-    legacy --> client: Redirect to New API
-    
-    client -> newapi: Updated API Request
-    activate newapi
-    newapi --> client: Improved Response
-    deactivate newapi
-    
-else Pattern Optimization Only
-    engine -> legacy: Apply In-place Optimizations
-    legacy --> client: Optimized Response
-end
+ARP -> PC: Register pattern data
+activate PC
 
-deactivate engine
-deactivate legacy
+PC -> PC: Update pattern summary
+note right: Total patterns: 1\nImplementation category: 1\nAvg significance: 3
 
-note over client, analyzer: ApiRefactoringPattern shows decreasing trend\nindicating successful pattern evolution
+PC --> ARP: Pattern registered
+deactivate PC
+
+ARP --> PA: Analysis complete\nPattern significance: 3\nOccurrences: 5 (decreasing)
+deactivate ARP
+
+note over PA, PC: API Refactoring Pattern shows decreasing usage\nbut maintains moderate significance level
 
 @enduml

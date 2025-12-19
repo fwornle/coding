@@ -1,80 +1,34 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "MCP Agent Development Framework" {
-    
-    abstract class MCPPattern <<pattern>> {
-        +name: String
-        +category: String
-        +description: String
-        +significance: Integer
-        +occurrences: Integer
-        +trend: String
-        +getEvidence(): List<String>
-        +calculateSignificance(): Integer
-    }
-    
-    class McpAgentDevelopmentPattern <<implementation>> {
-        -occurrences: Integer = 15
-        -trend: String = "increasing"
-        -usageNotes: List<String>
-        +implementAgent(): void
-        +trackUsage(): Integer
-        +analyzeTrend(): String
-    }
-    
-    class PatternCatalog <<service>> {
-        -totalPatterns: Integer = 1
-        -avgSignificance: Double = 8.0
-        -topPatterns: List<String>
-        +addPattern(pattern: MCPPattern): void
-        +getPatternsByCategory(category: String): List<MCPPattern>
-        +calculateAverageSignificance(): Double
-        +getTopPatterns(): List<String>
-    }
-    
-    class ImplementationCategory <<category>> {
-        -patternCount: Integer = 1
-        +addPattern(pattern: MCPPattern): void
-        +getPatternCount(): Integer
-    }
-    
-    class AnalysisData <<data>> {
-        -content: String
-        -name: String
-        +generateReport(): String
-        +exportData(): Map<String, Object>
-    }
-    
-    interface PatternRepository <<interface>> {
-        +findByCategory(category: String): List<MCPPattern>
-        +save(pattern: MCPPattern): void
-        +getBySignificance(minSignificance: Integer): List<MCPPattern>
-    }
-    
-    class Evidence <<value>> {
-        -occurrenceCount: String
-        -trendAnalysis: String
-        +validate(): Boolean
-        +toString(): String
-    }
-    
-    MCPPattern <|-- McpAgentDevelopmentPattern
-    PatternCatalog o-- MCPPattern : contains
-    PatternCatalog --> ImplementationCategory : categorizes
-    McpAgentDevelopmentPattern --> Evidence : provides
-    AnalysisData --> PatternCatalog : generates
-    PatternRepository <|.. PatternCatalog : implements
-    
-    note right of McpAgentDevelopmentPattern
-        15 occurrences detected
-        Trend: increasing
-        Significance: 8/10
-    end note
-    
-    note bottom of PatternCatalog
-        Single pattern catalog with
-        high significance rating
-    end note
+package "Pattern Catalog" {
+  class McpAgentDevelopmentPattern {
+    - name: String
+    - category: String
+    - description: String
+    - significance: Integer
+    + getEvidence(): List<String>
+    + getRelatedComponents(): List<String>
+    + getImplementation(): Implementation
+  }
+
+  class Implementation {
+    - language: String
+    - usageNotes: List<String>
+  }
+
+  McpAgentDevelopmentPattern --* Implementation
 }
+
+package "Summary" {
+  class PatternSummary {
+    - totalPatterns: Integer
+    - byCategory: Map<String, Integer>
+    - avgSignificance: Double
+    - topPatterns: List<String>
+  }
+
+  PatternSummary ..> McpAgentDevelopmentPattern
+}
+
 @enduml
