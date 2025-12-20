@@ -341,12 +341,17 @@ class StatusLineHealthMonitor {
                 if (transcriptFiles.length > 0) {
                   const mostRecent = transcriptFiles[0];
                   const age = Date.now() - mostRecent.stats.mtime.getTime();
-                  // Only show dormant sessions within 48 hours
-                  if (age < 172800000) { // 48 hours
+                  // Only show no-monitor sessions if:
+                  // 1. Claude session is running (virgin/idle session), OR
+                  // 2. Very recent activity (< 5 min) suggesting session just closed
+                  // Sessions with older transcripts but no Claude process are truly closed - omit them
+                  const hasClaudeSession = claudeSessions.has(projectName);
+                  const isVeryRecent = age < 300000; // 5 minutes
+                  if (hasClaudeSession || isVeryRecent) {
                     sessions[projectName] = {
                       status: 'no-monitor',
                       icon: '💤',
-                      details: 'No monitor'
+                      details: hasClaudeSession ? 'virgin' : 'closing'
                     };
                   }
                 }
@@ -393,12 +398,16 @@ class StatusLineHealthMonitor {
               if (transcriptFiles.length > 0) {
                 const mostRecent = transcriptFiles[0];
                 const age = Date.now() - mostRecent.stats.mtime.getTime();
-                // Only show dormant sessions within 48 hours
-                if (age < 172800000) { // 48 hours
+                // Only show no-monitor sessions if:
+                // 1. Claude session is running (virgin/idle session), OR
+                // 2. Very recent activity (< 5 min) suggesting session just closed
+                const hasClaudeSession = claudeSessions.has(projectName);
+                const isVeryRecent = age < 300000; // 5 minutes
+                if (hasClaudeSession || isVeryRecent) {
                   sessions[projectName] = {
                     status: 'no-monitor',
                     icon: '💤',
-                    details: 'No monitor'
+                    details: hasClaudeSession ? 'virgin' : 'closing'
                   };
                 }
               }
@@ -527,12 +536,16 @@ class StatusLineHealthMonitor {
               if (transcriptFiles.length > 0) {
                 const mostRecent = transcriptFiles[0];
                 const age = Date.now() - mostRecent.stats.mtime.getTime();
-                // Only show dormant sessions within 48 hours
-                if (age < 172800000) { // 48 hours
+                // Only show no-monitor sessions if:
+                // 1. Claude session is running (virgin/idle session), OR
+                // 2. Very recent activity (< 5 min) suggesting session just closed
+                const hasClaudeSession = claudeSessions.has(projectName);
+                const isVeryRecent = age < 300000; // 5 minutes
+                if (hasClaudeSession || isVeryRecent) {
                   sessions[projectName] = {
                     status: 'no-monitor',
                     icon: '💤',
-                    details: 'No monitor'
+                    details: hasClaudeSession ? 'virgin' : 'closing'
                   };
                 }
               }
