@@ -50,7 +50,7 @@ export interface HistoricalWorkflow {
   repositoryPath: string
 }
 
-// Historical step with errors
+// Historical step with errors and outputs
 export interface HistoricalStep {
   index: number
   name: string
@@ -59,6 +59,7 @@ export interface HistoricalStep {
   status: string
   duration: string
   errors?: string[]
+  outputs?: Record<string, any>
 }
 
 // Historical workflow with full details
@@ -70,10 +71,12 @@ export interface HistoricalWorkflowDetail extends HistoricalWorkflow {
 }
 
 // Workflow agents definition (for status inference)
+// 15 agents total - matches ukb-workflow-graph.tsx WORKFLOW_AGENTS
 export const WORKFLOW_AGENTS = [
-  'git_history', 'vibe_history', 'semantic_analysis', 'web_search',
+  'git_history', 'vibe_history', 'code_graph', 'code_intelligence',
+  'documentation_linker', 'semantic_analysis', 'web_search',
   'insight_generation', 'observation_generation', 'ontology_classification',
-  'code_graph', 'documentation_linker', 'quality_assurance',
+  'documentation_semantics', 'quality_assurance',
   'persistence', 'deduplication', 'content_validation'
 ] as const
 
@@ -83,17 +86,23 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'analyze_recent_changes': 'git_history',
   'analyze_vibe_history': 'vibe_history',
   'analyze_recent_vibes': 'vibe_history',
-  'semantic_analysis': 'semantic_analysis',
-  'analyze_semantics': 'semantic_analysis',
-  'web_search': 'web_search',
-  'generate_insights': 'insight_generation',
-  'generate_observations': 'observation_generation',
-  'classify_with_ontology': 'ontology_classification',
   'index_codebase': 'code_graph',
   'index_recent_code': 'code_graph',
   'transform_code_entities': 'code_graph',
   'transform_code_entities_incremental': 'code_graph',
+  'code_intelligence': 'code_intelligence',
+  'analyze_code_intelligence': 'code_intelligence',
   'link_documentation': 'documentation_linker',
+  'transform_doc_links': 'documentation_linker',
+  'semantic_analysis': 'semantic_analysis',
+  'analyze_semantics': 'semantic_analysis',
+  'web_search': 'web_search',
+  'generate_insights': 'insight_generation',
+  'generate_pattern_insights': 'insight_generation',
+  'generate_observations': 'observation_generation',
+  'classify_with_ontology': 'ontology_classification',
+  'analyze_documentation_semantics': 'documentation_semantics',
+  'analyze_documentation_semantics_incremental': 'documentation_semantics',
   'quality_assurance': 'quality_assurance',
   'validate_incremental_qa': 'quality_assurance',
   'persist_results': 'persistence',
@@ -103,6 +112,9 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'deduplicate_incremental': 'deduplication',
   'validate_content': 'content_validation',
   'validate_content_incremental': 'content_validation',
+  'validate_entity_content': 'content_validation',
+  'validate_all_entities': 'content_validation',
+  'validate_project_entities': 'content_validation',
 }
 
 interface UKBState {
@@ -368,6 +380,7 @@ export const selectNodeStatus = createSelector(
             name: s.agent || s.name,
             status: s.status === 'success' ? 'completed' : s.status as StepStatus,
             error: s.errors?.join('\n'),
+            outputs: s.outputs,
           }))
         } : null)
       : ukb.processes[ukb.selectedProcessIndex]
@@ -421,6 +434,7 @@ export const selectStepStatusMap = createSelector(
             status: s.status === 'success' ? 'completed' : s.status as StepStatus,
             duration: undefined,
             error: s.errors?.join('\n'),
+            outputs: s.outputs,
           }))
         } : null)
       : ukb.processes[ukb.selectedProcessIndex]
