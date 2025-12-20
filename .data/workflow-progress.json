@@ -1,10 +1,10 @@
 {
   "workflowName": "complete-analysis",
-  "executionId": "complete-analysis-1766222087122",
+  "executionId": "complete-analysis-1766248553369",
   "status": "completed",
   "team": "coding",
   "repositoryPath": "/Users/q284340/Agentic/coding",
-  "startTime": "2025-12-20T09:14:47.122Z",
+  "startTime": "2025-12-20T16:35:53.369Z",
   "currentStep": null,
   "totalSteps": 15,
   "completedSteps": 15,
@@ -12,8 +12,8 @@
   "skippedSteps": 0,
   "runningSteps": 0,
   "stepsCompleted": [
-    "analyze_git_history",
     "link_documentation",
+    "analyze_git_history",
     "analyze_vibe_history",
     "index_codebase",
     "transform_code_entities",
@@ -33,39 +33,73 @@
   "stepsRunning": [],
   "stepsDetail": [
     {
-      "name": "analyze_git_history",
+      "name": "link_documentation",
       "status": "completed",
-      "duration": 9255,
+      "duration": 2679,
       "outputs": {
-        "commitsCount": 727,
-        "filesCount": 6016,
+        "codeGraphStats": {},
         "timing": {
-          "duration": 9255,
-          "timeout": 300
+          "duration": 2679,
+          "timeout": 120
         }
       }
     },
     {
-      "name": "link_documentation",
+      "name": "analyze_git_history",
       "status": "completed",
-      "duration": 1043,
+      "duration": 8929,
       "outputs": {
-        "codeGraphStats": {},
+        "commitsCount": 733,
+        "filesCount": 6036,
         "timing": {
-          "duration": 1043,
-          "timeout": 120
+          "duration": 8929,
+          "timeout": 300
         }
       }
     },
     {
       "name": "analyze_vibe_history",
       "status": "completed",
-      "duration": 22883,
+      "duration": 77640,
       "outputs": {
-        "sessionsCount": 769,
-        "topTopicNames": [],
+        "sessionsCount": 776,
+        "keyTopicsCount": 37,
+        "topTopics": [
+          {
+            "topic": "User Authentication and Profile Management",
+            "category": "feature",
+            "significance": 9
+          },
+          {
+            "topic": "Error Handling and Debugging",
+            "category": "bugfix",
+            "significance": 9
+          },
+          {
+            "topic": "Deployment and Workflow",
+            "category": "infrastructure",
+            "significance": 9
+          },
+          {
+            "topic": "Deployment Debugging",
+            "category": "infrastructure",
+            "significance": 9
+          },
+          {
+            "topic": "Constraint Monitoring and Violations",
+            "category": "feature",
+            "significance": 9
+          }
+        ],
+        "topTopicNames": [
+          "User Authentication and Profile Management",
+          "Error Handling and Debugging",
+          "Deployment and Workflow",
+          "Deployment Debugging",
+          "Constraint Monitoring and Violations"
+        ],
         "timing": {
-          "duration": 22883,
+          "duration": 77640,
           "timeout": 600
         }
       }
@@ -73,7 +107,7 @@
     {
       "name": "index_codebase",
       "status": "completed",
-      "duration": 216526,
+      "duration": 247086,
       "outputs": {
         "entitiesCount": 0,
         "codeGraphStats": {
@@ -95,7 +129,7 @@
           }
         },
         "timing": {
-          "duration": 216526,
+          "duration": 247086,
           "timeout": 600
         }
       }
@@ -103,10 +137,10 @@
     {
       "name": "transform_code_entities",
       "status": "completed",
-      "duration": 3,
+      "duration": 14,
       "outputs": {
         "timing": {
-          "duration": 3,
+          "duration": 14,
           "timeout": 60
         }
       }
@@ -114,10 +148,10 @@
     {
       "name": "semantic_analysis",
       "status": "completed",
-      "duration": 2995,
+      "duration": 3740,
       "outputs": {
         "timing": {
-          "duration": 2995,
+          "duration": 3740,
           "timeout": 240
         }
       }
@@ -125,10 +159,10 @@
     {
       "name": "web_search",
       "status": "completed",
-      "duration": 139,
+      "duration": 153,
       "outputs": {
         "timing": {
-          "duration": 139,
+          "duration": 153,
           "timeout": 90
         }
       }
@@ -136,7 +170,7 @@
     {
       "name": "generate_insights",
       "status": "completed",
-      "duration": 4111,
+      "duration": 1947,
       "outputs": {
         "insightDocuments": [
           {
@@ -145,23 +179,9 @@
             "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
             "significance": 9,
             "diagramCount": 0
-          },
-          {
-            "name": "BugFixPattern",
-            "title": "BugFixPattern - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
-            "significance": 9,
-            "diagramCount": 0
-          },
-          {
-            "name": "AgentArchitecturePattern",
-            "title": "AgentArchitecturePattern - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md",
-            "significance": 9,
-            "diagramCount": 0
           }
         ],
-        "totalInsights": 3,
+        "totalInsights": 1,
         "patterns": [
           {
             "name": "FeatureImplementation",
@@ -177,19 +197,49 @@
             "name": "AgentArchitecturePattern",
             "category": "Architecture",
             "significance": 8
+          },
+          {
+            "name": "HealthDashboardDevelopmentPattern",
+            "category": "Implementation",
+            "significance": 8
+          },
+          {
+            "name": "McpAgentDevelopmentPattern",
+            "category": "Implementation",
+            "significance": 5
+          },
+          {
+            "name": "SolutionPattern1",
+            "category": "Solution",
+            "significance": 5
+          },
+          {
+            "name": "UiComponentWorkPattern",
+            "category": "Implementation",
+            "significance": 4
+          },
+          {
+            "name": "ApiRefactoringPattern",
+            "category": "Implementation",
+            "significance": 3
+          },
+          {
+            "name": "InstallationAndDeploymentPattern",
+            "category": "Implementation",
+            "significance": 2
           }
         ],
-        "totalPatterns": 3,
-        "avgPatternSignificance": 8,
+        "totalPatterns": 9,
+        "avgPatternSignificance": 6,
         "generationMetrics": {
-          "processingTime": 4111,
-          "documentsGenerated": 3,
+          "processingTime": 1946,
+          "documentsGenerated": 1,
           "diagramsGenerated": 0,
-          "patternsIdentified": 3,
-          "qualityScore": 65
+          "patternsIdentified": 9,
+          "qualityScore": 60
         },
         "timing": {
-          "duration": 4111,
+          "duration": 1947,
           "timeout": 300
         }
       }
@@ -197,11 +247,11 @@
     {
       "name": "generate_observations",
       "status": "completed",
-      "duration": 38535,
+      "duration": 409,
       "outputs": {
-        "observationsCount": 1058,
+        "observationsCount": 1073,
         "timing": {
-          "duration": 38535,
+          "duration": 409,
           "timeout": 90
         }
       }
@@ -209,10 +259,10 @@
     {
       "name": "classify_with_ontology",
       "status": "completed",
-      "duration": 30187,
+      "duration": 32967,
       "outputs": {
         "timing": {
-          "duration": 30187,
+          "duration": 32967,
           "timeout": 600
         }
       }
@@ -220,11 +270,11 @@
     {
       "name": "analyze_documentation_semantics",
       "status": "completed",
-      "duration": 284103,
+      "duration": 279440,
       "outputs": {
         "codeGraphStats": {},
         "timing": {
-          "duration": 284103,
+          "duration": 279440,
           "timeout": 600
         }
       }
@@ -232,10 +282,10 @@
     {
       "name": "quality_assurance",
       "status": "completed",
-      "duration": 2561,
+      "duration": 2590,
       "outputs": {
         "timing": {
-          "duration": 2561,
+          "duration": 2590,
           "timeout": 90
         }
       }
@@ -243,18 +293,16 @@
     {
       "name": "persist_results",
       "status": "completed",
-      "duration": 27196,
+      "duration": 31784,
       "outputs": {
-        "entitiesCreated": 3,
+        "entitiesCreated": 1,
         "entitiesUpdated": 0,
         "filesCreated": [
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md"
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md"
         ],
         "errorsCount": 0,
         "timing": {
-          "duration": 27196,
+          "duration": 31784,
           "timeout": 90
         }
       }
@@ -273,43 +321,55 @@
     {
       "name": "validate_content",
       "status": "completed",
-      "duration": 39663,
+      "duration": 46517,
       "outputs": {
         "timing": {
-          "duration": 39663,
+          "duration": 46517,
           "timeout": 120
         }
       }
     }
   ],
   "summary": {
-    "totalCommits": 727,
-    "totalFiles": 6016,
-    "totalSessions": 769,
-    "totalKeyTopics": 0,
-    "totalObservations": 1058,
-    "totalInsights": 3,
-    "totalPatterns": 3,
-    "keyTopics": [],
+    "totalCommits": 733,
+    "totalFiles": 6036,
+    "totalSessions": 776,
+    "totalKeyTopics": 37,
+    "totalObservations": 1073,
+    "totalInsights": 1,
+    "totalPatterns": 9,
+    "keyTopics": [
+      {
+        "topic": "User Authentication and Profile Management",
+        "category": "feature",
+        "significance": 9
+      },
+      {
+        "topic": "Error Handling and Debugging",
+        "category": "bugfix",
+        "significance": 9
+      },
+      {
+        "topic": "Deployment and Workflow",
+        "category": "infrastructure",
+        "significance": 9
+      },
+      {
+        "topic": "Deployment Debugging",
+        "category": "infrastructure",
+        "significance": 9
+      },
+      {
+        "topic": "Constraint Monitoring and Violations",
+        "category": "feature",
+        "significance": 9
+      }
+    ],
     "insightsGenerated": [
       {
         "name": "FeatureImplementation",
         "title": "FeatureImplementation - Implementation Analysis",
         "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
-        "significance": 9,
-        "diagramCount": 0
-      },
-      {
-        "name": "BugFixPattern",
-        "title": "BugFixPattern - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
-        "significance": 9,
-        "diagramCount": 0
-      },
-      {
-        "name": "AgentArchitecturePattern",
-        "title": "AgentArchitecturePattern - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md",
         "significance": 9,
         "diagramCount": 0
       }
@@ -329,6 +389,36 @@
         "name": "AgentArchitecturePattern",
         "category": "Architecture",
         "significance": 8
+      },
+      {
+        "name": "HealthDashboardDevelopmentPattern",
+        "category": "Implementation",
+        "significance": 8
+      },
+      {
+        "name": "McpAgentDevelopmentPattern",
+        "category": "Implementation",
+        "significance": 5
+      },
+      {
+        "name": "SolutionPattern1",
+        "category": "Solution",
+        "significance": 5
+      },
+      {
+        "name": "UiComponentWorkPattern",
+        "category": "Implementation",
+        "significance": 4
+      },
+      {
+        "name": "ApiRefactoringPattern",
+        "category": "Implementation",
+        "significance": 3
+      },
+      {
+        "name": "InstallationAndDeploymentPattern",
+        "category": "Implementation",
+        "significance": 2
       }
     ],
     "codeGraphStats": {
@@ -336,6 +426,6 @@
     },
     "skippedReasons": {}
   },
-  "lastUpdate": "2025-12-20T09:25:33.582Z",
-  "elapsedSeconds": 646
+  "lastUpdate": "2025-12-20T16:47:35.162Z",
+  "elapsedSeconds": 702
 }
