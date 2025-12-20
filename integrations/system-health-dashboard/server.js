@@ -663,6 +663,16 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // Add a unique refresh key to each process to force React re-renders
+            // This ensures the UI updates even when the step data content is the same
+            const timestamp = Date.now();
+            if (detailedStatus.processes) {
+                for (const proc of detailedStatus.processes) {
+                    proc._refreshKey = `${proc.pid}-${timestamp}`;
+                }
+            }
+            detailedStatus._lastRefresh = timestamp;
+
             res.json({
                 status: 'success',
                 data: detailedStatus
