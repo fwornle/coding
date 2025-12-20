@@ -4,48 +4,37 @@
 left to right direction
 
 actor "UI Developer" as dev
-actor "System User" as user
-actor "Component Library" as lib
+actor "System Architect" as arch
+actor "End User" as user
 
-package "UI Component Work Pattern System" {
-    usecase "Design UI Components" as design
-    usecase "Implement Component Logic" as implement
-    usecase "Test Component Behavior" as test
-    usecase "Integrate Components" as integrate
-    usecase "Manage Component State" as state
-    usecase "Handle User Interactions" as interactions
-    usecase "Render UI Elements" as render
-    usecase "Update Component Properties" as update
-    usecase "Validate Component Data" as validate
-    usecase "Monitor Component Performance" as monitor
-    usecase "Maintain Component Lifecycle" as lifecycle
-    usecase "Optimize Component Rendering" as optimize
+rectangle "UI Component Work Pattern System" {
+  usecase "Implement UI Components" as implement
+  usecase "Apply Work Pattern" as apply
+  usecase "Monitor Pattern Usage" as monitor
+  usecase "Analyze Pattern Stability" as analyze
+  usecase "Maintain Component Library" as maintain
+  usecase "Review Implementation Quality" as review
+  usecase "Track Pattern Occurrences" as track
+  usecase "Generate Usage Reports" as reports
 }
 
-dev --> design
 dev --> implement
-dev --> test
-dev --> integrate
-dev --> state
-dev --> lifecycle
-dev --> optimize
+dev --> apply
+dev --> maintain
 
-user --> interactions
-user --> render
-user --> update
+arch --> monitor
+arch --> analyze
+arch --> review
+arch --> track
 
-lib --> validate
-lib --> monitor
+user --> implement : uses components
 
-design ..> implement : <<include>>
-implement ..> test : <<include>>
-integrate ..> state : <<include>>
-interactions ..> update : <<include>>
-render ..> optimize : <<extend>>
-state ..> validate : <<include>>
-lifecycle ..> monitor : <<include>>
+implement ..> apply : <<include>>
+monitor ..> track : <<include>>
+analyze ..> track : <<include>>
+monitor ..> reports : <<extend>>
 
-note top of design : "Pattern Significance: 6\n12 Occurrences\nTrend: Increasing"
-note bottom of "UI Component Work Pattern System" : "Implementation Category\nArchitectural Analysis Focus"
+note right of apply : Pattern shows stable trend\nwith 10 occurrences
+note bottom of track : Implementation category\nSignificance level: 5
 
 @enduml

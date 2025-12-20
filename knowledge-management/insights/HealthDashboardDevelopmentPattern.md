@@ -1,4 +1,4 @@
-# UiComponentWorkPattern
+# HealthDashboardDevelopmentPattern
 
 **Type:** Technical Pattern
 
@@ -24,7 +24,7 @@ Configuration-driven development approach
 
 ## Architecture
 
-![Architecture](images/ui-component-work-pattern-architecture.png)
+![Architecture](images/health-dashboard-development-pattern-architecture.png)
 
 
 ---

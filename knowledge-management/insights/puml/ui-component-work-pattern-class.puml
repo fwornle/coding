@@ -1,100 +1,93 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "UI Component Work Pattern Architecture" {
+package "UI Component Architecture" {
     
     abstract class ComponentPattern <<pattern>> {
         +name: String
         +category: String
         +description: String
-        +significance: Integer
-        +occurrences: Integer
+        +significance: int
+        +occurrences: int
         +trend: String
         --
-        +analyze(): PatternAnalysis
+        +analyze(): void
         +getEvidence(): List<String>
-        +calculateSignificance(): Integer
+        +calculateSignificance(): int
     }
     
     class UiComponentWorkPattern <<implementation>> {
-        -occurrences: Integer = 12
-        -trend: String = "increasing"
+        -occurrences: int = 10
+        -trend: String = "stable"
+        -language: String = "Unknown"
         -usageNotes: List<String>
         --
-        +getOccurrences(): Integer
+        +getOccurrences(): int
         +getTrend(): String
         +getUsageNotes(): List<String>
-        +trackUsage(): void
-        +analyzeImplementation(): void
+        +isStable(): boolean
     }
     
     class PatternCatalog <<catalog>> {
         -patterns: List<ComponentPattern>
-        -totalPatterns: Integer
-        -avgSignificance: Double
+        -totalPatterns: int
+        -avgSignificance: double
         -topPatterns: List<String>
         --
         +addPattern(pattern: ComponentPattern): void
         +getPatternsByCategory(category: String): List<ComponentPattern>
-        +calculateAvgSignificance(): Double
+        +calculateAverageSignificance(): double
         +getTopPatterns(): List<String>
         +generateSummary(): PatternSummary
     }
     
     class PatternSummary <<summary>> {
-        +totalPatterns: Integer
-        +byCategory: Map<String, Integer>
-        +avgSignificance: Double
-        +topPatterns: List<String>
+        -totalPatterns: int
+        -byCategory: Map<String, Integer>
+        -avgSignificance: double
+        -topPatterns: List<String>
         --
-        +getCategoryCount(category: String): Integer
-        +getOverallStats(): Statistics
+        +getTotalPatterns(): int
+        +getCategoryCounts(): Map<String, Integer>
+        +getAverageSignificance(): double
     }
     
     enum PatternCategory <<enumeration>> {
         IMPLEMENTATION
-        ARCHITECTURAL
         BEHAVIORAL
         STRUCTURAL
+        CREATIONAL
     }
     
-    class ImplementationDetails <<details>> {
-        +language: String
-        +usageNotes: List<String>
-        +relatedComponents: List<String>
+    class ImplementationEvidence <<evidence>> {
+        -occurrenceCount: int
+        -trendAnalysis: String
+        -stabilityMetric: String
         --
-        +addUsageNote(note: String): void
-        +linkComponent(component: String): void
-    }
-    
-    interface PatternAnalyzer <<interface>> {
-        +analyzePattern(pattern: ComponentPattern): PatternAnalysis
-        +trackTrends(pattern: ComponentPattern): TrendData
-        +calculateMetrics(pattern: ComponentPattern): Metrics
-    }
-    
-    class UiPatternAnalyzer <<service>> {
-        -analysisEngine: AnalysisEngine
-        --
-        +analyzeUiPatterns(): List<PatternAnalysis>
-        +identifyTrends(): TrendReport
-        +generateRecommendations(): List<String>
+        +collectEvidence(): List<String>
+        +analyzeTrend(): String
+        +assessStability(): boolean
     }
 }
 
 ' Relationships
 ComponentPattern <|-- UiComponentWorkPattern
-PatternCatalog *-- "1..*" ComponentPattern
-PatternCatalog --> PatternSummary : generates
-ComponentPattern --> PatternCategory : categorized by
-UiComponentWorkPattern *-- ImplementationDetails
-PatternAnalyzer <|.. UiPatternAnalyzer
-UiPatternAnalyzer --> UiComponentWorkPattern : analyzes
-PatternCatalog --> PatternAnalyzer : uses
+PatternCatalog o-- ComponentPattern : contains
+PatternCatalog ..> PatternSummary : generates
+UiComponentWorkPattern --> PatternCategory : categorized by
+UiComponentWorkPattern *-- ImplementationEvidence : has evidence
+ComponentPattern ..> ImplementationEvidence : analyzed by
 
-' Annotations
-note top of UiComponentWorkPattern : 12 occurrences\nTrend: increasing\nSignificance: 6
-note right of PatternCatalog : Manages pattern collection\nProvides summary statistics
-note bottom of UiPatternAnalyzer : Specialized analyzer for\nUI component patterns
+note right of UiComponentWorkPattern
+  Current Status:
+  • 10 occurrences detected
+  • Stable trend
+  • Significance level: 5
+end note
+
+note top of PatternCatalog
+  Catalog contains 1 pattern
+  Average significance: 5.0
+end note
 
 @enduml

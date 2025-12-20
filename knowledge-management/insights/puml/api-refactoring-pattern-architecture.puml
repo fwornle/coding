@@ -1,34 +1,31 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title API Refactoring Pattern Architecture
-
 package "Implementation Patterns" {
-    component "API Refactoring Pattern" as apiRefactoring <<api>>
+  component "API Refactoring Pattern" as apiRefactor <<api>>
 }
 
-cloud "Legacy API System" as legacyApi <<external>>
+component "Legacy API" as legacyApi <<external>>
 component "Refactored API" as newApi <<api>>
-database "API Configuration" as apiConfig <<storage>>
+component "Client Applications" as clients <<external>>
 
-legacyApi --> apiRefactoring : "requires refactoring"
-apiRefactoring --> newApi : "produces"
-apiRefactoring --> apiConfig : "uses configuration"
+legacyApi --> apiRefactor : "refactors to"
+apiRefactor --> newApi : "produces"
+clients --> newApi : "consumes"
+clients ..> legacyApi : "migrating from"
 
-note right of apiRefactoring
-  **Pattern Details**
+note top of apiRefactor
+  **API Refactoring Pattern**
   - Occurrences: 5
+  - Trend: decreasing
   - Significance: 3/5
-  - Trend: Decreasing
-  - Category: Implementation
 end note
 
 note bottom
-  **Architecture Summary**
-  - Total Patterns: 1
-  - Categories: Implementation (1)
-  - Average Significance: 3.0
-  - Top Pattern: ApiRefactoringPattern
+  **Pattern Analysis Summary**
+  Total Patterns: 1
+  Categories: Implementation (1)
+  Average Significance: 3.0
 end note
 
 @enduml

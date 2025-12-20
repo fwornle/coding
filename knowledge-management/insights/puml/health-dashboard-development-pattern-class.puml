@@ -1,0 +1,93 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Health Dashboard Architecture" {
+    
+    abstract class HealthDashboardPattern <<pattern>> {
+        +name: String
+        +category: String
+        +significance: int
+        +occurrences: int
+        +trend: String
+        +getImplementationDetails(): Map
+        +analyzeUsagePattern(): PatternAnalysis
+    }
+    
+    class HealthDashboardDevelopmentPattern <<implementation>> {
+        -occurrences: int = 8
+        -trend: String = "increasing"
+        -language: String = "Unknown"
+        -usageNotes: List<String>
+        +trackOccurrence(): void
+        +updateTrend(): void
+        +generateUsageReport(): Report
+    }
+    
+    interface PatternCatalog {
+        +getTotalPatterns(): int
+        +getPatternsByCategory(): Map
+        +getAverageSignificance(): double
+        +getTopPatterns(): List<String>
+    }
+    
+    class ImplementationPatternCatalog <<service>> {
+        -patterns: List<Pattern>
+        -totalPatterns: int = 1
+        -avgSignificance: double = 4.0
+        +addPattern(pattern: Pattern): void
+        +categorizePatterns(): Map
+        +calculateMetrics(): CatalogMetrics
+    }
+    
+    class PatternAnalysis <<data>> {
+        -content: String
+        -name: String
+        -analysisType: String
+        +performAnalysis(): AnalysisResult
+        +generateReport(): String
+    }
+    
+    class CatalogMetrics <<value>> {
+        +totalPatterns: int
+        +byCategory: Map<String, Integer>
+        +avgSignificance: double
+        +topPatterns: List<String>
+    }
+    
+    enum PatternCategory {
+        IMPLEMENTATION
+        ARCHITECTURAL
+        BEHAVIORAL
+        CREATIONAL
+    }
+    
+    class UsageEvidence <<data>> {
+        -occurrenceCount: int
+        -trendDirection: String
+        -relatedComponents: List<String>
+        +collectEvidence(): void
+        +validateTrend(): boolean
+    }
+}
+
+HealthDashboardDevelopmentPattern --|> HealthDashboardPattern
+ImplementationPatternCatalog ..|> PatternCatalog
+ImplementationPatternCatalog --o HealthDashboardPattern : contains
+PatternAnalysis --> HealthDashboardDevelopmentPattern : analyzes
+HealthDashboardPattern --> PatternCategory : categorized by
+HealthDashboardDevelopmentPattern --> UsageEvidence : provides
+CatalogMetrics <-- ImplementationPatternCatalog : generates
+
+note right of HealthDashboardDevelopmentPattern
+  8 occurrences detected
+  Trend: increasing
+  Significance: 4/5
+end note
+
+note top of ImplementationPatternCatalog
+  Current catalog contains
+  1 implementation pattern
+  with high significance
+end note
+
+@enduml

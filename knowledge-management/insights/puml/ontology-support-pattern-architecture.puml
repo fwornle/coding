@@ -1,45 +1,38 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-!define DIRECTION top to bottom direction
+title Ontology Support Pattern Architecture
 
 package "Implementation Patterns" {
     component "Ontology Support Pattern" as osp <<core>>
-}
-
-package "Supporting Infrastructure" {
+    
     database "Knowledge Base" as kb <<storage>>
-    component "Ontology Engine" as oe <<api>>
     component "Semantic Processor" as sp <<core>>
+    component "Ontology Manager" as om <<core>>
+    component "Pattern Validator" as pv <<core>>
 }
 
 package "External Systems" {
-    cloud "Ontology Services" as os <<external>>
-    database "RDF Store" as rdf <<storage>>
+    cloud "Ontology Repositories" as repos <<external>>
+    component "Client Applications" as clients <<external>>
 }
 
-' Pattern relationships
-osp --> oe : "utilizes"
-osp --> sp : "processes with"
-osp --> kb : "accesses"
+' Core relationships
+osp --> kb : "stores ontologies"
+osp --> sp : "processes semantics"
+osp --> om : "manages ontologies"
+osp --> pv : "validates patterns"
 
-' Infrastructure relationships
-oe --> rdf : "stores in"
-oe --> os : "integrates with"
-sp --> kb : "reads from"
+' External connections
+om --> repos : "fetches ontologies"
+clients --> osp : "uses pattern"
 
-' Summary information
-note right of osp
-  **Pattern Analysis Summary**
-  • Total Patterns: 1
-  • Significance Level: 3/5
-  • Occurrences: 6 (increasing trend)
-  • Category: Implementation
-end note
+' Data flow
+sp --> kb : "queries"
+pv --> kb : "validates against"
 
-note bottom of kb
-  Supports semantic data
-  and ontology definitions
-end note
+note top of osp : Pattern Usage:\n• 6 occurrences\n• Trend: increasing\n• Significance: 3/5
+
+note bottom : Architecture Summary:\n• Total Patterns: 1\n• Category: Implementation\n• Average Significance: 3.0
 
 @enduml

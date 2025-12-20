@@ -1,0 +1,46 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Health Dashboard Development Pattern - Implementation Flow
+
+actor "Developer" as dev
+participant "Pattern Analyzer" as analyzer
+participant "Health Dashboard" as dashboard
+participant "Implementation Engine" as engine
+participant "Monitoring System" as monitor
+
+dev -> analyzer : Initiate pattern analysis
+activate analyzer
+
+analyzer -> analyzer : Identify HealthDashboardDevelopmentPattern
+note right : Category: Implementation\nSignificance: 4\nOccurrences: 8
+
+analyzer -> dashboard : Create dashboard instance
+activate dashboard
+
+loop 8 occurrences (increasing trend)
+    analyzer -> engine : Apply implementation pattern
+    activate engine
+    
+    engine -> dashboard : Configure health metrics
+    dashboard -> dashboard : Initialize components
+    
+    engine -> monitor : Setup monitoring hooks
+    activate monitor
+    
+    monitor -> dashboard : Register health checks
+    dashboard -> monitor : Return status endpoints
+    
+    deactivate monitor
+    deactivate engine
+end
+
+dashboard -> analyzer : Report implementation status
+analyzer -> dev : Pattern application complete
+
+note over analyzer, monitor : Pattern shows increasing trend\nwith high significance (4/5)
+
+deactivate dashboard
+deactivate analyzer
+
+@enduml

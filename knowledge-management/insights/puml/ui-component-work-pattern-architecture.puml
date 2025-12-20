@@ -2,47 +2,22 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Implementation Patterns" {
-  component "UI Component Work Pattern" as uiPattern <<core>>
+  component "UI Component Work Pattern" as uicomp <<core>>
 }
 
-package "Frontend Layer" {
-  component "UI Components" as uiComp <<api>>
-  component "Component Factory" as factory <<core>>
-  component "State Management" as state <<storage>>
-}
-
-package "Pattern Engine" {
-  component "Pattern Detector" as detector <<core>>
-  component "Usage Analytics" as analytics <<storage>>
-}
-
-' Pattern relationships
-uiPattern --> uiComp : "implements"
-uiPattern --> factory : "creates instances"
-uiPattern --> state : "manages state"
-
-' Pattern analysis relationships
-detector --> uiPattern : "analyzes"
-analytics --> uiPattern : "tracks usage"
-factory --> analytics : "reports metrics"
-
-' Component interactions
-uiComp --> state : "updates"
-factory --> uiComp : "instantiates"
-
-note top of uiPattern
-  **Pattern Statistics**
-  - Occurrences: 12
-  - Significance: 6/10
-  - Trend: Increasing
+note right of uicomp
+  **Pattern Details:**
+  - Occurrences: 10
+  - Trend: Stable
+  - Significance: 5/10
   - Category: Implementation
 end note
 
-note bottom of analytics
-  **System Metrics**
-  - Total Patterns: 1
-  - Avg Significance: 6
-  - Top Pattern: UI Component Work
+note top
+  **Architecture Summary**
+  Total Patterns: 1
+  Implementation Category: 1
+  Average Significance: 5.0
 end note
 
 @enduml

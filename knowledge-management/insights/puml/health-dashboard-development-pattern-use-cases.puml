@@ -1,0 +1,52 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+left to right direction
+
+actor "Healthcare Professional" as HP
+actor "Patient" as P
+actor "System Administrator" as SA
+actor "Data Analyst" as DA
+
+rectangle "Health Dashboard System" {
+  usecase "View Patient Data" as UC1
+  usecase "Monitor Health Metrics" as UC2
+  usecase "Generate Reports" as UC3
+  usecase "Configure Dashboard" as UC4
+  usecase "Manage User Access" as UC5
+  usecase "Analyze Health Trends" as UC6
+  usecase "Export Data" as UC7
+  usecase "Set Health Alerts" as UC8
+  
+  usecase "Authenticate User" as UC_AUTH
+  usecase "Log System Activity" as UC_LOG
+  
+  UC1 ..> UC_AUTH : <<include>>
+  UC2 ..> UC_AUTH : <<include>>
+  UC3 ..> UC_LOG : <<include>>
+  UC6 ..> UC_LOG : <<include>>
+  
+  UC8 ..> UC2 : <<extend>>
+  UC7 ..> UC3 : <<extend>>
+}
+
+HP --> UC1
+HP --> UC2
+HP --> UC3
+HP --> UC8
+
+P --> UC1
+P --> UC2
+
+SA --> UC4
+SA --> UC5
+SA --> UC_LOG
+
+DA --> UC6
+DA --> UC3
+DA --> UC7
+
+note right of UC2 : "8 occurrences\nTrend: increasing"
+note top of "Health Dashboard System" : "HealthDashboardDevelopmentPattern\nSignificance: 4/5"
+
+@enduml

@@ -1,34 +1,70 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Pattern Catalog" {
-  class McpAgentDevelopmentPattern {
-    - name: String
-    - category: String
-    - description: String
-    - significance: Integer
-    + getEvidence(): List<String>
-    + getRelatedComponents(): List<String>
-    + getImplementation(): Implementation
-  }
-
-  class Implementation {
-    - language: String
-    - usageNotes: List<String>
-  }
-
-  McpAgentDevelopmentPattern --* Implementation
+package "MCP Agent Development Pattern" {
+    
+    abstract class McpAgentPattern <<pattern>> {
+        +name: String
+        +category: String
+        +description: String
+        +significance: Integer
+        +occurrences: Integer
+        +trend: String
+        +getImplementationDetails()
+        +analyzePatternUsage()
+    }
+    
+    class McpAgentDevelopmentPattern <<implementation>> {
+        -occurrences: Integer = 15
+        -trend: String = "increasing"
+        -language: String = "Unknown"
+        -usageNotes: List<String>
+        +implementPattern()
+        +trackOccurrences()
+        +analyzeTrend()
+        +generateUsageReport()
+    }
+    
+    class PatternCatalog <<catalog>> {
+        -totalPatterns: Integer
+        -avgSignificance: Double
+        -topPatterns: List<String>
+        +addPattern(pattern: McpAgentPattern)
+        +getPatternsByCategory(category: String)
+        +calculateSignificance()
+        +generateSummary()
+    }
+    
+    class ImplementationCategory <<category>> {
+        -categoryName: String = "Implementation"
+        -patternCount: Integer = 1
+        +categorizePattern(pattern: McpAgentPattern)
+        +getPatternCount()
+    }
+    
+    class PatternEvidence <<evidence>> {
+        -occurrenceCount: Integer
+        -trendAnalysis: String
+        +collectEvidence()
+        +validateTrend()
+    }
+    
+    class ArchitecturalAnalysis <<analysis>> {
+        -contentName: String
+        -analysisType: String
+        +performAnalysis()
+        +generateReport()
+    }
+    
+    McpAgentPattern <|-- McpAgentDevelopmentPattern
+    PatternCatalog *-- McpAgentDevelopmentPattern
+    ImplementationCategory o-- McpAgentDevelopmentPattern
+    McpAgentDevelopmentPattern --> PatternEvidence : "generates"
+    PatternCatalog --> ArchitecturalAnalysis : "feeds into"
+    
 }
 
-package "Summary" {
-  class PatternSummary {
-    - totalPatterns: Integer
-    - byCategory: Map<String, Integer>
-    - avgSignificance: Double
-    - topPatterns: List<String>
-  }
-
-  PatternSummary ..> McpAgentDevelopmentPattern
-}
+note top of McpAgentDevelopmentPattern : Significance: 8/10\nTrend: Increasing usage
+note right of PatternCatalog : Contains 1 pattern\nAverage significance: 8
 
 @enduml

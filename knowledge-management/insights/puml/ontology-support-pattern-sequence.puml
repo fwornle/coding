@@ -1,38 +1,43 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "System Architecture" as SA
-participant "Pattern Analyzer" as PA
-participant "Ontology Support Pattern" as OSP
-participant "Implementation Monitor" as IM
-database "Pattern Catalog" as PC
+participant "System Architect" as architect
+participant "Ontology Manager" as ontologyMgr
+participant "Pattern Analyzer" as analyzer
+participant "Implementation Engine" as engine
+participant "Knowledge Base" as kb
 
-SA -> PA: Analyze architectural patterns
-activate PA
+architect -> analyzer: Initiate ontology support analysis
+activate analyzer
 
-PA -> PC: Query existing patterns
-PC --> PA: Return pattern data
+analyzer -> ontologyMgr: Request ontology patterns
+activate ontologyMgr
 
-PA -> OSP: Identify ontology support instances
-activate OSP
-note right of OSP: Category: Implementation\nSignificance: 3\nOccurrences: 6
+ontologyMgr -> kb: Query existing ontology implementations
+activate kb
+kb --> ontologyMgr: Return 6 ontology support instances
+deactivate kb
 
-loop Pattern Detection (6 occurrences)
-    OSP -> IM: Monitor implementation usage
-    activate IM
-    IM --> OSP: Report increasing trend
-    deactivate IM
-end
+ontologyMgr --> analyzer: Ontology pattern data (6 occurrences)
+deactivate ontologyMgr
 
-OSP --> PA: Pattern analysis complete
-deactivate OSP
+analyzer -> analyzer: Calculate significance score
+note right: Significance: 3\nTrend: increasing
 
-PA -> PC: Update pattern catalog
-note over PC: Total Patterns: 1\nImplementation Category: 1\nAvg Significance: 3
+analyzer -> engine: Process OntologySupportPattern
+activate engine
 
-PA --> SA: Return analysis results
-deactivate PA
+engine -> engine: Validate pattern implementation
+note right: Category: Implementation\nOccurrences: 6
 
-note over SA: Top Pattern: OntologySupportPattern\nTrend: Increasing usage
+engine --> analyzer: Pattern processing complete
+deactivate engine
 
+analyzer -> analyzer: Generate pattern catalog
+note right: Total patterns: 1\nTop pattern: OntologySupportPattern
+
+analyzer --> architect: Return analysis results
+deactivate analyzer
+
+note over architect, kb: Ontology Support Pattern shows increasing trend\nwith 6 occurrences and significance level 3
 @enduml
