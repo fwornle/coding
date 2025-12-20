@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import {
   Dialog,
@@ -79,6 +79,13 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // Derived state
   const showSidebar = selectedNode !== null && activeTab === 'active'
   const showHistoricalSidebar = selectedNode !== null && activeTab === 'history'
+
+  // Filter to only include truly active processes (running and alive, or recently completed for context)
+  // A process is "active" if: status === 'running' OR (status === 'completed' and isAlive !== false)
+  // But for the Active tab count, we only want running processes
+  const activeProcesses = useMemo(() => {
+    return processes.filter(p => p.status === 'running' || (p.isAlive && p.status !== 'completed' && p.status !== 'failed'))
+  }, [processes])
 
   // Fetch historical workflows when history tab is selected
   useEffect(() => {
@@ -204,7 +211,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Render Active Workflows Content
   const renderActiveContent = () => {
-    if (processes.length === 0) {
+    // Only show truly active (running) workflows in the Active tab
+    if (activeProcesses.length === 0) {
       return (
         <div className="flex-1 flex items-center justify-center text-center">
           <div className="space-y-4">
@@ -214,6 +222,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               <p className="text-sm text-muted-foreground mt-1">
                 Start a UKB workflow using the semantic analysis MCP tool to see it here.
               </p>
+              {processes.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Recently completed workflows can be found in the History tab.
+                </p>
+              )}
             </div>
             <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg font-mono">
               mcp__semantic-analysis__execute_workflow<br />
@@ -224,34 +237,38 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       )
     }
 
+    // Use the active process at the selected index (bounded to valid range)
+    const activeIndex = Math.min(selectedProcessIndex, activeProcesses.length - 1)
+    const activeCurrentProcess = activeProcesses[activeIndex] || null
+
     return (
       <>
         {/* Process selector */}
-        {processes.length > 1 && (
+        {activeProcesses.length > 1 && (
           <div className="flex items-center justify-center gap-2 mb-4">
             <Button
               variant="outline"
               size="icon"
-              onClick={() => dispatch(setSelectedProcessIndex(Math.max(0, selectedProcessIndex - 1)))}
-              disabled={selectedProcessIndex === 0}
+              onClick={() => dispatch(setSelectedProcessIndex(Math.max(0, activeIndex - 1)))}
+              disabled={activeIndex === 0}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm text-muted-foreground">
-              Process {selectedProcessIndex + 1} / {processes.length}
+              Process {activeIndex + 1} / {activeProcesses.length}
             </span>
             <Button
               variant="outline"
               size="icon"
-              onClick={() => dispatch(setSelectedProcessIndex(Math.min(processes.length - 1, selectedProcessIndex + 1)))}
-              disabled={selectedProcessIndex === processes.length - 1}
+              onClick={() => dispatch(setSelectedProcessIndex(Math.min(activeProcesses.length - 1, activeIndex + 1)))}
+              disabled={activeIndex === activeProcesses.length - 1}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         )}
 
-        {currentProcess && (
+        {activeCurrentProcess && (
           <>
             {/* Process Info Header */}
             <Card className="flex-shrink-0">
@@ -568,11 +585,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         <Tabs value={activeTab} onValueChange={(v) => dispatch(setActiveTab(v as 'active' | 'history'))} className="contents">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="active" className="flex items-center gap-2">
-              <Loader2 className={`h-4 w-4 ${processes.length > 0 ? 'animate-spin' : ''}`} />
+              <Loader2 className={`h-4 w-4 ${activeProcesses.length > 0 ? 'animate-spin' : ''}`} />
               Active
-              {processes.length > 0 && (
+              {activeProcesses.length > 0 && (
                 <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                  {processes.length}
+                  {activeProcesses.length}
                 </Badge>
               )}
             </TabsTrigger>

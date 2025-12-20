@@ -58,6 +58,9 @@ class CombinedStatusLine {
       // Robust transcript monitor health check and auto-restart
       await this.ensureTranscriptMonitorRunning();
 
+      // Ensure ALL transcript monitors are running (safety net)
+      await this.ensureAllTranscriptMonitorsRunning();
+
       // Ensure statusline health monitor daemon is running (global singleton)
       await this.ensureStatuslineHealthMonitorRunning();
 
@@ -1037,6 +1040,171 @@ class CombinedStatusLine {
     } catch (error) {
       if (process.env.DEBUG_STATUS) {
         console.error('DEBUG: Failed to start transcript monitor:', error.message);
+      }
+    }
+  }
+
+  /**
+   * Ensure ALL transcript monitors are running for all discovered projects
+   * This is a safety net in addition to the global supervisor
+   */
+  async ensureAllTranscriptMonitorsRunning() {
+    try {
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+
+      // Rate limit: Only check every 60 seconds to avoid spawning storms
+      const now = Date.now();
+      if (this._lastAllMonitorCheck && now - this._lastAllMonitorCheck < 60000) {
+        return;
+      }
+      this._lastAllMonitorCheck = now;
+
+      const ProcessStateManager = (await import('./process-state-manager.js')).default;
+      const psm = new ProcessStateManager({ codingRoot: codingPath });
+      await psm.initialize();
+
+      // Discover projects from multiple sources
+      const projects = new Set();
+
+      // Source 1: PSM registry
+      try {
+        const registry = await psm.getAllServices();
+        const projectServices = registry.services?.projects || {};
+        for (const projectPath of Object.keys(projectServices)) {
+          if (projectPath.includes('/Agentic/')) {
+            projects.add(projectPath);
+          }
+        }
+      } catch {
+        // Ignore PSM errors
+      }
+
+      // Source 2: Health files
+      try {
+        const healthDir = join(codingPath, '.health');
+        if (existsSync(healthDir)) {
+          const files = fs.readdirSync(healthDir);
+          for (const file of files) {
+            const match = file.match(/^(.+)-transcript-monitor-health\.json$/);
+            if (match) {
+              const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+              if (existsSync(projectPath)) {
+                projects.add(projectPath);
+              }
+            }
+          }
+        }
+      } catch {
+        // Ignore health file errors
+      }
+
+      // Source 3: Claude transcript directories with recent activity
+      try {
+        const claudeProjectsDir = join(process.env.HOME || '/Users/q284340', '.claude', 'projects');
+        if (existsSync(claudeProjectsDir)) {
+          const dirs = fs.readdirSync(claudeProjectsDir);
+          for (const dir of dirs) {
+            const match = dir.match(/^-Users-q284340-Agentic-(.+)$/);
+            if (match) {
+              const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+              if (existsSync(projectPath)) {
+                // Check for recent transcript activity (last 6 hours)
+                const transcriptDir = join(claudeProjectsDir, dir);
+                const jsonlFiles = fs.readdirSync(transcriptDir).filter(f => f.endsWith('.jsonl'));
+                if (jsonlFiles.length > 0) {
+                  const latestMtime = Math.max(
+                    ...jsonlFiles.map(f => fs.statSync(join(transcriptDir, f)).mtime.getTime())
+                  );
+                  if (Date.now() - latestMtime < 6 * 60 * 60 * 1000) {
+                    projects.add(projectPath);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // Ignore Claude dir errors
+      }
+
+      // Check each project's monitor health
+      for (const projectPath of projects) {
+        const projectName = basename(projectPath);
+        const healthFile = join(codingPath, '.health', `${projectName}-transcript-monitor-health.json`);
+
+        let needsRestart = false;
+        let reason = '';
+
+        if (!existsSync(healthFile)) {
+          needsRestart = true;
+          reason = 'no health file';
+        } else {
+          const stats = fs.statSync(healthFile);
+          const age = Date.now() - stats.mtime.getTime();
+
+          if (age > 60000) {
+            needsRestart = true;
+            reason = `stale health file (${Math.round(age / 1000)}s)`;
+          } else {
+            // Check if PID is alive
+            try {
+              const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+              const pid = healthData.metrics?.processId;
+              if (pid && !psm.isProcessAlive(pid)) {
+                needsRestart = true;
+                reason = `PID ${pid} is dead`;
+              }
+            } catch {
+              needsRestart = true;
+              reason = 'invalid health file';
+            }
+          }
+        }
+
+        if (needsRestart) {
+          if (process.env.DEBUG_STATUS) {
+            console.error(`DEBUG: Restarting monitor for ${projectName}: ${reason}`);
+          }
+
+          // Use existing startTranscriptMonitor logic but with explicit project
+          try {
+            const monitorScript = join(codingPath, 'scripts', 'enhanced-transcript-monitor.js');
+            if (existsSync(monitorScript)) {
+              // Clean up dead PSM entry
+              await psm.unregisterService('enhanced-transcript-monitor', 'per-project', { projectPath });
+
+              const { spawn } = await import('child_process');
+              const monitor = spawn('node', [monitorScript, projectPath], {
+                detached: true,
+                stdio: 'ignore',
+                env: { ...process.env, CODING_REPO: codingPath, TRANSCRIPT_SOURCE_PROJECT: projectPath },
+                cwd: codingPath
+              });
+              monitor.unref();
+
+              await psm.registerService({
+                name: 'enhanced-transcript-monitor',
+                pid: monitor.pid,
+                type: 'per-project',
+                script: 'enhanced-transcript-monitor.js',
+                projectPath,
+                metadata: { spawnedBy: 'combined-status-line-all', restartedAt: new Date().toISOString() }
+              });
+
+              if (process.env.DEBUG_STATUS) {
+                console.error(`DEBUG: Started monitor for ${projectName} (PID: ${monitor.pid})`);
+              }
+            }
+          } catch (spawnError) {
+            if (process.env.DEBUG_STATUS) {
+              console.error(`DEBUG: Failed to restart monitor for ${projectName}: ${spawnError.message}`);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Error in ensureAllTranscriptMonitorsRunning:', error.message);
       }
     }
   }
