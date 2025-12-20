@@ -279,7 +279,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                     <div className="text-xs text-muted-foreground mb-1">Workflow</div>
                     <div className="font-medium flex items-center gap-1">
                       <GitBranch className="h-3 w-3" />
-                      {getWorkflowDisplayName(currentProcess.workflowName)}
+                      {getWorkflowDisplayName(activeCurrentProcess.workflowName)}
                     </div>
                   </div>
 
@@ -288,23 +288,23 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                     <div className="text-xs text-muted-foreground mb-1">Team</div>
                     <div className="font-medium flex items-center gap-1">
                       <Server className="h-3 w-3" />
-                      {currentProcess.team}
+                      {activeCurrentProcess.team}
                     </div>
                   </div>
 
                   {/* Repository */}
                   <div className="col-span-2">
                     <div className="text-xs text-muted-foreground mb-1">Repository</div>
-                    <div className="font-medium text-sm truncate flex items-center gap-1" title={currentProcess.repositoryPath}>
+                    <div className="font-medium text-sm truncate flex items-center gap-1" title={activeCurrentProcess.repositoryPath}>
                       <Folder className="h-3 w-3 flex-shrink-0" />
-                      {currentProcess.repositoryPath.split('/').slice(-2).join('/')}
+                      {activeCurrentProcess.repositoryPath.split('/').slice(-2).join('/')}
                     </div>
                   </div>
 
                   {/* Health Status */}
                   <div>
                     <div className="text-xs text-muted-foreground mb-1">Health</div>
-                    {getHealthBadge(currentProcess.health)}
+                    {getHealthBadge(activeCurrentProcess.health)}
                   </div>
 
                   {/* Elapsed Time */}
@@ -312,7 +312,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                     <div className="text-xs text-muted-foreground mb-1">Elapsed</div>
                     <div className="font-medium flex items-center gap-1">
                       <Timer className="h-3 w-3" />
-                      {formatElapsed(currentProcess.startTime)}
+                      {formatElapsed(activeCurrentProcess.startTime)}
                     </div>
                   </div>
                 </div>
@@ -321,16 +321,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 <div className="mt-4">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-muted-foreground">
-                      Progress: {currentProcess.completedSteps} / {currentProcess.totalSteps} steps
-                      {currentProcess.currentStep && (
+                      Progress: {activeCurrentProcess.completedSteps} / {activeCurrentProcess.totalSteps} steps
+                      {activeCurrentProcess.currentStep && (
                         <span className="ml-2 text-blue-600">
-                          (Currently: {currentProcess.currentStep.replace(/_/g, ' ')})
+                          (Currently: {activeCurrentProcess.currentStep.replace(/_/g, ' ')})
                         </span>
                       )}
                     </span>
-                    <span className="font-medium">{currentProcess.progressPercent}%</span>
+                    <span className="font-medium">{activeCurrentProcess.progressPercent}%</span>
                   </div>
-                  <Progress value={currentProcess.progressPercent} className="h-2" />
+                  <Progress value={activeCurrentProcess.progressPercent} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -340,7 +340,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               {/* Workflow Graph */}
               <div className={`flex-1 min-w-0 ${showSidebar ? 'mr-0' : ''}`}>
                 <UKBWorkflowGraph
-                  process={currentProcess}
+                  process={activeCurrentProcess}
                   onNodeClick={handleNodeClick}
                   selectedNode={selectedNode}
                 />
@@ -351,7 +351,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 <div className="flex-shrink-0 overflow-auto">
                   <UKBNodeDetailsSidebar
                     agentId={selectedNode}
-                    process={currentProcess}
+                    process={activeCurrentProcess}
                     onClose={handleCloseSidebar}
                   />
                 </div>
@@ -362,28 +362,28 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             <div className="flex-shrink-0 pt-2 border-t">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <div className="flex items-center gap-4">
-                  <span>PID: {currentProcess.pid}</span>
-                  <span>Last heartbeat: {currentProcess.heartbeatAgeSeconds}s ago</span>
-                  {currentProcess.logFile && (
-                    <span className="truncate max-w-xs" title={currentProcess.logFile}>
-                      Log: {currentProcess.logFile.split('/').pop()}
+                  <span>PID: {activeCurrentProcess.pid}</span>
+                  <span>Last heartbeat: {activeCurrentProcess.heartbeatAgeSeconds}s ago</span>
+                  {activeCurrentProcess.logFile && (
+                    <span className="truncate max-w-xs" title={activeCurrentProcess.logFile}>
+                      Log: {activeCurrentProcess.logFile.split('/').pop()}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {currentProcess.health === 'healthy' && currentProcess.status === 'running' && (
+                  {activeCurrentProcess.health === 'healthy' && activeCurrentProcess.status === 'running' && (
                     <span className="flex items-center gap-1 text-green-600">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Processing
                     </span>
                   )}
-                  {currentProcess.status === 'completed' && (
+                  {activeCurrentProcess.status === 'completed' && (
                     <span className="flex items-center gap-1 text-green-600">
                       <CheckCircle2 className="h-3 w-3" />
                       Completed
                     </span>
                   )}
-                  {currentProcess.status === 'failed' && (
+                  {activeCurrentProcess.status === 'failed' && (
                     <span className="flex items-center gap-1 text-red-600">
                       <XCircle className="h-3 w-3" />
                       Failed
