@@ -1,36 +1,341 @@
 {
   "workflowName": "complete-analysis",
-  "executionId": "complete-analysis-1766221881344",
-  "status": "running",
+  "executionId": "complete-analysis-1766222087122",
+  "status": "completed",
   "team": "coding",
   "repositoryPath": "/Users/q284340/Agentic/coding",
-  "startTime": "2025-12-20T09:11:21.344Z",
-  "currentStep": "index_codebase",
+  "startTime": "2025-12-20T09:14:47.122Z",
+  "currentStep": null,
   "totalSteps": 15,
-  "completedSteps": 0,
+  "completedSteps": 15,
   "failedSteps": 0,
   "skippedSteps": 0,
-  "stepsCompleted": [],
+  "runningSteps": 0,
+  "stepsCompleted": [
+    "analyze_git_history",
+    "link_documentation",
+    "analyze_vibe_history",
+    "index_codebase",
+    "transform_code_entities",
+    "semantic_analysis",
+    "web_search",
+    "generate_insights",
+    "generate_observations",
+    "classify_with_ontology",
+    "analyze_documentation_semantics",
+    "quality_assurance",
+    "persist_results",
+    "deduplicate_insights",
+    "validate_content"
+  ],
   "stepsFailed": [],
   "stepsSkipped": [],
+  "stepsRunning": [],
   "stepsDetail": [
     {
+      "name": "analyze_git_history",
+      "status": "completed",
+      "duration": 9255,
+      "outputs": {
+        "commitsCount": 727,
+        "filesCount": 6016,
+        "timing": {
+          "duration": 9255,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "link_documentation",
+      "status": "completed",
+      "duration": 1043,
+      "outputs": {
+        "codeGraphStats": {},
+        "timing": {
+          "duration": 1043,
+          "timeout": 120
+        }
+      }
+    },
+    {
+      "name": "analyze_vibe_history",
+      "status": "completed",
+      "duration": 22883,
+      "outputs": {
+        "sessionsCount": 769,
+        "topTopicNames": [],
+        "timing": {
+          "duration": 22883,
+          "timeout": 600
+        }
+      }
+    },
+    {
       "name": "index_codebase",
-      "status": "running"
+      "status": "completed",
+      "duration": 216526,
+      "outputs": {
+        "entitiesCount": 0,
+        "codeGraphStats": {
+          "totalEntities": 0,
+          "totalRelationships": 0,
+          "languageDistribution": {},
+          "entityTypeDistribution": {}
+        },
+        "diagnostics": {
+          "codeGraphRagDirExists": true,
+          "pyprojectExists": true,
+          "repositoryExists": true,
+          "memgraphConnection": {
+            "connected": true
+          },
+          "uvAvailable": {
+            "available": true,
+            "path": "/Library/Frameworks/Python.framework/Versions/3.12/bin/uv"
+          }
+        },
+        "timing": {
+          "duration": 216526,
+          "timeout": 600
+        }
+      }
+    },
+    {
+      "name": "transform_code_entities",
+      "status": "completed",
+      "duration": 3,
+      "outputs": {
+        "timing": {
+          "duration": 3,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "semantic_analysis",
+      "status": "completed",
+      "duration": 2995,
+      "outputs": {
+        "timing": {
+          "duration": 2995,
+          "timeout": 240
+        }
+      }
+    },
+    {
+      "name": "web_search",
+      "status": "completed",
+      "duration": 139,
+      "outputs": {
+        "timing": {
+          "duration": 139,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "generate_insights",
+      "status": "completed",
+      "duration": 4111,
+      "outputs": {
+        "insightDocuments": [
+          {
+            "name": "FeatureImplementation",
+            "title": "FeatureImplementation - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
+            "significance": 9,
+            "diagramCount": 0
+          },
+          {
+            "name": "BugFixPattern",
+            "title": "BugFixPattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
+            "significance": 9,
+            "diagramCount": 0
+          },
+          {
+            "name": "AgentArchitecturePattern",
+            "title": "AgentArchitecturePattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md",
+            "significance": 9,
+            "diagramCount": 0
+          }
+        ],
+        "totalInsights": 3,
+        "patterns": [
+          {
+            "name": "FeatureImplementation",
+            "category": "Architecture",
+            "significance": 8
+          },
+          {
+            "name": "BugFixPattern",
+            "category": "Architecture",
+            "significance": 8
+          },
+          {
+            "name": "AgentArchitecturePattern",
+            "category": "Architecture",
+            "significance": 8
+          }
+        ],
+        "totalPatterns": 3,
+        "avgPatternSignificance": 8,
+        "generationMetrics": {
+          "processingTime": 4111,
+          "documentsGenerated": 3,
+          "diagramsGenerated": 0,
+          "patternsIdentified": 3,
+          "qualityScore": 65
+        },
+        "timing": {
+          "duration": 4111,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "generate_observations",
+      "status": "completed",
+      "duration": 38535,
+      "outputs": {
+        "observationsCount": 1058,
+        "timing": {
+          "duration": 38535,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "classify_with_ontology",
+      "status": "completed",
+      "duration": 30187,
+      "outputs": {
+        "timing": {
+          "duration": 30187,
+          "timeout": 600
+        }
+      }
+    },
+    {
+      "name": "analyze_documentation_semantics",
+      "status": "completed",
+      "duration": 284103,
+      "outputs": {
+        "codeGraphStats": {},
+        "timing": {
+          "duration": 284103,
+          "timeout": 600
+        }
+      }
+    },
+    {
+      "name": "quality_assurance",
+      "status": "completed",
+      "duration": 2561,
+      "outputs": {
+        "timing": {
+          "duration": 2561,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "persist_results",
+      "status": "completed",
+      "duration": 27196,
+      "outputs": {
+        "entitiesCreated": 3,
+        "entitiesUpdated": 0,
+        "filesCreated": [
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md"
+        ],
+        "errorsCount": 0,
+        "timing": {
+          "duration": 27196,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "deduplicate_insights",
+      "status": "completed",
+      "duration": 3,
+      "outputs": {
+        "timing": {
+          "duration": 3,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "validate_content",
+      "status": "completed",
+      "duration": 39663,
+      "outputs": {
+        "timing": {
+          "duration": 39663,
+          "timeout": 120
+        }
+      }
     }
   ],
   "summary": {
-    "totalCommits": 0,
-    "totalFiles": 0,
-    "totalSessions": 0,
-    "totalObservations": 0,
-    "totalInsights": 0,
-    "totalPatterns": 0,
-    "insightsGenerated": [],
-    "patternsFound": [],
-    "codeGraphStats": null,
+    "totalCommits": 727,
+    "totalFiles": 6016,
+    "totalSessions": 769,
+    "totalKeyTopics": 0,
+    "totalObservations": 1058,
+    "totalInsights": 3,
+    "totalPatterns": 3,
+    "keyTopics": [],
+    "insightsGenerated": [
+      {
+        "name": "FeatureImplementation",
+        "title": "FeatureImplementation - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
+        "significance": 9,
+        "diagramCount": 0
+      },
+      {
+        "name": "BugFixPattern",
+        "title": "BugFixPattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
+        "significance": 9,
+        "diagramCount": 0
+      },
+      {
+        "name": "AgentArchitecturePattern",
+        "title": "AgentArchitecturePattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md",
+        "significance": 9,
+        "diagramCount": 0
+      }
+    ],
+    "patternsFound": [
+      {
+        "name": "FeatureImplementation",
+        "category": "Architecture",
+        "significance": 8
+      },
+      {
+        "name": "BugFixPattern",
+        "category": "Architecture",
+        "significance": 8
+      },
+      {
+        "name": "AgentArchitecturePattern",
+        "category": "Architecture",
+        "significance": 8
+      }
+    ],
+    "codeGraphStats": {
+      "languages": []
+    },
     "skippedReasons": {}
   },
-  "lastUpdate": "2025-12-20T09:11:26.747Z",
-  "elapsedSeconds": 5
+  "lastUpdate": "2025-12-20T09:25:33.582Z",
+  "elapsedSeconds": 646
 }
