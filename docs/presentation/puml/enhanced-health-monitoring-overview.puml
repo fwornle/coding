@@ -1,55 +1,49 @@
 @startuml
 !include _standard-style.puml
 
-title Enhanced Health Monitoring - 6 Layers
+title Health Monitoring System
 
 left to right direction
 
-package "Failsafe" as L0 {
-  component [Watchdog] as SMW <<infra>>
+package "Supervision" {
+  component [GlobalProcessSupervisor] as GPS <<supervisor>>
 }
 
-package "Services" as L1 {
-  component [GSC] as GSC <<core>>
-  component [GLC] as GLC <<core>>
+package "Verification" {
+  component [HealthVerifier] as HV <<verifier>>
 }
 
-package "Verify" as L23 {
-  component [Pre-Session] as MV <<infra>>
-  component [Health] as HV <<core>>
+package "Status" {
+  component [StatusLineMonitor] as SHM <<monitor>>
+  component [StatusLine] as CSL <<display>>
 }
 
-package "Display" as L4 {
-  component [StatusLine] as SHM <<core>>
-  component [Dashboard] as Dash <<api>>
-}
-
-package "Monitor" as L5 {
-  component [Transcript] as ETM <<core>>
-  component [Logging] as LLC <<util>>
+package "Per-Project" {
+  component [TranscriptMonitor] as ETM <<per_project>>
 }
 
 database [PSM\nRegistry] as PSM <<storage>>
 
 database [Health\nFiles] as HF <<storage>>
 
-' Main flow
-SMW CONTROL_LINE GSC : restart
-GSC CONTROL_LINE GLC : coordinate
-GLC CONTROL_LINE ETM : recover
-MV ..> HV : trigger
-HV DATA_LINE SHM : status
-SHM SYNC_LINE Dash : display
+' Main supervision flow
+GPS --> ETM : supervises
+GPS --> SHM : supervises
+GPS --> HV : supervises
+GPS --> HF : checks
 
-' Health data flow
-ETM DATA_LINE HF : write
-SHM SYNC_LINE HF : read
-HV SYNC_LINE HF : check
+' Verification
+HV --> HF : verifies
 
-' PSM usage
-PSM -up-> SMW
-PSM -up-> GSC
-PSM -up-> SHM
-PSM -up-> ETM
+' Status display
+SHM --> HF : aggregates
+CSL --> SHM : displays
+
+' Per-project
+ETM --> HF : writes
+ETM --> PSM : registers
+
+' Core
+GPS --> PSM : uses
 
 @enduml

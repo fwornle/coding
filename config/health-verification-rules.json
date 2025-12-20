@@ -108,6 +108,7 @@
         "check_type": "psm_service",
         "service_name": "enhanced-transcript-monitor",
         "service_type": "per-project",
+        "dynamic_discovery": true,
         "project_path": "/Users/q284340/Agentic/coding",
         "description": "Live Session Logging (LSL) transcript monitor - CRITICAL for session history",
         "auto_heal": true,

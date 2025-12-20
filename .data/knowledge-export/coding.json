@@ -1511,6 +1511,51 @@
         "last_updated": "2025-12-18T17:40:23.776Z"
       },
       "id": "mc4flkgk7p8ly"
+    },
+    {
+      "name": "BugFixPattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        "Implementation: Configuration-driven development approach - Standardize configuration management across 18 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
+        "Applies to: Applicable to knowledge management and similar domain challenges",
+        "Details: http://localhost:8080/knowledge-management/insights/BugFixPattern.md"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2025-12-20T07:25:18.470Z",
+        "last_updated": "2025-12-20T07:25:18.470Z"
+      },
+      "id": "mc4flkg154s53l"
+    },
+    {
+      "name": "AgentArchitecturePattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        "Implementation: Configuration-driven development approach - Standardize configuration management across 18 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
+        "Applies to: Applicable to knowledge management and similar domain challenges",
+        "Details: http://localhost:8080/knowledge-management/insights/AgentArchitecturePattern.md"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2025-12-20T07:25:18.480Z",
+        "last_updated": "2025-12-20T07:25:18.480Z"
+      },
+      "id": "mc4flkg2wjrziw"
+    },
+    {
+      "name": "FeatureImplementation",
+      "entityType": "TransferablePattern",
+      "observations": [
+        "Implementation: Configuration-driven development approach - Standardize configuration management across 18 config files - Implement validation schemas for configuration - Create centralized configuration loading - Add environment-specific configuration support - Est...",
+        "Applies to: Applicable to knowledge management and similar domain challenges",
+        "Details: http://localhost:8080/knowledge-management/insights/FeatureImplementation.md"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2025-12-20T07:25:18.485Z",
+        "last_updated": "2025-12-20T07:25:18.485Z"
+      },
+      "id": "mc4flkg1hkvd48"
     }
   ],
   "relations": [
@@ -2029,14 +2074,86 @@
       "to": "CollectiveKnowledge",
       "relationType": "related-to",
       "metadata": {}
+    },
+    {
+      "from": "BugFixPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
+      "from": "BugFixPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "AgentArchitecturePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
+      "from": "AgentArchitecturePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "FeatureImplementation",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
+      "from": "FeatureImplementation",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "BugFixPattern",
+      "to": "Coding",
+      "relationType": "implemented_in",
+      "metadata": {}
+    },
+    {
+      "from": "AgentArchitecturePattern",
+      "to": "Coding",
+      "relationType": "implemented_in",
+      "metadata": {}
+    },
+    {
+      "from": "FeatureImplementation",
+      "to": "Coding",
+      "relationType": "implemented_in",
+      "metadata": {}
+    },
+    {
+      "from": "BugFixPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
+      "from": "AgentArchitecturePattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
+      "from": "FeatureImplementation",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-12-18T17:40:28.788Z",
-    "total_entities": 21,
-    "total_relations": 86,
+    "exported_at": "2025-12-20T07:25:30.527Z",
+    "total_entities": 24,
+    "total_relations": 98,
     "description": "Coding project infrastructure and patterns"
   }
 }

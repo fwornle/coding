@@ -1,35 +1,66 @@
 @startuml
 !include _standard-style.puml
 
-title Enhanced Health Monitoring System - 6-Layer Architecture
+title Health Monitoring System Architecture\nWith Global Process Supervisor
 
 top to bottom direction
 
-package "Layer 0: System Failsafe" {
-  component [SystemMonitorWatchdog] as SMW <<layer0>>
+package "Active Supervision Layer" {
+  component [GlobalProcessSupervisor] as GPS <<supervisor>>
+  note right of GPS
+    **Global Process Supervisor**
+    - 30s supervision loop
+    - Dynamic project discovery
+    - 5-min cooldown per service
+    - Max 10 restarts/hour
+    - Heartbeat: .health/supervisor-heartbeat.json
+  end note
 }
 
-package "Layer 1: Service Management" {
-  component [GlobalServiceCoordinator] as GSC <<layer1>>
-  component [GlobalLSLCoordinator] as GLC <<layer1>>
+package "Pre-Session Verification" {
+  component [MonitoringVerifier] as MV <<verifier>>
+  note right of MV
+    **Startup Gate**
+    - Exit 0=OK, 1=FAIL, 2=WARN
+    - Blocks Claude if unhealthy
+  end note
 }
 
-package "Layer 2: Pre-Session Verification" {
-  component [MonitoringVerifier] as MV <<layer2>>
+package "Health Verification Layer" {
+  component [HealthVerifier] as HV <<verifier>>
+  note right of HV
+    **Layer 3 Verification**
+    - 60s periodic checks
+    - Dynamic discovery of ALL projects
+    - Auto-healing triggers
+  end note
 }
 
-package "Layer 3: Health Verification" {
-  component [HealthVerifier] as HV <<layer3>>
+package "Status Aggregation Layer" {
+  component [StatusLineHealthMonitor] as SHM <<monitor>>
+  component [CombinedStatusLine] as CSL <<display>>
+  note right of SHM
+    **Status Aggregation**
+    - 15s updates
+    - Multi-session status display
+    - Health file aggregation
+  end note
+  note right of CSL
+    **Status Display**
+    - ensureAllTranscriptMonitorsRunning()
+    - Fallback supervisor (60s rate limit)
+  end note
 }
 
-package "Layer 4: Presentation" {
-  component [StatusLineHealthMonitor] as SHM <<layer4>>
-  component [Combined Status Line] as CSL <<display>>
-}
-
-package "Layer 5: Per-Project Monitoring" {
-  component [EnhancedTranscriptMonitor] as ETM <<layer5>>
-  component [LiveLoggingCoordinator] as LLC <<layer5>>
+package "Per-Project Monitoring" {
+  component [EnhancedTranscriptMonitor] as ETM <<per_project>>
+  component [LiveLoggingCoordinator] as LLC <<coordinator>>
+  note right of ETM
+    **Per-Project Monitor**
+    - 2s check interval
+    - LSL generation
+    - Trajectory analysis
+  end note
 }
 
 package "Core Infrastructure" {
@@ -38,90 +69,62 @@ package "Core Infrastructure" {
 }
 
 package "Health Data Storage" {
-  database [.health/*.json] as Health_Files <<per_project>>
-  database [.global-lsl-registry.json] as LSL_Registry <<central>>
+  database [.health/*-transcript-monitor-health.json] as Health_Files <<per_project>>
+  database [.health/supervisor-heartbeat.json] as Heartbeat <<central>>
   database [.health/verification-status.json] as Verify_Status <<central>>
 }
 
-' Layer relationships
-SMW CONTROL_LINE GSC : monitors & restarts
-GSC CONTROL_LINE GLC : coordinates
-GLC CONTROL_LINE ETM : ensures & recovers
+package "Discovery Sources" {
+  database [PSM Registry] as PSM_Reg <<source>>
+  database [Health Files] as HF_Src <<source>>
+  database [Claude Transcript Dirs] as CT_Src <<source>>
+}
+
+' Global Process Supervisor connections
+GPS --> PSM : uses for registration
+GPS --> Health_Files : checks freshness
+GPS --> ETM : restarts if dead
+GPS --> SHM : restarts if dead
+GPS --> HV : restarts if dead
+GPS --> Heartbeat : writes heartbeat
+
+' Discovery
+GPS ..> PSM_Reg : discovers projects
+GPS ..> HF_Src : discovers projects
+GPS ..> CT_Src : discovers projects
+
+' Health Verifier connections
+HV --> PSM : uses
+HV --> Verify_Status : writes reports
+HV ..> PSM_Reg : dynamic discovery
+HV ..> HF_Src : dynamic discovery
 
 ' Verification chain
-MV ..> SMW : verifies
-MV ..> GSC : verifies
+MV ..> GPS : verifies running
 MV ..> HV : triggers
 
-' Health flow
-HV DATA_LINE Verify_Status : writes reports
-SHM SYNC_LINE Health_Files : aggregates
-SHM SYNC_LINE Verify_Status : reads status
-CSL SYNC_LINE SHM : queries
+' Status aggregation
+SHM --> Health_Files : aggregates
+SHM --> Verify_Status : reads
+CSL --> SHM : queries status
+CSL --> ETM : ensures running (fallback)
 
 ' Per-project monitoring
-ETM DATA_LINE Health_Files : writes health
-ETM ..> LLC : uses
+ETM --> Health_Files : writes health
+ETM --> LLC : uses for LSL
+ETM --> PSM : registers
 
 ' PSM is central
-PSM DATA_LINE LPR : manages
-SMW --> PSM : uses
-GSC --> PSM : uses
-GLC --> PSM : uses
-MV --> PSM : uses
-HV --> PSM : uses
-SHM --> PSM : uses
-ETM --> PSM : uses
+PSM --> LPR : manages
+LLC --> PSM : uses
 
-' Registry updates
-GLC ASYNC_LINE LSL_Registry : maintains
-
-note right of SMW
-  **Layer 0: Ultimate Failsafe**
-  - Runs via cron/launchd (60s)
-  - Ensures GSC always runs
-  - Cannot be killed by user
-end note
-
-note right of GSC
-  **Layer 1: Service Daemon**
-  - 15s health checks
-  - Exponential backoff
-  - Manages MCP servers
-end note
-
-note right of MV
-  **Layer 2: Pre-Session**
-  - Exit 0=OK, 1=FAIL, 2=WARN
-  - Must pass before Claude
-end note
-
-note right of HV
-  **Layer 3: Verification**
-  - 60s periodic checks
-  - Auto-healing triggers
-  - DB/Service/Process checks
-end note
-
-note right of SHM
-  **Layer 4: Aggregation**
-  - 15s updates
-  - Only running monitors shown
-  - Outputs status line text
-end note
-
-note right of ETM
-  **Layer 5: Per-Project**
-  - 2s check interval
-  - Centralized health files
-  - LSL generation
-end note
-
-note bottom of PSM
-  **Core Infrastructure**
-  Used by ALL other classes
-  Atomic file locking
-  Singleton management
-end note
+legend right
+  |= Component |= Responsibility |= Check Interval |
+  | GlobalProcessSupervisor | Active supervision, restart dead services | 30s |
+  | HealthVerifier | Multi-project health verification | 60s |
+  | StatusLineHealthMonitor | Status aggregation & display | 15s |
+  | CombinedStatusLine | Fallback restart + display | 60s (fallback) |
+  | EnhancedTranscriptMonitor | Per-project LSL & health | 2s |
+endlegend
 
 @enduml
