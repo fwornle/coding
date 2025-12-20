@@ -1,8 +1,8 @@
 {
-  "type": "sequence",
-  "name": "bug-fix-pattern",
-  "error": "LLM-enhanced diagram generation failed completely. Debug info: {\n  \"type\": \"sequence\",\n  \"dataKeys\": [\n    \"gitAnalysis\",\n    \"vibeAnalysis\",\n    \"semanticAnalysis\",\n    \"patternCatalog\",\n    \"entityInfo\"\n  ],\n  \"dataTypes\": {\n    \"gitAnalysis\": \"object\",\n    \"vibeAnalysis\": \"object\",\n    \"semanticAnalysis\": \"object\",\n    \"patternCatalog\": \"object\",\n    \"entityInfo\": \"undefined\"\n  },\n  \"semanticAnalyzerExists\": true,\n  \"hasData\": true,\n  \"dataSize\": 3861048\n}",
-  "timestamp": "2025-12-20T08:20:44.446Z",
+  "type": "use-cases",
+  "name": "feature-implementation",
+  "error": "LLM-enhanced diagram generation failed completely. Debug info: {\n  \"type\": \"use-cases\",\n  \"dataKeys\": [\n    \"gitAnalysis\",\n    \"vibeAnalysis\",\n    \"semanticAnalysis\",\n    \"patternCatalog\",\n    \"entityInfo\"\n  ],\n  \"dataTypes\": {\n    \"gitAnalysis\": \"object\",\n    \"vibeAnalysis\": \"object\",\n    \"semanticAnalysis\": \"object\",\n    \"patternCatalog\": \"object\",\n    \"entityInfo\": \"undefined\"\n  },\n  \"semanticAnalyzerExists\": true,\n  \"hasData\": true,\n  \"dataSize\": 4021094\n}",
+  "timestamp": "2025-12-20T09:02:08.637Z",
   "dataKeys": [
     "gitAnalysis",
     "vibeAnalysis",
