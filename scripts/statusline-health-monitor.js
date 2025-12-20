@@ -323,10 +323,38 @@ class StatusLineHealthMonitor {
         const registry = JSON.parse(fs.readFileSync(this.registryPath, 'utf8'));
 
         for (const [projectName, projectInfo] of Object.entries(registry.projects || {})) {
-          // CRITICAL: Only show sessions with running transcript monitors
-          // Sessions without monitors should NOT appear in status line at all
+          // Check if monitor is running for this project
           if (!runningMonitors.has(projectName)) {
-            continue; // Skip - don't show sessions without running monitors
+            // No monitor running - show as dormant/sleeping with special icon
+            // Check if there's a recent transcript to determine if session is known
+            const claudeProjectDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects', `-Users-q284340-Agentic-${projectName}`);
+            if (fs.existsSync(claudeProjectDir)) {
+              try {
+                const transcriptFiles = fs.readdirSync(claudeProjectDir)
+                  .filter(file => file.endsWith('.jsonl'))
+                  .map(file => ({
+                    path: path.join(claudeProjectDir, file),
+                    stats: fs.statSync(path.join(claudeProjectDir, file))
+                  }))
+                  .sort((a, b) => b.stats.mtime - a.stats.mtime);
+
+                if (transcriptFiles.length > 0) {
+                  const mostRecent = transcriptFiles[0];
+                  const age = Date.now() - mostRecent.stats.mtime.getTime();
+                  // Only show dormant sessions within 48 hours
+                  if (age < 172800000) { // 48 hours
+                    sessions[projectName] = {
+                      status: 'no-monitor',
+                      icon: '💤',
+                      details: 'No monitor'
+                    };
+                  }
+                }
+              } catch (e) {
+                // Skip on error
+              }
+            }
+            continue; // Skip normal processing - already handled
           }
 
           const sessionHealth = await this.getProjectSessionHealth(projectName, projectInfo);
@@ -350,10 +378,34 @@ class StatusLineHealthMonitor {
           // Skip if already found via registry
           if (sessions[projectName]) continue;
 
-          // CRITICAL: Only show sessions with running transcript monitors
-          // Sessions without monitors should NOT appear in status line at all
+          // Check if monitor is running for this project
           if (!runningMonitors.has(projectName)) {
-            continue; // Skip - don't show sessions without running monitors
+            // No monitor running - check if session has recent activity
+            try {
+              const transcriptFiles = fs.readdirSync(projectDirPath)
+                .filter(file => file.endsWith('.jsonl'))
+                .map(file => ({
+                  path: path.join(projectDirPath, file),
+                  stats: fs.statSync(path.join(projectDirPath, file))
+                }))
+                .sort((a, b) => b.stats.mtime - a.stats.mtime);
+
+              if (transcriptFiles.length > 0) {
+                const mostRecent = transcriptFiles[0];
+                const age = Date.now() - mostRecent.stats.mtime.getTime();
+                // Only show dormant sessions within 48 hours
+                if (age < 172800000) { // 48 hours
+                  sessions[projectName] = {
+                    status: 'no-monitor',
+                    icon: '💤',
+                    details: 'No monitor'
+                  };
+                }
+              }
+            } catch (e) {
+              // Skip on error
+            }
+            continue; // Skip normal processing - already handled or too old
           }
 
           // Check if this project has a centralized health file FIRST
@@ -444,12 +496,12 @@ class StatusLineHealthMonitor {
       }
       
       // Method 3: Fallback hardcoded check for known project directories (using centralized health files)
-      // IMPORTANT: Only show sessions with running transcript monitors
       const commonProjectDirs = [
         this.codingRepoPath, // Current coding directory
         '/Users/q284340/Agentic/ui-template',
         '/Users/q284340/Agentic/curriculum-alignment',
-        '/Users/q284340/Agentic/nano-degree'
+        '/Users/q284340/Agentic/nano-degree',
+        '/Users/q284340/Agentic/virtual-validation'
       ];
 
       for (const projectDir of commonProjectDirs) {
@@ -458,10 +510,37 @@ class StatusLineHealthMonitor {
         // Skip if already found
         if (sessions[projectName]) continue;
 
-        // CRITICAL: Only show sessions with running transcript monitors
-        // Sessions without monitors should NOT appear in status line at all
+        // Check if monitor is running for this project
         if (!runningMonitors.has(projectName)) {
-          continue; // Skip - don't show sessions without running monitors
+          // No monitor running - check if session has recent transcript activity
+          const claudeProjectDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects', `-Users-q284340-Agentic-${projectName}`);
+          if (fs.existsSync(claudeProjectDir)) {
+            try {
+              const transcriptFiles = fs.readdirSync(claudeProjectDir)
+                .filter(file => file.endsWith('.jsonl'))
+                .map(file => ({
+                  path: path.join(claudeProjectDir, file),
+                  stats: fs.statSync(path.join(claudeProjectDir, file))
+                }))
+                .sort((a, b) => b.stats.mtime - a.stats.mtime);
+
+              if (transcriptFiles.length > 0) {
+                const mostRecent = transcriptFiles[0];
+                const age = Date.now() - mostRecent.stats.mtime.getTime();
+                // Only show dormant sessions within 48 hours
+                if (age < 172800000) { // 48 hours
+                  sessions[projectName] = {
+                    status: 'no-monitor',
+                    icon: '💤',
+                    details: 'No monitor'
+                  };
+                }
+              }
+            } catch (e) {
+              // Skip on error
+            }
+          }
+          continue; // Skip normal processing
         }
 
         if (fs.existsSync(projectDir)) {
@@ -483,12 +562,13 @@ class StatusLineHealthMonitor {
       // Skip if already found via other methods
       if (sessions[projectName]) continue;
 
-      // This session has Claude running but no monitor - show as warning
+      // This session has Claude running but no monitor - show as dormant (💤)
+      // Not a warning (🟡) because having Claude open without a monitor is expected
+      // for idle sessions - the Global Process Supervisor will restart it if needed
       sessions[projectName] = {
-        status: 'warning',
-        icon: '🟡',
-        details: 'no mon',
-        reason: 'no mon' // For backward compatibility with status line display
+        status: 'no-monitor',
+        icon: '💤',
+        details: 'idle'
       };
 
       this.log(`Detected Claude session without monitor: ${projectName}`, 'DEBUG');

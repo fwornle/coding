@@ -137,7 +137,7 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 | 🫒 | Fading | 15 min - 1 hour | Session fading, still tracked |
 | 🪨 | Dormant | 1 - 6 hours | Session dormant but alive |
 | ⚫ | Inactive | 6 - 24 hours | Session inactive, may be orphaned |
-| 💤 | Sleeping | > 24 hours | Session sleeping, consider cleanup |
+| 💤 | Sleeping/No Monitor | > 24 hours OR no monitor | Session sleeping OR no transcript monitor running |
 | 🟡 | Warning | Any | Trajectory file missing or stale |
 | ❌ | Error | Any | Health check failed or service crash |
 
@@ -188,13 +188,15 @@ The system uses multiple discovery methods to ensure **only active sessions** (w
 4. **Health File Validation**: Uses centralized health files from `.health/` directory
 
 **Key Behavior**:
-- **Only sessions with running transcript monitors are displayed** - closed sessions with stale health files are automatically hidden
-- Sessions are shown regardless of their activity age (dormant, sleeping, etc.) as long as a monitor is running
-- The running transcript monitor IS the signal that a session is active/open
+- Sessions WITH running transcript monitors are shown with full activity status (🟢, 🌲, 🫒, 🪨, ⚫)
+- Sessions WITHOUT running monitors BUT with recent transcripts (within 48h) are shown as 💤 (dormant/no monitor)
+- Sessions older than 48 hours without a monitor are hidden
+- The Global Process Supervisor automatically restarts dead monitors within 30 seconds
 
 **Example**:
-- `[C🟢 ND💤 UT🟢]` - Shows coding (active), nano-degree (sleeping but monitor running), ui-template (active)
-- Closed sessions like `budapest` or `curriculum-alignment` are NOT shown, even if their health files still exist
+- `[C🟢 ND💤 UT🟢]` - Shows coding (active), nano-degree (no monitor but recent transcript), ui-template (active)
+- `[C🟢 CA🌲 ND💤]` - coding active, curriculum-alignment cooling, nano-degree dormant (no monitor)
+- Sessions with transcripts older than 48 hours AND no running monitor are hidden
 
 ### Smart Abbreviation Engine
 
