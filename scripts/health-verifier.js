@@ -919,22 +919,18 @@ class HealthVerifier extends EventEmitter {
    */
   async checkExistingInstance() {
     try {
-      // Check PSM for existing instance
-      const isRunning = await this.psm.isServiceRunning('health-verifier', 'global');
-      if (isRunning) {
-        const services = await this.psm.getServicesByType('global');
-        const existing = services.find(s => s.name === 'health-verifier');
-        if (existing && existing.pid) {
-          // Verify the process is actually running
-          try {
-            process.kill(existing.pid, 0); // Signal 0 just checks if process exists
-            return { running: true, pid: existing.pid };
-          } catch (e) {
-            // Process doesn't exist, clean up stale entry
-            this.log(`Cleaning up stale PSM entry for health-verifier (PID: ${existing.pid})`);
-            await this.psm.unregisterService('health-verifier', 'global');
-            return { running: false };
-          }
+      // Check PSM for existing instance using getService (not getServicesByType which doesn't exist)
+      const existing = await this.psm.getService('health-verifier', 'global');
+      if (existing && existing.pid) {
+        // Verify the process is actually running
+        try {
+          process.kill(existing.pid, 0); // Signal 0 just checks if process exists
+          return { running: true, pid: existing.pid };
+        } catch (e) {
+          // Process doesn't exist, clean up stale entry
+          this.log(`Cleaning up stale PSM entry for health-verifier (PID: ${existing.pid})`);
+          await this.psm.unregisterService('health-verifier', 'global');
+          return { running: false };
         }
       }
       return { running: false };
