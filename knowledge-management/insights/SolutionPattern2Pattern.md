@@ -1,4 +1,4 @@
-# BugFixPattern
+# SolutionPattern2
 
 **Type:** Technical Pattern
 

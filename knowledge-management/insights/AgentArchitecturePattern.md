@@ -1,4 +1,4 @@
-# BugFixPattern
+# AgentArchitecturePattern
 
 **Type:** Technical Pattern
 

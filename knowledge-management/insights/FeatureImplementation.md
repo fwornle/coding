@@ -1,4 +1,4 @@
-# BugFixPattern
+# FeatureImplementation
 
 **Type:** Technical Pattern
 
