@@ -97,8 +97,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'NL→Cypher + Memgraph + SemanticAnalyzer',
-    row: 0.5,
-    col: 1.125,
+    row: 1,
+    col: 1.5,
   },
   {
     id: 'documentation_linker',
@@ -526,6 +526,84 @@ function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Rec
         const merged = outputs.entitiesMerged || 0
         return `Found ${duplicates} duplicates, merged ${merged} entities`
 
+      case 'code_graph':
+        // Check for failure/skip conditions first
+        if (outputs.skipped || outputs.warning || outputs.skipReason) {
+          const reason = outputs.skipReason || outputs.warning || 'Unknown reason'
+          // Extract the key part of the error message
+          const shortReason = reason.includes('code 143') ? 'Timeout (SIGTERM)' :
+                              reason.includes('failed') ? 'Indexing failed' :
+                              reason.slice(0, 50) + (reason.length > 50 ? '...' : '')
+          return `⚠️ Skipped: ${shortReason}`
+        }
+        // Check for incremental mode (used existing data)
+        if (outputs.incrementalMode && !outputs.reindexed) {
+          const existingNodes = outputs.statistics?.totalEntities || 0
+          const changedFiles = outputs.changedFilesCount || 0
+          if (changedFiles > 0) {
+            return `📊 Used existing graph (${existingNodes} nodes), ${changedFiles} files changed`
+          }
+          return `📊 Used existing graph (${existingNodes} nodes), no changes detected`
+        }
+        // Code graph indexing results from code-graph-rag
+        const functions = outputs.functionsIndexed || outputs.functions?.length || outputs.nodeStats?.functions || outputs.statistics?.entityTypeDistribution?.Function || 0
+        const classes = outputs.classesIndexed || outputs.classes?.length || outputs.nodeStats?.classes || outputs.statistics?.entityTypeDistribution?.Class || 0
+        const modules = outputs.modulesIndexed || outputs.modules?.length || outputs.nodeStats?.modules || outputs.statistics?.entityTypeDistribution?.Module || 0
+        const relationships = outputs.relationshipsIndexed || outputs.relationships?.length || outputs.edgeStats?.total || outputs.statistics?.totalRelationships || 0
+        const totalNodes = outputs.totalNodesIndexed || outputs.nodesCreated || outputs.totalNodes || outputs.statistics?.totalEntities || (functions + classes + modules)
+        if (totalNodes > 0 || functions > 0 || classes > 0) {
+          const reindexNote = outputs.reindexed ? ' (re-indexed)' : ''
+          return `Indexed ${totalNodes} nodes (${functions} functions, ${classes} classes), ${relationships} relationships${reindexNote}`
+        }
+        // Fallback for incremental indexing
+        const filesScanned = outputs.filesScanned || outputs.filesProcessed || 0
+        if (filesScanned > 0) {
+          return `Scanned ${filesScanned} files for code graph updates`
+        }
+        return `Code graph indexing completed`
+
+      case 'code_intelligence':
+        const queriesGenerated = outputs.queriesGenerated || outputs.queries?.length || 0
+        const patternsDiscovered = outputs.patternsDiscovered || outputs.patterns?.length || 0
+        const hotspots = outputs.hotspots?.length || 0
+        if (queriesGenerated > 0 || patternsDiscovered > 0) {
+          return `Generated ${queriesGenerated} queries, discovered ${patternsDiscovered} patterns${hotspots > 0 ? `, ${hotspots} hotspots` : ''}`
+        }
+        return `Code intelligence analysis completed`
+
+      case 'documentation_linker':
+        const docsLinked = outputs.documentsLinked || outputs.linksCreated || outputs.documents?.length || 0
+        const unresolvedRefs = outputs.unresolvedReferences || 0
+        return unresolvedRefs > 0
+          ? `Linked ${docsLinked} documents (${unresolvedRefs} unresolved references)`
+          : `Linked ${docsLinked} documents to code entities`
+
+      case 'documentation_semantics':
+        const docstringsAnalyzed = outputs.docstringsAnalyzed || outputs.docstrings?.length || 0
+        const semanticEntities = outputs.entitiesEnriched || outputs.entities?.length || 0
+        return `Analyzed ${docstringsAnalyzed} docstrings, enriched ${semanticEntities} entities`
+
+      case 'ontology_classification':
+        const entitiesClassified = outputs.entitiesClassified || outputs.classified?.length || 0
+        const avgConfidence = outputs.averageConfidence ? `${(outputs.averageConfidence * 100).toFixed(0)}%` : ''
+        const classesUsed = outputs.ontologyClassesUsed || 0
+        return avgConfidence
+          ? `Classified ${entitiesClassified} entities (${avgConfidence} avg confidence) into ${classesUsed} classes`
+          : `Classified ${entitiesClassified} entities into ontology taxonomy`
+
+      case 'web_search':
+        const searchesPerformed = outputs.searchesPerformed || outputs.searches?.length || 0
+        const resultsFound = outputs.resultsFound || outputs.results?.length || 0
+        return `Performed ${searchesPerformed} searches, found ${resultsFound} relevant results`
+
+      case 'content_validation':
+        const entitiesValidated = outputs.entitiesValidated || outputs.validated?.length || 0
+        const staleDetected = outputs.staleEntitiesDetected || outputs.stale?.length || 0
+        const refreshed = outputs.entitiesRefreshed || 0
+        return staleDetected > 0
+          ? `Validated ${entitiesValidated} entities, detected ${staleDetected} stale (${refreshed} refreshed)`
+          : `Validated ${entitiesValidated} entities against current codebase`
+
       default:
         return null
     }
@@ -951,7 +1029,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               return (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <g className="cursor-pointer">
+                    <g
+                      className="cursor-pointer"
+                      onClick={() => onNodeClick?.('orchestrator')}
+                    >
                       {/* Orchestrator background - wider than regular nodes */}
                       <rect
                         x={pos.x - (orchestratorWidth - nodeWidth) / 2}
@@ -1269,6 +1350,248 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   )
 }
 
+// Orchestrator details sidebar component
+function OrchestratorDetailsSidebar({
+  process,
+  onClose
+}: {
+  process: ProcessInfo
+  onClose: () => void
+}) {
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'running':
+        return <Badge className="bg-blue-500">Running</Badge>
+      case 'completed':
+        return <Badge className="bg-green-500">Completed</Badge>
+      case 'failed':
+        return <Badge variant="destructive">Failed</Badge>
+      default:
+        return <Badge variant="outline">Pending</Badge>
+    }
+  }
+
+  const progressPercent = process.totalSteps > 0
+    ? Math.round((process.completedSteps / process.totalSteps) * 100)
+    : 0
+
+  // Calculate total duration from steps
+  const totalDuration = process.steps?.reduce((acc, step) => acc + (step.duration || 0), 0) || 0
+
+  // Group steps by status
+  const completedSteps = process.steps?.filter(s => s.status === 'completed') || []
+  const failedSteps = process.steps?.filter(s => s.status === 'failed') || []
+  const runningSteps = process.steps?.filter(s => s.status === 'running') || []
+  const pendingSteps = process.steps?.filter(s => s.status === 'pending') || []
+  const skippedSteps = process.steps?.filter(s => s.status === 'skipped') || []
+
+  return (
+    <Card className="w-80 h-full overflow-auto">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Play className="h-5 w-5" />
+            <CardTitle className="text-lg">Workflow Coordinator</CardTitle>
+          </div>
+          {getStatusBadge(process.status)}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <div className="text-sm text-muted-foreground mb-2">
+            DAG-based workflow coordinator. Manages parallel execution with max 3 concurrent steps,
+            handles dependencies, retries failed steps, and aggregates results.
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Workflow Info */}
+        <div className="space-y-3">
+          <h4 className="font-medium text-sm">Workflow Details</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Name</span>
+              <span className="font-medium">{process.workflowName || 'Unknown'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Team</span>
+              <span>{process.team || 'Unknown'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Repository</span>
+              <span className="text-xs truncate max-w-[180px]" title={process.repositoryPath}>
+                {process.repositoryPath?.split('/').slice(-2).join('/') || 'Unknown'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Progress */}
+        <div className="space-y-3">
+          <h4 className="font-medium text-sm">Progress</h4>
+          <div className="space-y-2">
+            <Progress value={progressPercent} className="h-2" />
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Steps</span>
+              <span className="font-medium">{process.completedSteps} / {process.totalSteps}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{progressPercent}%</span>
+            </div>
+            {totalDuration > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  Total Duration
+                </span>
+                <span>{(totalDuration / 1000).toFixed(1)}s</span>
+              </div>
+            )}
+            {process.currentStep && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Current Step</span>
+                <span className="text-blue-600 font-medium text-xs">{process.currentStep}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Step Status Summary */}
+        <div className="space-y-3">
+          <h4 className="font-medium text-sm">Step Status Summary</h4>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <span>Completed: {completedSteps.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <span>Running: {runningSteps.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <span>Failed: {failedSteps.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gray-300" />
+              <span>Pending: {pendingSteps.length}</span>
+            </div>
+            {skippedSteps.length > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                <span>Skipped: {skippedSteps.length}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Executed Steps List */}
+        {process.steps && process.steps.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm">All Steps</h4>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {process.steps.map((step, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-center justify-between text-xs p-1.5 rounded ${
+                      step.status === 'completed' ? 'bg-green-50' :
+                      step.status === 'failed' ? 'bg-red-50' :
+                      step.status === 'running' ? 'bg-blue-50' :
+                      step.status === 'skipped' ? 'bg-yellow-50' :
+                      'bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {step.status === 'completed' && <CheckCircle2 className="h-3 w-3 text-green-600" />}
+                      {step.status === 'failed' && <XCircle className="h-3 w-3 text-red-600" />}
+                      {step.status === 'running' && <Loader2 className="h-3 w-3 text-blue-600 animate-spin" />}
+                      {step.status === 'pending' && <Clock className="h-3 w-3 text-gray-400" />}
+                      {step.status === 'skipped' && <RefreshCw className="h-3 w-3 text-yellow-600" />}
+                      <span className="truncate max-w-[140px]">{step.name}</span>
+                    </div>
+                    {step.duration !== undefined && step.duration > 0 && (
+                      <span className="text-muted-foreground tabular-nums">
+                        {(step.duration / 1000).toFixed(1)}s
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Failed Steps Details */}
+        {failedSteps.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm text-red-600 flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                Failed Steps
+              </h4>
+              {failedSteps.map((step, idx) => (
+                <div key={idx} className="text-xs bg-red-50 border border-red-200 rounded p-2 space-y-1">
+                  <div className="font-medium text-red-800">{step.name}</div>
+                  {step.error && (
+                    <div className="text-red-700 break-words">{step.error}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Technology */}
+        <Separator />
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm">Technology</h4>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Executor</span>
+              <span className="text-xs">TypeScript DAG</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Max Concurrent</span>
+              <span>3 steps</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Retry Policy</span>
+              <span className="text-xs">Progressive backoff</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Data Flow - Entry Points */}
+        <Separator />
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm">Dispatches To</h4>
+          <div className="flex flex-wrap gap-1">
+            {WORKFLOW_EDGES
+              .filter(e => e.from === 'orchestrator')
+              .map(e => {
+                const toAgent = WORKFLOW_AGENTS.find(a => a.id === e.to)
+                return (
+                  <Badge key={e.to} variant="outline" className="text-[10px]">
+                    {toAgent?.shortName || e.to}
+                  </Badge>
+                )
+              })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // Sidebar component for detailed node information
 export function UKBNodeDetailsSidebar({
   agentId,
@@ -1279,6 +1602,11 @@ export function UKBNodeDetailsSidebar({
   process: ProcessInfo
   onClose: () => void
 }) {
+  // Handle orchestrator node specially
+  if (agentId === 'orchestrator') {
+    return <OrchestratorDetailsSidebar process={process} onClose={onClose} />
+  }
+
   const agent = WORKFLOW_AGENTS.find(a => a.id === agentId)
   if (!agent) return null
 

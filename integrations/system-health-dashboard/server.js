@@ -998,6 +998,17 @@ class SystemHealthAPIServer {
                         .filter(line => line.startsWith('- '))
                         .map(line => line.replace(/^- /, '').trim()) || [];
 
+                    // Extract outputs JSON if present
+                    const outputsMatch = section.match(/#### Outputs\n\n```json\n([\s\S]*?)\n```/);
+                    let outputs = null;
+                    if (outputsMatch?.[1]) {
+                        try {
+                            outputs = JSON.parse(outputsMatch[1]);
+                        } catch (e) {
+                            // Invalid JSON, skip outputs
+                        }
+                    }
+
                     steps.push({
                         index: parseInt(headerMatch[1]),
                         name: headerMatch[2],
@@ -1005,7 +1016,8 @@ class SystemHealthAPIServer {
                         action: headerMatch[4],
                         status: headerMatch[5].toLowerCase(),
                         duration: headerMatch[6],
-                        errors: errors.length > 0 ? errors : undefined
+                        errors: errors.length > 0 ? errors : undefined,
+                        outputs: outputs
                     });
                 }
             }
