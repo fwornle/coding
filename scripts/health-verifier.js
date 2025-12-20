@@ -350,21 +350,207 @@ class HealthVerifier extends EventEmitter {
     // Check Enhanced Transcript Monitor (LSL system - CRITICAL for session history)
     if (serviceRules.enhanced_transcript_monitor?.enabled) {
       const rule = serviceRules.enhanced_transcript_monitor;
-      const transcriptCheck = await this.checkPSMService(
-        'enhanced_transcript_monitor',
-        rule.service_name,
-        rule.service_type,
-        rule.project_path
-      );
+
+      // Dynamic discovery mode: check ALL transcript monitors
+      if (rule.dynamic_discovery) {
+        const allMonitorChecks = await this.verifyAllTranscriptMonitors(rule);
+        checks.push(...allMonitorChecks);
+      } else {
+        // Legacy single-project mode
+        const transcriptCheck = await this.checkPSMService(
+          'enhanced_transcript_monitor',
+          rule.service_name,
+          rule.service_type,
+          rule.project_path
+        );
+        checks.push({
+          ...transcriptCheck,
+          auto_heal: rule.auto_heal,
+          auto_heal_action: rule.auto_heal_action,
+          severity: rule.severity
+        });
+      }
+    }
+
+    return checks;
+  }
+
+  /**
+   * Verify ALL transcript monitors across all discovered projects
+   * @param {Object} rule - The enhanced_transcript_monitor rule configuration
+   * @returns {Array} Array of check results for each project's monitor
+   */
+  async verifyAllTranscriptMonitors(rule) {
+    const checks = [];
+
+    try {
+      // Discover projects from multiple sources
+      const projects = await this.discoverActiveProjects();
+
+      for (const projectPath of projects) {
+        const projectName = path.basename(projectPath);
+        const healthFile = path.join(this.codingRoot, '.health', `${projectName}-transcript-monitor-health.json`);
+
+        const check = {
+          category: 'services',
+          check: `transcript_monitor_${projectName}`,
+          check_id: `transcript_monitor_${projectName}_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          auto_heal: rule.auto_heal,
+          auto_heal_action: rule.auto_heal_action,
+          severity: rule.severity
+        };
+
+        // Check health file existence and freshness
+        if (!fs.existsSync(healthFile)) {
+          checks.push({
+            ...check,
+            status: 'error',
+            message: `Transcript monitor for ${projectName} has no health file`,
+            details: { projectPath, healthFile, reason: 'no_health_file' }
+          });
+          continue;
+        }
+
+        const stats = fs.statSync(healthFile);
+        const age = Date.now() - stats.mtime.getTime();
+
+        if (age > 60000) {
+          checks.push({
+            ...check,
+            status: 'error',
+            message: `Transcript monitor for ${projectName} health file is stale (${Math.round(age / 1000)}s old)`,
+            details: { projectPath, healthFile, age, reason: 'stale_health_file' }
+          });
+          continue;
+        }
+
+        // Read health file and check PID
+        try {
+          const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+          const pid = healthData.metrics?.processId;
+
+          if (!pid) {
+            checks.push({
+              ...check,
+              status: 'error',
+              message: `Transcript monitor for ${projectName} has no PID in health file`,
+              details: { projectPath, healthFile, reason: 'no_pid' }
+            });
+            continue;
+          }
+
+          const psmHealth = await this.psm.getHealthStatus();
+          const isAlive = this.psm.isProcessAlive(pid);
+
+          if (!isAlive) {
+            checks.push({
+              ...check,
+              status: 'error',
+              message: `Transcript monitor for ${projectName} (PID ${pid}) is not running`,
+              details: { projectPath, healthFile, pid, reason: 'pid_dead' }
+            });
+            continue;
+          }
+
+          // Monitor is healthy
+          checks.push({
+            ...check,
+            status: 'pass',
+            message: `Transcript monitor for ${projectName} is running (PID ${pid})`,
+            details: { projectPath, pid, uptime: healthData.metrics?.uptimeSeconds }
+          });
+        } catch (parseError) {
+          checks.push({
+            ...check,
+            status: 'error',
+            message: `Failed to parse health file for ${projectName}: ${parseError.message}`,
+            details: { projectPath, healthFile, reason: 'parse_error' }
+          });
+        }
+      }
+    } catch (error) {
       checks.push({
-        ...transcriptCheck,
-        auto_heal: rule.auto_heal,
-        auto_heal_action: rule.auto_heal_action,
-        severity: rule.severity
+        category: 'services',
+        check: 'transcript_monitors_discovery',
+        check_id: `transcript_monitors_discovery_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        status: 'error',
+        message: `Failed to discover transcript monitors: ${error.message}`,
+        severity: 'warning'
       });
     }
 
     return checks;
+  }
+
+  /**
+   * Discover all active projects for transcript monitor verification
+   */
+  async discoverActiveProjects() {
+    const projects = new Set();
+
+    // Source 1: PSM registry
+    try {
+      const registry = await this.psm.getAllServices();
+      const projectServices = registry.services?.projects || {};
+      for (const projectPath of Object.keys(projectServices)) {
+        if (projectPath.includes('/Agentic/')) {
+          projects.add(projectPath);
+        }
+      }
+    } catch {
+      // Ignore PSM errors
+    }
+
+    // Source 2: Health files
+    try {
+      const healthDir = path.join(this.codingRoot, '.health');
+      if (fs.existsSync(healthDir)) {
+        const files = fs.readdirSync(healthDir);
+        for (const file of files) {
+          const match = file.match(/^(.+)-transcript-monitor-health\.json$/);
+          if (match) {
+            const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+            if (fs.existsSync(projectPath)) {
+              projects.add(projectPath);
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore health file errors
+    }
+
+    // Source 3: Claude transcript directories with recent activity (< 24 hours)
+    try {
+      const claudeProjectsDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects');
+      if (fs.existsSync(claudeProjectsDir)) {
+        const dirs = fs.readdirSync(claudeProjectsDir);
+        for (const dir of dirs) {
+          const match = dir.match(/^-Users-q284340-Agentic-(.+)$/);
+          if (match) {
+            const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+            if (fs.existsSync(projectPath)) {
+              const transcriptDir = path.join(claudeProjectsDir, dir);
+              const jsonlFiles = fs.readdirSync(transcriptDir).filter(f => f.endsWith('.jsonl'));
+              if (jsonlFiles.length > 0) {
+                const latestMtime = Math.max(
+                  ...jsonlFiles.map(f => fs.statSync(path.join(transcriptDir, f)).mtime.getTime())
+                );
+                if (Date.now() - latestMtime < 24 * 60 * 60 * 1000) {
+                  projects.add(projectPath);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore Claude dir errors
+    }
+
+    return Array.from(projects);
   }
 
   /**

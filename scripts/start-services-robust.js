@@ -429,6 +429,85 @@ const SERVICE_CONFIGS = {
     }
   },
 
+  globalProcessSupervisor: {
+    name: 'Global Process Supervisor',
+    required: false, // OPTIONAL - active supervision of all monitors
+    maxRetries: 2,
+    timeout: 10000,
+    startFn: async () => {
+      console.log('[GlobalSupervisor] Starting global process supervisor...');
+
+      // Check if already running globally (singleton pattern)
+      const isRunning = await psm.isServiceRunning('global-process-supervisor', 'global');
+      if (isRunning) {
+        console.log('[GlobalSupervisor] Already running globally - skipping startup');
+        return { pid: 'already-running', service: 'global-process-supervisor', skipRegistration: true };
+      }
+
+      // ALSO check OS-level to catch orphaned processes PSM doesn't know about
+      const osCheck = await isProcessRunningByScript('global-process-supervisor.js');
+      if (osCheck.running) {
+        console.log(`[GlobalSupervisor] Already running at OS level (PID: ${osCheck.pid}) - reusing`);
+        // Re-register this orphan with PSM so future checks work
+        try {
+          await psm.registerService({
+            name: 'global-process-supervisor',
+            pid: osCheck.pid,
+            type: 'global',
+            script: 'scripts/global-process-supervisor.js'
+          });
+        } catch (e) {
+          console.log(`[GlobalSupervisor] Warning: Could not re-register with PSM: ${e.message}`);
+        }
+        return { pid: osCheck.pid, service: 'global-process-supervisor', skipRegistration: true };
+      }
+
+      const child = spawn('node', [
+        path.join(SCRIPT_DIR, 'global-process-supervisor.js'),
+        '--daemon'
+      ], {
+        detached: true,
+        stdio: ['ignore', 'ignore', 'ignore'],
+        cwd: CODING_DIR
+      });
+
+      child.unref();
+
+      // Brief wait for process to start
+      await sleep(500);
+
+      // Check if process is still running
+      if (!isProcessRunning(child.pid)) {
+        throw new Error('Global process supervisor died immediately');
+      }
+
+      return { pid: child.pid, service: 'global-process-supervisor' };
+    },
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+
+      // Check heartbeat file freshness
+      const heartbeatPath = path.join(CODING_DIR, '.health', 'supervisor-heartbeat.json');
+      if (!fs.existsSync(heartbeatPath)) {
+        // Give it time to create first heartbeat
+        return createPidHealthCheck()(result);
+      }
+
+      try {
+        const stats = fs.statSync(heartbeatPath);
+        const ageMs = Date.now() - stats.mtime.getTime();
+        // Heartbeat should be updated within 60 seconds
+        if (ageMs > 60000) {
+          console.log(`[GlobalSupervisor] Warning: Heartbeat file is ${Math.round(ageMs/1000)}s old`);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        return createPidHealthCheck()(result);
+      }
+    }
+  },
+
   memgraph: {
     name: 'Memgraph (Code Graph RAG)',
     required: false, // OPTIONAL - for code-graph-rag AST analysis
@@ -933,7 +1012,28 @@ async function startAllServices() {
 
   console.log('');
 
-  // 6. OPTIONAL: System Health Dashboard API
+  // 6. OPTIONAL: Global Process Supervisor (active supervision of all monitors)
+  const globalSupervisorResult = await startServiceWithRetry(
+    SERVICE_CONFIGS.globalProcessSupervisor.name,
+    SERVICE_CONFIGS.globalProcessSupervisor.startFn,
+    SERVICE_CONFIGS.globalProcessSupervisor.healthCheckFn,
+    {
+      required: SERVICE_CONFIGS.globalProcessSupervisor.required,
+      maxRetries: SERVICE_CONFIGS.globalProcessSupervisor.maxRetries,
+      timeout: SERVICE_CONFIGS.globalProcessSupervisor.timeout
+    }
+  );
+
+  if (globalSupervisorResult.status === 'success') {
+    results.successful.push(globalSupervisorResult);
+    await registerWithPSM(globalSupervisorResult, 'scripts/global-process-supervisor.js');
+  } else {
+    results.degraded.push(globalSupervisorResult);
+  }
+
+  console.log('');
+
+  // 7. OPTIONAL: System Health Dashboard API (renumbered from 6)
   const systemHealthAPIResult = await startServiceWithRetry(
     SERVICE_CONFIGS.systemHealthDashboardAPI.name,
     SERVICE_CONFIGS.systemHealthDashboardAPI.startFn,
@@ -954,7 +1054,7 @@ async function startAllServices() {
 
   console.log('');
 
-  // 6b. OPTIONAL: System Health Dashboard Frontend (depends on API being available)
+  // 7b. OPTIONAL: System Health Dashboard Frontend (depends on API being available)
   const systemHealthFrontendResult = await startServiceWithRetry(
     SERVICE_CONFIGS.systemHealthDashboardFrontend.name,
     SERVICE_CONFIGS.systemHealthDashboardFrontend.startFn,
@@ -975,7 +1075,7 @@ async function startAllServices() {
 
   console.log('');
 
-  // 7. OPTIONAL: Memgraph (Code Graph RAG)
+  // 8. OPTIONAL: Memgraph (Code Graph RAG)
   const memgraphResult = await startServiceWithRetry(
     SERVICE_CONFIGS.memgraph.name,
     SERVICE_CONFIGS.memgraph.startFn,

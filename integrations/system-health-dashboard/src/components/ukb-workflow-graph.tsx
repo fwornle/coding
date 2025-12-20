@@ -637,8 +637,10 @@ function StepResultDetails({ outputs }: { outputs: Record<string, any> }) {
   }
 
   const renderValue = (key: string, value: any, depth: number = 0): React.ReactNode => {
+    // For nested keys like "parent.child.grandchild", display only the last part
+    const displayKey = key.includes('.') ? key.split('.').pop()! : key
     // Format key: commitsAnalyzed -> Commits Analyzed
-    const formattedKey = key
+    const formattedKey = displayKey
       .replace(/([A-Z])/g, ' $1')
       .replace(/^./, s => s.toUpperCase())
       .trim()
@@ -755,7 +757,7 @@ function StepResultDetails({ outputs }: { outputs: Record<string, any> }) {
             <div className="text-xs bg-slate-100 rounded p-2 ml-2 space-y-1">
               {entries.slice(0, 8).map(([k, v]) => {
                 const nestedKey = `${key}.${k}`
-                return renderValue(k, v, depth + 1)
+                return renderValue(nestedKey, v, depth + 1)
               })}
             </div>
           )}
@@ -847,10 +849,11 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     const stepInfo = stepStatusMap[agentId]
     if (stepInfo) return stepInfo.status
 
-    // If no step info exists for this agent, it's not part of the current workflow
-    // Don't infer from completedSteps index - that's unreliable for varying workflows
-    // Instead, mark as 'skipped' to indicate it's not in this workflow
-    return 'skipped'
+    // If no step info exists for this agent:
+    // - If workflow is complete (100%), the agent was not part of this workflow -> 'skipped'
+    // - If workflow is still running, the agent hasn't started yet -> 'pending'
+    const isWorkflowComplete = process.completedSteps >= process.totalSteps && process.totalSteps > 0
+    return isWorkflowComplete ? 'skipped' : 'pending'
   }
 
   // Returns fill and stroke colors for SVG nodes with better contrast
@@ -1451,7 +1454,7 @@ function OrchestratorDetailsSidebar({
                 <span>{(totalDuration / 1000).toFixed(1)}s</span>
               </div>
             )}
-            {process.currentStep && (
+            {process.currentStep && runningSteps.length <= 1 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Current Step</span>
                 <span className="text-blue-600 font-medium text-xs">{process.currentStep}</span>
@@ -1459,6 +1462,37 @@ function OrchestratorDetailsSidebar({
             )}
           </div>
         </div>
+
+        {/* Active Steps - Parallel Execution */}
+        {runningSteps.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                  Active Steps {runningSteps.length > 1 && <Badge variant="secondary" className="text-[10px] ml-1">{runningSteps.length} parallel</Badge>}
+                </h4>
+              </div>
+              <div className="space-y-2">
+                {runningSteps.map((step: any) => {
+                  const agentDef = WORKFLOW_AGENTS.find(a =>
+                    a.id === step.name.replace('analyze_', '').replace('_history', '_history').replace('index_', '').replace('link_', '') ||
+                    step.name.includes(a.id.replace('_', ''))
+                  )
+                  const AgentIcon = agentDef?.icon || Code
+                  return (
+                    <div key={step.name} className="flex items-center gap-2 text-sm bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
+                      <AgentIcon className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                      <span className="font-medium text-blue-800 truncate">{step.name}</span>
+                      <Loader2 className="h-3 w-3 animate-spin text-blue-500 ml-auto flex-shrink-0" />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </>
+        )}
 
         <Separator />
 
@@ -1616,9 +1650,9 @@ export function UKBNodeDetailsSidebar({
   // Use same fallback logic as getNodeStatus in the graph
   const getInferredStatus = (): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
     if (stepInfo?.status) return stepInfo.status as any
-    // If no step info exists for this agent, it's not part of the current workflow
-    // Don't infer from completedSteps index - that's unreliable for varying workflows
-    return 'skipped'
+    // If workflow is complete but agent has no step info, it wasn't part of this workflow
+    const isWorkflowComplete = process.completedSteps >= process.totalSteps && process.totalSteps > 0
+    return isWorkflowComplete ? 'skipped' : 'pending'
   }
 
   const inferredStatus = getInferredStatus()
