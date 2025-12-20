@@ -18,87 +18,83 @@ The Health System provides **failsafe monitoring** with automatic verification a
 
 ![Health System Architecture](../images/enhanced-health-monitoring-overview.png)
 
-### 9 Core Classes
+### Core Components
 
-The health system is built on 9 interconnected classes across 6 architectural layers:
+The health system is built on interconnected components with active supervision:
 
 ![Health System Classes](../images/health-system-classes.png)
 
-| Layer | Class | File | Purpose |
-|-------|-------|------|---------|
-| 0 | **SystemMonitorWatchdog** | `system-monitor-watchdog.js` | Ultimate failsafe - runs via cron/launchd, ensures GSC always runs |
-| 1 | **GlobalServiceCoordinator** | `global-service-coordinator.js` | Self-healing daemon managing all critical services |
-| 1 | **GlobalLSLCoordinator** | `global-lsl-coordinator.js` | Multi-project transcript monitoring manager |
-| 2 | **MonitoringVerifier** | `monitoring-verifier.js` | Pre-session verification (exit 0=OK, 1=FAIL, 2=WARN) |
-| 3 | **HealthVerifier** | `health-verifier.js` | Core verification engine with auto-healing |
-| 4 | **StatusLineHealthMonitor** | `statusline-health-monitor.js` | Health aggregation for Claude Code status bar |
-| 5 | **EnhancedTranscriptMonitor** | `enhanced-transcript-monitor.js` | Real-time per-project transcript monitoring |
-| 5 | **LiveLoggingCoordinator** | `live-logging-coordinator.js` | Logging orchestration with multi-user support |
-| Core | **ProcessStateManager** | `process-state-manager.js` | Unified registry with atomic file locking (used by all) |
+| Component | File | Purpose |
+|-----------|------|---------|
+| **GlobalProcessSupervisor** | `global-process-supervisor.js` | Active supervision - 30s checks, restarts dead services |
+| **HealthVerifier** | `health-verifier.js` | Core verification engine with dynamic discovery & auto-healing |
+| **StatusLineHealthMonitor** | `statusline-health-monitor.js` | Health aggregation for Claude Code status bar |
+| **CombinedStatusLine** | `combined-status-line.js` | Status display + fallback supervisor (60s rate limit) |
+| **EnhancedTranscriptMonitor** | `enhanced-transcript-monitor.js` | Real-time per-project transcript monitoring |
+| **LiveLoggingCoordinator** | `live-logging-coordinator.js` | Logging orchestration with multi-user support |
+| **ProcessStateManager** | `process-state-manager.js` | Unified registry with atomic file locking (used by all) |
 
-### 6-Layer Protection Architecture
+### Supervision Architecture
 
-![Multi-Session Health Monitoring](../images/multi-session-health-architecture.png)
+![Health Monitoring Architecture](../images/enhanced-health-monitoring-overview.png)
 
-**Layer 0: System Failsafe** - SystemMonitorWatchdog runs via launchd
-**Layer 1: Service Management** - GlobalServiceCoordinator + GlobalLSLCoordinator
-**Layer 2: Pre-Session Verification** - MonitoringVerifier validates before Claude starts
-**Layer 3: Health Verification** - HealthVerifier runs periodic checks with auto-healing
-**Layer 4: Presentation** - StatusLineHealthMonitor aggregates and displays health
-**Layer 5: Per-Project** - EnhancedTranscriptMonitor + LiveLoggingCoordinator per session
+**Active Supervision Layer** - GlobalProcessSupervisor actively monitors and restarts dead services
+**Verification Layer** - HealthVerifier runs periodic checks with dynamic project discovery
+**Status Aggregation Layer** - StatusLineHealthMonitor + CombinedStatusLine display health
+**Per-Project Layer** - EnhancedTranscriptMonitor + LiveLoggingCoordinator per session
+**Core Infrastructure** - ProcessStateManager provides unified process registry
 
-## Core Components
+### Key Features
 
-### 9 Health System Classes
+- **Dynamic Discovery** - Discovers ALL projects from PSM, health files, and Claude transcript directories
+- **Active Supervision** - GlobalProcessSupervisor actively restarts dead monitors within 30 seconds
+- **Cooldown Protection** - 5-minute cooldown per service prevents restart storms
+- **Rate Limiting** - Max 10 restarts per hour per service
+- **Fallback Supervision** - CombinedStatusLine provides backup restart capability
 
-**ProcessStateManager** (`scripts/process-state-manager.js`) - Core Infrastructure
+## Component Details
+
+### GlobalProcessSupervisor (`scripts/global-process-supervisor.js`) - Active Supervision
+- **Active supervision of ALL transcript monitors and global services**
+- 30-second supervision loop with dynamic project discovery
+- Discovers projects from: PSM registry, health files, Claude transcript directories
+- 5-minute cooldown per service prevents restart storms
+- Max 10 restarts per hour per service (safety limit)
+- Heartbeat file: `.health/supervisor-heartbeat.json`
+- Started via: `start-services-robust.js` or manually
+
+### ProcessStateManager (`scripts/process-state-manager.js`) - Core Infrastructure
 - Unified registry for all system processes
 - Atomic file operations via proper-lockfile
 - Session-aware process tracking (global, per-project, per-session)
 - Storage: `.live-process-registry.json`
 
-**SystemMonitorWatchdog** (`scripts/system-monitor-watchdog.js`) - Layer 0
-- Ultimate failsafe "monitor monitoring the monitor"
-- Runs via system cron/launchd every minute
-- Ensures GlobalServiceCoordinator is always running
-- Cannot be killed by user processes
-
-**GlobalServiceCoordinator** (`scripts/global-service-coordinator.js`) - Layer 1
-- Self-healing service management daemon
-- 15-second health checks with exponential backoff recovery
-- Manages: constraint API, constraint dashboard, MCP servers
-- Maintains service registry
-
-**GlobalLSLCoordinator** (`scripts/global-lsl-coordinator.js`) - Layer 1
-- Multi-project transcript monitoring manager
-- 30-second health checks on all registered projects
-- Auto-recovery of dead Enhanced Transcript Monitors
-- Maintains: `.global-lsl-registry.json`
-
-**MonitoringVerifier** (`scripts/monitoring-verifier.js`) - Layer 2
-- Pre-session verification of all monitoring systems
-- Exit codes: 0=OK, 1=Critical failure (MUST NOT START), 2=Warning
-- Validates: watchdog, coordinator, project registration, service health
-
-**HealthVerifier** (`scripts/health-verifier.js`) - Layer 3
+### HealthVerifier (`scripts/health-verifier.js`) - Verification Layer
 - Core verification engine with 60-second periodic checks
+- **Dynamic discovery of ALL projects** (enabled via `dynamic_discovery: true` in config)
 - Checks databases (LevelDB, Qdrant, SQLite, Memgraph), services, processes
 - Generates health scores (0-100) per service
 - Triggers auto-healing via HealthRemediationActions
 
-**StatusLineHealthMonitor** (`scripts/statusline-health-monitor.js`) - Layer 4
+### StatusLineHealthMonitor (`scripts/statusline-health-monitor.js`) - Status Aggregation
 - Health aggregation for Claude Code status bar
 - 15-second update interval with auto-healing
 - **Only shows sessions with running transcript monitors**
 - Outputs to: `.logs/statusline-health-status.txt`
 
-**EnhancedTranscriptMonitor** (`scripts/enhanced-transcript-monitor.js`) - Layer 5
+### CombinedStatusLine (`scripts/combined-status-line.js`) - Status Display + Fallback
+- Displays health status in Claude Code status bar
+- **`ensureAllTranscriptMonitorsRunning()`** - Fallback supervisor for all projects
+- 60-second rate limiting to prevent restart storms
+- Acts as backup if GlobalProcessSupervisor is not running
+
+### EnhancedTranscriptMonitor (`scripts/enhanced-transcript-monitor.js`) - Per-Project
 - Real-time transcript monitoring per project
 - 2-second check interval for prompt detection
 - Writes health files to centralized `.health/` directory
 - Generates LSL files in `.specstory/history/`
 
-**LiveLoggingCoordinator** (`scripts/live-logging-coordinator.js`) - Layer 5
+### LiveLoggingCoordinator (`scripts/live-logging-coordinator.js`) - Logging
 - Orchestrates live logging components
 - Manages LSLFileManager and operational logging
 - Multi-user support with user hash tracking
@@ -255,29 +251,30 @@ See [Status Line System](./status-line.md) for complete documentation.
 
 ## Key Files
 
-**9 Core Health Classes** (in layer order):
-- `scripts/process-state-manager.js` - Core: Unified process registry with atomic locking
-- `scripts/system-monitor-watchdog.js` - Layer 0: Ultimate failsafe (cron/launchd)
-- `scripts/global-service-coordinator.js` - Layer 1: Service management daemon
-- `scripts/global-lsl-coordinator.js` - Layer 1: Multi-project LSL manager
-- `scripts/monitoring-verifier.js` - Layer 2: Pre-session verification
-- `scripts/health-verifier.js` - Layer 3: Core verification with auto-healing
-- `scripts/statusline-health-monitor.js` - Layer 4: Health aggregation daemon
-- `scripts/enhanced-transcript-monitor.js` - Layer 5: Per-project monitoring
-- `scripts/live-logging-coordinator.js` - Layer 5: Logging orchestration
+**Core Health Components**:
+- `scripts/global-process-supervisor.js` - Active supervision of all services
+- `scripts/process-state-manager.js` - Unified process registry with atomic locking
+- `scripts/health-verifier.js` - Core verification with dynamic discovery & auto-healing
+- `scripts/statusline-health-monitor.js` - Health aggregation daemon
+- `scripts/combined-status-line.js` - Status display + fallback supervisor
+- `scripts/enhanced-transcript-monitor.js` - Per-project monitoring
+- `scripts/live-logging-coordinator.js` - Logging orchestration
 
 **Supporting Scripts**:
 - `scripts/health-prompt-hook.js` - Pre-prompt integration
 - `scripts/health-remediation-actions.js` - Auto-healing actions
-- `scripts/combined-status-line.js` - Status line display
+- `scripts/start-services-robust.js` - Service startup with supervisor
 - `lib/api-quota-checker.js` - API quota checking (shared library)
 
 **Data Files**:
 - `.live-process-registry.json` - ProcessStateManager registry
-- `.global-lsl-registry.json` - GlobalLSLCoordinator registry
+- `.health/supervisor-heartbeat.json` - GlobalProcessSupervisor heartbeat
 - `.health/verification-status.json` - HealthVerifier output
 - `.health/*-transcript-monitor-health.json` - Per-project health files
 - `.logs/statusline-health-status.txt` - StatusLineHealthMonitor output
+
+**Configuration**:
+- `config/health-verification-rules.json` - Health check rules with `dynamic_discovery` flag
 
 **Dashboard**:
 - `integrations/system-health-dashboard/server.js` - API server (port 3033)
