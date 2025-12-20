@@ -167,6 +167,7 @@ src/**/*.d.ts
 .tmp/
 # Process state registry (volatile runtime data)
 .live-process-registry.json
+.process-state/
 
 # Windows artifacts
 nul

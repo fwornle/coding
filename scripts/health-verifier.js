@@ -453,10 +453,11 @@ class HealthVerifier extends EventEmitter {
             continue;
           }
 
-          // Monitor is healthy
+          // Monitor is healthy - override severity to 'info' for passing checks
           checks.push({
             ...check,
-            status: 'pass',
+            status: 'passed',  // Use 'passed' (not 'pass') for consistency with report filter
+            severity: 'info',  // Pass = info, not error
             message: `Transcript monitor for ${projectName} is running (PID ${pid})`,
             details: { projectPath, pid, uptime: healthData.metrics?.uptimeSeconds }
           });
