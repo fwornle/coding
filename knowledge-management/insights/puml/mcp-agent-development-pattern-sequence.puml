@@ -1,25 +1,22 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
+participant McpAgent as "MCP Agent"
+participant Developer as "Developer"
 participant PatternCatalog as "Pattern Catalog"
-participant McpAgentDevelopmentPattern as "MCP Agent Development Pattern"
-participant Implementation as "Implementation"
 
-note over PatternCatalog,McpAgentDevelopmentPattern: 1 pattern found
-note over McpAgentDevelopmentPattern: Category: Implementation
-note over McpAgentDevelopmentPattern: Description: MCP Agent Development with 15 occurrences
-note over McpAgentDevelopmentPattern: Significance: 8
-note over McpAgentDevelopmentPattern: Evidence: Occurrences: 15, Trend: increasing
+McpAgent->>Developer: Request MCP Agent Development
+Developer->>PatternCatalog: Query McpAgentDevelopmentPattern
+PatternCatalog->>Developer: Return pattern details (Occurrences: 15, Trend: increasing)
+Developer->>McpAgent: Develop MCP Agent using McpAgentDevelopmentPattern
+McpAgent->>Developer: Confirm MCP Agent Development
 
-McpAgentDevelopmentPattern->>Implementation: Related to Implementation
-PatternCatalog->>McpAgentDevelopmentPattern: Contains pattern
-
-alt Occurrences
-    McpAgentDevelopmentPattern->>Implementation: 15 occurrences
-end
-
-loop Trend
-    McpAgentDevelopmentPattern->>Implementation: Trend: increasing
+alt Successful Development
+    McpAgent->>Developer: Report successful development
+    Developer->>PatternCatalog: Update pattern usage notes
+else Failed Development
+    McpAgent->>Developer: Report development failure
+    Developer->>PatternCatalog: Update pattern usage notes with failure details
 end
 
 @enduml

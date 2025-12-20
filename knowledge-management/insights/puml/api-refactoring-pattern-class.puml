@@ -3,64 +3,82 @@
 
 package "Pattern Catalog" {
     class PatternCatalog {
-        -patterns: Pattern[]
-        -summary: PatternSummary
-        +getTotalPatterns(): int
-        +getPatternsByCategory(category: String): Pattern[]
-        +getTopPatterns(): String[]
+        -totalPatterns: int
+        -avgSignificance: double
+        +getPatterns(): List<Pattern>
+        +getSummary(): PatternSummary
+        +getTopPatterns(): List<String>
     }
-
+    
     class PatternSummary {
         -totalPatterns: int
         -byCategory: Map<String, Integer>
         -avgSignificance: double
-        -topPatterns: String[]
-        +calculateAverageSignificance(): double
+        -topPatterns: List<String>
         +getCategoryCount(category: String): int
     }
-
+    
     abstract class Pattern {
         -name: String
         -category: String
         -description: String
         -significance: int
-        -evidence: String[]
-        -relatedComponents: Component[]
+        -evidence: List<String>
+        -relatedComponents: List<String>
+        +getName(): String
         +getSignificance(): int
-        +getEvidence(): String[]
+        +getEvidence(): List<String>
     }
-
+    
     class ApiRefactoringPattern <<Implementation>> {
         -occurrences: int
         -trend: String
-        -implementation: Implementation
-        +getTrend(): String
-        +getOccurrences(): int
-        +isDecreasing(): boolean
-    }
-
-    class Implementation {
         -language: String
-        -usageNotes: String[]
-        +getUsageNotes(): String[]
-        +setLanguage(lang: String): void
+        -usageNotes: List<String>
+        +getOccurrences(): int
+        +getTrend(): String
+        +getUsageNotes(): List<String>
     }
-
-    class Component {
-        -name: String
-        -type: String
-        +getName(): String
-        +getType(): String
+    
+    class PatternImplementation {
+        -language: String
+        -usageNotes: List<String>
+        +getLanguage(): String
+        +getUsageNotes(): List<String>
+    }
+    
+    enum PatternCategory {
+        IMPLEMENTATION
+        ARCHITECTURAL
+        DESIGN
+        BEHAVIORAL
+    }
+    
+    enum TrendType {
+        INCREASING
+        DECREASING
+        STABLE
     }
 }
 
 PatternCatalog *-- "1..*" Pattern : contains
-PatternCatalog *-- "1" PatternSummary : summarizes
+PatternCatalog *-- "1" PatternSummary : has
 Pattern <|-- ApiRefactoringPattern : extends
-ApiRefactoringPattern *-- "1" Implementation : has
-Pattern o-- "0..*" Component : relates to
+Pattern *-- "1" PatternImplementation : implements
+Pattern --> PatternCategory : categorized by
+ApiRefactoringPattern --> TrendType : has trend
 
-note right of ApiRefactoringPattern : "5 occurrences\nTrend: decreasing\nSignificance: 3"
-note top of PatternCatalog : "Analysis: api-refactoring-pattern\narchitectural analysis"
+note right of ApiRefactoringPattern
+  Current Status:
+  - Occurrences: 5
+  - Trend: decreasing
+  - Significance: 3/5
+end note
+
+note top of PatternCatalog
+  Analysis: api-refactoring-pattern
+  Total Patterns: 1
+  Implementation Category: 1
+end note
 
 @enduml

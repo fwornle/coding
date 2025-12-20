@@ -1,48 +1,49 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title UI Component Work Pattern - Sequence Diagram
+participant "User" as U
+participant "UI Controller" as UC
+participant "Component Registry" as CR
+participant "UI Component" as UIC
+participant "Work Handler" as WH
+participant "State Manager" as SM
 
-participant "User Interface" as UI
-participant "Component Manager" as CM
-participant "UI Component" as UC
-participant "Pattern Analyzer" as PA
-participant "Metrics Collector" as MC
+note over UC, WH : UI Component Work Pattern Implementation\n10 stable occurrences identified
 
-activate UI
-activate CM
+U -> UC : initiate UI interaction
 activate UC
-activate PA
-activate MC
 
-note over UI, MC : UI Component Work Pattern Analysis (12 occurrences, increasing trend)
+UC -> CR : request component instance
+activate CR
+CR -> UIC : create/retrieve component
+activate UIC
+CR --> UC : return component reference
+deactivate CR
 
-UI -> CM : Request component work
-CM -> UC : Initialize component
-
-loop 12 times (increasing trend)
-    UC -> PA : Report pattern usage
-    PA -> MC : Record occurrence
-    MC -> PA : Update significance (6)
+loop 10 occurrences (stable trend)
+    UC -> UIC : trigger work execution
+    UIC -> WH : delegate work processing
+    activate WH
     
-    alt Component work required
-        CM -> UC : Execute work pattern
-        UC -> UI : Update interface
+    alt component state change required
+        WH -> SM : update component state
+        activate SM
+        SM --> WH : state updated
+        deactivate SM
+        WH -> UIC : apply state changes
+    else read-only operation
+        WH -> UIC : process without state change
     end
     
-    PA -> MC : Analyze trend data
-    MC -> PA : Confirm increasing trend
+    WH --> UIC : work completed
+    deactivate WH
+    UIC --> UC : operation result
 end
 
-note over PA, MC : Pattern Significance: 6/10\nCategory: Implementation\nTotal Patterns Identified: 1
-
-PA -> CM : Pattern analysis complete
-CM -> UI : Component work finished
-
-deactivate MC
-deactivate PA
+UC --> U : UI updated with results
+deactivate UIC
 deactivate UC
-deactivate CM
-deactivate UI
+
+note right of SM : Pattern Significance: 5/10\nCategory: Implementation\nStable usage across system
 
 @enduml

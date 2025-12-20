@@ -1,42 +1,47 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title API Refactoring Pattern Analysis Sequence
+title API Refactoring Pattern Analysis
 
+participant "Client" as C
+participant "Legacy API" as LA
+participant "Refactoring Engine" as RE
 participant "Pattern Analyzer" as PA
-participant "API Refactoring Pattern" as ARP
-participant "Implementation Monitor" as IM
-participant "Trend Tracker" as TT
-participant "Pattern Catalog" as PC
+participant "New API" as NA
 
-PA -> ARP: Analyze pattern occurrences
-activate ARP
+note over PA : ApiRefactoringPattern\nCategory: Implementation\nSignificance: 3/5\nOccurrences: 5 (decreasing trend)
 
-ARP -> IM: Check implementation status
-activate IM
-IM --> ARP: Language: Unknown\nCategory: Implementation
-deactivate IM
+C -> LA : Initial API Request
+activate LA
 
-ARP -> TT: Track usage trend
-activate TT
-TT --> ARP: 5 occurrences\nTrend: decreasing
-deactivate TT
+LA -> RE : Trigger Refactoring Process
+activate RE
 
-ARP -> ARP: Calculate significance
-note right: Significance level: 3
+RE -> PA : Analyze Current Implementation
+activate PA
 
-ARP -> PC: Register pattern data
-activate PC
+PA -> PA : Identify Pattern Occurrences\n(5 instances found)
 
-PC -> PC: Update pattern summary
-note right: Total patterns: 1\nImplementation category: 1\nAvg significance: 3
+PA -> RE : Pattern Analysis Results\n- Decreasing trend\n- Implementation category\n- Moderate significance
+deactivate PA
 
-PC --> ARP: Pattern registered
-deactivate PC
+alt Pattern Refactoring Required
+    RE -> NA : Create Refactored API
+    activate NA
+    
+    NA -> RE : Refactored Implementation
+    deactivate NA
+    
+    RE -> LA : Update API Structure
+    
+    LA -> C : Refactored Response
+else No Refactoring Needed
+    LA -> C : Standard Response
+end
 
-ARP --> PA: Analysis complete\nPattern significance: 3\nOccurrences: 5 (decreasing)
-deactivate ARP
+deactivate RE
+deactivate LA
 
-note over PA, PC: API Refactoring Pattern shows decreasing usage\nbut maintains moderate significance level
+note over RE, PA : Total Patterns: 1\nAverage Significance: 3\nTop Pattern: ApiRefactoringPattern
 
 @enduml

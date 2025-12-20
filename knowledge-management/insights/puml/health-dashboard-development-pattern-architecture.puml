@@ -1,0 +1,45 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+title Health Dashboard Development Architecture Pattern
+
+package "Implementation Patterns" {
+    component "Health Dashboard\nDevelopment Pattern" as hdp <<core>>
+    
+    component "Dashboard UI" as ui <<api>>
+    component "Health Metrics\nProcessor" as hmp <<core>>
+    component "Data Storage" as storage <<storage>>
+    component "Health Analytics\nEngine" as hae <<core>>
+}
+
+package "External Systems" {
+    cloud "Health Data\nSources" as hds <<external>>
+    cloud "Monitoring\nServices" as ms <<external>>
+}
+
+' Relationships
+hdp --> ui : "renders"
+hdp --> hmp : "processes metrics"
+hdp --> hae : "analyzes health data"
+hmp --> storage : "stores data"
+hae --> storage : "reads historical data"
+ui --> hae : "displays analytics"
+hds --> hmp : "provides health data"
+ms --> hmp : "monitoring feeds"
+
+note top of hdp
+**Pattern Significance: 4/5**
+- 8 occurrences identified
+- Trend: increasing
+- Category: Implementation
+end note
+
+note bottom
+**Architecture Summary**
+- Total Patterns: 1
+- Implementation Category: 1 pattern
+- Average Significance: 4.0
+- Top Pattern: Health Dashboard Development
+end note
+
+@enduml

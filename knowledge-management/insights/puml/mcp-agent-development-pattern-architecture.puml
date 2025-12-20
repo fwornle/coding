@@ -1,12 +1,39 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Implementation" {
-  component "McpAgentDevelopmentPattern" as madp <<agent>>
+title MCP Agent Development Pattern Architecture
+
+package "Implementation Patterns" {
+    component "MCP Agent Development" as mcpAgent <<agent>>
+    
+    component "Agent Runtime" as runtime <<core>>
+    component "Development Framework" as framework <<core>>
+    component "Pattern Library" as patterns <<storage>>
+    component "Message Protocol" as protocol <<api>>
 }
 
-note "Summary: 1 pattern, avg significance: 8" as summary
+package "External Systems" {
+    cloud "MCP Servers" as mcpServers <<external>>
+    cloud "Client Applications" as clients <<external>>
+}
 
-madp --> summary : relates to
+mcpAgent --> runtime : "executes on"
+mcpAgent --> framework : "built with"
+mcpAgent --> patterns : "implements"
+runtime --> protocol : "communicates via"
+protocol --> mcpServers : "connects to"
+protocol --> clients : "serves"
+framework --> patterns : "provides"
+
+note top of mcpAgent : Significance: 8/10\n15 occurrences\nTrend: increasing
+
+note as summary
+  **Pattern Analysis Summary**
+  • Total Patterns: 1
+  • Average Significance: 8.0
+  • Category Distribution:
+  - Implementation: 1 pattern
+  • Top Pattern: MCP Agent Development
+end note
 
 @enduml

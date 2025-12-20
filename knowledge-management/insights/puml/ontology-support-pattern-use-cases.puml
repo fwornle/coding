@@ -1,65 +1,51 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title "Ontology Support Pattern - Use Cases"
+title Ontology Support Pattern - Use Cases
+
+left to right direction
 
 actor "System Architect" as architect
 actor "Developer" as developer
-actor "Knowledge Engineer" as ke
-actor "Application User" as user
+actor "Domain Expert" as expert
+actor "Data Analyst" as analyst
 
-package "Ontology Management" {
-  usecase "Define Ontology Schema" as define
-  usecase "Import Existing Ontologies" as import
-  usecase "Validate Ontology Structure" as validate
-  usecase "Version Control Ontologies" as version
+package "Ontology Support System" {
+    usecase "Define Ontology Structure" as UC1
+    usecase "Implement Ontology Mapping" as UC2
+    usecase "Validate Ontology Rules" as UC3
+    usecase "Query Ontology Data" as UC4
+    usecase "Maintain Ontology Versions" as UC5
+    usecase "Generate Ontology Reports" as UC6
+    
+    usecase "Parse Semantic Data" as UC7
+    usecase "Infer Relationships" as UC8
 }
 
-package "Pattern Implementation" {
-  usecase "Apply Ontology Support Pattern" as apply
-  usecase "Configure Pattern Parameters" as configure
-  usecase "Monitor Pattern Usage" as monitor
-  usecase "Analyze Pattern Trends" as trends
-}
+architect --> UC1
+architect --> UC2
+architect --> UC5
 
-package "Query & Reasoning" {
-  usecase "Execute Semantic Queries" as query
-  usecase "Perform Reasoning Operations" as reason
-  usecase "Navigate Knowledge Graph" as navigate
-}
+developer --> UC2
+developer --> UC3
+developer --> UC7
 
-package "Integration" {
-  usecase "Integrate with Applications" as integrate
-  usecase "Expose API Endpoints" as api
-  usecase "Handle Data Mapping" as mapping
-}
+expert --> UC1
+expert --> UC3
+expert --> UC4
 
-architect --> define
-architect --> import
-architect --> apply
-architect --> configure
+analyst --> UC4
+analyst --> UC6
+analyst --> UC8
 
-ke --> define
-ke --> validate
-ke --> version
-ke --> reason
+UC2 .> UC7 : <<include>>
+UC4 .> UC8 : <<include>>
+UC3 .> UC8 : <<extend>>
 
-developer --> apply
-developer --> configure
-developer --> integrate
-developer --> api
-developer --> mapping
-
-user --> query
-user --> navigate
-
-apply .> configure : <<include>>
-apply .> validate : <<include>>
-monitor .> trends : <<extend>>
-query .> reason : <<extend>>
-integrate .> mapping : <<include>>
-
-note right of apply : "6 occurrences\nTrend: increasing"
-note top of "Ontology Management" : "Implementation Category\nSignificance: 3"
+note right of UC1
+  Pattern Significance: 3/5
+  Occurrences: 6
+  Trend: Increasing
+end note
 
 @enduml

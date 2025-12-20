@@ -4,47 +4,47 @@
 left to right direction
 
 actor "API Developer" as dev
-actor "System Architect" as architect
-actor "Legacy System" as legacy
-actor "Client Applications" as clients
+actor "API Client" as client
+actor "System Administrator" as admin
 
-package "API Refactoring System" {
-  usecase "Analyze API Structure" as analyze
+rectangle "API Refactoring System" {
+  usecase "Analyze API Endpoints" as analyze
   usecase "Identify Refactoring Opportunities" as identify
-  usecase "Apply Refactoring Patterns" as apply
+  usecase "Apply Refactoring Pattern" as apply
   usecase "Validate API Changes" as validate
   usecase "Monitor API Usage" as monitor
-  usecase "Generate Migration Plans" as migrate
-  usecase "Track Pattern Occurrences" as track
-  usecase "Assess Pattern Significance" as assess
+  usecase "Track Pattern Trends" as track
+  usecase "Generate Refactoring Report" as report
 }
 
-package "Implementation Patterns" {
-  usecase "Execute API Refactoring Pattern" as execute
-  usecase "Decrease Pattern Usage" as decrease
+rectangle "Implementation Support" {
+  usecase "Execute Code Changes" as execute
+  usecase "Update API Documentation" as docs
+  usecase "Manage Backward Compatibility" as compat
 }
 
 dev --> analyze
+dev --> identify
 dev --> apply
 dev --> validate
-architect --> identify
-architect --> assess
-architect --> migrate
+dev --> report
 
-legacy --> analyze
-clients --> monitor
-clients --> validate
+client --> monitor
+client --> validate
 
-analyze ..> identify : <<include>>
-identify ..> apply : <<include>>
-apply ..> validate : <<include>>
-apply --> execute
-monitor --> track
-assess --> track
+admin --> track
+admin --> monitor
+admin --> report
 
-execute --> decrease : <<extend>>
+apply ..> execute : <<include>>
+apply ..> docs : <<include>>
+apply ..> compat : <<include>>
 
-note right of execute : "5 occurrences\nTrend: decreasing\nSignificance: 3"
-note top of decrease : "Pattern usage trending downward"
+identify ..> analyze : <<include>>
+validate ..> monitor : <<include>>
+track ..> monitor : <<include>>
+
+note right of apply : "5 occurrences\nDecreasing trend"
+note bottom of track : "Pattern significance: 3/5"
 
 @enduml

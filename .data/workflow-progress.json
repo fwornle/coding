@@ -1,36 +1,314 @@
 {
-  "workflowName": "incremental-analysis",
-  "executionId": "incremental-analysis-1766127742418",
-  "status": "running",
+  "workflowName": "complete-analysis",
+  "executionId": "complete-analysis-1766174127309",
+  "status": "failed",
   "team": "coding",
   "repositoryPath": "/Users/q284340/Agentic/coding",
-  "startTime": "2025-12-19T07:02:22.418Z",
-  "currentStep": "index_recent_code",
-  "totalSteps": 13,
-  "completedSteps": 0,
-  "failedSteps": 0,
+  "startTime": "2025-12-19T19:55:27.309Z",
+  "currentStep": null,
+  "totalSteps": 15,
+  "completedSteps": 9,
+  "failedSteps": 1,
   "skippedSteps": 0,
-  "stepsCompleted": [],
-  "stepsFailed": [],
+  "stepsCompleted": [
+    "analyze_vibe_history",
+    "analyze_git_history",
+    "link_documentation",
+    "index_codebase",
+    "transform_code_entities",
+    "semantic_analysis",
+    "web_search",
+    "generate_insights",
+    "generate_observations"
+  ],
+  "stepsFailed": [
+    "analyze_documentation_semantics"
+  ],
   "stepsSkipped": [],
   "stepsDetail": [
     {
-      "name": "index_recent_code",
-      "status": "running"
+      "name": "analyze_vibe_history",
+      "status": "completed",
+      "duration": 3622,
+      "outputs": {
+        "sessionsCount": 200,
+        "timing": {
+          "duration": 3622,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "analyze_git_history",
+      "status": "completed",
+      "duration": 8694,
+      "outputs": {
+        "commitsCount": 722,
+        "filesCount": 6003,
+        "timing": {
+          "duration": 8694,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "link_documentation",
+      "status": "completed",
+      "duration": 1406,
+      "outputs": {
+        "codeGraphStats": {},
+        "timing": {
+          "duration": 1406,
+          "timeout": 120
+        }
+      }
+    },
+    {
+      "name": "index_codebase",
+      "status": "completed",
+      "duration": 266839,
+      "outputs": {
+        "entitiesCount": 0,
+        "codeGraphStats": {
+          "totalEntities": 0,
+          "totalRelationships": 0,
+          "languageDistribution": {},
+          "entityTypeDistribution": {}
+        },
+        "diagnostics": {
+          "codeGraphRagDirExists": true,
+          "pyprojectExists": true,
+          "repositoryExists": true,
+          "memgraphConnection": {
+            "connected": true
+          },
+          "uvAvailable": {
+            "available": true,
+            "path": "/Library/Frameworks/Python.framework/Versions/3.12/bin/uv"
+          }
+        },
+        "timing": {
+          "duration": 266839,
+          "timeout": 600
+        }
+      }
+    },
+    {
+      "name": "transform_code_entities",
+      "status": "completed",
+      "duration": 0,
+      "outputs": {
+        "timing": {
+          "duration": 0,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "semantic_analysis",
+      "status": "completed",
+      "duration": 3413,
+      "outputs": {
+        "timing": {
+          "duration": 3413,
+          "timeout": 240
+        }
+      }
+    },
+    {
+      "name": "web_search",
+      "status": "completed",
+      "duration": 145,
+      "outputs": {
+        "timing": {
+          "duration": 145,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "generate_insights",
+      "status": "completed",
+      "duration": 62427,
+      "outputs": {
+        "insightDocuments": [
+          {
+            "name": "McpAgentDevelopmentPattern",
+            "title": "McpAgentDevelopmentPattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/McpAgentDevelopmentPattern.md",
+            "significance": 9,
+            "diagramCount": 4
+          },
+          {
+            "name": "UiComponentWorkPattern",
+            "title": "UiComponentWorkPattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/UiComponentWorkPattern.md",
+            "significance": 8,
+            "diagramCount": 4
+          },
+          {
+            "name": "HealthDashboardDevelopmentPattern",
+            "title": "HealthDashboardDevelopmentPattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/HealthDashboardDevelopmentPattern.md",
+            "significance": 8,
+            "diagramCount": 4
+          },
+          {
+            "name": "ApiRefactoringPattern",
+            "title": "ApiRefactoringPattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ApiRefactoringPattern.md",
+            "significance": 8,
+            "diagramCount": 4
+          },
+          {
+            "name": "OntologySupportPattern",
+            "title": "OntologySupportPattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/OntologySupportPattern.md",
+            "significance": 8,
+            "diagramCount": 3
+          }
+        ],
+        "totalInsights": 5,
+        "patterns": [
+          {
+            "name": "McpAgentDevelopmentPattern",
+            "category": "Implementation",
+            "significance": 8
+          },
+          {
+            "name": "UiComponentWorkPattern",
+            "category": "Implementation",
+            "significance": 5
+          },
+          {
+            "name": "HealthDashboardDevelopmentPattern",
+            "category": "Implementation",
+            "significance": 4
+          },
+          {
+            "name": "ApiRefactoringPattern",
+            "category": "Implementation",
+            "significance": 3
+          },
+          {
+            "name": "OntologySupportPattern",
+            "category": "Implementation",
+            "significance": 3
+          }
+        ],
+        "totalPatterns": 5,
+        "avgPatternSignificance": 5,
+        "generationMetrics": {
+          "processingTime": 62427,
+          "documentsGenerated": 5,
+          "diagramsGenerated": 19,
+          "patternsIdentified": 5,
+          "qualityScore": 75
+        },
+        "timing": {
+          "duration": 62427,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "generate_observations",
+      "status": "completed",
+      "duration": 2241,
+      "outputs": {
+        "observationsCount": 1043,
+        "timing": {
+          "duration": 2241,
+          "timeout": 90
+        }
+      }
+    },
+    {
+      "name": "analyze_documentation_semantics",
+      "status": "failed",
+      "error": "Step timeout after 180s",
+      "outputs": {
+        "error": "Step timeout after 180s"
+      }
     }
   ],
   "summary": {
-    "totalCommits": 0,
-    "totalFiles": 0,
-    "totalSessions": 0,
-    "totalObservations": 0,
-    "totalInsights": 0,
-    "totalPatterns": 0,
-    "insightsGenerated": [],
-    "patternsFound": [],
-    "codeGraphStats": null,
+    "totalCommits": 722,
+    "totalFiles": 6003,
+    "totalSessions": 200,
+    "totalObservations": 1043,
+    "totalInsights": 5,
+    "totalPatterns": 5,
+    "insightsGenerated": [
+      {
+        "name": "McpAgentDevelopmentPattern",
+        "title": "McpAgentDevelopmentPattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/McpAgentDevelopmentPattern.md",
+        "significance": 9,
+        "diagramCount": 4
+      },
+      {
+        "name": "UiComponentWorkPattern",
+        "title": "UiComponentWorkPattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/UiComponentWorkPattern.md",
+        "significance": 8,
+        "diagramCount": 4
+      },
+      {
+        "name": "HealthDashboardDevelopmentPattern",
+        "title": "HealthDashboardDevelopmentPattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/HealthDashboardDevelopmentPattern.md",
+        "significance": 8,
+        "diagramCount": 4
+      },
+      {
+        "name": "ApiRefactoringPattern",
+        "title": "ApiRefactoringPattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ApiRefactoringPattern.md",
+        "significance": 8,
+        "diagramCount": 4
+      },
+      {
+        "name": "OntologySupportPattern",
+        "title": "OntologySupportPattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/OntologySupportPattern.md",
+        "significance": 8,
+        "diagramCount": 3
+      }
+    ],
+    "patternsFound": [
+      {
+        "name": "McpAgentDevelopmentPattern",
+        "category": "Implementation",
+        "significance": 8
+      },
+      {
+        "name": "UiComponentWorkPattern",
+        "category": "Implementation",
+        "significance": 5
+      },
+      {
+        "name": "HealthDashboardDevelopmentPattern",
+        "category": "Implementation",
+        "significance": 4
+      },
+      {
+        "name": "ApiRefactoringPattern",
+        "category": "Implementation",
+        "significance": 3
+      },
+      {
+        "name": "OntologySupportPattern",
+        "category": "Implementation",
+        "significance": 3
+      }
+    ],
+    "codeGraphStats": {
+      "totalEntities": 0,
+      "languages": []
+    },
     "skippedReasons": {}
   },
-  "lastUpdate": "2025-12-19T07:02:24.150Z",
-  "elapsedSeconds": 2
+  "lastUpdate": "2025-12-19T20:02:59.002Z",
+  "elapsedSeconds": 452
 }
