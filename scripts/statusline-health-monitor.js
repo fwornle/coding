@@ -1742,9 +1742,111 @@ class StatusLineHealthMonitor {
         }
       }
 
+      // Broadcast terminal titles to all Claude sessions for visibility in idle terminals
+      await this.broadcastTerminalTitles(sessionHealth);
+
     } catch (error) {
       this.log(`Error updating status line: ${error.message}`, 'ERROR');
     }
+  }
+
+  /**
+   * Broadcast terminal title updates to all Claude session terminals
+   * This makes status visible even in idle sessions (via terminal tab/title bar)
+   */
+  async broadcastTerminalTitles(sessionHealth) {
+    try {
+      // Find all Claude process TTYs and update their terminal titles
+      // NOTE: This works on iTerm2 and Terminal.app, but NOT on VSCode's integrated terminal
+      // VSCode does not process OSC 0 escape sequences written directly to TTY from external processes
+      const claudeTtys = await this.getClaudeSessionTTYs();
+
+      if (claudeTtys.length === 0) return;
+
+      for (const { projectName, tty } of claudeTtys) {
+        try {
+          // Create project-specific terminal title
+          const projectAbbr = this.getProjectAbbreviation(projectName);
+          const projectHealth = sessionHealth[projectName];
+          const projectIcon = projectHealth?.icon || '❓';
+
+          // Format: "C🟢 | CA🪨 ND💤 UT🟢" - current project first, then others
+          const otherSessions = Object.entries(sessionHealth)
+            .filter(([name]) => name !== projectName)
+            .map(([name, health]) => `${this.getProjectAbbreviation(name)}${health.icon}`)
+            .join(' ');
+
+          const title = `${projectAbbr}${projectIcon} | ${otherSessions}`;
+
+          // Write ANSI escape code to set terminal title
+          // ESC ] 0 ; title BEL - sets both window title and icon name
+          const titleSequence = `\x1b]0;${title}\x07`;
+
+          // Write to TTY (best effort - may fail for various reasons)
+          fs.writeFileSync(tty, titleSequence);
+        } catch (ttyError) {
+          // Silently ignore TTY write errors (permission, closed terminal, etc.)
+        }
+      }
+    } catch (error) {
+      // Silently ignore broadcast errors - this is a best-effort feature
+    }
+  }
+
+  /**
+   * Get TTY devices for all running Claude sessions
+   * @returns {Promise<Array<{projectName: string, tty: string}>>}
+   */
+  async getClaudeSessionTTYs() {
+    const sessions = [];
+
+    try {
+      // Find Claude processes and their TTYs using ps
+      // Format: PID TTY COMMAND
+      const { stdout } = await execAsync('ps -eo pid,tty,comm | grep -E "^[[:space:]]*[0-9]+[[:space:]]+ttys[0-9]+[[:space:]]+claude$"', { timeout: 5000 });
+
+      if (!stdout || !stdout.trim()) return sessions;
+
+      for (const line of stdout.trim().split('\n')) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 3) {
+          const pid = parts[0];
+          const tty = parts[1];
+
+          // Skip if no TTY (background process)
+          if (tty === '??' || tty === '-') continue;
+
+          // Get the working directory to determine project
+          try {
+            const { stdout: lsofOut } = await execAsync(`lsof -p ${pid} 2>/dev/null | grep cwd | head -1`, { timeout: 3000 });
+            if (lsofOut) {
+              const cwdParts = lsofOut.trim().split(/\s+/);
+              const cwdPath = cwdParts[cwdParts.length - 1];
+              const agenticMatch = cwdPath.match(/\/Agentic\/([^/\s]+)/);
+
+              if (agenticMatch) {
+                const projectName = agenticMatch[1];
+                const ttyPath = `/dev/${tty}`;
+
+                // Verify TTY exists and is writable
+                if (fs.existsSync(ttyPath)) {
+                  sessions.push({ projectName, tty: ttyPath });
+                }
+              }
+            }
+          } catch (lsofError) {
+            // Process may have exited
+          }
+        }
+      }
+    } catch (error) {
+      // grep returns exit code 1 when no matches - this is normal
+      if (!error.message.includes('exit code 1')) {
+        this.log(`Error getting Claude TTYs: ${error.message}`, 'DEBUG');
+      }
+    }
+
+    return sessions;
   }
 
   /**

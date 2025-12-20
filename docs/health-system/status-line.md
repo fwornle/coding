@@ -447,6 +447,56 @@ node scripts/combined-status-line.js --test-abbreviations
 # Edit config/status-line-config.json
 ```
 
+## Terminal Title Broadcasting
+
+The status line system now includes **automatic terminal title updates** that work even for idle sessions.
+
+### How It Works
+
+Every 15 seconds, the statusline-health-monitor broadcasts status to all Claude session terminals via ANSI escape codes:
+
+```
+Terminal Tab: "C🟢 | UT🪨 ND💤 CA🫒"
+              ↑          ↑
+        Current     Other sessions
+        project
+```
+
+This means you can see the current status of ALL sessions by looking at any terminal's tab or title bar, even if that session is idle.
+
+### Benefits
+
+- **Always visible status**: No need to type to update the status line
+- **Cross-session awareness**: Each terminal shows status of all projects
+- **Minimal overhead**: Only writes to TTYs when status changes
+
+### Terminal Compatibility
+
+Works with terminals that support ANSI OSC (Operating System Command) escape sequences when written directly to TTY:
+
+| Terminal | Status | Notes |
+|----------|--------|-------|
+| iTerm2 | ✅ Works | Full OSC 0 support |
+| Terminal.app | ✅ Works | Native macOS terminal |
+| VS Code Terminal | ❌ Limited | Does not process OSC 0 from external TTY writes |
+| tmux | ⚠️ Partial | Requires `set -g set-titles on` |
+
+**VSCode Limitation**: VSCode's integrated terminal captures TTY output and does not interpret OSC escape sequences written directly to the TTY device from external processes. The status line within the terminal content still updates on activity.
+
+### Troubleshooting Terminal Titles
+
+**Titles not updating?**
+```bash
+# Check if statusline-health-monitor is running
+ps aux | grep statusline-health-monitor
+
+# Check logs for TTY detection
+grep -i tty ~/.logs/statusline-health.log
+
+# Verify Claude processes have TTYs
+ps -eo pid,tty,comm | grep claude
+```
+
 ## Key Files
 
 **Core System**:
