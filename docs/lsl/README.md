@@ -203,6 +203,49 @@ ANTHROPIC_API_KEY=<SECRET_REDACTED>
 - Automatic session detection
 - Window-based file organization
 
+### Asynchronous Write Behavior
+
+**Important**: LSL file writes are **asynchronous and retroactive**. Understanding this behavior prevents confusion about file modification timestamps.
+
+**How It Works**:
+
+1. **Time-Slot Naming**: LSL files are named by their time window (e.g., `2025-12-20_1000-1100_g9b30a.md` for the 10:00-11:00 slot)
+
+2. **Retroactive Writing**: The transcript monitor can write to a time-slot file **after that time period has ended**. This happens because:
+   - Transcript processing is asynchronous - content is buffered and written in batches
+   - JSONL transcript files may not be processed immediately when they're created
+   - Session end triggers a final flush of all pending content to appropriate time-slot files
+
+3. **Modification Timestamps**: A file named `1000-1100` may show a modification time of 12:36 if:
+   - The session ended at 12:36 and flushed remaining buffered content
+   - The transcript monitor processed queued exchanges from that period
+   - Batch recovery/reprocessing was performed later
+
+**Example Scenario**:
+```
+Session starts at 09:30
+User works until 11:15
+Session ends at 12:36
+
+Files affected:
+- 2025-12-20_0900-1000_g9b30a.md (09:30-10:00 content)
+- 2025-12-20_1000-1100_g9b30a.md (10:00-11:00 content)  ← May be modified at 12:36
+- 2025-12-20_1100-1200_g9b30a.md (11:00-11:15 content)
+
+All files may show 12:36 as modification time if content was flushed at session end.
+```
+
+**Why This Design**:
+- Reduces I/O overhead during active sessions (batched writes)
+- Ensures no data loss at session boundaries
+- Allows recovery of content from crashed monitors
+- Enables retroactive reprocessing of transcripts
+
+**Git Implications**:
+- Files may appear as modified in git status even for "past" time slots
+- This is expected behavior - commit normally
+- The content reflects activity during that time period, regardless of when it was written to disk
+
 ### Health Metrics
 
 **Process Monitoring**:

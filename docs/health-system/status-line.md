@@ -128,7 +128,7 @@ The health verifier runs every 60 seconds. If the status file is older than 2 mi
 
 ### Session Activity Indicators
 
-Session activity uses a **unified graduated color scheme** that transitions smoothly from active to inactive, avoiding jarring orange/red colors that imply errors:
+Session activity uses a **unified graduated color scheme** that transitions smoothly from active to dormant, avoiding jarring orange/red/yellow colors that imply errors or warnings:
 
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
@@ -137,16 +137,28 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 | 🫒 | Fading | 15 min - 1 hour | Session fading, still tracked |
 | 🪨 | Dormant | 1 - 6 hours | Session dormant but alive |
 | ⚫ | Inactive | 6 - 24 hours | Session inactive, may be orphaned |
-| 💤 | Sleeping/No Monitor | > 24 hours OR no monitor | Session sleeping OR no transcript monitor running |
-| 🟡 | Warning | Any | Trajectory file missing or stale |
+| 💤 | Sleeping | > 24 hours | Session sleeping (long-term dormant) |
+| 💤 | Virgin Session | N/A (no prompts) | Session open but no user prompts yet |
+| 💤 | No Monitor | N/A | No transcript monitor running for this project |
 | ❌ | Error | Any | Health check failed or service crash |
+
+**Cooling-Down Sequence** (Gradual Transition to Dormant):
+```
+🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → 💤 Sleeping
+   <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
+```
+
+**Virgin Sessions**: Sessions that are open (Claude Code running with monitor) but have not yet received any user prompts show 💤. This indicates the session is ready but waiting for user input, not that it's broken or idle.
+
+**No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings like missing trajectory files or stale health data. Normal session inactivity is shown through the graduated cooling sequence, which naturally fades to 💤 rather than showing alarming colors.
 
 **Activity Age Calculation**:
 - Uses `transcriptInfo.ageMs` from health file (actual transcript inactivity)
 - Falls back to health file timestamp if transcript age unavailable
 - For stale health files (>5 min old), uses health file age as minimum to ensure closed sessions aren't falsely shown as active
+- Virgin sessions (no transcript exchanges) are detected by `exchangeCount === 0`
 
-**Design Rationale**: Projects that aren't actively being worked on should show gradual "cooling" colors rather than alarming red/orange. Red is reserved for actual errors, not inactive sessions.
+**Design Rationale**: Projects that aren't actively being worked on should show gradual "cooling" colors rather than alarming red/orange/yellow. These colors are reserved for actual errors and warnings, not normal session lifecycle states.
 
 ## Architecture
 
@@ -194,8 +206,10 @@ The system uses multiple discovery methods to ensure **only active sessions** (w
 - The Global Process Supervisor automatically restarts dead monitors within 30 seconds
 
 **Example**:
-- `[C🟢 ND💤 UT🟢]` - Shows coding (active), nano-degree (no monitor but recent transcript), ui-template (active)
-- `[C🟢 CA🌲 ND💤]` - coding active, curriculum-alignment cooling, nano-degree dormant (no monitor)
+- `[C🟢 ND💤 UT🟢]` - coding (active), nano-degree (no monitor/virgin session), ui-template (active)
+- `[C🟢 CA🌲 ND💤]` - coding active, curriculum-alignment cooling, nano-degree dormant
+- `[C💤 UT💤 CA💤 ND💤]` - All sessions are virgin (just started, no prompts yet)
+- `[C🟢 UT🫒 CA⚫]` - coding active, ui-template fading, curriculum-alignment inactive
 - Sessions with transcripts older than 48 hours AND no running monitor are hidden
 
 ### Smart Abbreviation Engine
@@ -297,19 +311,21 @@ Where:
 - **Unhealthy** (🔴) - Service failing
 - **Unknown** (❓) - Cannot determine status
 
-**Session Activity States** (for project sessions - graduated green scheme):
+**Session Activity States** (for project sessions - graduated cooling scheme):
 - **Active** (🟢) - Currently active (< 5 min)
 - **Cooling** (🌲) - Recently active (5-15 min)
 - **Fading** (🫒) - Activity fading (15 min - 1 hr)
 - **Dormant** (🪨) - Dormant but trackable (1-6 hr)
 - **Inactive** (⚫) - Session idle (6-24 hr)
-- **Sleeping** (💤) - Long-term dormant (> 24 hr)
+- **Sleeping** (💤) - Long-term dormant (> 24 hr) OR virgin session OR no monitor
 
 **Transitions**:
 - Health check success → Healthy/Active
-- Partial failure → Warning
+- Partial failure → Warning (services only, not sessions)
 - Complete failure → Unhealthy
-- Time passage → Cooling → Fading → Dormant → Inactive → Sleeping
+- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤
+- Virgin session (no prompts yet) → 💤 immediately
+- No running monitor → 💤
 
 ### Status Display States
 
