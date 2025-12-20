@@ -843,7 +843,9 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     }
 
     return map
-  }, [process.steps, process.currentStep, STEP_TO_AGENT])
+    // Include _refreshKey to force recalculation when API returns new data
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [process.steps, process.currentStep, STEP_TO_AGENT, (process as any)._refreshKey])
 
   const getNodeStatus = (agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
     const stepInfo = stepStatusMap[agentId]
