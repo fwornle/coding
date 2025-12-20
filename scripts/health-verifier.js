@@ -402,7 +402,7 @@ class HealthVerifier extends EventEmitter {
         };
 
         // Check health file existence and freshness
-        if (!fs.existsSync(healthFile)) {
+        if (!fsSync.existsSync(healthFile)) {
           checks.push({
             ...check,
             status: 'error',
@@ -412,7 +412,7 @@ class HealthVerifier extends EventEmitter {
           continue;
         }
 
-        const stats = fs.statSync(healthFile);
+        const stats = fsSync.statSync(healthFile);
         const age = Date.now() - stats.mtime.getTime();
 
         if (age > 60000) {
@@ -427,7 +427,7 @@ class HealthVerifier extends EventEmitter {
 
         // Read health file and check PID
         try {
-          const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+          const healthData = JSON.parse(fsSync.readFileSync(healthFile, 'utf8'));
           const pid = healthData.metrics?.processId;
 
           if (!pid) {
@@ -506,13 +506,13 @@ class HealthVerifier extends EventEmitter {
     // Source 2: Health files
     try {
       const healthDir = path.join(this.codingRoot, '.health');
-      if (fs.existsSync(healthDir)) {
-        const files = fs.readdirSync(healthDir);
+      if (fsSync.existsSync(healthDir)) {
+        const files = fsSync.readdirSync(healthDir);
         for (const file of files) {
           const match = file.match(/^(.+)-transcript-monitor-health\.json$/);
           if (match) {
             const projectPath = `/Users/q284340/Agentic/${match[1]}`;
-            if (fs.existsSync(projectPath)) {
+            if (fsSync.existsSync(projectPath)) {
               projects.add(projectPath);
             }
           }
@@ -525,18 +525,18 @@ class HealthVerifier extends EventEmitter {
     // Source 3: Claude transcript directories with recent activity (< 24 hours)
     try {
       const claudeProjectsDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects');
-      if (fs.existsSync(claudeProjectsDir)) {
-        const dirs = fs.readdirSync(claudeProjectsDir);
+      if (fsSync.existsSync(claudeProjectsDir)) {
+        const dirs = fsSync.readdirSync(claudeProjectsDir);
         for (const dir of dirs) {
           const match = dir.match(/^-Users-q284340-Agentic-(.+)$/);
           if (match) {
             const projectPath = `/Users/q284340/Agentic/${match[1]}`;
-            if (fs.existsSync(projectPath)) {
+            if (fsSync.existsSync(projectPath)) {
               const transcriptDir = path.join(claudeProjectsDir, dir);
-              const jsonlFiles = fs.readdirSync(transcriptDir).filter(f => f.endsWith('.jsonl'));
+              const jsonlFiles = fsSync.readdirSync(transcriptDir).filter(f => f.endsWith('.jsonl'));
               if (jsonlFiles.length > 0) {
                 const latestMtime = Math.max(
-                  ...jsonlFiles.map(f => fs.statSync(path.join(transcriptDir, f)).mtime.getTime())
+                  ...jsonlFiles.map(f => fsSync.statSync(path.join(transcriptDir, f)).mtime.getTime())
                 );
                 if (Date.now() - latestMtime < 24 * 60 * 60 * 1000) {
                   projects.add(projectPath);
