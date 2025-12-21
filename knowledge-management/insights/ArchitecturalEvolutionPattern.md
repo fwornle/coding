@@ -1,31 +1,18 @@
 # ArchitecturalEvolutionPattern
 
-**Type:** Technical Pattern
+**Type:** GraphDatabase
 
-Multi-agent architecture complexity in semantic analysis system
+ArchitecturalEvolutionPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
-## Implementation
+## What It Is
 
-Configuration-driven development approach
+- ArchitecturalEvolutionPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
-- Standardize configuration management across 22 config files
-- Implement validation schemas for configuration
-- Create centralized configuration loading
-- Add environment-specific configuration support
-- Establish configuration documentation patterns
+- shared-memory.json has been REMOVED from the codebase
 
-## Technologies
-
-- JSON Schema validation
-- Environment variable management
-- Configuration templating
-- Documentation
-- TypeScript/JavaScript
-
-## Architecture
-
-![Architecture](images/architectural-evolution-pattern-architecture.png)
+- Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph
 
 
 ---
-*Generated via fallback analysis*
+
+*Generated from 3 observations*

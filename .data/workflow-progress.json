@@ -1,10 +1,10 @@
 {
   "workflowName": "complete-analysis",
-  "executionId": "complete-analysis-1766250307161",
+  "executionId": "complete-analysis-1766305033496",
   "status": "completed",
   "team": "coding",
   "repositoryPath": "/Users/q284340/Agentic/coding",
-  "startTime": "2025-12-20T17:05:07.161Z",
+  "startTime": "2025-12-21T08:17:13.496Z",
   "currentStep": null,
   "totalSteps": 15,
   "completedSteps": 15,
@@ -12,11 +12,11 @@
   "skippedSteps": 0,
   "runningSteps": 0,
   "stepsCompleted": [
-    "analyze_git_history",
-    "link_documentation",
-    "analyze_vibe_history",
     "index_codebase",
     "transform_code_entities",
+    "link_documentation",
+    "analyze_git_history",
+    "analyze_vibe_history",
     "semantic_analysis",
     "web_search",
     "generate_insights",
@@ -33,69 +33,25 @@
   "stepsRunning": [],
   "stepsDetail": [
     {
-      "name": "analyze_git_history",
-      "status": "completed",
-      "duration": 14534,
-      "outputs": {
-        "commitsCount": 735,
-        "filesCount": 6052,
-        "timing": {
-          "duration": 14534,
-          "timeout": 300
-        }
-      }
-    },
-    {
-      "name": "link_documentation",
-      "status": "completed",
-      "duration": 11943,
-      "outputs": {
-        "codeGraphStats": {},
-        "timing": {
-          "duration": 11943,
-          "timeout": 120
-        }
-      }
-    },
-    {
-      "name": "analyze_vibe_history",
-      "status": "completed",
-      "duration": 20718,
-      "outputs": {
-        "sessionsCount": 779,
-        "topTopicNames": [],
-        "timing": {
-          "duration": 20718,
-          "timeout": 600
-        }
-      }
-    },
-    {
       "name": "index_codebase",
       "status": "completed",
-      "duration": 257972,
+      "duration": 1310,
       "outputs": {
         "entitiesCount": 0,
         "codeGraphStats": {
-          "totalEntities": 0,
-          "totalRelationships": 0,
+          "totalEntities": 62115,
+          "totalRelationships": 128791,
           "languageDistribution": {},
-          "entityTypeDistribution": {}
-        },
-        "diagnostics": {
-          "codeGraphRagDirExists": true,
-          "pyprojectExists": true,
-          "repositoryExists": true,
-          "memgraphConnection": {
-            "connected": true
-          },
-          "uvAvailable": {
-            "available": true,
-            "path": "/Library/Frameworks/Python.framework/Versions/3.12/bin/uv"
+          "entityTypeDistribution": {
+            "function": 32264,
+            "class": 1495,
+            "method": 7618,
+            "module": 991
           }
         },
+        "warning": "Using existing Memgraph data (no re-indexing performed)",
         "timing": {
-          "duration": 257972,
+          "duration": 1310,
           "timeout": 600
         }
       }
@@ -103,21 +59,59 @@
     {
       "name": "transform_code_entities",
       "status": "completed",
-      "duration": 4,
+      "duration": 6,
       "outputs": {
         "timing": {
-          "duration": 4,
+          "duration": 6,
           "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "link_documentation",
+      "status": "completed",
+      "duration": 1458,
+      "outputs": {
+        "codeGraphStats": {},
+        "timing": {
+          "duration": 1458,
+          "timeout": 120
+        }
+      }
+    },
+    {
+      "name": "analyze_git_history",
+      "status": "completed",
+      "duration": 7258,
+      "outputs": {
+        "commitsCount": 739,
+        "filesCount": 6061,
+        "timing": {
+          "duration": 7258,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "name": "analyze_vibe_history",
+      "status": "completed",
+      "duration": 11569,
+      "outputs": {
+        "sessionsCount": 789,
+        "topTopicNames": [],
+        "timing": {
+          "duration": 11569,
+          "timeout": 600
         }
       }
     },
     {
       "name": "semantic_analysis",
       "status": "completed",
-      "duration": 4266,
+      "duration": 1141,
       "outputs": {
         "timing": {
-          "duration": 4266,
+          "duration": 1141,
           "timeout": 240
         }
       }
@@ -125,10 +119,10 @@
     {
       "name": "web_search",
       "status": "completed",
-      "duration": 117,
+      "duration": 133,
       "outputs": {
         "timing": {
-          "duration": 117,
+          "duration": 133,
           "timeout": 90
         }
       }
@@ -136,84 +130,48 @@
     {
       "name": "generate_insights",
       "status": "completed",
-      "duration": 4054,
+      "duration": 1656,
       "outputs": {
         "insightDocuments": [
           {
-            "name": "FeatureImplementation",
-            "title": "FeatureImplementation - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
-            "significance": 9,
-            "diagramCount": 0
-          },
-          {
-            "name": "BugFixPattern",
-            "title": "BugFixPattern - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
-            "significance": 9,
-            "diagramCount": 0
-          },
-          {
-            "name": "AgentArchitecturePattern",
-            "title": "AgentArchitecturePattern - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md",
-            "significance": 9,
-            "diagramCount": 0
-          },
-          {
-            "name": "SolutionPattern1Pattern",
-            "title": "SolutionPattern1Pattern - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/SolutionPattern1Pattern.md",
+            "name": "Large-ScaleCodebasePattern",
+            "title": "Large-ScaleCodebasePattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/Large-ScaleCodebasePattern.md",
             "significance": 8,
             "diagramCount": 0
           },
           {
-            "name": "SolutionPattern2Pattern",
-            "title": "SolutionPattern2Pattern - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/SolutionPattern2Pattern.md",
+            "name": "FunctionalProgrammingPattern",
+            "title": "FunctionalProgrammingPattern - Implementation Analysis",
+            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FunctionalProgrammingPattern.md",
             "significance": 8,
             "diagramCount": 0
           }
         ],
-        "totalInsights": 5,
+        "totalInsights": 2,
         "patterns": [
           {
-            "name": "FeatureImplementation",
-            "category": "Architecture",
-            "significance": 8
+            "name": "Large-Scale Codebase Pattern",
+            "category": "architectural",
+            "significance": 7
           },
           {
-            "name": "BugFixPattern",
-            "category": "Architecture",
-            "significance": 8
-          },
-          {
-            "name": "AgentArchitecturePattern",
-            "category": "Architecture",
-            "significance": 8
-          },
-          {
-            "name": "SolutionPattern1",
-            "category": "Solution",
-            "significance": 5
-          },
-          {
-            "name": "SolutionPattern2",
-            "category": "Solution",
-            "significance": 5
+            "name": "Functional Programming Pattern",
+            "category": "design",
+            "significance": 6
           }
         ],
-        "totalPatterns": 5,
+        "totalPatterns": 2,
         "avgPatternSignificance": 7,
         "generationMetrics": {
-          "processingTime": 4054,
-          "documentsGenerated": 5,
+          "processingTime": 1655,
+          "documentsGenerated": 2,
           "diagramsGenerated": 0,
-          "patternsIdentified": 5,
-          "qualityScore": 75
+          "patternsIdentified": 2,
+          "qualityScore": 65
         },
         "timing": {
-          "duration": 4054,
+          "duration": 1656,
           "timeout": 300
         }
       }
@@ -221,11 +179,11 @@
     {
       "name": "generate_observations",
       "status": "completed",
-      "duration": 404,
+      "duration": 402,
       "outputs": {
-        "observationsCount": 1071,
+        "observationsCount": 1069,
         "timing": {
-          "duration": 404,
+          "duration": 402,
           "timeout": 90
         }
       }
@@ -233,10 +191,10 @@
     {
       "name": "classify_with_ontology",
       "status": "completed",
-      "duration": 33713,
+      "duration": 56592,
       "outputs": {
         "timing": {
-          "duration": 33713,
+          "duration": 56592,
           "timeout": 600
         }
       }
@@ -244,11 +202,11 @@
     {
       "name": "analyze_documentation_semantics",
       "status": "completed",
-      "duration": 354743,
+      "duration": 385057,
       "outputs": {
         "codeGraphStats": {},
         "timing": {
-          "duration": 354743,
+          "duration": 385057,
           "timeout": 600
         }
       }
@@ -256,10 +214,10 @@
     {
       "name": "quality_assurance",
       "status": "completed",
-      "duration": 2889,
+      "duration": 3038,
       "outputs": {
         "timing": {
-          "duration": 2889,
+          "duration": 3038,
           "timeout": 90
         }
       }
@@ -267,20 +225,17 @@
     {
       "name": "persist_results",
       "status": "completed",
-      "duration": 28236,
+      "duration": 14814,
       "outputs": {
         "entitiesCreated": 1,
         "entitiesUpdated": 0,
         "filesCreated": [
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md",
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/SolutionPattern1Pattern.md",
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/SolutionPattern2Pattern.md"
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/Large-ScaleCodebasePattern.md",
+          "/Users/q284340/Agentic/coding/knowledge-management/insights/FunctionalProgrammingPattern.md"
         ],
         "errorsCount": 0,
         "timing": {
-          "duration": 28236,
+          "duration": 14814,
           "timeout": 90
         }
       }
@@ -288,10 +243,10 @@
     {
       "name": "deduplicate_insights",
       "status": "completed",
-      "duration": 14,
+      "duration": 3,
       "outputs": {
         "timing": {
-          "duration": 14,
+          "duration": 3,
           "timeout": 60
         }
       }
@@ -299,86 +254,50 @@
     {
       "name": "validate_content",
       "status": "completed",
-      "duration": 45320,
+      "duration": 44793,
       "outputs": {
         "timing": {
-          "duration": 45320,
+          "duration": 44793,
           "timeout": 120
         }
       }
     }
   ],
   "summary": {
-    "totalCommits": 735,
-    "totalFiles": 6052,
-    "totalSessions": 779,
+    "totalCommits": 739,
+    "totalFiles": 6061,
+    "totalSessions": 789,
     "totalKeyTopics": 0,
-    "totalObservations": 1071,
-    "totalInsights": 5,
-    "totalPatterns": 5,
+    "totalObservations": 1069,
+    "totalInsights": 2,
+    "totalPatterns": 2,
     "keyTopics": [],
     "insightsGenerated": [
       {
-        "name": "FeatureImplementation",
-        "title": "FeatureImplementation - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
-        "significance": 9,
-        "diagramCount": 0
-      },
-      {
-        "name": "BugFixPattern",
-        "title": "BugFixPattern - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
-        "significance": 9,
-        "diagramCount": 0
-      },
-      {
-        "name": "AgentArchitecturePattern",
-        "title": "AgentArchitecturePattern - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md",
-        "significance": 9,
-        "diagramCount": 0
-      },
-      {
-        "name": "SolutionPattern1Pattern",
-        "title": "SolutionPattern1Pattern - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/SolutionPattern1Pattern.md",
+        "name": "Large-ScaleCodebasePattern",
+        "title": "Large-ScaleCodebasePattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/Large-ScaleCodebasePattern.md",
         "significance": 8,
         "diagramCount": 0
       },
       {
-        "name": "SolutionPattern2Pattern",
-        "title": "SolutionPattern2Pattern - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/SolutionPattern2Pattern.md",
+        "name": "FunctionalProgrammingPattern",
+        "title": "FunctionalProgrammingPattern - Implementation Analysis",
+        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FunctionalProgrammingPattern.md",
         "significance": 8,
         "diagramCount": 0
       }
     ],
     "patternsFound": [
       {
-        "name": "FeatureImplementation",
-        "category": "Architecture",
-        "significance": 8
+        "name": "Large-Scale Codebase Pattern",
+        "category": "architectural",
+        "significance": 7
       },
       {
-        "name": "BugFixPattern",
-        "category": "Architecture",
-        "significance": 8
-      },
-      {
-        "name": "AgentArchitecturePattern",
-        "category": "Architecture",
-        "significance": 8
-      },
-      {
-        "name": "SolutionPattern1",
-        "category": "Solution",
-        "significance": 5
-      },
-      {
-        "name": "SolutionPattern2",
-        "category": "Solution",
-        "significance": 5
+        "name": "Functional Programming Pattern",
+        "category": "design",
+        "significance": 6
       }
     ],
     "codeGraphStats": {
@@ -386,6 +305,6 @@
     },
     "skippedReasons": {}
   },
-  "lastUpdate": "2025-12-20T17:17:10.510Z",
-  "elapsedSeconds": 723
+  "lastUpdate": "2025-12-21T08:25:02.198Z",
+  "elapsedSeconds": 469
 }
