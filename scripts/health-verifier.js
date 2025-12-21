@@ -428,6 +428,26 @@ class HealthVerifier extends EventEmitter {
         // Read health file and check PID
         try {
           const healthData = JSON.parse(fsSync.readFileSync(healthFile, 'utf8'));
+
+          // Check if monitor was gracefully stopped (no active Claude session)
+          // This is a valid state, not an error
+          if (healthData.status === 'stopped') {
+            checks.push({
+              ...check,
+              status: 'passed',
+              severity: 'info',
+              message: `Transcript monitor for ${projectName} stopped (no active session)`,
+              details: {
+                projectPath,
+                healthFile,
+                stoppedAt: healthData.stoppedAt,
+                reason: healthData.reason || 'graceful_shutdown',
+                finalExchangeCount: healthData.metrics?.finalExchangeCount
+              }
+            });
+            continue;
+          }
+
           const pid = healthData.metrics?.processId;
 
           if (!pid) {
