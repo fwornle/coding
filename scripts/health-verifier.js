@@ -950,13 +950,109 @@ class HealthVerifier extends EventEmitter {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       memoryUsage: process.memoryUsage().heapUsed,
-      cycleCount: this.cycleCount || 0
+      cycleCount: this.cycleCount || 0,
+      consecutiveErrors: this.consecutiveErrors || 0
     };
     try {
       await fs.writeFile(heartbeatPath, JSON.stringify(heartbeat, null, 2));
+      this.lastHeartbeatWrite = Date.now();
     } catch (error) {
       this.log(`Failed to write heartbeat: ${error.message}`, 'ERROR');
     }
+  }
+
+  /**
+   * Self-watchdog: Check if our own heartbeat is stale (indicating we're stuck)
+   * If stale, trigger a graceful restart by exiting (external supervisor will restart)
+   */
+  checkSelfHealth() {
+    const heartbeatPath = path.join(this.codingRoot, '.health', 'verifier-heartbeat.json');
+    const MAX_STALE_MS = 180000; // 3 minutes - if no heartbeat update for 3 min, we're stuck
+    const MAX_CONSECUTIVE_ERRORS = 10; // If 10+ consecutive errors, restart
+
+    try {
+      // Check heartbeat file age
+      if (fsSync.existsSync(heartbeatPath)) {
+        const stats = fsSync.statSync(heartbeatPath);
+        const age = Date.now() - stats.mtimeMs;
+
+        if (age > MAX_STALE_MS) {
+          this.log(`WATCHDOG: Heartbeat file is stale (${Math.round(age/1000)}s old). Self-restarting...`, 'ERROR');
+          this.triggerSelfRestart('stale_heartbeat');
+          return;
+        }
+      }
+
+      // Check consecutive errors
+      if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        this.log(`WATCHDOG: Too many consecutive errors (${this.consecutiveErrors}). Self-restarting...`, 'ERROR');
+        this.triggerSelfRestart('too_many_errors');
+        return;
+      }
+
+      // Check memory usage (restart if using > 500MB to prevent memory leaks)
+      const memUsage = process.memoryUsage();
+      if (memUsage.heapUsed > 500 * 1024 * 1024) {
+        this.log(`WATCHDOG: High memory usage (${Math.round(memUsage.heapUsed / 1024 / 1024)}MB). Self-restarting...`, 'WARN');
+        this.triggerSelfRestart('high_memory');
+        return;
+      }
+
+    } catch (error) {
+      this.log(`WATCHDOG check failed: ${error.message}`, 'ERROR');
+    }
+  }
+
+  /**
+   * Trigger a graceful self-restart
+   */
+  async triggerSelfRestart(reason) {
+    this.log(`Triggering self-restart due to: ${reason}`);
+
+    // Write a restart marker so we know this was intentional
+    const restartMarker = path.join(this.codingRoot, '.health', 'verifier-restart-marker.json');
+    try {
+      await fs.writeFile(restartMarker, JSON.stringify({
+        reason,
+        timestamp: new Date().toISOString(),
+        pid: process.pid,
+        cycleCount: this.cycleCount,
+        consecutiveErrors: this.consecutiveErrors
+      }, null, 2));
+    } catch (e) {
+      // Ignore write errors during restart
+    }
+
+    // Clean up PSM entry
+    try {
+      await this.psm.unregisterService('health-verifier', 'global');
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+
+    // Exit with code 1 to signal abnormal termination
+    // External process manager (if any) should restart us
+    process.exit(1);
+  }
+
+  /**
+   * Run verify() with timeout protection to prevent hanging
+   */
+  async verifyWithTimeout(timeoutMs = 60000) {
+    return new Promise(async (resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error(`Verification timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        await this.verify();
+        clearTimeout(timeoutId);
+        resolve();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    });
   }
 
   /**
@@ -1187,13 +1283,49 @@ runIfMain(import.meta.url, () => {
       break;
 
     case 'stop':
-      verifier.stop()
-        .then(() => {
-          console.log('✅ Health verifier stopped');
-          process.exit(0);
+      // Must find the actual running daemon and kill it (not just call stop() on new instance)
+      verifier.checkExistingInstance()
+        .then(async (existing) => {
+          if (!existing.running) {
+            console.log('ℹ️  Health verifier is not running');
+            process.exit(0);
+          }
+
+          console.log(`🛑 Stopping health verifier (PID: ${existing.pid})...`);
+
+          try {
+            // Send SIGTERM to gracefully stop the daemon
+            process.kill(existing.pid, 'SIGTERM');
+
+            // Wait briefly for process to exit
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Verify it stopped
+            try {
+              process.kill(existing.pid, 0);
+              // Still running - force kill
+              console.log('⚠️  Process still running, sending SIGKILL...');
+              process.kill(existing.pid, 'SIGKILL');
+            } catch (e) {
+              // Process is gone - success
+            }
+
+            // Clean up PSM entry
+            try {
+              await verifier.psm.unregisterService('health-verifier', 'global');
+            } catch (e) {
+              // Ignore cleanup errors
+            }
+
+            console.log('✅ Health verifier stopped');
+            process.exit(0);
+          } catch (killError) {
+            console.error('❌ Failed to stop daemon:', killError.message);
+            process.exit(1);
+          }
         })
         .catch(error => {
-          console.error('❌ Failed to stop:', error.message);
+          console.error('❌ Failed to check existing instance:', error.message);
           process.exit(1);
         });
       break;

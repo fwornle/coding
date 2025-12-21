@@ -389,7 +389,9 @@ class UKBProcessManager {
         heartbeatAgeSeconds: Math.round(heartbeatAge / 1000),
         progressPercent: proc.totalSteps > 0
           ? Math.round((proc.completedSteps / proc.totalSteps) * 100)
-          : 0
+          : 0,
+        // Force React to detect changes on each poll
+        _refreshKey: now
       };
     });
 
