@@ -1056,7 +1056,7 @@ class HealthVerifier extends EventEmitter {
   }
 
   /**
-   * Start daemon mode with robust error handling
+   * Start daemon mode with robust error handling and self-watchdog
    */
   async start() {
     if (this.running) {
@@ -1075,17 +1075,33 @@ class HealthVerifier extends EventEmitter {
 
     this.running = true;
     this.cycleCount = 0;
+    this.consecutiveErrors = 0; // Track consecutive errors for watchdog
+    this.lastSuccessfulCycle = Date.now();
     this.log('Starting health verifier daemon mode');
+
+    // Check for restart marker (indicates we self-restarted)
+    const restartMarker = path.join(this.codingRoot, '.health', 'verifier-restart-marker.json');
+    if (fsSync.existsSync(restartMarker)) {
+      try {
+        const marker = JSON.parse(fsSync.readFileSync(restartMarker, 'utf8'));
+        this.log(`Restarted after self-restart (reason: ${marker.reason}, previous cycles: ${marker.cycleCount})`);
+        fsSync.unlinkSync(restartMarker); // Clean up marker
+      } catch (e) {
+        // Ignore marker read errors
+      }
+    }
 
     // Install global error handlers to prevent silent failures
     process.on('uncaughtException', (error) => {
       this.log(`UNCAUGHT EXCEPTION: ${error.message}\n${error.stack}`, 'ERROR');
-      // Don't exit - try to keep running
+      this.consecutiveErrors++;
+      // Don't exit immediately - let watchdog decide based on error count
     });
 
-    process.on('unhandledRejection', (reason, promise) => {
+    process.on('unhandledRejection', (reason) => {
       this.log(`UNHANDLED REJECTION: ${reason}`, 'ERROR');
-      // Don't exit - try to keep running
+      this.consecutiveErrors++;
+      // Don't exit immediately - let watchdog decide
     });
 
     // Register this instance with PSM
@@ -1101,12 +1117,19 @@ class HealthVerifier extends EventEmitter {
       this.log(`Failed to register with PSM: ${error.message}`, 'WARN');
     }
 
-    // Run initial verification
-    await this.verify();
-    await this.writeHeartbeat();
+    // Run initial verification with timeout protection
+    try {
+      await this.verifyWithTimeout(60000);
+      await this.writeHeartbeat();
+    } catch (error) {
+      this.log(`Initial verification failed: ${error.message}`, 'ERROR');
+      this.consecutiveErrors++;
+      await this.writeHeartbeat().catch(() => {});
+    }
 
     // Schedule periodic verification with robust error handling
     const interval = this.rules.verification.interval_seconds * 1000;
+    const verificationTimeout = Math.min(interval - 5000, 60000); // Leave 5s buffer, max 60s
 
     const runCycle = async () => {
       this.cycleCount++;
@@ -1117,20 +1140,33 @@ class HealthVerifier extends EventEmitter {
         await this.writeHeartbeat();
         this.log(`Timer cycle ${this.cycleCount} started`);
 
-        await this.verify();
+        // Use timeout-protected verification
+        await this.verifyWithTimeout(verificationTimeout);
 
         const cycleDuration = Date.now() - cycleStart;
         this.log(`Timer cycle ${this.cycleCount} completed in ${cycleDuration}ms`);
+
+        // Success - reset error count
+        this.consecutiveErrors = 0;
+        this.lastSuccessfulCycle = Date.now();
       } catch (error) {
-        this.log(`Verification error in cycle ${this.cycleCount}: ${error.message}\n${error.stack}`, 'ERROR');
+        this.consecutiveErrors++;
+        this.log(`Verification error in cycle ${this.cycleCount} (consecutive: ${this.consecutiveErrors}): ${error.message}`, 'ERROR');
+
         // Write heartbeat even on error to prove we're still running
         await this.writeHeartbeat().catch(() => {});
+
+        // If too many consecutive errors, run self-health check immediately
+        if (this.consecutiveErrors >= 5) {
+          this.log(`High error count (${this.consecutiveErrors}), running immediate watchdog check`, 'WARN');
+          this.checkSelfHealth();
+        }
       }
     };
 
     this.timer = setInterval(runCycle, interval);
 
-    // Additional safety: use setInterval reference check
+    // Additional safety: timer reference check
     this.timerCheckInterval = setInterval(() => {
       if (!this.timer) {
         this.log('CRITICAL: Main timer was cleared unexpectedly! Restarting...', 'ERROR');
@@ -1138,7 +1174,13 @@ class HealthVerifier extends EventEmitter {
       }
     }, interval * 2); // Check every 2 cycles
 
-    this.log(`Health verifier running (interval: ${this.rules.verification.interval_seconds}s)`);
+    // WATCHDOG: Self-health check runs every 90 seconds
+    // Checks: stale heartbeat, consecutive errors, memory usage
+    this.watchdogInterval = setInterval(() => {
+      this.checkSelfHealth();
+    }, 90000);
+
+    this.log(`Health verifier running (interval: ${this.rules.verification.interval_seconds}s, watchdog: 90s)`);
   }
 
   /**
@@ -1160,6 +1202,11 @@ class HealthVerifier extends EventEmitter {
     if (this.timerCheckInterval) {
       clearInterval(this.timerCheckInterval);
       this.timerCheckInterval = null;
+    }
+
+    if (this.watchdogInterval) {
+      clearInterval(this.watchdogInterval);
+      this.watchdogInterval = null;
     }
 
     // Unregister from PSM
