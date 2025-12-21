@@ -78,6 +78,22 @@ class PathAnalyzer {
         }
       }
 
+      // Priority 0: Any coding operation triggers coding classification
+      // For foreign project detection, ANY work on coding files should be captured
+      // This ensures Grep, Glob, Read operations on coding files are properly routed
+      if (codingOperations.length > 0) {
+        const pathPreview = codingOperations.slice(0, 3).join(', ');
+        const suffix = codingOperations.length > 3 ? ` (+${codingOperations.length - 3} more)` : '';
+        const reason = `Coding operations detected (${codingOperations.length}): ${pathPreview}${suffix}`;
+        return this.formatResult(true, fileOperations, reason, startTime, {
+          codingOperations,
+          nonCodingOperations,
+          codingWriteOperations,
+          nonCodingWriteOperations,
+          mode: 'any-coding-path'
+        });
+      }
+
       // Priority 1: Write operations determine classification
       // If there are write operations, classify based on majority of writes
       if (codingWriteOperations.length > 0 || nonCodingWriteOperations.length > 0) {
@@ -205,7 +221,17 @@ class PathAnalyzer {
     if (exchange.assistantResponse && typeof exchange.assistantResponse === 'string') {
       this.extractPathsFromText(exchange.assistantResponse, operations);
     }
-    
+
+    // Also check claudeResponse (used by batch processor and transcript monitor)
+    if (exchange.claudeResponse && typeof exchange.claudeResponse === 'string') {
+      this.extractPathsFromText(exchange.claudeResponse, operations);
+    }
+
+    // Check assistantMessage (batch processor format)
+    if (exchange.assistantMessage && typeof exchange.assistantMessage === 'string') {
+      this.extractPathsFromText(exchange.assistantMessage, operations);
+    }
+
     // Also check user message for file paths
     if (exchange.userMessage && typeof exchange.userMessage === 'string') {
       this.extractPathsFromText(exchange.userMessage, operations);
