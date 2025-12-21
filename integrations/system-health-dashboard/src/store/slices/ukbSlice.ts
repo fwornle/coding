@@ -16,7 +16,7 @@ export interface StepInfo {
 
 // Active workflow process
 export interface UKBProcess {
-  pid: number
+  pid: number | string  // Can be 'mcp-inline' for inline MCP workflows
   workflowName: string
   team: string
   repositoryPath: string
@@ -32,6 +32,8 @@ export interface UKBProcess {
   heartbeatAgeSeconds: number
   progressPercent: number
   steps?: StepInfo[]
+  _refreshKey?: string  // Server-generated key to force UI updates
+  isInlineMCP?: boolean  // Flag for inline MCP-triggered workflows
 }
 
 // Historical workflow summary

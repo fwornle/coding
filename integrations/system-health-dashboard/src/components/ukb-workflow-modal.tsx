@@ -340,6 +340,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               {/* Workflow Graph */}
               <div className={`flex-1 min-w-0 ${showSidebar ? 'mr-0' : ''}`}>
                 <UKBWorkflowGraph
+                  key={`${activeCurrentProcess.pid}-${activeCurrentProcess._refreshKey || ''}-${activeCurrentProcess.completedSteps}`}
                   process={activeCurrentProcess}
                   onNodeClick={handleNodeClick}
                   selectedNode={selectedNode}

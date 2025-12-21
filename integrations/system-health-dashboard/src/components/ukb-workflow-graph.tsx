@@ -448,7 +448,7 @@ interface StepInfo {
 }
 
 interface ProcessInfo {
-  pid: number
+  pid: number | string  // Can be 'mcp-inline' for inline MCP workflows
   workflowName: string
   team: string
   repositoryPath: string
@@ -458,6 +458,7 @@ interface ProcessInfo {
   completedSteps: number
   totalSteps: number
   currentStep: string | null
+  _refreshKey?: string  // Server-generated key to force UI updates
   health: 'healthy' | 'stale' | 'frozen' | 'dead'
   progressPercent: number
   steps?: StepInfo[]
@@ -527,10 +528,25 @@ function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Rec
         return `Found ${duplicates} duplicates, merged ${merged} entities`
 
       case 'code_graph':
-        // Check for failure/skip conditions first
-        if (outputs.skipped || outputs.warning || outputs.skipReason) {
+        // Check for codeGraphStats first - this has the actual Memgraph data
+        const codeGraphStats = outputs.codeGraphStats || {}
+        const graphTotalEntities = codeGraphStats.totalEntities || 0
+        const graphTotalRelationships = codeGraphStats.totalRelationships || 0
+        const graphFunctions = codeGraphStats.entityTypeDistribution?.function || 0
+        const graphClasses = codeGraphStats.entityTypeDistribution?.class || 0
+        const graphMethods = codeGraphStats.entityTypeDistribution?.method || 0
+
+        // If we have valid codeGraphStats, show those (even if there's a "using existing" warning)
+        if (graphTotalEntities > 0) {
+          const usedExisting = outputs.warning?.includes('existing') || outputs.warning?.includes('no re-indexing')
+          const prefix = usedExisting ? '📊 ' : ''
+          const suffix = usedExisting ? ' (cached)' : ''
+          return `${prefix}${graphTotalEntities.toLocaleString()} entities (${graphFunctions.toLocaleString()} functions, ${graphClasses.toLocaleString()} classes), ${graphTotalRelationships.toLocaleString()} relationships${suffix}`
+        }
+
+        // Check for actual failure/skip conditions
+        if (outputs.skipped || outputs.skipReason) {
           const reason = outputs.skipReason || outputs.warning || 'Unknown reason'
-          // Extract the key part of the error message
           const shortReason = reason.includes('code 143') ? 'Timeout (SIGTERM)' :
                               reason.includes('failed') ? 'Indexing failed' :
                               reason.slice(0, 50) + (reason.length > 50 ? '...' : '')
