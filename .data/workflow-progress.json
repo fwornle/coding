@@ -1,10 +1,10 @@
 {
   "workflowName": "complete-analysis",
-  "executionId": "complete-analysis-1766305033496",
+  "executionId": "complete-analysis-simulation-1766317131864",
   "status": "completed",
   "team": "coding",
   "repositoryPath": "/Users/q284340/Agentic/coding",
-  "startTime": "2025-12-21T08:17:13.496Z",
+  "startTime": "2025-12-21T11:38:51.864Z",
   "currentStep": null,
   "totalSteps": 15,
   "completedSteps": 15,
@@ -13,10 +13,10 @@
   "runningSteps": 0,
   "stepsCompleted": [
     "index_codebase",
-    "transform_code_entities",
     "link_documentation",
     "analyze_git_history",
     "analyze_vibe_history",
+    "transform_code_entities",
     "semantic_analysis",
     "web_search",
     "generate_insights",
@@ -35,34 +35,10 @@
     {
       "name": "index_codebase",
       "status": "completed",
-      "duration": 1310,
-      "outputs": {
-        "entitiesCount": 0,
-        "codeGraphStats": {
-          "totalEntities": 62115,
-          "totalRelationships": 128791,
-          "languageDistribution": {},
-          "entityTypeDistribution": {
-            "function": 32264,
-            "class": 1495,
-            "method": 7618,
-            "module": 991
-          }
-        },
-        "warning": "Using existing Memgraph data (no re-indexing performed)",
-        "timing": {
-          "duration": 1310,
-          "timeout": 600
-        }
-      }
-    },
-    {
-      "name": "transform_code_entities",
-      "status": "completed",
-      "duration": 6,
+      "duration": 3000,
       "outputs": {
         "timing": {
-          "duration": 6,
+          "duration": 3000,
           "timeout": 60
         }
       }
@@ -70,183 +46,142 @@
     {
       "name": "link_documentation",
       "status": "completed",
-      "duration": 1458,
+      "duration": 3000,
       "outputs": {
-        "codeGraphStats": {},
         "timing": {
-          "duration": 1458,
-          "timeout": 120
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "analyze_git_history",
       "status": "completed",
-      "duration": 7258,
+      "duration": 3000,
       "outputs": {
-        "commitsCount": 739,
-        "filesCount": 6061,
         "timing": {
-          "duration": 7258,
-          "timeout": 300
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "analyze_vibe_history",
       "status": "completed",
-      "duration": 11569,
+      "duration": 3000,
       "outputs": {
-        "sessionsCount": 789,
-        "topTopicNames": [],
         "timing": {
-          "duration": 11569,
-          "timeout": 600
+          "duration": 3000,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "transform_code_entities",
+      "status": "completed",
+      "duration": 3000,
+      "outputs": {
+        "timing": {
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "semantic_analysis",
       "status": "completed",
-      "duration": 1141,
+      "duration": 3000,
       "outputs": {
         "timing": {
-          "duration": 1141,
-          "timeout": 240
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "web_search",
       "status": "completed",
-      "duration": 133,
+      "duration": 3000,
       "outputs": {
         "timing": {
-          "duration": 133,
-          "timeout": 90
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "generate_insights",
       "status": "completed",
-      "duration": 1656,
+      "duration": 3000,
       "outputs": {
-        "insightDocuments": [
-          {
-            "name": "Large-ScaleCodebasePattern",
-            "title": "Large-ScaleCodebasePattern - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/Large-ScaleCodebasePattern.md",
-            "significance": 8,
-            "diagramCount": 0
-          },
-          {
-            "name": "FunctionalProgrammingPattern",
-            "title": "FunctionalProgrammingPattern - Implementation Analysis",
-            "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FunctionalProgrammingPattern.md",
-            "significance": 8,
-            "diagramCount": 0
-          }
-        ],
-        "totalInsights": 2,
-        "patterns": [
-          {
-            "name": "Large-Scale Codebase Pattern",
-            "category": "architectural",
-            "significance": 7
-          },
-          {
-            "name": "Functional Programming Pattern",
-            "category": "design",
-            "significance": 6
-          }
-        ],
-        "totalPatterns": 2,
-        "avgPatternSignificance": 7,
-        "generationMetrics": {
-          "processingTime": 1655,
-          "documentsGenerated": 2,
-          "diagramsGenerated": 0,
-          "patternsIdentified": 2,
-          "qualityScore": 65
-        },
         "timing": {
-          "duration": 1656,
-          "timeout": 300
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "generate_observations",
       "status": "completed",
-      "duration": 402,
+      "duration": 3000,
       "outputs": {
-        "observationsCount": 1069,
         "timing": {
-          "duration": 402,
-          "timeout": 90
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "classify_with_ontology",
       "status": "completed",
-      "duration": 56592,
+      "duration": 3000,
       "outputs": {
         "timing": {
-          "duration": 56592,
-          "timeout": 600
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "analyze_documentation_semantics",
       "status": "completed",
-      "duration": 385057,
+      "duration": 3000,
       "outputs": {
-        "codeGraphStats": {},
         "timing": {
-          "duration": 385057,
-          "timeout": 600
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "quality_assurance",
       "status": "completed",
-      "duration": 3038,
+      "duration": 3000,
       "outputs": {
         "timing": {
-          "duration": 3038,
-          "timeout": 90
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "persist_results",
       "status": "completed",
-      "duration": 14814,
+      "duration": 3000,
       "outputs": {
-        "entitiesCreated": 1,
-        "entitiesUpdated": 0,
-        "filesCreated": [
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/Large-ScaleCodebasePattern.md",
-          "/Users/q284340/Agentic/coding/knowledge-management/insights/FunctionalProgrammingPattern.md"
-        ],
-        "errorsCount": 0,
         "timing": {
-          "duration": 14814,
-          "timeout": 90
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "deduplicate_insights",
       "status": "completed",
-      "duration": 3,
+      "duration": 3000,
       "outputs": {
         "timing": {
-          "duration": 3,
+          "duration": 3000,
           "timeout": 60
         }
       }
@@ -254,57 +189,31 @@
     {
       "name": "validate_content",
       "status": "completed",
-      "duration": 44793,
+      "duration": 3000,
       "outputs": {
         "timing": {
-          "duration": 44793,
-          "timeout": 120
+          "duration": 3000,
+          "timeout": 60
         }
       }
     }
   ],
   "summary": {
-    "totalCommits": 739,
-    "totalFiles": 6061,
-    "totalSessions": 789,
-    "totalKeyTopics": 0,
-    "totalObservations": 1069,
-    "totalInsights": 2,
-    "totalPatterns": 2,
+    "totalCommits": 100,
+    "totalFiles": 500,
+    "totalSessions": 50,
+    "totalKeyTopics": 10,
+    "totalObservations": 0,
+    "totalInsights": 0,
+    "totalPatterns": 0,
     "keyTopics": [],
-    "insightsGenerated": [
-      {
-        "name": "Large-ScaleCodebasePattern",
-        "title": "Large-ScaleCodebasePattern - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/Large-ScaleCodebasePattern.md",
-        "significance": 8,
-        "diagramCount": 0
-      },
-      {
-        "name": "FunctionalProgrammingPattern",
-        "title": "FunctionalProgrammingPattern - Implementation Analysis",
-        "filePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FunctionalProgrammingPattern.md",
-        "significance": 8,
-        "diagramCount": 0
-      }
-    ],
-    "patternsFound": [
-      {
-        "name": "Large-Scale Codebase Pattern",
-        "category": "architectural",
-        "significance": 7
-      },
-      {
-        "name": "Functional Programming Pattern",
-        "category": "design",
-        "significance": 6
-      }
-    ],
+    "insightsGenerated": [],
+    "patternsFound": [],
     "codeGraphStats": {
       "languages": []
     },
     "skippedReasons": {}
   },
-  "lastUpdate": "2025-12-21T08:25:02.198Z",
-  "elapsedSeconds": 469
+  "lastUpdate": "2025-12-21T11:39:36.901Z",
+  "elapsedSeconds": 45
 }
