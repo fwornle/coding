@@ -938,15 +938,52 @@ install_code_graph_rag() {
 
     # Create .env if not exists
     if [[ ! -f "$CODE_GRAPH_RAG_DIR/.env" ]]; then
-        cat > "$CODE_GRAPH_RAG_DIR/.env" << 'ENVEOF'
+        # Source main .env to get API keys
+        if [[ -f "$CODING_REPO/.env" ]]; then
+            source "$CODING_REPO/.env"
+        fi
+
+        # Use Groq as default (OpenAI quota issues are common)
+        # Fall back to OpenAI if no Groq key available
+        if [[ -n "$GROQ_API_KEY" ]]; then
+            cat > "$CODE_GRAPH_RAG_DIR/.env" << ENVEOF
 # code-graph-rag configuration
 MEMGRAPH_HOST=localhost
 MEMGRAPH_PORT=7687
 MEMGRAPH_BATCH_SIZE=1000
+
+# Using Groq via OpenAI-compatible API (faster, no quota issues)
+CYPHER_PROVIDER=openai
+CYPHER_MODEL=llama-3.3-70b-versatile
+CYPHER_ENDPOINT=https://api.groq.com/openai/v1
+CYPHER_API_KEY=$GROQ_API_KEY
+ENVEOF
+            info "Created .env with Groq configuration"
+        else
+            cat > "$CODE_GRAPH_RAG_DIR/.env" << 'ENVEOF'
+# code-graph-rag configuration
+MEMGRAPH_HOST=localhost
+MEMGRAPH_PORT=7687
+MEMGRAPH_BATCH_SIZE=1000
+
+# Using OpenAI (set CYPHER_API_KEY or OPENAI_API_KEY)
 CYPHER_PROVIDER=openai
 CYPHER_MODEL=gpt-4o-mini
 ENVEOF
-        info "Created .env configuration"
+            info "Created .env with OpenAI configuration (set GROQ_API_KEY in main .env for better performance)"
+        fi
+    else
+        # Update existing .env if GROQ_API_KEY is available but not configured
+        if [[ -f "$CODING_REPO/.env" ]]; then
+            source "$CODING_REPO/.env"
+        fi
+        if [[ -n "$GROQ_API_KEY" ]] && ! grep -q "CYPHER_API_KEY" "$CODE_GRAPH_RAG_DIR/.env"; then
+            info "Adding Groq API key to existing code-graph-rag .env..."
+            echo "" >> "$CODE_GRAPH_RAG_DIR/.env"
+            echo "# Groq API key added by installer" >> "$CODE_GRAPH_RAG_DIR/.env"
+            echo "CYPHER_ENDPOINT=https://api.groq.com/openai/v1" >> "$CODE_GRAPH_RAG_DIR/.env"
+            echo "CYPHER_API_KEY=$GROQ_API_KEY" >> "$CODE_GRAPH_RAG_DIR/.env"
+        fi
     fi
 
     # Create docker-compose.yaml for Memgraph if not exists
