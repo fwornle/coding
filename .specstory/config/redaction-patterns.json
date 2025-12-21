@@ -114,13 +114,24 @@
       "severity": "critical"
     },
     {
-      "id": "aws_session_token_multiline",
-      "name": "AWS Session Token (Multiline)",
-      "description": "AWS Session Tokens that span multiple lines with IQoJ prefix",
-      "pattern": "IQoJ[a-zA-Z0-9+/=\\s\\n]{50,}",
-      "flags": "gi",
+      "id": "aws_session_token_standalone",
+      "name": "AWS Session Token (Standalone)",
+      "description": "AWS STS Session Tokens with IQoJb3JpZ2lu base64 prefix (decoded: {\"origin\")",
+      "pattern": "IQoJb3JpZ2lu[a-zA-Z0-9+/=]{20,}",
+      "flags": "g",
       "replacementType": "generic",
       "replacement": "<AWS_TOKEN_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "aws_session_token_truncated",
+      "name": "AWS Session Token (Truncated refs)",
+      "description": "Truncated AWS Session Token references in logs/docs",
+      "pattern": "IQoJb3JpZ2lu[a-zA-Z0-9+/=]*\\.{2,3}",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<AWS_TOKEN_REDACTED>...",
       "enabled": true,
       "severity": "critical"
     },
@@ -138,13 +149,46 @@
     {
       "id": "aws_secret_standalone",
       "name": "AWS Secret Access Key (Standalone)",
-      "description": "Standalone AWS Secret Access Keys (40 char alphanumeric with + and /)",
-      "pattern": "(?<![a-zA-Z0-9])[a-zA-Z0-9+/]{40}(?![a-zA-Z0-9])",
+      "description": "Standalone AWS Secret Access Keys (40 char base64-like with + and /)",
+      "pattern": "[a-zA-Z0-9+/]{40}",
       "flags": "g",
       "replacementType": "generic",
       "replacement": "<AWS_SECRET_REDACTED>",
       "enabled": true,
       "severity": "high"
+    },
+    {
+      "id": "aws_secret_in_context",
+      "name": "AWS Secret in Context",
+      "description": "AWS Secrets appearing after keywords like Secret:, SecretKey:, etc.",
+      "pattern": "(Secret|SecretKey|SecretAccessKey|secret_key)[:\\s]+[a-zA-Z0-9+/]{20,}",
+      "flags": "gi",
+      "replacementType": "generic",
+      "replacement": "$1: <AWS_SECRET_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "aws_secret_truncated",
+      "name": "AWS Secret (Truncated)",
+      "description": "Truncated AWS secrets in logs (base64-like followed by ...)",
+      "pattern": "[a-zA-Z0-9+/]{8,}\\+[a-zA-Z0-9+/]*\\.{2,3}",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<AWS_SECRET_REDACTED>...",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "aws_credentials_block",
+      "name": "AWS Credentials Block",
+      "description": "Full AWS credentials JSON blocks from CLI output",
+      "pattern": "\\{[^}]*[\"']?(AccessKeyId|Credentials)[\"']?[^}]*\\}",
+      "flags": "gi",
+      "replacementType": "generic",
+      "replacement": "{<AWS_CREDENTIALS_REDACTED>}",
+      "enabled": true,
+      "severity": "critical"
     },
     {
       "id": "generic_api_keys",
