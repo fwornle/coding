@@ -84,7 +84,7 @@
       "id": "aws_access_key_id_json",
       "name": "AWS Access Key ID (JSON)",
       "description": "AWS Access Key IDs in JSON format (AKIA*/ASIA* prefixes)",
-      "pattern": "\"(AccessKeyId|aws_access_key_id)\"\\s*:\\s*\"(A[SK]IA[A-Z0-9]{16,})\"",
+      "pattern": "\"(AccessKeyId|aws_access_key_id|accessKeyId)\"\\s*:\\s*\"(A[SK]IA[A-Z0-9]{12,})\"",
       "flags": "gi",
       "replacementType": "json_key",
       "replacement": "\"$1\": \"<AWS_KEY_REDACTED>\"",
@@ -94,8 +94,8 @@
     {
       "id": "aws_secret_access_key_json",
       "name": "AWS Secret Access Key (JSON)",
-      "description": "AWS Secret Access Keys in JSON format (40 char base64)",
-      "pattern": "\"(SecretAccessKey|aws_secret_access_key)\"\\s*:\\s*\"([a-zA-Z0-9+/]{40})\"",
+      "description": "AWS Secret Access Keys in JSON format (40+ char base64-like)",
+      "pattern": "\"(SecretAccessKey|aws_secret_access_key|secretAccessKey)\"\\s*:\\s*\"([a-zA-Z0-9+/]{20,})\"",
       "flags": "gi",
       "replacementType": "json_key",
       "replacement": "\"$1\": \"<AWS_SECRET_REDACTED>\"",
@@ -105,8 +105,8 @@
     {
       "id": "aws_session_token_json",
       "name": "AWS Session Token (JSON)",
-      "description": "AWS Session Tokens in JSON format (long base64 strings)",
-      "pattern": "\"(SessionToken|aws_session_token)\"\\s*:\\s*\"([a-zA-Z0-9+/=]{100,})\"",
+      "description": "AWS Session Tokens in JSON format (long base64 strings, may span lines)",
+      "pattern": "\"(SessionToken|aws_session_token|sessionToken)\"\\s*:\\s*\"([a-zA-Z0-9+/=\\s]{50,})\"",
       "flags": "gi",
       "replacementType": "json_key",
       "replacement": "\"$1\": \"<AWS_TOKEN_REDACTED>\"",
@@ -114,15 +114,37 @@
       "severity": "critical"
     },
     {
+      "id": "aws_session_token_multiline",
+      "name": "AWS Session Token (Multiline)",
+      "description": "AWS Session Tokens that span multiple lines with IQoJ prefix",
+      "pattern": "IQoJ[a-zA-Z0-9+/=\\s\\n]{50,}",
+      "flags": "gi",
+      "replacementType": "generic",
+      "replacement": "<AWS_TOKEN_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
       "id": "aws_access_key_standalone",
       "name": "AWS Access Key ID (Standalone)",
       "description": "Standalone AWS Access Key IDs (AKIA*/ASIA* prefixes)",
-      "pattern": "\\b(A[SK]IA[A-Z0-9]{16,})\\b",
+      "pattern": "\\bA[SK]IA[A-Z0-9]{12,}\\b",
       "flags": "g",
       "replacementType": "generic",
       "replacement": "<AWS_KEY_REDACTED>",
       "enabled": true,
       "severity": "critical"
+    },
+    {
+      "id": "aws_secret_standalone",
+      "name": "AWS Secret Access Key (Standalone)",
+      "description": "Standalone AWS Secret Access Keys (40 char alphanumeric with + and /)",
+      "pattern": "(?<![a-zA-Z0-9])[a-zA-Z0-9+/]{40}(?![a-zA-Z0-9])",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<AWS_SECRET_REDACTED>",
+      "enabled": true,
+      "severity": "high"
     },
     {
       "id": "generic_api_keys",
