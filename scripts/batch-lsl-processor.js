@@ -670,11 +670,28 @@ class BatchLSLProcessor {
       return true;
     }
 
-    // Check for interrupted sessions
+    // Check for interrupted sessions and warmup/goodbye messages
     const userExchanges = promptSet.exchanges.filter(e => e.type === 'user');
     if (userExchanges.length > 0) {
-      const userContent = userExchanges[0].content || '';
-      if (userContent.trim() === '[Request interrupted by user]') {
+      const userContent = (userExchanges[0].content || '').trim();
+
+      // Filter out interrupted requests
+      if (userContent === '[Request interrupted by user]') {
+        return true;
+      }
+
+      // Filter out session warmup messages (no useful content)
+      if (userContent.toLowerCase() === 'warmup') {
+        return true;
+      }
+
+      // Filter out session goodbye messages
+      if (userContent.includes('<local-command-stdout>Goodbye!</local-command-stdout>')) {
+        return true;
+      }
+
+      // Filter out bare goodbye messages
+      if (userContent.toLowerCase() === 'goodbye' || userContent.toLowerCase() === 'goodbye!') {
         return true;
       }
     }

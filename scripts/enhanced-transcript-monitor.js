@@ -1684,12 +1684,30 @@ class EnhancedTranscriptMonitor {
       if (exchange.userMessage && this.isSlCommand(exchange.userMessage)) {
         return false;
       }
-      
+
+      // Skip warmup and goodbye messages (session lifecycle noise)
+      const userMsg = (exchange.userMessage || '').trim().toLowerCase();
+      if (userMsg === 'warmup') {
+        this.debug('Filtering out warmup message');
+        return false;
+      }
+      if (userMsg === 'goodbye' || userMsg === 'goodbye!' ||
+          (exchange.userMessage || '').includes('<local-command-stdout>Goodbye!</local-command-stdout>')) {
+        this.debug('Filtering out goodbye message');
+        return false;
+      }
+
+      // Skip interrupted requests
+      if (userMsg === '[request interrupted by user]') {
+        this.debug('Filtering out interrupted request');
+        return false;
+      }
+
       // Skip exchanges with no user message and no response (empty entries)
       const hasUserMessage = this.hasMeaningfulContent(exchange.userMessage);
       const hasAssistantResponse = this.hasMeaningfulContent(exchange.claudeResponse) || this.hasMeaningfulContent(exchange.assistantResponse);
       const hasToolCalls = exchange.toolCalls && exchange.toolCalls.length > 0;
-      
+
       // Keep exchange if it has at least one of: meaningful user message, assistant response, or tool calls
       return hasUserMessage || hasAssistantResponse || hasToolCalls;
     });
@@ -2613,15 +2631,30 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
-   * Remove health file on shutdown
+   * Update health file on shutdown with 'stopped' status
+   * Previously this deleted the file, but that caused health verifier to report
+   * false errors when no Claude session was active for a project.
+   * Now we keep the file but mark it as stopped.
    */
   cleanupHealthFile() {
     try {
-      if (fs.existsSync(this.config.healthFile)) {
-        fs.unlinkSync(this.config.healthFile);
-      }
+      const stoppedHealth = {
+        timestamp: Date.now(),
+        projectPath: this.config.projectPath,
+        transcriptPath: this.transcriptPath,
+        status: 'stopped',
+        stoppedAt: new Date().toISOString(),
+        reason: 'graceful_shutdown',
+        metrics: {
+          processId: process.pid,
+          uptimeSeconds: Math.round(process.uptime()),
+          finalExchangeCount: this.exchangeCount || 0
+        }
+      };
+      fs.writeFileSync(this.config.healthFile, JSON.stringify(stoppedHealth, null, 2));
+      this.debug('Health file updated with stopped status');
     } catch (error) {
-      this.debug(`Failed to cleanup health file: ${error.message}`);
+      this.debug(`Failed to update health file on shutdown: ${error.message}`);
     }
   }
 }
