@@ -1,31 +1,21 @@
 # ApiRefactoringPattern
 
-**Type:** Technical Pattern
+**Type:** TransferablePattern
 
-Repository-specific development challenge identified through code analysis
+ApiRefactoringPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
-## Implementation
+## What It Is
 
-Configuration-driven development approach
+- ApiRefactoringPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
-- Standardize configuration management across 19 config files
-- Implement validation schemas for configuration
-- Create centralized configuration loading
-- Add environment-specific configuration support
-- Establish configuration documentation patterns
+- shared-memory.json has been REMOVED from the codebase
 
-## Technologies
 
-- JSON Schema validation
-- Environment variable management
-- Configuration templating
-- TypeScript/JavaScript
-- Documentation
+## Additional Details
 
-## Architecture
-
-![Architecture](images/api-refactoring-pattern-architecture.png)
+- Core components: VkbApiClient
 
 
 ---
-*Generated via fallback analysis*
+
+*Generated from 3 observations*
