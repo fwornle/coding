@@ -6,12 +6,11 @@ import { healthRefreshManager } from './store/middleware/healthRefreshMiddleware
 
 function App() {
   useEffect(() => {
-    // Initialize health refresh manager when app mounts
-    console.log('🚀 App mounted, health refresh manager initialized')
+    // Start/restart health refresh manager when app mounts
+    // This handles React StrictMode double-mount and HMR
+    healthRefreshManager.startAutoRefresh()
 
-    // Cleanup on unmount
     return () => {
-      console.log('🛑 App unmounting, cleaning up')
       healthRefreshManager.stopAutoRefresh()
     }
   }, [])

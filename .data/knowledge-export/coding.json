@@ -2107,16 +2107,56 @@
     },
     {
       "name": "Large-ScaleCodebasePattern",
-      "entityType": "GraphDatabase",
+      "entityType": "MCPAgent",
       "observations": [
-        "Problem: -Solution Patterns - **Problem:** [object Object] **Solution:** [object Object] - **Problem:** [object Object] **Solution:** [object Object] - **Problem:** [object Object] **Solution:** [object Object]",
-        "Applies to: Applicable to API design and similar domain challenges",
-        "Details: http://localhost:8080/knowledge-management/insights/Large-ScaleCodebasePattern.md"
+        {
+          "type": "implementation",
+          "content": "Large-ScaleCodebasePattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T12:54:08.175Z",
+          "metadata": {
+            "confidence": 0.9,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T12:54:08.179Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T12:54:08.175Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T12:54:08.179Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T12:54:08.175Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T12:54:08.179Z"
+          }
+        },
+        {
+          "type": "insight-document",
+          "content": "Detailed insight document available at: knowledge-management/insights/Large-ScaleCodebasePattern.md",
+          "date": "2025-12-22T12:54:10.051Z",
+          "metadata": {
+            "insightPath": "knowledge-management/insights/Large-ScaleCodebasePattern.md",
+            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/Large-ScaleCodebasePattern.md",
+            "diagramsGenerated": 0,
+            "generatedBy": "entity-refresh",
+            "refreshedAt": "2025-12-22T12:54:10.052Z",
+            "source": "entity-refresh"
+          }
+        }
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-21T08:24:03.394Z",
-        "last_updated": "2025-12-22T08:44:06.507Z"
+        "last_updated": "2025-12-22T12:54:10.108Z"
       },
       "id": "mc4flkg1ot16ee"
     }
@@ -2792,7 +2832,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-12-22T08:44:11.509Z",
+    "exported_at": "2025-12-22T12:54:15.121Z",
     "total_entities": 25,
     "total_relations": 111,
     "description": "Coding project infrastructure and patterns"

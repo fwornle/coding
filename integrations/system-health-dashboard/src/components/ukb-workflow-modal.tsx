@@ -82,15 +82,22 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Create a signature for change detection - ensures re-renders when process data changes
   // This captures key fields that affect display: pid, status, completedSteps, _refreshKey
+  // Also include steps signature for real-time step status updates
   const processesSignature = useMemo(() => {
-    return processes.map(p => `${p.pid}:${p.status}:${p.completedSteps}:${p._refreshKey || ''}`).join('|')
+    return processes.map(p => {
+      const stepsInfo = p.steps?.map(s => `${s.name}:${s.status}`).join(',') || ''
+      return `${p.pid}:${p.status}:${p.completedSteps}:${p.currentStep || ''}:${p._refreshKey || ''}:${stepsInfo}`
+    }).join('|')
   }, [processes])
 
-  // Filter to only include truly active processes (running and alive, or recently completed for context)
-  // A process is "active" if: status === 'running' OR (status === 'completed' and isAlive !== false)
-  // But for the Active tab count, we only want running processes
+  // Filter to only include truly active (running) processes
+  // Completed/failed workflows should move to History tab
   const activeProcesses = useMemo(() => {
-    return processes.filter(p => p.status === 'running' || (p.isAlive && p.status !== 'completed' && p.status !== 'failed'))
+    return processes.filter(p =>
+      p.status === 'running' ||
+      (p.isInlineMCP && p.status === 'running') || // Only show running inline MCP processes
+      (p.isAlive && p.status !== 'completed' && p.status !== 'failed')
+    )
     // Include processesSignature to ensure recalculation when any process data changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processes, processesSignature])
@@ -169,10 +176,17 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }
 
-  const formatElapsed = (startTime: string) => {
-    const start = new Date(startTime).getTime()
-    const now = Date.now()
-    const elapsedSeconds = Math.floor((now - start) / 1000)
+  const formatElapsed = (startTime: string, status?: string, fixedElapsedSeconds?: number) => {
+    // For completed/failed workflows, use the fixed elapsed time from when they finished
+    // For running workflows, calculate dynamically from start time
+    let elapsedSeconds: number
+    if (status && status !== 'running' && fixedElapsedSeconds !== undefined) {
+      elapsedSeconds = fixedElapsedSeconds
+    } else {
+      const start = new Date(startTime).getTime()
+      const now = Date.now()
+      elapsedSeconds = Math.floor((now - start) / 1000)
+    }
 
     if (elapsedSeconds < 60) return `${elapsedSeconds}s`
     const minutes = Math.floor(elapsedSeconds / 60)
@@ -320,7 +334,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                     <div className="text-xs text-muted-foreground mb-1">Elapsed</div>
                     <div className="font-medium flex items-center gap-1">
                       <Timer className="h-3 w-3" />
-                      {formatElapsed(activeCurrentProcess.startTime)}
+                      {formatElapsed(activeCurrentProcess.startTime, activeCurrentProcess.status, activeCurrentProcess.elapsedSeconds)}
                     </div>
                   </div>
                 </div>
@@ -348,7 +362,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               {/* Workflow Graph */}
               <div className={`flex-1 min-w-0 ${showSidebar ? 'mr-0' : ''}`}>
                 <UKBWorkflowGraph
-                  key={activeCurrentProcess.pid}
+                  key={`${activeCurrentProcess.pid}-${activeCurrentProcess._refreshKey || activeCurrentProcess.completedSteps}`}
                   process={activeCurrentProcess}
                   onNodeClick={handleNodeClick}
                   selectedNode={selectedNode}
