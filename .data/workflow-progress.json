@@ -1,59 +1,53 @@
 {
   "workflowName": "complete-analysis",
-  "executionId": "complete-analysis-1766392360099",
-  "status": "failed",
+  "executionId": "complete-analysis-simulation-1766394195617",
+  "status": "running",
   "team": "coding",
   "repositoryPath": "/Users/q284340/Agentic/coding",
-  "startTime": "2025-12-22T08:32:40.099Z",
-  "currentStep": null,
+  "startTime": "2025-12-22T09:03:15.617Z",
+  "currentStep": "quality_assurance",
   "totalSteps": 15,
-  "completedSteps": 4,
-  "failedSteps": 1,
+  "completedSteps": 11,
+  "failedSteps": 0,
   "skippedSteps": 0,
-  "runningSteps": 0,
+  "runningSteps": 1,
   "stepsCompleted": [
     "index_codebase",
-    "transform_code_entities",
+    "link_documentation",
     "analyze_git_history",
-    "link_documentation"
-  ],
-  "stepsFailed": [
+    "analyze_vibe_history",
+    "transform_code_entities",
+    "semantic_analysis",
+    "web_search",
+    "generate_insights",
+    "generate_observations",
+    "classify_with_ontology",
     "analyze_documentation_semantics"
   ],
+  "stepsFailed": [],
   "stepsSkipped": [],
-  "stepsRunning": [],
+  "stepsRunning": [
+    "quality_assurance"
+  ],
   "stepsDetail": [
     {
       "name": "index_codebase",
       "status": "completed",
-      "duration": 1201,
+      "duration": 3000,
       "outputs": {
-        "entitiesCount": 0,
-        "codeGraphStats": {
-          "totalEntities": 62115,
-          "totalRelationships": 128791,
-          "languageDistribution": {},
-          "entityTypeDistribution": {
-            "function": 32264,
-            "class": 1495,
-            "method": 7618,
-            "module": 991
-          }
-        },
-        "warning": "Using existing Memgraph data (no re-indexing performed)",
         "timing": {
-          "duration": 1201,
-          "timeout": 600
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
-      "name": "transform_code_entities",
+      "name": "link_documentation",
       "status": "completed",
-      "duration": 5,
+      "duration": 3000,
       "outputs": {
         "timing": {
-          "duration": 5,
+          "duration": 3000,
           "timeout": 60
         }
       }
@@ -61,42 +55,108 @@
     {
       "name": "analyze_git_history",
       "status": "completed",
-      "duration": 6102,
+      "duration": 3000,
       "outputs": {
-        "commitsCount": 747,
-        "filesCount": 6104,
         "timing": {
-          "duration": 6102,
-          "timeout": 300
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
-      "name": "link_documentation",
+      "name": "analyze_vibe_history",
       "status": "completed",
-      "duration": 2311,
+      "duration": 3000,
       "outputs": {
-        "codeGraphStats": {},
         "timing": {
-          "duration": 2311,
-          "timeout": 120
+          "duration": 3000,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "transform_code_entities",
+      "status": "completed",
+      "duration": 3000,
+      "outputs": {
+        "timing": {
+          "duration": 3000,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "semantic_analysis",
+      "status": "completed",
+      "duration": 3000,
+      "outputs": {
+        "timing": {
+          "duration": 3000,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "web_search",
+      "status": "completed",
+      "duration": 3000,
+      "outputs": {
+        "timing": {
+          "duration": 3000,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "generate_insights",
+      "status": "completed",
+      "duration": 3000,
+      "outputs": {
+        "timing": {
+          "duration": 3000,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "generate_observations",
+      "status": "completed",
+      "duration": 3000,
+      "outputs": {
+        "timing": {
+          "duration": 3000,
+          "timeout": 60
+        }
+      }
+    },
+    {
+      "name": "classify_with_ontology",
+      "status": "completed",
+      "duration": 3000,
+      "outputs": {
+        "timing": {
+          "duration": 3000,
+          "timeout": 60
         }
       }
     },
     {
       "name": "analyze_documentation_semantics",
-      "status": "failed",
-      "error": "Agent not found: documentation_semantics. Available agents: git_history, vibe_history, semantic_analysis, web_search, insight_generation, observation_generation, ontology_classification, quality_assurance, persistence, deduplication, content_validation, code_graph, documentation_linker",
+      "status": "completed",
+      "duration": 3000,
       "outputs": {
-        "error": "Agent not found: documentation_semantics. Available agents: git_history, vibe_history, semantic_analysis, web_search, insight_generation, observation_generation, ontology_classification, quality_assurance, persistence, deduplication, content_validation, code_graph, documentation_linker"
+        "timing": {
+          "duration": 3000,
+          "timeout": 60
+        }
       }
     }
   ],
   "summary": {
-    "totalCommits": 747,
-    "totalFiles": 6104,
-    "totalSessions": 0,
-    "totalKeyTopics": 0,
+    "totalCommits": 100,
+    "totalFiles": 500,
+    "totalSessions": 50,
+    "totalKeyTopics": 10,
     "totalObservations": 0,
     "totalInsights": 0,
     "totalPatterns": 0,
@@ -108,6 +168,6 @@
     },
     "skippedReasons": {}
   },
-  "lastUpdate": "2025-12-22T08:32:46.763Z",
-  "elapsedSeconds": 7
+  "lastUpdate": "2025-12-22T09:03:48.640Z",
+  "elapsedSeconds": 33
 }

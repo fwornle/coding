@@ -789,7 +789,27 @@ function StepResultDetails({ outputs }: { outputs: Record<string, any> }) {
     )
   }
 
-  const entries = Object.entries(outputs).filter(([key]) => !key.startsWith('_'))
+  // Smart filtering: hide misleading top-level keys when better nested data exists
+  const entries = Object.entries(outputs).filter(([key, value]) => {
+    // Always hide underscore-prefixed internal keys
+    if (key.startsWith('_')) return false
+
+    // Hide 'entitiesCount' if codeGraphStats has actual entity data
+    // (entitiesCount: 0 is misleading when codeGraphStats.totalEntities > 0)
+    if (key === 'entitiesCount' && outputs.codeGraphStats?.totalEntities > 0) {
+      return false
+    }
+
+    // Hide empty codeGraphStats objects (they add no value)
+    if (key === 'codeGraphStats' && typeof value === 'object' && value !== null) {
+      const stats = value as Record<string, any>
+      if (Object.keys(stats).length === 0 || stats.totalEntities === 0) {
+        return false
+      }
+    }
+
+    return true
+  })
 
   return (
     <div className="text-xs bg-slate-50 border rounded p-2 space-y-1.5">
@@ -832,6 +852,13 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     setWigglingNode(null)
   }, [])
 
+  // Create a stable signature of step statuses for dependency tracking
+  // This ensures useMemo recalculates when step statuses change, even if array reference doesn't
+  const stepsSignature = useMemo(() => {
+    if (!process.steps) return ''
+    return process.steps.map(s => `${s.name}:${s.status}`).join(',')
+  }, [process.steps])
+
   // Build step status map from process data
   const stepStatusMap = useMemo(() => {
     const map: Record<string, StepInfo> = {}
@@ -859,9 +886,11 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     }
 
     return map
-    // Include _refreshKey to force recalculation when API returns new data
+    // Use stepsSignature instead of process.steps for reliable change detection
+    // stepsSignature changes when any step's name or status changes
+    // Also include _refreshKey and completedSteps for additional change detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [process.steps, process.currentStep, STEP_TO_AGENT, (process as any)._refreshKey])
+  }, [stepsSignature, process.currentStep, process.completedSteps, STEP_TO_AGENT, (process as any)._refreshKey])
 
   const getNodeStatus = (agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
     const stepInfo = stepStatusMap[agentId]
