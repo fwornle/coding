@@ -1,0 +1,25 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant PersistenceAgent as "Persistence Agent"
+participant VKBCommand as "vkb Command"
+participant GraphSyncCommand as "graph-sync Command"
+participant LevelDB as "LevelDB"
+
+activate VKBCommand
+VKBCommand->>GraphDatabaseService: Request Visualization
+GraphDatabaseService->>GraphKnowledgeExporter: Request Knowledge Export
+GraphKnowledgeExporter->>GraphDatabaseService: Export Knowledge
+GraphDatabaseService->>VKBCommand: Return Visualization
+
+activate GraphSyncCommand
+GraphSyncCommand->>GraphDatabaseService: Request Knowledge Operations
+GraphDatabaseService->>PersistenceAgent: Request Knowledge Persistence
+PersistenceAgent->>LevelDB: Store Knowledge
+LevelDB->>PersistenceAgent: Confirm Knowledge Storage
+PersistenceAgent->>GraphDatabaseService: Confirm Knowledge Persistence
+GraphDatabaseService->>GraphSyncCommand: Return Knowledge Operations Result
+
+@enduml

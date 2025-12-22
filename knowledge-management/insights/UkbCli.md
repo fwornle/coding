@@ -1,6 +1,6 @@
 # UkbCli
 
-**Type:** GraphDatabase
+**Type:** MCPAgent
 
 UkbCli is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
@@ -20,6 +20,11 @@ UkbCli is implemented across: src/knowledge-management, lib/ukb-unified, integra
 - Core components: VkbApiClient
 
 
+## Usage Guidelines
+
+- Use 'vkb' command for visualization (http://localhost:8080) and MCP semantic-analysis tools for programmatic access
+
+
 ---
 
-*Generated from 5 observations*
+*Generated from 6 observations*

@@ -1,67 +1,53 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "VkbCli" {
-  class VkbCli {
-    - graphDatabase: GraphDatabase
-    - jsonExport: JSONExport
-    + initialize()
-    + storeData(data: String)
-    + exportData()
+package "VkbCli Knowledge Entity" {
+  class GraphDatabaseService <<service>> {
+    - graphData: String
+    + storeKnowledge()
+    + retrieveKnowledge()
   }
 
-  class GraphDatabase {
-    - graphology: Graphology
-    - levelDB: LevelDB
-    + storeData(data: String)
-    + retrieveData(): String
+  class GraphKnowledgeExporter <<service>> {
+    - exportData: String
+    + exportKnowledge()
   }
 
-  class Graphology {
-    + createGraph()
-    + addNode(node: Node)
-    + addEdge(edge: Edge)
+  class PersistenceAgent <<service>> {
+    - persistedData: String
+    + persistData()
   }
 
-  class LevelDB {
-    + storeData(data: String)
-    + retrieveData(): String
+  class VkbCli <<MCPAgent>> {
+    - knowledgeGraph: GraphDatabaseService
+    - knowledgeExporter: GraphKnowledgeExporter
+    - persistenceAgent: PersistenceAgent
+    + visualizeKnowledge()
+    + manageKnowledge()
   }
 
-  class JSONExport {
-    + exportData(data: String)
-  }
-
-  class GraphDatabaseService {
-    - graphDatabaseAdapter: GraphDatabaseAdapter
-    + processData(data: String)
-  }
-
-  class GraphDatabaseAdapter {
-    - graphDatabase: GraphDatabase
-    + storeData(data: String)
-    + retrieveData(): String
-  }
-
-  VkbCli --* GraphDatabase
-  VkbCli --* JSONExport
-  GraphDatabase --* Graphology
-  GraphDatabase --* LevelDB
-  GraphDatabaseService --* GraphDatabaseAdapter
-  GraphDatabaseAdapter --* GraphDatabase
+  GraphDatabaseService --* VkbCli
+  GraphKnowledgeExporter --* VkbCli
+  PersistenceAgent --* VkbCli
 }
 
-package "Tools" {
-  class VkbCommand {
-    + visualizeGraph()
+class VkbCommand <<interface>> {
+  + visualize()
+}
+
+VkbCli ..> VkbCommand : uses
+
+package "Data Storage" {
+  class KnowledgeGraphData <<file>> {
+    - graphData: String
   }
 
-  class MCPTools {
-    + performKnowledgeOperations()
+  class KnowledgeExportData <<file>> {
+    - exportData: String
   }
 
-  VkbCli --* VkbCommand
-  VkbCli --* MCPTools
+  KnowledgeGraphData --* GraphDatabaseService
+  KnowledgeExportData --* GraphKnowledgeExporter
 }
 
 @enduml

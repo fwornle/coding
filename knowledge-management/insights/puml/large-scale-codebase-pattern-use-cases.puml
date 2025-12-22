@@ -1,0 +1,33 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+actor Developer as "Developer"
+actor SystemAdmin as "System Admin"
+
+usecase "Visualize Knowledge Graph" as (Visualize)
+usecase "Perform Knowledge Operations" as (Operations)
+usecase "Store Knowledge" as (Store)
+
+rectangle Microservices [
+  usecase "Graph Database Service" as (GraphDB)
+  usecase "Graph Knowledge Exporter" as (Exporter)
+  usecase "Persistence Agent" as (Agent)
+]
+
+Developer -- (Visualize)
+SystemAdmin -- (Operations)
+(Visualize) ..> (GraphDB) : uses
+(Operations) ..> (GraphDB) : uses
+(Operations) ..> (Exporter) : uses
+(Operations) ..> (Agent) : uses
+(Store) ..> (GraphDB) : uses
+(Store) ..> (Agent) : uses
+
+package "Commands" {
+  usecase "vkb command" as (vkb)
+  usecase "graph-sync command" as (graphSync)
+}
+(vkb) -- (Visualize) : triggers
+(graphSync) -- (Operations) : triggers
+
+@enduml

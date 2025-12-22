@@ -1,45 +1,44 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title DecoratorPattern Use Case Diagram
+actor MCPAgent as "MCP Agent"
+actor Developer as "Developer"
+actor User as "User"
 
-actor MCPUser as "MCP User"
-actor VKBCommand as "VKB Command"
-actor GraphSyncCommand as "Graph Sync Command"
-actor MCPTools as "MCP Tools"
-
-usecase "Visualize Knowledge Graph" as (VisualizeKnowledgeGraph)
-usecase "Perform Knowledge Operations" as (PerformKnowledgeOperations)
-usecase "Auto-Sync Graph Database" as (AutoSyncGraphDatabase)
-usecase "Access Knowledge Graph Database" as (AccessKnowledgeGraphDatabase)
-
-MCPUser -- (VisualizeKnowledgeGraph)
-MCPUser -- (PerformKnowledgeOperations)
-VKBCommand -- (VisualizeKnowledgeGraph)
-MCPTools -- (PerformKnowledgeOperations)
-GraphSyncCommand -- (AutoSyncGraphDatabase)
-
-package "Knowledge Management" {
-  usecase "Semantic Analysis" as (SemanticAnalysis)
-  usecase "Knowledge Management Infrastructure" as (KnowledgeManagementInfrastructure)
-  
-  (SemanticAnalysis) ..> (AccessKnowledgeGraphDatabase) : include
-  (KnowledgeManagementInfrastructure) ..> (AccessKnowledgeGraphDatabase) : include
-}
+usecase "Manage Knowledge Graph" as (Manage Knowledge Graph)
+usecase "Perform Data Synchronization" as (Perform Data Synchronization)
+usecase "Visualize Knowledge Graph" as (Visualize Knowledge Graph)
+usecase "Ensure Data Consistency" as (Ensure Data Consistency)
+usecase "Maintain Codebase" as (Maintain Codebase)
 
 package "Graph Database" {
-  usecase "Store Knowledge Graph" as (StoreKnowledgeGraph)
-  usecase "Query Knowledge Graph" as (QueryKnowledgeGraph)
-  
-  (StoreKnowledgeGraph) ..> (AccessKnowledgeGraphDatabase) : include
-  (QueryKnowledgeGraph) ..> (AccessKnowledgeGraphDatabase) : include
+  component GraphDatabaseService as "Graph Database Service"
+  component LevelDB as "LevelDB"
+  component Graphology as "Graphology"
 }
 
-(AutoSyncGraphDatabase) ..> (StoreKnowledgeGraph) : extend
+package "Data Synchronization" {
+  component GraphKnowledgeExporter as "Graph Knowledge Exporter"
+  component JSONExporter as "JSON Exporter"
+}
 
-note as AutoNote1
-  DecoratorPattern is used in semantic analysis and knowledge management infrastructure.
+package "Knowledge Operations" {
+  component PersistenceAgent as "Persistence Agent"
+  component VkbApiClient as "VkbApiClient"
+}
 
-end note
+MCPAgent -- (Manage Knowledge Graph)
+Developer -- (Maintain Codebase)
+User -- (Visualize Knowledge Graph)
+
+(Manage Knowledge Graph) ..> (Perform Data Synchronization) : includes
+(Perform Data Synchronization) ..> (Ensure Data Consistency) : extends
+(Visualize Knowledge Graph) ..> (Manage Knowledge Graph) : includes
+
+GraphDatabaseService ..> Graphology : uses
+GraphDatabaseService ..> LevelDB : uses
+GraphKnowledgeExporter ..> GraphDatabaseService : uses
+PersistenceAgent ..> GraphDatabaseService : uses
+VkbApiClient ..> GraphDatabaseService : uses
 
 @enduml

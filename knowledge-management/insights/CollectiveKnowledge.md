@@ -2,22 +2,19 @@
 
 **Type:** System
 
-CollectiveKnowledge is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+The use of Graphology and LevelDB provides a scalable and efficient knowledge storage solution, with benefits including improved data integrity and query performance
 
 ## What It Is
 
-- CollectiveKnowledge is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
+- CollectiveKnowledge is implemented across src/knowledge-management, lib/ukb-unified, and integrations/mcp-server-semantic-analysis/src
 
-- shared-memory.json has been REMOVED from the codebase
+- Available commands include vkb for visualization and graph-sync for data synchronization
 
-- Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph
+- The use of Graphology and LevelDB provides a scalable and efficient knowledge storage solution, with benefits including improved data integrity and query performance
 
-
-## Additional Details
-
-- Core components: GraphKnowledgeExporter
+- Core components include GraphDatabaseService, GraphKnowledgeExporter, and PersistenceAgent
 
 
 ---
 
-*Generated from 4 observations*
+*Generated from 5 observations*

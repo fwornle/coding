@@ -1,70 +1,32 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "Client Application" as Client
-participant "VkbApiClient" as ApiClient
-participant "Knowledge Management" as KnowledgeMgmt
-participant "UKB Unified" as UKB
-participant "MCP Semantic Analysis" as MCP
-participant "Graphology Engine" as Graph
-participant "LevelDB Storage" as LevelDB
-participant "JSON Export System" as JSONExport
+participant ApiPattern as "ApiPattern (MCPAgent)"
+participant GraphDatabaseService as "GraphDatabaseService"
+participant VkbApiClient as "VkbApiClient"
+participant PersistenceAgent as "PersistenceAgent"
+participant GraphDatabaseAdapter as "GraphDatabaseAdapter"
+participant MCPTools as "MCP Tools"
 
-Client -> ApiClient: Request ApiPattern data
-activate ApiClient
+activate ApiPattern
+ApiPattern ->> GraphDatabaseService: Request knowledge storage
+GraphDatabaseService ->> ApiPattern: Provide knowledge storage
 
-ApiClient -> KnowledgeMgmt: Query knowledge graph
-activate KnowledgeMgmt
-
-alt Knowledge exists in graph
-    KnowledgeMgmt -> Graph: Retrieve ApiPattern nodes
-    activate Graph
-    
-    Graph -> LevelDB: Read graph data
-    activate LevelDB
-    LevelDB --> Graph: Return stored patterns
-    deactivate LevelDB
-    
-    Graph --> KnowledgeMgmt: Return ApiPattern entities
-    deactivate Graph
-    
-    KnowledgeMgmt -> UKB: Process unified knowledge
-    activate UKB
-    UKB --> KnowledgeMgmt: Unified pattern data
-    deactivate UKB
-    
-else Pattern needs analysis
-    KnowledgeMgmt -> MCP: Analyze codebase patterns
-    activate MCP
-    
-    MCP -> MCP: Extract ApiPattern from:\n- src/knowledge-management\n- lib/ukb-unified\n- integrations/mcp-server-semantic-analysis/src
-    
-    MCP --> KnowledgeMgmt: Analyzed patterns
-    deactivate MCP
-    
-    KnowledgeMgmt -> Graph: Store new patterns
-    activate Graph
-    Graph -> LevelDB: Persist to .data/knowledge-graph
-    activate LevelDB
-    LevelDB --> Graph: Confirm storage
-    deactivate LevelDB
-    deactivate Graph
+alt Synchronize GraphDB with JSON exports
+    ApiPattern ->> GraphDatabaseService: graph-sync command
+    GraphDatabaseService ->> ApiPattern: Synchronized GraphDB
 end
 
-KnowledgeMgmt -> JSONExport: Auto-sync to export
-activate JSONExport
-JSONExport -> JSONExport: Export to .data/knowledge-export
-JSONExport --> KnowledgeMgmt: Export complete
-deactivate JSONExport
+ApiPattern ->> VkbApiClient: Request visualization
+VkbApiClient ->> ApiPattern: Provide visualization
 
-KnowledgeMgmt --> ApiClient: Return ApiPattern data
-deactivate KnowledgeMgmt
+ApiPattern ->> MCPTools: Request knowledge operations
+MCPTools ->> ApiPattern: Perform knowledge operations
 
-ApiClient --> Client: ApiPattern response
-deactivate ApiClient
+ApiPattern ->> PersistenceAgent: Persist knowledge entities
+PersistenceAgent ->> GraphDatabaseAdapter: Store knowledge entities
+GraphDatabaseAdapter ->> GraphDatabaseService: Store knowledge entities in GraphDB
 
-note over Graph, LevelDB: GraphDatabase implementation\nreplaces shared-memory.json
-
-note over JSONExport: Auto-synced JSON exports\nfor external consumption
+deactivate ApiPattern
 
 @enduml

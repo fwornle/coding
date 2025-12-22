@@ -1,85 +1,32 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant "VSCode Extension" as VSCode
-participant "Bridge Pattern\nController" as Bridge
-participant "GraphDatabaseService" as GraphService
-participant "GraphDatabaseAdapter" as Adapter
-participant "PersistenceAgent" as Persistence
-participant "Graphology\n+ LevelDB" as Storage
-participant "Knowledge Export\n(.data/knowledge-export)" as Export
+participant GraphDatabase as "GraphDatabase (.data/knowledge-graph)"
+participant GraphDatabaseService as "GraphDatabaseService"
+participant GraphKnowledgeExporter as "GraphKnowledgeExporter"
+participant PersistenceAgent as "PersistenceAgent"
+participant GraphDatabaseAdapter as "GraphDatabaseAdapter"
+participant MCPTools as "MCP Tools"
+participant VKBCommand as "vkb Command"
+participant KnowledgeExport as ".data/knowledge-export (JSON)"
 
-VSCode -> Bridge: Initialize knowledge management
-activate Bridge
+GraphDatabaseService ->> GraphDatabase: Initialize Graph Database
+GraphDatabaseAdapter ->> GraphDatabase: Adapt Data for Graph Database
+GraphKnowledgeExporter ->> GraphDatabase: Export Knowledge
+GraphKnowledgeExporter ->> KnowledgeExport: Export to JSON
+PersistenceAgent ->> GraphDatabase: Manage Persistence Operations
 
-Bridge -> GraphService: setupGraphDatabase()
-activate GraphService
+MCPTools ->> GraphDatabaseService: Perform Knowledge Operations
+VKBCommand ->> GraphDatabase: Visualize Knowledge Graph
 
-GraphService -> Adapter: createAdapter()
-activate Adapter
+alt Redaction Patterns
+    GraphDatabaseService ->> GraphDatabase: Apply Redaction Patterns
+    GraphDatabaseService ->> GraphDatabase: Protect Sensitive Information (AWS access keys)
+end
 
-Adapter -> Storage: connect(.data/knowledge-graph)
-activate Storage
-Storage --> Adapter: connection established
-deactivate Storage
-
-Adapter --> GraphService: adapter ready
-deactivate Adapter
-
-GraphService -> Persistence: initializePersistenceAgent()
-activate Persistence
-
-Persistence -> Storage: validateStorage()
-activate Storage
-Storage --> Persistence: storage validated
-deactivate Storage
-
-Persistence --> GraphService: persistence ready
-deactivate Persistence
-
-GraphService --> Bridge: graph database ready
-deactivate GraphService
-
-Bridge --> VSCode: bridge pattern initialized
-deactivate Bridge
-
-note over VSCode, Export: Knowledge Management Flow
-
-VSCode -> Bridge: storeKnowledgeEntity(pattern)
-activate Bridge
-
-Bridge -> GraphService: persistEntity(VSCodeExtensionBridgePattern)
-activate GraphService
-
-GraphService -> Adapter: writeToGraph(entity)
-activate Adapter
-
-Adapter -> Storage: store(entity, relationships)
-activate Storage
-Storage --> Adapter: stored successfully
-deactivate Storage
-
-Adapter --> GraphService: entity persisted
-deactivate Adapter
-
-GraphService -> Persistence: syncToExport()
-activate Persistence
-
-Persistence -> Export: exportToJSON(entity)
-activate Export
-Export --> Persistence: export completed
-deactivate Export
-
-Persistence --> GraphService: sync completed
-deactivate Persistence
-
-GraphService --> Bridge: knowledge stored
-deactivate GraphService
-
-Bridge --> VSCode: pattern stored successfully
-deactivate Bridge
-
-note over Storage: Removed: shared-memory.json\nUsing: Graphology + LevelDB
-note over Export: Auto-synced JSON exports\nfor external access
+loop Data Retrieval and Storage
+    GraphDatabaseService ->> GraphDatabase: Retrieve Data
+    GraphDatabaseService ->> GraphDatabase: Store Data
+end
 
 @enduml

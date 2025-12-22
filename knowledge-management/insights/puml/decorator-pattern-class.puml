@@ -1,67 +1,53 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-  class GraphDatabaseService <<service>> {
-    - graphDatabase: GraphDatabase
-    + syncGraphDatabase()
-    + queryGraphDatabase()
+package "Graph Database" {
+  class GraphDatabaseService {
+    - graph: Graphology
+    - levelDB: LevelDB
+    + storeKnowledge()
+    + retrieveKnowledge()
   }
-
-  class GraphDatabaseAdapter <<interface>> {
-    + adaptGraphDatabase()
+  class GraphKnowledgeExporter {
+    - graphDatabaseService: GraphDatabaseService
+    + exportJSON()
   }
-
-  class KnowledgeGraph <<file>> {
-    - graphData: GraphData
-  }
-
-  GraphDatabaseService --* GraphDatabaseAdapter
-  GraphDatabaseAdapter ..> GraphDatabase
-  GraphDatabaseService --* KnowledgeGraph
 }
 
-package "MCP Agent" {
-  class MCPAgent <<service>> {
-    - mcpTools: MCPTools
-    + performKnowledgeOperations()
+package "Knowledge Operations" {
+  abstract class MCPAgent {
+    + operate()
   }
-
-  class MCPTools <<interface>> {
-    + executeMCPCommand()
-  }
-
-  MCPAgent --* MCPTools
-}
-
-package "Decorator Pattern" {
-  abstract class DecoratorPattern <<stereotype>> {
+  class DecoratorPattern <<service>> {
+    - persistenceAgent: PersistenceAgent
+    - vkbApiClient: VkbApiClient
     + decorate()
   }
-
-  class SemanticAnalysisDecorator {
-    - decoratorPattern: DecoratorPattern
-    + analyzeSemantics()
+  class PersistenceAgent {
+    + persist()
   }
-
-  DecoratorPattern <|-- SemanticAnalysisDecorator
+  class VkbApiClient {
+    + sync()
+  }
 }
 
-package "Visualization" {
-  class VKBCommand <<interface>> {
-    + visualizeGraph()
+package "Data Storage" {
+  class KnowledgeGraph {
+    - data: JSON
+    + store()
   }
-
-  class GraphSyncCommand <<interface>> {
-    + syncGraphDatabase()
+  class KnowledgeExport {
+    - data: JSON
+    + export()
   }
-
-  VKBCommand ..> GraphDatabase
-  GraphSyncCommand ..> GraphDatabase
 }
 
-GraphDatabaseService --* MCPAgent
-MCPAgent --* DecoratorPattern
-DecoratorPattern --* KnowledgeGraph
+GraphDatabaseService --* GraphKnowledgeExporter
+GraphKnowledgeExporter ..> KnowledgeGraph
+DecoratorPattern --|> MCPAgent
+DecoratorPattern --* PersistenceAgent
+DecoratorPattern --* VkbApiClient
+PersistenceAgent --* KnowledgeGraph
+VkbApiClient --* KnowledgeExport
 
 @enduml

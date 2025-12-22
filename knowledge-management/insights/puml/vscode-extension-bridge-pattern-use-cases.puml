@@ -1,60 +1,33 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+actor "System Administrator" as Admin
+actor "MCP Tools" as MCP
+actor "vkb Command" as vkb
 
-actor "VSCode Developer" as dev
-actor "Extension User" as user
-actor "MCP Server" as mcp
-actor "Graph Database" as gdb
+usecase "Manage Knowledge Graph" as (Manage Knowledge Graph)
+usecase "Export Knowledge" as (Export Knowledge)
+usecase "Visualize Knowledge" as (Visualize Knowledge)
+usecase "Perform Knowledge Operations" as (Perform Knowledge Operations)
 
-package "Knowledge Management" {
-  usecase "Store Knowledge Entity" as store
-  usecase "Query Graph Database" as query
-  usecase "Export Knowledge" as export
-  usecase "Sync Data" as sync
+package "GraphDatabase" {
+  component "GraphDatabaseService" as GDS
+  component "GraphDatabaseAdapter" as GDA
+  component "PersistenceAgent" as PA
+  component "GraphKnowledgeExporter" as GKE
 }
 
-package "Bridge Pattern Implementation" {
-  usecase "Initialize GraphDatabaseService" as init
-  usecase "Adapt Database Interface" as adapt
-  usecase "Manage Persistence" as persist
-  usecase "Handle Cross-Module Communication" as comm
-}
+Admin -- (Manage Knowledge Graph)
+MCP -- (Perform Knowledge Operations)
+vkb -- (Visualize Knowledge)
 
-package "Semantic Analysis" {
-  usecase "Analyze Code Patterns" as analyze
-  usecase "Extract Architecture Components" as extract
-  usecase "Generate Semantic Models" as generate
-}
+(Manage Knowledge Graph) ..> (Export Knowledge) : include
+(Manage Knowledge Graph) ..> (Visualize Knowledge) : include
+(Perform Knowledge Operations) ..> (Manage Knowledge Graph) : extend
 
-package "Data Storage" {
-  usecase "Use Graphology + LevelDB" as graphology
-  usecase "Maintain .data/knowledge-graph" as kgraph
-  usecase "Auto-sync JSON Exports" as jsonsync
-}
-
-dev --> store
-dev --> query
-dev --> analyze
-user --> query
-user --> export
-mcp --> comm
-mcp --> analyze
-gdb --> persist
-gdb --> sync
-
-store ..> init : <<include>>
-query ..> adapt : <<include>>
-export ..> jsonsync : <<include>>
-persist ..> graphology : <<include>>
-sync ..> kgraph : <<include>>
-analyze ..> extract : <<include>>
-extract ..> generate : <<include>>
-comm ..> adapt : <<extend>>
-
-note right of store : Pattern extracted from\nsrc/knowledge-management,\nlib/ukb-unified,\nintegrations/mcp-server-semantic-analysis
-note bottom of graphology : Replaces shared-memory.json\nwith persistent graph storage
-note top of jsonsync : Auto-synced from GraphDB\nto .data/knowledge-export
+GDS ..> GDA : adapt
+GDS ..> PA : manage
+GDS ..> GKE : export
+PA ..> GDA : store
 
 @enduml

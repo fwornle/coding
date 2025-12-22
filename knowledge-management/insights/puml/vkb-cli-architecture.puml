@@ -1,28 +1,24 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "VkbCli" {
-  component "GraphDatabaseService" as "GraphDatabaseService [Core]" <<core>>
-  component "GraphDatabaseAdapter" as "GraphDatabaseAdapter [Adapter]" <<api>>
-  component "Graphology" as "Graphology [Storage]" <<storage>>
-  component "LevelDB" as "LevelDB [Storage]" <<storage>>
-  component "JSON Export" as "JSON Export [Storage]" <<storage>>
-  component "vkb command" as "vkb command [Agent]" <<agent>>
-  component "MCP tools" as "MCP tools [Agent]" <<agent>>
-  
-  GraphDatabaseService --* GraphDatabaseAdapter
-  GraphDatabaseAdapter --* Graphology
-  GraphDatabaseAdapter --* LevelDB
-  Graphology --* LevelDB
-  LevelDB --* JSON Export
-  GraphDatabaseService --* vkb command
-  GraphDatabaseService --* MCP tools
-  vkb command --* GraphDatabaseService
-  MCP tools --* GraphDatabaseService
-  
-  note as AutoNote1
-  VkbCli: Dual-storage architecture with Graphology + LevelDB for primary storage and auto-synchronized JSON exports
-  end note
+package "VkbCli Architecture" {
+  component "Graph Database" as gds <<storage>>
+  component "Graph Knowledge Exporter" as gke <<api>>
+  component "Persistence Agent" as pa <<agent>>
+  component "MCP Tools" as mcp <<external>>
+  component "Vkb Command" as vkb <<cli>>
 }
+
+note as AutoNote1
+  VkbCli Entity Purpose: Improved knowledge management, enhanced data analysis, and increased productivity
+
+end note
+
+gds --> gke : exports knowledge graph
+gke --> pa : persists knowledge
+pa --> gds : updates knowledge graph
+mcp --> gds : uses knowledge graph
+vkb --> gds : visualizes knowledge graph
+vkb --> mcp : uses MCP tools
 
 @enduml

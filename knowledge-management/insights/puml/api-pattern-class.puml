@@ -1,110 +1,60 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Core Patterns" {
-    abstract class TransferablePattern {
-        +patternId: String
-        +metadata: Map
-        +transfer(): void
-        +validate(): boolean
-    }
-    
-    class ApiPattern {
-        -apiEndpoints: List<String>
-        -requestHandlers: Map
-        -responseMappers: Map
-        +processRequest(): Response
-        +mapResponse(): Object
-        +validateApi(): boolean
-    }
+package "Knowledge Management" {
+  class ApiPattern <<service>> {
+    - graphDatabaseService: GraphDatabaseService
+    - vkbApiClient: VkbApiClient
+    + synchronizeGraphDB()
+    + visualizeKnowledge()
+  }
+
+  class GraphDatabaseService <<service>> {
+    - graphDB: GraphDB
+    + storeKnowledge()
+    + retrieveKnowledge()
+  }
+
+  class VkbApiClient <<service>> {
+    - vkbApi: VkbApi
+    + visualize()
+  }
+
+  ApiPattern --* GraphDatabaseService
+  ApiPattern --* VkbApiClient
 }
 
-package "Microservices Layer" {
-    class GraphDatabaseService <<service>> {
-        -connectionPool: ConnectionPool
-        -queryEngine: QueryEngine
-        +storeKnowledge(): void
-        +retrieveKnowledge(): Knowledge
-        +syncToExport(): void
-        +executeQuery(): ResultSet
-    }
-    
-    class VkbApiClient <<service>> {
-        -apiConfig: Configuration
-        -httpClient: HttpClient
-        +exportKnowledge(): void
-        +syncWithGraph(): void
-        +processCommands(): void
-    }
-    
-    class ParallelWorkerService <<service>> {
-        -workerPool: ThreadPool
-        -taskQueue: Queue
-        +processBatch(): void
-        +analyzeSemantics(): AnalysisResult
-        +distributeWork(): void
-    }
+package "Persistence" {
+  class PersistenceAgent <<service>> {
+    - graphDatabaseAdapter: GraphDatabaseAdapter
+    + persistKnowledge()
+  }
+
+  class GraphDatabaseAdapter <<service>> {
+    - graphDB: GraphDB
+    + adaptGraphDB()
+  }
+
+  PersistenceAgent --* GraphDatabaseAdapter
+  GraphDatabaseAdapter --* GraphDatabaseService
 }
 
-package "Data Management" {
-    class KnowledgeGraph <<file>> {
-        -graphData: GraphStructure
-        -nodes: List<Node>
-        -relationships: List<Edge>
-        +addNode(): void
-        +addRelationship(): void
-        +query(): ResultSet
-    }
-    
-    class JsonExporter <<file>> {
-        -exportPath: String
-        -syncScheduler: Scheduler
-        +autoSync(): void
-        +exportToJson(): void
-        +validateExport(): boolean
-    }
+package "MCP Tools" {
+  class MCPAgent <<service>> {
+    - mcpTools: McpTools
+    + performKnowledgeOperations()
+  }
+
+  class McpTools <<service>> {
+    - mcpApi: McpApi
+    + execute()
+  }
+
+  MCPAgent --* McpTools
+  MCPAgent --* ApiPattern
 }
 
-package "Command Interface" {
-    class VkbCommand {
-        -commandType: CommandType
-        -parameters: Map
-        +execute(): CommandResult
-        +validate(): boolean
-    }
-    
-    class GraphSyncCommand {
-        -syncMode: SyncMode
-        -targetPath: String
-        +syncGraph(): void
-        +validateSync(): boolean
-    }
-}
-
-' Inheritance relationships
-TransferablePattern <|-- ApiPattern
-
-' Service dependencies
-ApiPattern --> GraphDatabaseService : uses
-ApiPattern --> VkbApiClient : integrates
-VkbApiClient --> ParallelWorkerService : delegates
-
-' Data flow relationships
-GraphDatabaseService --> KnowledgeGraph : manages
-GraphDatabaseService --> JsonExporter : triggers
-JsonExporter --> KnowledgeGraph : exports
-
-' Command relationships
-VkbCommand --> VkbApiClient : controls
-GraphSyncCommand --> GraphDatabaseService : syncs
-VkbCommand <|-- GraphSyncCommand
-
-' Storage relationships
-KnowledgeGraph ..> JsonExporter : auto-synced to
-
-note right of ApiPattern : "Main transferable pattern\nfor API-based knowledge operations"
-note bottom of ParallelWorkerService : "Improves performance through\nbatch semantic analysis"
-note left of JsonExporter : "Data stored at:\n.data/knowledge-export"
-note left of KnowledgeGraph : "Graph stored at:\n.data/knowledge-graph"
+ApiPattern ..> MCPAgent : uses
+GraphDatabaseService ..> GraphDatabaseAdapter : uses
 
 @enduml

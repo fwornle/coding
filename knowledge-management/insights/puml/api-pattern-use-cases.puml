@@ -1,65 +1,36 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-left to right direction
+actor MCPAgent as "MCP Agent"
+actor VkbApiClient as "VKB API Client"
+actor GraphDatabaseService as "Graph Database Service"
 
-actor "Developer" as dev
-actor "Knowledge System" as ks
-actor "MCP Client" as mcp
+usecase "Knowledge Storage" as (KnowledgeStorage)
+usecase "Visualization" as (Visualization)
+usecase "Knowledge Operations" as (KnowledgeOperations)
+usecase "Graph Synchronization" as (GraphSynchronization)
 
-rectangle "ApiPattern GraphDatabase System" {
-    package "Knowledge Management" {
-        usecase "Store Graph Data" as store
-        usecase "Query Knowledge Graph" as query
-        usecase "Export Knowledge" as export
-        usecase "Manage VKB" as vkb
-    }
-    
-    package "Unified Knowledge Base" {
-        usecase "Access VkbApiClient" as client
-        usecase "Sync GraphDB to JSON" as sync
-        usecase "Persist to LevelDB" as persist
-    }
-    
-    package "Semantic Analysis" {
-        usecase "Analyze Code Patterns" as analyze
-        usecase "Extract Knowledge Entities" as extract
-        usecase "Serve MCP Requests" as serve
-    }
+package "Knowledge Management" {
+  (KnowledgeStorage)
+  (KnowledgeOperations)
 }
 
-dev --> store
-dev --> query
-dev --> export
-dev --> analyze
+package "Visualization Tools" {
+  (Visualization)
+}
 
-ks --> vkb
-ks --> sync
-ks --> persist
+MCPAgent -- (KnowledgeOperations)
+VkbApiClient -- (Visualization)
+GraphDatabaseService -- (KnowledgeStorage)
 
-mcp --> serve
-mcp --> client
+(KnowledgeOperations) ..> (KnowledgeStorage) : include
+(Visualization) ..> (KnowledgeStorage) : extend
+(GraphSynchronization) ..> (KnowledgeStorage) : include
 
-store ..> persist : <<include>>
-query ..> client : <<include>>
-export ..> sync : <<include>>
-analyze ..> extract : <<include>>
-extract ..> store : <<extend>>
-serve ..> query : <<include>>
+package "Semantic Analysis" {
+  (GraphSynchronization)
+}
 
-note right of sync
-  Auto-synced from GraphDB
-  to .data/knowledge-export
-end note
-
-note bottom of persist
-  Graphology + LevelDB
-  at .data/knowledge-graph
-end note
-
-note top of serve
-  Replaces removed
-  shared-memory.json
-end note
+MCPAgent -- (GraphSynchronization)
 
 @enduml

@@ -1,0 +1,39 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Microservices Architecture" {
+  class GraphDatabaseService <<service>> {
+    - graphDatabase: Graph
+    + storeData(data: String)
+    + retrieveData(query: String)
+  }
+
+  class GraphKnowledgeExporter <<service>> {
+    - graphDatabase: Graph
+    + exportKnowledge(graph: Graph)
+  }
+
+  class PersistenceAgent <<service>> {
+    - levelDB: LevelDB
+    + storeData(data: String)
+    + retrieveData(key: String)
+  }
+}
+
+package "Commands" {
+  class VKBCommand <<interface>> {
+    + visualize(graph: Graph)
+  }
+
+  class GraphSyncCommand <<interface>> {
+    + syncGraph(graph: Graph)
+  }
+}
+
+GraphDatabaseService --* GraphKnowledgeExporter : uses
+GraphDatabaseService --* PersistenceAgent : uses
+VKBCommand --|> GraphDatabaseService : uses
+GraphSyncCommand --|> GraphDatabaseService : uses
+GraphKnowledgeExporter --* PersistenceAgent : uses
+
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Knowledge Management" {
+  component "Graph Database" as graphDb <<storage>>
+  component "Graph Knowledge Exporter" as gke <<agent>>
+  component "Persistence Agent" as pa <<agent>>
+  database "LevelDB" as leveldb <<storage>>
+}
+
+package "Visualization and Sync" {
+  component "vkb Command" as vkb <<cli>>
+  component "graph-sync Command" as graphSync <<cli>>
+}
+
+graphDb --> leveldb : stores
+gke --> graphDb : uses
+pa --> graphDb : updates
+vkb --> graphDb : reads
+graphSync --> graphDb : syncs
+
+note as AutoNote1
+  Large-Scale Codebase Pattern: manages knowledge graph and provides scalable data storage
+
+end note
+
+@enduml
