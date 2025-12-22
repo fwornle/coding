@@ -80,12 +80,20 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const showSidebar = selectedNode !== null && activeTab === 'active'
   const showHistoricalSidebar = selectedNode !== null && activeTab === 'history'
 
+  // Create a signature for change detection - ensures re-renders when process data changes
+  // This captures key fields that affect display: pid, status, completedSteps, _refreshKey
+  const processesSignature = useMemo(() => {
+    return processes.map(p => `${p.pid}:${p.status}:${p.completedSteps}:${p._refreshKey || ''}`).join('|')
+  }, [processes])
+
   // Filter to only include truly active processes (running and alive, or recently completed for context)
   // A process is "active" if: status === 'running' OR (status === 'completed' and isAlive !== false)
   // But for the Active tab count, we only want running processes
   const activeProcesses = useMemo(() => {
     return processes.filter(p => p.status === 'running' || (p.isAlive && p.status !== 'completed' && p.status !== 'failed'))
-  }, [processes])
+    // Include processesSignature to ensure recalculation when any process data changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processes, processesSignature])
 
   // Fetch historical workflows when history tab is selected
   useEffect(() => {
@@ -340,7 +348,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               {/* Workflow Graph */}
               <div className={`flex-1 min-w-0 ${showSidebar ? 'mr-0' : ''}`}>
                 <UKBWorkflowGraph
-                  key={`${activeCurrentProcess.pid}-${activeCurrentProcess._refreshKey || ''}-${activeCurrentProcess.completedSteps}`}
+                  key={activeCurrentProcess.pid}
                   process={activeCurrentProcess}
                   onNodeClick={handleNodeClick}
                   selectedNode={selectedNode}
