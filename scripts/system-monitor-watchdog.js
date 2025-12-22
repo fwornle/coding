@@ -83,6 +83,30 @@ class SystemMonitorWatchdog {
       const isRunning = await this.psm.isServiceRunning('global-service-coordinator', 'global');
 
       if (!isRunning) {
+        // Check if coordinator is running at OS level but not registered in PSM
+        try {
+          const { stdout } = await execAsync('pgrep -f "global-service-coordinator.js"', { timeout: 5000 });
+          const pids = stdout.trim().split('\n').filter(p => p).map(p => parseInt(p, 10));
+
+          if (pids.length > 0) {
+            const pid = pids[0];
+            this.log(`Found coordinator running at OS level (PID: ${pid}) but not in PSM - registering...`);
+
+            // Register the orphaned coordinator
+            await this.psm.registerService({
+              name: 'global-service-coordinator',
+              pid: pid,
+              type: 'global',
+              script: 'scripts/global-service-coordinator.js',
+              metadata: { managedBy: 'watchdog-recovery', recoveredAt: new Date().toISOString() }
+            });
+
+            return { alive: true, pid: pid, healthAge: 0, recovered: true };
+          }
+        } catch (pgrepError) {
+          // No coordinator running at OS level
+        }
+
         this.warn('Coordinator not running according to PSM');
         return { alive: false, reason: 'not_in_psm' };
       }
@@ -156,27 +180,44 @@ class SystemMonitorWatchdog {
 
       child.unref(); // Allow parent to exit
 
-      // Wait and verify startup
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for coordinator to fully start and self-register with PSM
+      // The coordinator registers itself, so we don't need to do it here
+      this.log(`Waiting for coordinator to self-register (PID: ${child.pid})...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Register with PSM
-      try {
-        await this.psm.registerService({
-          name: 'global-service-coordinator',
-          pid: child.pid,
-          type: 'global',
-          script: 'scripts/global-service-coordinator.js',
-          metadata: {
-            managedBy: 'watchdog',
-            restartedBy: 'system-monitor-watchdog'
-          }
-        });
-        this.log(`Registered coordinator with PSM (PID: ${child.pid})`);
-      } catch (error) {
-        this.warn(`Failed to register with PSM: ${error.message}`);
+      // Retry the alive check a few times to handle startup timing
+      let status = { alive: false, reason: 'not_checked' };
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        status = await this.isCoordinatorAlive();
+        if (status.alive) {
+          break;
+        }
+        if (attempt < 3) {
+          this.log(`Attempt ${attempt}/3: Coordinator not ready yet, waiting...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
 
-      const status = await this.isCoordinatorAlive();
+      // Only register if coordinator didn't self-register
+      if (!status.alive && status.reason === 'not_in_psm') {
+        try {
+          await this.psm.registerService({
+            name: 'global-service-coordinator',
+            pid: child.pid,
+            type: 'global',
+            script: 'scripts/global-service-coordinator.js',
+            metadata: {
+              managedBy: 'watchdog',
+              restartedBy: 'system-monitor-watchdog'
+            }
+          });
+          this.log(`Fallback: Registered coordinator with PSM (PID: ${child.pid})`);
+          // Re-check after fallback registration
+          status = await this.isCoordinatorAlive();
+        } catch (error) {
+          this.warn(`Failed to register with PSM: ${error.message}`);
+        }
+      }
       if (status.alive) {
         this.log(`✅ Global Service Coordinator started successfully (PID: ${status.pid})`);
         return true;

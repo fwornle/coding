@@ -31,22 +31,25 @@ class ProcessStateManager {
   }
 
   /**
-   * Initialize registry file if it doesn't exist
+   * Initialize registry file if it doesn't exist or is invalid
    */
   async initialize() {
+    const defaultRegistry = {
+      version: '3.0.0',
+      lastChange: Date.now(),
+      sessions: {},
+      services: {
+        global: {},
+        projects: {}
+      }
+    };
+
     try {
-      await fs.access(this.registryPath);
+      const content = await fs.readFile(this.registryPath, 'utf8');
+      // Validate JSON content - this throws if invalid/empty
+      JSON.parse(content);
     } catch {
-      // File doesn't exist, create with default structure
-      const defaultRegistry = {
-        version: '3.0.0',
-        lastChange: Date.now(),
-        sessions: {},
-        services: {
-          global: {},
-          projects: {}
-        }
-      };
+      // File doesn't exist, is empty, or contains invalid JSON - create with default structure
       await fs.writeFile(this.registryPath, JSON.stringify(defaultRegistry, null, 2), 'utf8');
     }
   }
