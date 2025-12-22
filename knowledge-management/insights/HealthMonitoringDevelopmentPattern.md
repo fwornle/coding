@@ -12,25 +12,7 @@ Health Monitoring Development with 23 occurrences
 - Trend: increasing
 
 ## Development History
-Analysis of 743 commits.
-
-### Architectural Decisions
-- [object Object]
-- [object Object]
-- [object Object]
-- [object Object]
-- [object Object]
-
-## Conversation Insights
-Analysis of 794 development sessions.
-
-### Problem-Solution Patterns
-- **Problem:** [object Object]
-  **Solution:** [object Object]
-- **Problem:** [object Object]
-  **Solution:** [object Object]
-- **Problem:** [object Object]
-  **Solution:** [object Object]
+Analysis of 743 commits across 794 development sessions.
 
 ## Code Analysis
 

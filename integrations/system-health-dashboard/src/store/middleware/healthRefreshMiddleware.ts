@@ -44,15 +44,12 @@ class HealthRefreshManager {
     this.refreshInterval = setInterval(() => {
       this.fetchAllData()
     }, 5000)
-
-    console.log('🔄 Health refresh manager started (5s interval)')
   }
 
   stopAutoRefresh() {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval)
       this.refreshInterval = null
-      console.log('🛑 Health refresh manager stopped')
     }
   }
 
@@ -150,8 +147,6 @@ class HealthRefreshManager {
       }
     } catch (error: any) {
       this.store.dispatch(fetchUKBStatusFailure(error.message))
-      // Don't log as error - UKB may not always be running
-      // console.error('Failed to fetch UKB status:', error)
     }
   }
 }

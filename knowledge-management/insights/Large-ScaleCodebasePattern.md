@@ -1,42 +1,18 @@
-# Large-Scale Codebase Pattern
-**Type:** architectural
-**Generated:** 2025-12-22T08:38:08.194Z
+# Large-ScaleCodebasePattern
 
-## Pattern Overview
-Enterprise-scale codebase with 62115 code entities
+**Type:** GraphDatabase
 
-**Significance:** 7/10
+Large-ScaleCodebasePattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
-## Evidence
-- Total entities: 62115
-- Relationships: 128791
+## What It Is
 
-## Development History
-Analysis of 748 commits.
+- Large-ScaleCodebasePattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src
 
-### Architectural Decisions
-- [object Object]
-- [object Object]
-- [object Object]
-- [object Object]
-- [object Object]
+- shared-memory.json has been REMOVED from the codebase
 
-## Conversation Insights
-Analysis of 804 development sessions.
+- Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph
 
-### Problem-Solution Patterns
-- **Problem:** [object Object]
-  **Solution:** [object Object]
-- **Problem:** [object Object]
-  **Solution:** [object Object]
-- **Problem:** [object Object]
-  **Solution:** [object Object]
 
-## Code Analysis
+---
 
-### Architectural Patterns
-- api
-- service
-- promise
-- decorator
-- component
+*Generated from 3 observations*
