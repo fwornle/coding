@@ -1,39 +1,43 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor User as "System User"
-actor MCP_Server as "MCP Server"
+actor Developer as "Developer"
+actor SystemAdmin as "System Admin"
 
-usecase "Visualize Knowledge Graph" as (Visualize)
-usecase "Synchronize Knowledge Graph" as (Synchronize)
-usecase "Perform Knowledge Operations" as (KnowledgeOperations)
+usecase "Manage Knowledge Graph" as (Manage Knowledge Graph)
+usecase "Export Knowledge Graph" as (Export Knowledge Graph)
+usecase "Perform Semantic Analysis" as (Perform Semantic Analysis)
 
-User -- (Visualize)
-User -- (Synchronize)
-MCP_Server -- (KnowledgeOperations)
+Developer -- (Manage Knowledge Graph)
+SystemAdmin -- (Export Knowledge Graph)
+Developer -- (Perform Semantic Analysis)
 
-package "Graph Database" {
-  component GraphDatabaseService as "Graph Database Service"
-  component GraphDatabaseAdapter as "Graph Database Adapter"
-  component GraphKnowledgeExporter as "Graph Knowledge Exporter"
-  component LevelDB as "LevelDB"
-  component Graphology as "Graphology"
-  
-  GraphDatabaseService ..> Graphology
-  GraphDatabaseService ..> LevelDB
-  GraphDatabaseAdapter ..> GraphDatabaseService
-  GraphKnowledgeExporter ..> GraphDatabaseService
+package "SemanticAnalysisAgentSystemImplementation" {
+  (Manage Knowledge Graph)
+  (Export Knowledge Graph)
+  (Perform Semantic Analysis)
 }
 
-(Synchronize) ..> GraphDatabaseService : uses
-(Visualize) ..> GraphDatabaseService : uses
-(KnowledgeOperations) ..> GraphDatabaseService : uses
+usecase "Use Command-Line Interface" as (Use Command-Line Interface)
+usecase "View Knowledge Export" as (View Knowledge Export)
 
-package "CLI Commands" {
-  component vkb as "vkb command"
-  component graph_sync as "graph-sync command"
-  vkb -- (Visualize)
-  graph_sync -- (Synchronize)
+Developer -- (Use Command-Line Interface)
+SystemAdmin -- (View Knowledge Export)
+
+(Use Command-Line Interface) ..> (Manage Knowledge Graph) : includes
+(Use Command-Line Interface) ..> (Export Knowledge Graph) : includes
+(View Knowledge Export) ..> (Export Knowledge Graph) : includes
+
+package "Graph Database Service" {
+  (Manage Knowledge Graph)
+}
+
+package "Graph Knowledge Exporter" {
+  (Export Knowledge Graph)
+}
+
+package "Persistence Agent" {
+  (Perform Semantic Analysis)
 }
 
 @enduml

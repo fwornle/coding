@@ -1,38 +1,34 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Knowledge Management" {
-  component GraphDatabaseService <<api>> as "Graph Database Service"
-  component GraphDatabaseAdapter <<api>> as "Graph Database Adapter"
-  component "Knowledge Graph Database" <<storage>> as "Knowledge Graph Database"
-  GraphDatabaseService -- GraphDatabaseAdapter
-  GraphDatabaseAdapter -- "Knowledge Graph Database"
+package "Knowledge Storage" {
+  database "Graph Database" as graphdb <<storage>>
+  database "LevelDB" as leveldb <<storage>>
 }
 
-package "Decorator Pattern" {
-  component DecoratorPattern <<core>> as "Decorator Pattern"
-  component MCPAgent <<agent>> as "MCP Agent"
-  DecoratorPattern -- MCPAgent
+package "Data Synchronization" {
+  component "GraphKnowledgeExporter" as gke <<core>>
+  component "PersistenceAgent" as pa <<agent>>
+  component "VkbApiClient" as vkb <<api>>
 }
 
-package "Data Storage" {
-  component LevelDB <<storage>> as "LevelDB"
-  component "JSON Exports" <<storage>> as "JSON Exports"
-  "Knowledge Graph Database" -- LevelDB
-  "Knowledge Graph Database" -- "JSON Exports"
+package "Visualization and Control" {
+  component "GraphDatabaseService" as gds <<core>>
+  component "vkb" as vkbcli <<cli>>
+  component "graph-sync" as graphsync <<cli>>
 }
 
-package "Tools and Commands" {
-  component vkb <<api>> as "vkb Command"
-  component "MCP Tools" <<api>> as "MCP Tools"
-  component graph_sync <<api>> as "graph-sync Command"
-  vkb -- DecoratorPattern
-  "MCP Tools" -- DecoratorPattern
-  graph_sync -- "Knowledge Graph Database"
-}
+graphdb --> leveldb : uses
+gke --> graphdb : uses
+gke --> leveldb : uses
+pa --> graphdb : uses
+vkb --> gds : uses
+vkbcli --> gds : uses
+graphsync --> gds : uses
+gds --> graphdb : uses
 
 note as AutoNote1
-  Decorator Pattern: Provides semantic analysis and knowledge management infrastructure
+  DecoratorPattern: Provides scalability, data consistency, and security through graph database and access control measures.
 
 end note
 

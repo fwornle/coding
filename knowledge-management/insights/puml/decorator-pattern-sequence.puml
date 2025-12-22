@@ -1,41 +1,48 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant GraphDatabaseService as "Graph Database Service"
-participant GraphDatabaseAdapter as "Graph Database Adapter"
 participant MCPAgent as "MCP Agent"
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant PersistenceAgent as "Persistence Agent"
+participant VkbApiClient as "Vkb Api Client"
 participant Graphology as "Graphology"
 participant LevelDB as "LevelDB"
-participant vkb as "VKB Command"
-participant "Graph-Sync Command" as graph-sync
-participant KnowledgeGraph as "Knowledge Graph"
 
-MCPAgent->>GraphDatabaseService: Request Knowledge Graph Data
-GraphDatabaseService->>GraphDatabaseAdapter: Query Knowledge Graph
-GraphDatabaseAdapter->>Graphology: Use Graphology for Storage
-Graphology->>LevelDB: Store Data in LevelDB
-LevelDB->>Graphology: Retrieve Data from LevelDB
-Graphology->>GraphDatabaseAdapter: Return Data to Adapter
-GraphDatabaseAdapter->>GraphDatabaseService: Return Knowledge Graph Data
-GraphDatabaseService->>MCPAgent: Return Knowledge Graph Data
+MCPAgent->>GraphDatabaseService: Request knowledge graph
+GraphDatabaseService->>Graphology: Retrieve knowledge graph
+Graphology->>LevelDB: Store knowledge graph
+LevelDB->>Graphology: Return stored knowledge graph
+Graphology->>GraphDatabaseService: Return knowledge graph
+GraphDatabaseService->>MCPAgent: Return knowledge graph
 
-alt Sync Knowledge Graph
-    graph-sync->>GraphDatabaseService: Sync Knowledge Graph
-    GraphDatabaseService->>GraphDatabaseAdapter: Update Knowledge Graph
-    GraphDatabaseAdapter->>Graphology: Update Graphology Storage
-    Graphology->>LevelDB: Update LevelDB Storage
-    LevelDB->>Graphology: Confirm Update
-    Graphology->>GraphDatabaseAdapter: Confirm Update
-    GraphDatabaseAdapter->>GraphDatabaseService: Confirm Update
-    GraphDatabaseService->>graph-sync: Confirm Sync
-end
+MCPAgent->>GraphKnowledgeExporter: Request JSON export
+GraphKnowledgeExporter->>GraphDatabaseService: Retrieve knowledge graph
+GraphDatabaseService->>Graphology: Retrieve knowledge graph
+Graphology->>LevelDB: Retrieve knowledge graph
+LevelDB->>Graphology: Return retrieved knowledge graph
+Graphology->>GraphDatabaseService: Return knowledge graph
+GraphDatabaseService->>GraphKnowledgeExporter: Return knowledge graph
+GraphKnowledgeExporter->>MCPAgent: Return JSON export
 
-opt Visualize Knowledge Graph
-    vkb->>GraphDatabaseService: Request Knowledge Graph Visualization
-    GraphDatabaseService->>GraphDatabaseAdapter: Query Knowledge Graph for Visualization
-    GraphDatabaseAdapter->>Graphology: Use Graphology for Visualization
-    Graphology->>vkb: Return Visualization Data
-    vkb->>MCPAgent: Display Knowledge Graph Visualization
-end
+MCPAgent->>PersistenceAgent: Perform knowledge operation
+PersistenceAgent->>VkbApiClient: Perform knowledge operation
+VkbApiClient->>GraphDatabaseService: Update knowledge graph
+GraphDatabaseService->>Graphology: Update knowledge graph
+Graphology->>LevelDB: Update knowledge graph
+LevelDB->>Graphology: Confirm update
+Graphology->>GraphDatabaseService: Confirm update
+GraphDatabaseService->>VkbApiClient: Confirm update
+VkbApiClient->>PersistenceAgent: Confirm update
+PersistenceAgent->>MCPAgent: Confirm update
+
+MCPAgent->>VkbApiClient: Sync data
+VkbApiClient->>GraphDatabaseService: Sync data
+GraphDatabaseService->>Graphology: Sync data
+Graphology->>LevelDB: Sync data
+LevelDB->>Graphology: Confirm sync
+Graphology->>GraphDatabaseService: Confirm sync
+GraphDatabaseService->>VkbApiClient: Confirm sync
+VkbApiClient->>MCPAgent: Confirm sync
 
 @enduml

@@ -2,27 +2,33 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Persistence Pattern" {
-  component GraphDatabase as "Graph Database <<storage>>" 
-  component LevelDB as "LevelDB <<storage>>"
-  component GraphDatabaseService as "Graph Database Service <<core>>"
-  component GraphKnowledgeExporter as "Graph Knowledge Exporter <<agent>>"
-  component PersistenceAgent as "Persistence Agent <<agent>>"
-
-  note as AutoNote1
-  Provides scalable and maintainable solution for knowledge storage and retrieval
-
-  end note
-  GraphDatabaseService --* GraphDatabase : interacts with
-  GraphKnowledgeExporter --* GraphDatabase : exports from
-  PersistenceAgent --* GraphDatabase : persists to
-  GraphKnowledgeExporter --* PersistenceAgent : triggers auto-export
-  GraphDatabaseService --* GraphKnowledgeExporter : configures
-  GraphDatabaseService --* PersistenceAgent : configures
+  component "Graph Database Service" as gds <<core>>
+  component "GraphDatabaseAdapter" as gda <<agent>>
+  component "Knowledge Exporter" as ke <<agent>>
+  component "Persistence Agent" as pa <<agent>>
+  database "Graph Database" as gd <<storage>>
+  database "Knowledge Graph" as kg <<storage>>
+  file "JSON Export" as je <<external>>
 }
 
-package "File System" {
-  component knowledge_export_directory as ".data/knowledge-export <<storage>>"
-  GraphKnowledgeExporter --* knowledge_export_directory : exports to
+package "Tools and APIs" {
+  component "VkbApiClient" as va <<api>>
+  component "MCP Tools" as mcp <<cli>>
+  component "VKB API" as vapi <<external>>
 }
+
+gds --> gd : uses
+gda --> gd : interacts
+ke --> kg : exports
+pa --> gda : uses
+va --> vapi : interacts
+mcp --> gds : uses
+ke --> je : exports
+gds --> ke : triggers
+
+note as AutoNote1
+  Knowledge Persistence Pattern: Enables scalable and flexible knowledge management infrastructure
+
+end note
 
 @enduml

@@ -1,40 +1,30 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Semantic Analysis Agent System Implementation" {
-  component GraphDatabase <<storage>> as "Graph Database"
-  component LevelDB <<storage>> as "LevelDB"
-  component GraphDatabaseService <<core>> as "Graph Database Service"
-  component GraphDatabaseAdapter <<core>> as "Graph Database Adapter"
-  component GraphKnowledgeExporter <<core>> as "Graph Knowledge Exporter"
-
-  GraphDatabase --* LevelDB
-  GraphDatabaseService -- GraphDatabase
-  GraphDatabaseAdapter -- GraphDatabase
-  GraphKnowledgeExporter -- GraphDatabase
-
-  note as AutoNote1
-  Purpose: Manage knowledge graph storage and synchronization
-  end note
+package "Knowledge Management" {
+  component "GraphDatabaseService" as gds <<core>>
+  component "GraphKnowledgeExporter" as gke <<core>>
+  component "PersistenceAgent" as pa <<agent>>
 }
 
-package "CLI Access" {
-  component vkb <<api>> as "vkb Command"
-  component graph-sync <<api>> as "graph-sync Command"
-  vkb -- GraphDatabase
-  graph-sync -- GraphDatabase
+package "Data Storage" {
+  database "Graphology" as graphology <<storage>>
+  database "LevelDB" as leveldb <<storage>>
 }
 
-package "Integration" {
-  component MCP_server <<api>> as "MCP Server"
-  component integrations <<core>> as "Integrations"
-  MCP_server -- integrations
-  integrations -- GraphDatabase
+package "Interfaces" {
+  component "Command-Line Interface" as cli <<cli>>
 }
 
-package "Export" {
-  component "knowledge-export" <<storage>> as "Knowledge Export"
-  GraphKnowledgeExporter -- "knowledge-export"
-}
+gds --> graphology : uses
+gds --> leveldb : uses
+gke --> gds : uses
+pa --> gds : uses
+cli --> gds : interacts
+cli --> gke : interacts
 
+note as AutoNote1
+  Semantic Analysis Agent System Implementation: A system for managing knowledge graphs and exporting data.
+
+end note
 @enduml

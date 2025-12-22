@@ -1,42 +1,50 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant KnowledgePersistencePattern as "Knowledge Persistence Pattern"
 participant GraphDatabaseService as "Graph Database Service"
-participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant KnowledgeExporter as "Knowledge Exporter"
 participant PersistenceAgent as "Persistence Agent"
-participant EnvironmentVariables as "Environment Variables"
+participant GraphDatabaseAdapter as "Graph Database Adapter"
+participant VkbApiClient as "Vkb API Client"
 
-activate KnowledgePersistencePattern
-KnowledgePersistencePattern ->> GraphDatabaseService: Initialize Graph Database
-GraphDatabaseService ->> KnowledgePersistencePattern: Confirm Initialization
+activate GraphDatabaseService
+GraphDatabaseService ->> GraphDatabaseService: Initialize Graph Database (Graphology and LevelDB)
+deactivate GraphDatabaseService
 
-alt Successful Initialization
-    KnowledgePersistencePattern ->> PersistenceAgent: Persist Knowledge Data
-    PersistenceAgent ->> GraphDatabaseService: Store Knowledge Data
-    GraphDatabaseService ->> PersistenceAgent: Confirm Storage
-    activate GraphKnowledgeExporter
-    GraphKnowledgeExporter ->> GraphDatabaseService: Request JSON Data
-    GraphDatabaseService ->> GraphKnowledgeExporter: Provide JSON Data
-    GraphKnowledgeExporter ->> GraphKnowledgeExporter: Auto-Export JSON Data
-    GraphKnowledgeExporter ->> EnvironmentVariables: Configure Export Directory (.data/knowledge-export)
-    EnvironmentVariables ->> GraphKnowledgeExporter: Confirm Configuration
-    GraphKnowledgeExporter ->> GraphKnowledgeExporter: Export JSON Data to Directory
-    deactivate GraphKnowledgeExporter
+activate KnowledgeExporter
+KnowledgeExporter ->> GraphDatabaseService: Listen to entity:stored events
+KnowledgeExporter ->> KnowledgeExporter: Auto-export to JSON at .data/knowledge-export
+deactivate KnowledgeExporter
+
+activate PersistenceAgent
+PersistenceAgent ->> GraphDatabaseAdapter: Interact with Graph Database
+PersistenceAgent ->> VkbApiClient: Interact with VKB API
+deactivate PersistenceAgent
+
+activate GraphDatabaseService
+GraphDatabaseService ->> KnowledgeExporter: Trigger entity:stored event
+deactivate GraphDatabaseService
+
+activate KnowledgeExporter
+KnowledgeExporter ->> KnowledgeExporter: Export knowledge graph to JSON
+KnowledgeExporter ->> PersistenceAgent: Notify persistence agent of export
+deactivate KnowledgeExporter
+
+activate PersistenceAgent
+PersistenceAgent ->> GraphDatabaseAdapter: Update graph database
+PersistenceAgent ->> VkbApiClient: Update VKB API
+deactivate PersistenceAgent
+
+activate GraphDatabaseService
+GraphDatabaseService ->> GraphDatabaseService: Store knowledge graphs at .data/knowledge-graph
+GraphDatabaseService ->> GraphDatabaseService: Store JSON exports at .data/knowledge-export
+deactivate GraphDatabaseService
+
+alt Synchronizing Knowledge Graph
+    activate PersistenceAgent
+    PersistenceAgent ->> GraphDatabaseAdapter: Synchronize knowledge graph using graph-sync command
+    PersistenceAgent ->> VkbApiClient: Synchronize VKB API
+    deactivate PersistenceAgent
 end
-
-opt Auto-Syncing JSON Data
-    KnowledgePersistencePattern ->> GraphKnowledgeExporter: Trigger Auto-Export (entity:stored)
-    GraphKnowledgeExporter ->> GraphDatabaseService: Request Updated JSON Data
-    GraphDatabaseService ->> GraphKnowledgeExporter: Provide Updated JSON Data
-    GraphKnowledgeExporter ->> GraphKnowledgeExporter: Auto-Export Updated JSON Data
-    GraphKnowledgeExporter ->> EnvironmentVariables: Update Export Directory (.data/knowledge-export)
-    EnvironmentVariables ->> GraphKnowledgeExporter: Confirm Update
-end
-
-KnowledgePersistencePattern ->> GraphDatabaseService: Retrieve Knowledge Data
-GraphDatabaseService ->> KnowledgePersistencePattern: Provide Knowledge Data
-
-deactivate KnowledgePersistencePattern
 
 @enduml

@@ -1,39 +1,34 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant GraphDatabaseService as "Graph Database Service"
-participant GraphDatabaseAdapter as "Graph Database Adapter"
-participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
-participant vkb as "vkb Command"
-participant graph-sync as "graph-sync Command"
-participant MCP_server as "MCP Server"
-participant LevelDB as "LevelDB Storage"
-participant JSON_Export as "JSON Export"
+participant SemanticAnalysisAgentSystemImplementation as "MCP Agent"
+participant GraphDatabaseService as "Graph DB"
+participant GraphKnowledgeExporter as "Exporter"
+participant PersistenceAgent as "Persistence"
+participant LevelDB as "LevelDB"
+participant Graphology as "Graphology"
+participant Command-Line Interface as "CLI"
+participant .data/knowledge-export as "File"
 
-note over GraphDatabaseService: Initialization
-GraphDatabaseService ->> LevelDB: Initialize Graph Storage
-GraphDatabaseAdapter ->> LevelDB: Configure Storage Adapter
-GraphKnowledgeExporter ->> LevelDB: Register Exporter
+SemanticAnalysisAgentSystemImplementation ->> GraphDatabaseService: Initialize Graph DB
+GraphDatabaseService ->> LevelDB: Connect to LevelDB
+GraphDatabaseService ->> Graphology: Load Graphology
 
-vkb ->> GraphDatabaseService: Request Visualization
-graph-sync ->> GraphDatabaseService: Request Synchronization
+SemanticAnalysisAgentSystemImplementation ->> GraphKnowledgeExporter: Request Export
+GraphKnowledgeExporter ->> GraphDatabaseService: Query Graph DB
+GraphDatabaseService ->> GraphKnowledgeExporter: Return Query Results
+GraphKnowledgeExporter ->> SemanticAnalysisAgentSystemImplementation: Export JSON
 
-GraphDatabaseService ->> GraphDatabaseAdapter: Fetch Graph Data
-GraphDatabaseAdapter ->> LevelDB: Retrieve Data
-LevelDB ->> GraphDatabaseAdapter: Return Data
-GraphDatabaseAdapter ->> GraphDatabaseService: Return Fetched Data
+alt Export to File
+    GraphKnowledgeExporter ->> .data/knowledge-export: Write JSON File
+end
 
-GraphDatabaseService ->> GraphKnowledgeExporter: Export Knowledge
-GraphKnowledgeExporter ->> JSON_Export: Export to JSON
-JSON_Export ->> GraphKnowledgeExporter: Confirm Export
+SemanticAnalysisAgentSystemImplementation ->> PersistenceAgent: Save Knowledge Graph
+PersistenceAgent ->> GraphDatabaseService: Persist Graph DB
+GraphDatabaseService ->> LevelDB: Save to LevelDB
 
-graph-sync ->> GraphDatabaseService: Sync Request
-GraphDatabaseService ->> MCP_server: Sync with MCP Server
-MCP_server ->> GraphDatabaseService: Return Sync Response
-GraphDatabaseService ->> graph-sync: Return Sync Result
-
-note over GraphDatabaseService: Auto-Sync
-GraphKnowledgeExporter ->> JSON_Export: Auto-Export Knowledge
-JSON_Export ->> GraphKnowledgeExporter: Confirm Auto-Export
+note over SemanticAnalysisAgentSystemImplementation: Modular architecture with separate directories and components
+SemanticAnalysisAgentSystemImplementation ->> Command-Line Interface: Command-Line Interface
+note over Command-Line Interface: Command-line interface with commands such as vkb and coding
 
 @enduml

@@ -1,33 +1,39 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant VkbCli as "VkbCli (Entity)"
-participant GraphDatabaseService as "GraphDatabaseService"
-participant GraphDatabaseAdapter as "GraphDatabaseAdapter"
-participant Graphology as "Graphology (Graph Database)"
-participant LevelDB as "LevelDB (Graph Database)"
-participant JSON_Export as "JSON Export (.data/knowledge-export)"
-participant vkb_Command as "vkb Command (Visualization)"
-participant MCP_Tools as "MCP Tools (Knowledge Operations)"
+participant VkbCli as "VkbCli (MCPAgent)"
+participant GraphDatabaseService as "Graph Database Service"
+participant GraphKnowledgeExporter as "Graph Knowledge Exporter"
+participant PersistenceAgent as "Persistence Agent"
+participant MCPTools as "MCP Tools"
+participant VkbCommand as "Vkb Command"
 
-VkbCli ->> GraphDatabaseService: Request data storage/access
-GraphDatabaseService ->> GraphDatabaseAdapter: Request data access abstraction
-GraphDatabaseAdapter ->> Graphology: Store/Retrieve data from Graphology
-GraphDatabaseAdapter ->> LevelDB: Store/Retrieve data from LevelDB
-Graphology ->> LevelDB: Auto-synchronize data
-LevelDB ->> JSON_Export: Auto-synchronize JSON exports
-VkbCli ->> vkb_Command: Request visualization
-vkb_Command ->> Graphology: Retrieve data for visualization
-VkbCli ->> MCP_Tools: Perform knowledge operations
-MCP_Tools ->> Graphology: Update data after operations
-MCP_Tools ->> JSON_Export: Update JSON exports after operations
+note over VkbCli: Initialization
+VkbCli ->> GraphDatabaseService: Initialize graph database
+VkbCli ->> GraphKnowledgeExporter: Initialize graph knowledge exporter
+VkbCli ->> PersistenceAgent: Initialize persistence agent
 
-alt Success
-    JSON_Export ->> VkbCli: Return updated JSON exports
-    Graphology ->> VkbCli: Return updated graph data
-else Failure
-    JSON_Export ->> VkbCli: Return error message
-    Graphology ->> VkbCli: Return error message
+alt Successful Initialization
+    VkbCli ->> GraphDatabaseService: Store knowledge in graph database (.data/knowledge-graph)
+    GraphDatabaseService ->> GraphKnowledgeExporter: Export knowledge as JSON (.data/knowledge-export)
+    GraphKnowledgeExporter ->> PersistenceAgent: Store JSON export
+    PersistenceAgent ->> VkbCli: Confirm knowledge storage
 end
+
+opt Knowledge Visualization
+    VkbCli ->> VkbCommand: Visualize knowledge
+    VkbCommand ->> GraphDatabaseService: Retrieve knowledge from graph database
+    GraphDatabaseService ->> VkbCommand: Return knowledge for visualization
+end
+
+loop Knowledge Operations
+    VkbCli ->> MCPTools: Perform knowledge operations
+    MCPTools ->> GraphDatabaseService: Update graph database
+    GraphDatabaseService ->> GraphKnowledgeExporter: Trigger knowledge export
+    GraphKnowledgeExporter ->> PersistenceAgent: Update stored JSON export
+end
+
+note over VkbCli: Verified Codebase State
+VkbCli ->> VkbCli: Ensure verified codebase state for accuracy and consistency
 
 @enduml

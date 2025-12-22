@@ -2,42 +2,65 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Persistence Pattern" {
-  class GraphDatabaseService <<service>> {
-    + interactWithGraphDatabase()
+  class KnowledgePersistencePattern {
+    - graphDatabase: GraphDatabase
+    - knowledgeExporter: KnowledgeExporter
+    - persistenceAgent: PersistenceAgent
   }
 
-  class GraphKnowledgeExporter <<service>> {
-    + autoExportJSONData()
+  abstract class GraphDatabase {
+    {abstract} +store(entity: Entity)
+    {abstract} +retrieve(entity Id: String): Entity
   }
 
-  class PersistenceAgent <<service>> {
-    + persistKnowledgeData()
+  class Graphology <<service>> {
+    +store(entity: Entity)
+    +retrieve(entity Id: String): Entity
   }
 
-  class KnowledgePersistencePattern <<interface>> {
-    {method}
-    + storeKnowledge()
-    + retrieveKnowledge()
+  class LevelDB <<service>> {
+    +store(entity: Entity)
+    +retrieve(entity Id: String): Entity
   }
 
-  GraphDatabaseService --* GraphKnowledgeExporter : uses
-  GraphKnowledgeExporter --* PersistenceAgent : triggers
-  PersistenceAgent --* GraphDatabaseService : uses
-  KnowledgePersistencePattern --|> GraphDatabaseService : implements
-  KnowledgePersistencePattern --|> GraphKnowledgeExporter : implements
-  KnowledgePersistencePattern --|> PersistenceAgent : implements
-}
+  GraphDatabase --|> Graphology
+  GraphDatabase --|> LevelDB
 
-package "Utilities" {
-  class EnvironmentVariables <<interface>> {
-    {method}
-    + getPort()
-    + getStoragePath()
+  class KnowledgeExporter {
+    +exportToJSON(knowledgeGraph: KnowledgeGraph)
   }
 
-  GraphDatabaseService ..> EnvironmentVariables : uses
-  GraphKnowledgeExporter ..> EnvironmentVariables : uses
-  PersistenceAgent ..> EnvironmentVariables : uses
+  class PersistenceAgent {
+    - graphDatabaseAdapter: GraphDatabaseAdapter
+    + persist(knowledgeGraph: KnowledgeGraph)
+  }
+
+  class GraphDatabaseAdapter {
+    + store(knowledgeGraph: KnowledgeGraph)
+    + retrieve(knowledgeGraphId: String): KnowledgeGraph
+  }
+
+  KnowledgePersistencePattern --* KnowledgeExporter
+  KnowledgePersistencePattern --* PersistenceAgent
+  PersistenceAgent --* GraphDatabaseAdapter
+  GraphDatabaseAdapter --* GraphDatabase
+
+  package "Event-Driven Architecture" {
+    class EntityStoredEvent {
+      - entity Id: String
+    }
+
+    KnowledgeExporter ..> EntityStoredEvent : listens to
+  }
+
+  package "VKB API" {
+    class VkbApiClient {
+      + visualize(knowledgeGraph: KnowledgeGraph)
+      + operate(knowledgeGraph: KnowledgeGraph)
+    }
+
+    KnowledgePersistencePattern --* VkbApiClient
+  }
 }
 
 @enduml

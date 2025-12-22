@@ -1,55 +1,35 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title VSCodeExtensionBridgePattern - Graph Database Architecture
-
 package "Knowledge Management" {
-    component [GraphDatabaseService] as GDS <<core>>
-    component [GraphDatabaseAdapter] as GDA <<api>>
-    component [PersistenceAgent] as PA <<agent>>
+  component "GraphDatabase" as graphdb <<storage>>
+  component "GraphDatabaseService" as gds <<core>>
+  component "GraphDatabaseAdapter" as gda <<agent>>
+  component "PersistenceAgent" as pa <<agent>>
 }
 
-package "Unified Knowledge Base" {
-    component [UKB-Unified] as UKB <<core>>
+package "Data Export" {
+  component "GraphKnowledgeExporter" as gke <<core>>
+  database "Knowledge Export JSON" as kejson
 }
 
-package "MCP Server Integration" {
-    component [SemanticAnalysis] as SA <<api>>
-    component [MCPServer] as MCP <<core>>
+package "Tools and Interfaces" {
+  component "MCP Tools" as mcptools <<external>>
+  component "vkb Command" as vkb <<cli>>
 }
 
-package "Storage Layer" {
-    database [Graphology\nGraph Engine] as GE <<storage>>
-    database [LevelDB\nPersistence] as LDB <<storage>>
-    folder [.data/knowledge-graph] as KGData <<storage>>
-}
+graphdb --> gds : uses
+gds --> gda : uses
+gda --> graphdb : adapts
+gds --> gke : triggers
+gke --> kejson : exports
+mcptools --> gds : uses
+vkb --> graphdb : visualizes
+pa --> graphdb : manages
 
-package "Export Layer" {
-    folder [.data/knowledge-export] as Export <<storage>>
-    component [JSONExporter] as JE <<agent>>
-}
+note as AutoNote1
+  VSCodeExtensionBridgePattern: Scalable knowledge management with efficient data storage and retrieval.
 
-' Core relationships
-GDS --> GDA : uses
-GDA --> PA : coordinates
-PA --> GE : manages graph operations
-GE --> LDB : persists to
-LDB --> KGData : stores at
-
-' Integration relationships  
-UKB --> GDS : integrates with
-SA --> GDS : queries
-MCP --> SA : serves
-
-' Export flow
-GDS --> JE : triggers export
-JE --> Export : auto-syncs to
-Export --> Export : JSON files
-
-' Data flow
-KGData --> Export : synced data
-
-note top of GDS : Core bridge component connecting\nVSCode extension to graph database
-note bottom of KGData : Removed: shared-memory.json\nReplaced with persistent graph storage
+end note
 
 @enduml

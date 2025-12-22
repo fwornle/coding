@@ -2,39 +2,36 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "Knowledge Management" {
-  component [VkbApiClient] <<api>>
-  component [src/knowledge-management] <<core>>
+  component "GraphDatabaseService" as gds <<storage>>
+  component "GraphDatabaseAdapter" as gda <<api>>
+  component "PersistenceAgent" as pa <<agent>>
 }
 
-package "Unified Knowledge Base" {
-  component [lib/ukb-unified] <<core>>
+package "Semantic Analysis" {
+  component "MCPAgent" as mcpa <<agent>>
+  component "VkbApiClient" as vka <<external>>
+  component "MCP Tools" as mcpt <<cli>>
 }
 
-package "MCP Integration" {
-  component [integrations/mcp-server-semantic-analysis/src] <<agent>>
+package "Data Storage" {
+  database "LevelDB" as ldb
+  database "GraphDB" as graphdb
+  file "JSON Exports" as json
 }
 
-package "Storage Layer" {
-  component [Graphology] <<storage>>
-  component [LevelDB] <<storage>>
-  database ".data/knowledge-graph" <<storage>>
-}
+gds --> graphdb : stores
+gda --> gds : interacts
+pa --> gds : persists
+mcpa --> gds : uses
+mcpa --> mcpt : uses
+vka --> gds : visualizes
+mcpa --> vka : uses
+graphdb ..> json : exports
+mcpt --> graphdb : synchronizes
 
-package "Export Layer" {
-  folder ".data/knowledge-export" <<storage>>
-  note right of ".data/knowledge-export" : JSON exports\n(auto-synced from GraphDB)
-}
+note as AutoNote1
+  ApiPattern: MCPAgent for semantic analysis and knowledge management
 
-[VkbApiClient] --> [lib/ukb-unified] : API calls
-[src/knowledge-management] --> [VkbApiClient] : uses
-[integrations/mcp-server-semantic-analysis/src] --> [lib/ukb-unified] : semantic analysis
-[lib/ukb-unified] --> [Graphology] : graph operations
-[Graphology] --> [LevelDB] : persistence
-[LevelDB] --> ".data/knowledge-graph" : stores
-".data/knowledge-graph" --> ".data/knowledge-export" : auto-sync
-
-note top of "Knowledge Management" : ApiPattern Implementation\nPattern extracted from codebase analysis\nStored as reusable knowledge entity
-
-note bottom of ".data/knowledge-graph" : Replaces shared-memory.json\n(REMOVED from codebase)
+end note
 
 @enduml

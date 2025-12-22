@@ -1,45 +1,44 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor User as "User"
-actor MCP_Tools as "MCP Tools"
+actor MCPUser as "MCP User"
+actor VkbCli as "VkbCli (MCPAgent)"
 
-usecase "Visualize Knowledge Graph" as (Visualize_KG)
-usecase "Perform Knowledge Operations" as (Perform_KO)
-usecase "Store Data" as (Store_Data)
-usecase "Export Data" as (Export_Data)
+usecase "Visualize Knowledge" as (VisualizeKnowledge)
+usecase "Export Knowledge" as (ExportKnowledge)
+usecase "Manage Knowledge" as (ManageKnowledge)
+usecase "Analyze Data" as (AnalyzeData)
 
-User -- (Visualize_KG)
-MCP_Tools -- (Perform_KO)
+VkbCli -- (VisualizeKnowledge)
+VkbCli -- (ExportKnowledge)
+VkbCli -- (ManageKnowledge)
+VkbCli -- (AnalyzeData)
 
-(Visualize_KG) ..> (Store_Data) : uses
-(Perform_KO) ..> (Store_Data) : uses
-(Store_Data) ..> (Export_Data) : triggers
+MCPUser -- (VisualizeKnowledge)
+MCPUser -- (ExportKnowledge)
+MCPUser -- (ManageKnowledge)
+MCPUser -- (AnalyzeData)
 
-package "VkbCli" {
-  (Visualize_KG)
-  (Perform_KO)
-  (Store_Data)
-  (Export_Data)
+package "Graph Database Service" {
+  usecase "Store Knowledge" as (StoreKnowledge)
+  usecase "Retrieve Knowledge" as (RetrieveKnowledge)
+  VkbCli -- (StoreKnowledge)
+  VkbCli -- (RetrieveKnowledge)
 }
 
-package "GraphDatabaseService" {
-  (Store_Data)
-  (Export_Data)
+package "Graph Knowledge Exporter" {
+  usecase "Export Knowledge Graph" as (ExportKnowledgeGraph)
+  VkbCli -- (ExportKnowledgeGraph)
 }
 
-package "GraphDatabaseAdapter" {
-  (Store_Data)
+package "Persistence Agent" {
+  usecase "Persist Knowledge" as (PersistKnowledge)
+  VkbCli -- (PersistKnowledge)
 }
 
-User -- (Perform_KO)
-MCP_Tools -- (Visualize_KG)
-
-note "Dual-Storage Architecture" as N1
-(Store_Data) .. N1
-note "Graphology + LevelDB" as N2
-(Store_Data) .. N2
-note "Auto-Synchronized JSON Exports" as N3
-(Export_Data) .. N3
+(VisualizeKnowledge) ..> (StoreKnowledge) : includes
+(ExportKnowledge) ..> (ExportKnowledgeGraph) : includes
+(ManageKnowledge) ..> (RetrieveKnowledge) : includes
+(AnalyzeData) ..> (RetrieveKnowledge) : includes
 
 @enduml

@@ -1,35 +1,35 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-actor System as "System"
-actor User as "User"
+actor "KnowledgeExporter" as exporter
+actor "PersistenceAgent" as agent
+actor "VkbApiClient" as vkb_api
+actor "GraphDatabaseService" as graph_db
+
+usecase "Store Knowledge Graph" as store_kg
+usecase "Export Knowledge Graph" as export_kg
+usecase "Synchronize Knowledge Graph" as sync_kg
+usecase "Visualize Knowledge Graph" as visualize_kg
+usecase "Perform Knowledge Operations" as knowledge_ops
 
 package "Knowledge Persistence Pattern" {
-  usecase "Store Knowledge" as Store
-  usecase "Retrieve Knowledge" as Retrieve
-  usecase "Export JSON" as Export
-  usecase "Sync JSON" as Sync
-
-  component GraphDatabaseService as "Graph DB Service"
-  component GraphKnowledgeExporter as "Graph Exporter"
-  component PersistenceAgent as "Persistence Agent"
-
-  GraphDatabaseService --> Store : interacts
-  GraphDatabaseService --> Retrieve : interacts
-  GraphKnowledgeExporter --> Export : triggers
-  PersistenceAgent --> Store : persists
-
-  Store --> Export : triggers
-  Export --> Sync : triggers
+  graph_db -- store_kg
+  graph_db -- export_kg
+  graph_db -- sync_kg
+  agent -- store_kg
+  agent -- sync_kg
+  exporter -- export_kg
+  vkb_api -- visualize_kg
+  vkb_api -- knowledge_ops
 }
 
-System --> Store
-User --> Retrieve
+store_kg ..> export_kg : include
+sync_kg ..> store_kg : include
+visualize_kg ..> export_kg : include
+knowledge_ops ..> store_kg : include
 
-note "Environment Variables" as envNote
-envNote --> GraphDatabaseService : configures
-
-note "Entity Events" as entity Events
-entity Events --> Export : triggers
+exporter -- graph_db
+agent -- graph_db
+vkb_api -- graph_db
 
 @enduml

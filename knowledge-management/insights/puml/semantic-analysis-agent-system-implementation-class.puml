@@ -1,52 +1,77 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-package "Graph Database" {
-  class GraphDatabaseService <<service>> {
-    - graphDatabase: GraphDatabase
-    + manageGraphDatabase()
+package "Knowledge Management" {
+  class SemanticAnalysisAgentSystemImplementation <<MCPAgent>> {
+    - graphDatabaseService: GraphDatabaseService
+    - graphKnowledgeExporter: GraphKnowledgeExporter
+    - persistenceAgent: PersistenceAgent
+    + initialize()
+    + start()
+    + stop()
   }
-  class GraphDatabaseAdapter <<service>> {
-    - graphDatabase: GraphDatabase
-    + adaptGraphDatabase()
+
+  class GraphDatabaseService {
+    - graph: Graph
+    + createGraph()
+    + storeData(data: String)
   }
-  class GraphKnowledgeExporter <<service>> {
-    - graphDatabase: GraphDatabase
-    + exportGraphKnowledge()
+
+  class GraphKnowledgeExporter {
+    - graph: Graph
+    + exportToJson()
   }
-  class GraphDatabase <<file>> {
-    - data: String
+
+  class PersistenceAgent {
+    - levelDB: LevelDB
+    + persistData(data: String)
+  }
+
+  class Graph {
+    - nodes: List<Node>
+    - edges: List<Edge>
+  }
+
+  class Node {
+    - id: String
+    - properties: Map<String, String>
+  }
+
+  class Edge {
+    - id: String
+    - source: Node
+    - target: Node
+  }
+
+  class LevelDB {
+    - database: Database
+    + storeData(data: String)
+  }
+
+  class Database {
+    - filename: String
   }
 }
 
-package "CLI Access" {
-  class VKBCommand <<interface>> {
-    + visualizeGraph()
+package "Interfaces" {
+  interface Graphology {
+    + createGraph()
+    + storeData(data: String)
   }
-  class GraphSyncCommand <<interface>> {
-    + synchronizeGraph()
+
+  interface LevelDBInterface {
+    + storeData(data: String)
   }
 }
 
-package "Knowledge Export" {
-  class AutoSynchronizedJSONExport <<file>> {
-    - jsonData: String
-  }
-}
-
-package "MCP Server Integration" {
-  class MCPServer <<service>> {
-    - integrations: String
-    + enableKnowledgeOperations()
-  }
-}
-
-GraphDatabaseService --* GraphDatabase
-GraphDatabaseAdapter --* GraphDatabase
-GraphKnowledgeExporter --* GraphDatabase
-VKBCommand ..> GraphDatabaseService : uses
-GraphSyncCommand ..> GraphDatabaseService : uses
-AutoSynchronizedJSONExport ..> GraphKnowledgeExporter : uses
-MCPServer --* GraphDatabaseService
+SemanticAnalysisAgentSystemImplementation --* GraphDatabaseService
+SemanticAnalysisAgentSystemImplementation --* GraphKnowledgeExporter
+SemanticAnalysisAgentSystemImplementation --* PersistenceAgent
+GraphDatabaseService --* Graph
+GraphKnowledgeExporter --* Graph
+PersistenceAgent --* LevelDB
+LevelDB --* Database
+GraphDatabaseService ..> Graphology
+LevelDB ..> LevelDBInterface
 
 @enduml
