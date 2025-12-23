@@ -506,9 +506,17 @@ function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Rec
         return `Processed ${sessions} sessions, found ${problemSolutions} problem-solution pairs`
 
       case 'semantic_analysis':
-        const patterns = outputs.patternsFound || outputs.patterns?.length || 0
-        const insights = outputs.insights?.length || outputs.insightsGenerated || 0
-        return `Identified ${patterns} patterns with ${insights} semantic insights`
+        const keyPatterns = outputs.keyPatternsCount || outputs.patternsFound || outputs.patterns?.length || 0
+        const learnings = outputs.learningsCount || 0
+        const archDecisions = outputs.architecturalDecisionsCount || 0
+        const semConfidence = outputs.confidence ? `${Math.round(outputs.confidence * 100)}%` : ''
+        const filesAnalyzed = outputs.filesAnalyzed || 0
+        const totalSemantic = keyPatterns + learnings + archDecisions
+        if (totalSemantic > 0) {
+          const confStr = semConfidence ? ` (${semConfidence} confidence)` : ''
+          return `Found ${keyPatterns} patterns, ${learnings} learnings, ${archDecisions} arch decisions${confStr}`
+        }
+        return `Semantic analysis completed (${filesAnalyzed} files analyzed)`
 
       case 'insight_generation':
         const patternCount = outputs.patterns?.length || outputs.patternsGenerated || 0
@@ -604,11 +612,14 @@ function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Rec
         return `Code intelligence analysis completed`
 
       case 'documentation_linker':
-        const docsLinked = outputs.documentsLinked || outputs.linksCreated || outputs.documents?.length || 0
+        const totalDocs = outputs.totalDocuments || outputs.documentsCount || outputs.documents?.length || 0
+        const totalLinks = outputs.totalLinks || outputs.linksCount || outputs.documentsLinked || 0
         const unresolvedRefs = outputs.unresolvedReferences || 0
-        return unresolvedRefs > 0
-          ? `Linked ${docsLinked} documents (${unresolvedRefs} unresolved references)`
-          : `Linked ${docsLinked} documents to code entities`
+        if (totalDocs > 0 || totalLinks > 0) {
+          const unresolvedStr = unresolvedRefs > 0 ? ` (${unresolvedRefs} unresolved)` : ''
+          return `Found ${totalDocs} documents with ${totalLinks} code references${unresolvedStr}`
+        }
+        return `Documentation analysis completed`
 
       case 'documentation_semantics':
         const docstringsAnalyzed = outputs.docstringsAnalyzed || outputs.docstrings?.length || 0
