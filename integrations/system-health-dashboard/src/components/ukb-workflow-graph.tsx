@@ -376,11 +376,12 @@ interface WorkflowDefinitionsAPI {
 }
 
 // Hook to fetch workflow definitions from API
-function useWorkflowDefinitions() {
+function useWorkflowDefinitions(workflowName?: string) {
   const [agents, setAgents] = useState(WORKFLOW_AGENTS)
   const [orchestrator, setOrchestrator] = useState(ORCHESTRATOR_NODE)
   const [edges, setEdges] = useState(WORKFLOW_EDGES)
   const [stepToAgent, setStepToAgent] = useState(STEP_TO_AGENT)
+  const [allWorkflows, setAllWorkflows] = useState<Array<{ name: string; edges: EdgeDefinitionAPI[] }>>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -414,11 +415,8 @@ function useWorkflowDefinitions() {
           // Update step mappings
           setStepToAgent(data.data.stepMappings)
 
-          // Get edges from the first workflow (incremental-analysis by default)
-          const incrementalWorkflow = data.data.workflows.find(w => w.name === 'incremental-analysis')
-          if (incrementalWorkflow?.edges) {
-            setEdges(incrementalWorkflow.edges)
-          }
+          // Store all workflows for later selection
+          setAllWorkflows(data.data.workflows.map(w => ({ name: w.name, edges: w.edges })))
 
           console.log('✅ Loaded workflow definitions from API (Single Source of Truth)')
         }
@@ -433,6 +431,24 @@ function useWorkflowDefinitions() {
 
     fetchDefinitions()
   }, [])
+
+  // Select edges based on the workflow name
+  useEffect(() => {
+    if (allWorkflows.length > 0 && workflowName) {
+      const workflow = allWorkflows.find(w => w.name === workflowName)
+      if (workflow?.edges) {
+        setEdges(workflow.edges)
+        console.log(`✅ Loaded edges for workflow: ${workflowName}`)
+      } else {
+        // Fallback to incremental-analysis if workflow not found
+        const fallback = allWorkflows.find(w => w.name === 'incremental-analysis')
+        if (fallback?.edges) {
+          setEdges(fallback.edges)
+          console.warn(`⚠️ Workflow '${workflowName}' not found, using incremental-analysis edges`)
+        }
+      }
+    }
+  }, [allWorkflows, workflowName])
 
   return { agents, orchestrator, edges, stepToAgent, isLoading, error }
 }
@@ -825,7 +841,8 @@ function StepResultDetails({ outputs }: { outputs: Record<string, any> }) {
 
 export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }: UKBWorkflowGraphProps) {
   // Fetch workflow definitions from API (Single Source of Truth)
-  const { agents: WORKFLOW_AGENTS, orchestrator: ORCHESTRATOR_NODE, edges: WORKFLOW_EDGES, stepToAgent: STEP_TO_AGENT, isLoading: definitionsLoading } = useWorkflowDefinitions()
+  // Pass workflow name to load correct edges for the current workflow
+  const { agents: WORKFLOW_AGENTS, orchestrator: ORCHESTRATOR_NODE, edges: WORKFLOW_EDGES, stepToAgent: STEP_TO_AGENT, isLoading: definitionsLoading } = useWorkflowDefinitions(process.workflowName)
 
   // Track which node is currently wiggling
   const [wigglingNode, setWigglingNode] = useState<string | null>(null)
@@ -891,6 +908,24 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     // Also include _refreshKey and completedSteps for additional change detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepsSignature, process.currentStep, process.completedSteps, STEP_TO_AGENT, (process as any)._refreshKey])
+
+  // Filter agents to only show those that are part of the current workflow's edges
+  // This ensures nodes like "Intel" don't appear in complete-analysis workflow
+  const visibleAgents = useMemo(() => {
+    if (WORKFLOW_EDGES.length === 0) return WORKFLOW_AGENTS
+
+    // Collect all agent IDs that appear in edges (either as source or target)
+    const agentIdsInWorkflow = new Set<string>()
+    for (const edge of WORKFLOW_EDGES) {
+      if (edge.from !== 'orchestrator') {
+        agentIdsInWorkflow.add(edge.from)
+      }
+      agentIdsInWorkflow.add(edge.to)
+    }
+
+    // Filter agents to only those in the workflow
+    return WORKFLOW_AGENTS.filter(agent => agentIdsInWorkflow.has(agent.id))
+  }, [WORKFLOW_AGENTS, WORKFLOW_EDGES])
 
   const getNodeStatus = (agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
     const stepInfo = stepStatusMap[agentId]
@@ -1183,8 +1218,8 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               )
             })()}
 
-            {/* Nodes */}
-            {WORKFLOW_AGENTS.map((agent) => {
+            {/* Nodes - only show agents that are part of this workflow */}
+            {visibleAgents.map((agent) => {
               const pos = getNodePosition(agent)
               const status = getNodeStatus(agent.id)
               const isSelected = selectedNode === agent.id
