@@ -168,11 +168,11 @@ class UKBProcessManager {
     const mcpServerPath = join(codingRoot, 'integrations', 'mcp-server-semantic-analysis', 'dist', 'cli.js');
 
     // Create a wrapper script that calls the MCP tool
+    // Note: executeWorkflow() handles initialization internally via initializeAgents()
     const wrapperScript = `
       import { CoordinatorAgent } from '${join(codingRoot, 'integrations', 'mcp-server-semantic-analysis', 'dist', 'agents', 'coordinator.js')}';
 
       const coordinator = new CoordinatorAgent('${repositoryPath}', '${team}');
-      await coordinator.ensureInitialized();
       const result = await coordinator.executeWorkflow('${workflowName}', {
         repositoryPath: '${repositoryPath}',
         team: '${team}'
