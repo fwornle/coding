@@ -1516,8 +1516,9 @@ function OrchestratorDetailsSidebar({
   const pendingSteps = process.steps?.filter(s => s.status === 'pending') || []
   const skippedSteps = process.steps?.filter(s => s.status === 'skipped') || []
 
-  // Determine if workflow can be cancelled (running, stale, or frozen)
-  const canCancel = process.status === 'running' || process.health === 'stale' || process.health === 'frozen'
+  // Determine if workflow can be cancelled - any active workflow can be cancelled
+  const canCancel = process.status === 'running' || process.status === 'pending' || process.health === 'stale' || process.health === 'frozen'
+  const isFrozenOrStale = process.health === 'stale' || process.health === 'frozen'
 
   return (
     <Card className="w-80 h-full overflow-auto">
@@ -1623,7 +1624,7 @@ function OrchestratorDetailsSidebar({
                     </>
                   )}
                 </Button>
-                {process.health === 'frozen' && (
+                {isFrozenOrStale && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -1641,7 +1642,9 @@ function OrchestratorDetailsSidebar({
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Stops the workflow and resets state. Use when workflow is frozen or stuck.
+                  {isFrozenOrStale
+                    ? 'Workflow appears frozen/stale. Kill to reset state and optionally cleanup processes.'
+                    : 'Cancel the running workflow and reset state.'}
                 </p>
               </div>
             </div>
