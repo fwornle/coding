@@ -31,6 +31,7 @@ export interface UKBProcess {
   health: 'healthy' | 'stale' | 'frozen' | 'dead'
   heartbeatAgeSeconds: number
   progressPercent: number
+  elapsedSeconds?: number  // Elapsed time since workflow started
   steps?: StepInfo[]
   _refreshKey?: string  // Server-generated key to force UI updates
   isInlineMCP?: boolean  // Flag for inline MCP-triggered workflows

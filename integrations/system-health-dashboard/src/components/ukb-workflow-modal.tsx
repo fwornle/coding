@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import {
   Dialog,
@@ -32,6 +32,7 @@ import {
   History,
   FileText,
   RefreshCw,
+  Trash2,
 } from 'lucide-react'
 import UKBWorkflowGraph, { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
@@ -79,6 +80,32 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // Derived state
   const showSidebar = selectedNode !== null && activeTab === 'active'
   const showHistoricalSidebar = selectedNode !== null && activeTab === 'history'
+
+  // Cancel workflow state
+  const [cancelLoading, setCancelLoading] = useState(false)
+
+  // Cancel/clear a stuck or frozen workflow
+  const handleCancelWorkflow = async () => {
+    setCancelLoading(true)
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/ukb/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ killProcesses: true })
+      })
+      const data = await response.json()
+      if (data.status === 'success') {
+        console.log('Workflow cancelled:', data.data)
+        // The process list will be updated via polling
+      } else {
+        console.error('Failed to cancel workflow:', data.message)
+      }
+    } catch (error) {
+      console.error('Error cancelling workflow:', error)
+    } finally {
+      setCancelLoading(false)
+    }
+  }
 
   // Create a signature for change detection - ensures re-renders when process data changes
   // This captures key fields that affect display: pid, status, completedSteps, _refreshKey
@@ -326,7 +353,25 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   {/* Health Status */}
                   <div>
                     <div className="text-xs text-muted-foreground mb-1">Health</div>
-                    {getHealthBadge(activeCurrentProcess.health)}
+                    <div className="flex items-center gap-2">
+                      {getHealthBadge(activeCurrentProcess.health)}
+                      {(activeCurrentProcess.health === 'frozen' || activeCurrentProcess.health === 'stale') && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={handleCancelWorkflow}
+                          disabled={cancelLoading}
+                          title="Cancel stuck workflow"
+                        >
+                          {cancelLoading ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3 w-3" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Elapsed Time */}
