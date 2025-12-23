@@ -8,7 +8,7 @@
 
 import express from 'express';
 import { createServer } from 'http';
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
@@ -101,6 +101,7 @@ class SystemHealthAPIServer {
         this.app.get('/api/ukb/status', this.handleGetUKBStatus.bind(this));
         this.app.get('/api/ukb/processes', this.handleGetUKBProcesses.bind(this));
         this.app.post('/api/ukb/cleanup', this.handleUKBCleanup.bind(this));
+        this.app.post('/api/ukb/cancel', this.handleCancelWorkflow.bind(this));
         this.app.post('/api/ukb/start', this.handleStartUKBWorkflow.bind(this));
         this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
         this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
@@ -788,6 +789,69 @@ class SystemHealthAPIServer {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to cleanup UKB processes',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Cancel/kill a running or frozen workflow
+     * Resets the workflow-progress.json and optionally kills stale processes
+     */
+    async handleCancelWorkflow(req, res) {
+        try {
+            const { killProcesses = false } = req.body;
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            let previousState = null;
+            let killedProcesses = [];
+
+            // Read current state before resetting
+            if (existsSync(progressPath)) {
+                try {
+                    previousState = JSON.parse(readFileSync(progressPath, 'utf8'));
+                } catch (e) {
+                    // Ignore parse errors
+                }
+            }
+
+            // Reset workflow progress to idle state
+            const resetState = {
+                status: 'cancelled',
+                workflow: previousState?.workflowName || null,
+                previousStatus: previousState?.status || 'unknown',
+                cancelledAt: new Date().toISOString(),
+                stepsDetail: [],
+                lastUpdate: new Date().toISOString()
+            };
+
+            writeFileSync(progressPath, JSON.stringify(resetState, null, 2));
+
+            // Optionally kill stale semantic-analysis processes
+            if (killProcesses) {
+                const ukbManager = new UKBProcessManager();
+                killedProcesses = ukbManager.cleanupStaleProcesses(false);
+            }
+
+            console.log(`🛑 Workflow cancelled: ${previousState?.workflowName || 'unknown'} (was: ${previousState?.status || 'unknown'})`);
+
+            res.json({
+                status: 'success',
+                data: {
+                    cancelled: true,
+                    previousWorkflow: previousState?.workflowName || null,
+                    previousStatus: previousState?.status || 'unknown',
+                    completedSteps: previousState?.completedSteps || 0,
+                    totalSteps: previousState?.totalSteps || 0,
+                    killedProcesses: killedProcesses.length,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        } catch (error) {
+            console.error('Failed to cancel workflow:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to cancel workflow',
                 error: error.message
             });
         }

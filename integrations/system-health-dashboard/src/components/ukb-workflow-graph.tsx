@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
@@ -30,6 +31,7 @@ import {
   Hash,
   RefreshCw,
   Play,
+  StopCircle,
 } from 'lucide-react'
 
 // Orchestrator node - represents the coordinator that manages all agents
@@ -1454,6 +1456,39 @@ function OrchestratorDetailsSidebar({
   process: ProcessInfo
   onClose: () => void
 }) {
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelResult, setCancelResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  const handleCancelWorkflow = async (killProcesses: boolean = false) => {
+    setIsCancelling(true)
+    setCancelResult(null)
+    try {
+      const apiPort = 3033
+      const response = await fetch(`http://localhost:${apiPort}/api/ukb/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ killProcesses })
+      })
+
+      const data = await response.json()
+
+      if (data.status === 'success') {
+        setCancelResult({
+          success: true,
+          message: `Cancelled ${data.data.previousWorkflow || 'workflow'} (was ${data.data.previousStatus})`
+        })
+        // Refresh the page after a short delay to show updated state
+        setTimeout(() => window.location.reload(), 1500)
+      } else {
+        setCancelResult({ success: false, message: data.message || 'Failed to cancel' })
+      }
+    } catch (error) {
+      setCancelResult({ success: false, message: `Error: ${error instanceof Error ? error.message : 'Unknown'}` })
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'running':
@@ -1480,6 +1515,9 @@ function OrchestratorDetailsSidebar({
   const runningSteps = process.steps?.filter(s => s.status === 'running') || []
   const pendingSteps = process.steps?.filter(s => s.status === 'pending') || []
   const skippedSteps = process.steps?.filter(s => s.status === 'skipped') || []
+
+  // Determine if workflow can be cancelled (running, stale, or frozen)
+  const canCancel = process.status === 'running' || process.health === 'stale' || process.health === 'frozen'
 
   return (
     <Card className="w-80 h-full overflow-auto">
@@ -1555,6 +1593,60 @@ function OrchestratorDetailsSidebar({
             )}
           </div>
         </div>
+
+        {/* Kill Workflow Button - shown when workflow is running, stale, or frozen */}
+        {canCancel && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm text-red-600 flex items-center gap-1">
+                <StopCircle className="h-4 w-4" />
+                Workflow Control
+              </h4>
+              <div className="space-y-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleCancelWorkflow(false)}
+                  disabled={isCancelling}
+                >
+                  {isCancelling ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Cancelling...
+                    </>
+                  ) : (
+                    <>
+                      <StopCircle className="h-4 w-4 mr-2" />
+                      Kill Workflow
+                    </>
+                  )}
+                </Button>
+                {process.health === 'frozen' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => handleCancelWorkflow(true)}
+                    disabled={isCancelling}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Kill + Cleanup Processes
+                  </Button>
+                )}
+                {cancelResult && (
+                  <div className={`text-xs p-2 rounded ${cancelResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                    {cancelResult.message}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Stops the workflow and resets state. Use when workflow is frozen or stuck.
+                </p>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Active Steps - Parallel Execution */}
         {runningSteps.length > 0 && (
