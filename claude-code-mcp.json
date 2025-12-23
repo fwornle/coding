@@ -30,13 +30,6 @@
         "https://gitmcp.io/oraios/serena?tab=readme-ov-file"
       ]
     },
-    "mcp-git-ingest": {
-        "command": "uvx",
-        "args": ["--from", "git+https://github.com/adhikasp/mcp-git-ingest", "mcp-git-ingest"],
-        "env": {
-          "LOG_LEVEL": "WARNING"
-        }
-    },
     "constraint-monitor": {
       "command": "node",
       "args": ["{{CODING_TOOLS_PATH}}/integrations/mcp-constraint-monitor/src/server.js"],
