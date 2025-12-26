@@ -1609,8 +1609,8 @@ class StatusLineHealthMonitor {
 
       this.log('Starting VKB server via bin/vkb...', 'INFO');
 
-      // Start VKB in background
-      execAsync(`"${vkbScript}" start`).catch(err => {
+      // Start VKB in background (--no-browser to prevent opening windows on auto-heal)
+      execAsync(`"${vkbScript}" start --no-browser`).catch(err => {
         this.log(`VKB start error (non-critical): ${err.message}`, 'DEBUG');
       });
 
