@@ -1214,9 +1214,20 @@ class StatusLineHealthMonitor {
 
             const statusCode = parseInt(response.stdout.trim());
             if (statusCode >= 200 && statusCode < 400) {
-              // Server responding correctly
-              if (healthStatus === 'healthy') {
-                healthIssues = []; // Clear any issues if server is actually working
+              // Server responding - but also check if graphDB is healthy
+              try {
+                const apiHealth = await execAsync(`curl -s http://localhost:${vkbPort}/api/health --max-time 2`);
+                const healthData = JSON.parse(apiHealth.stdout);
+                if (healthData.graph === false) {
+                  healthIssues.push('GraphDB unavailable');
+                  healthStatus = 'unhealthy';
+                } else if (healthStatus === 'healthy') {
+                  healthIssues = []; // Clear any issues if server is fully working
+                }
+              } catch (apiError) {
+                // API check failed but HTTP works - warning state
+                healthIssues.push('API health check failed');
+                healthStatus = 'warning';
               }
             } else if (statusCode === 404 && fs.existsSync(distPath)) {
               healthIssues.push('404 despite dist exists');
@@ -1600,9 +1611,22 @@ class StatusLineHealthMonitor {
     try {
       this.log('Stopping any existing VKB server processes...', 'INFO');
 
-      // Kill any process on port 8080
-      await execAsync('lsof -ti:8080 | xargs kill -9 2>/dev/null || true');
+      // Gracefully stop VKB first (allows LevelDB to close properly)
+      const vkbStopScript = path.join(this.codingRepoPath, 'bin', 'vkb');
+      try {
+        await execAsync(`"${vkbStopScript}" stop`, { timeout: 5000 });
+      } catch (stopErr) {
+        this.log('Graceful stop failed, trying SIGTERM...', 'DEBUG');
+      }
+
+      // Give graceful shutdown time, then SIGTERM (not SIGKILL)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await execAsync('lsof -ti:8080 | xargs kill -15 2>/dev/null || true');
       await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Only force kill if still running
+      await execAsync('lsof -ti:8080 | xargs kill -9 2>/dev/null || true');
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Use the bin/vkb script to start the server properly
       const vkbScript = path.join(this.codingRepoPath, 'bin', 'vkb');
