@@ -362,6 +362,7 @@ export const selectHistoricalProcessInfo = createSelector(
                       ? (step.agent === 'code_graph' ? 'code-graph-rag' : 'anthropic')
                       : undefined,
         error: step.errors?.join('\n'),
+        outputs: step.outputs,
       }))
     }
   }
