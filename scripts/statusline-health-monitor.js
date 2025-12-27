@@ -1874,7 +1874,7 @@ class StatusLineHealthMonitor {
   }
 
   /**
-   * Check if another instance is already running via PSM
+   * Check if another instance is already running via PSM and PID file
    * @param {boolean} forceKill - If true, kill existing instance and take over
    * @returns {Promise<{running: boolean, pid?: number, killed?: boolean}>}
    */
@@ -1886,7 +1886,40 @@ class StatusLineHealthMonitor {
         this.log(`Cleaned up ${cleaned} dead process(es) from PSM registry`, 'INFO');
       }
 
-      // Check if service is registered and alive
+      // Check PID file first (shell script compatibility)
+      const pidFile = path.join(this.codingRepoPath, '.pids', 'statusline-health-monitor.pid');
+      let pidFromFile = null;
+
+      if (fs.existsSync(pidFile)) {
+        try {
+          pidFromFile = parseInt(fs.readFileSync(pidFile, 'utf8').trim(), 10);
+          if (!isNaN(pidFromFile) && this.psm.isProcessAlive(pidFromFile)) {
+            // Verify it's the health monitor process
+            const { stdout } = await execAsync(`ps -p ${pidFromFile} -o args=`, { timeout: 3000 }).catch(() => ({ stdout: '' }));
+            if (stdout.includes('statusline-health-monitor')) {
+              if (forceKill) {
+                this.log(`Force killing existing instance from PID file (PID: ${pidFromFile})...`, 'WARN');
+                process.kill(pidFromFile, 'SIGTERM');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                if (this.psm.isProcessAlive(pidFromFile)) {
+                  process.kill(pidFromFile, 'SIGKILL');
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                fs.unlinkSync(pidFile);
+                await this.psm.unregisterService(this.serviceName, 'global');
+                return { running: false, pid: pidFromFile, killed: true };
+              }
+              return { running: true, pid: pidFromFile };
+            }
+          }
+          // Stale PID file, clean it up
+          fs.unlinkSync(pidFile);
+        } catch (e) {
+          // Ignore errors, continue to PSM check
+        }
+      }
+
+      // Check if service is registered and alive via PSM
       const isRunning = await this.psm.isServiceRunning(this.serviceName, 'global');
 
       if (isRunning) {
@@ -1973,10 +2006,51 @@ class StatusLineHealthMonitor {
   }
 
   /**
+   * Write PID file for shell script compatibility
+   */
+  writePidFile() {
+    const pidDir = path.join(this.codingRepoPath, '.pids');
+    const pidFile = path.join(pidDir, 'statusline-health-monitor.pid');
+
+    try {
+      if (!fs.existsSync(pidDir)) {
+        fs.mkdirSync(pidDir, { recursive: true });
+      }
+      fs.writeFileSync(pidFile, String(process.pid));
+      this.log(`PID file written: ${pidFile} (PID: ${process.pid})`);
+    } catch (error) {
+      this.log(`Failed to write PID file: ${error.message}`, 'WARN');
+    }
+  }
+
+  /**
+   * Remove PID file on shutdown
+   */
+  removePidFile() {
+    const pidFile = path.join(this.codingRepoPath, '.pids', 'statusline-health-monitor.pid');
+
+    try {
+      if (fs.existsSync(pidFile)) {
+        const storedPid = fs.readFileSync(pidFile, 'utf8').trim();
+        // Only remove if it's our PID (prevent removing another instance's file)
+        if (storedPid === String(process.pid)) {
+          fs.unlinkSync(pidFile);
+          this.log('PID file removed');
+        }
+      }
+    } catch (error) {
+      this.log(`Failed to remove PID file: ${error.message}`, 'WARN');
+    }
+  }
+
+  /**
    * Start monitoring
    */
   async start() {
     this.log('🚀 Starting StatusLine Health Monitor...');
+
+    // Write PID file for shell script compatibility
+    this.writePidFile();
 
     // Register with PSM
     await this.registerWithPSM();
@@ -2015,6 +2089,7 @@ class StatusLineHealthMonitor {
   async gracefulShutdown() {
     this.log('📴 Shutting down StatusLine Health Monitor...');
     this.stop();
+    this.removePidFile();
     await this.unregisterFromPSM();
     process.exit(0);
   }

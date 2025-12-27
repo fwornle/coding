@@ -304,31 +304,35 @@ class HealthVerifier extends EventEmitter {
 
     // Check Constraint Monitor
     if (serviceRules.constraint_monitor.enabled) {
-      const constraintCheck = await this.checkPortListening(
-        'constraint_monitor',
-        serviceRules.constraint_monitor.port,
-        serviceRules.constraint_monitor.timeout_ms
-      );
+      const rule = serviceRules.constraint_monitor;
+      let constraintCheck;
+      if (rule.check_type === 'http_health' && rule.endpoint) {
+        constraintCheck = await this.checkHTTPHealth('constraint_monitor', rule.endpoint, rule.timeout_ms);
+      } else {
+        constraintCheck = await this.checkPortListening('constraint_monitor', rule.port, rule.timeout_ms);
+      }
       checks.push({
         ...constraintCheck,
-        auto_heal: serviceRules.constraint_monitor.auto_heal,
-        auto_heal_action: serviceRules.constraint_monitor.auto_heal_action,
-        severity: serviceRules.constraint_monitor.severity
+        auto_heal: rule.auto_heal,
+        auto_heal_action: rule.auto_heal_action,
+        severity: rule.severity
       });
     }
 
     // Check Dashboard Server
     if (serviceRules.dashboard_server.enabled) {
-      const dashboardCheck = await this.checkPortListening(
-        'dashboard_server',
-        serviceRules.dashboard_server.port,
-        serviceRules.dashboard_server.timeout_ms
-      );
+      const rule = serviceRules.dashboard_server;
+      let dashboardCheck;
+      if (rule.check_type === 'http_health' && rule.endpoint) {
+        dashboardCheck = await this.checkHTTPHealth('dashboard_server', rule.endpoint, rule.timeout_ms);
+      } else {
+        dashboardCheck = await this.checkPortListening('dashboard_server', rule.port, rule.timeout_ms);
+      }
       checks.push({
         ...dashboardCheck,
-        auto_heal: serviceRules.dashboard_server.auto_heal,
-        auto_heal_action: serviceRules.dashboard_server.auto_heal_action,
-        severity: serviceRules.dashboard_server.severity
+        auto_heal: rule.auto_heal,
+        auto_heal_action: rule.auto_heal_action,
+        severity: rule.severity
       });
     }
 
