@@ -110,6 +110,13 @@ class SystemHealthAPIServer {
         this.app.get('/api/workflows/definitions', this.handleGetWorkflowDefinitions.bind(this));
         this.app.get('/api/workflows/definitions/:workflowName', this.handleGetWorkflowDefinition.bind(this));
 
+        // Batch processing endpoints
+        this.app.get('/api/batch/progress', this.handleGetBatchProgress.bind(this));
+        this.app.get('/api/batch/history', this.handleGetBatchHistory.bind(this));
+        this.app.get('/api/batch/dag', this.handleGetBatchDAG.bind(this));
+        this.app.post('/api/batch/pause', this.handlePauseBatch.bind(this));
+        this.app.post('/api/batch/resume', this.handleResumeBatch.bind(this));
+
         // Error handling
         this.app.use(this.handleError.bind(this));
     }
@@ -1122,6 +1129,337 @@ class SystemHealthAPIServer {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to get UKB history detail',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get current batch processing progress
+     * Reads from .data/batch-progress.json written by BatchScheduler
+     */
+    async handleGetBatchProgress(req, res) {
+        try {
+            const progressPath = join(codingRoot, '.data', 'batch-progress.json');
+
+            if (!existsSync(progressPath)) {
+                return res.json({
+                    status: 'success',
+                    data: {
+                        status: 'idle',
+                        message: 'No batch processing in progress',
+                        currentBatch: null,
+                        completedBatches: 0,
+                        totalBatches: 0,
+                        accumulatedStats: {
+                            entities: 0,
+                            relations: 0,
+                            tokensUsed: 0
+                        }
+                    }
+                });
+            }
+
+            const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+            const age = Date.now() - new Date(progress.lastUpdate || progress.startedAt).getTime();
+
+            // Determine health status
+            let health = 'healthy';
+            if (progress.status === 'running') {
+                if (age > 300000) {
+                    health = 'frozen';
+                } else if (age > 120000) {
+                    health = 'stale';
+                }
+            }
+
+            res.json({
+                status: 'success',
+                data: {
+                    ...progress,
+                    health,
+                    ageMs: age,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        } catch (error) {
+            console.error('Failed to get batch progress:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to retrieve batch progress',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get history of completed batches
+     * Reads from batch checkpoint manager data
+     */
+    async handleGetBatchHistory(req, res) {
+        try {
+            const checkpointsPath = join(codingRoot, '.data', 'batch-checkpoints.json');
+
+            if (!existsSync(checkpointsPath)) {
+                return res.json({
+                    status: 'success',
+                    data: {
+                        checkpoints: [],
+                        total: 0
+                    }
+                });
+            }
+
+            const checkpointData = JSON.parse(readFileSync(checkpointsPath, 'utf8'));
+            const { limit = 50, team } = req.query;
+
+            let checkpoints = checkpointData.checkpoints || [];
+
+            // Filter by team if specified
+            if (team) {
+                checkpoints = checkpoints.filter(c => c.team === team);
+            }
+
+            // Sort by completion time (newest first)
+            checkpoints.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+
+            res.json({
+                status: 'success',
+                data: {
+                    checkpoints: checkpoints.slice(0, parseInt(limit)),
+                    total: checkpoints.length,
+                    lastCompleted: checkpointData.lastCompletedBatch || null,
+                    accumulatedStats: checkpointData.accumulatedStats || null
+                }
+            });
+        } catch (error) {
+            console.error('Failed to get batch history:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to retrieve batch history',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get DAG structure for batch operator pipeline visualization
+     * Returns the 6 Tree-KG operators and their relationships
+     */
+    async handleGetBatchDAG(req, res) {
+        try {
+            // Load model-tiers.yaml for operator tier information
+            const configDir = join(codingRoot, 'integrations/mcp-server-semantic-analysis/config');
+            const modelTiersPath = join(configDir, 'model-tiers.yaml');
+
+            let operatorTiers = {};
+            if (existsSync(modelTiersPath)) {
+                const modelTiers = parseYaml(readFileSync(modelTiersPath, 'utf-8'));
+                operatorTiers = modelTiers.operator_tiers || {};
+            }
+
+            // Define the operator DAG structure
+            const operators = [
+                {
+                    id: 'conv',
+                    name: 'Context Convolution',
+                    shortName: 'Conv',
+                    description: 'Enriches entity descriptions with temporal context from commits and sessions',
+                    tier: operatorTiers.conv || 'premium',
+                    position: { row: 0, col: 0 }
+                },
+                {
+                    id: 'aggr',
+                    name: 'Entity Aggregation',
+                    shortName: 'Aggr',
+                    description: 'Assigns core/non-core roles based on significance scoring',
+                    tier: operatorTiers.aggr || 'standard',
+                    position: { row: 0, col: 1 }
+                },
+                {
+                    id: 'embed',
+                    name: 'Node Embedding',
+                    shortName: 'Embed',
+                    description: 'Generates vector embeddings for similarity comparison',
+                    tier: operatorTiers.embed || 'fast',
+                    position: { row: 0, col: 2 }
+                },
+                {
+                    id: 'dedup',
+                    name: 'Deduplication',
+                    shortName: 'Dedup',
+                    description: 'Merges equivalent entities with role consistency',
+                    tier: operatorTiers.dedup || 'standard',
+                    position: { row: 1, col: 0 }
+                },
+                {
+                    id: 'pred',
+                    name: 'Edge Prediction',
+                    shortName: 'Pred',
+                    description: 'Predicts relationships using weighted scoring (α·cos + β·AA + γ·CA)',
+                    tier: operatorTiers.pred || 'premium',
+                    position: { row: 1, col: 1 }
+                },
+                {
+                    id: 'merge',
+                    name: 'Structure Merge',
+                    shortName: 'Merge',
+                    description: 'Fuses batch results into accumulated knowledge graph',
+                    tier: operatorTiers.merge || 'standard',
+                    position: { row: 1, col: 2 }
+                }
+            ];
+
+            // Define the operator edges (pipeline flow)
+            const edges = [
+                { from: 'conv', to: 'aggr', type: 'pipeline' },
+                { from: 'aggr', to: 'embed', type: 'pipeline' },
+                { from: 'embed', to: 'dedup', type: 'pipeline' },
+                { from: 'dedup', to: 'pred', type: 'pipeline' },
+                { from: 'pred', to: 'merge', type: 'pipeline' }
+            ];
+
+            // Get current progress to annotate operator status
+            const progressPath = join(codingRoot, '.data', 'batch-progress.json');
+            let operatorStatuses = {};
+
+            if (existsSync(progressPath)) {
+                try {
+                    const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                    if (progress.currentBatch?.operators) {
+                        operatorStatuses = progress.currentBatch.operators;
+                    }
+                } catch (e) {
+                    // Ignore parse errors
+                }
+            }
+
+            // Annotate operators with status
+            const annotatedOperators = operators.map(op => ({
+                ...op,
+                status: operatorStatuses[op.id]?.status || 'pending',
+                duration: operatorStatuses[op.id]?.duration || null,
+                progress: operatorStatuses[op.id]?.progress || null
+            }));
+
+            res.json({
+                status: 'success',
+                data: {
+                    operators: annotatedOperators,
+                    edges,
+                    pipelineOrder: ['conv', 'aggr', 'embed', 'dedup', 'pred', 'merge']
+                }
+            });
+        } catch (error) {
+            console.error('Failed to get batch DAG:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to retrieve batch DAG',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Pause batch processing after current batch completes
+     * Writes a pause flag to the progress file
+     */
+    async handlePauseBatch(req, res) {
+        try {
+            const progressPath = join(codingRoot, '.data', 'batch-progress.json');
+
+            if (!existsSync(progressPath)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'No batch processing in progress'
+                });
+            }
+
+            const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+
+            if (progress.status !== 'running') {
+                return res.json({
+                    status: 'success',
+                    message: 'Batch processing is not running',
+                    data: { status: progress.status }
+                });
+            }
+
+            // Set pause flag
+            progress.pauseRequested = true;
+            progress.pauseRequestedAt = new Date().toISOString();
+            progress.lastUpdate = new Date().toISOString();
+
+            writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+
+            console.log('⏸️ Batch processing pause requested');
+
+            res.json({
+                status: 'success',
+                message: 'Pause requested - will pause after current batch completes',
+                data: {
+                    pauseRequested: true,
+                    currentBatch: progress.currentBatch?.id || null,
+                    completedBatches: progress.completedBatches
+                }
+            });
+        } catch (error) {
+            console.error('Failed to pause batch processing:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to pause batch processing',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Resume paused batch processing
+     * Clears pause flag and optionally triggers continuation
+     */
+    async handleResumeBatch(req, res) {
+        try {
+            const progressPath = join(codingRoot, '.data', 'batch-progress.json');
+
+            if (!existsSync(progressPath)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'No batch processing state found'
+                });
+            }
+
+            const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+
+            // Clear pause flag
+            progress.pauseRequested = false;
+            progress.pauseRequestedAt = null;
+            progress.lastUpdate = new Date().toISOString();
+
+            // If status was paused, update to running
+            if (progress.status === 'paused') {
+                progress.status = 'running';
+                progress.resumedAt = new Date().toISOString();
+            }
+
+            writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+
+            console.log('▶️ Batch processing resumed');
+
+            res.json({
+                status: 'success',
+                message: 'Batch processing resumed',
+                data: {
+                    status: progress.status,
+                    currentBatch: progress.currentBatch?.id || null,
+                    completedBatches: progress.completedBatches,
+                    totalBatches: progress.totalBatches
+                }
+            });
+        } catch (error) {
+            console.error('Failed to resume batch processing:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to resume batch processing',
                 error: error.message
             });
         }

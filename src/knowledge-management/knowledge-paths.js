@@ -14,6 +14,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,7 +49,6 @@ export function getCodingRepoPath() {
 
   // Verify the path exists (prefer repoPath if it looks valid)
   try {
-    const fs = require('fs');
     fs.accessSync(path.join(repoPath, 'package.json'));
     return repoPath;
   } catch {
