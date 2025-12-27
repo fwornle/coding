@@ -68,8 +68,10 @@ install.log
 # VSCode extension build artifacts
 integrations/vscode-km-copilot/*.vsix
 
-# Process ID files
+# Process ID files and lock files
 *.pid
+*.lock
+.pids/
 
 # Legacy shared memory files (deprecated - now using .data/knowledge-export/)
 # shared-memory*.json
@@ -101,6 +103,11 @@ integrations/mcp-server-browserbase/
 
 # Workflow checkpoints (timestamps that change frequently but don't need git tracking)
 .data/workflow-checkpoints.json
+.data/workflow-progress.json
+
+# Batch processing runtime state
+.data/batch-*.json
+.data/ukb-*.json
 
 # Workflow execution reports (generated on each UKB run, not needed in git)
 .data/workflow-reports/
