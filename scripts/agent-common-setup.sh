@@ -184,29 +184,65 @@ start_transcript_monitoring() {
 # STATUSLINE HEALTH MONITOR
 # ==============================================================================
 # Start StatusLine Health Monitor daemon (global monitoring for all sessions)
+# Uses PID lock file to prevent duplicate daemons (race-condition safe)
 start_statusline_health_monitor() {
   local coding_repo="$1"
+  local pidfile="$coding_repo/.pids/statusline-health-monitor.pid"
+  local lockfile="$coding_repo/.pids/statusline-health-monitor.lock"
 
-  # Check if health monitor is already running
-  if pgrep -f "statusline-health-monitor.js" >/dev/null 2>&1; then
-    log "StatusLine Health Monitor already running"
-    return 0
-  fi
+  # Ensure .pids directory exists
+  mkdir -p "$coding_repo/.pids"
 
-  log "Starting StatusLine Health Monitor daemon..."
+  # Use flock for atomic check-and-start (prevents race conditions)
+  (
+    flock -n 200 || {
+      log "StatusLine Health Monitor startup in progress by another process"
+      return 0
+    }
 
-  # Start the health monitor daemon in background
-  cd "$coding_repo"
-  nohup node scripts/statusline-health-monitor.js --daemon > .logs/statusline-health-daemon.log 2>&1 &
-  local health_monitor_pid=$!
+    # Check PID file first (faster than pgrep)
+    if [ -f "$pidfile" ]; then
+      local existing_pid
+      existing_pid=$(cat "$pidfile" 2>/dev/null)
+      if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+        # Verify it's actually the health monitor (not a recycled PID)
+        if ps -p "$existing_pid" -o args= 2>/dev/null | grep -q "statusline-health-monitor"; then
+          log "StatusLine Health Monitor already running (PID: $existing_pid)"
+          return 0
+        fi
+      fi
+      # Stale PID file, remove it
+      rm -f "$pidfile"
+    fi
 
-  # Brief wait to check if it started successfully
-  sleep 1
-  if kill -0 "$health_monitor_pid" 2>/dev/null; then
-    log "✅ StatusLine Health Monitor started (PID: $health_monitor_pid)"
-  else
-    log "⚠️ StatusLine Health Monitor may have failed to start"
-  fi
+    # Double-check with pgrep (catches monitors started outside this function)
+    if pgrep -f "statusline-health-monitor.js.*--daemon" >/dev/null 2>&1; then
+      local running_pid
+      running_pid=$(pgrep -f "statusline-health-monitor.js.*--daemon" | head -1)
+      log "StatusLine Health Monitor already running (PID: $running_pid)"
+      echo "$running_pid" > "$pidfile"
+      return 0
+    fi
+
+    log "Starting StatusLine Health Monitor daemon..."
+
+    # Start the health monitor daemon in background
+    cd "$coding_repo"
+    nohup node scripts/statusline-health-monitor.js --daemon --auto-heal > .logs/statusline-health-daemon.log 2>&1 &
+    local health_monitor_pid=$!
+
+    # Write PID file immediately
+    echo "$health_monitor_pid" > "$pidfile"
+
+    # Brief wait to check if it started successfully
+    sleep 1
+    if kill -0 "$health_monitor_pid" 2>/dev/null; then
+      log "✅ StatusLine Health Monitor started (PID: $health_monitor_pid)"
+    else
+      log "⚠️ StatusLine Health Monitor may have failed to start"
+      rm -f "$pidfile"
+    fi
+  ) 200>"$lockfile"
 }
 
 # ==============================================================================

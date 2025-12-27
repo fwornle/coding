@@ -32,6 +32,10 @@ import {
   RefreshCw,
   Play,
   StopCircle,
+  Calendar,
+  Network,
+  Save,
+  RotateCcw,
 } from 'lucide-react'
 
 // Orchestrator node - represents the coordinator that manages all agents
@@ -45,15 +49,54 @@ const ORCHESTRATOR_NODE = {
   llmModel: null,
   techStack: 'TypeScript DAG executor',
   row: -1,  // Above all other nodes
-  col: 1.125,  // Centered
+  col: 0.6,  // Centered (aligned with single-agent column)
 }
 
-// Agent definitions for the 13-agent workflow
+// Agent definitions for the workflow (15 original + 3 batch processing = 18 agents)
 // LLM info verified via Serena analysis of mcp-server-semantic-analysis
 // Priority: Groq > Gemini > Anthropic > OpenAI (auto-fallback based on API key availability)
-// Grid layout: row/col positions reflect actual DAG structure from coordinator.ts
-// Phase 1 (row 0): git_history, vibe_history, code_graph, documentation_linker (all parallel entry points)
+// Grid layout: row/col positions reflect actual workflow structures
+// - Complete/Incremental: 4 parallel entry points at row 0
+// - Batch: Batch Scheduler at row 0 col 2.5 (far right), then sequential flow with loop-back
 const WORKFLOW_AGENTS = [
+  // --- Batch Processing Agents ---
+  {
+    id: 'batch_scheduler',
+    name: 'Batch Scheduler',
+    shortName: 'Batch',
+    icon: Calendar,
+    description: 'Plans and tracks chronological batch windows. Divides git history into 50-commit batches for incremental processing with checkpoint-based resumption.',
+    usesLLM: false,
+    llmModel: null,
+    techStack: 'Git CLI + Checkpoint Manager',
+    row: 0,    // Same row as extraction agents but different column
+    col: 2.5,  // Far right to avoid overlap with Git/Vibe/Code
+  },
+  {
+    id: 'kg_operators',
+    name: 'KG Operators',
+    shortName: 'KG-Ops',
+    icon: Network,
+    description: 'Tree-KG inspired operators for incremental knowledge graph expansion. Implements conv, aggr, embed, dedup, pred, merge operators per batch.',
+    usesLLM: true,
+    llmModel: 'Multi-tier: fast/standard/premium per operator',
+    techStack: 'SemanticAnalyzer + Embeddings',
+    row: 4,
+    col: 1.125,
+  },
+  {
+    id: 'batch_checkpoint_manager',
+    name: 'Batch Checkpoint',
+    shortName: 'Checkpoint',
+    icon: Save,
+    description: 'Per-batch checkpoint state management. Tracks completed batches, operator results, and supports resumption from any batch. Loops back to Git for next batch.',
+    usesLLM: false,
+    llmModel: null,
+    techStack: 'JSON file persistence',
+    row: 6.5,
+    col: 1.125,
+  },
+  // --- Original Agents ---
   {
     id: 'git_history',
     name: 'Git History',
@@ -238,6 +281,24 @@ const WORKFLOW_AGENTS = [
 
 // Step name to agent ID mapping
 const STEP_TO_AGENT: Record<string, string> = {
+  // Batch workflow steps
+  'plan_batches': 'batch_scheduler',
+  'extract_batch_commits': 'git_history',
+  'extract_batch_sessions': 'vibe_history',
+  'batch_semantic_analysis': 'semantic_analysis',
+  'operator_conv': 'kg_operators',
+  'operator_aggr': 'kg_operators',
+  'operator_embed': 'kg_operators',
+  'operator_dedup': 'kg_operators',
+  'operator_pred': 'kg_operators',
+  'operator_merge': 'kg_operators',
+  'batch_qa': 'quality_assurance',
+  'save_batch_checkpoint': 'batch_checkpoint_manager',
+  'final_persist': 'persistence',
+  'final_dedup': 'deduplication',
+  'final_validation': 'content_validation',
+
+  // Complete/Incremental workflow steps
   'analyze_git_history': 'git_history',
   'analyze_recent_changes': 'git_history',
   'analyze_vibe_history': 'vibe_history',
@@ -340,6 +401,10 @@ const ICON_MAP: Record<string, typeof GitBranch> = {
   CheckCircle2,
   Zap,
   Play,
+  Calendar,    // Batch Scheduler
+  Network,     // KG Operators
+  Save,        // Batch Checkpoint Manager
+  RotateCcw,   // Loop indicator
 }
 
 // Types for API response
@@ -922,12 +987,14 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepsSignature, process.currentStep, process.completedSteps, STEP_TO_AGENT, (process as any)._refreshKey])
 
-  // Filter agents to only show those that are part of the current workflow's edges
-  // This ensures nodes like "Intel" don't appear in complete-analysis workflow
-  const visibleAgents = useMemo(() => {
-    if (WORKFLOW_EDGES.length === 0) return WORKFLOW_AGENTS
+  // Filter agents to only those appearing in the current workflow
+  // PRESERVE original row/col positions from agents.yaml (Single Source of Truth)
+  const { visibleAgents, maxRow, maxCol } = useMemo(() => {
+    if (WORKFLOW_EDGES.length === 0) {
+      return { visibleAgents: WORKFLOW_AGENTS, maxRow: 9, maxCol: 2.5 }
+    }
 
-    // Collect all agent IDs that appear in edges (either as source or target)
+    // Collect all agent IDs that appear in edges
     const agentIdsInWorkflow = new Set<string>()
     for (const edge of WORKFLOW_EDGES) {
       if (edge.from !== 'orchestrator') {
@@ -936,8 +1003,38 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
       agentIdsInWorkflow.add(edge.to)
     }
 
-    // Filter agents to only those in the workflow
-    return WORKFLOW_AGENTS.filter(agent => agentIdsInWorkflow.has(agent.id))
+    // Filter agents and preserve their original positions from agents.yaml
+    const filtered = WORKFLOW_AGENTS.filter(agent => agentIdsInWorkflow.has(agent.id))
+
+    // Normalize ALL row numbers to consecutive integers (e.g., rows -1, -0.5, 0, 1, 4 → 0, 1, 2, 3, 4)
+    // This ensures equal spacing between ALL rows regardless of original values
+    const uniqueRows = [...new Set(filtered.map(a => a.row))].sort((a, b) => a - b)
+    const rowMap = new Map<number, number>()
+
+    // Map all rows to consecutive integers starting from 0
+    uniqueRows.forEach((row, index) => {
+      rowMap.set(row, index)
+    })
+
+    // Apply normalized positions
+    const normalizedAgents = filtered.map(agent => ({
+      ...agent,
+      row: rowMap.get(agent.row) ?? agent.row
+    }))
+
+    // Compute max row and col from normalized agents
+    let computedMaxRow = 0
+    let computedMaxCol = 0
+    for (const agent of normalizedAgents) {
+      computedMaxRow = Math.max(computedMaxRow, agent.row)
+      computedMaxCol = Math.max(computedMaxCol, agent.col)
+    }
+
+    return {
+      visibleAgents: normalizedAgents,
+      maxRow: computedMaxRow,
+      maxCol: Math.max(computedMaxCol, 2)
+    }
   }, [WORKFLOW_AGENTS, WORKFLOW_EDGES])
 
   const getNodeStatus = (agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
@@ -998,15 +1095,17 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   }
 
   // Calculate SVG dimensions based on grid
-  // Layout: Orchestrator at row -1, then 4 parallel entry nodes in row 0, then converging down
+  // Layout: Orchestrator at row -1, then 4-5 parallel entry nodes in row 0, then converging down
   const nodeWidth = 100
   const nodeHeight = 55
   const horizontalGap = 30
-  const verticalGap = 15
-  // Grid width: 3 columns (col 0, 1.125, 2.25) = max col 2.25 + 1 node width
-  const gridWidth = nodeWidth * 3.5 + horizontalGap * 2.5
-  // Add extra row at top for orchestrator (row -1 becomes row 0 in rendering)
-  const gridHeight = (nodeHeight + verticalGap) * 11  // 11 rows: -1 to 9
+  const verticalGap = 60  // Increased for fractional row spacing (prevents batch/-0.5 overlapping git/0)
+  // Dynamic grid width based on computed maxCol from layout algorithm
+  const numCols = Math.ceil(maxCol) + 1  // +1 because col is 0-indexed
+  const gridWidth = nodeWidth * numCols + horizontalGap * (numCols - 0.5)
+  // Dynamic grid height based on computed maxRow, +2 for orchestrator row (-1) and buffer
+  const numRows = Math.ceil(maxRow) + 3  // +3 for: row -1 (orchestrator), 0-maxRow, and buffer
+  const gridHeight = (nodeHeight + verticalGap) * numRows
   const padding = 30
   const orchestratorOffset = nodeHeight + verticalGap  // Offset to account for row -1
 
@@ -1058,25 +1157,107 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               >
                 <polygon points="0 0, 10 3.5, 0 7" fill="#a855f7" />
               </marker>
+              <marker
+                id="arrowhead-control"
+                markerWidth="10"
+                markerHeight="7"
+                refX="9"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b" />
+              </marker>
+              <marker
+                id="arrowhead-self"
+                markerWidth="10"
+                markerHeight="7"
+                refX="9"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon points="0 0, 10 3.5, 0 7" fill="#8b5cf6" />
+              </marker>
             </defs>
 
-            {/* Edges */}
+            {/* Edges - use visibleAgents for correct normalized positions */}
             {WORKFLOW_EDGES.map((edge, idx) => {
-              // Handle orchestrator as source
+              // Handle self-referencing edges (e.g., kg_operators → kg_operators)
+              if ((edge as any).type === 'self' && edge.from === edge.to) {
+                const agent = visibleAgents.find(a => a.id === edge.from)
+                if (!agent) return null
+                const pos = getNodePosition(agent)
+
+                // Draw a curved loop on the right side of the node
+                const startX = pos.x + nodeWidth
+                const startY = pos.y + nodeHeight / 2 - 10
+                const endX = pos.x + nodeWidth
+                const endY = pos.y + nodeHeight / 2 + 10
+                const loopRadius = 25
+
+                const path = `M ${startX} ${startY}
+                              C ${startX + loopRadius * 2} ${startY},
+                                ${startX + loopRadius * 2} ${endY},
+                                ${endX} ${endY}`
+
+                return (
+                  <g key={idx}>
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke="#8b5cf6"
+                      strokeWidth={1.5}
+                      strokeDasharray="3,2"
+                      markerEnd="url(#arrowhead-self)"
+                    />
+                    {/* Label for self-loop */}
+                    {(edge as any).label && (
+                      <text
+                        x={startX + loopRadius * 2 + 5}
+                        y={pos.y + nodeHeight / 2}
+                        fontSize="8"
+                        fill="#8b5cf6"
+                        className="select-none"
+                      >
+                        {(edge as any).label.length > 15 ? '6 ops' : (edge as any).label}
+                      </text>
+                    )}
+                  </g>
+                )
+              }
+
+              // Handle orchestrator as source - use visibleAgents for normalized positions
               const fromAgent = edge.from === 'orchestrator'
                 ? ORCHESTRATOR_NODE
-                : WORKFLOW_AGENTS.find(a => a.id === edge.from)
-              const toAgent = WORKFLOW_AGENTS.find(a => a.id === edge.to)
+                : visibleAgents.find(a => a.id === edge.from)
+              const toAgent = visibleAgents.find(a => a.id === edge.to)
               if (!fromAgent || !toAgent) return null
 
               const fromPos = getNodePosition(fromAgent)
               const toPos = getNodePosition(toAgent)
 
-              // Calculate edge start/end points
-              const fromX = fromPos.x + nodeWidth / 2
-              const fromY = fromPos.y + nodeHeight
-              const toX = toPos.x + nodeWidth / 2
-              const toY = toPos.y
+              // Determine edge type
+              const isControl = (edge as any).type === 'control'
+              const isDataflow = edge.type === 'dataflow'
+
+              // Check if this is a loop-back edge (going UP instead of down)
+              const isLoopBack = isControl && fromPos.y > toPos.y
+
+              // Calculate edge start/end points based on direction
+              let fromX, fromY, toX, toY
+
+              if (isLoopBack) {
+                // Loop-back: exit from left side, enter at left side
+                fromX = fromPos.x - 5  // Left side of source
+                fromY = fromPos.y + nodeHeight / 2
+                toX = toPos.x - 5  // Left side of target
+                toY = toPos.y + nodeHeight / 2
+              } else {
+                // Normal: exit from bottom, enter at top
+                fromX = fromPos.x + nodeWidth / 2
+                fromY = fromPos.y + nodeHeight
+                toX = toPos.x + nodeWidth / 2
+                toY = toPos.y
+              }
 
               // Determine if this edge is active (current data flow)
               const fromStatus = edge.from === 'orchestrator'
@@ -1086,16 +1267,50 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const isActive = fromStatus === 'completed' && toStatus === 'running'
               const isCompleted = fromStatus === 'completed' && toStatus === 'completed'
 
-              // Different colors for dependency vs dataflow edges
-              const isDataflow = edge.type === 'dataflow'
-              const strokeColor = isActive ? '#3b82f6' : isCompleted ? '#22c55e' : isDataflow ? '#a855f7' : '#cbd5e1'
-              const strokeWidth = isActive ? 2 : 1.5
-              const markerEnd = isActive ? 'url(#arrowhead-active)' : isDataflow ? 'url(#arrowhead-dataflow)' : 'url(#arrowhead)'
-              const strokeDasharray = isDataflow ? '4,2' : undefined
+              // Different colors for edge types
+              let strokeColor: string
+              let markerEnd: string
+              let strokeDasharray: string | undefined
 
-              // Create curved path for better visualization
-              const midY = (fromY + toY) / 2
-              const path = `M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${toY - 5}`
+              if (isActive) {
+                strokeColor = '#3b82f6'
+                markerEnd = 'url(#arrowhead-active)'
+              } else if (isCompleted) {
+                strokeColor = '#22c55e'
+                markerEnd = 'url(#arrowhead)'
+              } else if (isControl) {
+                strokeColor = '#f59e0b'  // Amber for control/loop edges
+                markerEnd = 'url(#arrowhead-control)'
+                strokeDasharray = '5,3'
+              } else if (isDataflow) {
+                strokeColor = '#a855f7'  // Purple for dataflow
+                markerEnd = 'url(#arrowhead-dataflow)'
+                strokeDasharray = '4,2'
+              } else {
+                strokeColor = '#cbd5e1'  // Gray for dependency
+                markerEnd = 'url(#arrowhead)'
+              }
+
+              const strokeWidth = isActive ? 2 : 1.5
+
+              // Create path based on direction
+              let path: string
+
+              if (isLoopBack) {
+                // Loop-back path: curve to the left and up with horizontal final approach
+                const leftOffset = 50  // How far left to curve
+                const approachX = toX - 12  // Point for horizontal approach to target
+                path = `M ${fromX} ${fromY}
+                        C ${fromX - leftOffset} ${fromY},
+                          ${approachX - leftOffset} ${toY},
+                          ${approachX} ${toY} L ${toX} ${toY}`
+              } else {
+                // Path with vertical final approach for proper arrowhead alignment
+                // Curve to a point above target, then straight down to target
+                const approachY = toY - 15  // Point above target for vertical approach
+                const midY = (fromY + approachY) / 2
+                path = `M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${approachY} L ${toX} ${toY - 3}`
+              }
 
               return (
                 <g key={idx}>
@@ -1108,6 +1323,18 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                     markerEnd={markerEnd}
                     className={isActive ? 'animate-pulse' : ''}
                   />
+                  {/* Label for control edges */}
+                  {isControl && (edge as any).label && (
+                    <text
+                      x={isLoopBack ? fromX - 45 : (fromX + toX) / 2 + 5}
+                      y={isLoopBack ? (fromY + toY) / 2 : (fromY + toY) / 2}
+                      fontSize="9"
+                      fill="#f59e0b"
+                      className="select-none font-medium"
+                    >
+                      {(edge as any).label}
+                    </text>
+                  )}
                 </g>
               )
             })}
@@ -1440,6 +1667,14 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
             <div className="flex items-center gap-1.5">
               <div className="w-5 h-0.5 border-t-2 border-dashed border-purple-500" />
               <span>Data Flow</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-0.5 border-t-2 border-dashed border-amber-500" />
+              <span>Control/Loop</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <RotateCcw className="h-2.5 w-2.5 text-violet-500" />
+              <span>Self-Ref</span>
             </div>
           </div>
         </div>
