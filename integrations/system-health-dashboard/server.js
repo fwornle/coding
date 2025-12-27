@@ -1026,12 +1026,40 @@ class SystemHealthAPIServer {
             // Find the report file across all project paths
             let filePath = null;
             let projectName = null;
+
+            // First try exact filename match
             for (const projectPath of projectPaths) {
                 const candidatePath = join(projectPath, '.data', 'workflow-reports', `${reportId}.md`);
                 if (existsSync(candidatePath)) {
                     filePath = candidatePath;
                     projectName = projectPath.split('/').pop();
                     break;
+                }
+            }
+
+            // If not found by filename, search by execution ID inside report files
+            if (!filePath) {
+                for (const projectPath of projectPaths) {
+                    const reportsDir = join(projectPath, '.data', 'workflow-reports');
+                    if (!existsSync(reportsDir)) continue;
+
+                    const files = readdirSync(reportsDir).filter(f => f.endsWith('.md'));
+                    for (const file of files) {
+                        const candidatePath = join(reportsDir, file);
+                        try {
+                            const content = readFileSync(candidatePath, 'utf8');
+                            // Check if this report's execution ID matches
+                            const executionIdMatch = content.match(/\*\*Execution ID:\*\*\s*(.+)/);
+                            if (executionIdMatch && executionIdMatch[1].trim() === reportId) {
+                                filePath = candidatePath;
+                                projectName = projectPath.split('/').pop();
+                                break;
+                            }
+                        } catch (e) {
+                            // Skip unreadable files
+                        }
+                    }
+                    if (filePath) break;
                 }
             }
 
