@@ -677,6 +677,28 @@ const SERVICE_CONFIGS = {
         // Ignore errors
       }
 
+      // Also kill any stale Vite processes that might have auto-switched to the API port
+      // This prevents the "<!doctype html>" JSON parse error in the dashboard
+      try {
+        const { stdout } = await execAsync(`lsof -ti:${PORTS.SYSTEM_HEALTH_API} 2>/dev/null || true`, { timeout: 5000 });
+        const pids = stdout.trim().split('\n').filter(p => p);
+        for (const pid of pids) {
+          // Check if this is a Vite process (not the API server)
+          try {
+            const { stdout: cmdline } = await execAsync(`ps -p ${pid} -o args= 2>/dev/null || true`);
+            if (cmdline.includes('vite')) {
+              console.log(`[SystemHealthFrontend] Killing stale Vite process ${pid} on API port ${PORTS.SYSTEM_HEALTH_API}`);
+              process.kill(parseInt(pid, 10), 'SIGTERM');
+              await sleep(500);
+            }
+          } catch (e) {
+            // Ignore
+          }
+        }
+      } catch (error) {
+        // Ignore errors
+      }
+
       const dashboardDir = path.join(CODING_DIR, 'integrations/system-health-dashboard');
 
       // Check if node_modules exists, if not skip this service
@@ -698,9 +720,10 @@ const SERVICE_CONFIGS = {
 
       child.unref();
 
-      // Minimal wait - don't block startup for too long (vite can take time)
-      // The health check will verify the service is actually running
-      await sleep(500);
+      // Vite needs more time to initialize and bind to port than other services
+      // Without sufficient delay, the health check runs before the port is listening
+      // causing the first attempt to fail and require a retry
+      await sleep(1500);
 
       // Non-blocking check - warn but don't fail if process check fails
       // Vite spawns child processes so PID might not be directly trackable

@@ -12,6 +12,7 @@ export default defineConfig({
   },
   server: {
     port: parseInt(process.env.SYSTEM_HEALTH_DASHBOARD_PORT || '3032'),
+    strictPort: true, // Fail if port is occupied instead of auto-switching
   },
   preview: {
     port: parseInt(process.env.SYSTEM_HEALTH_DASHBOARD_PORT || '3032'),
