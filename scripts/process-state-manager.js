@@ -21,11 +21,12 @@ class ProcessStateManager {
     this.codingRoot = options.codingRoot || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
     this.registryPath = path.join(this.codingRoot, '.live-process-registry.json');
     this.lockOptions = {
-      stale: 10000, // Consider lock stale after 10 seconds
+      stale: 5000, // Consider lock stale after 5 seconds
       retries: {
-        retries: 5,
+        retries: 10,       // More retries for concurrent service startups (was 5)
         minTimeout: 100,
-        maxTimeout: 1000
+        maxTimeout: 2000,  // Wait longer between retries (was 1000)
+        factor: 1.5        // Gentler backoff to avoid too-quick exhaustion
       }
     };
   }

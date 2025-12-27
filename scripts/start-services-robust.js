@@ -621,8 +621,10 @@ const SERVICE_CONFIGS = {
 
       child.unref();
 
-      // Minimal wait - health check will verify the service is running
-      await sleep(500);
+      // API server needs time to initialize Express, connect to dependencies, and bind to port
+      // Without sufficient delay, the health check runs before the port is listening
+      // causing the first attempt to fail and require a retry
+      await sleep(1500);
 
       // Non-blocking check - warn but don't fail
       try {
