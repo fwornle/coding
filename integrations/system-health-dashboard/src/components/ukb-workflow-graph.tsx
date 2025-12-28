@@ -501,12 +501,25 @@ function useWorkflowDefinitions(workflowName?: string) {
   }, [])
 
   // Select edges based on the workflow name
+  // Workflow names may include batch IDs (e.g., "batch-analysis-batch-123456")
+  // so we need to match by prefix or extract base name
   useEffect(() => {
     if (allWorkflows.length > 0 && workflowName) {
-      const workflow = allWorkflows.find(w => w.name === workflowName)
+      // Extract base workflow name (remove batch ID suffix like "-batch-123456")
+      const baseWorkflowName = workflowName.replace(/-batch-\d+$/, '')
+
+      // Try exact match first, then prefix match
+      let workflow = allWorkflows.find(w => w.name === workflowName)
+      if (!workflow) {
+        workflow = allWorkflows.find(w => w.name === baseWorkflowName)
+      }
+      if (!workflow) {
+        workflow = allWorkflows.find(w => workflowName.startsWith(w.name))
+      }
+
       if (workflow?.edges) {
         setEdges(workflow.edges)
-        console.log(`✅ Loaded edges for workflow: ${workflowName}`)
+        console.log(`✅ Loaded edges for workflow: ${workflowName} (matched: ${workflow.name})`)
       } else {
         // Fallback to incremental-analysis if workflow not found
         const fallback = allWorkflows.find(w => w.name === 'incremental-analysis')
@@ -546,6 +559,11 @@ interface ProcessInfo {
   health: 'healthy' | 'stale' | 'frozen' | 'dead'
   progressPercent: number
   steps?: StepInfo[]
+  batchProgress?: {
+    currentBatch: number
+    totalBatches: number
+    batchId?: string
+  }
 }
 
 interface UKBWorkflowGraphProps {
@@ -1491,7 +1509,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                           </div>
                           <span className="text-xs font-semibold">{process.workflowName || 'Workflow'}</span>
                           <span className="text-[10px] opacity-80">
-                            {process.completedSteps}/{process.totalSteps} steps
+                            {process.batchProgress
+                              ? `Batch ${process.batchProgress.currentBatch}/${process.batchProgress.totalBatches}`
+                              : `${process.completedSteps}/${process.totalSteps} steps`
+                            }
                           </span>
                         </div>
                       </foreignObject>
@@ -1895,6 +1916,14 @@ function OrchestratorDetailsSidebar({
               <span className="text-muted-foreground">Progress</span>
               <span className="font-medium">{progressPercent}%</span>
             </div>
+            {process.batchProgress && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Batch</span>
+                <span className="font-medium text-blue-600">
+                  {process.batchProgress.currentBatch} / {process.batchProgress.totalBatches}
+                </span>
+              </div>
+            )}
             {totalDuration > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1">
