@@ -1131,6 +1131,100 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // Load batch checkpoints for accumulated totals
+            const projectDir = dirname(dirname(filePath)); // Go from workflow-reports to .data to project
+            const checkpointsPath = join(projectDir, 'batch-checkpoints.json');
+            let accumulatedStats = null;
+            let batchSummary = null;
+            let persistedKnowledge = null;
+
+            if (existsSync(checkpointsPath)) {
+                try {
+                    const checkpointsData = JSON.parse(readFileSync(checkpointsPath, 'utf8'));
+                    accumulatedStats = checkpointsData.accumulatedStats || null;
+
+                    // Build batch summary - aggregate stats per agent across all batches
+                    if (checkpointsData.completedBatches?.length > 0) {
+                        const batches = checkpointsData.completedBatches;
+                        batchSummary = {
+                            totalBatches: batches.length,
+                            totalCommits: batches.reduce((sum, b) => sum + (b.stats?.commits || 0), 0),
+                            totalSessions: batches.reduce((sum, b) => sum + (b.stats?.sessions || 0), 0),
+                            totalEntities: batches.reduce((sum, b) => sum + (b.stats?.entitiesCreated || 0), 0),
+                            totalRelations: batches.reduce((sum, b) => sum + (b.stats?.relationsAdded || 0), 0),
+                            batchesWithSessions: batches.filter(b => (b.stats?.sessions || 0) > 0).length,
+                            dateRange: {
+                                start: batches[0]?.dateRange?.start || null,
+                                end: batches[batches.length - 1]?.dateRange?.end || null
+                            }
+                        };
+                    }
+
+                    // Load final persisted knowledge stats (after deduplication)
+                    const team = checkpointsData.team || 'coding';
+                    const exportPath = join(projectDir, 'knowledge-export', `${team}.json`);
+                    if (existsSync(exportPath)) {
+                        const exportData = JSON.parse(readFileSync(exportPath, 'utf8'));
+                        const entityTypes = {};
+                        (exportData.entities || []).forEach(e => {
+                            entityTypes[e.entityType] = (entityTypes[e.entityType] || 0) + 1;
+                        });
+                        persistedKnowledge = {
+                            entities: (exportData.entities || []).length,
+                            relations: (exportData.relations || []).length,
+                            entityTypes,
+                            deduplicationRatio: batchSummary?.totalEntities > 0
+                                ? ((1 - (exportData.entities || []).length / batchSummary.totalEntities) * 100).toFixed(1)
+                                : null
+                        };
+                    }
+
+                    // Build aggregated step data - totals across ALL batches for each agent type
+                    if (checkpointsData.completedBatches?.length > 0) {
+                        const batches = checkpointsData.completedBatches;
+                        batchSummary.aggregatedSteps = {
+                            git_history: {
+                                totalCommits: batches.reduce((sum, b) => sum + (b.stats?.commits || 0), 0),
+                                batchesProcessed: batches.length
+                            },
+                            vibe_history: {
+                                totalSessions: batches.reduce((sum, b) => sum + (b.stats?.sessions || 0), 0),
+                                batchesWithSessions: batches.filter(b => (b.stats?.sessions || 0) > 0).length,
+                                batchesProcessed: batches.length
+                            },
+                            semantic_analysis: {
+                                totalEntities: batches.reduce((sum, b) => sum + (b.stats?.entitiesCreated || 0), 0),
+                                totalRelations: batches.reduce((sum, b) => sum + (b.stats?.relationsAdded || 0), 0),
+                                batchesProcessed: batches.length
+                            },
+                            kg_operators: {
+                                // conv: Convert raw entities to KG format
+                                totalProcessed: batches.reduce((sum, b) => sum + (b.stats?.operatorResults?.conv?.processed || 0), 0),
+                                // aggr: Classify entities as core vs non-core
+                                totalCoreEntities: batches.reduce((sum, b) => sum + (b.stats?.operatorResults?.aggr?.core || 0), 0),
+                                // embed: Generate embeddings for similarity
+                                totalEmbedded: batches.reduce((sum, b) => sum + (b.stats?.operatorResults?.embed?.embedded || 0), 0),
+                                // dedup: Merge duplicate entities
+                                totalMerged: batches.reduce((sum, b) => sum + (b.stats?.operatorResults?.dedup?.merged || 0), 0),
+                                // pred: Predict and add edges/relations
+                                totalEdgesAdded: batches.reduce((sum, b) => sum + (b.stats?.operatorResults?.pred?.edgesAdded || 0), 0),
+                                // merge: Final entity additions
+                                totalEntitiesAdded: batches.reduce((sum, b) => sum + (b.stats?.operatorResults?.merge?.entitiesAdded || 0), 0),
+                                batchesProcessed: batches.length
+                            },
+                            // content_validation: Uses persisted knowledge as source of truth
+                            content_validation: persistedKnowledge ? {
+                                entitiesValidated: persistedKnowledge.entities,
+                                relationsValidated: persistedKnowledge.relations,
+                                validationComplete: true
+                            } : null
+                        };
+                    }
+                } catch (e) {
+                    console.warn('Could not load batch checkpoints:', e.message);
+                }
+            }
+
             res.json({
                 status: 'success',
                 data: {
@@ -1149,7 +1243,12 @@ class SystemHealthAPIServer {
                     repositoryPath: repoMatch?.[1] || 'unknown',
                     recommendations,
                     steps,
-                    rawContent: content
+                    rawContent: content,
+                    // Aggregated data from all batches
+                    accumulatedStats,
+                    batchSummary,
+                    // Final persisted knowledge (after deduplication)
+                    persistedKnowledge
                 }
             });
         } catch (error) {

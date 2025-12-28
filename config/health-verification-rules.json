@@ -63,8 +63,8 @@
       "constraint_monitor": {
         "enabled": true,
         "severity": "error",
-        "check_type": "port_listening",
-        "port": 3031,
+        "check_type": "http_health",
+        "endpoint": "http://localhost:3031/api/health",
         "timeout_ms": 3000,
         "description": "Constraint monitor API availability",
         "auto_heal": true,

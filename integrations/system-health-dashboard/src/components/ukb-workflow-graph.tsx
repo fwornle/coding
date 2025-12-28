@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import type { AggregatedSteps } from '@/store/slices/ukbSlice'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -557,8 +558,73 @@ interface UKBWorkflowGraphProps {
  * Generates a semantic summary of step results based on the agent type.
  * Shows meaningful, human-readable descriptions of what the step produced.
  */
-function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Record<string, any> }) {
+function StepResultSummary({ agentId, outputs, aggregatedSteps }: { agentId: string; outputs: Record<string, any>; aggregatedSteps?: AggregatedSteps | null }) {
   const getSummary = (): string | null => {
+    // For historical workflows, prefer aggregated totals across all batches
+    // This provides accurate "final" numbers rather than just batch-001 data
+    if (aggregatedSteps) {
+      switch (agentId) {
+        case 'git_history':
+          if (aggregatedSteps.git_history) {
+            const { totalCommits, batchesProcessed } = aggregatedSteps.git_history
+            return `📊 Total: ${totalCommits.toLocaleString()} commits (across ${batchesProcessed} batches)`
+          }
+          break
+        case 'vibe_history':
+          if (aggregatedSteps.vibe_history) {
+            const { totalSessions, batchesWithSessions, batchesProcessed } = aggregatedSteps.vibe_history
+            const sessionInfo = batchesWithSessions < batchesProcessed
+              ? ` (${batchesWithSessions}/${batchesProcessed} batches had sessions)`
+              : ` (across ${batchesProcessed} batches)`
+            return `📊 Total: ${totalSessions.toLocaleString()} sessions${sessionInfo}`
+          }
+          break
+        case 'semantic_analysis':
+          if (aggregatedSteps.semantic_analysis) {
+            const { totalEntities, totalRelations, batchesProcessed } = aggregatedSteps.semantic_analysis
+            return `📊 Total: ${totalEntities.toLocaleString()} entities, ${totalRelations.toLocaleString()} relations (across ${batchesProcessed} batches)`
+          }
+          break
+        case 'kg_operators':
+          if (aggregatedSteps.kg_operators) {
+            const { totalProcessed, totalMerged, totalEdgesAdded, totalEmbedded, totalCoreEntities, batchesProcessed } = aggregatedSteps.kg_operators
+            const parts = []
+            if (totalProcessed > 0) parts.push(`${totalProcessed.toLocaleString()} converted`)
+            if (totalEmbedded > 0) parts.push(`${totalEmbedded.toLocaleString()} embedded`)
+            if (totalMerged > 0) parts.push(`${totalMerged.toLocaleString()} deduped`)
+            if (totalEdgesAdded > 0) parts.push(`${totalEdgesAdded.toLocaleString()} edges predicted`)
+            const summary = parts.length > 0 ? parts.join(', ') : 'pipeline completed'
+            return `📊 Tree-KG: ${summary} (${batchesProcessed} batches)`
+          }
+          break
+        case 'deduplication':
+          if (aggregatedSteps.kg_operators) {
+            const { totalMerged } = aggregatedSteps.kg_operators
+            return `📊 Total: ${totalMerged.toLocaleString()} duplicate entities merged`
+          }
+          break
+        case 'quality_assurance':
+          if (aggregatedSteps.kg_operators) {
+            const { totalProcessed, batchesProcessed } = aggregatedSteps.kg_operators
+            return `📊 QA validated ${totalProcessed.toLocaleString()} entities across ${batchesProcessed} batches`
+          }
+          break
+        case 'persistence':
+          if (aggregatedSteps.kg_operators) {
+            const { totalProcessed, totalEdgesAdded } = aggregatedSteps.kg_operators
+            return `📊 Total: ${totalProcessed.toLocaleString()} entities, ${totalEdgesAdded.toLocaleString()} edges persisted`
+          }
+          break
+        case 'content_validation':
+          if (aggregatedSteps.content_validation) {
+            const { entitiesValidated, relationsValidated } = aggregatedSteps.content_validation
+            return `📊 Validated ${entitiesValidated} entities and ${relationsValidated} relations against codebase`
+          }
+          break
+      }
+    }
+
+    // Fallback to per-step outputs (for active workflows or if no aggregated data)
     switch (agentId) {
       case 'git_history':
         // Check all possible property names: commitsCount (coordinator summary), commitsAnalyzed (agent), commits array
@@ -599,6 +665,23 @@ function StepResultSummary({ agentId, outputs }: { agentId: string; outputs: Rec
         return filtered > 0
           ? `Created ${entities} entities (${filtered} low-value removed), ${observations} observations`
           : `Created ${entities} entities with ${observations} observations`
+
+      case 'kg_operators':
+        // Tree-KG operators: conv, aggr, embed, dedup, pred, merge
+        const kgConv = outputs.conv?.processed || outputs.entitiesProcessed || 0
+        const kgEmbed = outputs.embed?.embedded || outputs.entitiesEmbedded || 0
+        const kgDedup = outputs.dedup?.merged || outputs.mergedCount || 0
+        const kgPred = outputs.pred?.edgesAdded || outputs.edgesAdded || 0
+        const kgMerge = outputs.merge?.entitiesAdded || outputs.entitiesAdded || 0
+        const kgParts = []
+        if (kgConv > 0) kgParts.push(`${kgConv} converted`)
+        if (kgEmbed > 0) kgParts.push(`${kgEmbed} embedded`)
+        if (kgDedup > 0) kgParts.push(`${kgDedup} deduped`)
+        if (kgPred > 0) kgParts.push(`${kgPred} edges`)
+        if (kgMerge > 0) kgParts.push(`${kgMerge} merged`)
+        return kgParts.length > 0
+          ? `Tree-KG ops: ${kgParts.join(', ')}`
+          : `Tree-KG pipeline completed`
 
       case 'quality_assurance':
         const passed = outputs.passed || outputs.validationsPassed || 0
@@ -2053,11 +2136,13 @@ function OrchestratorDetailsSidebar({
 export function UKBNodeDetailsSidebar({
   agentId,
   process,
-  onClose
+  onClose,
+  aggregatedSteps
 }: {
   agentId: string
   process: ProcessInfo
   onClose: () => void
+  aggregatedSteps?: AggregatedSteps | null
 }) {
   // Handle orchestrator node specially
   if (agentId === 'orchestrator') {
@@ -2073,7 +2158,20 @@ export function UKBNodeDetailsSidebar({
   // Use same fallback logic as getNodeStatus in the graph
   const getInferredStatus = (): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
     if (stepInfo?.status) return stepInfo.status as any
-    // If workflow is complete but agent has no step info, it wasn't part of this workflow
+
+    // For batch workflows, check if we have aggregated data for this agent - means it was processed
+    if (aggregatedSteps) {
+      const agentHasData =
+        (agentId === 'git_history' && aggregatedSteps.git_history?.totalCommits) ||
+        (agentId === 'vibe_history' && aggregatedSteps.vibe_history?.totalSessions !== undefined) ||
+        (agentId === 'semantic_analysis' && aggregatedSteps.semantic_analysis?.totalEntities) ||
+        (agentId === 'kg_operators' && aggregatedSteps.kg_operators?.totalProcessed) ||
+        (agentId === 'quality_assurance' && aggregatedSteps.kg_operators?.totalProcessed) ||
+        (agentId === 'content_validation' && aggregatedSteps.content_validation?.validationComplete)
+      if (agentHasData) return 'completed'
+    }
+
+    // If workflow is complete but agent has no step info or aggregated data, it wasn't part of this workflow
     const isWorkflowComplete = process.completedSteps >= process.totalSteps && process.totalSteps > 0
     return isWorkflowComplete ? 'skipped' : 'pending'
   }
@@ -2210,10 +2308,10 @@ export function UKBNodeDetailsSidebar({
                 <Zap className="h-3 w-3" />
                 Results
               </h4>
-              {/* Semantic Summary based on agent type */}
-              <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} />
-              {/* Detailed Results with expandable sections */}
-              <StepResultDetails outputs={stepInfo.outputs} />
+              {/* Semantic Summary based on agent type - uses aggregated totals for historical workflows */}
+              <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} aggregatedSteps={aggregatedSteps} />
+              {/* Only show detailed results if we DON'T have aggregated data (which would contradict it) */}
+              {!aggregatedSteps && <StepResultDetails outputs={stepInfo.outputs} />}
             </div>
           </>
         )}

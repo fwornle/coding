@@ -1,22 +1,26 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-participant McpAgent as "MCP Agent"
-participant Developer as "Developer"
-participant PatternCatalog as "Pattern Catalog"
+participant McpAgentDevelopmentPattern as "MCP Agent"
+participant GraphDatabaseService as "Graph Database Service"
+participant VkbApiClient as "VKB API Client"
+participant GraphDatabaseAdapter as "Graph Database Adapter"
 
-McpAgent->>Developer: Request MCP Agent Development
-Developer->>PatternCatalog: Query McpAgentDevelopmentPattern
-PatternCatalog->>Developer: Return pattern details (Occurrences: 15, Trend: increasing)
-Developer->>McpAgent: Develop MCP Agent using McpAgentDevelopmentPattern
-McpAgent->>Developer: Confirm MCP Agent Development
+McpAgentDevelopmentPattern->>GraphDatabaseService: Request data
+GraphDatabaseService->>GraphDatabaseAdapter: Fetch data
+GraphDatabaseAdapter->>GraphDatabaseService: Return data
+GraphDatabaseService->>McpAgentDevelopmentPattern: Return data
 
-alt Successful Development
-    McpAgent->>Developer: Report successful development
-    Developer->>PatternCatalog: Update pattern usage notes
-else Failed Development
-    McpAgent->>Developer: Report development failure
-    Developer->>PatternCatalog: Update pattern usage notes with failure details
+alt Successful data retrieval
+    McpAgentDevelopmentPattern->>VkbApiClient: Send command
+    VkbApiClient->>McpAgentDevelopmentPattern: Return response
+else Data retrieval failed
+    McpAgentDevelopmentPattern->>GraphDatabaseService: Retry request
+end
+
+loop Continuous interaction
+    McpAgentDevelopmentPattern->>GraphDatabaseService: Request updates
+    GraphDatabaseService->>McpAgentDevelopmentPattern: Return updates
 end
 
 @enduml

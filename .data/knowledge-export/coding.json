@@ -5,158 +5,115 @@
       "entityType": "GraphDatabase",
       "observations": [
         {
-          "type": "architecture",
-          "content": "The knowledge persistence pattern uses a microservices architecture with separate components for graph database service, knowledge exporter, and persistence agent.",
-          "date": "2025-12-22T08:20:00.175Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
           "type": "implementation",
-          "content": "The graph database service uses Graphology and LevelDB for knowledge storage and JSON exports.",
-          "date": "2025-12-22T08:20:00.175Z",
+          "content": "KnowledgePersistencePattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T13:00:32.791Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "validation",
-          "content": "The knowledge persistence pattern uses event-driven architecture to enable real-time data processing.",
-          "date": "2025-12-22T08:20:00.175Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "workflow",
-          "content": "The graph knowledge exporter listens to entity:stored events and auto-exports to JSON at .data/knowledge-export.",
-          "date": "2025-12-22T08:20:00.175Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "benefits",
-          "content": "The knowledge persistence pattern enables scalable and flexible knowledge management infrastructure.",
-          "date": "2025-12-22T08:20:00.175Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "rule",
-          "content": "The knowledge persistence pattern uses the vkb command for visualization and MCP tools for knowledge operations.",
-          "date": "2025-12-22T08:20:00.175Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "implementation",
-          "content": "The persistence agent uses the GraphDatabaseAdapter component for graph database interactions.",
-          "date": "2025-12-22T08:20:00.175Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "validation",
-          "content": "The knowledge persistence pattern uses the graph-sync command for synchronizing the knowledge graph.",
-          "date": "2025-12-22T08:20:00.175Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
           }
         },
         {
           "type": "architecture",
-          "content": "The knowledge persistence pattern stores knowledge graphs at .data/knowledge-graph and JSON exports at .data/knowledge-export.",
-          "date": "2025-12-22T08:20:00.175Z",
+          "content": "Core components: GraphKnowledgeExporter, PersistenceAgent",
+          "date": "2025-12-22T13:00:32.791Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T13:00:32.791Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:00:32.791Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:00:32.791Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
+          }
+        },
+        {
+          "type": "implementation",
+          "content": "Knowledge persistence uses GraphDatabaseService (Graphology in-memory + LevelDB persistence)",
+          "date": "2025-12-22T13:00:32.791Z",
+          "metadata": {
+            "confidence": 0.95,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
           }
         },
         {
           "type": "workflow",
-          "content": "The knowledge persistence pattern uses the VkbApiClient component for interacting with the VKB API.",
-          "date": "2025-12-22T08:20:00.175Z",
+          "content": "GraphKnowledgeExporter listens to entity:stored events and auto-exports to JSON at .data/knowledge-export",
+          "date": "2025-12-22T13:00:32.791Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
+            "confidence": 0.95,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
           }
         },
         {
-          "type": "benefits",
-          "content": "The knowledge persistence pattern enables efficient knowledge storage and retrieval using Graphology and LevelDB.",
-          "date": "2025-12-22T08:20:00.175Z",
+          "type": "architecture",
+          "content": "Pattern extracted from codebase analysis and stored as reusable knowledge entity",
+          "date": "2025-12-22T13:00:32.791Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:12.697Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "KnowledgePersistencePattern is part of the semantic analysis and knowledge management infrastructure",
+          "date": "2025-12-22T13:00:32.791Z",
+          "metadata": {
+            "confidence": 0.75,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
+          }
+        },
+        {
+          "type": "implementation",
+          "content": "KnowledgePersistencePattern implementation details pending full codebase analysis",
+          "date": "2025-12-22T13:00:32.791Z",
+          "metadata": {
+            "confidence": 0.6,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.793Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/KnowledgePersistencePattern.md",
-          "date": "2025-12-22T08:20:47.002Z",
+          "date": "2025-12-22T13:00:41.201Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/KnowledgePersistencePattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/KnowledgePersistencePattern.md",
-            "diagramsGenerated": 4,
+            "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:20:47.005Z",
+            "refreshedAt": "2025-12-22T13:00:41.202Z",
             "source": "entity-refresh"
           }
         }
@@ -164,7 +121,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.574Z",
-        "last_updated": "2025-12-22T08:20:47.084Z"
+        "last_updated": "2025-12-22T13:00:41.369Z"
       },
       "id": "mc4flkg3g96u4x"
     },
@@ -175,73 +132,73 @@
         {
           "type": "implementation",
           "content": "Coding is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:47.540Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.620Z"
+            "refreshedAt": "2025-12-22T13:00:47.542Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:47.540Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.620Z"
+            "refreshedAt": "2025-12-22T13:00:47.542Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:47.540Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.620Z"
+            "refreshedAt": "2025-12-22T13:00:47.542Z"
           }
         },
         {
           "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:47.540Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.620Z"
+            "refreshedAt": "2025-12-22T13:00:47.542Z"
           }
         },
         {
           "type": "insight",
           "content": "Coding is part of the semantic analysis and knowledge management infrastructure",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:47.540Z",
           "metadata": {
             "confidence": 0.75,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.620Z"
+            "refreshedAt": "2025-12-22T13:00:47.542Z"
           }
         },
         {
           "type": "implementation",
           "content": "Coding implementation details pending full codebase analysis",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:47.540Z",
           "metadata": {
             "confidence": 0.6,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.620Z"
+            "refreshedAt": "2025-12-22T13:00:47.542Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/Coding.md",
-          "date": "2025-12-21T07:48:00.830Z",
+          "date": "2025-12-22T13:01:00.010Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/Coding.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/Coding.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:48:00.831Z",
+            "refreshedAt": "2025-12-22T13:01:00.012Z",
             "source": "entity-refresh"
           }
         }
@@ -249,7 +206,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.575Z",
-        "last_updated": "2025-12-12T06:10:47.926Z"
+        "last_updated": "2025-12-22T13:01:05.796Z"
       },
       "id": "mc4flkgxgvxje"
     },
@@ -260,83 +217,83 @@
         {
           "type": "implementation",
           "content": "NetworkAwareInstallationPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:48.072Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.074Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:48.072Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.074Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:48.072Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.074Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-21T07:47:48.072Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.074Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "architecture",
           "content": "Pattern extracted from codebase analysis and stored as reusable knowledge entity",
-          "date": "2025-12-21T07:47:48.072Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.074Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "NetworkAwareInstallationPattern is part of the semantic analysis and knowledge management infrastructure",
-          "date": "2025-12-21T07:47:48.072Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.75,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.074Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "workflow",
           "content": "NetworkAwareInstallationPattern workflow details pending full codebase analysis",
-          "date": "2025-12-21T07:47:48.072Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.6,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.074Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/NetworkAwareInstallationPattern.md",
-          "date": "2025-12-21T07:48:00.261Z",
+          "date": "2025-12-22T13:01:00.717Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/NetworkAwareInstallationPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/NetworkAwareInstallationPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:48:00.262Z",
+            "refreshedAt": "2025-12-22T13:01:00.718Z",
             "source": "entity-refresh"
           }
         }
@@ -344,7 +301,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.577Z",
-        "last_updated": "2025-12-12T06:20:16.507Z"
+        "last_updated": "2025-12-22T13:01:05.905Z"
       },
       "id": "mc4flkg83d5ay"
     },
@@ -355,93 +312,93 @@
         {
           "type": "implementation",
           "content": "MCPMemoryLoggingIntegrationPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-22T08:24:28.885Z",
+          "date": "2025-12-22T13:00:17.316Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:28.887Z"
+            "refreshedAt": "2025-12-22T13:00:17.318Z"
           }
         },
         {
           "type": "architecture",
           "content": "Core components: GraphDatabaseService, GraphKnowledgeExporter, GraphDatabaseAdapter",
-          "date": "2025-12-22T08:24:28.885Z",
+          "date": "2025-12-22T13:00:17.316Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:28.887Z"
+            "refreshedAt": "2025-12-22T13:00:17.318Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-22T08:24:28.885Z",
+          "date": "2025-12-22T13:00:17.316Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:28.887Z"
+            "refreshedAt": "2025-12-22T13:00:17.318Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-22T08:24:28.885Z",
+          "date": "2025-12-22T13:00:17.316Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:28.887Z"
+            "refreshedAt": "2025-12-22T13:00:17.318Z"
           }
         },
         {
           "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-22T08:24:28.885Z",
+          "date": "2025-12-22T13:00:17.316Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:28.887Z"
+            "refreshedAt": "2025-12-22T13:00:17.318Z"
           }
         },
         {
           "type": "architecture",
           "content": "Pattern extracted from codebase analysis and stored as reusable knowledge entity",
-          "date": "2025-12-22T08:24:28.885Z",
+          "date": "2025-12-22T13:00:17.316Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:28.887Z"
+            "refreshedAt": "2025-12-22T13:00:17.318Z"
           }
         },
         {
           "type": "insight",
           "content": "MCPMemoryLoggingIntegrationPattern is part of the semantic analysis and knowledge management infrastructure",
-          "date": "2025-12-22T08:24:28.885Z",
+          "date": "2025-12-22T13:00:17.316Z",
           "metadata": {
             "confidence": 0.75,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:28.887Z"
+            "refreshedAt": "2025-12-22T13:00:17.318Z"
           }
         },
         {
           "type": "insight",
           "content": "MCPMemoryLoggingIntegrationPattern insight details pending full codebase analysis",
-          "date": "2025-12-22T08:24:28.885Z",
+          "date": "2025-12-22T13:00:17.316Z",
           "metadata": {
             "confidence": 0.6,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:28.887Z"
+            "refreshedAt": "2025-12-22T13:00:17.318Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/MCPMemoryLoggingIntegrationPattern.md",
-          "date": "2025-12-22T08:24:33.588Z",
+          "date": "2025-12-22T13:00:25.479Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/MCPMemoryLoggingIntegrationPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/MCPMemoryLoggingIntegrationPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:33.590Z",
+            "refreshedAt": "2025-12-22T13:00:25.481Z",
             "source": "entity-refresh"
           }
         }
@@ -458,132 +415,95 @@
       "entityType": "GraphDatabase",
       "observations": [
         {
-          "type": "architecture",
-          "content": "The knowledge management infrastructure utilizes a GraphDatabase with Graphology + LevelDB at .data/knowledge-graph for storage.",
-          "date": "2025-12-22T08:23:10.349Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
           "type": "implementation",
-          "content": "The system employs components like GraphDatabaseService, GraphKnowledgeExporter, and PersistenceAgent for data management.",
-          "date": "2025-12-22T08:23:10.349Z",
+          "content": "VSCodeExtensionBridgePattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "validation",
-          "content": "Data exports are automatically synced to .data/knowledge-export in JSON format.",
-          "date": "2025-12-22T08:23:10.349Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "workflow",
-          "content": "The vkb command is used for visualization, while MCP tools handle knowledge operations.",
-          "date": "2025-12-22T08:23:10.349Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "benefits",
-          "content": "The current architecture supports scalable knowledge management with efficient data storage and retrieval.",
-          "date": "2025-12-22T08:23:10.349Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "rule",
-          "content": "Redaction patterns are in place to protect sensitive information, including AWS access keys.",
-          "date": "2025-12-22T08:23:10.349Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:17.418Z"
           }
         },
         {
           "type": "architecture",
-          "content": "The system relies on the PersistenceAgent for managing persistence operations.",
-          "date": "2025-12-22T08:23:10.349Z",
+          "content": "Core components: GraphDatabaseService, GraphDatabaseAdapter, PersistenceAgent",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:17.418Z"
           }
         },
         {
-          "type": "implementation",
-          "content": "GraphDatabaseAdapter plays a crucial role in adapting data for the GraphDatabase.",
-          "date": "2025-12-22T08:23:10.349Z",
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:17.418Z"
           }
         },
         {
-          "type": "validation",
-          "content": "The removal of shared-memory.json has been addressed through adjustments in the existing components or services.",
-          "date": "2025-12-22T08:23:10.349Z",
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
-            "confidence": 0.8,
-            "refreshedAt": "2025-12-22T08:23:22.659Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:17.418Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:00:17.417Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.418Z"
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "Pattern extracted from codebase analysis and stored as reusable knowledge entity",
+          "date": "2025-12-22T13:00:17.417Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.418Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "VSCodeExtensionBridgePattern is part of the semantic analysis and knowledge management infrastructure",
+          "date": "2025-12-22T13:00:17.417Z",
+          "metadata": {
+            "confidence": 0.75,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.418Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "VSCodeExtensionBridgePattern insight details pending full codebase analysis",
+          "date": "2025-12-22T13:00:17.417Z",
+          "metadata": {
+            "confidence": 0.6,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.418Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/VSCodeExtensionBridgePattern.md",
-          "date": "2025-12-22T08:23:55.436Z",
+          "date": "2025-12-22T13:00:26.330Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/VSCodeExtensionBridgePattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/VSCodeExtensionBridgePattern.md",
-            "diagramsGenerated": 4,
+            "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:23:55.440Z",
+            "refreshedAt": "2025-12-22T13:00:26.332Z",
             "source": "entity-refresh"
           }
         }
@@ -591,7 +511,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.579Z",
-        "last_updated": "2025-12-22T08:23:55.608Z"
+        "last_updated": "2025-12-22T13:00:27.102Z"
       },
       "id": "mc4flkg2hdmma6"
     },
@@ -602,83 +522,83 @@
         {
           "type": "implementation",
           "content": "CodingWorkflow is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.568Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.568Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.568Z"
           }
         },
         {
           "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.568Z"
           }
         },
         {
           "type": "implementation",
           "content": "Workflow is triggered via MCP tools (execute_workflow) or automatic incremental analysis",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.568Z"
           }
         },
         {
           "type": "insight",
           "content": "CodingWorkflow is part of the semantic analysis and knowledge management infrastructure",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.75,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.568Z"
           }
         },
         {
           "type": "workflow",
           "content": "CodingWorkflow workflow details pending full codebase analysis",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.6,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.568Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/CodingWorkflow.md",
-          "date": "2025-12-21T07:47:59.663Z",
+          "date": "2025-12-22T13:01:01.946Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/CodingWorkflow.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/CodingWorkflow.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:59.665Z",
+            "refreshedAt": "2025-12-22T13:01:01.947Z",
             "source": "entity-refresh"
           }
         }
@@ -686,7 +606,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.581Z",
-        "last_updated": "2025-12-12T06:07:25.666Z"
+        "last_updated": "2025-12-22T13:01:06.489Z"
       },
       "id": "mc4flkg2gtg02x"
     },
@@ -697,73 +617,83 @@
         {
           "type": "implementation",
           "content": "UkbCli is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-22T08:24:21.877Z",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:21.879Z"
+            "refreshedAt": "2025-12-22T13:00:17.419Z"
           }
         },
         {
           "type": "architecture",
           "content": "Core components: VkbApiClient",
-          "date": "2025-12-22T08:24:21.877Z",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:21.879Z"
+            "refreshedAt": "2025-12-22T13:00:17.419Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-22T08:24:21.877Z",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:21.879Z"
+            "refreshedAt": "2025-12-22T13:00:17.419Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-22T08:24:21.877Z",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:21.879Z"
+            "refreshedAt": "2025-12-22T13:00:17.419Z"
           }
         },
         {
           "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-22T08:24:21.877Z",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:21.879Z"
+            "refreshedAt": "2025-12-22T13:00:17.419Z"
           }
         },
         {
           "type": "rule",
           "content": "Use 'vkb' command for visualization (http://localhost:8080) and MCP semantic-analysis tools for programmatic access",
-          "date": "2025-12-22T08:24:21.877Z",
+          "date": "2025-12-22T13:00:17.417Z",
           "metadata": {
             "confidence": 0.95,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:21.879Z"
+            "refreshedAt": "2025-12-22T13:00:17.419Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "UkbCli is part of the semantic analysis and knowledge management infrastructure",
+          "date": "2025-12-22T13:00:17.417Z",
+          "metadata": {
+            "confidence": 0.75,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.419Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/UkbCli.md",
-          "date": "2025-12-22T08:24:26.837Z",
+          "date": "2025-12-22T13:00:24.897Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/UkbCli.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/UkbCli.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:26.840Z",
+            "refreshedAt": "2025-12-22T13:00:24.899Z",
             "source": "entity-refresh"
           }
         }
@@ -771,7 +701,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.582Z",
-        "last_updated": "2025-12-22T08:24:27.190Z"
+        "last_updated": "2025-12-22T13:00:24.984Z"
       },
       "id": "mc4flkgt3o5ws"
     },
@@ -780,93 +710,85 @@
       "entityType": "MCPAgent",
       "observations": [
         {
-          "type": "architecture",
-          "content": "The VkbCli knowledge entity is implemented using a microservices architecture, with separate components for graph database service, graph knowledge exporter, and persistence agent.",
-          "date": "2025-12-22T08:20:47.232Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:59.598Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
           "type": "implementation",
-          "content": "The VkbCli knowledge entity uses a graph database to store knowledge, with data stored at .data/knowledge-graph and JSON exports at .data/knowledge-export.",
-          "date": "2025-12-22T08:20:47.232Z",
+          "content": "VkbCli is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T13:00:32.734Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:59.598Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.736Z"
           }
         },
         {
-          "type": "validation",
-          "content": "The VkbCli knowledge entity uses the vkb command for visualization and MCP tools for knowledge operations.",
-          "date": "2025-12-22T08:20:47.232Z",
+          "type": "architecture",
+          "content": "Core components: VkbApiClient",
+          "date": "2025-12-22T13:00:32.734Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:59.598Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.736Z"
           }
         },
         {
-          "type": "workflow",
-          "content": "The VkbCli knowledge entity uses a workflow that involves graph database service, graph knowledge exporter, and persistence agent components.",
-          "date": "2025-12-22T08:20:47.232Z",
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T13:00:32.734Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:59.598Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.736Z"
           }
         },
         {
-          "type": "benefits",
-          "content": "The VkbCli knowledge entity provides benefits such as improved knowledge management, enhanced data analysis, and increased productivity.",
-          "date": "2025-12-22T08:20:47.232Z",
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:00:32.734Z",
           "metadata": {
-            "confidence": 0.8,
-            "refreshedAt": "2025-12-22T08:20:59.598Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.736Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:00:32.734Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.736Z"
           }
         },
         {
           "type": "rule",
-          "content": "The VkbCli knowledge entity follows the rule of using a verified codebase state to ensure accuracy and consistency.",
-          "date": "2025-12-22T08:20:47.232Z",
+          "content": "Use 'vkb' command for visualization (http://localhost:8080) and MCP semantic-analysis tools for programmatic access",
+          "date": "2025-12-22T13:00:32.734Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:20:59.598Z",
+            "confidence": 0.95,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.736Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "VkbCli is part of the semantic analysis and knowledge management infrastructure",
+          "date": "2025-12-22T13:00:32.734Z",
+          "metadata": {
+            "confidence": 0.75,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.736Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/VkbCli.md",
-          "date": "2025-12-22T08:21:37.756Z",
+          "date": "2025-12-22T13:00:40.866Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/VkbCli.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/VkbCli.md",
-            "diagramsGenerated": 4,
+            "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:21:37.760Z",
+            "refreshedAt": "2025-12-22T13:00:40.868Z",
             "source": "entity-refresh"
           }
         }
@@ -874,7 +796,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.583Z",
-        "last_updated": "2025-12-22T08:21:37.800Z"
+        "last_updated": "2025-12-22T13:00:40.922Z"
       },
       "id": "mc4flkgsmmjil"
     },
@@ -885,73 +807,83 @@
         {
           "type": "implementation",
           "content": "SemanticAnalysisWorkflowIssue is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.759Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.103Z"
+            "refreshedAt": "2025-12-22T13:01:11.875Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.759Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.103Z"
+            "refreshedAt": "2025-12-22T13:01:11.875Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.759Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.103Z"
+            "refreshedAt": "2025-12-22T13:01:11.875Z"
           }
         },
         {
           "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.759Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.103Z"
+            "refreshedAt": "2025-12-22T13:01:11.875Z"
           }
         },
         {
           "type": "architecture",
           "content": "Uses multi-agent architecture: GitHistoryAgent, VibeHistoryAgent, ObservationGenerationAgent, InsightGenerationAgent, ContentValidationAgent, QualityAssuranceAgent",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.759Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.103Z"
+            "refreshedAt": "2025-12-22T13:01:11.875Z"
           }
         },
         {
           "type": "workflow",
           "content": "Orchestrated by Coordinator agent which manages agent lifecycle, parallel execution, and result aggregation",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.759Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.103Z"
+            "refreshedAt": "2025-12-22T13:01:11.875Z"
+          }
+        },
+        {
+          "type": "implementation",
+          "content": "Workflow is triggered via MCP tools (execute_workflow) or automatic incremental analysis",
+          "date": "2025-12-22T13:01:11.759Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:11.875Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/SemanticAnalysisWorkflowIssue.md",
-          "date": "2025-12-21T07:47:42.124Z",
+          "date": "2025-12-22T13:01:20.810Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/SemanticAnalysisWorkflowIssue.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/SemanticAnalysisWorkflowIssue.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:42.125Z",
+            "refreshedAt": "2025-12-22T13:01:20.811Z",
             "source": "entity-refresh"
           }
         }
@@ -959,7 +891,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.584Z",
-        "last_updated": "2025-12-21T07:47:42.892Z"
+        "last_updated": "2025-12-22T13:01:21.166Z"
       },
       "id": "mc4flkgh5t7c8"
     },
@@ -970,53 +902,63 @@
         {
           "type": "implementation",
           "content": "ComprehensiveSemanticAnalysis is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:51.248Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:51.249Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:51.248Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:51.249Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:51.248Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:51.249Z"
           }
         },
         {
           "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-21T07:47:48.618Z",
+          "date": "2025-12-22T13:00:51.248Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:51.249Z"
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "Uses multi-agent architecture: GitHistoryAgent, VibeHistoryAgent, ObservationGenerationAgent, InsightGenerationAgent, ContentValidationAgent, QualityAssuranceAgent",
+          "date": "2025-12-22T13:00:51.248Z",
+          "metadata": {
+            "confidence": 0.9,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:51.249Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/ComprehensiveSemanticAnalysis.md",
-          "date": "2025-12-21T07:47:56.747Z",
+          "date": "2025-12-22T13:00:58.416Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/ComprehensiveSemanticAnalysis.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ComprehensiveSemanticAnalysis.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:56.748Z",
+            "refreshedAt": "2025-12-22T13:00:58.418Z",
             "source": "entity-refresh"
           }
         }
@@ -1024,7 +966,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.589Z",
-        "last_updated": "2025-12-21T07:47:57.275Z"
+        "last_updated": "2025-12-22T13:00:58.629Z"
       },
       "id": "mc4flkg34x7w16"
     },
@@ -1035,93 +977,93 @@
         {
           "type": "implementation",
           "content": "ConfigurationPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:48.617Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:48.617Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:48.617Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-21T07:47:48.617Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "architecture",
           "content": "Pattern extracted from codebase analysis and stored as reusable knowledge entity",
-          "date": "2025-12-21T07:47:48.617Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "implementation",
           "content": "Configuration managed through environment variables and project-level config files",
-          "date": "2025-12-21T07:47:48.617Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "ConfigurationPattern is part of the semantic analysis and knowledge management infrastructure",
-          "date": "2025-12-21T07:47:48.617Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.75,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight",
           "content": "ConfigurationPattern insight details pending full codebase analysis",
-          "date": "2025-12-21T07:47:48.617Z",
+          "date": "2025-12-22T13:00:48.566Z",
           "metadata": {
             "confidence": 0.6,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:48.619Z"
+            "refreshedAt": "2025-12-22T13:00:48.570Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/ConfigurationPattern.md",
-          "date": "2025-12-21T07:47:57.792Z",
+          "date": "2025-12-22T13:00:58.260Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/ConfigurationPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ConfigurationPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:57.794Z",
+            "refreshedAt": "2025-12-22T13:00:58.261Z",
             "source": "entity-refresh"
           }
         }
@@ -1138,80 +1080,75 @@
       "entityType": "System",
       "observations": [
         {
-          "type": "architecture",
-          "content": "CollectiveKnowledge is implemented across src/knowledge-management, lib/ukb-unified, and integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-22T08:23:55.811Z",
+          "type": "implementation",
+          "content": "CollectiveKnowledge is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T13:00:17.280Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:24:12.145Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 2
+            "refreshedAt": "2025-12-22T13:00:17.282Z"
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "Core components: GraphKnowledgeExporter",
+          "date": "2025-12-22T13:00:17.280Z",
+          "metadata": {
+            "confidence": 0.9,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.282Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T13:00:17.280Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.282Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:00:17.280Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.282Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:00:17.280Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:17.282Z"
           }
         },
         {
           "type": "implementation",
-          "content": "Core components include GraphDatabaseService, GraphKnowledgeExporter, and PersistenceAgent",
-          "date": "2025-12-22T08:23:55.811Z",
+          "content": "Knowledge persistence uses GraphDatabaseService (Graphology in-memory + LevelDB persistence)",
+          "date": "2025-12-22T13:00:17.280Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:24:12.145Z",
+            "confidence": 0.95,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 2
-          }
-        },
-        {
-          "type": "validation",
-          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph, with auto-synced JSON exports at .data/knowledge-export",
-          "date": "2025-12-22T08:23:55.811Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:24:12.145Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 2
-          }
-        },
-        {
-          "type": "workflow",
-          "content": "Available commands include vkb for visualization and graph-sync for data synchronization",
-          "date": "2025-12-22T08:23:55.811Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:24:12.145Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 2
-          }
-        },
-        {
-          "type": "benefits",
-          "content": "The use of Graphology and LevelDB provides a scalable and efficient knowledge storage solution, with benefits including improved data integrity and query performance",
-          "date": "2025-12-22T08:23:55.811Z",
-          "metadata": {
-            "confidence": 0.8,
-            "refreshedAt": "2025-12-22T08:24:12.145Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 2
+            "refreshedAt": "2025-12-22T13:00:17.282Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/CollectiveKnowledge.md",
-          "date": "2025-12-22T08:24:19.770Z",
+          "date": "2025-12-22T13:00:25.480Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/CollectiveKnowledge.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/CollectiveKnowledge.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:24:19.771Z",
+            "refreshedAt": "2025-12-22T13:00:25.484Z",
             "source": "entity-refresh"
           }
         }
@@ -1219,128 +1156,104 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.592Z",
-        "last_updated": "2025-12-22T08:24:19.896Z"
+        "last_updated": "2025-12-22T13:00:26.457Z"
       },
       "id": "mc4flkg1qr4h9s"
     },
     {
       "name": "ApiPattern",
-      "entityType": "GraphDatabase",
+      "entityType": "MCPAgent",
       "observations": [
         {
-          "type": "architecture",
-          "content": "The ApiPattern is implemented across src/knowledge-management, lib/ukb-unified, and integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-22T08:21:37.838Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:21:49.562Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
           "type": "implementation",
-          "content": "The GraphDatabaseService is used for knowledge storage, and JSON exports are stored at .data/knowledge-export",
-          "date": "2025-12-22T08:21:37.838Z",
+          "content": "ApiPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T13:00:36.179Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:21:49.562Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "validation",
-          "content": "The VkbApiClient is used for visualization, and MCP tools are used for knowledge operations",
-          "date": "2025-12-22T08:21:37.838Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:21:49.562Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "workflow",
-          "content": "The graph-sync command is used to synchronize the GraphDB with JSON exports",
-          "date": "2025-12-22T08:21:37.838Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:21:49.562Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "benefits",
-          "content": "The use of Graphology and LevelDB provides efficient and scalable knowledge storage",
-          "date": "2025-12-22T08:21:37.838Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:21:49.562Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:36.180Z"
           }
         },
         {
           "type": "architecture",
-          "content": "The ApiPattern is part of the semantic analysis and knowledge management infrastructure",
-          "date": "2025-12-22T08:21:37.838Z",
+          "content": "Core components: VkbApiClient",
+          "date": "2025-12-22T13:00:36.179Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:21:49.562Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:36.180Z"
           }
         },
         {
-          "type": "implementation",
-          "content": "The PersistenceAgent is used to persist knowledge entities, and the GraphDatabaseAdapter is used to interact with the GraphDB",
-          "date": "2025-12-22T08:21:37.838Z",
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T13:00:36.179Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:21:49.562Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:36.180Z"
           }
         },
         {
-          "type": "validation",
-          "content": "The ApiPattern is implemented using the vkb command for visualization and MCP tools for knowledge operations",
-          "date": "2025-12-22T08:21:37.838Z",
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:00:36.179Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:21:49.562Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:36.180Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:00:36.179Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:36.180Z"
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "Pattern extracted from codebase analysis and stored as reusable knowledge entity",
+          "date": "2025-12-22T13:00:36.179Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:36.180Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ApiPattern is part of the semantic analysis and knowledge management infrastructure",
+          "date": "2025-12-22T13:00:36.179Z",
+          "metadata": {
+            "confidence": 0.75,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:36.180Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ApiPattern insight details pending full codebase analysis",
+          "date": "2025-12-22T13:00:36.179Z",
+          "metadata": {
+            "confidence": 0.6,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:36.180Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/ApiPattern.md",
-          "date": "2025-12-22T08:22:23.268Z",
+          "date": "2025-12-22T13:00:41.370Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/ApiPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ApiPattern.md",
-            "diagramsGenerated": 4,
+            "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:22:23.272Z",
+            "refreshedAt": "2025-12-22T13:00:41.375Z",
             "source": "entity-refresh"
           }
         }
@@ -1348,7 +1261,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-02T07:55:27.986Z",
-        "last_updated": "2025-12-22T08:22:23.462Z"
+        "last_updated": "2025-12-22T13:00:41.961Z"
       },
       "id": "mc4flkg3cz7gvq"
     },
@@ -1359,43 +1272,53 @@
         {
           "type": "implementation",
           "content": "ArchitecturalEvolutionPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:30.588Z",
+          "date": "2025-12-22T13:01:15.015Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:30.589Z"
+            "refreshedAt": "2025-12-22T13:01:15.016Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:30.588Z",
+          "date": "2025-12-22T13:01:15.015Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:30.589Z"
+            "refreshedAt": "2025-12-22T13:01:15.016Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:30.588Z",
+          "date": "2025-12-22T13:01:15.015Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:30.589Z"
+            "refreshedAt": "2025-12-22T13:01:15.016Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:01:15.015Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:15.016Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/ArchitecturalEvolutionPattern.md",
-          "date": "2025-12-21T07:47:40.844Z",
+          "date": "2025-12-22T13:01:20.272Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/ArchitecturalEvolutionPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ArchitecturalEvolutionPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:40.846Z",
+            "refreshedAt": "2025-12-22T13:01:20.274Z",
             "source": "entity-refresh"
           }
         }
@@ -1403,128 +1326,94 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-02T07:55:27.994Z",
-        "last_updated": "2025-12-21T07:47:41.933Z"
+        "last_updated": "2025-12-22T13:01:20.518Z"
       },
       "id": "mc4flkg6pyxea"
     },
     {
       "name": "DecoratorPattern",
-      "entityType": "GraphDatabase",
+      "entityType": "MCPAgent",
       "observations": [
         {
-          "type": "architecture",
-          "content": "The system uses a graph database (Graphology + LevelDB) for knowledge storage and JSON exports for data synchronization.",
-          "date": "2025-12-22T08:22:23.664Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:22:35.958Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
           "type": "implementation",
-          "content": "The DecoratorPattern knowledge entity is implemented across multiple components, including GraphDatabaseService and GraphKnowledgeExporter.",
-          "date": "2025-12-22T08:22:23.664Z",
+          "content": "DecoratorPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T13:00:32.648Z",
           "metadata": {
-            "confidence": 0.8,
-            "refreshedAt": "2025-12-22T08:22:35.958Z",
+            "confidence": 0.9,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.651Z"
           }
         },
         {
-          "type": "validation",
-          "content": "The system uses vkb and graph-sync commands for visualization and data synchronization.",
-          "date": "2025-12-22T08:22:23.664Z",
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T13:00:32.648Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:22:35.958Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.651Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:00:32.648Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.651Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:00:32.648Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.651Z"
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "Pattern extracted from codebase analysis and stored as reusable knowledge entity",
+          "date": "2025-12-22T13:00:32.648Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.651Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DecoratorPattern is part of the semantic analysis and knowledge management infrastructure",
+          "date": "2025-12-22T13:00:32.648Z",
+          "metadata": {
+            "confidence": 0.75,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:32.651Z"
           }
         },
         {
           "type": "workflow",
-          "content": "The system uses a microservices-based architecture with multiple components and integrations.",
-          "date": "2025-12-22T08:22:23.664Z",
+          "content": "DecoratorPattern workflow details pending full codebase analysis",
+          "date": "2025-12-22T13:00:32.648Z",
           "metadata": {
-            "confidence": 0.8,
-            "refreshedAt": "2025-12-22T08:22:35.958Z",
+            "confidence": 0.6,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "benefits",
-          "content": "The system provides benefits such as scalability, data consistency, and security through the use of a graph database and access control measures.",
-          "date": "2025-12-22T08:22:23.664Z",
-          "metadata": {
-            "confidence": 0.8,
-            "refreshedAt": "2025-12-22T08:22:35.958Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "architecture",
-          "content": "The system stores knowledge graphs at .data/knowledge-graph and JSON exports at .data/knowledge-export.",
-          "date": "2025-12-22T08:22:23.664Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:22:35.958Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "implementation",
-          "content": "The system uses PersistenceAgent and VkbApiClient for knowledge operations and data synchronization.",
-          "date": "2025-12-22T08:22:23.664Z",
-          "metadata": {
-            "confidence": 0.8,
-            "refreshedAt": "2025-12-22T08:22:35.958Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "validation",
-          "content": "The system uses recent commits and feature additions to ensure that the codebase is actively maintained and updated.",
-          "date": "2025-12-22T08:22:23.664Z",
-          "metadata": {
-            "confidence": 0.8,
-            "refreshedAt": "2025-12-22T08:22:35.958Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:32.651Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/DecoratorPattern.md",
-          "date": "2025-12-22T08:23:10.036Z",
+          "date": "2025-12-22T13:00:40.875Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/DecoratorPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/DecoratorPattern.md",
-            "diagramsGenerated": 4,
+            "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:23:10.038Z",
+            "refreshedAt": "2025-12-22T13:00:40.918Z",
             "source": "entity-refresh"
           }
         }
@@ -1532,128 +1421,114 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-02T09:42:47.766Z",
-        "last_updated": "2025-12-22T08:23:10.152Z"
+        "last_updated": "2025-12-22T13:00:41.366Z"
       },
       "id": "mc4flkg2spe7lh"
     },
     {
       "name": "SemanticAnalysisAgentSystemImplementation",
-      "entityType": "GraphDatabase",
+      "entityType": "MCPAgent",
       "observations": [
         {
           "type": "implementation",
-          "content": "SemanticAnalysisAgentSystemImplementation is implemented across: src/knowledge-management, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-22T08:19:02.994Z",
+          "content": "SemanticAnalysisAgentSystemImplementation is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T13:00:34.164Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:19:15.354Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
           }
         },
         {
           "type": "architecture",
-          "content": "Core components: GraphDatabaseService, GraphKnowledgeExporter, PersistenceAgent",
-          "date": "2025-12-22T08:19:02.994Z",
+          "content": "Core components: PersistenceAgent",
+          "date": "2025-12-22T13:00:34.164Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:19:15.354Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
           }
         },
         {
-          "type": "validation",
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T13:00:34.164Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
+          }
+        },
+        {
+          "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-22T08:19:02.994Z",
+          "date": "2025-12-22T13:00:34.164Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:19:15.354Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
           }
         },
         {
-          "type": "workflow",
+          "type": "insight",
           "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-22T08:19:02.994Z",
+          "date": "2025-12-22T13:00:34.164Z",
           "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:19:15.354Z",
+            "confidence": 0.85,
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "benefits",
-          "content": "The use of Graphology and LevelDB provides a robust data management system",
-          "date": "2025-12-22T08:19:02.994Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:19:15.354Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
           }
         },
         {
           "type": "architecture",
-          "content": "The system uses a modular architecture with separate directories and components",
-          "date": "2025-12-22T08:19:02.994Z",
+          "content": "Uses multi-agent architecture: GitHistoryAgent, VibeHistoryAgent, ObservationGenerationAgent, InsightGenerationAgent, ContentValidationAgent, QualityAssuranceAgent",
+          "date": "2025-12-22T13:00:34.164Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:19:15.354Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
-          }
-        },
-        {
-          "type": "validation",
-          "content": "The system uses existing libraries such as Graphology and LevelDB",
-          "date": "2025-12-22T08:19:02.994Z",
-          "metadata": {
-            "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:19:15.354Z",
-            "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
           }
         },
         {
           "type": "workflow",
-          "content": "The system uses a command-line interface with commands such as vkb and coding",
-          "date": "2025-12-22T08:19:02.994Z",
+          "content": "Orchestrated by Coordinator agent which manages agent lifecycle, parallel execution, and result aggregation",
+          "date": "2025-12-22T13:00:34.164Z",
           "metadata": {
             "confidence": 0.9,
-            "refreshedAt": "2025-12-22T08:19:15.354Z",
             "source": "entity-refresh",
-            "analysisMethod": "full-pipeline",
-            "gitCommitsAnalyzed": 73,
-            "vibeSessionsAnalyzed": 0
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "SemanticAnalysisAgentSystemImplementation is part of the semantic analysis and knowledge management infrastructure",
+          "date": "2025-12-22T13:00:34.164Z",
+          "metadata": {
+            "confidence": 0.75,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
+          }
+        },
+        {
+          "type": "architecture",
+          "content": "SemanticAnalysisAgentSystemImplementation architecture details pending full codebase analysis",
+          "date": "2025-12-22T13:00:34.164Z",
+          "metadata": {
+            "confidence": 0.6,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:00:34.166Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/SemanticAnalysisAgentSystemImplementation.md",
-          "date": "2025-12-22T08:19:59.716Z",
+          "date": "2025-12-22T13:00:41.763Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/SemanticAnalysisAgentSystemImplementation.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/SemanticAnalysisAgentSystemImplementation.md",
-            "diagramsGenerated": 3,
+            "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T08:19:59.718Z",
+            "refreshedAt": "2025-12-22T13:00:41.764Z",
             "source": "entity-refresh"
           }
         }
@@ -1661,7 +1536,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-06T20:51:38.905Z",
-        "last_updated": "2025-12-22T08:19:59.799Z"
+        "last_updated": "2025-12-22T13:00:41.892Z"
       },
       "id": "mc4flkg16i4iu4"
     },
@@ -1669,54 +1544,14 @@
       "name": "McpAgentDevelopmentPattern",
       "entityType": "MCPAgent",
       "observations": [
-        {
-          "type": "implementation",
-          "content": "McpAgentDevelopmentPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:30.582Z",
-          "metadata": {
-            "confidence": 0.9,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:30.585Z"
-          }
-        },
-        {
-          "type": "architecture",
-          "content": "Core components: PersistenceAgent",
-          "date": "2025-12-21T07:47:30.582Z",
-          "metadata": {
-            "confidence": 0.9,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:30.585Z"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:30.582Z",
-          "metadata": {
-            "confidence": 0.85,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:30.585Z"
-          }
-        },
-        {
-          "type": "insight-document",
-          "content": "Detailed insight document available at: knowledge-management/insights/McpAgentDevelopmentPattern.md",
-          "date": "2025-12-21T07:47:39.424Z",
-          "metadata": {
-            "insightPath": "knowledge-management/insights/McpAgentDevelopmentPattern.md",
-            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/McpAgentDevelopmentPattern.md",
-            "diagramsGenerated": 0,
-            "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:39.425Z",
-            "source": "entity-refresh"
-          }
-        }
+        "Significance: 8/10 - ",
+        "Applies to: Applicable to system architecture, API design and similar domain challenges",
+        "Details: http://localhost:8080/knowledge-management/insights/McpAgentDevelopmentPattern.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.893Z",
-        "last_updated": "2025-12-21T07:47:39.941Z"
+        "last_updated": "2025-12-23T11:11:48.904Z"
       },
       "id": "mc4flkg1q2w7a8"
     },
@@ -1727,43 +1562,53 @@
         {
           "type": "implementation",
           "content": "ApiRefactoringPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.876Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.104Z"
+            "refreshedAt": "2025-12-22T13:01:11.879Z"
           }
         },
         {
           "type": "architecture",
           "content": "Core components: VkbApiClient",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.876Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.104Z"
+            "refreshedAt": "2025-12-22T13:01:11.879Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:31.102Z",
+          "date": "2025-12-22T13:01:11.876Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.104Z"
+            "refreshedAt": "2025-12-22T13:01:11.879Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:01:11.876Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:11.879Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/ApiRefactoringPattern.md",
-          "date": "2025-12-21T07:47:40.129Z",
+          "date": "2025-12-22T13:01:20.273Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/ApiRefactoringPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/ApiRefactoringPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:40.130Z",
+            "refreshedAt": "2025-12-22T13:01:20.274Z",
             "source": "entity-refresh"
           }
         }
@@ -1771,7 +1616,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.901Z",
-        "last_updated": "2025-12-21T07:47:40.845Z"
+        "last_updated": "2025-12-22T13:01:20.472Z"
       },
       "id": "mc4flkg4snood2"
     },
@@ -1782,43 +1627,53 @@
         {
           "type": "implementation",
           "content": "KnowledgeBaseUpdatesPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:31.103Z",
+          "date": "2025-12-22T13:01:11.751Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.104Z"
+            "refreshedAt": "2025-12-22T13:01:11.754Z"
           }
         },
         {
           "type": "architecture",
           "content": "Core components: GraphDatabaseService, GraphKnowledgeExporter, GraphDatabaseAdapter",
-          "date": "2025-12-21T07:47:31.103Z",
+          "date": "2025-12-22T13:01:11.751Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.104Z"
+            "refreshedAt": "2025-12-22T13:01:11.754Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:31.103Z",
+          "date": "2025-12-22T13:01:11.751Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:31.104Z"
+            "refreshedAt": "2025-12-22T13:01:11.754Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:01:11.751Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:11.754Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/KnowledgeBaseUpdatesPattern.md",
-          "date": "2025-12-21T07:47:40.845Z",
+          "date": "2025-12-22T13:01:19.517Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/KnowledgeBaseUpdatesPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/KnowledgeBaseUpdatesPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:40.847Z",
+            "refreshedAt": "2025-12-22T13:01:19.519Z",
             "source": "entity-refresh"
           }
         }
@@ -1826,7 +1681,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.907Z",
-        "last_updated": "2025-12-21T07:47:41.934Z"
+        "last_updated": "2025-12-22T13:01:19.787Z"
       },
       "id": "mc4flkg2wua5wr"
     },
@@ -1837,43 +1692,53 @@
         {
           "type": "implementation",
           "content": "OntologySupportPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:17.776Z",
+          "date": "2025-12-22T13:01:26.435Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:17.779Z"
+            "refreshedAt": "2025-12-22T13:01:26.436Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:17.776Z",
+          "date": "2025-12-22T13:01:26.435Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:17.779Z"
+            "refreshedAt": "2025-12-22T13:01:26.436Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:17.776Z",
+          "date": "2025-12-22T13:01:26.435Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:17.779Z"
+            "refreshedAt": "2025-12-22T13:01:26.436Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:01:26.435Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.436Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/OntologySupportPattern.md",
-          "date": "2025-12-21T07:47:24.659Z",
+          "date": "2025-12-22T13:01:33.881Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/OntologySupportPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/OntologySupportPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:24.660Z",
+            "refreshedAt": "2025-12-22T13:01:33.882Z",
             "source": "entity-refresh"
           }
         }
@@ -1881,7 +1746,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.912Z",
-        "last_updated": "2025-12-21T07:47:25.080Z"
+        "last_updated": "2025-12-22T13:01:34.096Z"
       },
       "id": "mc4flkg2a2h3ww"
     },
@@ -1892,43 +1757,53 @@
         {
           "type": "implementation",
           "content": "UiComponentWorkPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.705Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.265Z"
+            "refreshedAt": "2025-12-22T13:01:26.707Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.705Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.265Z"
+            "refreshedAt": "2025-12-22T13:01:26.707Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.705Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.265Z"
+            "refreshedAt": "2025-12-22T13:01:26.707Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:01:26.705Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.707Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/UiComponentWorkPattern.md",
-          "date": "2025-12-21T07:47:25.080Z",
+          "date": "2025-12-22T13:01:34.858Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/UiComponentWorkPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/UiComponentWorkPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:25.082Z",
+            "refreshedAt": "2025-12-22T13:01:34.860Z",
             "source": "entity-refresh"
           }
         }
@@ -1936,7 +1811,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-14T17:08:29.917Z",
-        "last_updated": "2025-12-21T07:47:25.548Z"
+        "last_updated": "2025-12-22T13:01:35.120Z"
       },
       "id": "mc4flkgk7p8ly"
     },
@@ -1947,43 +1822,53 @@
         {
           "type": "implementation",
           "content": "BugFixPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.435Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.264Z"
+            "refreshedAt": "2025-12-22T13:01:26.437Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.435Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.264Z"
+            "refreshedAt": "2025-12-22T13:01:26.437Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.435Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.264Z"
+            "refreshedAt": "2025-12-22T13:01:26.437Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:01:26.435Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.437Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/BugFixPattern.md",
-          "date": "2025-12-21T07:47:25.547Z",
+          "date": "2025-12-22T13:01:34.500Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/BugFixPattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:25.549Z",
+            "refreshedAt": "2025-12-22T13:01:34.501Z",
             "source": "entity-refresh"
           }
         }
@@ -1991,7 +1876,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-20T07:25:18.470Z",
-        "last_updated": "2025-12-21T07:47:25.843Z"
+        "last_updated": "2025-12-22T13:01:34.622Z"
       },
       "id": "mc4flkg154s53l"
     },
@@ -2002,43 +1887,53 @@
         {
           "type": "implementation",
           "content": "AgentArchitecturePattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.322Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.265Z"
+            "refreshedAt": "2025-12-22T13:01:26.324Z"
           }
         },
         {
           "type": "architecture",
           "content": "Core components: PersistenceAgent",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.322Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.265Z"
+            "refreshedAt": "2025-12-22T13:01:26.324Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:18.263Z",
+          "date": "2025-12-22T13:01:26.322Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.265Z"
+            "refreshedAt": "2025-12-22T13:01:26.324Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:01:26.322Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.324Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/AgentArchitecturePattern.md",
-          "date": "2025-12-21T07:47:25.547Z",
+          "date": "2025-12-22T13:01:35.031Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/AgentArchitecturePattern.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/AgentArchitecturePattern.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:25.549Z",
+            "refreshedAt": "2025-12-22T13:01:35.032Z",
             "source": "entity-refresh"
           }
         }
@@ -2046,7 +1941,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-20T07:25:18.480Z",
-        "last_updated": "2025-12-21T07:47:25.845Z"
+        "last_updated": "2025-12-22T13:01:35.495Z"
       },
       "id": "mc4flkg2wjrziw"
     },
@@ -2057,43 +1952,53 @@
         {
           "type": "implementation",
           "content": "FeatureImplementation is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-21T07:47:18.950Z",
+          "date": "2025-12-22T13:01:26.434Z",
           "metadata": {
             "confidence": 0.9,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.951Z"
+            "refreshedAt": "2025-12-22T13:01:26.436Z"
           }
         },
         {
           "type": "insight",
           "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-21T07:47:18.950Z",
+          "date": "2025-12-22T13:01:26.434Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.951Z"
+            "refreshedAt": "2025-12-22T13:01:26.436Z"
           }
         },
         {
           "type": "insight",
           "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-21T07:47:18.950Z",
+          "date": "2025-12-22T13:01:26.434Z",
           "metadata": {
             "confidence": 0.85,
             "source": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:18.951Z"
+            "refreshedAt": "2025-12-22T13:01:26.436Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:01:26.434Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.436Z"
           }
         },
         {
           "type": "insight-document",
           "content": "Detailed insight document available at: knowledge-management/insights/FeatureImplementation.md",
-          "date": "2025-12-21T07:47:25.843Z",
+          "date": "2025-12-22T13:01:34.008Z",
           "metadata": {
             "insightPath": "knowledge-management/insights/FeatureImplementation.md",
             "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/FeatureImplementation.md",
             "diagramsGenerated": 0,
             "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-21T07:47:25.845Z",
+            "refreshedAt": "2025-12-22T13:01:34.009Z",
             "source": "entity-refresh"
           }
         }
@@ -2101,7 +2006,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-20T07:25:18.485Z",
-        "last_updated": "2025-12-21T07:47:26.100Z"
+        "last_updated": "2025-12-22T13:01:34.125Z"
       },
       "id": "mc4flkg1hkvd48"
     },
@@ -2109,56 +2014,31 @@
       "name": "Large-ScaleCodebasePattern",
       "entityType": "MCPAgent",
       "observations": [
-        {
-          "type": "implementation",
-          "content": "Large-ScaleCodebasePattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-22T12:54:08.175Z",
-          "metadata": {
-            "confidence": 0.9,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T12:54:08.179Z"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-22T12:54:08.175Z",
-          "metadata": {
-            "confidence": 0.85,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T12:54:08.179Z"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-22T12:54:08.175Z",
-          "metadata": {
-            "confidence": 0.85,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T12:54:08.179Z"
-          }
-        },
-        {
-          "type": "insight-document",
-          "content": "Detailed insight document available at: knowledge-management/insights/Large-ScaleCodebasePattern.md",
-          "date": "2025-12-22T12:54:10.051Z",
-          "metadata": {
-            "insightPath": "knowledge-management/insights/Large-ScaleCodebasePattern.md",
-            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/Large-ScaleCodebasePattern.md",
-            "diagramsGenerated": 0,
-            "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T12:54:10.052Z",
-            "source": "entity-refresh"
-          }
-        }
+        "Significance: 7/10 - r",
+        "Applies to: Applicable to API design and similar domain challenges",
+        "Details: http://localhost:8080/knowledge-management/insights/Large-ScaleCodebasePattern.md"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2025-12-21T08:24:03.394Z",
-        "last_updated": "2025-12-22T12:54:10.108Z"
+        "last_updated": "2025-12-23T11:31:23.025Z"
       },
       "id": "mc4flkg1ot16ee"
+    },
+    {
+      "name": "FunctionalProgrammingPattern",
+      "entityType": "TransferablePattern",
+      "observations": [
+        "Significance: 6/10 - r",
+        "Applies to: Applicable to system architecture, API design and similar domain challenges",
+        "Details: http://localhost:8080/knowledge-management/insights/FunctionalProgrammingPattern.md"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2025-12-23T11:31:23.037Z",
+        "last_updated": "2025-12-23T11:31:23.037Z"
+      },
+      "id": "mc4flkgm12fie"
     }
   ],
   "relations": [
@@ -2827,14 +2707,42 @@
       "to": "Large-ScaleCodebasePattern",
       "relationType": "contains",
       "metadata": {}
+    },
+    {
+      "from": "FunctionalProgrammingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
+      "from": "FunctionalProgrammingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "metadata": {}
+    },
+    {
+      "from": "FunctionalProgrammingPattern",
+      "to": "Coding",
+      "relationType": "implemented_in",
+      "metadata": {}
+    },
+    {
+      "from": "FunctionalProgrammingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2025-12-22T12:54:15.121Z",
-    "total_entities": 25,
-    "total_relations": 111,
-    "description": "Coding project infrastructure and patterns"
+    "exported_at": "2025-12-23T11:31:35.096Z",
+    "total_entities": 26,
+    "total_relations": 115,
+    "description": "Coding project infrastructure and patterns",
+    "last_updated": "2025-12-27T13:06:33.725Z",
+    "checkpointResetAt": "2025-12-27T13:06:33.725Z",
+    "checkpointResetReason": "7 days ago (2025-12-20T13:06:33.724Z)",
+    "lastSuccessfulWorkflowCompletion": "2025-12-20T13:06:33.724Z"
   }
 }
