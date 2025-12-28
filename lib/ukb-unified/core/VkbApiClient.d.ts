@@ -45,4 +45,9 @@ export class VkbApiClient {
      * POST /api/relations
      */
     createRelation(relationData: any): Promise<any>;
+    /**
+     * POST /api/export
+     * Export team data to JSON file
+     */
+    exportTeam(team: string, filePath: string): Promise<any>;
 }

@@ -36,6 +36,7 @@ import {
   BarChart3,
   MessageSquare,
   Network,
+  StopCircle,
 } from 'lucide-react'
 import UKBWorkflowGraph, { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
@@ -747,10 +748,28 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] grid grid-rows-[auto_auto_1fr] gap-4 overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Brain className="h-5 w-5" />
-            UKB Workflow Monitor
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              UKB Workflow Monitor
+            </DialogTitle>
+            {activeProcesses.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleCancelWorkflow}
+                disabled={cancelLoading}
+                className="flex items-center gap-2"
+              >
+                {cancelLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <StopCircle className="h-4 w-4" />
+                )}
+                Cancel Workflow
+              </Button>
+            )}
+          </div>
           <DialogDescription>
             Monitor active and historical UKB semantic analysis workflows
           </DialogDescription>
