@@ -2,69 +2,39 @@
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
 package "MCP Agent Development Pattern" {
-    
-    abstract class McpAgentPattern <<pattern>> {
-        +name: String
-        +category: String
-        +description: String
-        +significance: Integer
-        +occurrences: Integer
-        +trend: String
-        +getImplementationDetails()
-        +analyzePatternUsage()
-    }
-    
-    class McpAgentDevelopmentPattern <<implementation>> {
-        -occurrences: Integer = 15
-        -trend: String = "increasing"
-        -language: String = "Unknown"
-        -usageNotes: List<String>
-        +implementPattern()
-        +trackOccurrences()
-        +analyzeTrend()
-        +generateUsageReport()
-    }
-    
-    class PatternCatalog <<catalog>> {
-        -totalPatterns: Integer
-        -avgSignificance: Double
-        -topPatterns: List<String>
-        +addPattern(pattern: McpAgentPattern)
-        +getPatternsByCategory(category: String)
-        +calculateSignificance()
-        +generateSummary()
-    }
-    
-    class ImplementationCategory <<category>> {
-        -categoryName: String = "Implementation"
-        -patternCount: Integer = 1
-        +categorizePattern(pattern: McpAgentPattern)
-        +getPatternCount()
-    }
-    
-    class PatternEvidence <<evidence>> {
-        -occurrenceCount: Integer
-        -trendAnalysis: String
-        +collectEvidence()
-        +validateTrend()
-    }
-    
-    class ArchitecturalAnalysis <<analysis>> {
-        -contentName: String
-        -analysisType: String
-        +performAnalysis()
-        +generateReport()
-    }
-    
-    McpAgentPattern <|-- McpAgentDevelopmentPattern
-    PatternCatalog *-- McpAgentDevelopmentPattern
-    ImplementationCategory o-- McpAgentDevelopmentPattern
-    McpAgentDevelopmentPattern --> PatternEvidence : "generates"
-    PatternCatalog --> ArchitecturalAnalysis : "feeds into"
-    
+  class McpAgentDevelopmentPattern <<MCPAgent>> {
+    - graphDatabaseService: GraphDatabaseService
+    - vkbApiClient: VkbApiClient
+    + manageData()
+    + interactWithVkb()
+  }
+
+  class GraphDatabaseService <<service>> {
+    + provideGraphDatabaseAccess()
+  }
+
+  class VkbApiClient <<service>> {
+    + provideVkbApiAccess()
+  }
+
+  class GraphDatabaseAdapter <<interface>> {
+    + adaptGraphDatabase()
+  }
+
+  McpAgentDevelopmentPattern --* GraphDatabaseService
+  McpAgentDevelopmentPattern --* VkbApiClient
+  McpAgentDevelopmentPattern ..> GraphDatabaseAdapter
 }
 
-note top of McpAgentDevelopmentPattern : Significance: 8/10\nTrend: Increasing usage
-note right of PatternCatalog : Contains 1 pattern\nAverage significance: 8
+package "Adapters and Interfaces" {
+  class GraphDatabaseAdapterImpl implements GraphDatabaseAdapter {
+    + adaptGraphDatabase()
+  }
+
+  GraphDatabaseAdapter --|> GraphDatabaseAdapterImpl
+}
+
+McpAgentDevelopmentPattern ..> VkbApiClient : uses
+McpAgentDevelopmentPattern ..> GraphDatabaseService : uses
 
 @enduml

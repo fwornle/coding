@@ -65,12 +65,82 @@ export interface HistoricalStep {
   outputs?: Record<string, any>
 }
 
+// Accumulated stats from all batches
+export interface AccumulatedStats {
+  totalCommits: number
+  totalSessions: number
+  totalTokensUsed: number
+  totalEntitiesCreated: number
+  totalEntitiesUpdated: number
+  totalRelationsAdded: number
+}
+
+// Aggregated step data across all batches
+export interface AggregatedSteps {
+  git_history?: {
+    totalCommits: number
+    batchesProcessed: number
+  }
+  vibe_history?: {
+    totalSessions: number
+    batchesWithSessions: number
+    batchesProcessed: number
+  }
+  semantic_analysis?: {
+    totalEntities: number
+    totalRelations: number
+    batchesProcessed: number
+  }
+  kg_operators?: {
+    totalProcessed: number      // conv: entities converted to KG format
+    totalCoreEntities: number   // aggr: entities classified as core
+    totalEmbedded: number       // embed: entities with embeddings
+    totalMerged: number         // dedup: duplicate entities merged
+    totalEdgesAdded: number     // pred: predicted edges/relations
+    totalEntitiesAdded: number  // merge: final entities added
+    batchesProcessed: number
+  }
+  content_validation?: {
+    entitiesValidated: number   // entities that passed validation
+    relationsValidated: number  // relations that passed validation
+    validationComplete: boolean
+  }
+}
+
+// Batch summary aggregated from checkpoints
+export interface BatchSummary {
+  totalBatches: number
+  totalCommits: number
+  totalSessions: number
+  totalEntities: number
+  totalRelations: number
+  batchesWithSessions: number
+  dateRange: {
+    start: string | null
+    end: string | null
+  }
+  aggregatedSteps?: AggregatedSteps
+}
+
+// Final persisted knowledge stats (after deduplication)
+export interface PersistedKnowledge {
+  entities: number
+  relations: number
+  entityTypes: Record<string, number>
+  deduplicationRatio: string | null
+}
+
 // Historical workflow with full details
 export interface HistoricalWorkflowDetail extends HistoricalWorkflow {
   entitiesCreated: number
   entitiesUpdated: number
   recommendations: string[]
   steps: HistoricalStep[]
+  // Aggregated totals from all batches
+  accumulatedStats?: AccumulatedStats | null
+  batchSummary?: BatchSummary | null
+  // Final persisted knowledge (after deduplication)
+  persistedKnowledge?: PersistedKnowledge | null
 }
 
 // Workflow agents definition (for status inference)
@@ -318,6 +388,22 @@ export const selectSelectedHistoricalWorkflow = createSelector(
 export const selectHistoricalDetail = createSelector(
   [selectUkbState],
   (ukb) => ukb.historicalWorkflowDetail
+)
+
+// Select batch summary and accumulated stats for historical workflows
+export const selectBatchSummary = createSelector(
+  [selectHistoricalDetail],
+  (detail) => detail?.batchSummary || null
+)
+
+export const selectAccumulatedStats = createSelector(
+  [selectHistoricalDetail],
+  (detail) => detail?.accumulatedStats || null
+)
+
+export const selectPersistedKnowledge = createSelector(
+  [selectHistoricalDetail],
+  (detail) => detail?.persistedKnowledge || null
 )
 
 // Convert historical detail to ProcessInfo format for graph

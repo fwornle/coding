@@ -33,6 +33,9 @@ import {
   FileText,
   RefreshCw,
   Trash2,
+  BarChart3,
+  MessageSquare,
+  Network,
 } from 'lucide-react'
 import UKBWorkflowGraph, { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
@@ -49,6 +52,9 @@ import {
   fetchDetailFailure,
   selectCurrentProcess,
   selectHistoricalProcessInfo,
+  selectBatchSummary,
+  selectAccumulatedStats,
+  selectPersistedKnowledge,
   type HistoricalWorkflow,
   type UKBProcess,
 } from '@/store/slices/ukbSlice'
@@ -76,6 +82,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // Memoized selectors
   const currentProcess = useSelector(selectCurrentProcess)
   const historicalProcessInfo = useSelector(selectHistoricalProcessInfo)
+  const batchSummary = useSelector(selectBatchSummary)
+  const accumulatedStats = useSelector(selectAccumulatedStats)
+  const persistedKnowledge = useSelector(selectPersistedKnowledge)
 
   // Derived state
   const showSidebar = selectedNode !== null && activeTab === 'active'
@@ -525,6 +534,102 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             <span><strong>Started:</strong> {formatDate(selectedHistoricalWorkflowState.startTime)}</span>
           </div>
 
+          {/* Aggregated Totals - Show cumulative results from all batches */}
+          {batchSummary && (
+            <div className="flex-shrink-0 mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-1.5">
+                <BarChart3 className="h-3.5 w-3.5 text-blue-600" />
+                <span className="text-xs font-medium text-blue-800">
+                  Pipeline Totals ({batchSummary.totalBatches} batches)
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <GitBranch className="h-3 w-3 text-blue-500" />
+                  <span className="text-blue-700">
+                    <strong>{batchSummary.totalCommits.toLocaleString()}</strong> commits
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MessageSquare className="h-3 w-3 text-blue-500" />
+                  <span className="text-blue-700">
+                    <strong>{batchSummary.totalSessions.toLocaleString()}</strong> sessions
+                    {batchSummary.batchesWithSessions < batchSummary.totalBatches && (
+                      <span className="text-blue-500 ml-1">
+                        ({batchSummary.batchesWithSessions}/{batchSummary.totalBatches} batches)
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Brain className="h-3 w-3 text-blue-500" />
+                  <span className="text-blue-700">
+                    <strong>{batchSummary.totalEntities.toLocaleString()}</strong> candidates
+                    {persistedKnowledge && (
+                      <span className="text-blue-500 ml-1">
+                        → {persistedKnowledge.entities} final
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Network className="h-3 w-3 text-blue-500" />
+                  <span className="text-blue-700">
+                    <strong>{batchSummary.totalRelations.toLocaleString()}</strong> raw relations
+                    {persistedKnowledge && (
+                      <span className="text-blue-500 ml-1">
+                        → {persistedKnowledge.relations} final
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+              {batchSummary.dateRange?.start && batchSummary.dateRange?.end && (
+                <div className="text-[10px] text-blue-500 mt-1">
+                  Coverage: {new Date(batchSummary.dateRange.start).toLocaleDateString()} → {new Date(batchSummary.dateRange.end).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Final Persisted Knowledge - Show deduplicated results */}
+          {persistedKnowledge && (
+            <div className="flex-shrink-0 mb-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                <span className="text-xs font-medium text-green-800">
+                  Knowledge Base (After Deduplication)
+                </span>
+                {persistedKnowledge.deduplicationRatio && (
+                  <Badge variant="outline" className="ml-auto text-[10px] h-4 bg-green-100 text-green-700 border-green-300">
+                    {persistedKnowledge.deduplicationRatio}% reduction
+                  </Badge>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Brain className="h-3 w-3 text-green-500" />
+                  <span className="text-green-700">
+                    <strong>{persistedKnowledge.entities}</strong> entities
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Network className="h-3 w-3 text-green-500" />
+                  <span className="text-green-700">
+                    <strong>{persistedKnowledge.relations}</strong> relations
+                  </span>
+                </div>
+                <div className="col-span-2 flex flex-wrap gap-1">
+                  {Object.entries(persistedKnowledge.entityTypes || {}).map(([type, count]) => (
+                    <Badge key={type} variant="outline" className="text-[10px] h-4 bg-green-50 text-green-600 border-green-200">
+                      {type}: {count}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Workflow Graph - Main Content - takes remaining space */}
           <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
             {loadingDetail ? (
@@ -552,6 +657,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                       agentId={selectedNode}
                       process={historicalProcessInfo}
                       onClose={handleCloseHistoricalSidebar}
+                      aggregatedSteps={batchSummary?.aggregatedSteps}
                     />
                   </div>
                 )}

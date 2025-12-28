@@ -184,65 +184,86 @@ start_transcript_monitoring() {
 # STATUSLINE HEALTH MONITOR
 # ==============================================================================
 # Start StatusLine Health Monitor daemon (global monitoring for all sessions)
-# Uses PID lock file to prevent duplicate daemons (race-condition safe)
+# Uses mkdir-based locking (atomic on POSIX, works on macOS and Linux)
 start_statusline_health_monitor() {
   local coding_repo="$1"
   local pidfile="$coding_repo/.pids/statusline-health-monitor.pid"
-  local lockfile="$coding_repo/.pids/statusline-health-monitor.lock"
+  local lockdir="$coding_repo/.pids/statusline-health-monitor.lock.d"
 
   # Ensure .pids directory exists
   mkdir -p "$coding_repo/.pids"
 
-  # Use flock for atomic check-and-start (prevents race conditions)
-  (
-    flock -n 200 || {
-      log "StatusLine Health Monitor startup in progress by another process"
-      return 0
-    }
-
-    # Check PID file first (faster than pgrep)
-    if [ -f "$pidfile" ]; then
-      local existing_pid
-      existing_pid=$(cat "$pidfile" 2>/dev/null)
-      if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
-        # Verify it's actually the health monitor (not a recycled PID)
-        if ps -p "$existing_pid" -o args= 2>/dev/null | grep -q "statusline-health-monitor"; then
-          log "StatusLine Health Monitor already running (PID: $existing_pid)"
+  # Use mkdir for atomic locking (works on macOS and Linux)
+  # mkdir is atomic on POSIX systems - only one process can create the dir
+  if ! mkdir "$lockdir" 2>/dev/null; then
+    # Check if lock is stale (older than 60 seconds)
+    if [ -d "$lockdir" ]; then
+      local lock_age
+      lock_age=$(find "$lockdir" -maxdepth 0 -mmin +1 2>/dev/null | wc -l)
+      if [ "$lock_age" -gt 0 ]; then
+        log "Removing stale lock directory"
+        rm -rf "$lockdir"
+        mkdir "$lockdir" 2>/dev/null || {
+          log "StatusLine Health Monitor startup in progress by another process"
           return 0
-        fi
+        }
+      else
+        log "StatusLine Health Monitor startup in progress by another process"
+        return 0
       fi
-      # Stale PID file, remove it
-      rm -f "$pidfile"
     fi
+  fi
 
-    # Double-check with pgrep (catches monitors started outside this function)
-    if pgrep -f "statusline-health-monitor.js.*--daemon" >/dev/null 2>&1; then
-      local running_pid
-      running_pid=$(pgrep -f "statusline-health-monitor.js.*--daemon" | head -1)
-      log "StatusLine Health Monitor already running (PID: $running_pid)"
-      echo "$running_pid" > "$pidfile"
-      return 0
+  # Ensure lock is cleaned up on exit
+  trap "rm -rf '$lockdir' 2>/dev/null" EXIT
+
+  # Check PID file first (faster than pgrep)
+  if [ -f "$pidfile" ]; then
+    local existing_pid
+    existing_pid=$(cat "$pidfile" 2>/dev/null)
+    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+      # Verify it's actually the health monitor (not a recycled PID)
+      if ps -p "$existing_pid" -o args= 2>/dev/null | grep -q "statusline-health-monitor"; then
+        log "StatusLine Health Monitor already running (PID: $existing_pid)"
+        rm -rf "$lockdir" 2>/dev/null
+        return 0
+      fi
     fi
+    # Stale PID file, remove it
+    rm -f "$pidfile"
+  fi
 
-    log "Starting StatusLine Health Monitor daemon..."
+  # Double-check with pgrep (catches monitors started outside this function)
+  if pgrep -f "statusline-health-monitor.js.*--daemon" >/dev/null 2>&1; then
+    local running_pid
+    running_pid=$(pgrep -f "statusline-health-monitor.js.*--daemon" | head -1)
+    log "StatusLine Health Monitor already running (PID: $running_pid)"
+    echo "$running_pid" > "$pidfile"
+    rm -rf "$lockdir" 2>/dev/null
+    return 0
+  fi
 
-    # Start the health monitor daemon in background
-    cd "$coding_repo"
-    nohup node scripts/statusline-health-monitor.js --daemon --auto-heal > .logs/statusline-health-daemon.log 2>&1 &
-    local health_monitor_pid=$!
+  log "Starting StatusLine Health Monitor daemon..."
 
-    # Write PID file immediately
-    echo "$health_monitor_pid" > "$pidfile"
+  # Start the health monitor daemon in background
+  cd "$coding_repo"
+  nohup node scripts/statusline-health-monitor.js --daemon --auto-heal > .logs/statusline-health-daemon.log 2>&1 &
+  local health_monitor_pid=$!
 
-    # Brief wait to check if it started successfully
-    sleep 1
-    if kill -0 "$health_monitor_pid" 2>/dev/null; then
-      log "✅ StatusLine Health Monitor started (PID: $health_monitor_pid)"
-    else
-      log "⚠️ StatusLine Health Monitor may have failed to start"
-      rm -f "$pidfile"
-    fi
-  ) 200>"$lockfile"
+  # Write PID file immediately
+  echo "$health_monitor_pid" > "$pidfile"
+
+  # Brief wait to check if it started successfully
+  sleep 1
+  if kill -0 "$health_monitor_pid" 2>/dev/null; then
+    log "✅ StatusLine Health Monitor started (PID: $health_monitor_pid)"
+  else
+    log "⚠️ StatusLine Health Monitor may have failed to start"
+    rm -f "$pidfile"
+  fi
+
+  # Release lock
+  rm -rf "$lockdir" 2>/dev/null
 }
 
 # ==============================================================================

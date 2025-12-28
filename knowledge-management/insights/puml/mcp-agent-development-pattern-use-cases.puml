@@ -1,57 +1,29 @@
 @startuml
 !include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
 
-title MCP Agent Development Pattern Use Cases
+actor MCPAgent as "MCP Agent"
+actor VkbApiClient as "VKB API Client"
+actor GraphDatabaseService as "Graph Database Service"
 
-actor "Agent Developer" as dev
-actor "System Administrator" as admin
-actor "End User" as user
-actor "MCP Client" as client
-actor "MCP Server" as server
+usecase "Interact with VKB API" as (InteractWithVkbApi)
+usecase "Manage Graph Database" as (ManageGraphDatabase)
+usecase "Execute vkb command" as (ExecuteVkbCommand)
 
-rectangle "MCP Agent Development System" {
-  usecase "Design Agent Architecture" as UC1
-  usecase "Implement MCP Protocol" as UC2
-  usecase "Configure Agent Behavior" as UC3
-  usecase "Test Agent Functionality" as UC4
-  usecase "Deploy Agent" as UC5
-  usecase "Monitor Agent Performance" as UC6
-  usecase "Handle Protocol Messages" as UC7
-  usecase "Manage Resource Access" as UC8
-  usecase "Execute Agent Tasks" as UC9
-  usecase "Maintain Connection" as UC10
+MCPAgent --> (InteractWithVkbApi)
+MCPAgent --> (ManageGraphDatabase)
+MCPAgent --> (ExecuteVkbCommand)
+
+VkbApiClient --> (InteractWithVkbApi)
+GraphDatabaseService --> (ManageGraphDatabase)
+
+(InteractWithVkbApi) ..> (ExecuteVkbCommand) : includes
+(ManageGraphDatabase) ..> (ExecuteVkbCommand) : includes
+
+package "MCP Agent Development Pattern" {
+  MCPAgent
+  (InteractWithVkbApi)
+  (ManageGraphDatabase)
+  (ExecuteVkbCommand)
 }
-
-rectangle "Pattern Implementation Support" {
-  usecase "Apply Development Patterns" as UC11
-  usecase "Validate Pattern Usage" as UC12
-  usecase "Optimize Pattern Performance" as UC13
-}
-
-dev --> UC1
-dev --> UC2
-dev --> UC3
-dev --> UC4
-dev --> UC11
-
-admin --> UC5
-admin --> UC6
-admin --> UC12
-admin --> UC13
-
-user --> UC9
-client --> UC7
-client --> UC10
-server --> UC8
-
-UC2 ..> UC7 : <<include>>
-UC3 ..> UC8 : <<include>>
-UC5 ..> UC10 : <<include>>
-UC6 ..> UC13 : <<extend>>
-UC4 ..> UC12 : <<include>>
-
-note right of UC11 : "15 occurrences\nTrend: increasing\nSignificance: 8/10"
-
-note bottom of "MCP Agent Development System" : "Implementation Category Pattern\nArchitectural Analysis Focus"
 
 @enduml

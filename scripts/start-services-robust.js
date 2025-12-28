@@ -17,7 +17,7 @@
 
 import path from 'path';
 import fs from 'fs';
-import { spawn, exec } from 'child_process';
+import { spawn, exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import {
@@ -394,11 +394,59 @@ const SERVICE_CONFIGS = {
     startFn: async () => {
       console.log('[StatusLineHealth] Starting statusline health monitor...');
 
-      // Check if already running globally (parallel session detection)
+      // Check if already running globally (parallel session detection via PSM)
       const isRunning = await psm.isServiceRunning('statusline-health-monitor', 'global');
       if (isRunning) {
-        console.log('[StatusLineHealth] Already running globally - skipping startup');
+        console.log('[StatusLineHealth] Already running globally (PSM) - skipping startup');
         return { pid: 'already-running', service: 'statusline-health-monitor', skipRegistration: true };
+      }
+
+      // Fallback: Check PID file (process may be running but not registered in PSM)
+      const pidFile = path.join(CODING_DIR, '.pids', 'statusline-health-monitor.pid');
+      try {
+        if (fs.existsSync(pidFile)) {
+          const existingPid = parseInt(fs.readFileSync(pidFile, 'utf8').trim(), 10);
+          if (existingPid && isProcessRunning(existingPid)) {
+            // Verify it's actually the health monitor
+            try {
+              const psOutput = execSync(`ps -p ${existingPid} -o args=`, { encoding: 'utf8', timeout: 3000 });
+              if (psOutput.includes('statusline-health-monitor')) {
+                console.log(`[StatusLineHealth] Already running (PID file: ${existingPid}) - registering with PSM`);
+                // Register with PSM for future checks
+                await psm.registerService({
+                  name: 'statusline-health-monitor',
+                  type: 'global',
+                  pid: existingPid,
+                  script: 'scripts/statusline-health-monitor.js'
+                });
+                return { pid: existingPid, service: 'statusline-health-monitor', skipRegistration: true };
+              }
+            } catch (psError) {
+              // Process may have exited, continue with startup
+            }
+          }
+        }
+      } catch (pidCheckError) {
+        // PID file check failed, continue with startup
+      }
+
+      // Final fallback: Check via pgrep
+      try {
+        const pgrepOutput = execSync('pgrep -f "statusline-health-monitor.js.*--daemon"', { encoding: 'utf8', timeout: 3000 }).trim();
+        if (pgrepOutput) {
+          const runningPid = parseInt(pgrepOutput.split('\n')[0], 10);
+          console.log(`[StatusLineHealth] Already running (pgrep: ${runningPid}) - registering with PSM`);
+          // Register with PSM for future checks
+          await psm.registerService({
+            name: 'statusline-health-monitor',
+            type: 'global',
+            pid: runningPid,
+            script: 'scripts/statusline-health-monitor.js'
+          });
+          return { pid: runningPid, service: 'statusline-health-monitor', skipRegistration: true };
+        }
+      } catch (pgrepError) {
+        // pgrep returns exit code 1 when no matches - this is normal
       }
 
       const child = spawn('node', [
