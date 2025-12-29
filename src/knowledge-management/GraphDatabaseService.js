@@ -74,7 +74,7 @@ export class GraphDatabaseService extends EventEmitter {
     try {
       // Create Graphology graph with multi-edge support
       this.graph = new Graph({ multi: true });
-      console.log('✓ Graphology graph instance created');
+      console.error('✓ Graphology graph instance created');
 
       // Pre-flight check: Detect database locks before attempting to open
       const lockPath = path.join(this.dbPath, 'LOCK');
@@ -82,7 +82,7 @@ export class GraphDatabaseService extends EventEmitter {
         await fs.access(lockPath);
         // Skip lsof check on Windows
         if (process.platform === 'win32') {
-          console.log('[GraphDB] Skipping lock check on Windows');
+          console.error('[GraphDB] Skipping lock check on Windows');
           throw new Error('SKIP');
         }
         // Lock file exists - check who owns it (with timeout to prevent hangs)
@@ -146,7 +146,7 @@ export class GraphDatabaseService extends EventEmitter {
       // Create and open Level database - NO FALLBACK, FAIL-FAST
       this.levelDB = new Level(this.dbPath, { valueEncoding: 'json' });
       await this.levelDB.open();
-      console.log(`✓ Level database opened at: ${this.dbPath}`);
+      console.error(`✓ Level database opened at: ${this.dbPath}`);
 
       // Load existing graph from Level if present
       await this._loadGraphFromLevel();
@@ -157,7 +157,7 @@ export class GraphDatabaseService extends EventEmitter {
       }
 
       this.emit('ready');
-      console.log(`✓ Graph database initialized (${this.graph.order} nodes, ${this.graph.size} edges)`);
+      console.error(`✓ Graph database initialized (${this.graph.order} nodes, ${this.graph.size} edges)`);
 
     } catch (error) {
       // Enhance error message for common issues
@@ -233,7 +233,7 @@ export class GraphDatabaseService extends EventEmitter {
       const incomingIsFallback = !incomingType || fallbackTypes.includes(incomingType);
 
       if (existingIsSpecific && incomingIsFallback) {
-        console.log(`[GraphDatabaseService] Preserving entityType '${existingType}' for ${entity.name} (incoming was fallback '${incomingType}')`);
+        console.error(`[GraphDatabaseService] Preserving entityType '${existingType}' for ${entity.name} (incoming was fallback '${incomingType}')`);
         attributes.entityType = existingType;
       }
 
@@ -280,7 +280,7 @@ export class GraphDatabaseService extends EventEmitter {
               created_at: new Date().toISOString(),
               auto_generated: true // Mark as auto-generated for audit trail
             });
-            console.log(`[GraphDatabaseService] Auto-linked ${entity.name} to CollectiveKnowledge (orphan prevention)`);
+            console.error(`[GraphDatabaseService] Auto-linked ${entity.name} to CollectiveKnowledge (orphan prevention)`);
           }
         }
       }
@@ -501,7 +501,7 @@ export class GraphDatabaseService extends EventEmitter {
         });
       }
     });
-    console.log(`🔍 [DELETE] Deleting "${name}": Removing ${relationsBeforeDelete.length} relations:`, JSON.stringify(relationsBeforeDelete, null, 2));
+    console.error(`🔍 [DELETE] Deleting "${name}": Removing ${relationsBeforeDelete.length} relations:`, JSON.stringify(relationsBeforeDelete, null, 2));
 
     // Delete the node (this automatically removes all associated edges)
     this.graph.dropNode(nodeId);
@@ -518,7 +518,7 @@ export class GraphDatabaseService extends EventEmitter {
     // Emit deletion event (GraphKnowledgeExporter and QdrantSyncService listen to this)
     this.emit('entity:deleted', { team, name, nodeId, entity });
 
-    console.log(`✓ Deleted entity: ${name} (team: ${team})`);
+    console.error(`✓ Deleted entity: ${name} (team: ${team})`);
 
     return {
       success: true,
@@ -581,7 +581,7 @@ export class GraphDatabaseService extends EventEmitter {
 
     if (existingEdge) {
       // Edge already exists - skip to prevent duplicates
-      console.log(`[GraphDatabaseService] Skipping duplicate relation: ${fromEntity} --[${normalizedType}]--> ${toEntity} (existing: ${existingEdge})`);
+      console.error(`[GraphDatabaseService] Skipping duplicate relation: ${fromEntity} --[${normalizedType}]--> ${toEntity} (existing: ${existingEdge})`);
       return;
     }
 
@@ -645,7 +645,7 @@ export class GraphDatabaseService extends EventEmitter {
     // Delete collected edges
     for (const edge of edgesToDelete) {
       this.graph.dropEdge(edge.edgeId);
-      console.log(`🗑️  Deleted edge: ${edge.source} → ${edge.target} (${relationType})`);
+      console.error(`🗑️  Deleted edge: ${edge.source} → ${edge.target} (${relationType})`);
     }
 
     // Mark as dirty for persistence
@@ -658,7 +658,7 @@ export class GraphDatabaseService extends EventEmitter {
       }
     }
 
-    console.log(`✓ Deleted ${edgesToDelete.length} edges with type "${relationType}"`);
+    console.error(`✓ Deleted ${edgesToDelete.length} edges with type "${relationType}"`);
     return {
       deleted: edgesToDelete.length,
       edges: edgesToDelete.map(e => ({
@@ -677,7 +677,7 @@ export class GraphDatabaseService extends EventEmitter {
    * @returns {Promise<{duplicatesRemoved: number, details: Array}>} Deduplication result
    */
   async deduplicateRelations() {
-    console.log('🔍 Scanning for duplicate relations...');
+    console.error('🔍 Scanning for duplicate relations...');
 
     // Helper to normalize relation type (spaces to underscores)
     const normalizeType = (type) => (type || '').replace(/\s+/g, '_');
@@ -729,7 +729,7 @@ export class GraphDatabaseService extends EventEmitter {
           duplicateCount: duplicates.length
         });
 
-        console.log(`  Found ${duplicates.length} duplicate(s): ${sourceName} --[${edges[0].normalizedType}]--> ${targetName}`);
+        console.error(`  Found ${duplicates.length} duplicate(s): ${sourceName} --[${edges[0].normalizedType}]--> ${targetName}`);
       }
     }
 
@@ -746,7 +746,7 @@ export class GraphDatabaseService extends EventEmitter {
       }
     }
 
-    console.log(`✓ Deduplication complete: removed ${edgesToDelete.length} duplicate edges`);
+    console.error(`✓ Deduplication complete: removed ${edgesToDelete.length} duplicate edges`);
     return {
       duplicatesRemoved: edgesToDelete.length,
       details: duplicateDetails
@@ -764,7 +764,7 @@ export class GraphDatabaseService extends EventEmitter {
    * @returns {Promise<{normalized: number, genericRemoved: number, details: Object}>}
    */
   async normalizeAndCleanupRelations() {
-    console.log('🧹 Normalizing and cleaning up relations...');
+    console.error('🧹 Normalizing and cleaning up relations...');
 
     const normalizeType = (type) => (type || '').replace(/\s+/g, '_');
 
@@ -790,13 +790,13 @@ export class GraphDatabaseService extends EventEmitter {
           from: currentType,
           to: normalizedType
         });
-        console.log(`  Normalized: "${currentType}" → "${normalizedType}"`);
+        console.error(`  Normalized: "${currentType}" → "${normalizedType}"`);
       }
 
       // Remove empty/null types by marking for deletion
       if (!normalizedType) {
         edgesToDelete.push(edgeId);
-        console.log(`  Removing edge with empty type: ${edgeId}`);
+        console.error(`  Removing edge with empty type: ${edgeId}`);
       }
     });
 
@@ -834,7 +834,7 @@ export class GraphDatabaseService extends EventEmitter {
             const targetName = this.graph.hasNode(target)
               ? this.graph.getNodeAttribute(target, 'name')
               : target;
-            console.log(`  Removing generic 'relation': ${sourceName} → ${targetName} (specific types: ${specificEdges.map(e => e.type).join(', ')})`);
+            console.error(`  Removing generic 'relation': ${sourceName} → ${targetName} (specific types: ${specificEdges.map(e => e.type).join(', ')})`);
           }
         }
       }
@@ -857,10 +857,10 @@ export class GraphDatabaseService extends EventEmitter {
       }
     }
 
-    console.log(`✓ Cleanup complete:`);
-    console.log(`  - Normalized ${normalizedCount} relation types`);
-    console.log(`  - Removed ${genericRemovedCount} generic 'relation' edges`);
-    console.log(`  - Removed ${edgesToDelete.length - genericRemovedCount} edges with empty types`);
+    console.error(`✓ Cleanup complete:`);
+    console.error(`  - Normalized ${normalizedCount} relation types`);
+    console.error(`  - Removed ${genericRemovedCount} generic 'relation' edges`);
+    console.error(`  - Removed ${edgesToDelete.length - genericRemovedCount} edges with empty types`);
 
     return {
       normalized: normalizedCount,
@@ -1706,7 +1706,7 @@ export class GraphDatabaseService extends EventEmitter {
       this.graph.clear();
     }
 
-    console.log('✓ Graph database closed');
+    console.error('✓ Graph database closed');
   }
 
   /**
@@ -1782,12 +1782,12 @@ export class GraphDatabaseService extends EventEmitter {
         }
       }
 
-      console.log(`  Loaded ${graphData.metadata.nodeCount} nodes and ${graphData.metadata.edgeCount} edges from Level`);
+      console.error(`  Loaded ${graphData.metadata.nodeCount} nodes and ${graphData.metadata.edgeCount} edges from Level`);
 
     } catch (error) {
       if (error.code === 'LEVEL_NOT_FOUND') {
         // No existing data, start fresh
-        console.log('  No existing graph data found in Level, starting fresh');
+        console.error('  No existing graph data found in Level, starting fresh');
       } else {
         console.warn('  Failed to load graph from Level:', error.message);
       }
