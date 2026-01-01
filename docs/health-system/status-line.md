@@ -11,20 +11,21 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 ### Example Display
 
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 O○ X$25] | 📋🟠2130-2230(3min) →coding]
+[C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq● A$18 O○ X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
 ### Reading the Status Line
 
-**Format**: `[🏥 health | 🛡️ compliance trajectory | [api-quota] | 📋 lsl-status]`
+**Format**: `[sessions] [🛡️ compliance trajectory] [api-quota] [📚 knowledge] [🏥 health] 📋time`
 
 **Components**:
-- `🏥 95%` - **System Health**: Overall health score (0-100%)
-- `🛡️ 94%` - **Constraint Compliance**: Code quality compliance percentage
-- `⚙️ IMP` - **Trajectory State**: Current development activity
+- `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
+- `🛡️ 67%` - **Constraint Compliance**: Code quality compliance percentage
+- `🔍 EX` - **Trajectory State**: Current development activity
 - `[Gq● A$18 O○ X$25]` - **API Quota**: LLM provider availability (see below)
-- `📋🟠2130-2230(3min)` - **LSL Status**: Logging window and activity
-- `→coding` - **Active Project**: Project with recent activity
+- `[📚✅]` - **Knowledge System**: Knowledge extraction status
+- `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
+- `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
 ### API Quota Monitoring
 
@@ -74,36 +75,42 @@ To show remaining dollars, set `prepaidCredits` in `config/live-logging-config.j
 - Anthropic: `ANTHROPIC_ADMIN_API_KEY` - Get at console.anthropic.com → Settings → Admin API Keys
 - OpenAI: `OPENAI_ADMIN_API_KEY` - Get at platform.openai.com/settings/organization/admin-keys
 
-### Health Verifier Status Indicators
+### Unified Health Status Indicator
 
-The `[🏥...]` section shows the health verifier system status:
+The `[🏥...]` section shows **unified system health** combining:
+- **GCM (Global Coding Monitor)**: Session coordinator health
+- **Health Verifier**: Service, database, and process health
+- **Constraint Enforcement**: Whether constraints are actively enforced
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `[🏥✅]` | Health verifier operational, no violations | None needed |
-| `[🏥🟡]` | Degraded - some issues detected | Review health dashboard |
-| `[🏥⏰]` | **Stale** - verification data >2 minutes old | Health verifier may have crashed/stuck |
-| `[🏥❌]` | Error reading health status | Check health verifier process |
-| `[🏥⚠️X]` | X violations detected | Review violations in dashboard |
+| `[🏥✅]` | All systems healthy | None needed |
+| `[🏥⚠️]` | Issues detected | Check dashboard for details |
+| `[🏥⏰]` | **Stale** - verification data >2 minutes old | Health verifier may have crashed |
+| `[🏥❌]` | Critical issues or error | Immediate attention required |
+| `[🏥💤]` | Health verifier offline | Start health verifier |
 
-**Common Causes of `[🏥⏰]` (Stale)**:
-- Health verifier process crashed or was killed
-- System under heavy load (verifier couldn't run)
-- Health status file locked by another process
+**Note**: Violation counts are no longer shown in the status line. Details are available on the health dashboard at http://localhost:3033.
 
-**To Fix Stale Status**:
+**Common Causes of `[🏥⚠️]` (Issues)**:
+- Constraint enforcement disabled
+- Service health check failures
+- Database connectivity issues
+- Stale PIDs in process registry
+
+**To Fix Issues**:
 ```bash
-# Check if health verifier is running
-ps aux | grep health-verifier
+# Check health details
+node scripts/health-verifier.js status
 
-# Manually trigger verification
-node scripts/health-verifier.js
+# Manually trigger verification with auto-heal
+node scripts/health-verifier.js --auto-heal
 
 # Or restart all services
 coding --restart-services
 ```
 
-The health verifier runs every 60 seconds. If the status file is older than 2 minutes, it's considered stale.
+The health verifier runs every 60 seconds with auto-healing enabled.
 
 ### Trajectory States
 
@@ -128,7 +135,7 @@ The health verifier runs every 60 seconds. If the status file is older than 2 mi
 
 ### Session Activity Indicators
 
-Session activity uses a **unified graduated color scheme** that transitions smoothly from active to dormant, avoiding jarring orange/red/yellow colors that imply errors or warnings:
+Session activity uses a **unified graduated color scheme** that transitions smoothly from active to dormant. **Only active sessions (< 24 hours) are displayed** - sleeping/inactive sessions are automatically filtered out to reduce clutter.
 
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
@@ -136,21 +143,19 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 | 🌲 | Cooling | 5 - 15 minutes | Session cooling down |
 | 🫒 | Fading | 15 min - 1 hour | Session fading, still tracked |
 | 🪨 | Dormant | 1 - 6 hours | Session dormant but alive |
-| ⚫ | Inactive | 6 - 24 hours | Session inactive, may be orphaned |
-| 💤 | Sleeping | > 24 hours | Session sleeping (long-term dormant) |
-| 💤 | Virgin Session | N/A (no prompts) | Session open but no user prompts yet |
-| 💤 | No Monitor | N/A | No transcript monitor running for this project |
+| ⚫ | Inactive | 6 - 24 hours | Session inactive (last shown before filtering) |
+| 💤 | Sleeping | > 24 hours | **Hidden from display** |
 | ❌ | Error | Any | Health check failed or service crash |
 
-**Cooling-Down Sequence** (Gradual Transition to Dormant):
+**Displayed Sessions** (Active within 24 hours):
 ```
-🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → 💤 Sleeping
+🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → [hidden]
    <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
 ```
 
-**Virgin Sessions**: Sessions that are open (Claude Code running with monitor) but have not yet received any user prompts show 💤. This indicates the session is ready but waiting for user input, not that it's broken or idle.
+**Hidden Sessions**: Sessions inactive for more than 24 hours (💤 sleeping) are automatically filtered from the status line display. This keeps the status line focused on actively used projects.
 
-**No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings like missing trajectory files or stale health data. Normal session inactivity is shown through the graduated cooling sequence, which naturally fades to 💤 rather than showing alarming colors.
+**No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings like missing trajectory files or stale health data. Normal session inactivity is shown through the graduated cooling sequence.
 
 **Activity Age Calculation**:
 - Uses `transcriptInfo.ageMs` from health file (actual transcript inactivity)
@@ -206,11 +211,10 @@ The system uses multiple discovery methods to ensure **only active sessions** (w
 - The Global Process Supervisor automatically restarts dead monitors within 30 seconds
 
 **Example**:
-- `[C🟢 ND💤 UT🟢]` - coding (active), nano-degree (no monitor/virgin session), ui-template (active)
-- `[C🟢 CA🌲 ND💤]` - coding active, curriculum-alignment cooling, nano-degree dormant
-- `[C💤 UT💤 CA💤 ND💤]` - All sessions are virgin (just started, no prompts yet)
-- `[C🟢 UT🫒 CA⚫]` - coding active, ui-template fading, curriculum-alignment inactive
-- Sessions with transcripts older than 48 hours AND no running monitor are hidden
+- `[C🟢 UT🟢]` - coding and ui-template both active
+- `[C🟢 CA🌲]` - coding active, curriculum-alignment cooling
+- `[C🟢 UT🫒 CA🪨]` - coding active, ui-template fading, curriculum-alignment dormant
+- Sessions inactive >24 hours (💤 sleeping) are automatically hidden from display
 
 ### Smart Abbreviation Engine
 
@@ -231,24 +235,25 @@ Project names are automatically abbreviated using intelligent algorithms:
 
 ## Multi-Session Support
 
-The status line displays information for **multiple active Claude Code sessions** simultaneously.
+The status line displays information for **multiple active Claude Code sessions** simultaneously. Only sessions active within the last 24 hours are shown.
 
-### Session Consolidation
+### Session Display
 
-**Single Session Display**:
+**Single Active Session**:
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 O○ X$25] | 📋🟠2130-2230(3min) →coding]
+[C🟢] [🛡️ 67% 🔍EX] [Gq● A$18] [📚✅] [🏥✅] 📋17-18
 ```
 
-**Multi-Session Display**:
+**Multiple Active Sessions**:
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 X$25] | 📋C:🟢1400-1500(2m) CA:🟠2130-2230(15m)]
+[C🟢 UT🫒 CA🌲] [🛡️ 67% 🔍EX] [Gq● A$18 X$25] [📚✅] [🏥⚠️] 📋17-18
 ```
 
 Where:
-- `C:` - coding project
-- `CA:` - curriculum-alignment project
-- Each with its own LSL status
+- `C` - coding project (active)
+- `UT` - ui-template project (fading)
+- `CA` - curriculum-alignment project (cooling)
+- Current project is underlined in terminal
 
 ### Session Prioritization
 
@@ -305,27 +310,27 @@ Where:
 
 ![Service Lifecycle State](../images/service-lifecycle-state.png)
 
-**Service Health States** (for system services like GCM, Guards, DB, VKB):
-- **Healthy** (✅) - Service operational
-- **Warning** (🟡) - Service degraded but functional
-- **Unhealthy** (🔴) - Service failing
-- **Unknown** (❓) - Cannot determine status
+**Unified Health States** (for `[🏥...]` indicator):
+- **Healthy** (✅) - All systems operational (GCM + Health Verifier + Enforcement)
+- **Warning** (⚠️) - Issues detected - check dashboard for details
+- **Stale** (⏰) - Health data older than 2 minutes
+- **Critical** (❌) - Critical issues requiring immediate attention
+- **Offline** (💤) - Health verifier not running
 
 **Session Activity States** (for project sessions - graduated cooling scheme):
 - **Active** (🟢) - Currently active (< 5 min)
 - **Cooling** (🌲) - Recently active (5-15 min)
 - **Fading** (🫒) - Activity fading (15 min - 1 hr)
 - **Dormant** (🪨) - Dormant but trackable (1-6 hr)
-- **Inactive** (⚫) - Session idle (6-24 hr)
-- **Sleeping** (💤) - Long-term dormant (> 24 hr) OR virgin session OR no monitor
+- **Inactive** (⚫) - Session idle (6-24 hr) - last visible state
+- **Sleeping** (💤) - Long-term dormant (> 24 hr) - **hidden from display**
 
 **Transitions**:
-- Health check success → Healthy/Active
-- Partial failure → Warning (services only, not sessions)
-- Complete failure → Unhealthy
-- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤
-- Virgin session (no prompts yet) → 💤 immediately
-- No running monitor → 💤
+- Health check success → Healthy (✅)
+- GCM or Health Verifier issues → Warning (⚠️)
+- Critical failures → Critical (❌)
+- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → [hidden]
+- Sessions >24 hours are filtered from display
 
 ### Status Display States
 
@@ -383,7 +388,7 @@ coding
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq● A$18 O○ X$25] | 📋🟠2130-2230(3min) →coding]
+# [C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq● A$18 X$25] [📚✅] [🏥⚠️] 📋17-18
 ```
 
 ### Troubleshooting
@@ -456,10 +461,10 @@ The status line system now includes **automatic terminal title updates** that wo
 Every 15 seconds, the statusline-health-monitor broadcasts status to all Claude session terminals via ANSI escape codes:
 
 ```
-Terminal Tab: "C🟢 | UT🪨 ND💤 CA🫒"
+Terminal Tab: "C🟢 | UT🫒 CA🌲"
               ↑          ↑
-        Current     Other sessions
-        project
+        Current     Other active sessions
+        project     (sleeping sessions hidden)
 ```
 
 This means you can see the current status of ALL sessions by looking at any terminal's tab or title bar, even if that session is idle.

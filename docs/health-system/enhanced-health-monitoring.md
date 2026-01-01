@@ -321,34 +321,57 @@ The system includes a real-time web-based health dashboard accessible at `http:/
 
 ### Current Display
 ```
-[🏥 95% | 🛡️ 94% ⚙️ IMP | [Gq📊🟢95% A📊🟢 O📊🟢 X📊🟢85%] | 📋🟠2130-2230(3min) →coding]
+[C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq● A$18 X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
 ### Component Breakdown
 
 | Component | Icon | Description | Example |
 |-----------|------|-------------|---------|
-| System Health | 🏥 95% | Overall health score | 95% (healthy) |
-| Constraint Compliance | 🛡️ 94% | Code quality compliance | 94% compliance |
-| Trajectory State | ⚙️ IMP | Development activity | IMP (implementing) |
-| API Quota | [Gq📊🟢95%...] | LLM provider usage | Groq 95%, X.AI 85% |
-| LSL Status | 📋🟠2130-2230 | Logging window | Session 2130-2230 |
-| Active Project | →coding | Project with activity | coding project |
+| Active Sessions | `[C🟢 UT🫒]` | Project abbreviations with activity icons | C=coding (active), UT=ui-template (fading) |
+| Constraint Compliance | `🛡️ 67%` | Code quality compliance | 67% compliance |
+| Trajectory State | `🔍EX` | Development activity | EX=exploring, IMP=implementing |
+| API Quota | `[Gq● A$18 X$25]` | LLM provider availability | Groq available, Anthropic $18 |
+| Knowledge System | `[📚✅]` | Knowledge extraction status | ✅=healthy, ⚠️=issues |
+| Unified Health | `[🏥✅]` | GCM + Health Verifier + Enforcement | ✅=all healthy |
+| LSL Time Window | `📋17-18` | Session time range | 17:00-18:00 |
 
-### Status Indicators
+### Session Activity Indicators
 
-- **🟢** - Healthy (has transcript monitor)
-- **🟡** - Warning (active session, no monitor)
-- **🔴** - Error (session issues detected)
-- **⚫** - Unknown/Offline
+Sessions use a graduated color scheme based on time since last activity:
 
-### Enhanced Status Filtering
+| Icon | Status | Time Since Activity | Display |
+|------|--------|---------------------|---------|
+| 🟢 | Active | < 5 minutes | Shown |
+| 🌲 | Cooling | 5 - 15 minutes | Shown |
+| 🫒 | Fading | 15 min - 1 hour | Shown |
+| 🪨 | Dormant | 1 - 6 hours | Shown |
+| ⚫ | Inactive | 6 - 24 hours | Shown |
+| 💤 | Sleeping | > 24 hours | **Hidden** |
 
-**Recent Enhancement**: Added dormant session filtering to reduce statusLine clutter:
-- Sessions marked as 'dormant' are automatically hidden from statusLine display
-- Only active sessions with healthy monitors are shown
-- Ensures statusLine remains clean and focused on relevant projects
-- Sessions can be rediscovered when they become active again
+### Unified Health Indicator
+
+The `[🏥...]` indicator combines:
+- **GCM (Global Coding Monitor)**: Session coordinator health
+- **Health Verifier**: Service, database, process health
+- **Constraint Enforcement**: Whether constraints are actively enforced
+
+| Display | Meaning |
+|---------|---------|
+| `[🏥✅]` | All systems healthy |
+| `[🏥⚠️]` | Issues detected - check dashboard |
+| `[🏥⏰]` | Health data stale (>2 min old) |
+| `[🏥❌]` | Critical issues |
+| `[🏥💤]` | Health verifier offline |
+
+**Note**: Violation counts are no longer shown. Details available on dashboard at http://localhost:3033.
+
+### Session Filtering
+
+**Sleeping sessions (>24 hours) are automatically hidden** to reduce status line clutter:
+- Only sessions active within 24 hours are displayed
+- Sessions rediscover automatically when they become active
+- Keeps status line focused on relevant projects
 
 ## Health Data Storage
 
