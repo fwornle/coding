@@ -155,7 +155,7 @@ socket.connect(7687, 'localhost');
 
 ## Docker Configuration
 
-The `code-graph-rag` submodule contains a `docker-compose.yaml` that uses environment variables for port configuration:
+The `code-graph-rag` submodule contains a `docker-compose.yaml` with persistence and auto-restart:
 
 ```yaml
 services:
@@ -164,15 +164,64 @@ services:
     ports:
       - "${MEMGRAPH_PORT:-7687}:7687"
       - "${MEMGRAPH_HTTP_PORT:-7444}:7444"
+    volumes:
+      - ./shared-data:/import
+      - memgraph-data:/var/lib/memgraph  # Persistent data - survives container restarts
+    restart: unless-stopped  # Auto-restart on failure or Docker restart
   lab:
     image: memgraph/lab
     ports:
       - "${LAB_PORT:-3000}:3000"
     environment:
       QUICK_CONNECT_MG_HOST: memgraph
+    restart: unless-stopped
+
+# Named volumes for data persistence
+volumes:
+  memgraph-data:
+    name: code-graph-rag-memgraph-data
 ```
 
-**Note**: This is a git submodule - do not modify the file directly. Port customization is achieved by passing environment variables at startup time:
+### Fast CSV Bulk Loading
+
+The indexer uses Memgraph's `LOAD CSV` for fast bulk import:
+
+```
+shared-data/                    →  /import (mounted in container)
+├── nodes/
+│   ├── function.csv (5MB)         LOAD CSV FROM '/import/nodes/...'
+│   ├── class.csv                         ↓
+│   ├── method.csv               ┌─────────────────┐
+│   └── ...                      │    Memgraph     │
+└── relationships.csv (29MB)     │   Graph Engine  │
+                                 └────────┬────────┘
+                                          ↓
+                     memgraph-data:/var/lib/memgraph (persistent)
+```
+
+- **CSV files** = Staging format for bulk import (regenerated on re-index)
+- **Memgraph volume** = Actual graph storage (persisted)
+
+### Persistence
+
+**The code graph index is persisted** via Docker named volume `code-graph-rag-memgraph-data`. This means:
+- Index survives container restarts and recreation
+- No need to re-index (20+ min) after `docker-compose down/up`
+- Data persists across Docker daemon restarts
+
+To verify persistence is working:
+```bash
+docker volume ls | grep memgraph
+# Should show: code-graph-rag-memgraph-data
+```
+
+To completely reset the index (if needed):
+```bash
+docker-compose -f integrations/code-graph-rag/docker-compose.yaml down -v
+# The -v flag removes the named volume
+```
+
+**Note**: This is a git submodule. Port customization is achieved by passing environment variables at startup time:
 
 ```javascript
 // From start-services-robust.js

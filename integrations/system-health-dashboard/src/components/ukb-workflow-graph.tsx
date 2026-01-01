@@ -127,12 +127,12 @@ const WORKFLOW_AGENTS = [
     name: 'Code Graph',
     shortName: 'Code',
     icon: Code,
-    description: 'Builds AST-based knowledge graph using Tree-sitter parsing. Uses external LLM (via code-graph-rag MCP) for Cypher query generation and RAG orchestration. Indexes functions, classes, imports, and call relationships into Memgraph.',
+    description: 'Builds AST-based knowledge graph using Tree-sitter parsing. Uses external LLM (via code-graph-rag MCP) for Cypher query generation and RAG orchestration. Indexes functions, classes, imports, and call relationships into Memgraph. Runs in FINALIZATION phase after all batches complete to avoid temporal mismatch.',
     usesLLM: true,
     llmModel: 'External: code-graph-rag (OpenAI/Anthropic/Ollama)',
     techStack: 'Tree-sitter + Memgraph + pydantic_ai',
-    row: 0,
-    col: 1.5,
+    row: 7,      // FINALIZATION: After batch_checkpoint (6.5), indexes current HEAD
+    col: 0.5,    // Left side of finalization row
   },
   {
     id: 'code_intelligence',
@@ -251,7 +251,7 @@ const WORKFLOW_AGENTS = [
     usesLLM: false,
     llmModel: null,
     techStack: 'LevelDB + Graphology',
-    row: 7,
+    row: 8,      // Shifted: After code_graph correlation
     col: 1.125,
   },
   {
@@ -263,7 +263,7 @@ const WORKFLOW_AGENTS = [
     usesLLM: false,
     llmModel: 'Embeddings: text-embedding-3-small',
     techStack: 'OpenAI Embeddings API',
-    row: 8,
+    row: 9,      // Shifted
     col: 1.125,
   },
   {
@@ -275,7 +275,7 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
-    row: 9,
+    row: 10,     // Shifted
     col: 1.125,
   },
 ]
@@ -330,27 +330,33 @@ const STEP_TO_AGENT: Record<string, string> = {
 }
 
 // Edge definitions showing data flow between agents
-// IMPORTANT: Must match actual workflow dependencies in coordinator.ts
-// Phase 1 (Parallel entry points - no incoming edges): git_history, vibe_history, code_graph, documentation_linker
+// IMPORTANT: Must match actual workflow dependencies in batch-analysis.yaml
+//
+// ARCHITECTURE (batch-analysis v1.2):
+// - BATCH LOOP: git_history, vibe_history → semantic_analysis → KG operators → checkpoint
+// - FINALIZATION: After all batches, code_graph indexes current HEAD, correlates with historical findings
+// - This avoids temporal mismatch between old commits and current codebase state
+//
 // Edge types: 'dependency' (solid) = must complete before next, 'dataflow' (dashed) = passes data/parameters
 const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'dataflow' }> = [
-  // Orchestrator dispatches to all entry points (dataflow - sends parameters)
+  // ========== INITIALIZATION ==========
+  // Orchestrator dispatches to batch scheduler (batch workflow) or entry points (complete workflow)
   { from: 'orchestrator', to: 'git_history', type: 'dataflow' },
   { from: 'orchestrator', to: 'vibe_history', type: 'dataflow' },
-  { from: 'orchestrator', to: 'code_graph', type: 'dataflow' },
   { from: 'orchestrator', to: 'documentation_linker', type: 'dataflow' },
+  // NOTE: code_graph is NOT in initialization - it runs in FINALIZATION
 
-  // Phase 1 -> Code Intelligence: Git, Vibe, and Code Graph feed intelligent queries
+  // ========== BATCH LOOP (no code_graph here) ==========
+  // Phase 1 -> Code Intelligence: Git and Vibe feed intelligent queries
   { from: 'git_history', to: 'code_intelligence' },
   { from: 'vibe_history', to: 'code_intelligence' },
-  { from: 'code_graph', to: 'code_intelligence' },  // After indexing, query for patterns
 
-  // Phase 1 + Code Intel -> Phase 2: All sources + intelligence feed Semantic Analysis
+  // Phase 1 + Code Intel -> Phase 2: Sources + intelligence feed Semantic Analysis
+  // NOTE: code_graph removed - semantic analysis is pure historical in batch loop
   { from: 'git_history', to: 'semantic_analysis' },
   { from: 'vibe_history', to: 'semantic_analysis' },
-  { from: 'code_graph', to: 'semantic_analysis' },  // index_codebase result feeds semantic
-  { from: 'code_intelligence', to: 'semantic_analysis' },  // intelligent query results
-  { from: 'documentation_linker', to: 'semantic_analysis' },  // link_documentation result feeds semantic
+  { from: 'code_intelligence', to: 'semantic_analysis' },
+  { from: 'documentation_linker', to: 'semantic_analysis' },
 
   // Phase 2 -> Phase 3: Semantic feeds Web Search
   { from: 'semantic_analysis', to: 'web_search' },
@@ -358,7 +364,7 @@ const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'd
   // Phase 3 -> Phase 4: Semantic + Web + Code Intel feed Insights
   { from: 'semantic_analysis', to: 'insight_generation' },
   { from: 'web_search', to: 'insight_generation' },
-  { from: 'code_intelligence', to: 'insight_generation' },  // Evidence-backed patterns
+  { from: 'code_intelligence', to: 'insight_generation' },
 
   // Phase 4 -> Phase 5: Insights -> Observations
   { from: 'insight_generation', to: 'observation_generation' },
@@ -366,17 +372,26 @@ const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'd
   // Phase 5 -> Phase 6: Observations -> Ontology Classification
   { from: 'observation_generation', to: 'ontology_classification' },
 
-  // Documentation Semantics - LLM analysis of docstrings and docs prose
-  // Depends on: transform_code_entities (code_graph), link_documentation (documentation_linker)
-  { from: 'code_graph', to: 'documentation_semantics' },  // transform_code_entities result
-  { from: 'documentation_linker', to: 'documentation_semantics' },  // link_documentation result
+  // Documentation Semantics - runs during batch but doesn't need code_graph
+  { from: 'documentation_linker', to: 'documentation_semantics' },
 
   // Phase 6 + Doc Semantics -> Phase 7: All feed QA
   { from: 'ontology_classification', to: 'quality_assurance' },
-  { from: 'documentation_semantics', to: 'quality_assurance' },  // doc semantics feeds QA
+  { from: 'documentation_semantics', to: 'quality_assurance' },
 
-  // Phase 7 -> Phase 8: QA -> Persistence
-  { from: 'quality_assurance', to: 'persistence' },
+  // ========== FINALIZATION (after ALL batches) ==========
+  // QA -> Batch Checkpoint (end of batch loop)
+  { from: 'quality_assurance', to: 'batch_checkpoint_manager' },
+
+  // After all batches: Checkpoint triggers CGR indexing of CURRENT codebase
+  { from: 'batch_checkpoint_manager', to: 'code_graph' },
+
+  // CGR indexes current HEAD, synthesizes insights, correlates with historical entities
+  // Then code_graph feeds persistence with enriched + historical entities
+  { from: 'code_graph', to: 'persistence' },
+
+  // Also feed accumulated batch entities to persistence
+  { from: 'batch_checkpoint_manager', to: 'persistence', type: 'dataflow' },
 
   // Phase 8 -> Phase 9: Persistence -> Deduplication
   { from: 'persistence', to: 'deduplication' },
