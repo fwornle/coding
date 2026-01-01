@@ -160,6 +160,7 @@ function outputBlockedResponse(healthStatus) {
 
 /**
  * Output health context for Claude (normal flow)
+ * Simplified: no counts, just status. Details on dashboard.
  */
 function outputHealthContext(healthStatus) {
     let context = '';
@@ -168,12 +169,15 @@ function outputHealthContext(healthStatus) {
         context = `🔄 System Health: Verification triggered (data was stale)\n`;
     } else if (healthStatus.exists && healthStatus.status) {
         const ageSeconds = Math.floor(healthStatus.ageMs / 1000);
+        const criticalCount = healthStatus.status.criticalCount || 0;
         const violations = healthStatus.status.violationCount || 0;
 
         if (violations === 0) {
             context = `✅ System Health: All systems operational (verified ${ageSeconds}s ago)\n`;
+        } else if (criticalCount > 0) {
+            context = `❌ System Health: Critical issues detected - check dashboard\n`;
         } else {
-            context = `⚠️ System Health: ${violations} issues detected (verified ${ageSeconds}s ago) - auto-healing active\n`;
+            context = `⚠️ System Health: Issues detected - auto-healing active\n`;
         }
     } else {
         context = `🔄 System Health: Initial verification in progress\n`;

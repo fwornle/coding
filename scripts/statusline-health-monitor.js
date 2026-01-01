@@ -962,14 +962,36 @@ class StatusLineHealthMonitor {
         portHealth.dashboard = false;
       }
       
+      // Enhanced API check: get full health response including enforcement status
+      let enforcementHealth = {
+        checked: false,
+        healthy: null,
+        message: null
+      };
+
       try {
-        // Quick HTTP connectivity test for API
+        // Fetch full health response with enforcement details
         const apiResponse = await Promise.race([
-          execAsync(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${apiPort}/api/health --max-time 3`),
+          execAsync(`curl -s http://localhost:${apiPort}/api/health --max-time 3`),
           new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
         ]);
-        const apiStatus = parseInt(apiResponse.stdout.trim());
-        portHealth.api = apiStatus >= 200 && apiStatus < 500;
+
+        if (apiResponse.stdout.trim()) {
+          try {
+            const healthData = JSON.parse(apiResponse.stdout.trim());
+            portHealth.api = true; // API responded
+
+            // Extract enforcement status
+            if (healthData.enforcement) {
+              enforcementHealth.checked = true;
+              enforcementHealth.healthy = healthData.enforcement.healthy;
+              enforcementHealth.message = healthData.enforcement.message;
+            }
+          } catch (parseError) {
+            // Not JSON, but API responded
+            portHealth.api = true;
+          }
+        }
       } catch (error) {
         // API port not responding
         portHealth.api = false;
@@ -1045,12 +1067,20 @@ class StatusLineHealthMonitor {
           icon: '🟡',
           details: `Port ${failedPorts.join(',')} down`
         };
+      } else if (enforcementHealth.checked && enforcementHealth.healthy === false) {
+        // Ports responsive BUT enforcement is broken - this is a critical issue!
+        healthResult = {
+          status: 'enforcement_broken',
+          icon: '🟡',
+          reason: 'enf',
+          details: enforcementHealth.message || 'Constraint enforcement not working'
+        };
       } else {
-        // All checks passed
+        // All checks passed including enforcement
         healthResult = {
           status: 'healthy',
           icon: '✅',
-          details: 'Ports 3030,3031 responsive'
+          details: 'Ports 3030,3031 responsive, enforcement active'
         };
       }
       
@@ -1662,14 +1692,13 @@ class StatusLineHealthMonitor {
       statusLine += `[GCM:${gcmHealth.icon}]`;
     }
 
-    // Project Sessions - show individual session statuses with abbreviations
-    // Since we now only include sessions with running transcript monitors,
-    // we show all sessions regardless of status (dormant, sleeping, etc.)
-    // The running monitor IS the signal that a session is active
-    const sessionEntries = Object.entries(sessionHealth);
+    // Project Sessions - only show ACTIVE sessions (exclude sleeping/inactive >24h)
+    // Filter out stale sessions that haven't been used in over 24 hours
+    const activeSessionEntries = Object.entries(sessionHealth)
+      .filter(([_, health]) => !['sleeping', 'inactive'].includes(health.status) && health.icon !== '💤' && health.icon !== '⚫');
 
-    if (sessionEntries.length > 0) {
-      const sessionStatuses = sessionEntries
+    if (activeSessionEntries.length > 0) {
+      const sessionStatuses = activeSessionEntries
         .map(([projectName, health]) => {
           const abbrev = this.getProjectAbbreviation(projectName);
           // Add reason in parentheses for yellow/red statuses
@@ -1683,8 +1712,13 @@ class StatusLineHealthMonitor {
       statusLine += ` [Sessions: ${sessionStatuses}]`;
     }
 
-    // Constraint Monitor
-    statusLine += ` [Guards:${constraintHealth.icon}]`;
+    // Constraint Monitor (Guards) - show reason if unhealthy
+    if (constraintHealth.icon === '🟡' || constraintHealth.icon === '🔴') {
+      const reason = constraintHealth.reason || this.getShortReason(constraintHealth.details || constraintHealth.status);
+      statusLine += ` [Guards:${constraintHealth.icon}(${reason})]`;
+    } else {
+      statusLine += ` [Guards:${constraintHealth.icon}]`;
+    }
 
     // Database Health (GraphDB + LevelDB + SQLite)
     if (databaseHealth.icon === '🟡' || databaseHealth.icon === '🔴') {
