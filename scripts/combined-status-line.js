@@ -1317,14 +1317,13 @@ class CombinedStatusLine {
     const parts = [];
     let overallColor = 'green';
 
-    // Global Health Status (GCM + Individual Session Statuses) - highest priority monitoring
+    // Sessions Display (without separate GCM indicator - merged into 🏥)
+    // Filter out sleeping/inactive sessions (>24h)
     if (globalHealth && globalHealth.status !== 'error') {
-      const gcmIcon = globalHealth.gcm?.icon || '🟡';
-      const sessionEntries = Object.entries(globalHealth.sessions || {});
+      const sessionEntries = Object.entries(globalHealth.sessions || {})
+        .filter(([_, health]) => !['sleeping', 'inactive'].includes(health.status) && health.icon !== '💤' && health.icon !== '⚫');
 
       if (sessionEntries.length > 0) {
-        // Build the full GCM and Sessions display without labels
-        // Determine current project to highlight it
         const currentProject = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
         const currentProjectName = currentProject.split('/').pop();
         const currentAbbrev = this.getProjectAbbreviation(currentProjectName);
@@ -1332,10 +1331,8 @@ class CombinedStatusLine {
         const sessionStatuses = sessionEntries
           .map(([project, health]) => {
             const abbrev = this.getProjectAbbreviation(project);
-            // Underline the current project's abbreviation
             const isCurrentProject = abbrev === currentAbbrev;
             const displayAbbrev = isCurrentProject ? `\u001b[4m${abbrev}\u001b[24m` : abbrev;
-            // Add reason for yellow/red statuses
             if ((health.icon === '🟡' || health.icon === '🔴') && health.reason) {
               return `${displayAbbrev}${health.icon}(${health.reason})`;
             }
@@ -1343,27 +1340,18 @@ class CombinedStatusLine {
           })
           .join(' ');
 
-        // Include GCM with reason code if not healthy
-        const gcmReason = globalHealth.gcm?.reason;
-        const gcmDisplay = gcmReason ? `GCM${gcmIcon}(${gcmReason})` : `GCM${gcmIcon}`;
-        parts.push(`[${gcmDisplay}]`);
         parts.push(`[${sessionStatuses}]`);
-        
-        // Determine overall session health for color coding
+
         const hasUnhealthy = sessionStatuses.includes('🔴');
         const hasWarning = sessionStatuses.includes('🟡');
-        
         if (hasUnhealthy) overallColor = 'red';
         else if (hasWarning && overallColor === 'green') overallColor = 'yellow';
-      } else {
-        // Just GCM with no sessions
-        const gcmReason = globalHealth.gcm?.reason;
-        const gcmDisplay = gcmReason ? `GCM${gcmIcon}(${gcmReason})` : `GCM${gcmIcon}`;
-        parts.push(`[${gcmDisplay}]`);
-        if (gcmIcon === '❌') overallColor = 'red';
-        else if (gcmIcon === '🟡' && overallColor === 'green') overallColor = 'yellow';
       }
     }
+
+    // Store GCM status to merge into health indicator later
+    const gcmIcon = globalHealth?.gcm?.icon || '🟡';
+    const gcmHealthy = gcmIcon === '✅';
 
     // Constraint Monitor Status with TRJ label (trajectory)
     if (constraint.status === 'operational') {
@@ -1430,55 +1418,51 @@ class CombinedStatusLine {
       overallColor = 'red';
     }
 
-    // Knowledge System Status (Book icon for knowledge extraction)
+    // Knowledge System Status - simplified (no counts)
     if (knowledge.status === 'operational') {
-      const stateIcon = knowledge.extractionState === 'ready' ? '✅' :
-                        knowledge.extractionState === 'processing' ? '⏳' :
-                        knowledge.extractionState === 'idle' ? '💤' : '⚠️';
-
       const errorCount = knowledge.errorCount || 0;
       if (errorCount > 0) {
-        // When showing errorCount, don't duplicate the warning emoji
-        // If state is already warning, just show the count
-        const displayIcon = stateIcon === '⚠️' ? '' : stateIcon;
-        parts.push(`[📚${displayIcon}⚠️${errorCount}]`);
+        parts.push('[📚⚠️]'); // Has errors - check dashboard
         if (overallColor === 'green') overallColor = 'yellow';
       } else {
+        const stateIcon = knowledge.extractionState === 'ready' ? '✅' :
+                          knowledge.extractionState === 'processing' ? '⏳' :
+                          knowledge.extractionState === 'idle' ? '💤' : '✅';
         parts.push(`[📚${stateIcon}]`);
       }
     } else if (knowledge.status === 'disabled') {
-      parts.push('[📚⏸️ ]'); // Paused/disabled (space for alignment)
+      parts.push('[📚⏸️]'); // Disabled
     } else {
-      parts.push('[📚❌]'); // Offline (no space - red cross is wide enough)
+      parts.push('[📚❌]'); // Offline
       if (overallColor === 'green') overallColor = 'yellow';
     }
 
-    // Health Verifier Status (Hospital/medical icon for health monitoring)
+    // Unified Health Status - merges GCM + Health Verifier into single indicator
+    // Shows overall system health: infrastructure (GCM) + services (healthVerifier)
     if (healthVerifier && healthVerifier.status === 'operational') {
-      const overallStatus = healthVerifier.overallStatus || 'healthy';
-      const violationCount = healthVerifier.violationCount || 0;
       const criticalCount = healthVerifier.criticalCount || 0;
+      const violationCount = healthVerifier.violationCount || 0;
 
       if (criticalCount > 0) {
-        parts.push(`[🏥❌${criticalCount}]`); // Critical issues
+        parts.push('[🏥❌]'); // Critical - check dashboard
         overallColor = 'red';
-      } else if (violationCount > 0) {
-        parts.push(`[🏥⚠️${violationCount}]`); // Warning issues
+      } else if (!gcmHealthy || violationCount > 0) {
+        parts.push('[🏥⚠️]'); // GCM or health issues - check dashboard
         if (overallColor === 'green') overallColor = 'yellow';
-      } else if (overallStatus === 'healthy') {
-        parts.push('[🏥✅]'); // All checks passed
       } else {
-        parts.push('[🏥🟡]'); // Degraded but no specific violations
-        if (overallColor === 'green') overallColor = 'yellow';
+        parts.push('[🏥✅]'); // All healthy (GCM + services)
       }
     } else if (healthVerifier && healthVerifier.status === 'stale') {
-      parts.push('[🏥⏰]'); // Stale data
+      parts.push('[🏥⏰]'); // Stale
+      if (overallColor === 'green') overallColor = 'yellow';
+    } else if (!gcmHealthy) {
+      parts.push('[🏥⚠️]'); // GCM unhealthy
       if (overallColor === 'green') overallColor = 'yellow';
     } else if (healthVerifier && healthVerifier.status === 'error') {
-      parts.push('[🏥❌]'); // Error reading status
+      parts.push('[🏥❌]'); // Error
       if (overallColor === 'green') overallColor = 'yellow';
     } else {
-      parts.push('[🏥💤]'); // Offline/not running
+      parts.push('[🏥💤]'); // Offline
     }
 
     // UKB (Update Knowledge Base) Process Status - shows 13-agent workflow activity

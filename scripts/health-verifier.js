@@ -302,12 +302,12 @@ class HealthVerifier extends EventEmitter {
       });
     }
 
-    // Check Constraint Monitor
+    // Check Constraint Monitor - with enhanced enforcement status extraction
     if (serviceRules.constraint_monitor.enabled) {
       const rule = serviceRules.constraint_monitor;
       let constraintCheck;
       if (rule.check_type === 'http_health' && rule.endpoint) {
-        constraintCheck = await this.checkHTTPHealth('constraint_monitor', rule.endpoint, rule.timeout_ms);
+        constraintCheck = await this.checkConstraintMonitorHealth(rule.endpoint, rule.timeout_ms);
       } else {
         constraintCheck = await this.checkPortListening('constraint_monitor', rule.port, rule.timeout_ms);
       }
@@ -738,6 +738,98 @@ class HealthVerifier extends EventEmitter {
     }
 
     return false;
+  }
+
+  /**
+   * Enhanced check for Constraint Monitor with enforcement status extraction
+   * Parses the response body to provide detailed enforcement health information
+   */
+  async checkConstraintMonitorHealth(endpoint, timeout) {
+    const serviceName = 'constraint_monitor';
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // Parse response body for enforcement details
+      let healthData = {};
+      try {
+        healthData = await response.json();
+      } catch {
+        // Ignore parse errors
+      }
+
+      const enforcement = healthData.enforcement || {};
+      const checks = enforcement.checks || {};
+
+      if (response.ok && enforcement.healthy !== false) {
+        // Service healthy AND enforcement working
+        const enabledCount = checks.has_constraints?.enabled || 0;
+        const totalCount = checks.has_constraints?.count || 0;
+        return {
+          category: 'services',
+          check: serviceName,
+          check_id: `${serviceName}_${Date.now()}`,
+          status: 'passed',
+          message: `Constraint enforcement active (${enabledCount}/${totalCount} constraints)`,
+          details: {
+            endpoint,
+            status_code: response.status,
+            enforcement: enforcement
+          },
+          timestamp: new Date().toISOString()
+        };
+      } else {
+        // Service responding but enforcement broken
+        const enforcementMsg = enforcement.message || 'Unknown enforcement issue';
+        const failedChecks = [];
+
+        if (checks.config_loads && !checks.config_loads.passed) {
+          failedChecks.push(`config load failed: ${checks.config_loads.error || 'unknown'}`);
+        }
+        if (checks.enforcement_enabled && !checks.enforcement_enabled.passed) {
+          failedChecks.push('enforcement disabled in runtime config');
+        }
+        if (checks.has_constraints && !checks.has_constraints.passed) {
+          failedChecks.push('no constraints loaded');
+        }
+
+        return {
+          category: 'services',
+          check: serviceName,
+          check_id: `${serviceName}_${Date.now()}`,
+          status: 'error',
+          message: `Constraint enforcement BROKEN: ${enforcementMsg}`,
+          details: {
+            endpoint,
+            status_code: response.status,
+            enforcement: enforcement,
+            failed_checks: failedChecks
+          },
+          recommendation: failedChecks.length > 0
+            ? `Fix: ${failedChecks.join('; ')}`
+            : 'Check constraint monitor configuration',
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (error) {
+      return {
+        category: 'services',
+        check: serviceName,
+        check_id: `${serviceName}_${Date.now()}`,
+        status: 'error',
+        message: `Constraint monitor unavailable: ${error.message}`,
+        details: { endpoint, error: error.message },
+        recommendation: 'Start constraint monitor service',
+        timestamp: new Date().toISOString()
+      };
+    }
   }
 
   /**
