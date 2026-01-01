@@ -104,10 +104,20 @@ integrations/mcp-server-browserbase/
 # Workflow checkpoints (timestamps that change frequently but don't need git tracking)
 .data/workflow-checkpoints.json
 .data/workflow-progress.json
+.data/workflow-runner-progress.json
+
+# Workflow execution configs (per-run configs with unique IDs)
+.data/workflow-configs/
 
 # Batch processing runtime state
 .data/batch-*.json
 .data/ukb-*.json
+
+# Ontology suggestions (runtime-generated, not needed in git)
+.data/ontologies/suggestions/
+
+# Code graph RAG index (binary, regenerated on indexing)
+.data/code-graph-index/
 
 # Workflow execution reports (generated on each UKB run, not needed in git)
 .data/workflow-reports/
