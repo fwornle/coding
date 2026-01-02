@@ -126,13 +126,13 @@ export default function CGRReindexModal() {
           </DialogTitle>
           <DialogDescription>
             {cgr.reindexStatus === 'idle' && (
-              'This will rebuild the entire code graph index from scratch.'
+              'This will rebuild the code graph index for the coding repository.'
             )}
             {cgr.reindexStatus === 'running' && (
-              'The code graph is being rebuilt. This runs in the background.'
+              'The code graph for coding is being rebuilt. This runs in the background.'
             )}
             {cgr.reindexStatus === 'completed' && (
-              'The code graph index has been successfully rebuilt.'
+              'The code graph index for coding has been successfully rebuilt.'
             )}
             {cgr.reindexStatus === 'failed' && (
               'The re-index operation failed. Please check the logs.'
@@ -142,13 +142,20 @@ export default function CGRReindexModal() {
 
         <div className="py-4">
           {cgr.reindexStatus === 'idle' && (
-            <Alert>
-              <Clock className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Warning:</strong> This operation typically takes <strong>20-30 minutes</strong> to complete,
-                depending on repository size. The process runs asynchronously and you can continue using the dashboard.
-              </AlertDescription>
-            </Alert>
+            <div className="space-y-3">
+              <Alert>
+                <Clock className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Warning:</strong> This operation typically takes <strong>20-30 minutes</strong> to complete.
+                  The process runs asynchronously and you can continue using the dashboard.
+                </AlertDescription>
+              </Alert>
+              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                <strong>Scope:</strong> Re-indexes the <code className="bg-background px-1 rounded">coding</code> repository
+                including all integrations (code-graph-rag, semantic-analysis, etc.). This covers ~33k functions across
+                the entire monorepo. Other repositories indexed via UKB remain in Memgraph but aren&apos;t cache-tracked.
+              </div>
+            </div>
           )}
 
           {cgr.reindexStatus === 'running' && (
