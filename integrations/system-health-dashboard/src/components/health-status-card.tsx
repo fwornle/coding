@@ -3,6 +3,7 @@
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { CheckCircle2, AlertTriangle, XCircle, Clock } from 'lucide-react'
 
 interface StatusItem {
@@ -10,6 +11,13 @@ interface StatusItem {
   status: 'operational' | 'warning' | 'error' | 'offline'
   description: string
   tooltip?: string
+  action?: {
+    label: string
+    icon?: React.ReactNode
+    onClick: (e: React.MouseEvent) => void
+    disabled?: boolean
+    variant?: 'default' | 'outline' | 'ghost' | 'destructive'
+  }
 }
 
 interface HealthStatusCardProps {
@@ -73,9 +81,26 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
                   <div className="text-xs text-muted-foreground">{item.description}</div>
                 </div>
               </div>
-              <span title={item.tooltip || ''}>
-                {getStatusBadge(item.status)}
-              </span>
+              <div className="flex items-center gap-2">
+                {item.action && (
+                  <Button
+                    size="sm"
+                    variant={item.action.variant || 'outline'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      item.action?.onClick(e)
+                    }}
+                    disabled={item.action.disabled}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {item.action.icon}
+                    {item.action.label}
+                  </Button>
+                )}
+                <span title={item.tooltip || ''}>
+                  {getStatusBadge(item.status)}
+                </span>
+              </div>
             </div>
           ))}
         </div>

@@ -19,12 +19,15 @@ import {
   RefreshCw,
   Zap,
   ExternalLink,
-  Brain
+  Brain,
+  RotateCcw
 } from 'lucide-react'
 import HealthStatusCard from './health-status-card'
 import ViolationsTable from './violations-table'
 import SystemChecksTable from './system-checks-table'
 import UKBWorkflowModal from './ukb-workflow-modal'
+import CGRReindexModal from './cgr-reindex-modal'
+import { openConfirmModal } from '@/store/slices/cgrSlice'
 
 export default function SystemHealthDashboard() {
   const dispatch = useAppDispatch()
@@ -34,6 +37,7 @@ export default function SystemHealthDashboard() {
   const autoHealing = useAppSelector((state) => state.autoHealing)
   const apiQuota = useAppSelector((state) => state.apiQuota)
   const ukb = useAppSelector((state) => state.ukb)
+  const cgr = useAppSelector((state) => state.cgr)
 
   // Real-time age calculation - updates every second
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -133,13 +137,23 @@ export default function SystemHealthDashboard() {
     if (cgrCheck) {
       const commitsBehind = cgrCheck.details?.commits_behind
       const cachedCommit = cgrCheck.details?.cached_commit
+      const isReindexing = cgr.reindexStatus === 'running'
       items.push({
         name: 'CGR Cache',
         status: mapCheckStatus(cgrCheck),
-        description: commitsBehind !== undefined
-          ? `${commitsBehind} commits behind`
-          : (cachedCommit ? `@ ${cachedCommit}` : 'Code graph'),
-        tooltip: cgrCheck.message + (cgrCheck.recommendation ? ` - ${cgrCheck.recommendation}` : '')
+        description: isReindexing
+          ? 'Re-indexing...'
+          : (commitsBehind !== undefined
+            ? `${commitsBehind} commits behind`
+            : (cachedCommit ? `@ ${cachedCommit.substring(0, 7)}` : 'Code graph')),
+        tooltip: cgrCheck.message + (cgrCheck.recommendation ? ` - ${cgrCheck.recommendation}` : ''),
+        action: {
+          label: isReindexing ? 'Running...' : 'Re-index',
+          icon: <RotateCcw className={`h-3 w-3 mr-1 ${isReindexing ? 'animate-spin' : ''}`} />,
+          onClick: () => dispatch(openConfirmModal()),
+          disabled: isReindexing,
+          variant: 'outline' as const,
+        }
       })
     }
 
@@ -520,6 +534,9 @@ export default function SystemHealthDashboard() {
         onOpenChange={setUkbModalOpen}
         processes={ukb.processes || []}
       />
+
+      {/* CGR Re-index Modal */}
+      <CGRReindexModal />
     </div>
   )
 }
