@@ -132,21 +132,33 @@ export default function SystemHealthDashboard() {
       })
     }
 
-    // CGR Cache check
+    // CGR Cache check - tracks code-graph-rag index for 'coding' repository
     const cgrCheck = checks.find((c: any) => c.check === 'cgr_cache')
     if (cgrCheck) {
       const commitsBehind = cgrCheck.details?.commits_behind
       const cachedCommit = cgrCheck.details?.cached_commit
+      const repoName = cgrCheck.details?.repo_name || 'coding'
       const isReindexing = cgr.reindexStatus === 'running'
+
+      // Description shows repo name and staleness
+      let description = 'Code graph'
+      if (isReindexing) {
+        description = 'Re-indexing coding...'
+      } else if (commitsBehind !== undefined && commitsBehind > 0) {
+        description = `${repoName}: ${commitsBehind} behind`
+      } else if (cachedCommit) {
+        description = `${repoName} @ ${cachedCommit.substring(0, 7)}`
+      }
+
+      // Tooltip explains scope
+      const scopeNote = 'CGR Cache tracks the code-graph-rag index for coding (including all integrations). Re-indexing rebuilds the AST-based code graph (~33k functions).'
+      const statusNote = cgrCheck.message + (cgrCheck.recommendation ? ` - ${cgrCheck.recommendation}` : '')
+
       items.push({
         name: 'CGR Cache',
         status: mapCheckStatus(cgrCheck),
-        description: isReindexing
-          ? 'Re-indexing...'
-          : (commitsBehind !== undefined
-            ? `${commitsBehind} commits behind`
-            : (cachedCommit ? `@ ${cachedCommit.substring(0, 7)}` : 'Code graph')),
-        tooltip: cgrCheck.message + (cgrCheck.recommendation ? ` - ${cgrCheck.recommendation}` : ''),
+        description,
+        tooltip: `${statusNote}\n\n${scopeNote}`,
         action: {
           label: isReindexing ? 'Running...' : 'Re-index',
           icon: <RotateCcw className={`h-3 w-3 mr-1 ${isReindexing ? 'animate-spin' : ''}`} />,
