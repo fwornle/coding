@@ -12,4 +12,5 @@
 	url = https://github.com/oraios/serena.git
 [submodule "integrations/code-graph-rag"]
 	path = integrations/code-graph-rag
-	url = https://github.com/vitali87/code-graph-rag.git
+	url = https://github.com/fwornle/code-graph-rag.git
+	branch = semantic-enhancements
