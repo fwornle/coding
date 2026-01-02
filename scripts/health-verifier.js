@@ -277,6 +277,14 @@ class HealthVerifier extends EventEmitter {
       }
     }
 
+    // Check 3: CGR Cache Staleness
+    const cgrCacheCheck = await this.checkCGRCacheStaleness();
+    checks.push({
+      ...cgrCacheCheck,
+      check_id: 'cgr_cache_staleness',
+      timestamp: new Date().toISOString()
+    });
+
     return checks;
   }
 
@@ -885,6 +893,95 @@ class HealthVerifier extends EventEmitter {
    */
   async checkPortListening(serviceName, port, timeout) {
     return this.checkHTTPHealth(serviceName, `http://localhost:${port}`, timeout);
+  }
+
+  /**
+   * Check code-graph-rag cache staleness
+   */
+  async checkCGRCacheStaleness() {
+    const cgrDir = path.join(this.codingRoot, 'integrations', 'code-graph-rag');
+    const stalenessScript = path.join(cgrDir, 'scripts', 'check-cache-staleness.sh');
+
+    // Check if script exists
+    if (!fsSync.existsSync(stalenessScript)) {
+      return {
+        category: 'databases',
+        check: 'cgr_cache',
+        status: 'passed',
+        severity: 'info',
+        message: 'CGR cache staleness check not available',
+        details: { script_missing: true }
+      };
+    }
+
+    try {
+      const { execSync } = await import('child_process');
+      const result = execSync(`"${stalenessScript}" "${this.codingRoot}"`, {
+        encoding: 'utf-8',
+        timeout: 10000
+      });
+
+      const staleness = JSON.parse(result);
+
+      if (staleness.status === 'no_cache') {
+        return {
+          category: 'databases',
+          check: 'cgr_cache',
+          status: 'warning',
+          severity: 'warning',
+          message: 'CGR cache not found - indexing required',
+          recommendation: 'Run: cd integrations/code-graph-rag && uv run graph-code load-index',
+          details: staleness
+        };
+      }
+
+      if (staleness.is_stale) {
+        return {
+          category: 'databases',
+          check: 'cgr_cache',
+          status: 'warning',
+          severity: 'warning',
+          message: `CGR cache is ${staleness.commits_behind || 'many'} commits behind`,
+          recommendation: 'Reindex with: cd integrations/code-graph-rag && uv run graph-code load-index',
+          details: staleness
+        };
+      }
+
+      return {
+        category: 'databases',
+        check: 'cgr_cache',
+        status: 'passed',
+        message: `CGR cache fresh (${staleness.cached_commit})`,
+        details: staleness
+      };
+    } catch (error) {
+      // Exit code 1 means stale, 2 means no cache
+      if (error.status === 1) {
+        try {
+          const staleness = JSON.parse(error.stdout);
+          return {
+            category: 'databases',
+            check: 'cgr_cache',
+            status: 'warning',
+            severity: 'warning',
+            message: `CGR cache stale: ${staleness.commits_behind || 'unknown'} commits behind`,
+            recommendation: 'Reindex code-graph-rag',
+            details: staleness
+          };
+        } catch {
+          // Couldn't parse output
+        }
+      }
+
+      return {
+        category: 'databases',
+        check: 'cgr_cache',
+        status: 'passed',
+        severity: 'info',
+        message: 'CGR cache check unavailable',
+        details: { error: error.message }
+      };
+    }
   }
 
   /**

@@ -147,6 +147,7 @@ The health system is built on interconnected components with active supervision:
 - **Qdrant** - Vector database (port 6333)
 - **SQLite** - Analytics database
 - **Memgraph** - Code graph database (port 7687 Bolt protocol, port 3100 Lab UI)
+- **CGR Cache** - Code graph index staleness (commit tracking)
 
 ### Services
 - **VKB Server** - Knowledge visualization (port 8080)

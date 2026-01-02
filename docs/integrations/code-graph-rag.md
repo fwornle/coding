@@ -133,11 +133,34 @@ RETURN c.name, parent.name;
 
 ## Health Monitoring
 
-Memgraph health is monitored by the system health dashboard:
+Memgraph and CGR cache health are monitored by the system health dashboard:
 
-- **Protocol**: TCP (Bolt) - NOT HTTP
+- **Memgraph Protocol**: TCP (Bolt) - NOT HTTP
 - **Health Check**: Raw socket connection to port 7687
+- **CGR Cache**: Staleness check via commit comparison
 - **Dashboard**: Visible in System Health Dashboard (`http://localhost:3032`)
+
+### CGR Cache Status
+
+The health system monitors CGR cache freshness:
+
+| Status | Commits Behind | Action |
+|--------|---------------|--------|
+| Fresh | 0-50 | None needed |
+| Stale | >50 | Reindexing recommended |
+| Diverged | N/A (not in history) | Reindexing required |
+| No Cache | N/A | Initial indexing needed |
+
+**API Endpoint**:
+```bash
+# Get cache status
+curl http://localhost:3033/api/cgr/status
+
+# Trigger reindexing
+curl -X POST http://localhost:3033/api/cgr/reindex
+```
+
+**Dashboard Display**: The Databases card shows CGR Cache status with commits behind count.
 
 ### Manual Health Check
 
@@ -151,6 +174,9 @@ socket.on('connect', () => { console.log('Memgraph OK'); socket.destroy(); });
 socket.on('error', (e) => { console.log('Memgraph FAIL:', e.code); });
 socket.connect(7687, 'localhost');
 "
+
+# Check CGR cache staleness
+./integrations/code-graph-rag/scripts/check-cache-staleness.sh
 ```
 
 ## Docker Configuration
@@ -182,6 +208,36 @@ volumes:
     name: code-graph-rag-memgraph-data
 ```
 
+### Cache Architecture
+
+![CGR Cache Architecture](../images/cgr-cache-architecture.png)
+
+The indexer creates CSV files that are bulk-loaded into Memgraph. For frequently-indexed repositories (like coding), pre-built caches are available via GitHub Releases.
+
+**Cache Components:**
+- `shared-data/nodes/*.csv` - Node definitions (functions, classes, methods)
+- `shared-data/relationships.csv` - Call graph and dependencies
+- `shared-data/cache-metadata.json` - Commit hash, timestamp, statistics
+- Docker volume `memgraph-data` - Persistent graph storage
+
+**Cache Flow:**
+1. **Indexing** → Creates CSV files in `shared-data/`
+2. **LOAD CSV** → Bulk imports into Memgraph
+3. **Persistence** → Graph stored in Docker named volume
+4. **Staleness Check** → Compares cached commit vs current HEAD
+
+### Pre-Built Cache (coding repo)
+
+Fresh installations automatically download a pre-built cache:
+
+```bash
+# Automatic during install.sh
+integrations/code-graph-rag/shared-data/  ← Downloaded from GitHub Release
+
+# Contains ~50MB of indexed data for coding repo
+# Avoids 15-20 minute initial indexing
+```
+
 ### Fast CSV Bulk Loading
 
 The indexer uses Memgraph's `LOAD CSV` for fast bulk import:
@@ -201,6 +257,7 @@ shared-data/                    →  /import (mounted in container)
 
 - **CSV files** = Staging format for bulk import (regenerated on re-index)
 - **Memgraph volume** = Actual graph storage (persisted)
+- **cache-metadata.json** = Tracks indexed commit for staleness detection
 
 ### Persistence
 

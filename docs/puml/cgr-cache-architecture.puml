@@ -1,0 +1,91 @@
+@startuml cgr-cache-architecture
+!include _standard-style.puml
+
+title CGR Cache Architecture
+
+' Layout: top-down vertical flow
+top to bottom direction
+
+' Source layer
+package "Source Code" as src {
+  folder "Repository" as repo {
+    file "*.py, *.ts, *.js" as srcfiles
+  }
+  file "Git HEAD" as githead
+}
+
+' Indexing layer
+package "Indexing Process" as idx {
+  component "Parser\n(Tree-sitter)" as parser <<core>>
+  component "Indexer\n(AST Analysis)" as indexer <<core>>
+}
+
+' Cache layer
+package "Cache Storage" as cache {
+  folder "shared-data/" as shareddata {
+    folder "nodes/" as nodes {
+      file "function.csv" as funccsv
+      file "class.csv" as classcsv
+      file "method.csv" as methodcsv
+    }
+    file "relationships.csv" as relcsv
+    file "cache-metadata.json" as metadata
+  }
+}
+
+' Persistence layer
+package "Graph Storage" as storage {
+  database "Memgraph\n(Docker Volume)" as memgraph
+}
+
+' Health monitoring
+package "Health Monitoring" as health {
+  component "Health Verifier" as verifier <<api>>
+  component "Staleness Check\nScript" as staleness <<util>>
+}
+
+' External distribution
+cloud "GitHub Release" as ghrelease {
+  file "cgr-cache-*.tar.gz" as tarball
+}
+
+' Indexing flow
+srcfiles --> parser : reads
+parser --> indexer : AST
+indexer --> funccsv : writes
+indexer --> classcsv
+indexer --> methodcsv
+indexer --> relcsv
+githead --> metadata : commit hash
+
+' Load flow
+funccsv --> memgraph : LOAD CSV
+classcsv --> memgraph
+methodcsv --> memgraph
+relcsv --> memgraph
+
+' Health check flow
+verifier --> staleness : triggers
+staleness --> metadata : reads\ncached commit
+staleness --> githead : compares\ncurrent commit
+
+' Distribution flow
+shareddata --> tarball : package-cache.sh
+tarball --> shareddata : install.sh\ndownload
+
+' Notes
+note right of metadata
+  Tracks:
+  - commit_hash
+  - indexed_at
+  - stats (counts)
+end note
+
+note bottom of staleness
+  Status:
+  - fresh (0-50 behind)
+  - stale (>50 behind)
+  - diverged (not in history)
+end note
+
+@enduml
