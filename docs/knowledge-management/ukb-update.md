@@ -111,6 +111,21 @@ When triggered, the MCP semantic-analysis server executes:
 **Non-LLM Agent (1 agent):**
 14. **PersistenceAgent** - Stores entities to GraphDB (no LLM needed)
 
+### Workflow Visualization
+
+The System Health Dashboard provides a visual workflow graph of UKB workflow execution:
+
+![UKB Workflow Monitor](../images/health-monitor-dag.png)
+
+**Dashboard Features:**
+- **Pipeline Totals** - Commits processed, sessions analyzed, candidates discovered
+- **Deduplication Stats** - Shows reduction percentage (e.g., 86.9% reduction from raw to final)
+- **Visual Agent Flow** - Workflow graph showing batch-analysis → Git/Vibe/Code → Semantic agent chain
+- **Entity Breakdown** - Final entity counts by type (GraphDatabase, MCPAgent, etc.)
+- **Execution Details** - Duration, LLM provider used, completion status
+
+Access via System Health Dashboard at `http://localhost:3032` → UKB Workflow Monitor card.
+
 ---
 
 ## Storage Architecture

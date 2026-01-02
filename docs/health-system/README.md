@@ -135,10 +135,13 @@ The health system is built on interconnected components with active supervision:
 **Dashboard** (`integrations/system-health-dashboard/`)
 - React-based real-time visualization at port 3032
 - 4-card monitoring system (Databases, Services, Processes, API Quota)
+- UKB Workflow Monitor with visual workflow graph of agent execution
 - Service status indicators
 - Auto-healing history
 - Manual restart controls
 - Real-time API quota tracking
+
+![UKB Workflow Monitor](../images/health-monitor-dag.png)
 
 ## What It Monitors
 
