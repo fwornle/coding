@@ -260,11 +260,13 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-'
     const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
+      year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true
     })
   }
 

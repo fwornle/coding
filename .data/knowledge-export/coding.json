@@ -11830,20 +11830,51 @@
           "metadata": {
             "source": "workflow_persist"
           }
-        }
+        },
+        "decision to use a service-oriented architecture, as seen in the multiple api patterns, which allows for loose coupling and scalability"
       ],
-      "significance": 0.7,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2025-12-29T12:05:32.954Z",
-        "last_updated": "2025-12-29T12:05:32.954Z",
-        "significance": 7,
+        "last_updated": "2026-01-02T08:24:56.133Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2025-12-29T12:05:32.950Z",
-          "last_updated": "2025-12-29T12:05:32.950Z",
-          "created_by": "workflow_persist",
-          "version": "1.0",
+          "significance": 7,
+          "originalMetadata": {
+            "created_at": "2025-12-29T12:05:32.950Z",
+            "last_updated": "2025-12-29T12:05:32.950Z",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "heuristic",
+              "confidence": 0.94
+            },
+            "classificationConfidence": 0.94,
+            "classificationMethod": "heuristic",
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "lenient"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 100,
+              "totalIssues": 0,
+              "criticalIssues": 0,
+              "validatedAt": "2025-12-29T12:05:32.952Z",
+              "mode": "lenient"
+            },
+            "staleness_score": 100,
+            "staleness_check_at": "2025-12-29T12:05:32.952Z"
+          },
+          "source": "manual",
+          "team": "coding",
+          "created_at": "2025-12-29T12:05:32.954Z",
+          "last_updated": "2026-01-02T08:24:55.922Z",
           "ontology": {
             "ontologyName": "coding",
             "classificationMethod": "heuristic",
@@ -11859,14 +11890,16 @@
           },
           "contentValidation": {
             "overallValid": false,
-            "overallScore": 100,
-            "totalIssues": 0,
-            "criticalIssues": 0,
-            "validatedAt": "2025-12-29T12:05:32.952Z",
+            "overallScore": 80,
+            "totalIssues": 1,
+            "criticalIssues": 1,
+            "validatedAt": "2026-01-02T08:24:55.925Z",
             "mode": "lenient"
           },
+          "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2025-12-29T12:05:32.952Z"
+          "staleness_check_at": "2026-01-02T08:24:55.925Z",
+          "staleness_method": "git-based"
         }
       },
       "source": "manual",
@@ -12176,22 +12209,54 @@
             "source": "workflow_persist"
           }
         },
-        "The decision to implement a comprehensive knowledge graph management system, as seen in the commit 'feat: comprehensive knowledge graph management system', has a significant impact on the overall system architecture and scalability."
+        "The decision to implement a comprehensive knowledge graph management system, as seen in the commit 'feat: comprehensive knowledge graph management system', has a significant impact on the overall system architecture and scalability.",
+        "The decision to use a comprehensive knowledge graph management system (feat: comprehensive knowledge graph management system, commit date: 2025-05-31T06:58:09.000Z) has a significant impact on the project's scalability and maintainability",
+        "The decision to implement a 'multi-project semantic classifier' (embeddings) in commit 'feat: multi-project semantic classifier (embeddings)' demonstrates an effort to improve code analysis and understanding. The impact of this decision is likely to enhance the system's ability to classify and analyze code."
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2025-12-29T13:46:47.363Z",
-        "last_updated": "2026-01-01T12:48:14.998Z",
+        "last_updated": "2026-01-02T08:24:54.884Z",
         "significance": 5,
         "originalMetadata": {
-          "significance": 7,
+          "significance": 5,
           "originalMetadata": {
-            "created_at": "2025-12-29T13:46:47.357Z",
-            "last_updated": "2025-12-29T13:46:47.357Z",
-            "created_by": "workflow_persist",
-            "version": "1.0",
+            "significance": 7,
+            "originalMetadata": {
+              "created_at": "2025-12-29T13:46:47.357Z",
+              "last_updated": "2025-12-29T13:46:47.357Z",
+              "created_by": "workflow_persist",
+              "version": "1.0",
+              "ontology": {
+                "ontologyName": "coding",
+                "classificationMethod": "heuristic",
+                "confidence": 0.94
+              },
+              "classificationConfidence": 0.94,
+              "classificationMethod": "heuristic",
+              "validation": {
+                "valid": true,
+                "errors": [],
+                "warnings": [],
+                "mode": "lenient"
+              },
+              "contentValidation": {
+                "overallValid": false,
+                "overallScore": 100,
+                "totalIssues": 0,
+                "criticalIssues": 0,
+                "validatedAt": "2025-12-29T13:46:47.360Z",
+                "mode": "lenient"
+              },
+              "staleness_score": 100,
+              "staleness_check_at": "2025-12-29T13:46:47.360Z"
+            },
+            "source": "manual",
+            "team": "coding",
+            "created_at": "2025-12-29T13:46:47.363Z",
+            "last_updated": "2026-01-01T12:48:14.893Z",
             "ontology": {
               "ontologyName": "coding",
               "classificationMethod": "heuristic",
@@ -12207,25 +12272,27 @@
             },
             "contentValidation": {
               "overallValid": false,
-              "overallScore": 100,
-              "totalIssues": 0,
-              "criticalIssues": 0,
-              "validatedAt": "2025-12-29T13:46:47.360Z",
+              "overallScore": 80,
+              "totalIssues": 1,
+              "criticalIssues": 1,
+              "validatedAt": "2026-01-01T12:48:14.895Z",
               "mode": "lenient"
             },
+            "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2025-12-29T13:46:47.360Z"
+            "staleness_check_at": "2026-01-01T12:48:14.895Z",
+            "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2025-12-29T13:46:47.363Z",
-          "last_updated": "2026-01-01T12:48:14.893Z",
+          "last_updated": "2026-01-02T08:24:54.203Z",
           "ontology": {
             "ontologyName": "coding",
             "classificationMethod": "heuristic",
-            "confidence": 0.94
+            "confidence": 0.95
           },
-          "classificationConfidence": 0.94,
+          "classificationConfidence": 0.95,
           "classificationMethod": "heuristic",
           "validation": {
             "valid": true,
@@ -12238,12 +12305,12 @@
             "overallScore": 80,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-01T12:48:14.895Z",
+            "validatedAt": "2026-01-02T08:24:54.206Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-01T12:48:14.895Z",
+          "staleness_check_at": "2026-01-02T08:24:54.206Z",
           "staleness_method": "git-based"
         }
       },
@@ -12252,7 +12319,7 @@
     },
     {
       "name": "CrossanalysisGitvibecorrelationPattern",
-      "entityType": "KnowledgeEntity",
+      "entityType": "LSLSession",
       "observations": [
         {
           "type": "insight",
@@ -12280,32 +12347,424 @@
         },
         "Correlation identified between git activity (promise) and conversation focus (No theme)",
         "Correlation identified between git activity (The use of 'decorator' and 'repository' patterns in 'network-aware-installation-pattern.puml' and 'ssh-key-management-pattern.puml' files indicates a focus on modular and scalable design.) and conversation focus (No theme)",
-        "Correlation identified between git activity (Redux State Management Pattern: Demonstrated in knowledge-management/insights/ReduxStateManagementPattern.md, with evidence of usage in configureStore, createSlice, useAppSelector, and useAppDispatch functions.) and conversation focus (No theme)"
+        "Correlation identified between git activity (Redux State Management Pattern: Demonstrated in knowledge-management/insights/ReduxStateManagementPattern.md, with evidence of usage in configureStore, createSlice, useAppSelector, and useAppDispatch functions.) and conversation focus (No theme)",
+        "Correlation identified between git activity (API pattern in .claude/settings.local.json, demonstrating good practice in managing API settings) and conversation focus (No theme)",
+        "Correlation identified between git activity (Redux State Management Pattern: The use of Redux patterns in `knowledge-management/insights/ReduxStateManagementPattern.md` and `lib/adapters/claude-mcp.js` demonstrates a good practice of state management in the application.) and conversation focus (No theme)",
+        "Correlation identified between git activity (Service and API patterns in lib/adapters/copilot-http-server.js and knowledge-management/insights/VSCodeToolIntegrationPattern.md, demonstrating good practices in service-oriented architecture and API design) and conversation focus (No theme)",
+        "Correlation identified between git activity (The use of promise patterns in files such as lib/adapters/copilot-http-server.js and lib/knowledge-api/core/insights.js, which demonstrates good practices for handling asynchronous operations.) and conversation focus (No theme)",
+        "Correlation identified between git activity (Promise pattern is widely used in the codebase, indicating a focus on asynchronous programming (e.g., lib/agent-detector.js, lib/utils/system.js, scripts/claude-conversation-extractor.js)) and conversation focus (No theme)",
+        "Correlation identified between git activity (promise pattern in lib/knowledge-api/adapters/multi-file-storage.js and lib/knowledge-api/core/entities.js, indicating a focus on asynchronous programming) and conversation focus (No theme)",
+        "Correlation identified between git activity (API pattern in .claude/settings.local.json and scripts/combined-status-line.js, demonstrating a consistent approach to API integration) and conversation focus (No theme)",
+        "Correlation identified between git activity (The use of promise patterns in files like scripts/combined-status-line.js and scripts/violation-capture-service.js indicates a good practice of handling asynchronous operations.) and conversation focus (No theme)",
+        "Correlation identified between git activity (Use of promise pattern in scripts/enhanced-transcript-monitor.js, indicating asynchronous programming and error handling) and conversation focus (No theme)",
+        "Correlation identified between git activity (Commit messages follow a consistent naming convention, using keywords like 'fix', 'feat', 'chore', and 'refactor', which indicates good practice in change tracking and version control. For example, commit 'fix: add heartbeat to keep live-state.json fresh' demonstrates a clear and descriptive commit message.) and conversation focus (No theme)",
+        "Correlation identified between git activity (The use of JSON files for configuration and data storage is a prevalent pattern, as seen in files such as `.lsl/config.json`, `.spec-workflow/session.json`, and `.specstory/config/knowledge-system.schema.json`. This suggests a preference for human-readable data formats.) and conversation focus (No theme)",
+        "Correlation identified between git activity (The use of promise, decorator, repository, service, component, and api patterns in scripts/enhanced-transcript-monitor.js indicates a well-structured JavaScript application with a focus on modularity and reusability.) and conversation focus (No theme)"
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2025-12-29T13:46:47.376Z",
-        "last_updated": "2026-01-01T12:48:15.073Z",
+        "last_updated": "2026-01-02T08:24:58.218Z",
         "significance": 5,
         "originalMetadata": {
           "significance": 5,
           "originalMetadata": {
             "significance": 5,
             "originalMetadata": {
-              "significance": 8,
+              "significance": 5,
               "originalMetadata": {
-                "created_at": "2025-12-29T13:46:47.371Z",
-                "last_updated": "2025-12-29T13:46:47.371Z",
-                "created_by": "workflow_persist",
-                "version": "1.0",
+                "significance": 5,
+                "originalMetadata": {
+                  "significance": 5,
+                  "originalMetadata": {
+                    "significance": 5,
+                    "originalMetadata": {
+                      "significance": 5,
+                      "originalMetadata": {
+                        "significance": 5,
+                        "originalMetadata": {
+                          "significance": 5,
+                          "originalMetadata": {
+                            "significance": 5,
+                            "originalMetadata": {
+                              "significance": 5,
+                              "originalMetadata": {
+                                "significance": 5,
+                                "originalMetadata": {
+                                  "significance": 5,
+                                  "originalMetadata": {
+                                    "significance": 5,
+                                    "originalMetadata": {
+                                      "significance": 8,
+                                      "originalMetadata": {
+                                        "created_at": "2025-12-29T13:46:47.371Z",
+                                        "last_updated": "2025-12-29T13:46:47.371Z",
+                                        "created_by": "workflow_persist",
+                                        "version": "1.0",
+                                        "ontology": {
+                                          "ontologyName": "coding",
+                                          "classificationMethod": "heuristic",
+                                          "confidence": 0.85
+                                        },
+                                        "classificationConfidence": 0.85,
+                                        "classificationMethod": "heuristic",
+                                        "validation": {
+                                          "valid": true,
+                                          "errors": [],
+                                          "warnings": [],
+                                          "mode": "lenient"
+                                        },
+                                        "contentValidation": {
+                                          "overallValid": false,
+                                          "overallScore": 100,
+                                          "totalIssues": 0,
+                                          "criticalIssues": 0,
+                                          "validatedAt": "2025-12-29T13:46:47.374Z",
+                                          "mode": "lenient"
+                                        },
+                                        "staleness_score": 100,
+                                        "staleness_check_at": "2025-12-29T13:46:47.374Z"
+                                      },
+                                      "source": "manual",
+                                      "team": "coding",
+                                      "created_at": "2025-12-29T13:46:47.376Z",
+                                      "last_updated": "2025-12-29T13:46:47.386Z",
+                                      "ontology": {
+                                        "ontologyName": "coding",
+                                        "classificationMethod": "heuristic",
+                                        "confidence": 0.85
+                                      },
+                                      "classificationConfidence": 0.85,
+                                      "classificationMethod": "heuristic",
+                                      "validation": {
+                                        "valid": true,
+                                        "errors": [],
+                                        "warnings": [],
+                                        "mode": "lenient"
+                                      },
+                                      "contentValidation": {
+                                        "overallValid": false,
+                                        "overallScore": 100,
+                                        "totalIssues": 0,
+                                        "criticalIssues": 0,
+                                        "validatedAt": "2025-12-29T13:46:47.388Z",
+                                        "mode": "lenient"
+                                      },
+                                      "staleness_score": 100,
+                                      "staleness_check_at": "2025-12-29T13:46:47.388Z"
+                                    },
+                                    "source": "manual",
+                                    "team": "coding",
+                                    "created_at": "2025-12-29T13:46:47.376Z",
+                                    "last_updated": "2026-01-01T12:48:15.008Z",
+                                    "ontology": {
+                                      "ontologyName": "coding",
+                                      "classificationMethod": "heuristic",
+                                      "confidence": 0.85
+                                    },
+                                    "classificationConfidence": 0.85,
+                                    "classificationMethod": "heuristic",
+                                    "validation": {
+                                      "valid": true,
+                                      "errors": [],
+                                      "warnings": [],
+                                      "mode": "lenient"
+                                    },
+                                    "contentValidation": {
+                                      "overallValid": false,
+                                      "overallScore": 65,
+                                      "totalIssues": 2,
+                                      "criticalIssues": 2,
+                                      "validatedAt": "2026-01-01T12:48:15.010Z",
+                                      "mode": "lenient"
+                                    },
+                                    "invalidating_commits": [],
+                                    "staleness_score": 100,
+                                    "staleness_check_at": "2026-01-01T12:48:15.010Z",
+                                    "staleness_method": "git-based"
+                                  },
+                                  "source": "manual",
+                                  "team": "coding",
+                                  "created_at": "2025-12-29T13:46:47.376Z",
+                                  "last_updated": "2026-01-01T12:48:15.048Z",
+                                  "ontology": {
+                                    "ontologyName": "coding",
+                                    "classificationMethod": "heuristic",
+                                    "confidence": 0.88
+                                  },
+                                  "classificationConfidence": 0.88,
+                                  "classificationMethod": "heuristic",
+                                  "validation": {
+                                    "valid": true,
+                                    "errors": [],
+                                    "warnings": [],
+                                    "mode": "lenient"
+                                  },
+                                  "contentValidation": {
+                                    "overallValid": false,
+                                    "overallScore": 65,
+                                    "totalIssues": 2,
+                                    "criticalIssues": 2,
+                                    "validatedAt": "2026-01-01T12:48:15.050Z",
+                                    "mode": "lenient"
+                                  },
+                                  "invalidating_commits": [],
+                                  "staleness_score": 100,
+                                  "staleness_check_at": "2026-01-01T12:48:15.050Z",
+                                  "staleness_method": "git-based"
+                                },
+                                "source": "manual",
+                                "team": "coding",
+                                "created_at": "2025-12-29T13:46:47.376Z",
+                                "last_updated": "2026-01-02T08:24:54.895Z",
+                                "ontology": {
+                                  "ontologyName": "coding",
+                                  "classificationMethod": "heuristic",
+                                  "confidence": 0.94
+                                },
+                                "classificationConfidence": 0.94,
+                                "classificationMethod": "heuristic",
+                                "validation": {
+                                  "valid": true,
+                                  "errors": [],
+                                  "warnings": [],
+                                  "mode": "lenient"
+                                },
+                                "contentValidation": {
+                                  "overallValid": false,
+                                  "overallScore": 65,
+                                  "totalIssues": 2,
+                                  "criticalIssues": 2,
+                                  "validatedAt": "2026-01-02T08:24:54.898Z",
+                                  "mode": "lenient"
+                                },
+                                "invalidating_commits": [],
+                                "staleness_score": 100,
+                                "staleness_check_at": "2026-01-02T08:24:54.898Z",
+                                "staleness_method": "git-based"
+                              },
+                              "source": "manual",
+                              "team": "coding",
+                              "created_at": "2025-12-29T13:46:47.376Z",
+                              "last_updated": "2026-01-02T08:24:55.071Z",
+                              "ontology": {
+                                "ontologyName": "coding",
+                                "classificationMethod": "heuristic",
+                                "confidence": 0.94
+                              },
+                              "classificationConfidence": 0.94,
+                              "classificationMethod": "heuristic",
+                              "validation": {
+                                "valid": true,
+                                "errors": [],
+                                "warnings": [],
+                                "mode": "lenient"
+                              },
+                              "contentValidation": {
+                                "overallValid": false,
+                                "overallScore": 65,
+                                "totalIssues": 2,
+                                "criticalIssues": 2,
+                                "validatedAt": "2026-01-02T08:24:55.074Z",
+                                "mode": "lenient"
+                              },
+                              "invalidating_commits": [],
+                              "staleness_score": 100,
+                              "staleness_check_at": "2026-01-02T08:24:55.074Z",
+                              "staleness_method": "git-based"
+                            },
+                            "source": "manual",
+                            "team": "coding",
+                            "created_at": "2025-12-29T13:46:47.376Z",
+                            "last_updated": "2026-01-02T08:24:55.252Z",
+                            "ontology": {
+                              "ontologyName": "coding",
+                              "classificationMethod": "heuristic",
+                              "confidence": 0.95
+                            },
+                            "classificationConfidence": 0.95,
+                            "classificationMethod": "heuristic",
+                            "validation": {
+                              "valid": true,
+                              "errors": [],
+                              "warnings": [],
+                              "mode": "lenient"
+                            },
+                            "contentValidation": {
+                              "overallValid": false,
+                              "overallScore": 65,
+                              "totalIssues": 2,
+                              "criticalIssues": 2,
+                              "validatedAt": "2026-01-02T08:24:55.255Z",
+                              "mode": "lenient"
+                            },
+                            "invalidating_commits": [],
+                            "staleness_score": 100,
+                            "staleness_check_at": "2026-01-02T08:24:55.255Z",
+                            "staleness_method": "git-based"
+                          },
+                          "source": "manual",
+                          "team": "coding",
+                          "created_at": "2025-12-29T13:46:47.376Z",
+                          "last_updated": "2026-01-02T08:24:55.417Z",
+                          "ontology": {
+                            "ontologyName": "coding",
+                            "classificationMethod": "heuristic",
+                            "confidence": 0.95
+                          },
+                          "classificationConfidence": 0.95,
+                          "classificationMethod": "heuristic",
+                          "validation": {
+                            "valid": true,
+                            "errors": [],
+                            "warnings": [],
+                            "mode": "lenient"
+                          },
+                          "contentValidation": {
+                            "overallValid": false,
+                            "overallScore": 65,
+                            "totalIssues": 2,
+                            "criticalIssues": 2,
+                            "validatedAt": "2026-01-02T08:24:55.420Z",
+                            "mode": "lenient"
+                          },
+                          "invalidating_commits": [],
+                          "staleness_score": 100,
+                          "staleness_check_at": "2026-01-02T08:24:55.420Z",
+                          "staleness_method": "git-based"
+                        },
+                        "source": "manual",
+                        "team": "coding",
+                        "created_at": "2025-12-29T13:46:47.376Z",
+                        "last_updated": "2026-01-02T08:24:55.589Z",
+                        "ontology": {
+                          "ontologyName": "coding",
+                          "classificationMethod": "heuristic",
+                          "confidence": 0.95
+                        },
+                        "classificationConfidence": 0.95,
+                        "classificationMethod": "heuristic",
+                        "validation": {
+                          "valid": true,
+                          "errors": [],
+                          "warnings": [],
+                          "mode": "lenient"
+                        },
+                        "contentValidation": {
+                          "overallValid": false,
+                          "overallScore": 65,
+                          "totalIssues": 2,
+                          "criticalIssues": 2,
+                          "validatedAt": "2026-01-02T08:24:55.592Z",
+                          "mode": "lenient"
+                        },
+                        "invalidating_commits": [],
+                        "staleness_score": 100,
+                        "staleness_check_at": "2026-01-02T08:24:55.592Z",
+                        "staleness_method": "git-based"
+                      },
+                      "source": "manual",
+                      "team": "coding",
+                      "created_at": "2025-12-29T13:46:47.376Z",
+                      "last_updated": "2026-01-02T08:24:56.139Z",
+                      "ontology": {
+                        "ontologyName": "coding",
+                        "classificationMethod": "heuristic",
+                        "confidence": 0.95
+                      },
+                      "classificationConfidence": 0.95,
+                      "classificationMethod": "heuristic",
+                      "validation": {
+                        "valid": true,
+                        "errors": [],
+                        "warnings": [],
+                        "mode": "lenient"
+                      },
+                      "contentValidation": {
+                        "overallValid": false,
+                        "overallScore": 65,
+                        "totalIssues": 2,
+                        "criticalIssues": 2,
+                        "validatedAt": "2026-01-02T08:24:56.142Z",
+                        "mode": "lenient"
+                      },
+                      "invalidating_commits": [],
+                      "staleness_score": 100,
+                      "staleness_check_at": "2026-01-02T08:24:56.142Z",
+                      "staleness_method": "git-based"
+                    },
+                    "source": "manual",
+                    "team": "coding",
+                    "created_at": "2025-12-29T13:46:47.376Z",
+                    "last_updated": "2026-01-02T08:24:56.312Z",
+                    "ontology": {
+                      "ontologyName": "coding",
+                      "classificationMethod": "heuristic",
+                      "confidence": 0.95
+                    },
+                    "classificationConfidence": 0.95,
+                    "classificationMethod": "heuristic",
+                    "validation": {
+                      "valid": true,
+                      "errors": [],
+                      "warnings": [],
+                      "mode": "lenient"
+                    },
+                    "contentValidation": {
+                      "overallValid": false,
+                      "overallScore": 65,
+                      "totalIssues": 2,
+                      "criticalIssues": 2,
+                      "validatedAt": "2026-01-02T08:24:56.315Z",
+                      "mode": "lenient"
+                    },
+                    "invalidating_commits": [],
+                    "staleness_score": 100,
+                    "staleness_check_at": "2026-01-02T08:24:56.315Z",
+                    "staleness_method": "git-based"
+                  },
+                  "source": "manual",
+                  "team": "coding",
+                  "created_at": "2025-12-29T13:46:47.376Z",
+                  "last_updated": "2026-01-02T08:24:56.486Z",
+                  "ontology": {
+                    "ontologyName": "coding",
+                    "classificationMethod": "heuristic",
+                    "confidence": 0.95
+                  },
+                  "classificationConfidence": 0.95,
+                  "classificationMethod": "heuristic",
+                  "validation": {
+                    "valid": true,
+                    "errors": [],
+                    "warnings": [],
+                    "mode": "lenient"
+                  },
+                  "contentValidation": {
+                    "overallValid": false,
+                    "overallScore": 65,
+                    "totalIssues": 2,
+                    "criticalIssues": 2,
+                    "validatedAt": "2026-01-02T08:24:56.489Z",
+                    "mode": "lenient"
+                  },
+                  "invalidating_commits": [],
+                  "staleness_score": 100,
+                  "staleness_check_at": "2026-01-02T08:24:56.489Z",
+                  "staleness_method": "git-based"
+                },
+                "source": "manual",
+                "team": "coding",
+                "created_at": "2025-12-29T13:46:47.376Z",
+                "last_updated": "2026-01-02T08:24:56.654Z",
                 "ontology": {
                   "ontologyName": "coding",
                   "classificationMethod": "heuristic",
-                  "confidence": 0.85
+                  "confidence": 0.95
                 },
-                "classificationConfidence": 0.85,
+                "classificationConfidence": 0.95,
                 "classificationMethod": "heuristic",
                 "validation": {
                   "valid": true,
@@ -12315,25 +12774,27 @@
                 },
                 "contentValidation": {
                   "overallValid": false,
-                  "overallScore": 100,
-                  "totalIssues": 0,
-                  "criticalIssues": 0,
-                  "validatedAt": "2025-12-29T13:46:47.374Z",
+                  "overallScore": 65,
+                  "totalIssues": 2,
+                  "criticalIssues": 2,
+                  "validatedAt": "2026-01-02T08:24:56.657Z",
                   "mode": "lenient"
                 },
+                "invalidating_commits": [],
                 "staleness_score": 100,
-                "staleness_check_at": "2025-12-29T13:46:47.374Z"
+                "staleness_check_at": "2026-01-02T08:24:56.657Z",
+                "staleness_method": "git-based"
               },
               "source": "manual",
               "team": "coding",
               "created_at": "2025-12-29T13:46:47.376Z",
-              "last_updated": "2025-12-29T13:46:47.386Z",
+              "last_updated": "2026-01-02T08:24:57.025Z",
               "ontology": {
                 "ontologyName": "coding",
                 "classificationMethod": "heuristic",
-                "confidence": 0.85
+                "confidence": 0.95
               },
-              "classificationConfidence": 0.85,
+              "classificationConfidence": 0.95,
               "classificationMethod": "heuristic",
               "validation": {
                 "valid": true,
@@ -12343,25 +12804,27 @@
               },
               "contentValidation": {
                 "overallValid": false,
-                "overallScore": 100,
-                "totalIssues": 0,
-                "criticalIssues": 0,
-                "validatedAt": "2025-12-29T13:46:47.388Z",
+                "overallScore": 65,
+                "totalIssues": 2,
+                "criticalIssues": 2,
+                "validatedAt": "2026-01-02T08:24:57.028Z",
                 "mode": "lenient"
               },
+              "invalidating_commits": [],
               "staleness_score": 100,
-              "staleness_check_at": "2025-12-29T13:46:47.388Z"
+              "staleness_check_at": "2026-01-02T08:24:57.028Z",
+              "staleness_method": "git-based"
             },
             "source": "manual",
             "team": "coding",
             "created_at": "2025-12-29T13:46:47.376Z",
-            "last_updated": "2026-01-01T12:48:15.008Z",
+            "last_updated": "2026-01-02T08:24:57.575Z",
             "ontology": {
               "ontologyName": "coding",
               "classificationMethod": "heuristic",
-              "confidence": 0.85
+              "confidence": 0.95
             },
-            "classificationConfidence": 0.85,
+            "classificationConfidence": 0.95,
             "classificationMethod": "heuristic",
             "validation": {
               "valid": true,
@@ -12374,24 +12837,24 @@
               "overallScore": 65,
               "totalIssues": 2,
               "criticalIssues": 2,
-              "validatedAt": "2026-01-01T12:48:15.010Z",
+              "validatedAt": "2026-01-02T08:24:57.578Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-01-01T12:48:15.010Z",
+            "staleness_check_at": "2026-01-02T08:24:57.578Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2025-12-29T13:46:47.376Z",
-          "last_updated": "2026-01-01T12:48:15.048Z",
+          "last_updated": "2026-01-02T08:24:57.892Z",
           "ontology": {
             "ontologyName": "coding",
             "classificationMethod": "heuristic",
-            "confidence": 0.88
+            "confidence": 0.95
           },
-          "classificationConfidence": 0.88,
+          "classificationConfidence": 0.95,
           "classificationMethod": "heuristic",
           "validation": {
             "valid": true,
@@ -12404,12 +12867,12 @@
             "overallScore": 65,
             "totalIssues": 2,
             "criticalIssues": 2,
-            "validatedAt": "2026-01-01T12:48:15.050Z",
+            "validatedAt": "2026-01-02T08:24:57.896Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-01T12:48:15.050Z",
+          "staleness_check_at": "2026-01-02T08:24:57.896Z",
           "staleness_method": "git-based"
         }
       },
@@ -12480,6 +12943,282 @@
           },
           "staleness_score": 100,
           "staleness_check_at": "2026-01-01T12:58:44.820Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightTheIntroductionOfPattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The introduction of 'Layer 0 (Session Filter)' with conversation bias tracking in commit 'feat: implement Layer 0 (Session Filter) with conversation bias tracking' shows a focus on improving the system's filtering capabilities and reducing bias.",
+          "date": "2026-01-02T08:24:56.989Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-02T08:24:56.989Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-02T08:24:56.989Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-02T08:24:56.994Z",
+        "last_updated": "2026-01-02T08:24:56.994Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-02T08:24:56.989Z",
+          "last_updated": "2026-01-02T08:24:56.989Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.94
+          },
+          "classificationConfidence": 0.94,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-02T08:24:56.992Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-02T08:24:56.992Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightCommitMessagesFollowPattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "Commit messages follow a consistent naming convention, using keywords like 'fix', 'feat', 'chore', and 'refactor', which indicates good practice in change tracking and version control. For example, commit 'fix: add heartbeat to keep live-state.json fresh' demonstrates a clear and descriptive commit message.",
+          "date": "2026-01-02T08:24:56.996Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-02T08:24:56.996Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-02T08:24:56.996Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-02T08:24:57.000Z",
+        "last_updated": "2026-01-02T08:24:57.000Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-02T08:24:56.996Z",
+          "last_updated": "2026-01-02T08:24:56.996Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.94
+          },
+          "classificationConfidence": 0.94,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-02T08:24:56.998Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-02T08:24:56.998Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightThePresenceOfPattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The presence of a 'README.md' file in various directories, such as '.obsolete/analysis-docs' and 'docs', suggests a focus on documentation and knowledge sharing.",
+          "date": "2026-01-02T08:24:57.003Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-02T08:24:57.003Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-02T08:24:57.003Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-02T08:24:57.008Z",
+        "last_updated": "2026-01-02T08:24:57.008Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-02T08:24:57.003Z",
+          "last_updated": "2026-01-02T08:24:57.003Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.94
+          },
+          "classificationConfidence": 0.94,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-02T08:24:57.005Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-02T08:24:57.005Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightTheUseOfPattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The use of submodules, like 'integrations/mcp-constraint-monitor', indicates a modular approach to code organization and reusability.",
+          "date": "2026-01-02T08:24:57.011Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-02T08:24:57.011Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-02T08:24:57.011Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-02T08:24:57.015Z",
+        "last_updated": "2026-01-02T08:24:57.015Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-02T08:24:57.011Z",
+          "last_updated": "2026-01-02T08:24:57.011Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.95
+          },
+          "classificationConfidence": 0.95,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-02T08:24:57.014Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-02T08:24:57.014Z"
         }
       },
       "source": "manual",
@@ -13511,13 +14250,96 @@
       "relationType": "related-to",
       "confidence": 1,
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "SemanticinsightDecisionToUsePattern",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightTheIntroductionOfPattern",
+      "to": "CollectiveKnowledge",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightTheIntroductionOfPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightCommitMessagesFollowPattern",
+      "to": "CollectiveKnowledge",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightCommitMessagesFollowPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightThePresenceOfPattern",
+      "to": "CollectiveKnowledge",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightThePresenceOfPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightTheUseOfPattern",
+      "to": "CollectiveKnowledge",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightTheUseOfPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightTheIntroductionOfPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightCommitMessagesFollowPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightThePresenceOfPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightTheUseOfPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "confidence": 1,
+      "metadata": {}
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-01T12:59:28.629Z",
+    "last_updated": "2026-01-02T08:32:46.546Z",
     "team": "coding",
-    "entity_count": 38,
-    "relation_count": 153,
+    "entity_count": 42,
+    "relation_count": 166,
     "exported_by": "GraphDatabaseService",
     "export_version": "1.0"
   }
