@@ -1012,6 +1012,40 @@ DCEOF
         info "Created docker-compose.yaml for Memgraph"
     fi
 
+    # Download pre-built cache from GitHub Release (if available)
+    download_cgr_cache() {
+        local cache_url="https://github.com/fwornle/code-graph-rag/releases/download/v1.0.0-cache-coding/cgr-cache-coding.tar.gz"
+        local cache_dir="$CODE_GRAPH_RAG_DIR/shared-data"
+
+        info "Checking for pre-built code-graph-rag cache..."
+
+        # Skip if cache already exists with metadata
+        if [[ -f "$cache_dir/cache-metadata.json" ]]; then
+            info "Cache already exists, skipping download"
+            return 0
+        fi
+
+        # Try to download cache
+        if curl -fsSL --head "$cache_url" >/dev/null 2>&1; then
+            info "Downloading pre-built cache (saves ~20 min indexing)..."
+            local tmp_file="/tmp/cgr-cache-$$.tar.gz"
+            if curl -fsSL "$cache_url" -o "$tmp_file" 2>/dev/null; then
+                mkdir -p "$cache_dir"
+                tar -xzf "$tmp_file" -C "$CODE_GRAPH_RAG_DIR" 2>/dev/null && \
+                    success "Pre-built cache downloaded and extracted" || \
+                    warning "Failed to extract cache - will need to index on first run"
+                rm -f "$tmp_file"
+            else
+                warning "Cache download failed - will need to index on first run"
+            fi
+        else
+            info "No pre-built cache available yet - will need to index on first run"
+            info "  Run: cd integrations/code-graph-rag && uv run graph-code load-index /path/to/repo"
+        fi
+    }
+
+    download_cgr_cache
+
     success "code-graph-rag installed"
     info "  - Start Memgraph: cd integrations/code-graph-rag && docker-compose up -d"
     info "  - Memgraph Lab: http://localhost:3100"
