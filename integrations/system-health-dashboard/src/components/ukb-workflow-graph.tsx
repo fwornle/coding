@@ -82,8 +82,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Multi-tier: fast/standard/premium per operator',
     techStack: 'SemanticAnalyzer + Embeddings',
-    row: 4,
-    col: 1.125,
+    row: 3,      // After ontology (row 2), before QA (row 4)
+    col: 0.6,    // Centered in column
   },
   {
     id: 'batch_checkpoint_manager',
@@ -94,8 +94,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: false,
     llmModel: null,
     techStack: 'JSON file persistence',
-    row: 6.5,
-    col: 1.125,
+    row: 5,      // After QA (row 4), before Code Graph finalization (row 6)
+    col: 0.6,    // Centered in column
   },
   // --- Original Agents ---
   {
@@ -131,8 +131,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'External: code-graph-rag (OpenAI/Anthropic/Ollama)',
     techStack: 'Tree-sitter + Memgraph + pydantic_ai',
-    row: 7,      // FINALIZATION: After batch_checkpoint (6.5), indexes current HEAD
-    col: 0.5,    // Left side of finalization row
+    row: 6,      // FINALIZATION: After checkpoint (row 5), before persistence (row 7)
+    col: 0.6,    // Centered like other finalization nodes
   },
   {
     id: 'code_intelligence',
@@ -215,8 +215,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'OntologyClassifier + SemanticAnalyzer',
-    row: 5,
-    col: 0.75,
+    row: 2,      // After semantic (row 1), before KG-Ops (row 3)
+    col: 0.6,    // Centered in column
   },
   {
     id: 'documentation_semantics',
@@ -239,8 +239,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer + Semantic Value Filter',
-    row: 6,
-    col: 1.125,
+    row: 4,      // After KG-Ops (row 3), before Checkpoint (row 5)
+    col: 0.6,    // Centered in column
   },
   {
     id: 'persistence',
