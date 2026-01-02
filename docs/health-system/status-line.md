@@ -11,20 +11,20 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 ### Example Display
 
 ```
-[C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq● A$18 O○ X$25] [📚✅] [🏥✅] 📋17-18
+[🏥✅] [Gq● A$18 O○ X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Reading the Status Line
 
-**Format**: `[sessions] [🛡️ compliance trajectory] [api-quota] [📚 knowledge] [🏥 health] 📋time`
+**Format**: `[🏥 health] [api-quota] [sessions] [🛡️ compliance trajectory] [📚 knowledge] 📋time`
 
 **Components**:
+- `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
+- `[Gq● A$18 O○ X$25]` - **API Quota**: LLM provider availability (see below)
 - `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
 - `🛡️ 67%` - **Constraint Compliance**: Code quality compliance percentage
 - `🔍 EX` - **Trajectory State**: Current development activity
-- `[Gq● A$18 O○ X$25]` - **API Quota**: LLM provider availability (see below)
 - `[📚✅]` - **Knowledge System**: Knowledge extraction status
-- `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
 ### API Quota Monitoring
@@ -241,12 +241,12 @@ The status line displays information for **multiple active Claude Code sessions*
 
 **Single Active Session**:
 ```
-[C🟢] [🛡️ 67% 🔍EX] [Gq● A$18] [📚✅] [🏥✅] 📋17-18
+[🏥✅] [Gq● A$18] [C🟢] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Multiple Active Sessions**:
 ```
-[C🟢 UT🫒 CA🌲] [🛡️ 67% 🔍EX] [Gq● A$18 X$25] [📚✅] [🏥⚠️] 📋17-18
+[🏥⚠️] [Gq● A$18 X$25] [C🟢 UT🫒 CA🌲] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 Where:
@@ -388,7 +388,7 @@ coding
 node scripts/combined-status-line.js
 
 # Example output:
-# [C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq● A$18 X$25] [📚✅] [🏥⚠️] 📋17-18
+# [🏥⚠️] [Gq● A$18 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Troubleshooting

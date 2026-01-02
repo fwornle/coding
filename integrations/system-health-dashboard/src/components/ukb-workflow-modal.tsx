@@ -270,6 +270,31 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     })
   }
 
+  // Format duration string (e.g., "1933.59s" or raw seconds) to human readable format
+  const formatDuration = (duration: string | number | null | undefined): string => {
+    if (!duration) return '-'
+
+    // Parse the duration - could be "1933.59s" or just a number
+    let seconds: number
+    if (typeof duration === 'string') {
+      // Remove 's' suffix and parse
+      seconds = parseFloat(duration.replace(/s$/i, ''))
+    } else {
+      seconds = duration
+    }
+
+    if (isNaN(seconds)) return String(duration)
+
+    // Format as human readable
+    if (seconds < 60) return `${Math.round(seconds)}s`
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = Math.round(seconds % 60)
+    if (minutes < 60) return `${minutes}m ${remainingSeconds}s`
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+    return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`
+  }
+
   // Render Active Workflows Content
   const renderActiveContent = () => {
     // Only show truly active (running) workflows in the Active tab
@@ -532,7 +557,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           <div className="flex-shrink-0 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground mb-2 px-1">
             <span><strong>Workflow:</strong> {getWorkflowDisplayName(selectedHistoricalWorkflowState.workflowName)}</span>
             <span><strong>Team:</strong> {selectedHistoricalWorkflowState.team}</span>
-            <span><strong>Duration:</strong> {selectedHistoricalWorkflowState.duration || '-'}</span>
+            <span><strong>Duration:</strong> {formatDuration(selectedHistoricalWorkflowState.duration)}</span>
             <span><strong>Steps:</strong> {selectedHistoricalWorkflowState.completedSteps}/{selectedHistoricalWorkflowState.totalSteps}</span>
             <span><strong>Started:</strong> {formatDate(selectedHistoricalWorkflowState.startTime)}</span>
           </div>
@@ -731,7 +756,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                     <div className="flex items-center gap-3">
                       <div className="text-right text-xs text-muted-foreground">
                         <div>{workflow.completedSteps}/{workflow.totalSteps} steps</div>
-                        <div>{workflow.duration || '-'}</div>
+                        <div>{formatDuration(workflow.duration)}</div>
                       </div>
                       {getStatusBadge(workflow.status)}
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />

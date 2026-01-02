@@ -35,6 +35,11 @@ export interface UKBProcess {
   steps?: StepInfo[]
   _refreshKey?: string  // Server-generated key to force UI updates
   isInlineMCP?: boolean  // Flag for inline MCP-triggered workflows
+  batchProgress?: {  // Batch workflow progress
+    currentBatch: number
+    totalBatches: number
+    batchId?: string
+  }
 }
 
 // Historical workflow summary
