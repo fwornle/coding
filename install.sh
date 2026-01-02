@@ -65,9 +65,10 @@ SEMANTIC_ANALYSIS_CN_HTTPS="https://cc-github.bmwgroup.net/frankwoernle/mcp-serv
 SEMANTIC_ANALYSIS_PUBLIC_SSH="git@github.com:fwornle/mcp-server-semantic-analysis.git"
 SEMANTIC_ANALYSIS_PUBLIC_HTTPS="https://github.com/fwornle/mcp-server-semantic-analysis.git"
 
-# Code Graph RAG (NO CN MIRROR - always use public)
-CODE_GRAPH_RAG_SSH="git@github.com:vitali87/code-graph-rag.git"
-CODE_GRAPH_RAG_HTTPS="https://github.com/vitali87/code-graph-rag.git"
+# Code Graph RAG (forked with semantic enhancements)
+CODE_GRAPH_RAG_SSH="git@github.com:fwornle/code-graph-rag.git"
+CODE_GRAPH_RAG_HTTPS="https://github.com/fwornle/code-graph-rag.git"
+CODE_GRAPH_RAG_BRANCH="semantic-enhancements"
 CODE_GRAPH_RAG_DIR="$CODING_REPO/integrations/code-graph-rag"
 
 # Platform detection
@@ -909,12 +910,12 @@ install_code_graph_rag() {
     if [[ -d "$CODE_GRAPH_RAG_DIR/.git" ]] || [[ -f "$CODE_GRAPH_RAG_DIR/.git" ]]; then
         info "code-graph-rag exists (submodule), updating..."
         cd "$CODE_GRAPH_RAG_DIR"
-        timeout 30s git pull origin main 2>/dev/null || info "Could not update code-graph-rag (may be on specific commit)"
+        timeout 30s git pull origin "$CODE_GRAPH_RAG_BRANCH" 2>/dev/null || info "Could not update code-graph-rag (may be on specific commit)"
     else
-        info "Cloning code-graph-rag..."
-        if git clone "$CODE_GRAPH_RAG_HTTPS" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
+        info "Cloning code-graph-rag (branch: $CODE_GRAPH_RAG_BRANCH)..."
+        if git clone -b "$CODE_GRAPH_RAG_BRANCH" "$CODE_GRAPH_RAG_HTTPS" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
             success "Cloned code-graph-rag"
-        elif git clone "$CODE_GRAPH_RAG_SSH" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
+        elif git clone -b "$CODE_GRAPH_RAG_BRANCH" "$CODE_GRAPH_RAG_SSH" "$CODE_GRAPH_RAG_DIR" 2>/dev/null; then
             success "Cloned code-graph-rag via SSH"
         else
             warning "Failed to clone code-graph-rag"
