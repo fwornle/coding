@@ -117,6 +117,10 @@ class SystemHealthAPIServer {
         this.app.post('/api/batch/pause', this.handlePauseBatch.bind(this));
         this.app.post('/api/batch/resume', this.handleResumeBatch.bind(this));
 
+        // Code Graph RAG cache endpoints
+        this.app.get('/api/cgr/status', this.handleGetCGRStatus.bind(this));
+        this.app.post('/api/cgr/reindex', this.handleCGRReindex.bind(this));
+
         // Error handling
         this.app.use(this.handleError.bind(this));
     }
@@ -1589,6 +1593,142 @@ class SystemHealthAPIServer {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to resume batch processing',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get Code Graph RAG cache status
+     * Runs the staleness check script and returns cache status
+     */
+    async handleGetCGRStatus(req, res) {
+        try {
+            const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
+            const stalenessScript = join(cgrDir, 'scripts', 'check-cache-staleness.sh');
+
+            if (!existsSync(stalenessScript)) {
+                return res.json({
+                    status: 'success',
+                    data: {
+                        available: false,
+                        message: 'CGR cache staleness script not found',
+                        cacheStatus: 'unknown'
+                    }
+                });
+            }
+
+            try {
+                const result = execSync(`"${stalenessScript}" "${codingRoot}"`, {
+                    encoding: 'utf-8',
+                    timeout: 10000
+                });
+
+                const staleness = JSON.parse(result);
+
+                res.json({
+                    status: 'success',
+                    data: {
+                        available: true,
+                        cacheStatus: staleness.status,
+                        isStale: staleness.is_stale,
+                        commitsBehind: staleness.commits_behind,
+                        cachedCommit: staleness.cached_commit,
+                        currentCommit: staleness.current_commit,
+                        indexedAt: staleness.indexed_at,
+                        repoName: staleness.repo_name,
+                        threshold: staleness.threshold,
+                        message: staleness.message,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            } catch (execError) {
+                // Script may exit with code 1 (stale) or 2 (no cache)
+                if (execError.stdout) {
+                    try {
+                        const staleness = JSON.parse(execError.stdout);
+                        res.json({
+                            status: 'success',
+                            data: {
+                                available: true,
+                                cacheStatus: staleness.status,
+                                isStale: staleness.is_stale,
+                                commitsBehind: staleness.commits_behind,
+                                cachedCommit: staleness.cached_commit,
+                                currentCommit: staleness.current_commit,
+                                indexedAt: staleness.indexed_at,
+                                repoName: staleness.repo_name,
+                                threshold: staleness.threshold,
+                                message: staleness.message,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                        return;
+                    } catch (parseError) {
+                        // Fall through to error case
+                    }
+                }
+
+                res.json({
+                    status: 'success',
+                    data: {
+                        available: true,
+                        cacheStatus: 'error',
+                        isStale: true,
+                        message: `Check failed: ${execError.message}`,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Failed to get CGR status:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to retrieve CGR cache status',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Trigger Code Graph RAG reindexing
+     * Runs the indexing command in the background
+     */
+    async handleCGRReindex(req, res) {
+        try {
+            const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
+
+            if (!existsSync(cgrDir)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'Code Graph RAG directory not found'
+                });
+            }
+
+            console.log('🔄 Starting CGR reindex...');
+
+            // Run indexing in the background using uv
+            const indexProcess = spawn('/bin/bash', ['-c', `cd "${cgrDir}" && uv run graph-code load-index "${codingRoot}"`], {
+                cwd: cgrDir,
+                detached: true,
+                stdio: 'ignore'
+            });
+            indexProcess.unref();
+
+            res.json({
+                status: 'success',
+                message: 'CGR reindexing started in background',
+                data: {
+                    startedAt: new Date().toISOString(),
+                    targetRepo: codingRoot,
+                    note: 'Indexing may take 15-20 minutes. Check /api/cgr/status for updates.'
+                }
+            });
+        } catch (error) {
+            console.error('Failed to start CGR reindex:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to start CGR reindexing',
                 error: error.message
             });
         }

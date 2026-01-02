@@ -128,6 +128,21 @@ export default function SystemHealthDashboard() {
       })
     }
 
+    // CGR Cache check
+    const cgrCheck = checks.find((c: any) => c.check === 'cgr_cache')
+    if (cgrCheck) {
+      const commitsBehind = cgrCheck.details?.commits_behind
+      const cachedCommit = cgrCheck.details?.cached_commit
+      items.push({
+        name: 'CGR Cache',
+        status: mapCheckStatus(cgrCheck),
+        description: commitsBehind !== undefined
+          ? `${commitsBehind} commits behind`
+          : (cachedCommit ? `@ ${cachedCommit}` : 'Code graph'),
+        tooltip: cgrCheck.message + (cgrCheck.recommendation ? ` - ${cgrCheck.recommendation}` : '')
+      })
+    }
+
     return items
   }
 
