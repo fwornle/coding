@@ -91,6 +91,20 @@ When triggered, the MCP semantic-analysis server executes a coordinated workflow
 - Manages workflow execution
 - Aggregates results
 
+### Workflow Visualization
+
+The System Health Dashboard provides real-time visualization of workflow execution:
+
+![UKB Workflow Monitor](../images/health-monitor-dag.png)
+
+**Dashboard Features:**
+- **Visual Workflow Graph** - Shows agent execution flow, dependencies, and feedback loops
+- **Pipeline Statistics** - Commits processed, sessions analyzed, deduplication metrics
+- **Entity Breakdown** - Final counts by type (GraphDatabase, MCPAgent, Pattern, etc.)
+- **Execution Details** - Duration, LLM provider, completion status
+
+Access via `http://localhost:3032` → UKB Workflow Monitor.
+
 ## Storage Architecture
 
 ### Three-Layer Synchronization

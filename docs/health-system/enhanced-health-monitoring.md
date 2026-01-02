@@ -318,6 +318,22 @@ The system includes a real-time web-based health dashboard accessible at `http:/
 - **Violation Tracking**: Detailed view of active system violations
 - **Recommendations**: Actionable suggestions for system health improvement
 
+### UKB Workflow Monitor
+
+The dashboard includes a dedicated UKB Workflow Monitor that provides visual tracking of knowledge base update workflows:
+
+![UKB Workflow Monitor](../images/health-monitor-dag.png)
+
+**Features:**
+- **Visual Workflow Graph** - Shows agent execution flow with dependencies and feedback loops (batch-analysis → Git/Vibe/Code → Semantic)
+- **Pipeline Statistics** - Commits processed, sessions analyzed, candidates discovered vs. final entities
+- **Deduplication Metrics** - Shows reduction percentage (e.g., 86.9% reduction from raw to final)
+- **Entity Breakdown** - Final counts by type (GraphDatabase, MCPAgent, System, Pattern, etc.)
+- **Execution Details** - Duration, LLM provider used (e.g., Groq llama-3.3-70b), completion status
+- **Historical View** - Browse past workflow executions with full details
+
+**Access:** Click the "UKB Workflow Monitor" card on the dashboard or navigate to the dedicated tab.
+
 ## StatusLine Display Format
 
 ### Current Display
