@@ -83,7 +83,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Multi-tier: fast/standard/premium per operator',
     techStack: 'SemanticAnalyzer + Embeddings',
     row: 3,      // After ontology (row 2), before QA (row 4)
-    col: 0.6,    // Centered in column
+    col: 0.6,    // Centered in main flow column
   },
   {
     id: 'batch_checkpoint_manager',
@@ -95,7 +95,7 @@ const WORKFLOW_AGENTS = [
     llmModel: null,
     techStack: 'JSON file persistence',
     row: 5,      // After QA (row 4), before Code Graph finalization (row 6)
-    col: 0.6,    // Centered in column
+    col: 0.6,    // Centered in main flow column
   },
   // --- Original Agents ---
   {
@@ -132,7 +132,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'External: code-graph-rag (OpenAI/Anthropic/Ollama)',
     techStack: 'Tree-sitter + Memgraph + pydantic_ai',
     row: 6,      // FINALIZATION: After checkpoint (row 5), before persistence (row 7)
-    col: 0.6,    // Centered like other finalization nodes
+    col: 0.6,    // Centered in main flow column
   },
   {
     id: 'code_intelligence',
@@ -191,8 +191,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
-    row: 3,
-    col: 0.75,
+    row: 8,      // FINALIZATION: After persistence (row 7)
+    col: 0.6,    // Centered in main flow column
   },
   {
     id: 'observation_generation',
@@ -203,8 +203,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
-    row: 4,
-    col: 0.75,
+    row: 8.5,    // After insight (row 8) - used in incremental workflow
+    col: 0.6,    // Centered in main flow column
   },
   {
     id: 'ontology_classification',
@@ -216,7 +216,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'OntologyClassifier + SemanticAnalyzer',
     row: 2,      // After semantic (row 1), before KG-Ops (row 3)
-    col: 0.6,    // Centered in column
+    col: 0.6,    // Centered in main flow column
   },
   {
     id: 'documentation_semantics',
@@ -227,8 +227,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer + Batch Processing',
-    row: 5.5,
-    col: 1.875,
+    row: 5.5,    // Parallel to QA (row 5), feeds into checkpoint
+    col: 1.875,  // Offset right to show parallel processing
   },
   {
     id: 'quality_assurance',
@@ -240,7 +240,7 @@ const WORKFLOW_AGENTS = [
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer + Semantic Value Filter',
     row: 4,      // After KG-Ops (row 3), before Checkpoint (row 5)
-    col: 0.6,    // Centered in column
+    col: 0.6,    // Centered in main flow column
   },
   {
     id: 'persistence',
@@ -251,8 +251,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: false,
     llmModel: null,
     techStack: 'LevelDB + Graphology',
-    row: 8,      // Shifted: After code_graph correlation
-    col: 1.125,
+    row: 7,      // After code_graph (row 6)
+    col: 0.6,    // Centered in main flow column
   },
   {
     id: 'deduplication',
@@ -263,8 +263,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: false,
     llmModel: 'Embeddings: text-embedding-3-small',
     techStack: 'OpenAI Embeddings API',
-    row: 9,      // Shifted
-    col: 1.125,
+    row: 9,      // After insight (row 8)
+    col: 0.6,    // Centered in main flow column
   },
   {
     id: 'content_validation',
@@ -275,8 +275,8 @@ const WORKFLOW_AGENTS = [
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
-    row: 10,     // Shifted
-    col: 1.125,
+    row: 10,     // Final step after deduplication (row 9)
+    col: 0.6,    // Centered in main flow column
   },
 ]
 
@@ -338,7 +338,8 @@ const STEP_TO_AGENT: Record<string, string> = {
 // - This avoids temporal mismatch between old commits and current codebase state
 //
 // Edge types: 'dependency' (solid) = must complete before next, 'dataflow' (dashed) = passes data/parameters
-const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'dataflow' }> = [
+// 'control' (amber dashed) = feedback/retry loops that go backwards in the DAG
+const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'dataflow' | 'control'; label?: string }> = [
   // ========== INITIALIZATION ==========
   // Orchestrator dispatches to batch scheduler (batch workflow) or entry points (complete workflow)
   { from: 'orchestrator', to: 'git_history', type: 'dataflow' },
@@ -378,6 +379,11 @@ const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'd
   // Phase 6 + Doc Semantics -> Phase 7: All feed QA
   { from: 'ontology_classification', to: 'quality_assurance' },
   { from: 'documentation_semantics', to: 'quality_assurance' },
+
+  // ========== QA RETRY LOOPS ==========
+  // QA can send entities back for regeneration (up to 3 iterations)
+  { from: 'quality_assurance', to: 'insight_generation', type: 'control', label: 'retry' },
+  { from: 'quality_assurance', to: 'observation_generation', type: 'control', label: 'retry' },
 
   // ========== FINALIZATION (after ALL batches) ==========
   // QA -> Batch Checkpoint (end of batch loop)
@@ -441,7 +447,8 @@ interface AgentDefinitionAPI {
 interface EdgeDefinitionAPI {
   from: string
   to: string
-  type?: 'dependency' | 'dataflow'
+  type?: 'dependency' | 'dataflow' | 'control'
+  label?: string
 }
 
 interface WorkflowDefinitionsAPI {
@@ -578,6 +585,24 @@ interface ProcessInfo {
     currentBatch: number
     totalBatches: number
     batchId?: string
+  }
+  // Multi-agent orchestration data from SmartOrchestrator
+  multiAgent?: {
+    stepConfidences: Record<string, number>
+    routingHistory: Array<{
+      action: 'proceed' | 'retry' | 'skip' | 'escalate' | 'terminate'
+      affectedSteps: string[]
+      reason: string
+      confidence: number
+      llmAssisted: boolean
+      timestamp: string
+    }>
+    workflowModifications: Array<{
+      type: string
+      description: string
+      timestamp: string
+    }>
+    retryHistory: Record<string, number>
   }
 }
 
@@ -1164,6 +1189,50 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     return isWorkflowComplete ? 'skipped' : 'pending'
   }
 
+  // Helper to get confidence with fallback to multiAgent data
+  const getStepConfidence = (agentId: string, stepInfo: any): number | undefined => {
+    // First try per-step outputs
+    if (stepInfo?.outputs?.confidence !== undefined) {
+      return stepInfo.outputs.confidence
+    }
+    // Fallback to global multiAgent stepConfidences
+    if (process.multiAgent?.stepConfidences?.[agentId] !== undefined) {
+      return process.multiAgent.stepConfidences[agentId]
+    }
+    return undefined
+  }
+
+  // Helper to get routing decision with fallback to multiAgent routingHistory
+  const getStepRoutingDecision = (agentId: string, stepInfo: any): string | undefined => {
+    // First try per-step outputs
+    if (stepInfo?.outputs?.routingDecision) {
+      return stepInfo.outputs.routingDecision
+    }
+    // Fallback to global multiAgent routingHistory (find last decision affecting this step)
+    if (process.multiAgent?.routingHistory) {
+      const decisions = process.multiAgent.routingHistory.filter(
+        d => d.affectedSteps.includes(agentId)
+      )
+      if (decisions.length > 0) {
+        return decisions[decisions.length - 1].action
+      }
+    }
+    return undefined
+  }
+
+  // Helper to get retry count with fallback to multiAgent retryHistory
+  const getStepRetryCount = (agentId: string, stepInfo: any): number => {
+    // First try per-step outputs
+    if (stepInfo?.outputs?.retryCount !== undefined) {
+      return stepInfo.outputs.retryCount
+    }
+    // Fallback to global multiAgent retryHistory
+    if (process.multiAgent?.retryHistory?.[agentId] !== undefined) {
+      return process.multiAgent.retryHistory[agentId]
+    }
+    return 0
+  }
+
   // Returns fill and stroke colors for SVG nodes with better contrast
   const getNodeColors = (status: string, isSelected: boolean): { fill: string; stroke: string; textColor: string } => {
     switch (status) {
@@ -1325,27 +1394,49 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                       strokeDasharray="3,2"
                       markerEnd="url(#arrowhead-self)"
                     />
-                    {/* Label for self-loop */}
-                    {(edge as any).label && (
-                      <text
-                        x={startX + loopRadius * 2 + 5}
-                        y={pos.y + nodeHeight / 2}
-                        fontSize="8"
-                        fill="#8b5cf6"
-                        className="select-none"
-                      >
-                        {(edge as any).label.length > 15 ? '6 ops' : (edge as any).label}
-                      </text>
-                    )}
+                    {/* Label for self-loop with background for readability */}
+                    {(edge as any).label && (() => {
+                      const labelX = startX + loopRadius * 2 + 5
+                      const labelY = pos.y + nodeHeight / 2
+                      const labelText = (edge as any).label.length > 20
+                        ? ((edge as any).label.match(/→/g)?.length > 0
+                          ? `${((edge as any).label.match(/→/g) || []).length + 1} ops`
+                          : (edge as any).label.substring(0, 18) + '...')
+                        : (edge as any).label
+
+                      return (
+                        <g>
+                          <rect
+                            x={labelX - 2}
+                            y={labelY - 9}
+                            width={labelText.length * 5 + 8}
+                            height={14}
+                            rx={2}
+                            fill="rgba(255,255,255,0.9)"
+                          />
+                          <text
+                            x={labelX}
+                            y={labelY + 2}
+                            fontSize="9"
+                            fill="#8b5cf6"
+                            className="select-none font-medium"
+                          >
+                            {labelText}
+                          </text>
+                        </g>
+                      )
+                    })()}
                   </g>
                 )
               }
 
-              // Handle orchestrator as source - use visibleAgents for normalized positions
+              // Handle orchestrator as source OR target - use visibleAgents for normalized positions
               const fromAgent = edge.from === 'orchestrator'
                 ? ORCHESTRATOR_NODE
                 : visibleAgents.find(a => a.id === edge.from)
-              const toAgent = visibleAgents.find(a => a.id === edge.to)
+              const toAgent = edge.to === 'orchestrator'
+                ? ORCHESTRATOR_NODE
+                : visibleAgents.find(a => a.id === edge.to)
               if (!fromAgent || !toAgent) return null
 
               const fromPos = getNodePosition(fromAgent)
@@ -1379,31 +1470,40 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const fromStatus = edge.from === 'orchestrator'
                 ? (process.status === 'running' ? 'running' : 'completed')
                 : getNodeStatus(edge.from)
-              const toStatus = getNodeStatus(edge.to)
+              const toStatus = edge.to === 'orchestrator'
+                ? (process.status === 'running' ? 'running' : 'completed')
+                : getNodeStatus(edge.to)
               const isActive = fromStatus === 'completed' && toStatus === 'running'
               const isCompleted = fromStatus === 'completed' && toStatus === 'completed'
 
               // Different colors for edge types
+              // IMPORTANT: Check edge TYPE first (control, dataflow), then STATUS
+              // Control/dataflow edges always use their type color regardless of completion
               let strokeColor: string
               let markerEnd: string
               let strokeDasharray: string | undefined
 
-              if (isActive) {
-                strokeColor = '#3b82f6'
-                markerEnd = 'url(#arrowhead-active)'
-              } else if (isCompleted) {
-                strokeColor = '#22c55e'
-                markerEnd = 'url(#arrowhead)'
-              } else if (isControl) {
-                strokeColor = '#f59e0b'  // Amber for control/loop edges
+              if (isControl) {
+                // Control edges: always amber dashed (type takes precedence)
+                strokeColor = '#f59e0b'
                 markerEnd = 'url(#arrowhead-control)'
                 strokeDasharray = '5,3'
               } else if (isDataflow) {
-                strokeColor = '#a855f7'  // Purple for dataflow
+                // Dataflow edges: always purple dashed (type takes precedence)
+                strokeColor = '#a855f7'
                 markerEnd = 'url(#arrowhead-dataflow)'
                 strokeDasharray = '4,2'
+              } else if (isActive) {
+                // Dependency edges: blue when active
+                strokeColor = '#3b82f6'
+                markerEnd = 'url(#arrowhead-active)'
+              } else if (isCompleted) {
+                // Dependency edges: green when completed
+                strokeColor = '#22c55e'
+                markerEnd = 'url(#arrowhead)'
               } else {
-                strokeColor = '#cbd5e1'  // Gray for dependency
+                // Dependency edges: gray when pending
+                strokeColor = '#cbd5e1'
                 markerEnd = 'url(#arrowhead)'
               }
 
@@ -1439,18 +1539,53 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                     markerEnd={markerEnd}
                     className={isActive ? 'animate-pulse' : ''}
                   />
-                  {/* Label for control edges */}
-                  {isControl && (edge as any).label && (
-                    <text
-                      x={isLoopBack ? fromX - 45 : (fromX + toX) / 2 + 5}
-                      y={isLoopBack ? (fromY + toY) / 2 : (fromY + toY) / 2}
-                      fontSize="9"
-                      fill="#f59e0b"
-                      className="select-none font-medium"
-                    >
-                      {(edge as any).label}
-                    </text>
-                  )}
+                  {/* Label for control edges - positioned along the edge path */}
+                  {isControl && (edge as any).label && (() => {
+                    // Calculate label position along the edge
+                    // For loop-back: position to the left of the curve
+                    // For normal edges: position offset from midpoint based on direction
+                    const midY = (fromY + toY) / 2
+                    let labelX: number
+                    let labelY: number
+                    let textAnchor: 'start' | 'middle' | 'end' = 'start'
+
+                    if (isLoopBack) {
+                      // Loop-back: position to the left of the curved path
+                      labelX = Math.min(fromX, toX) - 55
+                      labelY = midY
+                      textAnchor = 'end'
+                    } else {
+                      // Normal edges: offset based on direction
+                      // Position label at 60% along the path (closer to target)
+                      const t = 0.6
+                      labelX = fromX + (toX - fromX) * t + 8
+                      labelY = fromY + (toY - fromY) * t - 4
+                    }
+
+                    return (
+                      <g>
+                        {/* Background for readability */}
+                        <rect
+                          x={labelX - (textAnchor === 'end' ? 75 : 2)}
+                          y={labelY - 8}
+                          width={72}
+                          height={12}
+                          rx={2}
+                          fill="rgba(255,255,255,0.85)"
+                        />
+                        <text
+                          x={labelX}
+                          y={labelY}
+                          fontSize="9"
+                          fill="#f59e0b"
+                          textAnchor={textAnchor}
+                          className="select-none font-medium"
+                        >
+                          {(edge as any).label}
+                        </text>
+                      </g>
+                    )
+                  })()}
                 </g>
               )
             })}
@@ -1679,6 +1814,121 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         }
                       />
 
+                      {/* Confidence bar - shows confidence level for completed steps */}
+                      {(() => {
+                        const confidence = getStepConfidence(agent.id, stepInfo)
+                        if (status !== 'completed' || confidence === undefined) return null
+                        return (
+                          <g>
+                            {/* Background bar */}
+                            <rect
+                              x={pos.x + 4}
+                              y={pos.y + nodeHeight - 8}
+                              width={nodeWidth - 8}
+                              height={4}
+                              rx={2}
+                              fill="#e2e8f0"
+                            />
+                            {/* Confidence fill */}
+                            <rect
+                              x={pos.x + 4}
+                              y={pos.y + nodeHeight - 8}
+                              width={Math.max(0, (nodeWidth - 8) * Math.min(1, confidence))}
+                              height={4}
+                              rx={2}
+                              fill={
+                                confidence >= 0.8 ? '#22c55e' :
+                                confidence >= 0.5 ? '#f59e0b' :
+                                '#ef4444'
+                              }
+                            />
+                            {/* Confidence value label */}
+                            <text
+                              x={pos.x + nodeWidth / 2}
+                              y={pos.y + nodeHeight + 10}
+                              fontSize="8"
+                              fill={
+                                confidence >= 0.8 ? '#16a34a' :
+                                confidence >= 0.5 ? '#d97706' :
+                                '#dc2626'
+                              }
+                              textAnchor="middle"
+                              className="font-medium"
+                            >
+                              {(confidence * 100).toFixed(0)}%
+                            </text>
+                          </g>
+                        )
+                      })()}
+
+                      {/* Routing decision badge - shows last routing action */}
+                      {(() => {
+                        const routingDecision = getStepRoutingDecision(agent.id, stepInfo)
+                        if (!routingDecision) return null
+                        return (
+                          <g>
+                            <rect
+                              x={pos.x + nodeWidth + 2}
+                              y={pos.y + 4}
+                              width={22}
+                              height={14}
+                              rx={3}
+                              fill={
+                                routingDecision === 'proceed' ? '#22c55e' :
+                                routingDecision === 'retry' ? '#f59e0b' :
+                                routingDecision === 'skip' ? '#94a3b8' :
+                                routingDecision === 'escalate' ? '#ef4444' :
+                                '#6b7280'
+                              }
+                            />
+                            <text
+                              x={pos.x + nodeWidth + 13}
+                              y={pos.y + 14}
+                              fontSize="7"
+                              fill="white"
+                              textAnchor="middle"
+                              className="font-bold"
+                            >
+                              {routingDecision === 'proceed' ? '✓' :
+                               routingDecision === 'retry' ? '↻' :
+                               routingDecision === 'skip' ? '⊘' :
+                               routingDecision === 'escalate' ? '!' :
+                               '?'}
+                            </text>
+                          </g>
+                        )
+                      })()}
+
+                      {/* Retry count badge - shows number of retries if > 0 */}
+                      {(() => {
+                        const retryCount = getStepRetryCount(agent.id, stepInfo)
+                        if (retryCount <= 0) return null
+                        return (
+                          <g>
+                            <rect
+                              x={pos.x - 4}
+                              y={pos.y + 4}
+                              width={20}
+                              height={14}
+                              rx={7}
+                              fill="#f59e0b"
+                              stroke="#d97706"
+                              strokeWidth={1}
+                            />
+                            <text
+                              x={pos.x + 6}
+                              y={pos.y + 14}
+                              fontSize="8"
+                              fill="white"
+                              textAnchor="middle"
+                              className="font-bold"
+                            >
+                              x{retryCount}
+                            </text>
+                          </g>
+                        )
+                      })()}
+
                       {/* QA Retry iteration badge - shows loop count for QA agent */}
                       {agent.id === 'quality_assurance' && stepInfo?.outputs?.qaIterations && stepInfo.outputs.qaIterations > 1 && (
                         <g>
@@ -1750,9 +2000,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
         </div>
 
         {/* Legend - positioned outside graph to avoid overlap */}
-        <div className="flex-shrink-0 w-28 bg-white/90 backdrop-blur-sm rounded-lg p-2 border shadow-sm self-end">
+        <div className="flex-shrink-0 w-32 bg-white/90 backdrop-blur-sm rounded-lg p-2 border shadow-sm self-end max-h-[500px] overflow-y-auto">
           <div className="text-xs font-medium mb-2">Legend</div>
-          <div className="flex flex-col gap-2 text-xs">
+          <div className="flex flex-col gap-1.5 text-xs">
+            <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Status</div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
               <span>Pending</span>
@@ -1779,6 +2030,39 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               <span>QA Retries</span>
             </div>
             <Separator className="my-1" />
+            <div className="text-[10px] font-medium text-muted-foreground mb-1">Confidence</div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-1 rounded-sm bg-green-500" />
+              <span>High (&gt;0.8)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-1 rounded-sm bg-amber-500" />
+              <span>Med (0.5-0.8)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-1 rounded-sm bg-red-500" />
+              <span>Low (&lt;0.5)</span>
+            </div>
+            <Separator className="my-1" />
+            <div className="text-[10px] font-medium text-muted-foreground mb-1">Routing</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold text-green-600">✓</span>
+              <span>Proceed</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold text-amber-600">↻</span>
+              <span>Retry</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold text-gray-500">⊘</span>
+              <span>Skip</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold text-red-600">!</span>
+              <span>Escalate</span>
+            </div>
+            <Separator className="my-1" />
+            <div className="text-[10px] font-medium text-muted-foreground mb-1">Edges</div>
             <div className="flex items-center gap-1.5">
               <div className="w-5 h-0.5 bg-slate-400" />
               <span>Dependency</span>

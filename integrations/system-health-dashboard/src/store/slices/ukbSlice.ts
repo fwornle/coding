@@ -40,6 +40,24 @@ export interface UKBProcess {
     totalBatches: number
     batchId?: string
   }
+  // Multi-agent orchestration data from SmartOrchestrator
+  multiAgent?: {
+    stepConfidences: Record<string, number>
+    routingHistory: Array<{
+      action: 'proceed' | 'retry' | 'skip' | 'escalate' | 'terminate'
+      affectedSteps: string[]
+      reason: string
+      confidence: number
+      llmAssisted: boolean
+      timestamp: string
+    }>
+    workflowModifications: Array<{
+      type: string
+      description: string
+      timestamp: string
+    }>
+    retryHistory: Record<string, number>
+  }
 }
 
 // Historical workflow summary
