@@ -39,16 +39,30 @@ import {
   RotateCcw,
 } from 'lucide-react'
 
+// Utility: Format duration in milliseconds to human readable format
+const formatDurationMs = (ms?: number): string => {
+  if (!ms) return '-'
+  if (ms < 1000) return `${ms}ms`
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`
+}
+
 // Orchestrator node - represents the coordinator that manages all agents
 const ORCHESTRATOR_NODE = {
   id: 'orchestrator',
   name: 'Orchestrator',
   shortName: 'Coordinator',
   icon: Play,
-  description: 'DAG-based workflow coordinator. Manages parallel execution with max 3 concurrent steps, handles dependencies, retries failed steps, and aggregates results.',
+  description: 'Multi-agent workflow coordinator. Manages parallel execution with max 3 concurrent steps, handles dependencies, retries failed steps, and aggregates results.',
   usesLLM: false,
   llmModel: null,
-  techStack: 'TypeScript DAG executor',
+  techStack: 'Multi-Agent Orchestrator',
   row: -1,  // Above all other nodes
   col: 0.6,  // Centered (aligned with single-agent column)
 }
@@ -338,7 +352,7 @@ const STEP_TO_AGENT: Record<string, string> = {
 // - This avoids temporal mismatch between old commits and current codebase state
 //
 // Edge types: 'dependency' (solid) = must complete before next, 'dataflow' (dashed) = passes data/parameters
-// 'control' (amber dashed) = feedback/retry loops that go backwards in the DAG
+// 'control' (amber dashed) = feedback/retry loops from agents back to orchestrator
 const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'dataflow' | 'control'; label?: string }> = [
   // ========== INITIALIZATION ==========
   // Orchestrator dispatches to batch scheduler (batch workflow) or entry points (complete workflow)
@@ -1974,7 +1988,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                             {stepInfo.duration && (
                               <div className="flex justify-between">
                                 <span>Duration:</span>
-                                <span>{formatDuration(stepInfo.duration)}</span>
+                                <span>{formatDurationMs(stepInfo.duration)}</span>
                               </div>
                             )}
                             {stepInfo.tokensUsed && (
@@ -2172,7 +2186,7 @@ function OrchestratorDetailsSidebar({
       <CardContent className="space-y-4">
         <div>
           <div className="text-sm text-muted-foreground mb-2">
-            DAG-based workflow coordinator. Manages parallel execution with max 3 concurrent steps,
+            Multi-agent workflow coordinator. Manages parallel execution with max 3 concurrent steps,
             handles dependencies, retries failed steps, and aggregates results.
           </div>
         </div>
@@ -2425,7 +2439,7 @@ function OrchestratorDetailsSidebar({
           <div className="space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Executor</span>
-              <span className="text-xs">TypeScript DAG</span>
+              <span className="text-xs">Multi-Agent</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Max Concurrent</span>
@@ -2587,7 +2601,7 @@ export function UKBNodeDetailsSidebar({
                   <Timer className="h-3 w-3" />
                   Duration
                 </span>
-                <span>{(stepInfo.duration / 1000).toFixed(1)}s</span>
+                <span>{formatDurationMs(stepInfo.duration)}</span>
               </div>
             )}
 
