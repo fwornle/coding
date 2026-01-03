@@ -86,6 +86,9 @@ constraints:
   message: 'CRITICAL: No parallel versions allowed - edit the original file directly'
   severity: critical
   enabled: true
+  applies_to: file_path
+  tool_filter:
+  - Write
   suggestion: Debug and fix the original file instead of creating parallel versions
 - id: debug-not-speculate
   group: architecture

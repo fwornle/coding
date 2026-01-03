@@ -73,6 +73,91 @@ async function isProcessRunningByScript(scriptPattern) {
   }
 }
 
+/**
+ * Kill process on a port and wait for it to actually be released
+ * Prevents race conditions where port is still in use after kill
+ *
+ * @param {number} port - Port number to free
+ * @param {Object} options - Configuration options
+ * @param {number} options.maxWaitMs - Maximum time to wait for port release (default: 5000)
+ * @param {number} options.pollIntervalMs - Polling interval (default: 200)
+ * @param {string} options.label - Label for logging (default: port number)
+ * @returns {Promise<boolean>} - true if port is free, false if timeout
+ */
+async function killProcessOnPortAndWait(port, options = {}) {
+  const { maxWaitMs = 5000, pollIntervalMs = 200, label = `port ${port}` } = options;
+
+  // Check if port is in use
+  const checkPortInUse = async () => {
+    try {
+      const { stdout } = await execAsync(`lsof -ti:${port} 2>/dev/null || true`, { timeout: 3000 });
+      return stdout.trim().length > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  // If port is already free, nothing to do
+  if (!(await checkPortInUse())) {
+    return true;
+  }
+
+  // Get PID(s) on the port
+  let pids = [];
+  try {
+    const { stdout } = await execAsync(`lsof -ti:${port} 2>/dev/null || true`, { timeout: 3000 });
+    pids = stdout.trim().split('\n').filter(p => p).map(p => parseInt(p, 10));
+  } catch {
+    // Ignore
+  }
+
+  if (pids.length === 0) {
+    return true; // No processes found
+  }
+
+  console.log(`[Cleanup] Killing ${pids.length} process(es) on ${label}: ${pids.join(', ')}`);
+
+  // First try SIGTERM (graceful)
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // Process may have already exited
+    }
+  }
+
+  // Wait for port to be released (with polling)
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWaitMs) {
+    await sleep(pollIntervalMs);
+
+    if (!(await checkPortInUse())) {
+      console.log(`[Cleanup] Port ${port} is now free`);
+      return true;
+    }
+
+    // After half the timeout, escalate to SIGKILL
+    if (Date.now() - startTime > maxWaitMs / 2) {
+      for (const pid of pids) {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {
+          // Process may have already exited
+        }
+      }
+    }
+  }
+
+  // Final check
+  if (!(await checkPortInUse())) {
+    console.log(`[Cleanup] Port ${port} is now free`);
+    return true;
+  }
+
+  console.log(`[Cleanup] Warning: Port ${port} still in use after ${maxWaitMs}ms timeout`);
+  return false;
+}
+
 // Get target project path from environment (set by bin/coding)
 const TARGET_PROJECT_PATH = process.env.CODING_PROJECT_DIR || CODING_DIR;
 
@@ -717,36 +802,35 @@ const SERVICE_CONFIGS = {
         }
       }
 
-      // Kill any existing process on System Health Dashboard port
-      try {
-        await new Promise((resolve) => {
-          exec(`lsof -ti:${PORTS.SYSTEM_HEALTH_DASHBOARD} | xargs kill -9 2>/dev/null`, () => resolve());
-        });
-        await sleep(500);
-      } catch (error) {
-        // Ignore errors
+      // Kill any existing process on the frontend port and wait for it to be released
+      // This prevents "Port already in use" errors from orphaned vite processes
+      const portFreed = await killProcessOnPortAndWait(PORTS.SYSTEM_HEALTH_DASHBOARD, {
+        maxWaitMs: 5000,
+        label: 'frontend port'
+      });
+
+      if (!portFreed) {
+        throw new Error(`Port ${PORTS.SYSTEM_HEALTH_DASHBOARD} still in use after cleanup`);
       }
 
-      // Also kill any stale Vite processes that might have auto-switched to the API port
-      // This prevents the "<!doctype html>" JSON parse error in the dashboard
+      // Also kill any orphaned Vite processes on the API port (prevents JSON parse errors)
       try {
         const { stdout } = await execAsync(`lsof -ti:${PORTS.SYSTEM_HEALTH_API} 2>/dev/null || true`, { timeout: 5000 });
         const pids = stdout.trim().split('\n').filter(p => p);
         for (const pid of pids) {
-          // Check if this is a Vite process (not the API server)
           try {
             const { stdout: cmdline } = await execAsync(`ps -p ${pid} -o args= 2>/dev/null || true`);
             if (cmdline.includes('vite')) {
-              console.log(`[SystemHealthFrontend] Killing stale Vite process ${pid} on API port ${PORTS.SYSTEM_HEALTH_API}`);
-              process.kill(parseInt(pid, 10), 'SIGTERM');
-              await sleep(500);
+              console.log(`[SystemHealthFrontend] Killing orphaned Vite on API port ${PORTS.SYSTEM_HEALTH_API}`);
+              await killProcessOnPortAndWait(PORTS.SYSTEM_HEALTH_API, { maxWaitMs: 3000, label: 'API port' });
+              break;
             }
           } catch (e) {
             // Ignore
           }
         }
       } catch (error) {
-        // Ignore errors
+        // Best-effort cleanup
       }
 
       const dashboardDir = path.join(CODING_DIR, 'integrations/system-health-dashboard');
