@@ -141,7 +141,7 @@ The health system is built on interconnected components with active supervision:
 - Manual restart controls
 - Real-time API quota tracking
 
-![UKB Workflow Monitor](../images/health-monitor-dag.png)
+![UKB Workflow Monitor](../images/health-monitor-multi-agent-wf.png)
 
 ## What It Monitors
 
