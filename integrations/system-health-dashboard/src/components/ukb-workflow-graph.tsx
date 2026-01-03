@@ -629,9 +629,45 @@ interface UKBWorkflowGraphProps {
 /**
  * Generates a semantic summary of step results based on the agent type.
  * Shows meaningful, human-readable descriptions of what the step produced.
+ * Returns appropriate messages for steps that haven't run yet.
  */
-function StepResultSummary({ agentId, outputs, aggregatedSteps }: { agentId: string; outputs: Record<string, any>; aggregatedSteps?: AggregatedSteps | null }) {
+function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
+  agentId: string;
+  outputs: Record<string, any>;
+  aggregatedSteps?: AggregatedSteps | null;
+  status?: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+}) {
   const getSummary = (): string | null => {
+    // Handle non-completed states with informative messages
+    if (status === 'pending') {
+      return '⏳ Waiting to run (depends on prior steps completing)'
+    }
+    if (status === 'running') {
+      return '🔄 Currently processing...'
+    }
+    if (status === 'skipped') {
+      return '⏭️ Skipped (not required for this workflow)'
+    }
+    if (status === 'failed') {
+      return '❌ Step failed - check error details above'
+    }
+
+    // Check if outputs only contains metadata fields (no actual results)
+    const metadataOnlyFields = ['fieldsPresent', 'totalFields', 'result', 'batchId']
+    const meaningfulFields = Object.keys(outputs || {}).filter(
+      k => !k.startsWith('_') && !metadataOnlyFields.includes(k)
+    )
+
+    // If no meaningful data and step hasn't completed, show waiting message
+    if (meaningfulFields.length === 0 && status !== 'completed') {
+      return '⏳ Results pending...'
+    }
+
+    // If completed but only metadata fields, show completion status
+    if (meaningfulFields.length === 0 && status === 'completed') {
+      return '✅ Step completed (detailed metrics not available)'
+    }
+
     // For historical workflows, prefer aggregated totals across all batches
     // This provides accurate "final" numbers rather than just batch-001 data
     if (aggregatedSteps) {
@@ -711,6 +747,14 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps }: { agentId: str
         return `Processed ${sessions} sessions, found ${problemSolutions} problem-solution pairs`
 
       case 'semantic_analysis':
+        // Check for batch workflow format (from summarizeStepResult): { batchEntities, batchRelations, batchId }
+        const batchEntities = outputs.batchEntities || outputs.result?.entities || 0
+        const batchRelations = outputs.batchRelations || outputs.result?.relations || 0
+        if (batchEntities > 0 || batchRelations > 0) {
+          return `Processed ${batchEntities} entities, ${batchRelations} relations`
+        }
+
+        // Legacy format checks
         const keyPatterns = outputs.keyPatternsCount || outputs.patternsFound || outputs.patterns?.length || 0
         const learnings = outputs.learningsCount || 0
         const archDecisions = outputs.architecturalDecisionsCount || 0
@@ -721,7 +765,11 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps }: { agentId: str
           const confStr = semConfidence ? ` (${semConfidence} confidence)` : ''
           return `Found ${keyPatterns} patterns, ${learnings} learnings, ${archDecisions} arch decisions${confStr}`
         }
-        return `Semantic analysis completed (${filesAnalyzed} files analyzed)`
+        if (filesAnalyzed > 0) {
+          return `Semantic analysis completed (${filesAnalyzed} files analyzed)`
+        }
+        // No meaningful data - will be handled by metadata check in getSummary
+        return null
 
       case 'insight_generation':
         const patternCount = outputs.patterns?.length || outputs.patternsGenerated || 0
@@ -756,12 +804,32 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps }: { agentId: str
           : `Tree-KG pipeline completed`
 
       case 'quality_assurance':
+        // Check for batch workflow format (from summarizeStepResult): { validated, entitiesCreated, relationsAdded, ... }
+        if (outputs.validated !== undefined) {
+          const entities = outputs.entitiesCreated || 0
+          const relations = outputs.relationsAdded || 0
+          const commits = outputs.commitsProcessed || 0
+          const sessions = outputs.sessionsProcessed || 0
+          const parts = []
+          if (commits > 0) parts.push(`${commits} commits`)
+          if (sessions > 0) parts.push(`${sessions} sessions`)
+          if (entities > 0) parts.push(`${entities} entities`)
+          if (relations > 0) parts.push(`${relations} relations`)
+          const status = outputs.validated ? '✅ Validated' : '⚠️ Validation issues'
+          return parts.length > 0 ? `${status}: ${parts.join(', ')}` : status
+        }
+
+        // Legacy format
         const passed = outputs.passed || outputs.validationsPassed || 0
         const failed = outputs.failed || outputs.validationsFailed || 0
         const qaIterations = outputs.qaIterations || 1
-        return qaIterations > 1
-          ? `QA: ${passed} passed, ${failed} failed (after ${qaIterations} iterations)`
-          : `QA: ${passed} passed, ${failed} failed`
+        if (passed > 0 || failed > 0) {
+          return qaIterations > 1
+            ? `QA: ${passed} passed, ${failed} failed (after ${qaIterations} iterations)`
+            : `QA: ${passed} passed, ${failed} failed`
+        }
+        // No meaningful data
+        return null
 
       case 'persistence':
         const persisted = outputs.entitiesPersisted || outputs.entities?.length || 0
@@ -2651,7 +2719,7 @@ export function UKBNodeDetailsSidebar({
                 Results
               </h4>
               {/* Semantic Summary based on agent type - uses aggregated totals for historical workflows */}
-              <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} aggregatedSteps={aggregatedSteps} />
+              <StepResultSummary agentId={agentId} outputs={stepInfo.outputs} aggregatedSteps={aggregatedSteps} status={inferredStatus} />
               {/* Only show detailed results if we DON'T have aggregated data (which would contradict it) */}
               {!aggregatedSteps && <StepResultDetails outputs={stepInfo.outputs} />}
             </div>
