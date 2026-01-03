@@ -38,7 +38,8 @@ import {
   Network,
   StopCircle,
 } from 'lucide-react'
-import UKBWorkflowGraph, { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
+import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend } from './workflow'
+import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
 import {
   setActiveTab,
@@ -439,19 +440,25 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               </CardContent>
             </Card>
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
-              {/* Workflow Graph */}
-              <div className={`flex-1 min-w-0 ${showSidebar ? 'mr-0' : ''}`}>
+            {/* Main Content - 3 column layout: [Left Info | Graph | Details] */}
+            <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
+              {/* Left Column: Legend */}
+              <div className="w-36 flex-shrink-0 flex flex-col gap-3">
+                <WorkflowLegend />
+              </div>
+
+              {/* Center: Workflow Graph - key only changes on workflow identity, not step updates */}
+              <div className="flex-1 min-w-0">
                 <UKBWorkflowGraph
-                  key={`${activeCurrentProcess.pid}-${activeCurrentProcess._refreshKey || activeCurrentProcess.completedSteps}`}
+                  key={`${activeCurrentProcess.pid}-${activeCurrentProcess.workflowName || 'workflow'}`}
                   process={activeCurrentProcess}
                   onNodeClick={handleNodeClick}
                   selectedNode={selectedNode}
+                  hideLegend
                 />
               </div>
 
-              {/* Details Sidebar */}
+              {/* Right: Details Sidebar */}
               {showSidebar && selectedNode && (
                 <div className="flex-shrink-0 overflow-auto">
                   <UKBNodeDetailsSidebar
@@ -658,8 +665,29 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             </div>
           )}
 
-          {/* Workflow Graph - Main Content - takes remaining space */}
-          <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
+          {/* Main Content - 3 column layout: [Left Info | Graph | Details] */}
+          <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
+            {/* Left Column: Legend + Recommendations */}
+            <div className="w-36 flex-shrink-0 flex flex-col gap-3">
+              <WorkflowLegend />
+
+              {/* Recommendations (if any) */}
+              {historicalWorkflowDetail?.recommendations && historicalWorkflowDetail.recommendations.length > 0 && (
+                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg overflow-auto flex-1">
+                  <div className="text-xs font-medium text-yellow-800 mb-1 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Tips ({historicalWorkflowDetail.recommendations.length})
+                  </div>
+                  <ul className="text-[10px] text-yellow-700 space-y-0.5">
+                    {historicalWorkflowDetail.recommendations.map((rec, i) => (
+                      <li key={i}>• {rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Center: Workflow Graph */}
             {loadingDetail ? (
               <div className="flex-1 flex items-center justify-center border rounded-lg bg-muted/20">
                 <div className="text-center space-y-2">
@@ -669,16 +697,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               </div>
             ) : historicalProcessInfo ? (
               <>
-                {/* Workflow Graph - scrollable */}
-                <div className="flex-1 min-w-0 min-h-0 overflow-auto border rounded-lg bg-gradient-to-br from-slate-50 to-slate-100">
+                <div className="flex-1 min-w-0 min-h-0">
                   <UKBWorkflowGraph
                     process={historicalProcessInfo}
                     onNodeClick={handleHistoricalNodeClick}
                     selectedNode={selectedNode}
+                    hideLegend
                   />
                 </div>
 
-                {/* Details Sidebar */}
+                {/* Right: Details Sidebar */}
                 {showHistoricalSidebar && selectedNode && (
                   <div className="w-80 flex-shrink-0 overflow-auto border rounded-lg bg-background">
                     <UKBNodeDetailsSidebar
@@ -700,21 +728,6 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               </div>
             )}
           </div>
-
-          {/* Recommendations (if any) - at bottom, fixed height */}
-          {historicalWorkflowDetail?.recommendations && historicalWorkflowDetail.recommendations.length > 0 && (
-            <div className="flex-shrink-0 mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg max-h-24 overflow-auto">
-              <div className="text-xs font-medium text-yellow-800 mb-1 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                Recommendations ({historicalWorkflowDetail.recommendations.length})
-              </div>
-              <ul className="text-xs text-yellow-700 space-y-0.5">
-                {historicalWorkflowDetail.recommendations.map((rec, i) => (
-                  <li key={i}>• {rec}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       )
     }

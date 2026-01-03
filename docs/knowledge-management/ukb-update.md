@@ -126,19 +126,18 @@ When triggered, the MCP semantic-analysis server executes a coordinated workflow
 
 ### Workflow Visualization
 
-The System Health Dashboard provides a visual DAG workflow graph with multi-agent data:
+The System Health Dashboard provides a visual multi-agent workflow graph:
 
-![UKB Workflow Monitor](../images/health-monitor-dag.png)
+![UKB Workflow Monitor](../images/health-monitor-multi-agent-wf.png)
 
 **Dashboard Features:**
-- **Visual DAG Workflow Graph** - Shows QA as central coordinator with routing edges
-- **Confidence Bars** - Per-agent confidence levels (green ≥80%, amber ≥50%, red <50%)
-- **Routing Decision Badges** - Shows proceed (✓), retry (↻), skip (⊘), or escalate (!) per step
-- **Retry Count Badges** - Displays semantic retry iterations per agent
+- **Visual Multi-Agent Workflow Graph** - Hub-and-spoke visualization with Coordinator orchestrating 13 specialized agents
+- **Agent Status Indicators** - Real-time execution status per agent (running, completed, not yet run)
+- **Legend Panel** - Edge types (Control, Feedback, Dataflow) and node states
 - **Pipeline Totals** - Commits processed, sessions analyzed, candidates discovered
 - **Deduplication Stats** - Shows reduction percentage (e.g., 86.9% reduction from raw to final)
 - **Entity Breakdown** - Final entity counts by type (GraphDatabase, MCPAgent, etc.)
-- **Multi-Agent Data** - stepConfidences, routingHistory, workflowModifications
+- **Agent Details Sidebar** - Click any agent to see description, technology, and execution details
 
 Access via System Health Dashboard at `http://localhost:3032` → UKB Workflow Monitor card.
 
