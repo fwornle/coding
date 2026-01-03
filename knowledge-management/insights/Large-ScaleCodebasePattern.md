@@ -1,21 +1,12 @@
 # Large-Scale Codebase Pattern
 **Type:** architectural
-**Generated:** 2025-12-26T11:36:23.403Z
+**Generated:** 2026-01-03T20:20:19.859Z
 
 ## Pattern Overview
-Enterprise-scale codebase with 62115 code entities
+Enterprise-scale codebase with 64165 code entities
 
 **Significance:** 7/10
 
 ## Evidence
-- Total entities: 62115
-- Relationships: 128791
-
-## Code Analysis
-
-### Architectural Patterns
-- api
-- service
-- promise
-- decorator
-- component
+- Total entities: 64165
+- Relationships: 90879
