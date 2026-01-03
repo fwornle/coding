@@ -6,7 +6,7 @@ title Semantic Analysis System - Communication Architecture
 top to bottom direction
 
 package "Client Layer" {
-  component [Claude Code] as claude
+  component [Coding Agent] as claude
 }
 
 package "Integration Layer" {
@@ -27,7 +27,7 @@ package "Orchestration Layer" {
   end note
 }
 
-package "10-Agent System" {
+package "14-Agent System" {
   component [GitHistoryAgent] as git
   component [VibeHistoryAgent] as vibe
   component [SemanticAnalysisAgent] as sa

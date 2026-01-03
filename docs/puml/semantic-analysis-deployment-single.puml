@@ -6,7 +6,7 @@ title Semantic Analysis System - Single Machine Deployment
 top to bottom direction
 
 node "Host Machine" as host {
-  component [Claude Code] as cc
+  component [Coding Agent] as cc
   component [MCP Server] as mcp
 
   package "Storage Layer" {
@@ -15,7 +15,7 @@ node "Host Machine" as host {
     database [coding.json\n.data/knowledge-export/] as storage
   }
 
-  package "10-Agent System" {
+  package "14-Agent System" {
     component [1. GitHistoryAgent] as git_agent
     component [2. VibeHistoryAgent] as vibe_agent
     component [3. SemanticAnalysisAgent] as sa

@@ -1,4 +1,4 @@
-@startuml Agent-Agnostic Architecture
+@startuml agent-agnostic-architecture-sequence
 !include _standard-style.puml
 
 

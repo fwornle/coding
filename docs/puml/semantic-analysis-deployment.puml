@@ -7,10 +7,10 @@ top to bottom direction
 
 package "Development Deployment" {
   node "Development Machine" as DevMachine {
-    component [Claude Code] as CC
+    component [Coding Agent] as CC
     component [MCP Server] as MCP
 
-    frame "10-Agent System" {
+    frame "14-Agent System" {
       component [GitHistoryAgent] as Git
       component [VibeHistoryAgent] as Vibe
       component [SemanticAnalysisAgent] as SA

@@ -22,7 +22,7 @@ Each integration component:
 **Location**: `integrations/mcp-server-semantic-analysis/`
 
 **What it provides:**
-- 14 specialized AI agents for code analysis (including code graph, code intelligence, and ontology)
+- 14 specialized AI agents for code analysis (including code graph and ontology classification)
 - Repository scanning and pattern extraction
 - AST-based code indexing via Memgraph
 - Ontology classification for knowledge entities
@@ -114,7 +114,7 @@ The core systems communicate with integrations through different protocols:
 - Classification happens in milliseconds with budget-conscious models
 
 **Trajectory Generation**:
-- Uses MCP Semantic Analysis (14 agents, 13 with LLM) for deep repository insights
+- Uses MCP Semantic Analysis (14 agents, 11 use LLM) for deep repository insights
 - Uses Serena AST for code structure analysis
 - Comprehensive architectural pattern extraction
 

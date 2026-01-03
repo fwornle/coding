@@ -66,7 +66,7 @@ User: "ukb"
 mcp__semantic-analysis__execute_workflow
 workflow_name: "incremental-analysis"
 
-# 10-Agent System executes:
+# 14-Agent System executes:
 1. GitHistoryAgent - analyzes recent commits
 2. VibeHistoryAgent - analyzes session logs
 3. SemanticAnalysisAgent - extracts insights
@@ -88,7 +88,7 @@ workflow_name: "incremental-analysis"
 - ✅ Architectural decision records
 - ✅ Team-wide knowledge sharing
 - ✅ Deliberate, high-quality capture
-- ✅ 10-agent semantic analysis workflow
+- ✅ 14-agent semantic analysis workflow
 
 **See**: [MCP Semantic Analysis Documentation](../knowledge-management/mcp-semantic-analysis.md)
 

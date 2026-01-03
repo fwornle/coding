@@ -5,7 +5,7 @@ title "14-Agent Semantic Analysis System"
 
 top to bottom direction
 
-[Claude Code] <<external>> as claude
+[Coding Agent] <<external>> as claude
 [MCP Server] <<api>> as mcp
 [Coordinator] <<agent>> as coord
 
@@ -14,9 +14,7 @@ package "Phase 1: Collection" {
   [Vibe History] <<agent>> as vibe
 }
 
-package "Phase 1.5: Intelligence" {
-  [Code Intel] <<agent>> as intel
-}
+' Phase 1.5 removed - CodeIntelligenceAgent was fictional
 
 package "Phase 2: Analysis" {
   [Semantic] <<agent>> as semantic
@@ -40,7 +38,7 @@ package "Phase 5: Quality" {
 }
 
 package "Phase 6: Storage" {
-  [Persistence] <<storage>> as persist
+  [Persistence] <<agent>> as persist
   [Deduplication] <<agent>> as dedup
 }
 
@@ -53,11 +51,9 @@ mcp --> coord
 
 coord --> git
 coord --> vibe
-git --> intel
-vibe --> intel
-codegraph --> intel
-intel --> semantic
-intel --> insight
+git --> semantic
+vibe --> semantic
+codegraph --> semantic
 semantic --> web
 web --> insight
 insight --> obs
@@ -72,7 +68,6 @@ dedup --> validate
 
 git --> llm
 vibe --> llm
-intel --> llm
 semantic --> llm
 web --> llm
 insight --> llm
@@ -87,7 +82,7 @@ persist --> db
 
 note right of coord
   14 agents, 6 phases
-  13 use LLM
+  11 use LLM
 end note
 
 @enduml

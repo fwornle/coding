@@ -1,4 +1,4 @@
-@startuml Graphology Memory Architecture
+@startuml graphology-memory-architecture
 !include _standard-style.puml
 
 

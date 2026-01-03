@@ -1,4 +1,4 @@
-@startuml Knowledge Management Architecture v2.0
+@startuml knowledge-architecture
 !include _standard-style.puml
 
 !define RECTANGLE class
@@ -39,7 +39,7 @@ rectangle "Online Learning" as ONLINE {
 
 rectangle "Manual Learning" as MANUAL {
     [MCP Semantic Analysis] as MCP
-    [10-Agent Workflow] as WORKFLOW
+    [14-Agent Workflow] as WORKFLOW
 
     note right of MCP : User types "ukb" → MCP tools\nexecute_workflow\ncreate_ukb_entity_with_insight\nDirect GraphDB writes
 }

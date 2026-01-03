@@ -2,9 +2,13 @@
 
 ## Overview
 
-The **MCP Semantic Analysis** system provides automated knowledge base updates through a 10-agent workflow. Users trigger updates by typing **"ukb"** in Claude chat, which causes Claude to call the MCP semantic-analysis server.
+The **MCP Semantic Analysis** system provides automated knowledge base updates through a **14-agent multi-agent system** with **semantic orchestration**. Users trigger updates by typing **"ukb"** in Claude chat, which causes Claude to call the MCP semantic-analysis server.
 
 **IMPORTANT**: `ukb` is **NOT a shell command**. It's a keyword that triggers Claude to execute the semantic analysis workflow via MCP tools.
+
+## Multi-Agent Architecture
+
+The system uses a **SmartOrchestrator** that provides semantic routing, confidence propagation, and intelligent retry mechanisms. Unlike traditional sequential pipelines, agents communicate through a central orchestrator that makes LLM-assisted routing decisions.
 
 ## How It Works
 
@@ -19,7 +23,7 @@ Claude decides: incremental or full analysis
                           ↓
 Claude calls MCP tool: mcp__semantic-analysis__execute_workflow
                           ↓
-10-Agent workflow executes
+14-Agent workflow executes
                           ↓
 Results stored to GraphDB + JSON export
                           ↓
@@ -36,60 +40,97 @@ Users can type any of these to trigger the workflow:
 
 Claude intelligently detects the intent and chooses the appropriate workflow.
 
-## 10-Agent Workflow
+## 14-Agent Multi-Agent System
 
-When triggered, the MCP semantic-analysis server executes a coordinated workflow:
+When triggered, the MCP semantic-analysis server executes a coordinated workflow with semantic routing:
 
-### 1. **GitHistoryAgent**
+### Core Data Extraction Agents
+
+#### 1. **GitHistoryAgent**
 - Analyzes git commits since last checkpoint
 - Identifies architectural changes
 - Extracts technical decisions
 
-### 2. **VibeHistoryAgent**
+#### 2. **VibeHistoryAgent**
 - Analyzes session logs (.specstory/history/)
 - Extracts conversation patterns
 - Identifies problem-solution pairs
 
-### 3. **SemanticAnalysisAgent**
+#### 3. **CodeGraphAgent**
+- AST-based code analysis via Memgraph
+- Function call graphs and dependencies
+- Natural language queries about code structure
+- Requires Docker (Memgraph)
+
+### Analysis & Enrichment Agents
+
+#### 4. **SemanticAnalysisAgent**
 - Deep semantic analysis of code and conversations
-- Pattern extraction
-- Significance scoring
+- Pattern extraction with significance scoring
 - Uses LLM fallback chain: Groq → Gemini → Custom → Anthropic → OpenAI
 
-### 4. **WebSearchAgent**
+#### 5. **OntologyClassificationAgent**
+- Maps entities to project-specific ontology
+- Validates entity types against upper/lower ontologies
+- Ensures semantic consistency
+
+#### 6. **WebSearchAgent**
 - Researches technical patterns (DuckDuckGo)
 - Finds best practices
 - Validates approaches
 
-### 5. **InsightGenerationAgent**
-- Creates structured insights
-- Generates documentation
+### Knowledge Generation Agents
+
+#### 7. **InsightGenerationAgent**
+- Creates structured insights with PlantUML diagrams
+- Generates documentation artifacts
 - Formats knowledge entities
 
-### 6. **ObservationGenerationAgent**
+#### 8. **ObservationGenerationAgent**
 - Adds observations to entities
 - Links related concepts
 - Enriches knowledge graph
 
-### 7. **QualityAssuranceAgent**
-- Validates insight quality
-- Checks for completeness
-- Ensures consistency
+#### 9. **DocumentationLinkerAgent**
+- Links entities to documentation files
+- Cross-references code and docs
+- Maintains documentation graph
 
-### 8. **PersistenceAgent**
+### Quality & Persistence Agents
+
+#### 10. **QualityAssuranceAgent** (Semantic Router)
+- **Central role in multi-agent coordination**
+- Validates insight quality with confidence scoring
+- Generates **routing decisions**: proceed, retry, skip, escalate
+- Provides semantic feedback for retry guidance
+- Reports confidence breakdown per step
+
+#### 11. **DeduplicationAgent**
+- Prevents duplicate entities using embeddings
+- Merges similar patterns
+- Uses OpenAI embeddings for similarity scoring
+
+#### 12. **ContentValidationAgent**
+- Final content validation
+- Refreshes stale entities
+- Ensures persistence-ready data
+
+#### 13. **PersistenceAgent**
 - Stores entities to GraphDB
 - Creates relations
 - Updates knowledge graph
 
-### 9. **DeduplicationAgent**
-- Prevents duplicate entities
-- Merges similar patterns
-- Uses OpenAI embeddings for similarity
+### SmartOrchestrator (Coordination Layer)
 
-### 10. **CoordinatorAgent**
-- Orchestrates all agents
-- Manages workflow execution
-- Aggregates results
+The **SmartOrchestrator** manages all agents with:
+
+- **Semantic Retry Guidance**: Instead of mechanical threshold tightening, provides specific feedback about what went wrong and how to fix it
+- **Confidence Propagation**: Each step reports confidence; downstream agents receive upstream confidence context
+- **Dynamic Routing**: QA results drive routing decisions (proceed/retry/skip/escalate)
+- **LLM-Assisted Decisions**: Uses AI to interpret complex failures and suggest remediation
+- **Workflow Modification**: Can skip steps or adjust parameters based on runtime conditions
+
+![SmartOrchestrator Flow](../images/smart-orchestrator-flow.png)
 
 ### Workflow Visualization
 
@@ -98,10 +139,13 @@ The System Health Dashboard provides real-time visualization of workflow executi
 ![UKB Workflow Monitor](../images/health-monitor-dag.png)
 
 **Dashboard Features:**
-- **Visual Workflow Graph** - Shows agent execution flow, dependencies, and feedback loops
+- **Visual DAG Workflow Graph** - Shows agent execution flow with QA as central coordinator
+- **Confidence Bars** - Per-agent confidence levels (green ≥80%, amber ≥50%, red <50%)
+- **Routing Decision Badges** - Shows proceed (✓), retry (↻), skip (⊘), or escalate (!) decisions
+- **Retry Count Badges** - Displays semantic retry iterations per agent
 - **Pipeline Statistics** - Commits processed, sessions analyzed, deduplication metrics
 - **Entity Breakdown** - Final counts by type (GraphDatabase, MCPAgent, Pattern, etc.)
-- **Execution Details** - Duration, LLM provider, completion status
+- **Multi-Agent Data** - stepConfidences, routingHistory, workflowModifications
 
 Access via `http://localhost:3032` → UKB Workflow Monitor.
 

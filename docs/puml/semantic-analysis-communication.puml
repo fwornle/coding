@@ -7,16 +7,16 @@ top to bottom direction
 
 package "MCP Integration Layer" {
   component [MCP Server] as MCP
-  port "Claude Code Interface" as MCPPort
+  port "Coding Agent Interface" as MCPPort
   note right of MCP
-    • 12 tools for Claude Code
+    • 12 tools for Coding Agent
     • Request routing to CoordinatorAgent
     • Response aggregation
     • Direct function calls (no MQTT/RPC)
   end note
 }
 
-package "10-Agent System - Direct Function Calls" {
+package "14-Agent System - Direct Function Calls" {
 
   component [CoordinatorAgent] as Coordinator
   note right of Coordinator
@@ -59,7 +59,7 @@ package "External Services" {
 }
 
 ' MCP to Coordinator
-[Claude Code] --> MCP : MCP tool calls
+[Coding Agent] --> MCP : MCP tool calls
 MCP --> Coordinator : Direct function call\n(workflow execution)
 
 ' Coordinator orchestrates all agents via direct calls
@@ -93,7 +93,7 @@ WebSearch --> WebAPIs : search
 
 ' Return path
 Coordinator --> MCP : results
-MCP --> [Claude Code] : tool response
+MCP --> [Coding Agent] : tool response
 
 note bottom of Coordinator
   **Direct Function Call Architecture**

@@ -41,7 +41,7 @@ learning -down-> ollama : sensitive\ndata
 
 ' MCP Integration Layer (compact)
 package "MCP Integration Servers" as mcp #E0E7FF {
-  [Semantic Analysis\n(10 Agents)] as semantic <<mcp>>
+  [Semantic Analysis\n(14 Agents)] as semantic <<mcp>>
   [Constraint Monitor] as mcp_constraint <<mcp>>
   [Serena AST] as serena <<mcp>>
   [Browser/Spec] as other_mcp <<mcp>>

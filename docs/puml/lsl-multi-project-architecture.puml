@@ -1,4 +1,4 @@
-@startuml LSL Multi-Project Architecture
+@startuml lsl-multi-project-architecture
 !include _standard-style.puml
 
 title LSL Multi-Project Monitoring System

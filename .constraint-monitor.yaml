@@ -82,10 +82,10 @@ constraints:
   suggestion: Avoid eval() - use safer alternatives for dynamic code execution
 - id: no-parallel-files
   group: architecture
-  pattern: (v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental)[._-]
+  pattern: (v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[ ._-]
   message: 'CRITICAL: No parallel versions allowed - edit the original file directly'
   severity: critical
-  enabled: false
+  enabled: true
   suggestion: Debug and fix the original file instead of creating parallel versions
 - id: debug-not-speculate
   group: architecture
@@ -168,6 +168,14 @@ constraints:
   severity: info
   enabled: true
   suggestion: Use descriptive names like workflow-sequence.puml, architecture-overview.puml
+- id: plantuml-diagram-name-format
+  group: plantuml
+  pattern: '@startuml\s+(?:[A-Z]|.*\s+.*|.*(?:v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[ ._-])'
+  message: 'CRITICAL: @startuml diagram name must be lowercase-hyphenated without spaces or version suffixes (determines output PNG filename)'
+  severity: critical
+  enabled: true
+  applies_to: content
+  suggestion: 'Change @startuml My Diagram Name to @startuml my-diagram-name (must match filename without .puml extension)'
 - id: image-reference-pattern
   group: documentation
   pattern: '!\[.*\]\((?!docs/images/).*\.(png|jpg|jpeg|svg)\)'
@@ -178,11 +186,16 @@ constraints:
   suggestion: 'Move images to docs/images/ and update markdown references: ![Description](docs/images/filename.png)'
 - id: documentation-filename-format
   group: documentation
-  pattern: '[A-Z][a-z]+[A-Z].*\.md$'
-  message: 'Documentation files should use kebab-case naming: feature-name.md'
-  severity: info
-  enabled: true
-  suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md'
+  pattern: '(?:[A-Z][a-z]+[A-Z]|[A-Z]{2,}).*\.md$'
+  message: 'Documentation files should use kebab-case naming: feature-name.md (only README.md and CHANGELOG.md may use uppercase)'
+  severity: error
+  enabled: false
+  applies_to: file_path
+  suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md or ALL-CAPS-FILE.md'
+  whitelist:
+  - README.md
+  - CHANGELOG.md
+  - CLAUDE.md
 - id: update-main-readme
   group: documentation
   pattern: (?i)readme.*(?:update|modify|change).*(?:structure|format|content)

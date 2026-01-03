@@ -1,4 +1,4 @@
-@startuml Knowledge Flow Architecture
+@startuml knowledge-management-architecture
 !include _standard-style.puml
 
 !define RECTANGLE class
@@ -20,7 +20,7 @@ note right: Triggers MCP semantic\nanalysis workflow
 CLAUDE -> MCP: execute_workflow or\ncreate_ukb_entity_with_insight
 note right: MCP Server routes to\nCoordinatorAgent
 
-MCP -> MCP: CoordinatorAgent executes\n14-agent workflow (13 with LLM)
+MCP -> MCP: CoordinatorAgent executes\n14-agent workflow (11 with LLM)
 MCP -> MCP: Direct function calls\n(no MQTT/RPC)
 
 == Phase 2: GraphDB Storage ==

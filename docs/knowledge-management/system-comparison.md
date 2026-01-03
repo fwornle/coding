@@ -324,7 +324,7 @@ These systems **do NOT replace each other**. They are designed to coexist:
 
 | System | Purpose | Agents | Storage | Activation |
 |--------|---------|--------|---------|------------|
-| **MCP Semantic Analysis** | Deep code analysis | 10 agents | UKB (Graph DB + JSON) | On-demand (MCP tools) |
+| **MCP Semantic Analysis** | Deep code analysis | 14 agents | UKB (Graph DB + JSON) | On-demand (MCP tools) |
 | **Continuous Learning** | Real-time session learning | 1 agent | Qdrant + SQLite | Automatic (always on) |
 
 **Recommendation**: **Use BOTH systems** for maximum knowledge management capabilities. They complement each other and do not conflict.

@@ -1,4 +1,4 @@
-@startuml agent-agnostic-architecture-new
+@startuml agent-agnostic-architecture-components
 !include _standard-style.puml
 
 title Agent-Agnostic Architecture\nCoding System

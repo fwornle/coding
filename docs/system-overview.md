@@ -8,7 +8,7 @@ Coding is an intelligent development infrastructure that:
 
 - **Captures** every conversation and code change across projects
 - **Classifies** content to route knowledge appropriately
-- **Analyzes** patterns using 10 specialized AI agents
+- **Analyzes** patterns using 14 specialized AI agents
 - **Enforces** code quality through real-time constraint monitoring
 - **Accumulates** knowledge that improves over time
 - **Works** seamlessly with Claude Code, GitHub CoPilot, and other AI assistants
@@ -50,7 +50,7 @@ Coding is an intelligent development infrastructure that:
 **Automated project analysis and living documentation**
 
 - **Repository Scanning**: Multi-layered code analysis
-- **MCP-Powered Analysis**: Deep semantic understanding using 10 agents
+- **MCP-Powered Analysis**: Deep semantic understanding using 14 agents
 - **Two-Tier System**: Light (quick insights) and Deep (comprehensive reports)
 - **Real-Time Updates**: Integrates with LSL for continuous trajectory updates
 - **Capability Focus**: Documents what the project does vs. historical activities
@@ -77,7 +77,7 @@ The system is built on **self-contained integration components**, each with its 
 
 ### MCP Semantic Analysis Server
 
-**10-agent AI analysis system for deep code understanding**
+**14-agent AI analysis system for deep code understanding**
 
 - CoordinatorAgent (orchestration)
 - GitHistoryAgent, VibeHistoryAgent, SemanticAnalysisAgent (uses LLM)

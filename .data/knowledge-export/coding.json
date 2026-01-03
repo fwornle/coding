@@ -11805,7 +11805,7 @@
     },
     {
       "name": "SemanticinsightDecisionToUsePattern",
-      "entityType": "SemanticAnalyzer",
+      "entityType": "KnowledgeEntity",
       "observations": [
         {
           "type": "insight",
@@ -11831,22 +11831,54 @@
             "source": "workflow_persist"
           }
         },
-        "decision to use a service-oriented architecture, as seen in the multiple api patterns, which allows for loose coupling and scalability"
+        "decision to use a service-oriented architecture, as seen in the multiple api patterns, which allows for loose coupling and scalability",
+        "Decision to use a multi-file storage adapter in lib/knowledge-api/adapters/multi-file-storage.js for handling entity storage, rationale: flexibility and scalability, impact: improved data management",
+        "Decision to use a submodule for mcp-constraint-monitor, allowing for separate development and updates (commits: 2025-10-11T15:47:16.000Z, 2025-10-11T15:53:01.000Z)"
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2025-12-29T12:05:32.954Z",
-        "last_updated": "2026-01-02T08:24:56.133Z",
+        "last_updated": "2026-01-03T05:52:01.794Z",
         "significance": 5,
         "originalMetadata": {
-          "significance": 7,
+          "significance": 5,
           "originalMetadata": {
-            "created_at": "2025-12-29T12:05:32.950Z",
-            "last_updated": "2025-12-29T12:05:32.950Z",
-            "created_by": "workflow_persist",
-            "version": "1.0",
+            "significance": 7,
+            "originalMetadata": {
+              "created_at": "2025-12-29T12:05:32.950Z",
+              "last_updated": "2025-12-29T12:05:32.950Z",
+              "created_by": "workflow_persist",
+              "version": "1.0",
+              "ontology": {
+                "ontologyName": "coding",
+                "classificationMethod": "heuristic",
+                "confidence": 0.94
+              },
+              "classificationConfidence": 0.94,
+              "classificationMethod": "heuristic",
+              "validation": {
+                "valid": true,
+                "errors": [],
+                "warnings": [],
+                "mode": "lenient"
+              },
+              "contentValidation": {
+                "overallValid": false,
+                "overallScore": 100,
+                "totalIssues": 0,
+                "criticalIssues": 0,
+                "validatedAt": "2025-12-29T12:05:32.952Z",
+                "mode": "lenient"
+              },
+              "staleness_score": 100,
+              "staleness_check_at": "2025-12-29T12:05:32.952Z"
+            },
+            "source": "manual",
+            "team": "coding",
+            "created_at": "2025-12-29T12:05:32.954Z",
+            "last_updated": "2026-01-02T08:24:55.922Z",
             "ontology": {
               "ontologyName": "coding",
               "classificationMethod": "heuristic",
@@ -11862,25 +11894,27 @@
             },
             "contentValidation": {
               "overallValid": false,
-              "overallScore": 100,
-              "totalIssues": 0,
-              "criticalIssues": 0,
-              "validatedAt": "2025-12-29T12:05:32.952Z",
+              "overallScore": 80,
+              "totalIssues": 1,
+              "criticalIssues": 1,
+              "validatedAt": "2026-01-02T08:24:55.925Z",
               "mode": "lenient"
             },
+            "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2025-12-29T12:05:32.952Z"
+            "staleness_check_at": "2026-01-02T08:24:55.925Z",
+            "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2025-12-29T12:05:32.954Z",
-          "last_updated": "2026-01-02T08:24:55.922Z",
+          "last_updated": "2026-01-03T05:52:01.674Z",
           "ontology": {
             "ontologyName": "coding",
             "classificationMethod": "heuristic",
-            "confidence": 0.94
+            "confidence": 0.95
           },
-          "classificationConfidence": 0.94,
+          "classificationConfidence": 0.95,
           "classificationMethod": "heuristic",
           "validation": {
             "valid": true,
@@ -11893,12 +11927,12 @@
             "overallScore": 80,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-02T08:24:55.925Z",
+            "validatedAt": "2026-01-03T05:52:01.676Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-02T08:24:55.925Z",
+          "staleness_check_at": "2026-01-03T05:52:01.676Z",
           "staleness_method": "git-based"
         }
       },
@@ -12211,24 +12245,55 @@
         },
         "The decision to implement a comprehensive knowledge graph management system, as seen in the commit 'feat: comprehensive knowledge graph management system', has a significant impact on the overall system architecture and scalability.",
         "The decision to use a comprehensive knowledge graph management system (feat: comprehensive knowledge graph management system, commit date: 2025-05-31T06:58:09.000Z) has a significant impact on the project's scalability and maintainability",
-        "The decision to implement a 'multi-project semantic classifier' (embeddings) in commit 'feat: multi-project semantic classifier (embeddings)' demonstrates an effort to improve code analysis and understanding. The impact of this decision is likely to enhance the system's ability to classify and analyze code."
+        "The decision to implement a 'multi-project semantic classifier' (embeddings) in commit 'feat: multi-project semantic classifier (embeddings)' demonstrates an effort to improve code analysis and understanding. The impact of this decision is likely to enhance the system's ability to classify and analyze code.",
+        "The decision to use a knowledge graph management system, as seen in the commit message 'feat: comprehensive knowledge graph management system', suggests a deliberate choice to manage complex relationships between knowledge entities."
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2025-12-29T13:46:47.363Z",
-        "last_updated": "2026-01-02T08:24:54.884Z",
+        "last_updated": "2026-01-03T05:52:01.622Z",
         "significance": 5,
         "originalMetadata": {
           "significance": 5,
           "originalMetadata": {
-            "significance": 7,
+            "significance": 5,
             "originalMetadata": {
-              "created_at": "2025-12-29T13:46:47.357Z",
-              "last_updated": "2025-12-29T13:46:47.357Z",
-              "created_by": "workflow_persist",
-              "version": "1.0",
+              "significance": 7,
+              "originalMetadata": {
+                "created_at": "2025-12-29T13:46:47.357Z",
+                "last_updated": "2025-12-29T13:46:47.357Z",
+                "created_by": "workflow_persist",
+                "version": "1.0",
+                "ontology": {
+                  "ontologyName": "coding",
+                  "classificationMethod": "heuristic",
+                  "confidence": 0.94
+                },
+                "classificationConfidence": 0.94,
+                "classificationMethod": "heuristic",
+                "validation": {
+                  "valid": true,
+                  "errors": [],
+                  "warnings": [],
+                  "mode": "lenient"
+                },
+                "contentValidation": {
+                  "overallValid": false,
+                  "overallScore": 100,
+                  "totalIssues": 0,
+                  "criticalIssues": 0,
+                  "validatedAt": "2025-12-29T13:46:47.360Z",
+                  "mode": "lenient"
+                },
+                "staleness_score": 100,
+                "staleness_check_at": "2025-12-29T13:46:47.360Z"
+              },
+              "source": "manual",
+              "team": "coding",
+              "created_at": "2025-12-29T13:46:47.363Z",
+              "last_updated": "2026-01-01T12:48:14.893Z",
               "ontology": {
                 "ontologyName": "coding",
                 "classificationMethod": "heuristic",
@@ -12244,25 +12309,27 @@
               },
               "contentValidation": {
                 "overallValid": false,
-                "overallScore": 100,
-                "totalIssues": 0,
-                "criticalIssues": 0,
-                "validatedAt": "2025-12-29T13:46:47.360Z",
+                "overallScore": 80,
+                "totalIssues": 1,
+                "criticalIssues": 1,
+                "validatedAt": "2026-01-01T12:48:14.895Z",
                 "mode": "lenient"
               },
+              "invalidating_commits": [],
               "staleness_score": 100,
-              "staleness_check_at": "2025-12-29T13:46:47.360Z"
+              "staleness_check_at": "2026-01-01T12:48:14.895Z",
+              "staleness_method": "git-based"
             },
             "source": "manual",
             "team": "coding",
             "created_at": "2025-12-29T13:46:47.363Z",
-            "last_updated": "2026-01-01T12:48:14.893Z",
+            "last_updated": "2026-01-02T08:24:54.203Z",
             "ontology": {
               "ontologyName": "coding",
               "classificationMethod": "heuristic",
-              "confidence": 0.94
+              "confidence": 0.95
             },
-            "classificationConfidence": 0.94,
+            "classificationConfidence": 0.95,
             "classificationMethod": "heuristic",
             "validation": {
               "valid": true,
@@ -12275,18 +12342,18 @@
               "overallScore": 80,
               "totalIssues": 1,
               "criticalIssues": 1,
-              "validatedAt": "2026-01-01T12:48:14.895Z",
+              "validatedAt": "2026-01-02T08:24:54.206Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-01-01T12:48:14.895Z",
+            "staleness_check_at": "2026-01-02T08:24:54.206Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2025-12-29T13:46:47.363Z",
-          "last_updated": "2026-01-02T08:24:54.203Z",
+          "last_updated": "2026-01-03T05:52:01.314Z",
           "ontology": {
             "ontologyName": "coding",
             "classificationMethod": "heuristic",
@@ -12305,12 +12372,12 @@
             "overallScore": 80,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-02T08:24:54.206Z",
+            "validatedAt": "2026-01-03T05:52:01.317Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-02T08:24:54.206Z",
+          "staleness_check_at": "2026-01-03T05:52:01.317Z",
           "staleness_method": "git-based"
         }
       },
@@ -13219,6 +13286,282 @@
           },
           "staleness_score": 100,
           "staleness_check_at": "2026-01-02T08:24:57.014Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightChoiceToImplementPattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "Choice to implement Layer 0 (Session Filter) with conversation bias tracking, indicating a focus on session filtering and bias detection (commit: 2025-10-17T04:17:19.000Z)",
+          "date": "2026-01-03T05:52:01.823Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-03T05:52:01.823Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-03T05:52:01.823Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-03T05:52:01.827Z",
+        "last_updated": "2026-01-03T05:52:01.827Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-03T05:52:01.823Z",
+          "last_updated": "2026-01-03T05:52:01.823Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.94
+          },
+          "classificationConfidence": 0.94,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-03T05:52:01.825Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-03T05:52:01.825Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightRationaleForExtractingPattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "Rationale for extracting agent-agnostic setup to a common script, promoting code reuse and modularity (commit: 2025-10-17T10:27:31.000Z)",
+          "date": "2026-01-03T05:52:01.830Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-03T05:52:01.830Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-03T05:52:01.830Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-03T05:52:01.834Z",
+        "last_updated": "2026-01-03T05:52:01.834Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-03T05:52:01.830Z",
+          "last_updated": "2026-01-03T05:52:01.830Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.94
+          },
+          "classificationConfidence": 0.94,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-03T05:52:01.832Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-03T05:52:01.832Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightRegularUpdatesToPattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "Regular updates to the mcp-constraint-monitor submodule, indicating a strong dependency on this module (commits: 2025-10-11T15:47:16.000Z, 2025-10-11T15:53:01.000Z, 2025-10-12T10:07:22.000Z)",
+          "date": "2026-01-03T05:52:01.837Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-03T05:52:01.837Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-03T05:52:01.837Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-03T05:52:01.843Z",
+        "last_updated": "2026-01-03T05:52:01.843Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-03T05:52:01.837Z",
+          "last_updated": "2026-01-03T05:52:01.837Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.95
+          },
+          "classificationConfidence": 0.95,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-03T05:52:01.840Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-03T05:52:01.840Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightFrequentChangesToPattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "Frequent changes to the scripts/enhanced-transcript-monitor.js file, suggesting a high-maintenance area of the codebase (commits: 2025-10-07T12:04:45.000Z, 2025-10-17T05:03:48.000Z, 2025-10-18T08:51:46.000Z)",
+          "date": "2026-01-03T05:52:01.847Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-03T05:52:01.847Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-03T05:52:01.847Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-03T05:52:01.852Z",
+        "last_updated": "2026-01-03T05:52:01.853Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-03T05:52:01.847Z",
+          "last_updated": "2026-01-03T05:52:01.847Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.94
+          },
+          "classificationConfidence": 0.94,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-03T05:52:01.850Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-03T05:52:01.850Z"
         }
       },
       "source": "manual",
@@ -14333,13 +14676,89 @@
       "relationType": "related-to",
       "confidence": 1,
       "metadata": {}
+    },
+    {
+      "from": "SemanticinsightChoiceToImplementPattern",
+      "to": "CollectiveKnowledge",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightChoiceToImplementPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightRationaleForExtractingPattern",
+      "to": "CollectiveKnowledge",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightRationaleForExtractingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightRegularUpdatesToPattern",
+      "to": "CollectiveKnowledge",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightRegularUpdatesToPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightFrequentChangesToPattern",
+      "to": "CollectiveKnowledge",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightFrequentChangesToPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "contributes_to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightChoiceToImplementPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightRationaleForExtractingPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightRegularUpdatesToPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "SemanticinsightFrequentChangesToPattern",
+      "to": "CollectiveKnowledge",
+      "relationType": "related-to",
+      "confidence": 1,
+      "metadata": {}
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-02T09:00:55.842Z",
+    "last_updated": "2026-01-03T05:53:51.743Z",
     "team": "coding",
-    "entity_count": 42,
-    "relation_count": 166,
+    "entity_count": 46,
+    "relation_count": 178,
     "exported_by": "GraphDatabaseService",
     "export_version": "1.0"
   }

@@ -19,29 +19,37 @@ package "Orchestration" #FFFFCC {
   [CoordinatorAgent\nOrchestrates ALL agents] <<agent>> as coord
 }
 
-package "Analysis Agents (No LLM)" #E6F3FF {
+package "Data Collection Agents" #E6F3FF {
   [GitHistoryAgent] <<agent>> as git
   [VibeHistoryAgent] <<agent>> as vibe
   [WebSearchAgent] <<agent>> as web
+}
+
+package "Generation Agents" #E6FFE6 {
   [ObservationGenerationAgent] <<agent>> as obs
+  [DocumentationLinkerAgent] <<agent>> as doclink
+}
+
+package "Infrastructure Agents" #F0F0F0 {
   [PersistenceAgent] <<agent>> as per
+  [ContentValidationAgent] <<agent>> as content
+  [CodeGraphAgent] <<agent>> as codegraph
 }
 
 package "LLM-Powered Agents" #FFE6E6 {
   [SemanticAnalysisAgent] <<agent>> as sem
   [InsightGenerationAgent] <<agent>> as ins
   [QualityAssuranceAgent] <<agent>> as qa
+  [OntologyClassificationAgent] <<agent>> as ontology
 }
 
-package "Infrastructure Agents" #E8F4FD {
-  [SynchronizationAgent] <<agent>> as sync
+package "Deduplication" #E8F4FD {
   [DeduplicationAgent] <<agent>> as dedup
 }
 
-package "Storage - 3 Sync Targets" {
-  database "Graphology DB\nIn-memory graph" <<storage>> as graphdb
+package "Storage" {
+  database "Graphology DB\nLevelDB persistence" <<storage>> as graphdb
   database "knowledge-export/<team>.json\nGit-tracked files" <<storage>> as files
-  database "MCP Memory\n(Placeholder)" <<storage>> as mcpmem
 }
 
 package "LLM Provider Chain" {
@@ -60,7 +68,7 @@ copilot -down-> http
 mcp -down-> coord
 http -down-> coord
 
-' Coordinator orchestrates all agents
+' Coordinator orchestrates all 14 agents
 coord -down-> git
 coord -down-> vibe
 coord -down-> sem
@@ -69,8 +77,11 @@ coord -down-> ins
 coord -down-> obs
 coord -down-> qa
 coord -down-> per
-coord -down-> sync
 coord -down-> dedup
+coord -down-> ontology
+coord -down-> content
+coord -down-> codegraph
+coord -down-> doclink
 
 ' LLM agents use provider chain
 sem ..> groq
@@ -80,13 +91,12 @@ sem ..> anthropic
 sem ..> openai
 ins ..> sem : "Delegates"
 
-' Sync agent manages storage
-sync -down-> graphdb
-sync -down-> files
-sync -.-> mcpmem
+' Persistence agent manages storage
+per -down-> graphdb
+per -down-> files
 
 note right of coord
-  **Coordinator orchestrates ALL agents**
+  **Coordinator orchestrates 14 agents**
 
   Workflow execution:
   1. Loads workflow definition
@@ -96,17 +106,15 @@ note right of coord
   5. Returns aggregated results
 end note
 
-note right of sync
-  **Storage Synchronization**
+note right of per
+  **Knowledge Persistence**
 
   Active targets:
-  • Graphology DB (in-memory)
+  • Graphology DB (LevelDB)
   • knowledge-export/ (git)
 
-  Placeholder:
-  • MCP Memory (incomplete)
-
-  Bidirectional sync: 60s interval
+  GraphDB handles entity storage
+  and relationship management
 end note
 
 note right of groq
