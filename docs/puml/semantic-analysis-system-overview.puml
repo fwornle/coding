@@ -6,7 +6,7 @@ title Semantic Analysis System - Complete Architecture Overview
 top to bottom direction
 
 package "User Interfaces" {
-  actor "Claude Code" as Claude <<external>>
+  actor "Coding Agent" as Claude <<external>>
   actor "CLI User" as CLIUser <<external>>
 }
 
@@ -60,7 +60,7 @@ package "External Services" <<external>> {
   end note
 }
 
-package "10-Agent System" {
+package "14-Agent System" {
   package "Orchestration" {
     component [CoordinatorAgent] as CoordinatorAgent <<agent>>
   }

@@ -9,7 +9,7 @@ skinparam ArrowThickness 2
 
 title 14-Agent Workflow
 
-participant "Claude" as CLAUDE
+participant "Coding Agent" as CLAUDE
 participant "Coordinator" as COORD #FFE6CC
 participant "Git/Vibe\nAgents" as DATA #E6F3FF
 participant "Analysis\nAgents" as ANALYSIS #E6F3FF

@@ -10,12 +10,12 @@
 
 The MCP Semantic Analysis Server is a standalone Node.js application that provides comprehensive AI-powered code analysis through the Model Context Protocol.
 
-### 13 Intelligent Agents
+### 14 Intelligent Agents
 
 **Orchestration (1 agent):**
 1. **CoordinatorAgent** - Orchestrates ALL agents via workflow definitions with step dependencies, data flow, and GraphDB integration
 
-**LLM-Powered Agents (10 agents - via SemanticAnalyzer):**
+**LLM-Powered Agents (10 core agents - via SemanticAnalyzer):**
 2. **SemanticAnalysisAgent** - Deep code analysis using 3-tier LLM chain
 3. **InsightGenerationAgent** - Generates insights with PlantUML diagrams using LLMs
 4. **QualityAssuranceAgent** - Enhanced validation with:
@@ -64,10 +64,10 @@ The MCP Semantic Analysis Server is a standalone Node.js application that provid
 
 ### How It Connects
 
-The MCP server integrates with Claude Code through the Model Context Protocol:
+The MCP server integrates with any MCP-compatible coding agent through the Model Context Protocol:
 
 ```
-Claude Code → MCP Protocol → Semantic Analysis Server → CoordinatorAgent → 13 Worker Agents → Analysis Results
+Coding Agent → MCP Protocol → Semantic Analysis Server → CoordinatorAgent → 14 Worker Agents → Analysis Results
 ```
 
 ### Agent Coordination Model
@@ -124,7 +124,7 @@ Configured in `~/.config/Claude/claude_desktop_config.json`:
 
 ### Usage in Workflows
 
-**Within Claude Code session:**
+**Within coding agent session:**
 
 ```json
 // Analyze current repository

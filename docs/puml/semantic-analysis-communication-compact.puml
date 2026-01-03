@@ -6,7 +6,7 @@ title Communication Patterns in Semantic Analysis System
 top to bottom direction
 
 package "Client" {
-  component [Claude Code] as claude
+  component [Coding Agent] as claude
 }
 
 package "MCP Layer" {
@@ -17,7 +17,7 @@ package "Orchestration" {
   component [CoordinatorAgent] as coord
 }
 
-package "10-Agent System" {
+package "14-Agent System" {
   component [Analysis Agents] as analysis
   component [Infrastructure Agents] as infra
 }

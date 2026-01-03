@@ -1,0 +1,136 @@
+@startuml smart-orchestrator-flow
+!include _standard-style.puml
+
+title Smart Orchestrator Multi-Agent Coordination
+
+' Define stereotypes for color-coding
+skinparam component {
+  BackgroundColor<<orchestrator>> #FFE6CC
+  BackgroundColor<<qa>> #FFCCCC
+  BackgroundColor<<data>> #CCE5FF
+  BackgroundColor<<analysis>> #D4EDDA
+  BackgroundColor<<generation>> #E2D4ED
+  BackgroundColor<<persistence>> #FFF3CD
+}
+
+' SmartOrchestrator at the top
+package "Orchestration Layer" {
+  component "SmartOrchestrator" as SO <<orchestrator>> {
+    component "decideNextSteps()" as decide
+    component "smartRetry()" as retry
+    component "interpretResult()" as interpret
+  }
+
+  component "CoordinatorAgent" as CA <<orchestrator>> {
+    component "executeWorkflow()" as exec
+    component "writeProgressFile()" as progress
+  }
+}
+
+' Data Extraction Layer
+package "Data Extraction" {
+  component "GitHistoryAgent" as GH <<data>>
+  component "VibeHistoryAgent" as VH <<data>>
+  component "CodeGraphAgent" as CG <<data>>
+}
+
+' Analysis Layer
+package "Analysis & Enrichment" {
+  component "SemanticAnalysisAgent" as SA <<analysis>>
+  component "OntologyClassificationAgent" as OC <<analysis>>
+  component "WebSearchAgent" as WS <<analysis>>
+}
+
+' Generation Layer
+package "Knowledge Generation" {
+  component "InsightGenerationAgent" as IG <<generation>>
+  component "ObservationGenerationAgent" as OG <<generation>>
+  component "DocumentationLinkerAgent" as DL <<generation>>
+}
+
+' QA as Semantic Router
+package "Quality Assurance (Semantic Router)" {
+  component "QualityAssuranceAgent" as QA <<qa>> {
+    component "validateQuality()" as validate
+    component "generateRoutingDecision()" as route
+    component "scoreConfidence()" as score
+  }
+}
+
+' Persistence Layer
+package "Persistence" {
+  component "DeduplicationAgent" as DA <<persistence>>
+  component "ContentValidationAgent" as CV <<persistence>>
+  component "PersistenceAgent" as PA <<persistence>>
+}
+
+' Storage
+database "GraphDB\n(LevelDB)" as DB
+database "JSON Export" as JSON
+
+' Flow connections
+SO --> CA : manages
+
+' CA orchestrates data extraction
+CA --> GH
+CA --> VH
+CA --> CG
+
+' Data flows to analysis
+GH --> SA
+VH --> SA
+CG --> SA
+
+SA --> OC
+SA --> WS
+
+' Analysis flows to generation
+OC --> IG
+WS --> IG
+
+IG --> OG
+OG --> DL
+
+' All generation flows to QA
+DL --> QA : results + confidence
+
+' QA routing decisions (the key multi-agent aspect)
+QA --> SO : routing decision\n(proceed/retry/skip/escalate)
+
+' QA successful proceed goes to persistence
+QA --> DA : proceed
+DA --> CV
+CV --> PA
+
+' Persistence writes to storage
+PA --> DB
+PA --> JSON
+
+' SmartOrchestrator can retry any step
+SO ..[#FF9800].> SA : retry with\nsemantic guidance
+SO ..[#FF9800].> IG : retry with\nenhanced params
+SO ..[#FF9800].> OG : retry with\nspecific feedback
+
+' Confidence propagation
+note right of QA
+  <b>Routing Decisions:</b>
+  * proceed - quality sufficient
+  * retry - needs improvement
+  * skip - not recoverable
+  * escalate - requires human
+
+  <b>Confidence Scores:</b>
+  * stepConfidences per agent
+  * routingHistory tracked
+  * retryHistory logged
+end note
+
+note right of SO
+  <b>Semantic Retry:</b>
+  * Not threshold tightening
+  * Specific error guidance
+  * Good vs bad examples
+  * Issue-based params
+end note
+
+@enduml

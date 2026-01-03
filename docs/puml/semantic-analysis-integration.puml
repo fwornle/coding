@@ -5,8 +5,8 @@ title Semantic Analysis System - Integration Architecture
 
 top to bottom direction
 
-package "Claude Code Integration Layer" {
-  component [Claude Code] as CC
+package "Coding Agent Integration Layer" {
+  component [Coding Agent] as CC
   note right of CC
     • Primary user interface
     • Tool-based interaction
@@ -24,7 +24,7 @@ package "Claude Code Integration Layer" {
   end note
 }
 
-package "10-Agent Semantic Analysis System" {
+package "14-Agent Semantic Analysis System" {
   component [GitHistoryAgent] as Git
   component [VibeHistoryAgent] as Vibe
   component [SemanticAnalysisAgent] as SA

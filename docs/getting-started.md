@@ -58,7 +58,7 @@ source ~/.bashrc  # or ~/.zshrc on macOS
    - `vkb` - View Knowledge Base (web visualization)
 
 2. **Integration Components**
-   - MCP Semantic Analysis Server (10 agents)
+   - MCP Semantic Analysis Server (14 agents)
    - MCP Constraint Monitor
    - Serena AST Analysis (MCP)
    - Browser Access (Stagehand)

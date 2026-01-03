@@ -8,7 +8,7 @@ skinparam linetype ortho
 
 ' Entry Layer
 package "Entry" {
-  [Claude Code] <<external>> as claude
+  [Coding Agent] <<external>> as claude
   [MCP Server\n(14 Tools)] <<api>> as mcp
 }
 
@@ -27,14 +27,6 @@ package "Phase 1: Data Collection" <<frame>> {
   }
   rectangle "VibeHistoryAgent" <<agent>> as vibe {
     [LLM Context Extraction] <<core>>
-  }
-}
-
-' Phase 1.5: Code Intelligence (LLM-Powered)
-package "Phase 1.5: Code Intelligence" <<frame>> {
-  rectangle "CodeIntelligenceAgent" <<agent>> as intelligence {
-    [NL→Cypher Queries] <<core>>
-    [Context-Aware Q&A] <<core>>
   }
 }
 
@@ -107,18 +99,15 @@ mcp --> coordinator
 
 coordinator --> git
 coordinator --> vibe
-git --> intelligence
-vibe --> intelligence
-codegraph --> intelligence
-intelligence --> semantic
-intelligence --> insight
+git --> semantic
+vibe --> semantic
 semantic --> web
 web --> insight
 semantic --> insight
+semantic --> codegraph
 insight --> obs
 obs --> ontology
 ontology --> doclink
-semantic --> codegraph
 codegraph --> doclink
 doclink --> qa
 qa --> persist
@@ -128,7 +117,6 @@ dedup --> validate
 ' LLM connections (simplified)
 git ..> llm
 vibe ..> llm
-intelligence ..> llm
 semantic ..> llm
 web ..> llm
 insight ..> llm
@@ -137,6 +125,7 @@ ontology ..> llm
 doclink ..> llm
 qa ..> llm
 validate ..> llm
+codegraph ..> llm
 
 ' Storage connections
 persist --> graphdb
@@ -147,7 +136,7 @@ note right of coordinator
   **Workflow Engine**
   14 agents in 6 phases
   Quality loops: up to 3 iterations
-  13 agents use LLM
+  11 agents use LLM
 end note
 
 note right of qa

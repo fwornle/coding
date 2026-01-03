@@ -14,7 +14,7 @@
 
 ## Current System: MCP Semantic Analysis
 
-**When you type "ukb" in Claude chat**, Claude detects your intent and calls the MCP semantic-analysis server to execute a comprehensive 14-agent workflow (13 agents with LLM support).
+**When you type "ukb" in Claude chat**, Claude detects your intent and calls the MCP semantic-analysis server to execute a comprehensive 14-agent workflow with SmartOrchestrator semantic coordination.
 
 ### Quick Start
 
@@ -43,9 +43,10 @@ User: "ukb"
 ### New System (Current)
 - `ukb` is a **keyword in Claude chat**
 - Claude decides: incremental or full analysis
-- **14-agent workflow** with LLM-powered semantic analysis (13 of 14 agents use LLM)
+- **14-agent multi-agent system** with **SmartOrchestrator** semantic coordination
 - **MCP tool integration**: `mcp__semantic-analysis__execute_workflow`
 - **Team synchronization** via git-tracked checkpoint files
+- **Semantic routing**: QA agent acts as central coordinator with confidence scoring
 
 ---
 
@@ -63,9 +64,10 @@ Claude will:
 1. Detect knowledge update request
 2. Decide: incremental or full analysis
 3. Call MCP semantic-analysis tool
-4. Execute 14-agent workflow (13 with LLM)
-5. Store to GraphDB → LevelDB → JSON export
-6. Show you a summary
+4. Execute 14-agent workflow with SmartOrchestrator
+5. QA agent provides semantic routing (proceed/retry/skip/escalate)
+6. Store to GraphDB → LevelDB → JSON export
+7. Show you a summary with confidence metrics
 
 ### Full Analysis
 
@@ -85,44 +87,58 @@ Claude checks the checkpoint and reports new commits/sessions since last run.
 
 ---
 
-## 14-Agent Workflow
+## 14-Agent Multi-Agent System with SmartOrchestrator
 
-When triggered, the MCP semantic-analysis server executes:
+When triggered, the MCP semantic-analysis server executes a coordinated workflow with **semantic routing**:
 
-**Orchestration:**
-1. **CoordinatorAgent** - Orchestrates all agents via workflow definitions
+**Orchestration Layer:**
+- **SmartOrchestrator** - Semantic coordination with confidence propagation and intelligent retry
+- **CoordinatorAgent** - Executes workflow definitions, manages agent lifecycle
 
-**LLM-Powered Analysis Agents (11 agents):**
-2. **GitHistoryAgent** - LLM-powered commit pattern analysis and evolution extraction
-3. **VibeHistoryAgent** - Analyzes session logs with LLM context extraction
-4. **CodeGraphAgent** - AST-based indexing via Memgraph
-5. **CodeIntelligenceAgent** - Context-aware NL→Cypher queries for evidence-backed insights
-6. **SemanticAnalysisAgent** - Deep semantic analysis with 3-tier LLM chain
-7. **WebSearchAgent** - Researches patterns with optional LLM result ranking
-8. **InsightGenerationAgent** - Creates structured insights with PlantUML diagrams
-9. **ObservationGenerationAgent** - Adds observations using LLM structuring
-10. **OntologyClassificationAgent** - LLM-powered ontology classification
-11. **DocumentationLinkerAgent** - LLM-powered semantic doc-to-code matching
-12. **QualityAssuranceAgent** - LLM-powered semantic value filtering and validation
+**Data Extraction Agents:**
+1. **GitHistoryAgent** - LLM-powered commit pattern analysis and evolution extraction
+2. **VibeHistoryAgent** - Analyzes session logs with LLM context extraction
+3. **CodeGraphAgent** - AST-based indexing via Memgraph (requires Docker)
 
-**Embedding Agent (1 agent):**
-13. **DeduplicationAgent** - Semantic duplicate detection using OpenAI embeddings
+**Analysis & Enrichment Agents:**
+4. **SemanticAnalysisAgent** - Deep semantic analysis with LLM fallback chain
+5. **OntologyClassificationAgent** - Maps entities to project ontology
+6. **WebSearchAgent** - Researches patterns with optional LLM result ranking
 
-**Non-LLM Agent (1 agent):**
-14. **PersistenceAgent** - Stores entities to GraphDB (no LLM needed)
+**Knowledge Generation Agents:**
+7. **InsightGenerationAgent** - Creates structured insights with PlantUML diagrams
+8. **ObservationGenerationAgent** - Adds observations using LLM structuring
+9. **DocumentationLinkerAgent** - LLM-powered semantic doc-to-code matching
+
+**Quality & Persistence Agents:**
+10. **QualityAssuranceAgent** - **Semantic Router**: validates quality, generates routing decisions (proceed/retry/skip/escalate), provides confidence scoring
+11. **DeduplicationAgent** - Semantic duplicate detection using OpenAI embeddings
+12. **ContentValidationAgent** - Final validation and entity refresh
+13. **PersistenceAgent** - Stores entities to GraphDB
+
+**SmartOrchestrator Features:**
+- **Semantic Retry**: Not mechanical threshold tightening - provides specific guidance on what went wrong
+- **Confidence Propagation**: Each step reports confidence; downstream agents are aware of upstream quality
+- **Routing Decisions**: QA generates proceed/retry/skip/escalate based on semantic analysis
+- **LLM-Assisted Decisions**: Uses AI to interpret failures and suggest remediation
+
+![SmartOrchestrator Flow](../images/smart-orchestrator-flow.png)
 
 ### Workflow Visualization
 
-The System Health Dashboard provides a visual workflow graph of UKB workflow execution:
+The System Health Dashboard provides a visual DAG workflow graph with multi-agent data:
 
 ![UKB Workflow Monitor](../images/health-monitor-dag.png)
 
 **Dashboard Features:**
+- **Visual DAG Workflow Graph** - Shows QA as central coordinator with routing edges
+- **Confidence Bars** - Per-agent confidence levels (green ≥80%, amber ≥50%, red <50%)
+- **Routing Decision Badges** - Shows proceed (✓), retry (↻), skip (⊘), or escalate (!) per step
+- **Retry Count Badges** - Displays semantic retry iterations per agent
 - **Pipeline Totals** - Commits processed, sessions analyzed, candidates discovered
 - **Deduplication Stats** - Shows reduction percentage (e.g., 86.9% reduction from raw to final)
-- **Visual Agent Flow** - Workflow graph showing batch-analysis → Git/Vibe/Code → Semantic agent chain
 - **Entity Breakdown** - Final entity counts by type (GraphDatabase, MCPAgent, etc.)
-- **Execution Details** - Duration, LLM provider used, completion status
+- **Multi-Agent Data** - stepConfidences, routingHistory, workflowModifications
 
 Access via System Health Dashboard at `http://localhost:3032` → UKB Workflow Monitor card.
 
@@ -198,8 +214,8 @@ If you were using the old UKB CLI system:
 ### What to Start Doing
 - ✅ Type "ukb" in Claude chat
 - ✅ Let Claude call MCP semantic-analysis tool
-- ✅ Trust the 14-agent workflow (13 with LLM)
-- ✅ Review auto-generated insights
+- ✅ Trust the 14-agent workflow with SmartOrchestrator
+- ✅ Review auto-generated insights and confidence metrics
 - ✅ Commit .data/knowledge-export/*.json and .data/ukb-last-run.json
 
 ---
@@ -219,14 +235,16 @@ If you were using the old UKB CLI system:
 
 ## Why the Change?
 
-The migration from CLI to MCP integration provides:
+The migration from CLI to MCP integration with SmartOrchestrator provides:
 
 ✅ **AI-Driven Analysis**: Claude makes intelligent decisions about analysis scope
-✅ **Semantic Understanding**: 14-agent workflow with 13 LLM-powered agents extracts deep insights
+✅ **Semantic Orchestration**: 14-agent system with SmartOrchestrator for intelligent coordination
+✅ **Confidence Propagation**: Upstream quality informs downstream processing
+✅ **Semantic Routing**: QA agent drives proceed/retry/skip/escalate decisions
 ✅ **Zero Manual Effort**: Just type "ukb" - no command-line arguments
 ✅ **Better Integration**: Seamless Claude Code workflow
 ✅ **Team Synchronization**: Git-tracked checkpoint ensures no duplicate work
-✅ **Richer Insights**: LLM-powered semantic analysis across all agents (Git, Web, Ontology, Docs)
+✅ **Visual Feedback**: Dashboard shows confidence bars, routing decisions, retry counts
 
 ---
 

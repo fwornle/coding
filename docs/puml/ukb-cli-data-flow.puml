@@ -67,7 +67,7 @@ else (no)
   end note
 endif
 
-|10-Agent Workflow|
+|14-Agent Workflow|
 :CoordinatorAgent orchestrates;<<workflow>>
 note right
   Sequential execution:
