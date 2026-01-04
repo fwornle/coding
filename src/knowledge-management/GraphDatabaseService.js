@@ -259,30 +259,37 @@ export class GraphDatabaseService extends EventEmitter {
       // Create new node
       this.graph.addNode(nodeId, attributes);
 
-      // CRITICAL: Ensure new entities are connected to CollectiveKnowledge to prevent orphaned nodes
-      // Skip for CollectiveKnowledge itself and Project nodes (which serve as connection points)
-      const projectNodes = ['Coding', 'DynArch', 'Timeline', 'Normalisa', 'CollectiveKnowledge'];
-      const isProjectOrCentralNode = projectNodes.includes(entity.name) ||
-                                      entity.entityType === 'Project' ||
-                                      entity.entityType === 'CentralKnowledge';
+      // HIERARCHICAL GRAPH STRUCTURE:
+      // CollectiveKnowledge (System) → includes → Project nodes
+      // Project nodes → various relations → Topic/Pattern nodes
+      // This creates a clean hierarchy: System → Projects → Topics
 
-      if (!isProjectOrCentralNode) {
+      const isProjectNode = entity.entityType === 'Project';
+      const isSystemNode = entity.entityType === 'System' || entity.name === 'CollectiveKnowledge';
+
+      // When a Project node is created, ensure CollectiveKnowledge links to it
+      if (isProjectNode && !isSystemNode) {
         const collectiveKnowledgeId = `${options.team}:CollectiveKnowledge`;
 
-        // Auto-create relation to CollectiveKnowledge if it exists
+        // Auto-create "includes" relation from CollectiveKnowledge to this Project
         if (this.graph.hasNode(collectiveKnowledgeId)) {
-          const relationEdgeId = `${nodeId}__contributes_to__${collectiveKnowledgeId}`;
+          const relationEdgeId = `${collectiveKnowledgeId}__includes__${nodeId}`;
           if (!this.graph.hasEdge(relationEdgeId)) {
-            this.graph.addEdge(nodeId, collectiveKnowledgeId, {
+            this.graph.addEdge(collectiveKnowledgeId, nodeId, {
               id: relationEdgeId,
-              relation_type: 'contributes_to',
+              relation_type: 'includes',
               team: options.team,
               created_at: new Date().toISOString(),
-              auto_generated: true // Mark as auto-generated for audit trail
+              auto_generated: true
             });
-            console.error(`[GraphDatabaseService] Auto-linked ${entity.name} to CollectiveKnowledge (orphan prevention)`);
+            console.log(`[GraphDatabaseService] CollectiveKnowledge -> includes -> ${entity.name}`);
           }
         }
+      }
+
+      // When CollectiveKnowledge is created, link it to all existing Project nodes
+      if (entity.name === 'CollectiveKnowledge') {
+        this._linkCollectiveKnowledgeToProjects(nodeId, options.team);
       }
     }
 
@@ -364,6 +371,37 @@ export class GraphDatabaseService extends EventEmitter {
     }
 
     return false;
+  }
+
+  /**
+   * Link CollectiveKnowledge node to all existing Project nodes in the team
+   *
+   * Creates "includes" relationships from CollectiveKnowledge to each Project node,
+   * establishing the hierarchical structure: CollectiveKnowledge → Projects → Topics
+   *
+   * @param {string} collectiveKnowledgeId - The node ID of CollectiveKnowledge
+   * @param {string} team - The team namespace
+   * @private
+   */
+  _linkCollectiveKnowledgeToProjects(collectiveKnowledgeId, team) {
+    // Find all Project nodes in this team
+    this.graph.forEachNode((nodeId, attributes) => {
+      if (attributes.team !== team) return;
+      if (attributes.entityType !== 'Project') return;
+      if (attributes.name === 'CollectiveKnowledge') return;
+
+      const relationEdgeId = `${collectiveKnowledgeId}__includes__${nodeId}`;
+      if (!this.graph.hasEdge(relationEdgeId)) {
+        this.graph.addEdge(collectiveKnowledgeId, nodeId, {
+          id: relationEdgeId,
+          relation_type: 'includes',
+          team: team,
+          created_at: new Date().toISOString(),
+          auto_generated: true
+        });
+        console.log(`[GraphDatabaseService] CollectiveKnowledge -> includes -> ${attributes.name}`);
+      }
+    });
   }
 
   /**

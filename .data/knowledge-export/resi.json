@@ -8,6 +8,7 @@
         "Handles streaming data from multiple sources with different schemas",
         "Implements advanced pattern matching and transformation pipelines"
       ],
+      "source": "manual",
       "metadata": {
         "created_at": "2025-11-18T10:51:00.060Z",
         "last_updated": "2025-11-18T10:51:00.060Z"
@@ -22,6 +23,7 @@
         "Contains only proven solutions applicable across multiple projects",
         "Focus: architectural decisions, performance patterns, reusable designs"
       ],
+      "source": "manual",
       "metadata": {
         "created_at": "2025-11-17T20:48:45.922Z",
         "last_updated": "2025-11-17T20:48:45.922Z"
@@ -37,6 +39,7 @@
         "Use reactive streams for memory-efficient processing",
         "Essential for real-time analytics and data normalization systems"
       ],
+      "source": "manual",
       "metadata": {
         "created_at": "2025-11-17T20:48:45.922Z",
         "last_updated": "2025-11-17T20:48:45.922Z"
@@ -54,6 +57,7 @@
         "Critical feature for long-running data processing systems"
       ],
       "significance": 7,
+      "source": "manual",
       "metadata": {
         "created_at": "2025-06-20T19:15:00.000Z",
         "last_updated": "2025-11-17T22:25:00.000Z"
@@ -64,18 +68,6 @@
     }
   ],
   "relations": [
-    {
-      "from": "CollectiveKnowledge",
-      "to": "StreamProcessingPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "SchemaEvolutionPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
     {
       "from": "StreamProcessingPattern",
       "to": "Normalisa",
@@ -89,18 +81,18 @@
       "metadata": {}
     },
     {
-      "from": "Normalisa",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
+      "from": "CollectiveKnowledge",
+      "to": "Normalisa",
+      "relationType": "includes",
       "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "resi",
-    "exported_at": "2025-11-22T17:42:42.204Z",
+    "exported_at": "2026-01-04T09:58:47.256Z",
     "total_entities": 4,
-    "total_relations": 5,
+    "total_relations": 3,
     "description": "Resi project patterns"
   }
 }
