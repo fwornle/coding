@@ -41,6 +41,7 @@ interface TraceEventUI {
   duration?: number
   tokensUsed?: number
   llmProvider?: string
+  llmCalls?: number
   outputs?: Record<string, any>
   error?: string
   startOffset: number // ms from workflow start
@@ -73,6 +74,7 @@ export function TraceModal({
         duration: step.duration,
         tokensUsed: step.tokensUsed,
         llmProvider: step.llmProvider,
+        llmCalls: step.llmCalls,
         outputs: step.outputs,
         error: step.error,
         startOffset: offset,
@@ -84,7 +86,8 @@ export function TraceModal({
       }
       if (step.tokensUsed) {
         totalTokens += step.tokensUsed
-        llmCalls++
+        // Use actual LLM call count from backend if available, otherwise count step as 1 call
+        llmCalls += step.llmCalls || 1
       }
       if (step.status === 'completed') completedCount++
       if (step.status === 'failed') failedCount++
