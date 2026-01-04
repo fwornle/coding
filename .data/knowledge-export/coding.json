@@ -11833,24 +11833,55 @@
         },
         "decision to use a service-oriented architecture, as seen in the multiple api patterns, which allows for loose coupling and scalability",
         "Decision to use a multi-file storage adapter in lib/knowledge-api/adapters/multi-file-storage.js for handling entity storage, rationale: flexibility and scalability, impact: improved data management",
-        "Decision to use a submodule for mcp-constraint-monitor, allowing for separate development and updates (commits: 2025-10-11T15:47:16.000Z, 2025-10-11T15:53:01.000Z)"
+        "Decision to use a submodule for mcp-constraint-monitor, allowing for separate development and updates (commits: 2025-10-11T15:47:16.000Z, 2025-10-11T15:53:01.000Z)",
+        "Decision to use a comprehensive knowledge graph management system, as seen in commit 'feat: comprehensive knowledge graph management system', which impacts the overall system architecture and data relationships"
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2025-12-29T12:05:32.954Z",
-        "last_updated": "2026-01-03T05:52:01.794Z",
+        "last_updated": "2026-01-04T05:48:06.164Z",
         "significance": 5,
         "originalMetadata": {
           "significance": 5,
           "originalMetadata": {
-            "significance": 7,
+            "significance": 5,
             "originalMetadata": {
-              "created_at": "2025-12-29T12:05:32.950Z",
-              "last_updated": "2025-12-29T12:05:32.950Z",
-              "created_by": "workflow_persist",
-              "version": "1.0",
+              "significance": 7,
+              "originalMetadata": {
+                "created_at": "2025-12-29T12:05:32.950Z",
+                "last_updated": "2025-12-29T12:05:32.950Z",
+                "created_by": "workflow_persist",
+                "version": "1.0",
+                "ontology": {
+                  "ontologyName": "coding",
+                  "classificationMethod": "heuristic",
+                  "confidence": 0.94
+                },
+                "classificationConfidence": 0.94,
+                "classificationMethod": "heuristic",
+                "validation": {
+                  "valid": true,
+                  "errors": [],
+                  "warnings": [],
+                  "mode": "lenient"
+                },
+                "contentValidation": {
+                  "overallValid": false,
+                  "overallScore": 100,
+                  "totalIssues": 0,
+                  "criticalIssues": 0,
+                  "validatedAt": "2025-12-29T12:05:32.952Z",
+                  "mode": "lenient"
+                },
+                "staleness_score": 100,
+                "staleness_check_at": "2025-12-29T12:05:32.952Z"
+              },
+              "source": "manual",
+              "team": "coding",
+              "created_at": "2025-12-29T12:05:32.954Z",
+              "last_updated": "2026-01-02T08:24:55.922Z",
               "ontology": {
                 "ontologyName": "coding",
                 "classificationMethod": "heuristic",
@@ -11866,25 +11897,27 @@
               },
               "contentValidation": {
                 "overallValid": false,
-                "overallScore": 100,
-                "totalIssues": 0,
-                "criticalIssues": 0,
-                "validatedAt": "2025-12-29T12:05:32.952Z",
+                "overallScore": 80,
+                "totalIssues": 1,
+                "criticalIssues": 1,
+                "validatedAt": "2026-01-02T08:24:55.925Z",
                 "mode": "lenient"
               },
+              "invalidating_commits": [],
               "staleness_score": 100,
-              "staleness_check_at": "2025-12-29T12:05:32.952Z"
+              "staleness_check_at": "2026-01-02T08:24:55.925Z",
+              "staleness_method": "git-based"
             },
             "source": "manual",
             "team": "coding",
             "created_at": "2025-12-29T12:05:32.954Z",
-            "last_updated": "2026-01-02T08:24:55.922Z",
+            "last_updated": "2026-01-03T05:52:01.674Z",
             "ontology": {
               "ontologyName": "coding",
               "classificationMethod": "heuristic",
-              "confidence": 0.94
+              "confidence": 0.95
             },
-            "classificationConfidence": 0.94,
+            "classificationConfidence": 0.95,
             "classificationMethod": "heuristic",
             "validation": {
               "valid": true,
@@ -11897,18 +11930,18 @@
               "overallScore": 80,
               "totalIssues": 1,
               "criticalIssues": 1,
-              "validatedAt": "2026-01-02T08:24:55.925Z",
+              "validatedAt": "2026-01-03T05:52:01.676Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-01-02T08:24:55.925Z",
+            "staleness_check_at": "2026-01-03T05:52:01.676Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2025-12-29T12:05:32.954Z",
-          "last_updated": "2026-01-03T05:52:01.674Z",
+          "last_updated": "2026-01-04T05:48:05.844Z",
           "ontology": {
             "ontologyName": "coding",
             "classificationMethod": "heuristic",
@@ -11927,12 +11960,12 @@
             "overallScore": 80,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-03T05:52:01.676Z",
+            "validatedAt": "2026-01-04T05:48:05.849Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-03T05:52:01.676Z",
+          "staleness_check_at": "2026-01-04T05:48:05.849Z",
           "staleness_method": "git-based"
         }
       },
@@ -14942,7 +14975,7 @@
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-03T21:04:12.428Z",
+    "last_updated": "2026-01-04T05:50:54.040Z",
     "team": "coding",
     "entity_count": 47,
     "relation_count": 181,
