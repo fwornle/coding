@@ -2113,126 +2113,6 @@
     },
     {
       "from": "Coding",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "CodingWorkflow",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "KnowledgePersistencePattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "MCPMemoryLoggingIntegrationPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "NetworkAwareInstallationPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "SemanticAnalysisWorkflowIssue",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "UkbCli",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "VSCodeExtensionBridgePattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "VkbCli",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "ComprehensiveSemanticAnalysis",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "ConfigurationPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "KnowledgePersistencePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "NetworkAwareInstallationPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "MCPMemoryLoggingIntegrationPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "VSCodeExtensionBridgePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "CodingWorkflow",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "UkbCli",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "VkbCli",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "SemanticAnalysisWorkflowIssue",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
       "to": "Coding",
       "relationType": "implemented_in",
       "metadata": {}
@@ -2241,24 +2121,6 @@
       "from": "SemanticAnalysisWorkflowIssue",
       "to": "Coding",
       "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
-      "to": "Coding",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "ApiPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "ArchitecturalEvolutionPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
       "metadata": {}
     },
     {
@@ -2283,12 +2145,6 @@
       "from": "ArchitecturalEvolutionPattern",
       "to": "CollectiveKnowledge",
       "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "DecoratorPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
       "metadata": {}
     },
     {
@@ -2340,19 +2196,7 @@
       "metadata": {}
     },
     {
-      "from": "SemanticAnalysisAgentSystemImplementation",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
       "from": "Coding",
-      "to": "SemanticAnalysisAgentSystemImplementation",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "CollectiveKnowledge",
       "to": "SemanticAnalysisAgentSystemImplementation",
       "relationType": "contains",
       "metadata": {}
@@ -2430,21 +2274,9 @@
       "metadata": {}
     },
     {
-      "from": "McpAgentDevelopmentPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
       "from": "ApiRefactoringPattern",
       "to": "CollectiveKnowledge",
       "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "ApiRefactoringPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
       "metadata": {}
     },
     {
@@ -2454,25 +2286,7 @@
       "metadata": {}
     },
     {
-      "from": "KnowledgeBaseUpdatesPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
       "from": "OntologySupportPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "OntologySupportPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "UiComponentWorkPattern",
       "to": "CollectiveKnowledge",
       "relationType": "related-to",
       "metadata": {}
@@ -2480,7 +2294,7 @@
     {
       "from": "UiComponentWorkPattern",
       "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
+      "relationType": "related-to",
       "metadata": {}
     },
     {
@@ -2550,25 +2364,7 @@
       "metadata": {}
     },
     {
-      "from": "BugFixPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
       "from": "AgentArchitecturePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "AgentArchitecturePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "FeatureImplementation",
       "to": "CollectiveKnowledge",
       "relationType": "related-to",
       "metadata": {}
@@ -2576,7 +2372,7 @@
     {
       "from": "FeatureImplementation",
       "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
+      "relationType": "related-to",
       "metadata": {}
     },
     {
@@ -2671,12 +2467,6 @@
     },
     {
       "from": "Large-ScaleCodebasePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "metadata": {}
-    },
-    {
-      "from": "Large-ScaleCodebasePattern",
       "to": "Coding",
       "relationType": "implemented_in",
       "metadata": {}
@@ -2692,14 +2482,20 @@
       "to": "Large-ScaleCodebasePattern",
       "relationType": "contains",
       "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "Coding",
+      "relationType": "includes",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-01-04T08:10:38.401Z",
+    "exported_at": "2026-01-04T09:58:31.880Z",
     "total_entities": 25,
-    "total_relations": 111,
+    "total_relations": 77,
     "description": "Coding project infrastructure and patterns"
   }
 }

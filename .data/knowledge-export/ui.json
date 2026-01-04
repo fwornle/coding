@@ -1,6 +1,4 @@
 {
-  "displayName": "Ui",
-  "description": "Knowledge graph export for team: ui",
   "entities": [
     {
       "name": "CollectiveKnowledge",
@@ -10,14 +8,12 @@
         "Contains only proven solutions applicable across multiple projects",
         "Focus: architectural decisions, performance patterns, reusable designs"
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-16T13:46:12.603Z",
-        "last_updated": "2025-06-18T15:33:31.309Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkg1qr4h9s"
     },
     {
       "name": "ViewportCullingPattern",
@@ -59,14 +55,12 @@
           "date": "2025-06-19T12:34:22Z"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-19T12:34:22Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkg2tip2ze"
     },
     {
       "name": "ReduxStateManagementPattern",
@@ -108,14 +102,12 @@
           "date": "2025-06-19T12:34:40Z"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-19T12:34:40Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkgdropbk"
     },
     {
       "name": "Timeline",
@@ -140,14 +132,12 @@
           "content": "Source of multiple transferable performance and architecture patterns"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-18T15:33:31.309Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkgx9w9zz"
     },
     {
       "name": "DynArch",
@@ -196,14 +186,12 @@
           "content": "Comprehensive documentation with UML diagrams and architectural patterns"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-18T15:33:31.309Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkg8djycx"
     },
     {
       "name": "StateDrivenAnimationPipelinePattern",
@@ -240,14 +228,12 @@
           "date": "2025-06-19T11:22:19Z"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-19T11:22:19Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkg27iv1q9"
     },
     {
       "name": "StrategyBasedModularRoutingPattern",
@@ -284,14 +270,12 @@
           "date": "2025-06-19T11:23:27Z"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-19T11:23:27Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkg3nbxv1o"
     },
     {
       "name": "MVIReduxArchitecturePattern",
@@ -338,14 +322,12 @@
           "content": "Details: http://localhost:8080/knowledge-management/insights/MVIReduxArchitecturePattern.md"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-18T15:17:44.017Z",
-        "last_updated": "2025-06-19T11:25:14Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkgqy6won"
     },
     {
       "name": "ReactThreeFiberIntegrationPattern",
@@ -392,14 +374,12 @@
           "content": "Details: http://localhost:8080/knowledge-management/insights/ReactThreeFiberIntegrationPattern.md"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-18T15:17:44.017Z",
-        "last_updated": "2025-06-19T11:25:29Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkg244kv55"
     },
     {
       "name": "ModularComponentArchitecturePattern",
@@ -446,14 +426,12 @@
           "content": "Details: http://localhost:8080/knowledge-management/insights/ModularComponentArchitecturePattern.md"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-18T15:17:44.017Z",
-        "last_updated": "2025-06-19T11:25:29Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkgt08ody"
     },
     {
       "name": "CustomHookExtractionPattern",
@@ -500,14 +478,12 @@
           "content": "Details: http://localhost:8080/knowledge-management/insights/CustomHookExtractionPattern.md"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-18T15:17:44.017Z",
-        "last_updated": "2025-06-19T11:25:29Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkg1sjnxhn"
     },
     {
       "name": "ConditionalLoggingPattern",
@@ -544,14 +520,12 @@
           "date": "2025-06-19T12:35:15Z"
         }
       ],
-      "significance": 5,
-      "problem": {},
-      "solution": {},
+      "source": "manual",
       "metadata": {
-        "created_at": "2025-06-16T13:46:12.604Z",
-        "last_updated": "2025-06-29T07:05:00Z"
+        "created_at": "2025-11-18T10:47:26.809Z",
+        "last_updated": "2025-11-18T10:47:26.809Z"
       },
-      "source": "manual"
+      "id": "mc4flkg159xya1"
     }
   ],
   "relations": [
@@ -559,149 +533,87 @@
       "from": "ViewportCullingPattern",
       "to": "Timeline",
       "relationType": "implemented_in",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ReduxStateManagementPattern",
       "to": "Timeline",
       "relationType": "implemented_in",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "StateDrivenAnimationPipelinePattern",
       "to": "DynArch",
       "relationType": "implemented_in",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "StrategyBasedModularRoutingPattern",
       "to": "DynArch",
       "relationType": "implemented_in",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "CustomHookExtractionPattern",
       "to": "Timeline",
       "relationType": "implemented_in",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ModularComponentArchitecturePattern",
       "to": "Timeline",
       "relationType": "implemented_in",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "MVIReduxArchitecturePattern",
       "to": "Timeline",
       "relationType": "implemented_in",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ReactThreeFiberIntegrationPattern",
       "to": "Timeline",
       "relationType": "implemented_in",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "ViewportCullingPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "ReduxStateManagementPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "StateDrivenAnimationPipelinePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "StrategyBasedModularRoutingPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "MVIReduxArchitecturePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "ReactThreeFiberIntegrationPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "ModularComponentArchitecturePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "CustomHookExtractionPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ConditionalLoggingPattern",
       "to": "DynArch",
       "relationType": "implemented_in",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ConditionalLoggingPattern",
       "to": "Timeline",
       "relationType": "implemented_in",
-      "confidence": 1,
-      "metadata": {}
-    },
-    {
-      "from": "ConditionalLoggingPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "contributes_to",
-      "confidence": 1,
       "metadata": {}
     },
     {
       "from": "ConditionalLoggingPattern",
       "to": "ReduxStateManagementPattern",
       "relationType": "related_to",
-      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "Timeline",
+      "relationType": "includes",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "DynArch",
+      "relationType": "includes",
       "metadata": {}
     }
   ],
   "metadata": {
-    "last_updated": "2025-11-07T09:18:09.424Z",
+    "version": "1.0.0",
     "team": "ui",
-    "entity_count": 12,
-    "relation_count": 20,
-    "exported_by": "GraphDatabaseService",
-    "export_version": "1.0"
+    "exported_at": "2026-01-04T08:58:59.474Z",
+    "total_entities": 12,
+    "total_relations": 13,
+    "description": "UI/frontend patterns"
   }
 }
