@@ -37,8 +37,9 @@ import {
   MessageSquare,
   Network,
   StopCircle,
+  Activity,
 } from 'lucide-react'
-import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend } from './workflow'
+import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal } from './workflow'
 import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
 import {
@@ -94,6 +95,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Cancel workflow state
   const [cancelLoading, setCancelLoading] = useState(false)
+
+  // Trace modal state
+  const [traceModalOpen, setTraceModalOpen] = useState(false)
 
   // Cancel/clear a stuck or frozen workflow
   const handleCancelWorkflow = async () => {
@@ -793,22 +797,36 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               <Brain className="h-5 w-5" />
               UKB Workflow Monitor
             </DialogTitle>
-            {activeProcesses.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleCancelWorkflow}
-                disabled={cancelLoading}
-                className="flex items-center gap-2"
-              >
-                {cancelLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <StopCircle className="h-4 w-4" />
-                )}
-                Cancel Workflow
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* View Trace button - show when there are steps to trace */}
+              {(currentProcess?.steps?.length || historicalWorkflowDetail?.steps?.length) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTraceModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Activity className="h-4 w-4" />
+                  View Trace
+                </Button>
+              )}
+              {activeProcesses.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleCancelWorkflow}
+                  disabled={cancelLoading}
+                  className="flex items-center gap-2"
+                >
+                  {cancelLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <StopCircle className="h-4 w-4" />
+                  )}
+                  Cancel Workflow
+                </Button>
+              )}
+            </div>
           </div>
           <DialogDescription>
             Monitor active and historical UKB semantic analysis workflows
@@ -837,6 +855,33 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           {activeTab === 'active' ? renderActiveContent() : renderHistoryContent()}
         </div>
       </DialogContent>
+
+      {/* Trace Modal */}
+      <TraceModal
+        open={traceModalOpen}
+        onOpenChange={setTraceModalOpen}
+        steps={
+          activeTab === 'active'
+            ? currentProcess?.steps || []
+            : historicalWorkflowDetail?.steps?.map(s => ({
+                name: s.agent || s.name,
+                status: s.status === 'success' ? 'completed' : s.status as any,
+                duration: s.duration ? parseFloat(String(s.duration).replace(/s$/i, '')) * 1000 : undefined,
+                error: s.errors?.join('\n'),
+                outputs: s.outputs,
+              })) || []
+        }
+        workflowName={
+          activeTab === 'active'
+            ? currentProcess?.workflowName || 'Unknown'
+            : selectedHistoricalWorkflowState?.workflowName || 'Unknown'
+        }
+        startTime={
+          activeTab === 'active'
+            ? currentProcess?.startTime
+            : selectedHistoricalWorkflowState?.startTime || undefined
+        }
+      />
     </Dialog>
   )
 }
