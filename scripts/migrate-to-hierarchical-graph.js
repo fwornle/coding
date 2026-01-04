@@ -6,7 +6,8 @@
  * to hierarchical structure (CollectiveKnowledge -> Projects -> Topics).
  *
  * Changes:
- * 1. Removes all "contributes_to" relations from topics to CollectiveKnowledge
+ * 1. Removes ALL relations from topics TO CollectiveKnowledge (any type: contributes_to,
+ *    related-to, contains, etc.) - except those from Project/System nodes
  * 2. Creates "includes" relations from CollectiveKnowledge to each Project node
  *
  * Usage:
@@ -39,12 +40,17 @@ async function fetchRelations(team) {
   return data.relations || [];
 }
 
-async function deleteRelation(from, to, team, type = null) {
+async function deleteRelation(from, to, team, type = null, deleteAll = true) {
   const url = new URL(`${VKB_BASE_URL}/api/relations`);
   url.searchParams.set('from', from);
   url.searchParams.set('to', to);
   url.searchParams.set('team', team);
-  if (type) url.searchParams.set('type', type);
+  if (type) {
+    url.searchParams.set('type', type);
+  } else if (deleteAll) {
+    // Delete ALL edges between entities regardless of type
+    url.searchParams.set('all', 'true');
+  }
 
   const response = await fetch(url.toString(), { method: 'DELETE' });
   return response.json();
@@ -133,12 +139,18 @@ async function migrateTeam(team, options) {
     return { removed: 0, created: 0 };
   }
 
-  // Find contributes_to relations to CollectiveKnowledge
-  const contributesToRelations = relations.filter(r => {
-    const relType = r.relation_type || r.type || r.relationType;
+  // Find ALL relations TO CollectiveKnowledge (except from Projects/System nodes)
+  // These create the unwanted star topology and should be removed
+  const projectAndSystemNames = new Set([
+    'CollectiveKnowledge',
+    ...projectNodes.map(p => p.entity_name || p.name)
+  ]);
+
+  const relationsToCollectiveKnowledge = relations.filter(r => {
+    const fromName = r.from_name || r.from;
     const toName = r.to_name || r.to;
-    return (relType === 'contributes_to' || relType === 'contributes to') &&
-           toName === 'CollectiveKnowledge';
+    // Remove any relation TO CollectiveKnowledge from non-infrastructure entities
+    return toName === 'CollectiveKnowledge' && !projectAndSystemNames.has(fromName);
   });
 
   // Find existing includes relations from CollectiveKnowledge
@@ -151,13 +163,13 @@ async function migrateTeam(team, options) {
   const existingIncludesTo = new Set(existingIncludes.map(r => r.to_name || r.to));
 
   // Calculate what needs to be done
-  const toRemove = contributesToRelations;
+  const toRemove = relationsToCollectiveKnowledge;
   const toCreate = projectNodes.filter(p => {
     const name = p.entity_name || p.name;
     return !existingIncludesTo.has(name);
   });
 
-  console.log(`    Found: ${contributesToRelations.length} contributes_to relations to remove`);
+  console.log(`    Found: ${relationsToCollectiveKnowledge.length} relations TO CollectiveKnowledge to remove`);
   console.log(`    Found: ${projectNodes.length} project nodes`);
   console.log(`    Need to create: ${toCreate.length} includes relations`);
 
@@ -261,7 +273,7 @@ async function main() {
   // Summary
   console.log(`\n========================================`);
   console.log(`Summary:`);
-  console.log(`  contributes_to relations ${options.dryRun ? 'to remove' : 'removed'}: ${totalRemoved}`);
+  console.log(`  Relations TO CollectiveKnowledge ${options.dryRun ? 'to remove' : 'removed'}: ${totalRemoved}`);
   console.log(`  includes relations ${options.dryRun ? 'to create' : 'created'}: ${totalCreated}`);
 
   if (options.dryRun) {

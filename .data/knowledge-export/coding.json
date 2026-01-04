@@ -1816,71 +1816,6 @@
       "id": "mc4flkgk7p8ly"
     },
     {
-      "name": "BugFixPattern",
-      "entityType": "MCPAgent",
-      "observations": [
-        {
-          "type": "implementation",
-          "content": "BugFixPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
-          "date": "2025-12-22T13:01:26.435Z",
-          "metadata": {
-            "confidence": 0.9,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T13:01:26.437Z"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "shared-memory.json has been REMOVED from the codebase",
-          "date": "2025-12-22T13:01:26.435Z",
-          "metadata": {
-            "confidence": 0.85,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T13:01:26.437Z"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
-          "date": "2025-12-22T13:01:26.435Z",
-          "metadata": {
-            "confidence": 0.85,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T13:01:26.437Z"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
-          "date": "2025-12-22T13:01:26.435Z",
-          "metadata": {
-            "confidence": 0.85,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T13:01:26.437Z"
-          }
-        },
-        {
-          "type": "insight-document",
-          "content": "Detailed insight document available at: knowledge-management/insights/BugFixPattern.md",
-          "date": "2025-12-22T13:01:34.500Z",
-          "metadata": {
-            "insightPath": "knowledge-management/insights/BugFixPattern.md",
-            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
-            "diagramsGenerated": 0,
-            "generatedBy": "entity-refresh",
-            "refreshedAt": "2025-12-22T13:01:34.501Z",
-            "source": "entity-refresh"
-          }
-        }
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-12-20T07:25:18.470Z",
-        "last_updated": "2025-12-22T13:01:34.622Z"
-      },
-      "id": "mc4flkg154s53l"
-    },
-    {
       "name": "AgentArchitecturePattern",
       "entityType": "MCPAgent",
       "observations": [
@@ -2024,6 +1959,71 @@
         "last_updated": "2025-12-23T11:31:23.025Z"
       },
       "id": "mc4flkg1ot16ee"
+    },
+    {
+      "name": "BugFixPattern",
+      "entityType": "MCPAgent",
+      "observations": [
+        {
+          "type": "implementation",
+          "content": "BugFixPattern is implemented across: src/knowledge-management, lib/ukb-unified, integrations/mcp-server-semantic-analysis/src",
+          "date": "2025-12-22T13:01:26.435Z",
+          "metadata": {
+            "confidence": 0.9,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.437Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "shared-memory.json has been REMOVED from the codebase",
+          "date": "2025-12-22T13:01:26.435Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.437Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Knowledge storage uses Graphology + LevelDB at .data/knowledge-graph",
+          "date": "2025-12-22T13:01:26.435Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.437Z"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "JSON exports are at .data/knowledge-export (auto-synced from GraphDB)",
+          "date": "2025-12-22T13:01:26.435Z",
+          "metadata": {
+            "confidence": 0.85,
+            "source": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:26.437Z"
+          }
+        },
+        {
+          "type": "insight-document",
+          "content": "Detailed insight document available at: knowledge-management/insights/BugFixPattern.md",
+          "date": "2025-12-22T13:01:34.500Z",
+          "metadata": {
+            "insightPath": "knowledge-management/insights/BugFixPattern.md",
+            "absolutePath": "/Users/q284340/Agentic/coding/knowledge-management/insights/BugFixPattern.md",
+            "diagramsGenerated": 0,
+            "generatedBy": "entity-refresh",
+            "refreshedAt": "2025-12-22T13:01:34.501Z",
+            "source": "entity-refresh"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-04T10:46:18.597Z",
+        "last_updated": "2026-01-04T10:46:18.597Z"
+      },
+      "id": "mc4flkg154s53l"
     }
   ],
   "relations": [
@@ -2136,27 +2136,9 @@
       "metadata": {}
     },
     {
-      "from": "ApiPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "ArchitecturalEvolutionPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
       "from": "DecoratorPattern",
       "to": "Coding",
       "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "DecoratorPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
       "metadata": {}
     },
     {
@@ -2190,12 +2172,6 @@
       "metadata": {}
     },
     {
-      "from": "SemanticAnalysisAgentSystemImplementation",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
       "from": "Coding",
       "to": "SemanticAnalysisAgentSystemImplementation",
       "relationType": "contains",
@@ -2205,12 +2181,6 @@
       "from": "SemanticAnalysisAgentSystemImplementation",
       "to": "Coding",
       "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "CollectiveKnowledge",
-      "relationType": "contains",
       "metadata": {}
     },
     {
@@ -2262,42 +2232,6 @@
       "metadata": {}
     },
     {
-      "from": "SemanticAnalysisAgentSystemImplementation",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "McpAgentDevelopmentPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "ApiRefactoringPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "KnowledgeBaseUpdatesPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "OntologySupportPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "UiComponentWorkPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
       "from": "McpAgentDevelopmentPattern",
       "to": "Coding",
       "relationType": "implemented_in",
@@ -2328,60 +2262,6 @@
       "metadata": {}
     },
     {
-      "from": "McpAgentDevelopmentPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "ApiRefactoringPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "KnowledgeBaseUpdatesPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "OntologySupportPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "UiComponentWorkPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "BugFixPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "AgentArchitecturePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "FeatureImplementation",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "BugFixPattern",
-      "to": "Coding",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
       "from": "AgentArchitecturePattern",
       "to": "Coding",
       "relationType": "implemented_in",
@@ -2391,24 +2271,6 @@
       "from": "FeatureImplementation",
       "to": "Coding",
       "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "BugFixPattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "AgentArchitecturePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "FeatureImplementation",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
       "metadata": {}
     },
     {
@@ -2420,12 +2282,6 @@
     {
       "from": "Coding",
       "to": "UiComponentWorkPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "BugFixPattern",
       "relationType": "contains",
       "metadata": {}
     },
@@ -2461,20 +2317,8 @@
     },
     {
       "from": "Large-ScaleCodebasePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
-      "metadata": {}
-    },
-    {
-      "from": "Large-ScaleCodebasePattern",
       "to": "Coding",
       "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "Large-ScaleCodebasePattern",
-      "to": "CollectiveKnowledge",
-      "relationType": "related-to",
       "metadata": {}
     },
     {
@@ -2488,14 +2332,26 @@
       "to": "Coding",
       "relationType": "includes",
       "metadata": {}
+    },
+    {
+      "from": "BugFixPattern",
+      "to": "Coding",
+      "relationType": "implemented_in",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "BugFixPattern",
+      "relationType": "contains",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-01-04T09:58:31.880Z",
+    "exported_at": "2026-01-04T10:47:39.032Z",
     "total_entities": 25,
-    "total_relations": 77,
+    "total_relations": 53,
     "description": "Coding project infrastructure and patterns"
   }
 }
