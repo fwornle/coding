@@ -1,8 +1,8 @@
 {
-  "type": "sequence",
+  "type": "class",
   "name": "functional-programming-pattern",
-  "error": "LLM-enhanced diagram generation failed completely. Debug info: {\n  \"type\": \"sequence\",\n  \"dataKeys\": [\n    \"gitAnalysis\",\n    \"vibeAnalysis\",\n    \"semanticAnalysis\",\n    \"patternCatalog\",\n    \"entityInfo\"\n  ],\n  \"dataTypes\": {\n    \"gitAnalysis\": \"undefined\",\n    \"vibeAnalysis\": \"undefined\",\n    \"semanticAnalysis\": \"undefined\",\n    \"patternCatalog\": \"object\",\n    \"entityInfo\": \"undefined\"\n  },\n  \"semanticAnalyzerExists\": true,\n  \"hasData\": true,\n  \"dataSize\": 585\n}",
-  "timestamp": "2026-01-03T20:20:20.767Z",
+  "error": "LLM-enhanced diagram generation failed completely. Debug info: {\n  \"type\": \"class\",\n  \"dataKeys\": [\n    \"gitAnalysis\",\n    \"vibeAnalysis\",\n    \"semanticAnalysis\",\n    \"patternCatalog\",\n    \"entityInfo\"\n  ],\n  \"dataTypes\": {\n    \"gitAnalysis\": \"undefined\",\n    \"vibeAnalysis\": \"undefined\",\n    \"semanticAnalysis\": \"undefined\",\n    \"patternCatalog\": \"object\",\n    \"entityInfo\": \"undefined\"\n  },\n  \"semanticAnalyzerExists\": true,\n  \"hasData\": true,\n  \"dataSize\": 585\n}",
+  "timestamp": "2026-01-03T21:02:10.924Z",
   "dataKeys": [
     "gitAnalysis",
     "vibeAnalysis",

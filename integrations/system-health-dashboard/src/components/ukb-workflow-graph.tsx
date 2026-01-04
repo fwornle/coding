@@ -129,7 +129,7 @@ const WORKFLOW_AGENTS = [
     name: 'Vibe History',
     shortName: 'Vibe',
     icon: MessageSquare,
-    description: 'Parses LSL session files to identify problem-solution pairs, extract development contexts, and discover workflow patterns from human-AI conversations.',
+    description: 'Uses LLM semantic analysis to extract key development topics, task/solution pairs, and workflow patterns from human-AI conversation sessions.',
     usesLLM: true,
     llmModel: 'Groq: llama-3.3-70b-versatile',
     techStack: 'SemanticAnalyzer',
@@ -743,8 +743,16 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
       case 'vibe_history':
         // Check all possible property names: sessionsCount (coordinator summary), sessionsAnalyzed (agent), sessions array
         const sessions = outputs.sessionsCount || outputs.sessionsAnalyzed || outputs.sessions?.length || 0
-        const problemSolutions = outputs.problemSolutionPairs || outputs.pairs?.length || 0
-        return `Processed ${sessions} sessions, found ${problemSolutions} problem-solution pairs`
+        // LLM-extracted task/solution pairs (new semantic analysis)
+        const taskSolutions = outputs.problemSolutionPairsCount || outputs.problemSolutionPairs?.length || 0
+        // LLM-extracted key topics (semantic analysis)
+        const keyTopics = outputs.keyTopicsCount || outputs.keyTopics?.length || 0
+        // Build result string with both metrics
+        const vibeParts = [`Processed ${sessions} sessions`]
+        if (taskSolutions > 0) vibeParts.push(`${taskSolutions} task/solutions`)
+        if (keyTopics > 0) vibeParts.push(`${keyTopics} key topics`)
+        if (taskSolutions === 0 && keyTopics === 0 && sessions > 0) vibeParts.push('analyzing...')
+        return vibeParts.join(', ')
 
       case 'semantic_analysis':
         // Check for batch workflow format (from summarizeStepResult): { batchEntities, batchRelations, batchId }
