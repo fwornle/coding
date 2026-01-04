@@ -1,6 +1,6 @@
 # Large-Scale Codebase Pattern
 **Type:** architectural
-**Generated:** 2026-01-03T21:02:09.642Z
+**Generated:** 2026-01-04T05:48:51.917Z
 
 ## Pattern Overview
 Enterprise-scale codebase with 64165 code entities
