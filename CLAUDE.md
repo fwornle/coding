@@ -40,6 +40,32 @@ Use Skill tool with command: "documentation-style"
 - **Commands**: `vkb` (visualize)
 - **Storage**: `.data/knowledge-graph/`
 
+### Knowledge Entity Purge
+**When user asks to delete/purge knowledge entities from a specific date:**
+
+```bash
+node scripts/purge-knowledge-entities.js <YYYY-MM-DD> [options]
+```
+
+**Options:**
+- `--team=<team>` - Team filter (default: coding)
+- `--dry-run` - Preview without deleting
+- `--verbose` - Show each entity being deleted
+
+**Examples:**
+```bash
+# Delete all entities created since Dec 23, 2025
+node scripts/purge-knowledge-entities.js 2025-12-23
+
+# Dry run to see what would be deleted
+node scripts/purge-knowledge-entities.js 2025-12-23 --dry-run
+
+# Delete from specific team with verbose output
+node scripts/purge-knowledge-entities.js 2025-12-23 --team=ui --verbose
+```
+
+**This script maintains consistency** across Graphology, LevelDB, and JSON exports by using the proper VKB DELETE API.
+
 ### Session Logging (LSL)
 - **Primary**: Live Session Logging with enhanced transcript monitor
 - **Location**: `.specstory/history/`
