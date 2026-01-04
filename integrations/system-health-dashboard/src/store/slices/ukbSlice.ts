@@ -10,6 +10,7 @@ export interface StepInfo {
   duration?: number
   tokensUsed?: number
   llmProvider?: string
+  llmCalls?: number
   error?: string
   outputs?: Record<string, any>
 }

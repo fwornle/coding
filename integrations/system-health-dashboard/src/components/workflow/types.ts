@@ -36,6 +36,11 @@ export interface StepInfo {
   startTime?: string
   duration?: number
   outputs?: Record<string, unknown>
+  // LLM metrics
+  tokensUsed?: number
+  llmProvider?: string
+  llmCalls?: number
+  error?: string
 }
 
 // Process info from Redux store - compatible with UKBProcess
