@@ -1474,6 +1474,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                                 ${startX + loopRadius * 2} ${endY},
                                 ${endX} ${endY}`
 
+                // Ordinal position for self-loop (at the top of the loop)
+                const ordinalX = startX + loopRadius * 2
+                const ordinalY = pos.y + nodeHeight / 2 - loopRadius
+
                 return (
                   <g key={idx}>
                     <path
@@ -1484,6 +1488,29 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                       strokeDasharray="3,2"
                       markerEnd="url(#arrowhead-self)"
                     />
+                    {/* Ordinal number badge on self-loop */}
+                    <g>
+                      <circle
+                        cx={ordinalX}
+                        cy={ordinalY}
+                        r={11}
+                        fill="white"
+                        stroke="#8b5cf6"
+                        strokeWidth={2}
+                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}
+                      />
+                      <text
+                        x={ordinalX}
+                        y={ordinalY + 4}
+                        fontSize="11"
+                        fontWeight="600"
+                        fill="#8b5cf6"
+                        textAnchor="middle"
+                        className="select-none"
+                      >
+                        {idx + 1}
+                      </text>
+                    </g>
                     {/* Label for self-loop with background for readability */}
                     {(edge as any).label && (() => {
                       const labelX = startX + loopRadius * 2 + 5
@@ -1618,6 +1645,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                 path = `M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${approachY} L ${toX} ${toY - 3}`
               }
 
+              // Calculate ordinal number position at midpoint, offset to the side
+              const ordinalX = (fromX + toX) / 2 + 12
+              const ordinalY = (fromY + toY) / 2
+
               return (
                 <g key={idx}>
                   <path
@@ -1629,6 +1660,29 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                     markerEnd={markerEnd}
                     className={isActive ? 'animate-pulse' : ''}
                   />
+                  {/* Ordinal number badge on edge - always show for non-loopback edges */}
+                  {!isLoopBack && (
+                    <g>
+                      <circle
+                        cx={ordinalX}
+                        cy={ordinalY}
+                        r={10}
+                        fill="#ffffff"
+                        stroke={strokeColor}
+                        strokeWidth={1.5}
+                      />
+                      <text
+                        x={ordinalX}
+                        y={ordinalY + 4}
+                        fontSize="10"
+                        fontWeight="bold"
+                        fill={strokeColor}
+                        textAnchor="middle"
+                      >
+                        {idx + 1}
+                      </text>
+                    </g>
+                  )}
                   {/* Label for control edges - positioned along the edge path */}
                   {isControl && (edge as any).label && (() => {
                     // Calculate label position along the edge

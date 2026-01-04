@@ -1946,21 +1946,6 @@
       "id": "mc4flkg1hkvd48"
     },
     {
-      "name": "Large-ScaleCodebasePattern",
-      "entityType": "MCPAgent",
-      "observations": [
-        "Significance: 7/10 - r",
-        "Applies to: Applicable to API design and similar domain challenges",
-        "Details: http://localhost:8080/knowledge-management/insights/Large-ScaleCodebasePattern.md"
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-12-21T08:24:03.394Z",
-        "last_updated": "2025-12-23T11:31:23.025Z"
-      },
-      "id": "mc4flkg1ot16ee"
-    },
-    {
       "name": "BugFixPattern",
       "entityType": "MCPAgent",
       "observations": [
@@ -2316,18 +2301,6 @@
       "metadata": {}
     },
     {
-      "from": "Large-ScaleCodebasePattern",
-      "to": "Coding",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "Large-ScaleCodebasePattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "CollectiveKnowledge",
       "to": "Coding",
       "relationType": "includes",
@@ -2349,9 +2322,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-01-04T10:47:39.032Z",
-    "total_entities": 25,
-    "total_relations": 53,
+    "exported_at": "2026-01-04T14:14:44.864Z",
+    "total_entities": 24,
+    "total_relations": 51,
     "description": "Coding project infrastructure and patterns"
   }
 }

@@ -233,17 +233,27 @@ export function MultiAgentGraph({
     const perpX = -(endY - startY) * 0.1
     const perpY = (endX - startX) * 0.1
 
-    const pathD = `M ${startX} ${startY} Q ${midX + perpX} ${midY + perpY} ${endX} ${endY}`
+    // Control point for quadratic bezier
+    const ctrlX = midX + perpX
+    const ctrlY = midY + perpY
+    const pathD = `M ${startX} ${startY} Q ${ctrlX} ${ctrlY} ${endX} ${endY}`
 
     // Active control line gets animated dash
     const isAnimated = isActiveControl && edge.type === 'control'
+
+    // Calculate ordinal badge position ON the bezier curve at t=0.5
+    // Quadratic bezier: Q(t) = (1-t)²*P0 + 2*(1-t)*t*P1 + t²*P2
+    // At t=0.5: Q = 0.25*start + 0.5*ctrl + 0.25*end
+    const ordinalX = 0.25 * startX + 0.5 * ctrlX + 0.25 * endX
+    const ordinalY = 0.25 * startY + 0.5 * ctrlY + 0.25 * endY
+    const edgeColor = isAnimated ? '#6366f1' : EDGE_COLORS[edge.type || 'dependency']
 
     return (
       <g key={idx}>
         <path
           d={pathD}
           fill="none"
-          stroke={isAnimated ? '#6366f1' : EDGE_COLORS[edge.type || 'dependency']}
+          stroke={edgeColor}
           strokeWidth={isAnimated ? 2.5 : edge.type === 'control' ? 1 : 1.5}
           strokeDasharray={edge.type === 'retry' ? '4,2' : edge.type === 'control' ? '4,4' : undefined}
           opacity={edge.type === 'control' && !isAnimated ? 0.3 : 0.7}
@@ -251,6 +261,29 @@ export function MultiAgentGraph({
           className={isAnimated ? 'animate-dash' : undefined}
           style={isAnimated ? { animation: 'dash 0.5s linear infinite' } : undefined}
         />
+        {/* Ordinal number badge showing edge sequence */}
+        {edge.type !== 'control' && (
+          <g>
+            <circle
+              cx={ordinalX}
+              cy={ordinalY}
+              r={8}
+              fill="white"
+              stroke={edgeColor}
+              strokeWidth={1.5}
+            />
+            <text
+              x={ordinalX}
+              y={ordinalY + 3}
+              textAnchor="middle"
+              fontSize="8"
+              fontWeight="bold"
+              fill={edgeColor}
+            >
+              {idx + 1}
+            </text>
+          </g>
+        )}
       </g>
     )
   }, [getPosition, nodeWidth, nodeHeight])
