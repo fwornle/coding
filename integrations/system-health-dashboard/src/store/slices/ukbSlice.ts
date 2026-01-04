@@ -153,6 +153,30 @@ export interface PersistedKnowledge {
   deduplicationRatio: string | null
 }
 
+// Trace event for workflow execution tracing
+export interface TraceEvent {
+  id: string
+  agentName: string
+  timestamp: number
+  duration?: number
+  status: 'started' | 'completed' | 'error'
+  input?: unknown
+  output?: unknown
+  llmMetrics?: {
+    model: string
+    inputTokens: number
+    outputTokens: number
+    cost?: number
+  }
+}
+
+// Trace state for workflow tracing feature
+export interface TraceState {
+  enabled: boolean
+  events: TraceEvent[]
+  selectedEventId?: string
+}
+
 // Historical workflow with full details
 export interface HistoricalWorkflowDetail extends HistoricalWorkflow {
   entitiesCreated: number
@@ -245,6 +269,9 @@ interface UKBState {
   historicalWorkflowDetail: HistoricalWorkflowDetail | null
   loadingDetail: boolean
   detailError: string | null
+
+  // Workflow tracing
+  trace: TraceState
 }
 
 const initialState: UKBState = {
@@ -279,6 +306,13 @@ const initialState: UKBState = {
   historicalWorkflowDetail: null,
   loadingDetail: false,
   detailError: null,
+
+  // Workflow tracing
+  trace: {
+    enabled: false,
+    events: [],
+    selectedEventId: undefined,
+  },
 }
 
 const ukbSlice = createSlice({
@@ -365,6 +399,32 @@ const ukbSlice = createSlice({
       state.loadingDetail = false
       state.detailError = action.payload
     },
+
+    // Trace actions
+    setTracingEnabled(state, action: PayloadAction<boolean>) {
+      state.trace.enabled = action.payload
+      // Clear events when disabling tracing
+      if (!action.payload) {
+        state.trace.events = []
+        state.trace.selectedEventId = undefined
+      }
+    },
+    addTraceEvent(state, action: PayloadAction<TraceEvent>) {
+      state.trace.events.push(action.payload)
+    },
+    updateTraceEvent(state, action: PayloadAction<Partial<TraceEvent> & { id: string }>) {
+      const index = state.trace.events.findIndex(e => e.id === action.payload.id)
+      if (index !== -1) {
+        state.trace.events[index] = { ...state.trace.events[index], ...action.payload }
+      }
+    },
+    clearTraces(state) {
+      state.trace.events = []
+      state.trace.selectedEventId = undefined
+    },
+    selectTraceEvent(state, action: PayloadAction<string | undefined>) {
+      state.trace.selectedEventId = action.payload
+    },
   },
 })
 
@@ -383,6 +443,12 @@ export const {
   fetchDetailStart,
   fetchDetailSuccess,
   fetchDetailFailure,
+  // Trace actions
+  setTracingEnabled,
+  addTraceEvent,
+  updateTraceEvent,
+  clearTraces,
+  selectTraceEvent,
 } = ukbSlice.actions
 
 // Selectors
@@ -577,6 +643,53 @@ export const selectStepStatusMap = createSelector(
     }
 
     return map
+  }
+)
+
+// Trace selectors
+export const selectTraceEnabled = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.trace.enabled
+)
+
+export const selectTraceEvents = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.trace.events
+)
+
+export const selectSelectedTraceEventId = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.trace.selectedEventId
+)
+
+export const selectSelectedTraceEvent = createSelector(
+  [selectUkbState],
+  (ukb) => {
+    if (!ukb.trace.selectedEventId) return null
+    return ukb.trace.events.find(e => e.id === ukb.trace.selectedEventId) || null
+  }
+)
+
+// Compute trace statistics
+export const selectTraceStats = createSelector(
+  [selectTraceEvents],
+  (events) => {
+    if (events.length === 0) return null
+
+    const completedEvents = events.filter(e => e.status === 'completed')
+    const totalDuration = completedEvents.reduce((sum, e) => sum + (e.duration || 0), 0)
+    const totalInputTokens = completedEvents.reduce((sum, e) => sum + (e.llmMetrics?.inputTokens || 0), 0)
+    const totalOutputTokens = completedEvents.reduce((sum, e) => sum + (e.llmMetrics?.outputTokens || 0), 0)
+    const totalCost = completedEvents.reduce((sum, e) => sum + (e.llmMetrics?.cost || 0), 0)
+
+    return {
+      totalEvents: events.length,
+      completedEvents: completedEvents.length,
+      totalDuration,
+      totalInputTokens,
+      totalOutputTokens,
+      totalCost,
+    }
   }
 )
 
