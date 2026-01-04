@@ -532,11 +532,17 @@ export const selectHistoricalProcessInfo = createSelector(
         name: step.agent || step.name,
         status: step.status === 'success' ? 'completed' : step.status as StepStatus,
         duration: parseDuration(step.duration),
-        llmProvider: ['semantic_analysis', 'insight_generation', 'observation_generation',
-                      'ontology_classification', 'quality_assurance', 'deduplication',
-                      'content_validation', 'documentation_linker', 'code_graph'].includes(step.agent)
-                      ? (step.agent === 'code_graph' ? 'code-graph-rag' : 'anthropic')
-                      : undefined,
+        // Use backend llmProvider first, fallback to agent-based inference
+        llmProvider: (step as any).llmProvider || (
+          ['semantic_analysis', 'insight_generation', 'observation_generation',
+           'ontology_classification', 'quality_assurance', 'deduplication',
+           'content_validation', 'documentation_linker', 'code_graph'].includes(step.agent)
+            ? (step.agent === 'code_graph' ? 'code-graph-rag' : 'anthropic')
+            : undefined
+        ),
+        // Pass through LLM metrics from backend
+        tokensUsed: (step as any).tokensUsed,
+        llmCalls: (step as any).llmCalls,
         error: step.errors?.join('\n'),
         outputs: step.outputs,
       }))
@@ -559,6 +565,9 @@ export const selectNodeStatus = createSelector(
           steps: ukb.historicalWorkflowDetail.steps.map(s => ({
             name: s.agent || s.name,
             status: s.status === 'success' ? 'completed' : s.status as StepStatus,
+            llmProvider: (s as any).llmProvider,
+            tokensUsed: (s as any).tokensUsed,
+            llmCalls: (s as any).llmCalls,
             error: s.errors?.join('\n'),
             outputs: s.outputs,
           }))
@@ -613,6 +622,9 @@ export const selectStepStatusMap = createSelector(
             name: s.agent || s.name,
             status: s.status === 'success' ? 'completed' : s.status as StepStatus,
             duration: undefined,
+            llmProvider: (s as any).llmProvider,
+            tokensUsed: (s as any).tokensUsed,
+            llmCalls: (s as any).llmCalls,
             error: s.errors?.join('\n'),
             outputs: s.outputs,
           }))
