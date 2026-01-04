@@ -871,6 +871,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 name: s.agent || s.name,
                 status: s.status === 'success' ? 'completed' : s.status as any,
                 duration: s.duration ? parseFloat(String(s.duration).replace(/s$/i, '')) * 1000 : undefined,
+                llmProvider: (s as any).llmProvider,
+                tokensUsed: (s as any).tokensUsed,
+                llmCalls: (s as any).llmCalls,
                 error: s.errors?.join('\n'),
                 outputs: s.outputs,
               })) || []
