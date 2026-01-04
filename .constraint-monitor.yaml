@@ -232,6 +232,7 @@ constraints:
     instead. You MUST invoke documentation-style skill FIRST'
   severity: error
   enabled: true
+  file_pattern: '\.md$'
   suggestion: 1. Invoke Skill tool with skill='documentation-style' 2. Create .puml
     file in docs/puml/ 3. Generate PNG with plantuml 4. Reference image in markdown
 - id: documentation-style-skill-required
