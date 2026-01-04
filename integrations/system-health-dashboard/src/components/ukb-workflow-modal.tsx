@@ -39,7 +39,7 @@ import {
   StopCircle,
   Activity,
 } from 'lucide-react'
-import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal } from './workflow'
+import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, STEP_TO_AGENT } from './workflow'
 import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
 import {
@@ -862,7 +862,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         onOpenChange={setTraceModalOpen}
         steps={
           activeTab === 'active'
-            ? currentProcess?.steps || []
+            ? (currentProcess?.steps || []).map(s => ({
+                ...s,
+                // Use descriptive agent name from STEP_TO_AGENT mapping for display
+                name: STEP_TO_AGENT[s.name] || s.name,
+              }))
             : historicalWorkflowDetail?.steps?.map(s => ({
                 name: s.agent || s.name,
                 status: s.status === 'success' ? 'completed' : s.status as any,
