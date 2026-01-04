@@ -102,6 +102,12 @@ export function MultiAgentGraph({
     }
   }, [agents, orchestrator])
 
+  // KG operator child agents that should aggregate to parent kg_operators
+  const KG_OPERATOR_CHILDREN = [
+    'context_convolution', 'entity_aggregation', 'node_embedding',
+    'deduplication_operator', 'edge_prediction', 'structure_merge'
+  ]
+
   // Build step status map and count steps per agent
   const { stepStatusMap, stepCountMap, agentsInWorkflow } = useMemo(() => {
     const statusMap: Record<string, StepInfo> = {}
@@ -117,6 +123,20 @@ export function MultiAgentGraph({
         // Keep most relevant status (running > completed > pending > failed)
         if (!statusMap[agentId] || step.status === 'running' || (step.status === 'completed' && statusMap[agentId].status !== 'running')) {
           statusMap[agentId] = { ...step }
+        }
+
+        // Aggregate KG operator child status to parent kg_operators
+        if (KG_OPERATOR_CHILDREN.includes(agentId)) {
+          agentSet.add('kg_operators')
+          countMap['kg_operators'] = (countMap['kg_operators'] || 0) + 1
+          // Aggregate status: running > failed > completed > pending
+          const existingStatus = statusMap['kg_operators']?.status
+          if (!existingStatus ||
+              step.status === 'running' ||
+              (step.status === 'failed' && existingStatus !== 'running') ||
+              (step.status === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
+            statusMap['kg_operators'] = { ...step, name: 'kg_operators' }
+          }
         }
       }
     }

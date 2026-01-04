@@ -1185,6 +1185,12 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     return process.steps.map(s => `${s.name}:${s.status}`).join(',')
   }, [process.steps])
 
+  // KG operator child agents that should aggregate to parent kg_operators
+  const KG_OPERATOR_CHILDREN = [
+    'context_convolution', 'entity_aggregation', 'node_embedding',
+    'deduplication_operator', 'edge_prediction', 'structure_merge'
+  ]
+
   // Build step status map from process data
   const stepStatusMap = useMemo(() => {
     const map: Record<string, StepInfo> = {}
@@ -1196,6 +1202,17 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
         // Create a shallow copy to avoid mutating Redux state
         if (!map[agentId] || step.status === 'running' || (step.status === 'completed' && map[agentId].status !== 'running')) {
           map[agentId] = { ...step }
+        }
+
+        // Aggregate KG operator child status to parent kg_operators
+        if (KG_OPERATOR_CHILDREN.includes(agentId)) {
+          const existingStatus = map['kg_operators']?.status
+          if (!existingStatus ||
+              step.status === 'running' ||
+              (step.status === 'failed' && existingStatus !== 'running') ||
+              (step.status === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
+            map['kg_operators'] = { ...step, name: 'kg_operators' }
+          }
         }
       }
     }
@@ -1742,8 +1759,13 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const isFailed = process.status === 'failed'
               const isCompleted = process.status === 'completed'
               const Icon = ORCHESTRATOR_NODE.icon
+              // Factor in batch progress for more accurate display
               const progressPercent = process.totalSteps > 0
-                ? Math.round((process.completedSteps / process.totalSteps) * 100)
+                ? Math.round(
+                    process.batchProgress && process.batchProgress.totalBatches > 0
+                      ? ((Math.max(0, process.completedSteps - 1) + (process.batchProgress.currentBatch / process.batchProgress.totalBatches)) / process.totalSteps) * 100
+                      : (process.completedSteps / process.totalSteps) * 100
+                  )
                 : 0
 
               return (
@@ -2284,8 +2306,15 @@ function OrchestratorDetailsSidebar({
     }
   }
 
+  // Calculate progress: factor in batch progress when available for more granular display
+  // If batch processing is active, treat it as partial progress within the current step
   const progressPercent = process.totalSteps > 0
-    ? Math.round((process.completedSteps / process.totalSteps) * 100)
+    ? Math.round(
+        process.batchProgress && process.batchProgress.totalBatches > 0
+          // When batch processing: (completed steps - 1 + batch fraction) / total
+          ? ((Math.max(0, process.completedSteps - 1) + (process.batchProgress.currentBatch / process.batchProgress.totalBatches)) / process.totalSteps) * 100
+          : (process.completedSteps / process.totalSteps) * 100
+      )
     : 0
 
   // Calculate total duration from steps

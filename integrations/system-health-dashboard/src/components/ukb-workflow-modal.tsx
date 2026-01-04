@@ -332,6 +332,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     const activeIndex = Math.min(selectedProcessIndex, activeProcesses.length - 1)
     const activeCurrentProcess = activeProcesses[activeIndex] || null
 
+    // Recalculate progress to factor in batch progress for more accurate display
+    const calculatedProgressPercent = activeCurrentProcess && activeCurrentProcess.totalSteps > 0
+      ? Math.round(
+          activeCurrentProcess.batchProgress && activeCurrentProcess.batchProgress.totalBatches > 0
+            // When batch processing: (completed steps - 1 + batch fraction) / total
+            ? ((Math.max(0, activeCurrentProcess.completedSteps - 1) + (activeCurrentProcess.batchProgress.currentBatch / activeCurrentProcess.batchProgress.totalBatches)) / activeCurrentProcess.totalSteps) * 100
+            : (activeCurrentProcess.completedSteps / activeCurrentProcess.totalSteps) * 100
+        )
+      : 0
+
     return (
       <>
         {/* Process selector */}
@@ -437,9 +447,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                         </span>
                       )}
                     </span>
-                    <span className="font-medium">{activeCurrentProcess.progressPercent}%</span>
+                    <span className="font-medium">{calculatedProgressPercent}%</span>
                   </div>
-                  <Progress value={activeCurrentProcess.progressPercent} className="h-2" />
+                  <Progress value={calculatedProgressPercent} className="h-2" />
                 </div>
               </CardContent>
             </Card>
