@@ -332,15 +332,32 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     const activeIndex = Math.min(selectedProcessIndex, activeProcesses.length - 1)
     const activeCurrentProcess = activeProcesses[activeIndex] || null
 
-    // Recalculate progress to factor in batch progress for more accurate display
-    const calculatedProgressPercent = activeCurrentProcess && activeCurrentProcess.totalSteps > 0
-      ? Math.round(
-          activeCurrentProcess.batchProgress && activeCurrentProcess.batchProgress.totalBatches > 0
-            // When batch processing: (completed steps - 1 + batch fraction) / total
-            ? ((Math.max(0, activeCurrentProcess.completedSteps - 1) + (activeCurrentProcess.batchProgress.currentBatch / activeCurrentProcess.batchProgress.totalBatches)) / activeCurrentProcess.totalSteps) * 100
-            : (activeCurrentProcess.completedSteps / activeCurrentProcess.totalSteps) * 100
+    // Calculate progress based on batch-weighted work distribution:
+    // - Batch phase (steps 1-14 running N times) = ~85% of total work
+    // - Finalization phase (steps 15-23 running once) = ~15% of total work
+    const BATCH_STEP_COUNT = 14
+    const BATCH_WEIGHT = 0.85
+    let calculatedProgressPercent = 0
+    if (activeCurrentProcess && activeCurrentProcess.totalSteps > 0) {
+      if (activeCurrentProcess.batchProgress && activeCurrentProcess.batchProgress.totalBatches > 0) {
+        // During batch phase: progress = batch completion × 85%
+        calculatedProgressPercent = Math.round(
+          (activeCurrentProcess.batchProgress.currentBatch / activeCurrentProcess.batchProgress.totalBatches) * BATCH_WEIGHT * 100
         )
-      : 0
+      } else if (activeCurrentProcess.completedSteps > BATCH_STEP_COUNT) {
+        // Finalization phase: 85% + finalization progress × 15%
+        const finSteps = activeCurrentProcess.completedSteps - BATCH_STEP_COUNT
+        const totalFinSteps = activeCurrentProcess.totalSteps - BATCH_STEP_COUNT
+        calculatedProgressPercent = Math.round(
+          (BATCH_WEIGHT + (finSteps / totalFinSteps) * (1 - BATCH_WEIGHT)) * 100
+        )
+      } else {
+        // Fallback for early stages or non-batch workflows
+        calculatedProgressPercent = Math.round(
+          (activeCurrentProcess.completedSteps / activeCurrentProcess.totalSteps) * 100
+        )
+      }
+    }
 
     return (
       <>
@@ -440,7 +457,10 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 <div className="mt-4">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-muted-foreground">
-                      Progress: {activeCurrentProcess.completedSteps} / {activeCurrentProcess.totalSteps} steps
+                      {activeCurrentProcess.batchProgress && activeCurrentProcess.batchProgress.totalBatches > 0
+                        ? `Batch ${activeCurrentProcess.batchProgress.currentBatch} / ${activeCurrentProcess.batchProgress.totalBatches}`
+                        : `Steps: ${activeCurrentProcess.completedSteps} / ${activeCurrentProcess.totalSteps}`
+                      }
                       {activeCurrentProcess.currentStep && (
                         <span className="ml-2 text-blue-600">
                           (Currently: {activeCurrentProcess.currentStep.replace(/_/g, ' ')})
