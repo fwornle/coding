@@ -815,7 +815,7 @@ class SystemHealthAPIServer {
 
     /**
      * Cancel/kill a running or frozen workflow
-     * Resets the workflow-progress.json and optionally kills stale processes
+     * Resets the workflow-progress.json and kills the workflow process
      */
     async handleCancelWorkflow(req, res) {
         try {
@@ -824,6 +824,7 @@ class SystemHealthAPIServer {
 
             let previousState = null;
             let killedProcesses = [];
+            let killedWorkflowPid = null;
 
             // Read current state before resetting
             if (existsSync(progressPath)) {
@@ -831,6 +832,31 @@ class SystemHealthAPIServer {
                     previousState = JSON.parse(readFileSync(progressPath, 'utf8'));
                 } catch (e) {
                     // Ignore parse errors
+                }
+            }
+
+            // CRITICAL: Kill the workflow process FIRST using its PID
+            // This prevents the workflow from overwriting our cancelled state
+            if (killProcesses && previousState?.pid) {
+                try {
+                    const pid = previousState.pid;
+                    // Check if process is still running
+                    try {
+                        process.kill(pid, 0); // Signal 0 = check if process exists
+                        // Process exists, kill it
+                        process.kill(pid, 'SIGTERM');
+                        killedWorkflowPid = pid;
+                        console.log(`🛑 Killed workflow process PID ${pid}`);
+                        // Give process time to terminate
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    } catch (e) {
+                        if (e.code !== 'ESRCH') {
+                            // ESRCH = process doesn't exist, which is fine
+                            console.warn(`Warning killing PID ${pid}: ${e.message}`);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Failed to kill workflow process: ${e.message}`);
                 }
             }
 
@@ -846,7 +872,7 @@ class SystemHealthAPIServer {
 
             writeFileSync(progressPath, JSON.stringify(resetState, null, 2));
 
-            // Optionally kill stale semantic-analysis processes
+            // Also cleanup any orphaned/stale processes
             if (killProcesses) {
                 const ukbManager = new UKBProcessManager();
                 killedProcesses = ukbManager.cleanupStaleProcesses(false);
@@ -862,7 +888,8 @@ class SystemHealthAPIServer {
                     previousStatus: previousState?.status || 'unknown',
                     completedSteps: previousState?.completedSteps || 0,
                     totalSteps: previousState?.totalSteps || 0,
-                    killedProcesses: killedProcesses.length,
+                    killedWorkflowPid,
+                    killedStaleProcesses: killedProcesses.length,
                     timestamp: new Date().toISOString()
                 }
             });
