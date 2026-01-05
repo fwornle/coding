@@ -641,6 +641,7 @@ class SystemHealthAPIServer {
                         steps: this.buildStepInfo(workflowProgress),
                         isInlineMCP: true, // Flag to indicate this is an inline MCP workflow
                         batchProgress: workflowProgress.batchProgress || null, // Batch progress for batch workflows
+                        batchIterations: workflowProgress.batchIterations || null, // Per-batch step tracking for tracer
                     };
 
                     detailedStatus.processes.push(inlineProcess);
@@ -674,6 +675,7 @@ class SystemHealthAPIServer {
                         proc.stepsFailed = workflowProgress.stepsFailed || [];
                         proc.elapsedSeconds = workflowProgress.elapsedSeconds || 0;
                         proc.batchProgress = workflowProgress.batchProgress || null;
+                        proc.batchIterations = workflowProgress.batchIterations || null;
 
                         // Build step info array for the graph visualization
                         proc.steps = this.buildStepInfo(workflowProgress);

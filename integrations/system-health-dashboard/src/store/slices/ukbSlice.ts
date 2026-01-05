@@ -41,6 +41,19 @@ export interface UKBProcess {
     totalBatches: number
     batchId?: string
   }
+  // Per-batch step tracking for tracer visualization
+  batchIterations?: Array<{
+    batchId: string
+    batchNumber: number
+    startTime: string
+    endTime?: string
+    steps: Array<{
+      name: string
+      status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
+      duration?: number
+      outputs?: Record<string, any>
+    }>
+  }>
   // Multi-agent orchestration data from SmartOrchestrator
   multiAgent?: {
     stepConfidences: Record<string, number>
