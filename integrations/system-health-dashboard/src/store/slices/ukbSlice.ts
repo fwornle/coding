@@ -99,6 +99,31 @@ export interface AccumulatedStats {
   totalRelationsAdded: number
 }
 
+// Step timing statistics for learned progress estimation
+export interface StepTimingStat {
+  avgDurationMs: number
+  minDurationMs: number
+  maxDurationMs: number
+  sampleCount: number
+  recentDurations?: number[]
+  isBatchStep?: boolean
+}
+
+export interface WorkflowTimingStats {
+  sampleCount: number
+  lastSampleDate: string
+  steps: Record<string, StepTimingStat>
+  avgBatchDurationMs: number
+  avgFinalizationDurationMs: number
+  avgTotalBatches: number
+}
+
+export interface StepTimingStatistics {
+  version: number
+  lastUpdated: string
+  workflowTypes: Record<string, WorkflowTimingStats>
+}
+
 // Aggregated step data across all batches
 export interface AggregatedSteps {
   git_history?: {
@@ -269,6 +294,10 @@ interface UKBState {
   selectedHistoricalWorkflow: HistoricalWorkflow | null
   historicalWorkflowDetail: HistoricalWorkflowDetail | null
   loadingDetail: boolean
+
+  // Step timing statistics for learned progress estimation
+  stepTimingStatistics: StepTimingStatistics | null
+  loadingStatistics: boolean
   detailError: string | null
 
   // Workflow tracing
@@ -307,6 +336,10 @@ const initialState: UKBState = {
   historicalWorkflowDetail: null,
   loadingDetail: false,
   detailError: null,
+
+  // Step timing statistics for learned progress estimation
+  stepTimingStatistics: null,
+  loadingStatistics: false,
 
   // Workflow tracing
   trace: {
@@ -401,6 +434,19 @@ const ukbSlice = createSlice({
       state.detailError = action.payload
     },
 
+    // Step timing statistics actions
+    fetchStatisticsStart(state) {
+      state.loadingStatistics = true
+    },
+    fetchStatisticsSuccess(state, action: PayloadAction<StepTimingStatistics | null>) {
+      state.loadingStatistics = false
+      state.stepTimingStatistics = action.payload
+    },
+    fetchStatisticsFailure(state) {
+      state.loadingStatistics = false
+      state.stepTimingStatistics = null
+    },
+
     // Trace actions
     setTracingEnabled(state, action: PayloadAction<boolean>) {
       state.trace.enabled = action.payload
@@ -444,6 +490,10 @@ export const {
   fetchDetailStart,
   fetchDetailSuccess,
   fetchDetailFailure,
+  // Statistics actions
+  fetchStatisticsStart,
+  fetchStatisticsSuccess,
+  fetchStatisticsFailure,
   // Trace actions
   setTracingEnabled,
   addTraceEvent,
@@ -478,6 +528,17 @@ export const selectSelectedHistoricalWorkflow = createSelector(
 export const selectHistoricalDetail = createSelector(
   [selectUkbState],
   (ukb) => ukb.historicalWorkflowDetail
+)
+
+// Step timing statistics for learned progress estimation
+export const selectStepTimingStatistics = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.stepTimingStatistics
+)
+
+export const selectLoadingStatistics = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.loadingStatistics
 )
 
 // Select batch summary and accumulated stats for historical workflows

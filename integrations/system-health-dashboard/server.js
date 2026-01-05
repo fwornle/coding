@@ -110,6 +110,10 @@ class SystemHealthAPIServer {
         this.app.get('/api/workflows/definitions', this.handleGetWorkflowDefinitions.bind(this));
         this.app.get('/api/workflows/definitions/:workflowName', this.handleGetWorkflowDefinition.bind(this));
 
+        // Workflow timing statistics endpoint (for progress estimation)
+        this.app.get('/api/workflows/statistics', this.handleGetWorkflowStatistics.bind(this));
+        this.app.post('/api/workflows/statistics/update', this.handleUpdateWorkflowStatistics.bind(this));
+
         // Batch processing endpoints
         this.app.get('/api/batch/progress', this.handleGetBatchProgress.bind(this));
         this.app.get('/api/batch/history', this.handleGetBatchHistory.bind(this));
@@ -1877,6 +1881,164 @@ class SystemHealthAPIServer {
             });
         } catch (error) {
             console.error('Failed to load workflow definition:', error);
+            res.status(500).json({
+                status: 'error',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * Get workflow timing statistics for progress estimation
+     * Returns historical averages for step durations, batch times, etc.
+     */
+    async handleGetWorkflowStatistics(req, res) {
+        try {
+            const statisticsPath = join(codingRoot, '.data/step-timing-statistics.json');
+
+            if (!existsSync(statisticsPath)) {
+                return res.json({
+                    status: 'success',
+                    data: null,
+                    message: 'No timing statistics available yet'
+                });
+            }
+
+            const statistics = JSON.parse(readFileSync(statisticsPath, 'utf-8'));
+            res.json({
+                status: 'success',
+                data: statistics
+            });
+        } catch (error) {
+            console.error('Failed to load workflow statistics:', error);
+            res.status(500).json({
+                status: 'error',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * Update workflow timing statistics after a workflow completes
+     * Uses exponential moving average (EMA) for adaptive learning
+     */
+    async handleUpdateWorkflowStatistics(req, res) {
+        try {
+            const { workflowName, batchDurationMs, finalizationDurationMs, totalBatches, stepDurations } = req.body;
+
+            if (!workflowName) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'workflowName is required'
+                });
+            }
+
+            const statisticsPath = join(codingRoot, '.data/step-timing-statistics.json');
+            const EMA_ALPHA = 0.2; // Weight for new samples
+
+            // Load existing statistics or create new
+            let statistics = {
+                version: 1,
+                lastUpdated: new Date().toISOString(),
+                workflowTypes: {}
+            };
+
+            if (existsSync(statisticsPath)) {
+                statistics = JSON.parse(readFileSync(statisticsPath, 'utf-8'));
+            }
+
+            // Initialize workflow type if not exists
+            if (!statistics.workflowTypes[workflowName]) {
+                statistics.workflowTypes[workflowName] = {
+                    sampleCount: 0,
+                    lastSampleDate: null,
+                    steps: {},
+                    avgBatchDurationMs: 0,
+                    avgFinalizationDurationMs: 0,
+                    avgTotalBatches: 0
+                };
+            }
+
+            const workflowStats = statistics.workflowTypes[workflowName];
+
+            // Update batch duration using EMA
+            if (batchDurationMs !== undefined && totalBatches > 0) {
+                const perBatchDuration = batchDurationMs / totalBatches;
+                if (workflowStats.sampleCount === 0) {
+                    workflowStats.avgBatchDurationMs = perBatchDuration;
+                } else {
+                    workflowStats.avgBatchDurationMs = Math.round(
+                        EMA_ALPHA * perBatchDuration + (1 - EMA_ALPHA) * workflowStats.avgBatchDurationMs
+                    );
+                }
+            }
+
+            // Update finalization duration using EMA
+            if (finalizationDurationMs !== undefined) {
+                if (workflowStats.sampleCount === 0) {
+                    workflowStats.avgFinalizationDurationMs = finalizationDurationMs;
+                } else {
+                    workflowStats.avgFinalizationDurationMs = Math.round(
+                        EMA_ALPHA * finalizationDurationMs + (1 - EMA_ALPHA) * workflowStats.avgFinalizationDurationMs
+                    );
+                }
+            }
+
+            // Update total batches average
+            if (totalBatches !== undefined) {
+                if (workflowStats.sampleCount === 0) {
+                    workflowStats.avgTotalBatches = totalBatches;
+                } else {
+                    workflowStats.avgTotalBatches = Math.round(
+                        EMA_ALPHA * totalBatches + (1 - EMA_ALPHA) * workflowStats.avgTotalBatches
+                    );
+                }
+            }
+
+            // Update step-level statistics
+            if (stepDurations && typeof stepDurations === 'object') {
+                for (const [stepName, duration] of Object.entries(stepDurations)) {
+                    if (!workflowStats.steps[stepName]) {
+                        workflowStats.steps[stepName] = {
+                            avgDurationMs: duration,
+                            minDurationMs: duration,
+                            maxDurationMs: duration,
+                            sampleCount: 1,
+                            recentDurations: [duration]
+                        };
+                    } else {
+                        const step = workflowStats.steps[stepName];
+                        step.avgDurationMs = Math.round(
+                            EMA_ALPHA * duration + (1 - EMA_ALPHA) * step.avgDurationMs
+                        );
+                        step.minDurationMs = Math.min(step.minDurationMs, duration);
+                        step.maxDurationMs = Math.max(step.maxDurationMs, duration);
+                        step.sampleCount += 1;
+                        step.recentDurations = [...(step.recentDurations || []), duration].slice(-10);
+                    }
+                }
+            }
+
+            // Update metadata
+            workflowStats.sampleCount += 1;
+            workflowStats.lastSampleDate = new Date().toISOString();
+            statistics.lastUpdated = new Date().toISOString();
+
+            // Save updated statistics
+            writeFileSync(statisticsPath, JSON.stringify(statistics, null, 2));
+
+            res.json({
+                status: 'success',
+                message: 'Statistics updated',
+                data: {
+                    workflowName,
+                    sampleCount: workflowStats.sampleCount,
+                    avgBatchDurationMs: workflowStats.avgBatchDurationMs,
+                    avgFinalizationDurationMs: workflowStats.avgFinalizationDurationMs
+                }
+            });
+        } catch (error) {
+            console.error('Failed to update workflow statistics:', error);
             res.status(500).json({
                 status: 'error',
                 message: error.message
