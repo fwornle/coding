@@ -135,18 +135,29 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const [traceModalOpen, setTraceModalOpen] = useState(false)
 
   // Cancel/clear a stuck or frozen workflow
-  const handleCancelWorkflow = async () => {
+  const handleCancelWorkflow = async (e: React.MouseEvent) => {
+    // Prevent event bubbling which could close the modal
+    e.stopPropagation()
+    e.preventDefault()
+
+    // Confirm before cancelling
+    if (!window.confirm('Are you sure you want to cancel the workflow? This will kill the running process.')) {
+      return
+    }
+
     setCancelLoading(true)
     try {
+      console.log('Cancelling workflow via API:', `${apiBaseUrl}/api/ukb/cancel`)
       const response = await fetch(`${apiBaseUrl}/api/ukb/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ killProcesses: true })
       })
       const data = await response.json()
+      console.log('Cancel API response:', data)
       if (data.status === 'success') {
         console.log('Workflow cancelled:', data.data)
-        // Refresh after short delay to show updated state (like graph component does)
+        // Refresh after short delay to show updated state
         setTimeout(() => window.location.reload(), 1500)
       } else {
         console.error('Failed to cancel workflow:', data.message)
