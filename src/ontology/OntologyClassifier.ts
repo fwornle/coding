@@ -21,6 +21,20 @@ import { OntologyManager } from './OntologyManager.js';
 import { OntologyValidator } from './OntologyValidator.js';
 import { HeuristicClassifier } from './heuristics/HeuristicClassifier.js';
 import { ontologyMetrics, startTimer } from './metrics.js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Debug logging function that writes to file (persists when stdio is discarded)
+const DEBUG_LOG_PATH = path.join(process.cwd(), '.data', 'ontology-debug.log');
+function debugLog(message: string, data?: any): void {
+  try {
+    const timestamp = new Date().toISOString();
+    const logLine = `[${timestamp}] ${message}${data ? ' ' + JSON.stringify(data) : ''}\n`;
+    fs.appendFileSync(DEBUG_LOG_PATH, logLine);
+  } catch (e) {
+    // Silently fail if we can't write to log
+  }
+}
 
 /**
  * OntologyClassifier - Main classifier combining LLM and heuristics
@@ -131,19 +145,24 @@ export class OntologyClassifier {
     // Try LLM classification if enabled and heuristics didn't find high-confidence match
     if (enableLLM && highestConfidence < 0.98) {
       console.log(`[OntologyClassifier] Calling LLM - enableLLM=${enableLLM}, highestConfidence=${highestConfidence} < 0.98`);
+      debugLog('LLM decision: CALLING LLM', { enableLLM, highestConfidence, threshold: 0.98 });
       const llmResult = await this.classifyWithLLM(text, team, llmBudget);
 
       if (llmResult) {
         console.log(`[OntologyClassifier] LLM returned: class=${llmResult.entityClass}, confidence=${llmResult.confidence}, method=${llmResult.method}`);
+        debugLog('LLM returned result', { class: llmResult.entityClass, confidence: llmResult.confidence, method: llmResult.method });
         if (llmResult.confidence > highestConfidence) {
           console.log(`[OntologyClassifier] LLM result (${llmResult.confidence}) better than heuristic (${highestConfidence}), using LLM`);
+          debugLog('Using LLM result (better confidence)', { llm: llmResult.confidence, heuristic: highestConfidence });
           bestClassification = llmResult;
           highestConfidence = llmResult.confidence;
         } else {
           console.log(`[OntologyClassifier] LLM result (${llmResult.confidence}) not better than heuristic (${highestConfidence}), keeping heuristic`);
+          debugLog('Keeping heuristic (better confidence)', { llm: llmResult.confidence, heuristic: highestConfidence });
         }
       } else {
         console.log(`[OntologyClassifier] LLM returned null - using heuristic fallback`);
+        debugLog('LLM returned NULL - falling back to heuristic');
       }
 
       // If both methods produced results, mark as hybrid
@@ -152,8 +171,10 @@ export class OntologyClassifier {
       }
     } else if (!enableLLM) {
       console.log(`[OntologyClassifier] LLM disabled - using heuristic only`);
+      debugLog('LLM decision: DISABLED', { enableLLM });
     } else {
       console.log(`[OntologyClassifier] Skipping LLM - highestConfidence=${highestConfidence} >= 0.98`);
+      debugLog('LLM decision: SKIPPED (confidence >= 0.98)', { highestConfidence });
     }
 
     // Check minimum confidence threshold
@@ -195,19 +216,24 @@ export class OntologyClassifier {
     const llmTimer = startTimer('ontology_llm_duration_seconds', { team: team || 'all' });
     ontologyMetrics.incrementCounter('ontology_llm_calls_total', { team: team || 'all' });
 
+    const logInfo = { team, budget: llmBudget, textLength: text.length };
     console.log(`[OntologyClassifier] classifyWithLLM called - team=${team}, budget=${llmBudget}, textLength=${text.length}`);
+    debugLog('classifyWithLLM called', logInfo);
 
     try {
       // Get available entity classes for context
       const entityClasses = this.ontologyManager.getAllEntityClasses(team);
       console.log(`[OntologyClassifier] Available entity classes: ${entityClasses.length}`);
+      debugLog('Available entity classes', { count: entityClasses.length });
 
       // Build LLM prompt
       const prompt = this.buildClassificationPrompt(text, entityClasses, team);
       console.log(`[OntologyClassifier] Built prompt, length=${prompt.length}`);
+      debugLog('Built prompt', { length: prompt.length });
 
       // Call LLM via UnifiedInferenceEngine (with timeout protection)
       console.log(`[OntologyClassifier] Calling inferenceEngine.generateCompletion...`);
+      debugLog('Calling inferenceEngine.generateCompletion...');
       const response = await this.generateWithTimeout(
         this.inferenceEngine.generateCompletion({
           messages: [
@@ -222,10 +248,12 @@ export class OntologyClassifier {
       );
 
       console.log(`[OntologyClassifier] LLM response received - model=${response.model}, contentLength=${response.content?.length || 0}`);
+      debugLog('LLM response received', { model: response.model, contentLength: response.content?.length || 0 });
 
       // Track token usage
       if (response.usage) {
         console.log(`[OntologyClassifier] Token usage - prompt=${response.usage.promptTokens}, completion=${response.usage.completionTokens}`);
+        debugLog('Token usage', { prompt: response.usage.promptTokens, completion: response.usage.completionTokens });
         ontologyMetrics.incrementCounter('ontology_llm_tokens_prompt', { team: team || 'all' }, response.usage.promptTokens);
         ontologyMetrics.incrementCounter('ontology_llm_tokens_completion', { team: team || 'all' }, response.usage.completionTokens);
       }
@@ -238,14 +266,18 @@ export class OntologyClassifier {
 
       if (classification) {
         console.log(`[OntologyClassifier] Parsed LLM response: class=${classification.entityClass}, confidence=${classification.confidence}`);
+        debugLog('Parsed LLM response', { class: classification.entityClass, confidence: classification.confidence });
       } else {
         console.log(`[OntologyClassifier] Failed to parse LLM response - content: ${response.content?.substring(0, 200)}...`);
+        debugLog('Failed to parse LLM response', { content: response.content?.substring(0, 200) });
       }
 
       llmTimer.stop();
       return classification;
     } catch (error) {
+      const errorInfo = error instanceof Error ? { message: error.message, stack: error.stack } : { error: String(error) };
       console.error('[OntologyClassifier] LLM classification failed:', error);
+      debugLog('LLM classification FAILED', errorInfo);
       llmTimer.stop();
       return null;
     }

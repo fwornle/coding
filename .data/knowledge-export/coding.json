@@ -12397,11 +12397,13 @@
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-05T11:03:52.872Z",
+    "last_updated": "2026-01-05T18:02:43.376Z",
     "team": "coding",
     "entity_count": 35,
     "relation_count": 51,
     "exported_by": "GraphDatabaseService",
-    "export_version": "1.0"
+    "export_version": "1.0",
+    "checkpointResetAt": "2026-01-05T18:02:43.376Z",
+    "checkpointResetReason": "cleared (will re-analyze from the beginning)"
   }
 }
