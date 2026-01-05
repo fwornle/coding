@@ -938,7 +938,9 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
         return `Analyzed ${docstringsAnalyzed} docstrings, enriched ${semanticEntities} entities`
 
       case 'ontology_classification':
-        const entitiesClassified = outputs.entitiesClassified || outputs.classified?.length || 0
+        // Handle both number (new format) and array (legacy format) for classified count
+        const entitiesClassified = outputs.entitiesClassified ||
+          (typeof outputs.classified === 'number' ? outputs.classified : outputs.classified?.length) || 0
         const avgConfidence = outputs.averageConfidence ? `${(outputs.averageConfidence * 100).toFixed(0)}%` : ''
         const classesUsed = outputs.ontologyClassesUsed || 0
         return avgConfidence

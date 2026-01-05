@@ -146,12 +146,15 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       const data = await response.json()
       if (data.status === 'success') {
         console.log('Workflow cancelled:', data.data)
-        // The process list will be updated via polling
+        // Refresh after short delay to show updated state (like graph component does)
+        setTimeout(() => window.location.reload(), 1500)
       } else {
         console.error('Failed to cancel workflow:', data.message)
+        alert(`Failed to cancel workflow: ${data.message || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error cancelling workflow:', error)
+      alert(`Error cancelling workflow: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setCancelLoading(false)
     }
