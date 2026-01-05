@@ -110,31 +110,50 @@ export class OntologyClassifier {
         };
         highestConfidence = topHeuristic.confidence;
 
-        // If confidence is very high (>= 0.85), skip LLM
-        if (topHeuristic.confidence >= 0.85) {
+        // If confidence is very high (>= 0.92), skip LLM
+        // NOTE: Threshold raised from 0.85 to 0.92 to ensure LLM is used more often
+        // Previously, heuristics returning 0.85 (the starting confidence for required keyword matches)
+        // would skip LLM entirely, meaning LLM was almost never called
+        if (topHeuristic.confidence >= 0.92) {
+          console.log(`[OntologyClassifier] Skipping LLM - heuristic confidence ${topHeuristic.confidence} >= 0.92 for class: ${topHeuristic.entityClass}`);
           return this.finalizeClassification(
             bestClassification,
             text,
             validate,
             validationOptions
           );
+        } else {
+          console.log(`[OntologyClassifier] Heuristic confidence ${topHeuristic.confidence} < 0.92, will try LLM for potential improvement`);
         }
       }
     }
 
     // Try LLM classification if enabled and heuristics didn't find high-confidence match
-    if (enableLLM && highestConfidence < 0.85) {
+    if (enableLLM && highestConfidence < 0.92) {
+      console.log(`[OntologyClassifier] Calling LLM - enableLLM=${enableLLM}, highestConfidence=${highestConfidence} < 0.92`);
       const llmResult = await this.classifyWithLLM(text, team, llmBudget);
 
-      if (llmResult && llmResult.confidence > highestConfidence) {
-        bestClassification = llmResult;
-        highestConfidence = llmResult.confidence;
+      if (llmResult) {
+        console.log(`[OntologyClassifier] LLM returned: class=${llmResult.entityClass}, confidence=${llmResult.confidence}, method=${llmResult.method}`);
+        if (llmResult.confidence > highestConfidence) {
+          console.log(`[OntologyClassifier] LLM result (${llmResult.confidence}) better than heuristic (${highestConfidence}), using LLM`);
+          bestClassification = llmResult;
+          highestConfidence = llmResult.confidence;
+        } else {
+          console.log(`[OntologyClassifier] LLM result (${llmResult.confidence}) not better than heuristic (${highestConfidence}), keeping heuristic`);
+        }
+      } else {
+        console.log(`[OntologyClassifier] LLM returned null - using heuristic fallback`);
       }
 
       // If both methods produced results, mark as hybrid
       if (bestClassification && enableHeuristics && llmResult) {
         bestClassification.method = 'hybrid';
       }
+    } else if (!enableLLM) {
+      console.log(`[OntologyClassifier] LLM disabled - using heuristic only`);
+    } else {
+      console.log(`[OntologyClassifier] Skipping LLM - highestConfidence=${highestConfidence} >= 0.92`);
     }
 
     // Check minimum confidence threshold
@@ -176,14 +195,19 @@ export class OntologyClassifier {
     const llmTimer = startTimer('ontology_llm_duration_seconds', { team: team || 'all' });
     ontologyMetrics.incrementCounter('ontology_llm_calls_total', { team: team || 'all' });
 
+    console.log(`[OntologyClassifier] classifyWithLLM called - team=${team}, budget=${llmBudget}, textLength=${text.length}`);
+
     try {
       // Get available entity classes for context
       const entityClasses = this.ontologyManager.getAllEntityClasses(team);
+      console.log(`[OntologyClassifier] Available entity classes: ${entityClasses.length}`);
 
       // Build LLM prompt
       const prompt = this.buildClassificationPrompt(text, entityClasses, team);
+      console.log(`[OntologyClassifier] Built prompt, length=${prompt.length}`);
 
       // Call LLM via UnifiedInferenceEngine (with timeout protection)
+      console.log(`[OntologyClassifier] Calling inferenceEngine.generateCompletion...`);
       const response = await this.generateWithTimeout(
         this.inferenceEngine.generateCompletion({
           messages: [
@@ -197,8 +221,11 @@ export class OntologyClassifier {
         })
       );
 
+      console.log(`[OntologyClassifier] LLM response received - model=${response.model}, contentLength=${response.content?.length || 0}`);
+
       // Track token usage
       if (response.usage) {
+        console.log(`[OntologyClassifier] Token usage - prompt=${response.usage.promptTokens}, completion=${response.usage.completionTokens}`);
         ontologyMetrics.incrementCounter('ontology_llm_tokens_prompt', { team: team || 'all' }, response.usage.promptTokens);
         ontologyMetrics.incrementCounter('ontology_llm_tokens_completion', { team: team || 'all' }, response.usage.completionTokens);
       }
@@ -209,10 +236,16 @@ export class OntologyClassifier {
         team || 'upper'
       );
 
+      if (classification) {
+        console.log(`[OntologyClassifier] Parsed LLM response: class=${classification.entityClass}, confidence=${classification.confidence}`);
+      } else {
+        console.log(`[OntologyClassifier] Failed to parse LLM response - content: ${response.content?.substring(0, 200)}...`);
+      }
+
       llmTimer.stop();
       return classification;
     } catch (error) {
-      console.error('LLM classification failed:', error);
+      console.error('[OntologyClassifier] LLM classification failed:', error);
       llmTimer.stop();
       return null;
     }
