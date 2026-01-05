@@ -21,6 +21,9 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertTriangle, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react'
 
+const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
+const API_BASE_URL = `http://localhost:${API_PORT}`
+
 export default function CGRReindexModal() {
   const dispatch = useAppDispatch()
   const cgr = useAppSelector((state) => state.cgr)
@@ -50,7 +53,7 @@ export default function CGRReindexModal() {
     dispatch(reindexStart())
 
     try {
-      const response = await fetch('/api/cgr/reindex', {
+      const response = await fetch(`${API_BASE_URL}/api/cgr/reindex`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
@@ -62,7 +65,7 @@ export default function CGRReindexModal() {
 
       const checkStatus = async () => {
         try {
-          const statusRes = await fetch('/api/cgr/status')
+          const statusRes = await fetch(`${API_BASE_URL}/api/cgr/status`)
           const status = await statusRes.json()
 
           if (status.indexing === false) {
