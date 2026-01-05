@@ -53,13 +53,18 @@ import {
   fetchDetailStart,
   fetchDetailSuccess,
   fetchDetailFailure,
+  fetchStatisticsStart,
+  fetchStatisticsSuccess,
+  fetchStatisticsFailure,
   selectCurrentProcess,
   selectHistoricalProcessInfo,
   selectBatchSummary,
   selectAccumulatedStats,
   selectPersistedKnowledge,
+  selectStepTimingStatistics,
   type HistoricalWorkflow,
   type UKBProcess,
+  type StepTimingStatistics,
 } from '@/store/slices/ukbSlice'
 
 interface UKBWorkflowModalProps {
@@ -88,6 +93,26 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const batchSummary = useSelector(selectBatchSummary)
   const accumulatedStats = useSelector(selectAccumulatedStats)
   const persistedKnowledge = useSelector(selectPersistedKnowledge)
+  const stepTimingStatistics = useSelector(selectStepTimingStatistics)
+
+  // Fetch step timing statistics on mount (for learned progress estimation)
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      dispatch(fetchStatisticsStart())
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/workflows/statistics`)
+        if (response.ok) {
+          const result = await response.json()
+          dispatch(fetchStatisticsSuccess(result.data))
+        } else {
+          dispatch(fetchStatisticsFailure())
+        }
+      } catch {
+        dispatch(fetchStatisticsFailure())
+      }
+    }
+    fetchStatistics()
+  }, [dispatch, apiBaseUrl])
 
   // Derived state
   const showSidebar = selectedNode !== null && activeTab === 'active'
@@ -337,27 +362,95 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     // - Finalization phase (steps 15-23 running once) = ~15% of total work
     const BATCH_STEP_COUNT = 14
     const BATCH_WEIGHT = 0.85
+
+    // Get workflow-specific timing statistics for time-based progress
+    const getWorkflowStats = () => {
+      if (!stepTimingStatistics?.workflowTypes || !activeCurrentProcess) return null
+      const workflowName = activeCurrentProcess.workflowName || ''
+      const statsKey = workflowName.includes('complete') ? 'complete-analysis' :
+                       workflowName.includes('incremental') ? 'incremental-analysis' :
+                       'batch-analysis'
+      return stepTimingStatistics.workflowTypes[statsKey] || null
+    }
+    const workflowStats = getWorkflowStats()
+    const hasReliableStats = workflowStats && workflowStats.sampleCount >= 3
+
+    // Calculate time-based progress and ETA
     let calculatedProgressPercent = 0
+    let etaMs = 0
+    let usingTimeBased = false
+
     if (activeCurrentProcess && activeCurrentProcess.totalSteps > 0) {
-      if (activeCurrentProcess.batchProgress && activeCurrentProcess.batchProgress.totalBatches > 0) {
-        // During batch phase: progress = batch completion × 85%
-        calculatedProgressPercent = Math.round(
-          (activeCurrentProcess.batchProgress.currentBatch / activeCurrentProcess.batchProgress.totalBatches) * BATCH_WEIGHT * 100
-        )
-      } else if (activeCurrentProcess.completedSteps > BATCH_STEP_COUNT) {
-        // Finalization phase: 85% + finalization progress × 15%
-        const finSteps = activeCurrentProcess.completedSteps - BATCH_STEP_COUNT
-        const totalFinSteps = activeCurrentProcess.totalSteps - BATCH_STEP_COUNT
-        calculatedProgressPercent = Math.round(
-          (BATCH_WEIGHT + (finSteps / totalFinSteps) * (1 - BATCH_WEIGHT)) * 100
-        )
-      } else {
-        // Fallback for early stages or non-batch workflows
-        calculatedProgressPercent = Math.round(
-          (activeCurrentProcess.completedSteps / activeCurrentProcess.totalSteps) * 100
-        )
+      // Calculate elapsed time from completed steps
+      const elapsedMs = activeCurrentProcess.steps?.reduce((acc: number, step: any) => {
+        if (step.status === 'completed') return acc + (step.duration || 0)
+        return acc
+      }, 0) || 0
+
+      const currentBatch = activeCurrentProcess.batchProgress?.currentBatch || 0
+      const totalBatches = activeCurrentProcess.batchProgress?.totalBatches || 0
+
+      // TIME-BASED PROGRESS: Use historical statistics when available (3+ samples)
+      if (hasReliableStats && workflowStats) {
+        const avgBatchMs = workflowStats.avgBatchDurationMs || 0
+        const avgFinalizationMs = workflowStats.avgFinalizationDurationMs || 0
+
+        if (avgBatchMs > 0 && totalBatches > 0) {
+          // Per-batch learning: estimate total time based on actual batch count
+          const estimatedBatchPhaseMs = avgBatchMs * totalBatches
+          const estimatedTotalMs = estimatedBatchPhaseMs + avgFinalizationMs
+
+          // Calculate progress based on elapsed time vs estimated total
+          if (currentBatch > 0 && currentBatch <= totalBatches) {
+            // In batch phase
+            const estimatedProgressMs = Math.min(elapsedMs, estimatedTotalMs)
+            calculatedProgressPercent = Math.min(99, Math.round((estimatedProgressMs / estimatedTotalMs) * 100))
+            etaMs = Math.max(0, estimatedTotalMs - estimatedProgressMs)
+            usingTimeBased = true
+          } else if (activeCurrentProcess.completedSteps > BATCH_STEP_COUNT) {
+            // In finalization phase
+            calculatedProgressPercent = Math.min(99, Math.round((elapsedMs / estimatedTotalMs) * 100))
+            etaMs = Math.max(0, estimatedTotalMs - elapsedMs)
+            usingTimeBased = true
+          }
+        }
+      }
+
+      // STEP-COUNT FALLBACK: Use weighted step-based calculation
+      if (!usingTimeBased) {
+        if (activeCurrentProcess.batchProgress && totalBatches > 0) {
+          // During batch phase: progress = batch completion × 85%
+          calculatedProgressPercent = Math.round(
+            (currentBatch / totalBatches) * BATCH_WEIGHT * 100
+          )
+        } else if (activeCurrentProcess.completedSteps > BATCH_STEP_COUNT) {
+          // Finalization phase: 85% + finalization progress × 15%
+          const finSteps = activeCurrentProcess.completedSteps - BATCH_STEP_COUNT
+          const totalFinSteps = activeCurrentProcess.totalSteps - BATCH_STEP_COUNT
+          calculatedProgressPercent = Math.round(
+            (BATCH_WEIGHT + (finSteps / totalFinSteps) * (1 - BATCH_WEIGHT)) * 100
+          )
+        } else {
+          // Fallback for early stages or non-batch workflows
+          calculatedProgressPercent = Math.round(
+            (activeCurrentProcess.completedSteps / activeCurrentProcess.totalSteps) * 100
+          )
+        }
       }
     }
+
+    // Format ETA for display
+    const formatEta = (ms: number): string => {
+      if (ms <= 0) return ''
+      const seconds = Math.round(ms / 1000)
+      if (seconds < 60) return `~${seconds}s`
+      const minutes = Math.floor(seconds / 60)
+      if (minutes < 60) return `~${minutes} min`
+      const hours = Math.floor(minutes / 60)
+      const remainingMin = minutes % 60
+      return `~${hours}h ${remainingMin}m`
+    }
+    const etaDisplay = formatEta(etaMs)
 
     return (
       <>
@@ -467,7 +560,15 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                         </span>
                       )}
                     </span>
-                    <span className="font-medium">{calculatedProgressPercent}%</span>
+                    <span className="font-medium flex items-center gap-2">
+                      {calculatedProgressPercent}%
+                      {/* ETA display - only when using time-based estimation with reliable stats */}
+                      {etaDisplay && usingTimeBased && activeCurrentProcess.status === 'running' && (
+                        <span className="text-green-600 font-normal">
+                          ({etaDisplay} remaining)
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <Progress value={calculatedProgressPercent} className="h-2" />
                 </div>
