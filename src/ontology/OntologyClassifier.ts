@@ -25,6 +25,9 @@ import { ontologyMetrics, startTimer } from './metrics.js';
 /**
  * OntologyClassifier - Main classifier combining LLM and heuristics
  */
+// LLM call timeout to prevent indefinite hangs (30 seconds)
+const LLM_TIMEOUT_MS = 30000;
+
 export class OntologyClassifier {
   private heuristicClassifier: HeuristicClassifier;
   private inferenceEngine: UnifiedInferenceEngine;
@@ -37,6 +40,30 @@ export class OntologyClassifier {
   ) {
     this.heuristicClassifier = heuristicClassifier;
     this.inferenceEngine = inferenceEngine;
+  }
+
+  /**
+   * Wrap LLM call with timeout to prevent indefinite hangs
+   */
+  private async generateWithTimeout<T>(
+    llmCall: Promise<T>,
+    timeoutMs: number = LLM_TIMEOUT_MS
+  ): Promise<T> {
+    let timeoutId: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(`LLM call timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    try {
+      const result = await Promise.race([llmCall, timeoutPromise]);
+      clearTimeout(timeoutId!);
+      return result;
+    } catch (error) {
+      clearTimeout(timeoutId!);
+      throw error;
+    }
   }
 
   /**
@@ -156,17 +183,19 @@ export class OntologyClassifier {
       // Build LLM prompt
       const prompt = this.buildClassificationPrompt(text, entityClasses, team);
 
-      // Call LLM via UnifiedInferenceEngine
-      const response = await this.inferenceEngine.generateCompletion({
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        maxTokens: llmBudget,
-        temperature: 0.3, // Lower temperature for more deterministic classification
-      });
+      // Call LLM via UnifiedInferenceEngine (with timeout protection)
+      const response = await this.generateWithTimeout(
+        this.inferenceEngine.generateCompletion({
+          messages: [
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          maxTokens: llmBudget,
+          temperature: 0.3, // Lower temperature for more deterministic classification
+        })
+      );
 
       // Track token usage
       if (response.usage) {
@@ -320,17 +349,19 @@ Choose the most appropriate entity class and provide a confidence score between 
       // Build extraction prompt
       const prompt = this.buildExtractionPrompt(text, entityClass, entityDef);
 
-      // Call LLM
-      const response = await this.inferenceEngine.generateCompletion({
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        maxTokens: 500,
-        temperature: 0.3,
-      });
+      // Call LLM (with timeout protection)
+      const response = await this.generateWithTimeout(
+        this.inferenceEngine.generateCompletion({
+          messages: [
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          maxTokens: 500,
+          temperature: 0.3,
+        })
+      );
 
       // Parse response
       const jsonMatch = response.content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/) ||
