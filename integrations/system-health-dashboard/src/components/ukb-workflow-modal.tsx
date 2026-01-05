@@ -252,7 +252,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const handleHistoricalNodeClick = handleNodeClick
   const handleCloseHistoricalSidebar = handleCloseSidebar
 
-  const getHealthBadge = (health: string) => {
+  const getHealthBadge = (health: string | undefined | null) => {
+    if (!health) return <Badge variant="outline">Unknown</Badge>
     switch (health) {
       case 'healthy':
         return <Badge className="bg-green-500">Healthy</Badge>
@@ -267,12 +268,14 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }
 
-  const formatElapsed = (startTime: string, status?: string, fixedElapsedSeconds?: number) => {
+  const formatElapsed = (startTime: string | undefined | null, status?: string, fixedElapsedSeconds?: number) => {
     // For completed/failed workflows, use the fixed elapsed time from when they finished
     // For running workflows, calculate dynamically from start time
     let elapsedSeconds: number
     if (status && status !== 'running' && fixedElapsedSeconds !== undefined) {
       elapsedSeconds = fixedElapsedSeconds
+    } else if (!startTime) {
+      return '-'
     } else {
       const start = new Date(startTime).getTime()
       const now = Date.now()
@@ -287,7 +290,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     return `${hours}h ${minutes % 60}m`
   }
 
-  const getWorkflowDisplayName = (name: string) => {
+  const getWorkflowDisplayName = (name: string | undefined | null) => {
+    if (!name) return 'Unknown Workflow'
     switch (name) {
       case 'complete-analysis':
         return 'Complete Analysis'
@@ -298,7 +302,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | undefined | null) => {
+    if (!status) return <Badge variant="outline">Unknown</Badge>
     switch (status.toLowerCase()) {
       case 'completed':
         return <Badge className="bg-green-500 text-white">Completed</Badge>
@@ -574,16 +579,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                     <div className="text-xs text-muted-foreground mb-1">Team</div>
                     <div className="font-medium flex items-center gap-1">
                       <Server className="h-3 w-3" />
-                      {activeCurrentProcess.team}
+                      {activeCurrentProcess.team || 'Unknown'}
                     </div>
                   </div>
 
                   {/* Repository */}
                   <div className="col-span-2">
                     <div className="text-xs text-muted-foreground mb-1">Repository</div>
-                    <div className="font-medium text-sm truncate flex items-center gap-1" title={activeCurrentProcess.repositoryPath}>
+                    <div className="font-medium text-sm truncate flex items-center gap-1" title={activeCurrentProcess.repositoryPath || 'Unknown'}>
                       <Folder className="h-3 w-3 flex-shrink-0" />
-                      {activeCurrentProcess.repositoryPath.split('/').slice(-2).join('/')}
+                      {activeCurrentProcess.repositoryPath?.split('/').slice(-2).join('/') || 'Unknown'}
                     </div>
                   </div>
 
