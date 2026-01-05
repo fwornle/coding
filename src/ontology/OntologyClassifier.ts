@@ -110,12 +110,12 @@ export class OntologyClassifier {
         };
         highestConfidence = topHeuristic.confidence;
 
-        // If confidence is very high (>= 0.92), skip LLM
-        // NOTE: Threshold raised from 0.85 to 0.92 to ensure LLM is used more often
-        // Previously, heuristics returning 0.85 (the starting confidence for required keyword matches)
-        // would skip LLM entirely, meaning LLM was almost never called
-        if (topHeuristic.confidence >= 0.92) {
-          console.log(`[OntologyClassifier] Skipping LLM - heuristic confidence ${topHeuristic.confidence} >= 0.92 for class: ${topHeuristic.entityClass}`);
+        // If confidence is very high (>= 0.98), skip LLM
+        // NOTE: Threshold raised from 0.92 to 0.98 to ensure LLM is used more often
+        // Heuristics typically return 0.94-0.95 for good matches, so 0.98 threshold
+        // ensures LLM is used in most cases for semantic verification
+        if (topHeuristic.confidence >= 0.98) {
+          console.log(`[OntologyClassifier] Skipping LLM - heuristic confidence ${topHeuristic.confidence} >= 0.98 for class: ${topHeuristic.entityClass}`);
           return this.finalizeClassification(
             bestClassification,
             text,
@@ -123,14 +123,14 @@ export class OntologyClassifier {
             validationOptions
           );
         } else {
-          console.log(`[OntologyClassifier] Heuristic confidence ${topHeuristic.confidence} < 0.92, will try LLM for potential improvement`);
+          console.log(`[OntologyClassifier] Heuristic confidence ${topHeuristic.confidence} < 0.98, will try LLM for potential improvement`);
         }
       }
     }
 
     // Try LLM classification if enabled and heuristics didn't find high-confidence match
-    if (enableLLM && highestConfidence < 0.92) {
-      console.log(`[OntologyClassifier] Calling LLM - enableLLM=${enableLLM}, highestConfidence=${highestConfidence} < 0.92`);
+    if (enableLLM && highestConfidence < 0.98) {
+      console.log(`[OntologyClassifier] Calling LLM - enableLLM=${enableLLM}, highestConfidence=${highestConfidence} < 0.98`);
       const llmResult = await this.classifyWithLLM(text, team, llmBudget);
 
       if (llmResult) {
@@ -153,7 +153,7 @@ export class OntologyClassifier {
     } else if (!enableLLM) {
       console.log(`[OntologyClassifier] LLM disabled - using heuristic only`);
     } else {
-      console.log(`[OntologyClassifier] Skipping LLM - highestConfidence=${highestConfidence} >= 0.92`);
+      console.log(`[OntologyClassifier] Skipping LLM - highestConfidence=${highestConfidence} >= 0.98`);
     }
 
     // Check minimum confidence threshold
