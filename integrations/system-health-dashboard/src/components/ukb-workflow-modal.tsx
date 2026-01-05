@@ -399,9 +399,33 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
       const currentBatch = activeCurrentProcess.batchProgress?.currentBatch || 0
       const totalBatches = activeCurrentProcess.batchProgress?.totalBatches || 0
+      const completedSteps = activeCurrentProcess.completedSteps || 0
+      const totalSteps = activeCurrentProcess.totalSteps
+
+      // STEP-COUNT PROGRESS: Calculate weighted step-based progress as a floor
+      // This ensures progress never appears behind what's actually completed
+      let stepBasedProgress = 0
+      const isInFinalization = completedSteps > BATCH_STEP_COUNT ||
+                               (currentBatch === totalBatches && totalBatches > 0)
+
+      if (isInFinalization) {
+        // Finalization phase: 85% (all batches) + finalization progress × 15%
+        const finSteps = Math.max(0, completedSteps - BATCH_STEP_COUNT)
+        const totalFinSteps = Math.max(1, totalSteps - BATCH_STEP_COUNT)
+        stepBasedProgress = Math.round(
+          (BATCH_WEIGHT + (finSteps / totalFinSteps) * (1 - BATCH_WEIGHT)) * 100
+        )
+      } else if (totalBatches > 0 && currentBatch > 0) {
+        // Batch phase: progress = batch completion × 85%
+        stepBasedProgress = Math.round((currentBatch / totalBatches) * BATCH_WEIGHT * 100)
+      } else {
+        // Fallback: simple step percentage
+        stepBasedProgress = Math.round((completedSteps / totalSteps) * 100)
+      }
 
       // TIME-BASED PROGRESS: Use historical statistics when available (3+ samples)
       // Use MEDIAN instead of mean for robustness against outliers
+      let timeBasedProgress = 0
       if (hasReliableStats && workflowStats) {
         // Compute median batch duration from individual step medians
         let medianBatchMs = 0
@@ -440,45 +464,43 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         if (medianBatchMs > 0 && totalBatches > 0) {
           // Per-batch learning: estimate total time based on actual batch count
           const estimatedBatchPhaseMs = medianBatchMs * totalBatches
-          const estimatedTotalMs = estimatedBatchPhaseMs + medianFinalizationMs
+          let estimatedTotalMs = estimatedBatchPhaseMs + medianFinalizationMs
+
+          // SANITY CHECK: Cap estimated total to prevent inflated historical stats
+          // from showing unreasonably low progress. If we're in finalization and
+          // step-based shows >80%, estimated total shouldn't exceed 1.5x elapsed time.
+          if (isInFinalization && stepBasedProgress >= 80 && elapsedMs > 0) {
+            const maxReasonableTotal = elapsedMs * 1.5 // Expect completion within 50% more time
+            if (estimatedTotalMs > maxReasonableTotal) {
+              estimatedTotalMs = maxReasonableTotal
+            }
+          }
 
           // Calculate progress based on elapsed time vs estimated total
-          if (currentBatch > 0 && currentBatch <= totalBatches) {
-            // In batch phase
-            const estimatedProgressMs = Math.min(elapsedMs, estimatedTotalMs)
-            calculatedProgressPercent = Math.min(99, Math.round((estimatedProgressMs / estimatedTotalMs) * 100))
-            etaMs = Math.max(0, estimatedTotalMs - estimatedProgressMs)
-            usingTimeBased = true
-          } else if (activeCurrentProcess.completedSteps > BATCH_STEP_COUNT) {
-            // In finalization phase
-            calculatedProgressPercent = Math.min(99, Math.round((elapsedMs / estimatedTotalMs) * 100))
-            etaMs = Math.max(0, estimatedTotalMs - elapsedMs)
-            usingTimeBased = true
-          }
+          const estimatedProgressMs = Math.min(elapsedMs, estimatedTotalMs)
+          timeBasedProgress = Math.min(99, Math.round((estimatedProgressMs / estimatedTotalMs) * 100))
+          etaMs = Math.max(0, estimatedTotalMs - elapsedMs)
+          usingTimeBased = true
         }
       }
 
-      // STEP-COUNT FALLBACK: Use weighted step-based calculation
-      if (!usingTimeBased) {
-        if (activeCurrentProcess.batchProgress && totalBatches > 0) {
-          // During batch phase: progress = batch completion × 85%
-          calculatedProgressPercent = Math.round(
-            (currentBatch / totalBatches) * BATCH_WEIGHT * 100
-          )
-        } else if (activeCurrentProcess.completedSteps > BATCH_STEP_COUNT) {
-          // Finalization phase: 85% + finalization progress × 15%
-          const finSteps = activeCurrentProcess.completedSteps - BATCH_STEP_COUNT
-          const totalFinSteps = activeCurrentProcess.totalSteps - BATCH_STEP_COUNT
-          calculatedProgressPercent = Math.round(
-            (BATCH_WEIGHT + (finSteps / totalFinSteps) * (1 - BATCH_WEIGHT)) * 100
-          )
-        } else {
-          // Fallback for early stages or non-batch workflows
-          calculatedProgressPercent = Math.round(
-            (activeCurrentProcess.completedSteps / activeCurrentProcess.totalSteps) * 100
-          )
+      // HYBRID APPROACH: Use maximum of time-based and step-based progress
+      // This ensures progress never appears behind actual completion
+      if (usingTimeBased) {
+        calculatedProgressPercent = Math.max(timeBasedProgress, stepBasedProgress)
+        // If using step-based as floor, recalculate ETA based on step progress rate
+        if (stepBasedProgress > timeBasedProgress && elapsedMs > 0 && stepBasedProgress < 99) {
+          // Estimate remaining time based on how long the completed portion took
+          const progressPerMs = stepBasedProgress / elapsedMs
+          const remainingProgress = 100 - stepBasedProgress
+          etaMs = progressPerMs > 0 ? Math.round(remainingProgress / progressPerMs) : 0
         }
+      } else {
+        calculatedProgressPercent = stepBasedProgress
       }
+
+      // Cap at 99% until workflow actually completes
+      calculatedProgressPercent = Math.min(99, calculatedProgressPercent)
     }
 
     // Format ETA for display
@@ -625,7 +647,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               </div>
 
               {/* Center: Workflow Graph - key only changes on workflow identity, not step updates */}
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 h-full">
                 <UKBWorkflowGraph
                   key={`${activeCurrentProcess.pid}-${activeCurrentProcess.workflowName || 'workflow'}`}
                   process={activeCurrentProcess}
@@ -874,7 +896,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               </div>
             ) : historicalProcessInfo ? (
               <>
-                <div className="flex-1 min-w-0 min-h-0">
+                <div className="flex-1 min-w-0 min-h-0 h-full">
                   <UKBWorkflowGraph
                     process={historicalProcessInfo}
                     onNodeClick={handleHistoricalNodeClick}
