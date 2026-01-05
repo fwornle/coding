@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "lastUpdated": "2026-01-05T11:21:29.101Z",
+  "lastUpdated": "2026-01-05T17:36:49.201Z",
   "workflowTypes": {
     "batch-analysis": {
-      "sampleCount": 57,
-      "lastSampleDate": "2026-01-05T11:21:29.101Z",
+      "sampleCount": 58,
+      "lastSampleDate": "2026-01-05T17:36:49.201Z",
       "steps": {
         "plan_batches": {
           "avgDurationMs": 50,
@@ -463,9 +463,9 @@
           "isBatchStep": true
         }
       },
-      "avgBatchDurationMs": 2866,
-      "avgFinalizationDurationMs": 104786,
-      "avgTotalBatches": 17
+      "avgBatchDurationMs": 2293,
+      "avgFinalizationDurationMs": 83829,
+      "avgTotalBatches": 14
     },
     "complete-analysis": {
       "sampleCount": 20,
