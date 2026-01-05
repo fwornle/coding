@@ -1046,7 +1046,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           </TabsList>
         </Tabs>
 
-        <div className="min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           {activeTab === 'active' ? renderActiveContent() : renderHistoryContent()}
         </div>
       </DialogContent>
