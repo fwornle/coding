@@ -74,6 +74,15 @@ interface UKBWorkflowModalProps {
   apiBaseUrl?: string
 }
 
+// Helper to calculate median from an array of numbers (more robust than mean for outliers)
+function calculateMedian(values: number[]): number {
+  if (!values || values.length === 0) return 0
+  const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b)
+  if (sorted.length === 0) return 0
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
 export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBaseUrl = 'http://localhost:3033' }: UKBWorkflowModalProps) {
   const dispatch = useDispatch()
 
@@ -381,24 +390,53 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     let usingTimeBased = false
 
     if (activeCurrentProcess && activeCurrentProcess.totalSteps > 0) {
-      // Calculate elapsed time from completed steps
-      const elapsedMs = activeCurrentProcess.steps?.reduce((acc: number, step: any) => {
-        if (step.status === 'completed') return acc + (step.duration || 0)
-        return acc
-      }, 0) || 0
+      // Use actual wall clock elapsed time (not sum of current batch step durations!)
+      const elapsedMs = (activeCurrentProcess.elapsedSeconds || 0) * 1000
 
       const currentBatch = activeCurrentProcess.batchProgress?.currentBatch || 0
       const totalBatches = activeCurrentProcess.batchProgress?.totalBatches || 0
 
       // TIME-BASED PROGRESS: Use historical statistics when available (3+ samples)
+      // Use MEDIAN instead of mean for robustness against outliers
       if (hasReliableStats && workflowStats) {
-        const avgBatchMs = workflowStats.avgBatchDurationMs || 0
-        const avgFinalizationMs = workflowStats.avgFinalizationDurationMs || 0
+        // Compute median batch duration from individual step medians
+        let medianBatchMs = 0
+        let medianFinalizationMs = 0
 
-        if (avgBatchMs > 0 && totalBatches > 0) {
+        if (workflowStats.steps) {
+          // Sum median durations of batch steps (steps that run per batch)
+          const batchStepNames = Object.keys(workflowStats.steps).filter(
+            name => workflowStats.steps[name]?.isBatchStep
+          )
+          medianBatchMs = batchStepNames.reduce((sum, name) => {
+            const step = workflowStats.steps[name]
+            const median = step?.recentDurations?.length
+              ? calculateMedian(step.recentDurations)
+              : step?.avgDurationMs || 0
+            return sum + median
+          }, 0)
+
+          // Sum median durations of finalization steps (non-batch steps)
+          const finStepNames = Object.keys(workflowStats.steps).filter(
+            name => !workflowStats.steps[name]?.isBatchStep
+          )
+          medianFinalizationMs = finStepNames.reduce((sum, name) => {
+            const step = workflowStats.steps[name]
+            const median = step?.recentDurations?.length
+              ? calculateMedian(step.recentDurations)
+              : step?.avgDurationMs || 0
+            return sum + median
+          }, 0)
+        }
+
+        // Fallback to stored averages if computed medians are 0
+        if (medianBatchMs === 0) medianBatchMs = workflowStats.avgBatchDurationMs || 0
+        if (medianFinalizationMs === 0) medianFinalizationMs = workflowStats.avgFinalizationDurationMs || 0
+
+        if (medianBatchMs > 0 && totalBatches > 0) {
           // Per-batch learning: estimate total time based on actual batch count
-          const estimatedBatchPhaseMs = avgBatchMs * totalBatches
-          const estimatedTotalMs = estimatedBatchPhaseMs + avgFinalizationMs
+          const estimatedBatchPhaseMs = medianBatchMs * totalBatches
+          const estimatedTotalMs = estimatedBatchPhaseMs + medianFinalizationMs
 
           // Calculate progress based on elapsed time vs estimated total
           if (currentBatch > 0 && currentBatch <= totalBatches) {

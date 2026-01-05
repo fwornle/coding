@@ -11897,6 +11897,75 @@
       },
       "source": "manual",
       "classification": "coding"
+    },
+    {
+      "name": "SemanticinsightDecisionToUsePattern",
+      "entityType": "SemanticAnalyzer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "Decision to use a knowledge graph management system: The commit 'feat: comprehensive knowledge graph management system' (2025-05-31T06:58:09.000Z) demonstrates a deliberate decision to adopt a knowledge graph-based approach, which can provide a robust and scalable framework for managing knowledge.",
+          "date": "2026-01-05T08:26:26.968Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Insight derived from semantic analysis of git and conversation history",
+          "date": "2026-01-05T08:26:26.968Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Applies to similar software development projects with rich commit and conversation history",
+          "date": "2026-01-05T08:26:26.968Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-01-05T08:26:27.082Z",
+        "last_updated": "2026-01-05T08:26:27.082Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-01-05T08:26:26.968Z",
+          "last_updated": "2026-01-05T08:26:26.968Z",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.94
+          },
+          "classificationConfidence": 0.94,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "lenient"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-01-05T08:26:26.974Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-01-05T08:26:26.974Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
     }
   ],
   "relations": [
@@ -12259,9 +12328,9 @@
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-04T20:15:06.347Z",
+    "last_updated": "2026-01-05T08:29:54.061Z",
     "team": "coding",
-    "entity_count": 33,
+    "entity_count": 34,
     "relation_count": 51,
     "exported_by": "GraphDatabaseService",
     "export_version": "1.0"
