@@ -1425,9 +1425,9 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
 
   return (
     <TooltipProvider>
-      <div className="flex gap-4 w-full">
-        {/* Graph Container - contains scrollable SVG */}
-        <div className="flex-1 relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border overflow-auto max-h-[500px]">
+      <div className="flex gap-4 w-full h-full">
+        {/* Graph Container - contains scrollable SVG, fills available height */}
+        <div className="flex-1 relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border overflow-auto h-full">
           <svg
             width={gridWidth + padding * 2}
             height={gridHeight + padding * 2}
