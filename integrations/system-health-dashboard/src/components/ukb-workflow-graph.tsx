@@ -600,6 +600,19 @@ interface ProcessInfo {
     totalBatches: number
     batchId?: string
   }
+  // Batch iteration tracking for tracer visualization
+  batchIterations?: Array<{
+    batchId: string
+    batchNumber: number
+    startTime: string
+    endTime?: string
+    steps: Array<{
+      name: string
+      status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
+      duration?: number
+      outputs?: Record<string, any>
+    }>
+  }>
   // Multi-agent orchestration data from SmartOrchestrator
   multiAgent?: {
     stepConfidences: Record<string, number>
@@ -1759,14 +1772,24 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const isFailed = process.status === 'failed'
               const isCompleted = process.status === 'completed'
               const Icon = ORCHESTRATOR_NODE.icon
-              // Factor in batch progress for more accurate display
-              const progressPercent = process.totalSteps > 0
-                ? Math.round(
-                    process.batchProgress && process.batchProgress.totalBatches > 0
-                      ? ((Math.max(0, process.completedSteps - 1) + (process.batchProgress.currentBatch / process.batchProgress.totalBatches)) / process.totalSteps) * 100
-                      : (process.completedSteps / process.totalSteps) * 100
-                  )
-                : 0
+              // Calculate progress based on batch-weighted work distribution
+              const BATCH_STEP_COUNT = 14
+              const BATCH_WEIGHT = 0.85
+              let orchestratorProgress = 0
+              if (process.totalSteps > 0) {
+                if (process.batchProgress && process.batchProgress.totalBatches > 0) {
+                  // During batch phase: progress = batch completion × 85%
+                  orchestratorProgress = Math.round((process.batchProgress.currentBatch / process.batchProgress.totalBatches) * BATCH_WEIGHT * 100)
+                } else if (process.completedSteps > BATCH_STEP_COUNT) {
+                  // Finalization phase: 85% + finalization progress × 15%
+                  const finSteps = process.completedSteps - BATCH_STEP_COUNT
+                  const totalFinSteps = process.totalSteps - BATCH_STEP_COUNT
+                  orchestratorProgress = Math.round((BATCH_WEIGHT + (finSteps / totalFinSteps) * (1 - BATCH_WEIGHT)) * 100)
+                } else {
+                  orchestratorProgress = Math.round((process.completedSteps / process.totalSteps) * 100)
+                }
+              }
+              const progressPercent = orchestratorProgress
 
               return (
                 <Tooltip>
@@ -2306,16 +2329,35 @@ function OrchestratorDetailsSidebar({
     }
   }
 
-  // Calculate progress: factor in batch progress when available for more granular display
-  // If batch processing is active, treat it as partial progress within the current step
-  const progressPercent = process.totalSteps > 0
-    ? Math.round(
-        process.batchProgress && process.batchProgress.totalBatches > 0
-          // When batch processing: (completed steps - 1 + batch fraction) / total
-          ? ((Math.max(0, process.completedSteps - 1) + (process.batchProgress.currentBatch / process.batchProgress.totalBatches)) / process.totalSteps) * 100
-          : (process.completedSteps / process.totalSteps) * 100
-      )
-    : 0
+  // Calculate progress based on actual work distribution:
+  // - Batch phase (steps 1-14 running 23× each) = ~85% of total work
+  // - Finalization phase (steps 15-23 running once) = ~15% of total work
+  // At batch 5/23, we're ~22% done, not 57%!
+  const BATCH_STEP_COUNT = 14  // Steps that repeat per batch
+  const BATCH_WEIGHT = 0.85    // Batch phase is ~85% of total work
+
+  const progressPercent = useMemo(() => {
+    if (process.totalSteps === 0) return 0
+
+    // During batch phase: use batch progress as primary indicator
+    if (process.batchProgress && process.batchProgress.totalBatches > 0) {
+      const batchPhaseProgress = (process.batchProgress.currentBatch / process.batchProgress.totalBatches) * BATCH_WEIGHT
+      return Math.round(batchPhaseProgress * 100)
+    }
+
+    // In finalization phase (after all batches): batch phase done + finalization progress
+    if (process.completedSteps > BATCH_STEP_COUNT) {
+      const finalizationSteps = process.completedSteps - BATCH_STEP_COUNT
+      const totalFinalizationSteps = process.totalSteps - BATCH_STEP_COUNT
+      const finalizationProgress = totalFinalizationSteps > 0
+        ? (finalizationSteps / totalFinalizationSteps) * (1 - BATCH_WEIGHT)
+        : 0
+      return Math.round((BATCH_WEIGHT + finalizationProgress) * 100)
+    }
+
+    // Fallback for non-batch workflows or early stages
+    return Math.round((process.completedSteps / process.totalSteps) * 100)
+  }, [process.completedSteps, process.totalSteps, process.batchProgress])
 
   // Calculate total duration from steps
   const totalDuration = process.steps?.reduce((acc, step) => acc + (step.duration || 0), 0) || 0
@@ -2565,6 +2607,75 @@ function OrchestratorDetailsSidebar({
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Batch Iterations History */}
+        {process.batchIterations && process.batchIterations.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm flex items-center gap-1">
+                <Hash className="h-4 w-4" />
+                Batch Iterations ({process.batchIterations.length})
+              </h4>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {process.batchIterations.map((batch, batchIdx) => {
+                  const batchDuration = batch.endTime
+                    ? new Date(batch.endTime).getTime() - new Date(batch.startTime).getTime()
+                    : Date.now() - new Date(batch.startTime).getTime()
+                  const isCurrentBatch = !batch.endTime
+                  return (
+                    <details
+                      key={batch.batchId}
+                      className={`text-xs border rounded p-2 ${isCurrentBatch ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}
+                      open={isCurrentBatch || batchIdx === process.batchIterations!.length - 1}
+                    >
+                      <summary className="cursor-pointer flex items-center justify-between font-medium">
+                        <span className="flex items-center gap-1">
+                          {isCurrentBatch ? (
+                            <Loader2 className="h-3 w-3 text-blue-600 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          )}
+                          Batch {batch.batchNumber}
+                        </span>
+                        <span className="text-muted-foreground tabular-nums">
+                          {(batchDuration / 1000).toFixed(1)}s
+                        </span>
+                      </summary>
+                      <div className="mt-2 space-y-1 pl-4 border-l-2 border-gray-200">
+                        {batch.steps.map((step, stepIdx) => (
+                          <div
+                            key={stepIdx}
+                            className={`flex items-center justify-between py-0.5 ${
+                              step.status === 'completed' ? 'text-green-700' :
+                              step.status === 'failed' ? 'text-red-700' :
+                              step.status === 'running' ? 'text-blue-700' :
+                              step.status === 'skipped' ? 'text-yellow-700' :
+                              'text-gray-500'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1">
+                              {step.status === 'completed' && <CheckCircle2 className="h-2.5 w-2.5" />}
+                              {step.status === 'failed' && <XCircle className="h-2.5 w-2.5" />}
+                              {step.status === 'running' && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+                              {step.status === 'skipped' && <RefreshCw className="h-2.5 w-2.5" />}
+                              <span className="truncate max-w-[120px]">{step.name.replace(/_/g, ' ')}</span>
+                            </span>
+                            {step.duration !== undefined && (
+                              <span className="text-muted-foreground tabular-nums">
+                                {step.duration < 1000 ? `${step.duration}ms` : `${(step.duration / 1000).toFixed(1)}s`}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )
+                })}
               </div>
             </div>
           </>
