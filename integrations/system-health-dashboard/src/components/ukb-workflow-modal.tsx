@@ -65,6 +65,7 @@ import {
   type HistoricalWorkflow,
   type UKBProcess,
   type StepTimingStatistics,
+  type StepInfo,
 } from '@/store/slices/ukbSlice'
 
 interface UKBWorkflowModalProps {
@@ -1031,11 +1032,29 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         onOpenChange={setTraceModalOpen}
         steps={
           activeTab === 'active'
-            ? (currentProcess?.steps || []).map(s => ({
-                ...s,
-                // Use descriptive agent name from STEP_TO_AGENT mapping for display
-                name: STEP_TO_AGENT[s.name] || s.name,
-              }))
+            ? (() => {
+                // If we have batch iterations, flatten them into a comprehensive step list
+                // This shows each batch's steps individually for full traceability
+                if (currentProcess?.batchIterations && currentProcess.batchIterations.length > 0) {
+                  const flattenedSteps: StepInfo[] = []
+                  for (const batch of currentProcess.batchIterations) {
+                    for (const step of batch.steps) {
+                      flattenedSteps.push({
+                        name: `[${batch.batchId}] ${STEP_TO_AGENT[step.name] || step.name}`,
+                        status: step.status,
+                        duration: step.duration,
+                        outputs: step.outputs,
+                      })
+                    }
+                  }
+                  return flattenedSteps
+                }
+                // Fallback to high-level steps if no batch iterations
+                return (currentProcess?.steps || []).map(s => ({
+                  ...s,
+                  name: STEP_TO_AGENT[s.name] || s.name,
+                }))
+              })()
             : historicalWorkflowDetail?.steps?.map(s => ({
                 name: s.agent || s.name,
                 status: s.status === 'success' ? 'completed' : s.status as any,
