@@ -2947,6 +2947,35 @@ export function UKBNodeDetailsSidebar({
               </div>
             )}
 
+            {/* LLM Usage Details - show provider/model/token breakdown */}
+            {stepInfo?.outputs?.llmUsage && (
+              <div className="space-y-1 pt-1 border-t border-dashed mt-1">
+                {stepInfo.outputs.llmUsage.providersUsed?.length > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Provider</span>
+                    <span className="font-medium">{stepInfo.outputs.llmUsage.providersUsed.join(', ')}</span>
+                  </div>
+                )}
+                {stepInfo.outputs.llmUsage.modelsUsed?.length > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Model</span>
+                    <span className="font-mono text-[10px]">{stepInfo.outputs.llmUsage.modelsUsed.join(', ')}</span>
+                  </div>
+                )}
+                {stepInfo.outputs.llmUsage.totalTokens > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Tokens</span>
+                    <span>
+                      <span className="text-green-600">{(stepInfo.outputs.llmUsage.totalPromptTokens || 0).toLocaleString()}</span>
+                      <span className="text-muted-foreground mx-0.5">→</span>
+                      <span className="text-blue-600">{(stepInfo.outputs.llmUsage.totalCompletionTokens || 0).toLocaleString()}</span>
+                      <span className="text-muted-foreground ml-1">({stepInfo.outputs.llmUsage.totalTokens.toLocaleString()} total)</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Show message if no timing data yet */}
             {!stepInfo?.duration && inferredStatus === 'completed' && (
               <div className="text-xs text-muted-foreground italic">

@@ -265,8 +265,16 @@ export class OntologyClassifier {
       );
 
       if (classification) {
-        console.log(`[OntologyClassifier] Parsed LLM response: class=${classification.entityClass}, confidence=${classification.confidence}`);
-        debugLog('Parsed LLM response', { class: classification.entityClass, confidence: classification.confidence });
+        // Add LLM usage stats to classification result
+        classification.llmUsage = {
+          model: response.model,
+          provider: this.extractProviderFromModel(response.model),
+          promptTokens: response.usage?.promptTokens,
+          completionTokens: response.usage?.completionTokens,
+          totalTokens: response.usage ? (response.usage.promptTokens || 0) + (response.usage.completionTokens || 0) : undefined,
+        };
+        console.log(`[OntologyClassifier] Parsed LLM response: class=${classification.entityClass}, confidence=${classification.confidence}, model=${response.model}`);
+        debugLog('Parsed LLM response', { class: classification.entityClass, confidence: classification.confidence, llmUsage: classification.llmUsage });
       } else {
         console.log(`[OntologyClassifier] Failed to parse LLM response - content: ${response.content?.substring(0, 200)}...`);
         debugLog('Failed to parse LLM response', { content: response.content?.substring(0, 200) });
@@ -476,6 +484,45 @@ Respond with JSON containing the extracted properties. Only include properties t
     options: ClassificationOptions = {}
   ): Promise<Array<OntologyClassification | null>> {
     return Promise.all(texts.map((text) => this.classify(text, options)));
+  }
+
+  /**
+   * Extract provider name from model identifier
+   */
+  private extractProviderFromModel(model?: string): string | undefined {
+    if (!model) return undefined;
+
+    const modelLower = model.toLowerCase();
+
+    // Groq models
+    if (modelLower.includes('llama') && !modelLower.includes('ollama')) {
+      return 'groq';
+    }
+    if (modelLower.includes('mixtral') || modelLower.includes('gemma')) {
+      return 'groq';
+    }
+
+    // Ollama models (local)
+    if (modelLower.includes('ollama') || modelLower.startsWith('llama3.2')) {
+      return 'ollama';
+    }
+
+    // OpenAI models
+    if (modelLower.includes('gpt-') || modelLower.includes('o1-') || modelLower.includes('o3-')) {
+      return 'openai';
+    }
+
+    // Anthropic models
+    if (modelLower.includes('claude')) {
+      return 'anthropic';
+    }
+
+    // Google models
+    if (modelLower.includes('gemini') || modelLower.includes('palm')) {
+      return 'gemini';
+    }
+
+    return 'unknown';
   }
 
   /**
