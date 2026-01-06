@@ -79,9 +79,10 @@ export function TraceModal({
     let completedCount = 0
     let failedCount = 0
 
-    for (const step of steps) {
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i]
       const event: TraceEventUI = {
-        id: step.name,
+        id: `${i}-${step.name}`, // Unique ID combining index and name to handle batch duplicates
         name: step.name.replace(/_/g, ' '),
         status: step.status,
         duration: step.duration,

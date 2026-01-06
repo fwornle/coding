@@ -213,6 +213,26 @@ export interface PropertyValidationResult {
 // ============================================================================
 
 /**
+ * LLM usage statistics for classification
+ */
+export interface LLMUsageStats {
+  /** Model used for inference */
+  model?: string;
+
+  /** Provider used (groq, ollama, gemini, etc.) */
+  provider?: string;
+
+  /** Input/prompt tokens consumed */
+  promptTokens?: number;
+
+  /** Output/completion tokens generated */
+  completionTokens?: number;
+
+  /** Total tokens (prompt + completion) */
+  totalTokens?: number;
+}
+
+/**
  * Ontology classification result
  */
 export interface OntologyClassification {
@@ -233,6 +253,9 @@ export interface OntologyClassification {
 
   /** Validation result if validation was performed */
   validation?: ValidationResult;
+
+  /** LLM usage statistics (when method is 'llm' or 'hybrid') */
+  llmUsage?: LLMUsageStats;
 }
 
 /**

@@ -62,6 +62,7 @@ class SystemHealthAPIServer {
         this.app = express();
         this.server = null;
         this.lastAutoVerifyTime = null; // Track last auto-triggered verification to rate limit
+        this.lastValidWorkflowProgress = null; // Cache for last valid workflow progress (to avoid 0/0 race conditions)
 
         this.setupMiddleware();
         this.setupRoutes();
@@ -617,13 +618,31 @@ class SystemHealthAPIServer {
 
                 if (isRelevant && !alreadyRegistered) {
                     // Guard against partial reads that result in 0/0 (race condition during file writes)
-                    const completedSteps = workflowProgress.completedSteps || 0;
-                    const totalSteps = workflowProgress.totalSteps || 0;
+                    let completedSteps = workflowProgress.completedSteps || 0;
+                    let totalSteps = workflowProgress.totalSteps || 0;
 
-                    // Skip if we got invalid data (0/0 is not valid for a running workflow)
-                    if (totalSteps === 0 && inferredStatus === 'running') {
-                        console.warn('Skipping inline process update - got 0/0 steps (likely partial read)');
-                        // Still add the process but mark it as stale to avoid 0/0 display
+                    // Check if we got invalid data (0/0 is not valid for a running workflow)
+                    const isRaceCondition = totalSteps === 0 && inferredStatus === 'running';
+
+                    if (isRaceCondition) {
+                        // Use cached values from last valid read if available
+                        if (this.lastValidWorkflowProgress &&
+                            this.lastValidWorkflowProgress.workflowName === workflowProgress.workflowName &&
+                            this.lastValidWorkflowProgress.totalSteps > 0) {
+                            console.log('Using cached progress data (race condition detected - got 0/0 steps)');
+                            completedSteps = this.lastValidWorkflowProgress.completedSteps;
+                            totalSteps = this.lastValidWorkflowProgress.totalSteps;
+                        } else {
+                            console.warn('Race condition detected (0/0 steps) but no valid cache available');
+                        }
+                    } else if (totalSteps > 0) {
+                        // Cache this valid progress for future race condition recovery
+                        this.lastValidWorkflowProgress = {
+                            workflowName: workflowProgress.workflowName,
+                            completedSteps: completedSteps,
+                            totalSteps: totalSteps,
+                            timestamp: Date.now()
+                        };
                     }
 
                     // Add a synthetic process entry for the inline MCP workflow
