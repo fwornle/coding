@@ -21,6 +21,7 @@ import { OntologyManager } from './OntologyManager.js';
 import { OntologyValidator } from './OntologyValidator.js';
 import { HeuristicClassifier } from './heuristics/HeuristicClassifier.js';
 import { ontologyMetrics, startTimer } from './metrics.js';
+import { SemanticAnalyzer } from '../agents/semantic-analyzer.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -265,14 +266,29 @@ export class OntologyClassifier {
       );
 
       if (classification) {
+        const provider = this.extractProviderFromModel(response.model);
+        const inputTokens = response.usage?.promptTokens || 0;
+        const outputTokens = response.usage?.completionTokens || 0;
+        const totalTokens = inputTokens + outputTokens;
+
         // Add LLM usage stats to classification result
         classification.llmUsage = {
           model: response.model,
-          provider: this.extractProviderFromModel(response.model),
-          promptTokens: response.usage?.promptTokens,
-          completionTokens: response.usage?.completionTokens,
-          totalTokens: response.usage ? (response.usage.promptTokens || 0) + (response.usage.completionTokens || 0) : undefined,
+          provider,
+          promptTokens: inputTokens,
+          completionTokens: outputTokens,
+          totalTokens,
         };
+
+        // Record metrics with SemanticAnalyzer for unified step-level tracking
+        SemanticAnalyzer.recordMetricsFromExternal({
+          provider: provider || 'unknown',
+          model: response.model || 'unknown',
+          inputTokens,
+          outputTokens,
+          totalTokens,
+        });
+
         console.log(`[OntologyClassifier] Parsed LLM response: class=${classification.entityClass}, confidence=${classification.confidence}, model=${response.model}`);
         debugLog('Parsed LLM response', { class: classification.entityClass, confidence: classification.confidence, llmUsage: classification.llmUsage });
       } else {
