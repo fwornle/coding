@@ -272,14 +272,16 @@ export function MultiAgentGraph({
 
   // Auto-expand substeps when a multi-step agent starts running
   useEffect(() => {
-    // Find any running agent that has substeps defined
-    const runningAgentWithSubsteps = process.steps?.find(step => {
-      const agentId = step.name
+    // Find any running step whose agent has substeps defined
+    const runningStepWithSubsteps = process.steps?.find(step => {
+      // Map step name to agent ID using STEP_TO_AGENT
+      const agentId = STEP_TO_AGENT[step.name] || step.name
       return step.status === 'running' && AGENT_SUBSTEPS[agentId]
     })
 
-    if (runningAgentWithSubsteps) {
-      const agentId = runningAgentWithSubsteps.name
+    if (runningStepWithSubsteps) {
+      // Map step name to agent ID
+      const agentId = STEP_TO_AGENT[runningStepWithSubsteps.name] || runningStepWithSubsteps.name
       // Auto-expand if not already expanded (don't override user's manual toggle)
       if (expandedSubStepsAgent !== agentId) {
         setExpandedSubStepsAgent(agentId)
@@ -288,9 +290,11 @@ export function MultiAgentGraph({
     } else if (autoExpandedAgent) {
       // Collapse if we auto-expanded and agent is no longer running
       const wasAutoExpanded = expandedSubStepsAgent === autoExpandedAgent
-      const agentStillRunning = process.steps?.some(
-        s => s.name === autoExpandedAgent && s.status === 'running'
-      )
+      // Check if any step mapping to this agent is still running
+      const agentStillRunning = process.steps?.some(s => {
+        const stepAgentId = STEP_TO_AGENT[s.name] || s.name
+        return stepAgentId === autoExpandedAgent && s.status === 'running'
+      })
       if (wasAutoExpanded && !agentStillRunning) {
         setExpandedSubStepsAgent(null)
         setAutoExpandedAgent(null)
@@ -821,10 +825,11 @@ export function MultiAgentGraph({
               const startAngle = -150
               const arcPerStep = (totalArc - (substeps.length - 1) * arcSpacing) / substeps.length
 
-              // Check if this agent is currently running
-              const isAgentRunning = process.steps?.some(
-                s => s.name === expandedSubStepsAgent && s.status === 'running'
-              )
+              // Check if this agent is currently running (map step names to agent IDs)
+              const isAgentRunning = process.steps?.some(s => {
+                const stepAgentId = STEP_TO_AGENT[s.name] || s.name
+                return stepAgentId === expandedSubStepsAgent && s.status === 'running'
+              })
 
               return substeps.map((substep, idx) => {
                 const angleStart = startAngle + idx * (arcPerStep + arcSpacing)
@@ -893,9 +898,10 @@ export function MultiAgentGraph({
             {(() => {
               const position = layout.positions.find(p => p.agent.id === expandedSubStepsAgent)
               if (!position) return null
-              const isAgentRunning = process.steps?.some(
-                s => s.name === expandedSubStepsAgent && s.status === 'running'
-              )
+              const isAgentRunning = process.steps?.some(s => {
+                const stepAgentId = STEP_TO_AGENT[s.name] || s.name
+                return stepAgentId === expandedSubStepsAgent && s.status === 'running'
+              })
               if (!isAgentRunning) return null
 
               const { x, y } = position
