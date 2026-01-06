@@ -2785,15 +2785,8 @@ export function UKBNodeDetailsSidebar({
   onClose: () => void
   aggregatedSteps?: AggregatedSteps | null
 }) {
-  // Handle orchestrator node specially
-  if (agentId === 'orchestrator') {
-    return <OrchestratorDetailsSidebar process={process} onClose={onClose} />
-  }
-
+  // Compute all values unconditionally to ensure hooks are called consistently
   const agent = WORKFLOW_AGENTS.find(a => a.id === agentId)
-  if (!agent) return null
-
-  const Icon = agent.icon
   const stepInfo = process.steps?.find(s => STEP_TO_AGENT[s.name] === agentId || s.name === agentId)
 
   // Use same fallback logic as getNodeStatus in the graph
@@ -2819,8 +2812,10 @@ export function UKBNodeDetailsSidebar({
 
   const inferredStatus = getInferredStatus()
 
-  // Log when agent sidebar is displayed
+  // Log when agent sidebar is displayed - useEffect must be called unconditionally (Rules of Hooks)
   useEffect(() => {
+    // Only log for non-orchestrator agents that exist
+    if (agentId === 'orchestrator' || !agent) return
     Logger.info(LogCategories.AGENT, `Agent sidebar opened: ${agent.name} (${agentId})`, {
       agentId,
       agentName: agent.name,
@@ -2849,7 +2844,17 @@ export function UKBNodeDetailsSidebar({
         error: stepInfo.error,
       })
     }
-  }, [agentId, agent.name, inferredStatus, stepInfo, agent.llmModel, agent.techStack, process.workflowName])
+  }, [agentId, agent?.name, inferredStatus, stepInfo, agent?.llmModel, agent?.techStack, process.workflowName])
+
+  // Handle orchestrator node specially - after hooks
+  if (agentId === 'orchestrator') {
+    return <OrchestratorDetailsSidebar process={process} onClose={onClose} />
+  }
+
+  // Return null for unknown agents - after hooks
+  if (!agent) return null
+
+  const Icon = agent.icon
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -2947,19 +2952,30 @@ export function UKBNodeDetailsSidebar({
               </div>
             )}
 
-            {/* LLM Usage Details - show provider/model/token breakdown */}
+            {/* LLM Usage Details - show model by provider and token breakdown */}
             {stepInfo?.outputs?.llmUsage && (
               <div className="space-y-1 pt-1 border-t border-dashed mt-1">
-                {stepInfo.outputs.llmUsage.providersUsed?.length > 0 && (
+                {/* Combined LLM display: model by provider */}
+                {(stepInfo.outputs.llmUsage.modelsUsed?.length > 0 || stepInfo.outputs.llmUsage.providersUsed?.length > 0) && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Provider</span>
-                    <span className="font-medium">{stepInfo.outputs.llmUsage.providersUsed.join(', ')}</span>
-                  </div>
-                )}
-                {stepInfo.outputs.llmUsage.modelsUsed?.length > 0 && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Model</span>
-                    <span className="font-mono text-[10px]">{stepInfo.outputs.llmUsage.modelsUsed.join(', ')}</span>
+                    <span className="text-muted-foreground">LLM</span>
+                    <span className="font-mono text-[10px] text-right max-w-[180px]">
+                      {(() => {
+                        const models = stepInfo.outputs.llmUsage.modelsUsed || []
+                        const providers = stepInfo.outputs.llmUsage.providersUsed || []
+                        if (models.length > 0 && providers.length > 0) {
+                          // Format: model by provider (e.g., "llama-3.3-70b by groq")
+                          return models.map((m: string, i: number) =>
+                            `${m}${providers[i] ? ` by ${providers[i]}` : ''}`
+                          ).join(', ')
+                        } else if (models.length > 0) {
+                          return models.join(', ')
+                        } else if (providers.length > 0) {
+                          return providers.join(', ')
+                        }
+                        return 'unknown'
+                      })()}
+                    </span>
                   </div>
                 )}
                 {stepInfo.outputs.llmUsage.totalTokens > 0 && (

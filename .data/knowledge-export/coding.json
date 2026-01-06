@@ -2192,12 +2192,12 @@
     },
     {
       "name": "SemanticinsightPromiseHandlesAsynchronousPattern",
-      "entityType": "SemanticAnalyzer",
+      "entityType": "Insight",
       "observations": [
         {
           "type": "insight",
           "content": "promise: Handles asynchronous operations",
-          "date": "2026-01-04T15:24:37.113Z",
+          "date": "2026-01-06T12:12:38.029Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -2205,7 +2205,7 @@
         {
           "type": "insight",
           "content": "Insight derived from semantic analysis of git and conversation history",
-          "date": "2026-01-04T15:24:37.113Z",
+          "date": "2026-01-06T12:12:38.029Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -2213,7 +2213,7 @@
         {
           "type": "insight",
           "content": "Applies to similar software development projects with rich commit and conversation history",
-          "date": "2026-01-04T15:24:37.113Z",
+          "date": "2026-01-06T12:12:38.029Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -2222,7 +2222,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-04T15:24:37.120Z",
-        "last_updated": "2026-01-04T15:24:37.120Z"
+        "last_updated": "2026-01-06T12:12:51.201Z"
       },
       "id": "mc4flkglhm9h6"
     },
@@ -2876,18 +2876,20 @@
         "Handles external communication (commit: 5cde8a03)",
         "Files: 41, Impact: medium, Commit: 5cde8a03",
         "Handles external communication (commit: 5579d141)",
-        "Files: 49, Impact: medium, Commit: 5579d141"
+        "Files: 49, Impact: medium, Commit: 5579d141",
+        "Handles external communication (commit: 52422ff0)",
+        "Files: 25, Impact: medium, Commit: 52422ff0"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:07.802Z",
-        "last_updated": "2026-01-06T12:08:48.051Z"
+        "last_updated": "2026-01-06T13:58:53.008Z"
       },
       "id": "mc4flkg8f9hrrq"
     },
     {
       "name": "RepositoryEncapsulatesDataAccessPattern",
-      "entityType": "AnalysisArtifact",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "insight",
@@ -3171,12 +3173,13 @@
         "Similar repository decisions in Markdown, JavaScript, JSON, TypeScript projects",
         "Files: 30, Impact: medium, Commit: 5cde8a03",
         "Files: 29, Impact: medium, Commit: 5579d141",
-        "Files: 29, Impact: low, Commit: 5ea43dbe"
+        "Files: 29, Impact: low, Commit: 5ea43dbe",
+        "Files: 22, Impact: medium, Commit: 52422ff0"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:41.369Z",
-        "last_updated": "2026-01-06T12:09:57.295Z"
+        "last_updated": "2026-01-06T13:59:02.902Z"
       },
       "id": "mc4flkg8fcjz12"
     },
@@ -3186,8 +3189,48 @@
       "observations": [
         {
           "type": "insight",
+          "content": "component architectural decision involving 22 files with low impact",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Reusable UI building blocks (commit: c3006d0e)",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component changes require careful coordination across 22 files",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Similar component decisions in Markdown, JSON, JavaScript projects",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 22, Impact: low, Commit: c3006d0e",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
           "content": "component architectural decision involving 1 files with low impact",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3195,7 +3238,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: e87ade99)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3203,7 +3246,7 @@
         {
           "type": "insight",
           "content": "component changes require careful coordination across 1 files",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3211,7 +3254,7 @@
         {
           "type": "insight",
           "content": "Similar component decisions in  projects",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3219,7 +3262,7 @@
         {
           "type": "insight",
           "content": "Files: 1, Impact: low, Commit: e87ade99",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3227,7 +3270,7 @@
         {
           "type": "insight",
           "content": "component architectural decision involving 6 files with low impact",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3235,7 +3278,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: 39859f62)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3243,7 +3286,7 @@
         {
           "type": "insight",
           "content": "component changes require careful coordination across 6 files",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3251,7 +3294,7 @@
         {
           "type": "insight",
           "content": "Similar component decisions in Markdown, JavaScript projects",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3259,7 +3302,7 @@
         {
           "type": "insight",
           "content": "Files: 6, Impact: low, Commit: 39859f62",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3267,7 +3310,7 @@
         {
           "type": "insight",
           "content": "component architectural decision involving 7 files with medium impact",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3275,7 +3318,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: 00467eb4)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3283,7 +3326,7 @@
         {
           "type": "insight",
           "content": "component changes require careful coordination across 7 files",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3291,7 +3334,7 @@
         {
           "type": "insight",
           "content": "Files: 7, Impact: medium, Commit: 00467eb4",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3299,7 +3342,7 @@
         {
           "type": "insight",
           "content": "component architectural decision involving 10 files with low impact",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3307,7 +3350,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: 9967b1a1)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3315,7 +3358,7 @@
         {
           "type": "insight",
           "content": "component changes require careful coordination across 10 files",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3323,7 +3366,7 @@
         {
           "type": "insight",
           "content": "Similar component decisions in JavaScript, Markdown projects",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3331,7 +3374,7 @@
         {
           "type": "insight",
           "content": "Files: 10, Impact: low, Commit: 9967b1a1",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3339,7 +3382,7 @@
         {
           "type": "insight",
           "content": "component architectural decision involving 3 files with low impact",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3347,7 +3390,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: c6c10f70)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3355,7 +3398,7 @@
         {
           "type": "insight",
           "content": "component changes require careful coordination across 3 files",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3363,7 +3406,7 @@
         {
           "type": "insight",
           "content": "Files: 3, Impact: low, Commit: c6c10f70",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3371,7 +3414,7 @@
         {
           "type": "insight",
           "content": "component architectural decision involving 2 files with low impact",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3379,7 +3422,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: 03aa8507)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3387,7 +3430,7 @@
         {
           "type": "insight",
           "content": "component changes require careful coordination across 2 files",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3395,7 +3438,7 @@
         {
           "type": "insight",
           "content": "Similar component decisions in JavaScript projects",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3403,7 +3446,7 @@
         {
           "type": "insight",
           "content": "Files: 2, Impact: low, Commit: 03aa8507",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3411,7 +3454,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: d1db0662)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3419,15 +3462,15 @@
         {
           "type": "insight",
           "content": "Files: 1, Impact: low, Commit: d1db0662",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
         {
           "type": "insight",
-          "content": "component architectural decision involving 17 files with medium impact",
-          "date": "2026-01-06T11:48:41.375Z",
+          "content": "component architectural decision involving 18 files with medium impact",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3435,31 +3478,31 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: d6e71f25)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
         {
           "type": "insight",
-          "content": "component changes require careful coordination across 17 files",
-          "date": "2026-01-06T11:48:41.375Z",
+          "content": "component changes require careful coordination across 18 files",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
         {
           "type": "insight",
-          "content": "Similar component decisions in Markdown, JavaScript, JSON projects",
-          "date": "2026-01-06T11:48:41.375Z",
+          "content": "Similar component decisions in JSON, Markdown, JavaScript projects",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
         {
           "type": "insight",
-          "content": "Files: 17, Impact: medium, Commit: d6e71f25",
-          "date": "2026-01-06T11:48:41.375Z",
+          "content": "Files: 18, Impact: medium, Commit: d6e71f25",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3467,7 +3510,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: 6a6f0395)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3475,7 +3518,7 @@
         {
           "type": "insight",
           "content": "Files: 1, Impact: low, Commit: 6a6f0395",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3483,7 +3526,7 @@
         {
           "type": "insight",
           "content": "component architectural decision involving 4 files with low impact",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3491,7 +3534,7 @@
         {
           "type": "insight",
           "content": "Reusable UI building blocks (commit: 1fe71916)",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3499,7 +3542,7 @@
         {
           "type": "insight",
           "content": "component changes require careful coordination across 4 files",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3507,7 +3550,7 @@
         {
           "type": "insight",
           "content": "Similar component decisions in JavaScript, JSON projects",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -3515,25 +3558,203 @@
         {
           "type": "insight",
           "content": "Files: 4, Impact: low, Commit: 1fe71916",
-          "date": "2026-01-06T11:48:41.375Z",
+          "date": "2026-01-06T13:50:39.606Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
-        "Reusable UI building blocks (commit: fa5b8ae9)",
-        "Files: 45, Impact: medium, Commit: fa5b8ae9",
-        "Reusable UI building blocks (commit: fba3b7f8)",
-        "Files: 61, Impact: medium, Commit: fba3b7f8",
-        "Reusable UI building blocks (commit: 2bd52dc4)",
-        "Files: 36, Impact: medium, Commit: 2bd52dc4",
-        "Reusable UI building blocks (commit: 7fa7f1bf)",
-        "Files: 40, Impact: medium, Commit: 7fa7f1bf",
-        "Reusable UI building blocks (commit: 564b421e)",
-        "Files: 59, Impact: medium, Commit: 564b421e",
-        "Reusable UI building blocks (commit: 6e617b84)",
-        "Files: 30, Impact: low, Commit: 6e617b84",
-        "Reusable UI building blocks (commit: c3006d0e)",
-        "Files: 22, Impact: low, Commit: c3006d0e",
+        {
+          "type": "insight",
+          "content": "component architectural decision involving 45 files with medium impact",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Reusable UI building blocks (commit: fa5b8ae9)",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component changes require careful coordination across 45 files",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 45, Impact: medium, Commit: fa5b8ae9",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component architectural decision involving 61 files with medium impact",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Reusable UI building blocks (commit: fba3b7f8)",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component changes require careful coordination across 61 files",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 61, Impact: medium, Commit: fba3b7f8",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component architectural decision involving 36 files with medium impact",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Reusable UI building blocks (commit: 2bd52dc4)",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component changes require careful coordination across 36 files",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 36, Impact: medium, Commit: 2bd52dc4",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component architectural decision involving 40 files with medium impact",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Reusable UI building blocks (commit: 7fa7f1bf)",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component changes require careful coordination across 40 files",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 40, Impact: medium, Commit: 7fa7f1bf",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component architectural decision involving 59 files with medium impact",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Reusable UI building blocks (commit: 564b421e)",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component changes require careful coordination across 59 files",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 59, Impact: medium, Commit: 564b421e",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component architectural decision involving 30 files with low impact",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Reusable UI building blocks (commit: 6e617b84)",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "component changes require careful coordination across 30 files",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 30, Impact: low, Commit: 6e617b84",
+          "date": "2026-01-06T13:50:39.606Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
         "Reusable UI building blocks (commit: 5cde8a03)",
         "Files: 33, Impact: medium, Commit: 5cde8a03",
         "Reusable UI building blocks (commit: 5579d141)",
@@ -3542,12 +3763,12 @@
         "Similar component decisions in JavaScript, Markdown, JSON, TypeScript projects",
         "Files: 35, Impact: medium, Commit: 5ea43dbe",
         "Reusable UI building blocks (commit: 52422ff0)",
-        "Files: 27, Impact: medium, Commit: 52422ff0"
+        "Files: 29, Impact: medium, Commit: 52422ff0"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:52.821Z",
-        "last_updated": "2026-01-06T12:10:40.248Z"
+        "last_updated": "2026-01-06T13:57:53.199Z"
       },
       "id": "mc4flkg1t4zsw0"
     },
@@ -3654,18 +3875,19 @@
         "Files: 17, Impact: low, Commit: c3006d0e",
         "Files: 34, Impact: medium, Commit: 5cde8a03",
         "Files: 33, Impact: medium, Commit: 5579d141",
-        "Files: 31, Impact: medium, Commit: 5ea43dbe"
+        "Files: 31, Impact: medium, Commit: 5ea43dbe",
+        "Files: 11, Impact: low, Commit: 52422ff0"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:11.546Z",
-        "last_updated": "2026-01-06T12:09:45.180Z"
+        "last_updated": "2026-01-06T13:52:48.320Z"
       },
       "id": "mc4flkg49raoty"
     },
     {
       "name": "PromiseHandlesAsynchronousOperationsPattern",
-      "entityType": "Insight",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "insight",
@@ -4016,12 +4238,14 @@
         "Handles asynchronous operations (commit: 5579d141)",
         "Files: 43, Impact: medium, Commit: 5579d141",
         "Handles asynchronous operations (commit: 5ea43dbe)",
-        "Files: 41, Impact: medium, Commit: 5ea43dbe"
+        "Files: 41, Impact: medium, Commit: 5ea43dbe",
+        "Handles asynchronous operations (commit: 52422ff0)",
+        "Files: 26, Impact: medium, Commit: 52422ff0"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:22.012Z",
-        "last_updated": "2026-01-06T12:09:20.103Z"
+        "last_updated": "2026-01-06T13:56:27.459Z"
       },
       "id": "mc4flkgrb6pg4"
     },
@@ -4383,18 +4607,20 @@
         "Files: 44, Impact: high, Commit: 5cde8a03",
         "Contains business logic (commit: 5579d141)",
         "Files: 43, Impact: medium, Commit: 5579d141",
-        "Contains business logic (commit: 5ea43dbe)"
+        "Contains business logic (commit: 5ea43dbe)",
+        "Contains business logic (commit: 52422ff0)",
+        "Files: 19, Impact: medium, Commit: 52422ff0"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:33.610Z",
-        "last_updated": "2026-01-06T12:09:08.390Z"
+        "last_updated": "2026-01-06T13:54:31.997Z"
       },
       "id": "mc4flkggu4sm2"
     },
     {
       "name": "MiddlewareProcessesRequestsInPattern",
-      "entityType": "Insight",
+      "entityType": "AnalysisArtifact",
       "observations": [
         {
           "type": "insight",
@@ -4584,12 +4810,15 @@
         "Processes requests in a pipeline (commit: 5579d141)",
         "Files: 13, Impact: low, Commit: 5579d141",
         "Processes requests in a pipeline (commit: 5ea43dbe)",
-        "Files: 6, Impact: low, Commit: 5ea43dbe"
+        "Files: 6, Impact: low, Commit: 5ea43dbe",
+        "Processes requests in a pipeline (commit: 52422ff0)",
+        "Files: 6, Impact: low, Commit: 52422ff0",
+        "Similar middleware decisions in Markdown, JavaScript, JSON projects"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:43.826Z",
-        "last_updated": "2026-01-06T12:10:11.338Z"
+        "last_updated": "2026-01-06T13:51:31.107Z"
       },
       "id": "mc4flkg234nsck"
     },
@@ -4599,304 +4828,8 @@
       "observations": [
         {
           "type": "insight",
-          "content": "factory architectural decision involving 1 files with low impact",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: 39859f62)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory changes require careful coordination across 1 files",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Similar factory decisions in JavaScript projects",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 1, Impact: low, Commit: 39859f62",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory architectural decision involving 2 files with low impact",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: 00467eb4)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory changes require careful coordination across 2 files",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Similar factory decisions in JavaScript, Markdown projects",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 2, Impact: low, Commit: 00467eb4",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory architectural decision involving 3 files with low impact",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: 9967b1a1)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory changes require careful coordination across 3 files",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 3, Impact: low, Commit: 9967b1a1",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: c6c10f70)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 3, Impact: low, Commit: c6c10f70",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: 03aa8507)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 2, Impact: low, Commit: 03aa8507",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: 1fe71916)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 1, Impact: low, Commit: 1fe71916",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory architectural decision involving 10 files with low impact",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: fa5b8ae9)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory changes require careful coordination across 10 files",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Similar factory decisions in Markdown projects",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 10, Impact: low, Commit: fa5b8ae9",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory architectural decision involving 13 files with low impact",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: fba3b7f8)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory changes require careful coordination across 13 files",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 13, Impact: low, Commit: fba3b7f8",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory architectural decision involving 5 files with low impact",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: 2bd52dc4)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory changes require careful coordination across 5 files",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Similar factory decisions in Markdown, JavaScript projects",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 5, Impact: low, Commit: 2bd52dc4",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
           "content": "factory architectural decision involving 9 files with low impact",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: 7fa7f1bf)",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "factory changes require careful coordination across 9 files",
-          "date": "2026-01-06T11:49:43.838Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "Files: 9, Impact: low, Commit: 7fa7f1bf",
-          "date": "2026-01-06T11:49:43.838Z",
+          "date": "2026-01-06T13:03:13.383Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -4904,7 +4837,23 @@
         {
           "type": "insight",
           "content": "Creates objects without specifying exact classes (commit: 564b421e)",
-          "date": "2026-01-06T11:49:43.838Z",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory changes require careful coordination across 9 files",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Similar factory decisions in Markdown, JavaScript projects",
+          "date": "2026-01-06T13:03:13.383Z",
           "metadata": {
             "source": "workflow_persist"
           }
@@ -4912,58 +4861,308 @@
         {
           "type": "insight",
           "content": "Files: 9, Impact: low, Commit: 564b421e",
-          "date": "2026-01-06T11:49:43.838Z",
+          "date": "2026-01-06T13:03:13.383Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
         {
           "type": "insight",
-          "content": "factory architectural decision involving 8 files with low impact",
-          "date": "2026-01-06T11:49:43.838Z",
+          "content": "factory architectural decision involving 1 files with low impact",
+          "date": "2026-01-06T13:03:13.383Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
         {
           "type": "insight",
-          "content": "Creates objects without specifying exact classes (commit: 6e617b84)",
-          "date": "2026-01-06T11:49:43.838Z",
+          "content": "Creates objects without specifying exact classes (commit: 39859f62)",
+          "date": "2026-01-06T13:03:13.383Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
         {
           "type": "insight",
-          "content": "factory changes require careful coordination across 8 files",
-          "date": "2026-01-06T11:49:43.838Z",
+          "content": "factory changes require careful coordination across 1 files",
+          "date": "2026-01-06T13:03:13.383Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
         {
           "type": "insight",
-          "content": "Files: 8, Impact: low, Commit: 6e617b84",
-          "date": "2026-01-06T11:49:43.838Z",
+          "content": "Similar factory decisions in JavaScript projects",
+          "date": "2026-01-06T13:03:13.383Z",
           "metadata": {
             "source": "workflow_persist"
           }
         },
+        {
+          "type": "insight",
+          "content": "Files: 1, Impact: low, Commit: 39859f62",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory architectural decision involving 2 files with low impact",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: 00467eb4)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory changes require careful coordination across 2 files",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Similar factory decisions in JavaScript, Markdown projects",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 2, Impact: low, Commit: 00467eb4",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory architectural decision involving 3 files with low impact",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: 9967b1a1)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory changes require careful coordination across 3 files",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 3, Impact: low, Commit: 9967b1a1",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: c6c10f70)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 3, Impact: low, Commit: c6c10f70",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: 03aa8507)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 2, Impact: low, Commit: 03aa8507",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: 1fe71916)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 1, Impact: low, Commit: 1fe71916",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory architectural decision involving 10 files with low impact",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: fa5b8ae9)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory changes require careful coordination across 10 files",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Similar factory decisions in Markdown projects",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 10, Impact: low, Commit: fa5b8ae9",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory architectural decision involving 13 files with low impact",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: fba3b7f8)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory changes require careful coordination across 13 files",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 13, Impact: low, Commit: fba3b7f8",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory architectural decision involving 5 files with low impact",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: 2bd52dc4)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "factory changes require careful coordination across 5 files",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 5, Impact: low, Commit: 2bd52dc4",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes (commit: 7fa7f1bf)",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Files: 9, Impact: low, Commit: 7fa7f1bf",
+          "date": "2026-01-06T13:03:13.383Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        "Files: 8, Impact: low, Commit: 6e617b84",
         "Similar factory decisions in Markdown, JavaScript, TypeScript projects",
         "Files: 8, Impact: low, Commit: 5cde8a03",
         "Files: 6, Impact: low, Commit: 5579d141",
-        "Files: 3, Impact: low, Commit: 5ea43dbe"
+        "Files: 3, Impact: low, Commit: 5ea43dbe",
+        "Files: 2, Impact: low, Commit: 52422ff0"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:50:33.041Z",
-        "last_updated": "2026-01-06T12:10:20.203Z"
+        "last_updated": "2026-01-06T13:59:53.607Z"
       },
       "id": "mc4flkg6ndkqb3"
     },
     {
       "name": "ObserverDefinesOnetomanyDependencyPattern",
-      "entityType": "Pattern",
+      "entityType": "Insight",
       "observations": [
         {
           "type": "insight",
@@ -5054,12 +5253,14 @@
         "Files: 9, Impact: low, Commit: 5cde8a03",
         "Similar observer decisions in TypeScript projects",
         "Files: 3, Impact: low, Commit: 5ea43dbe",
-        "Files: 3, Impact: low, Commit: 5579d141"
+        "Files: 3, Impact: low, Commit: 5579d141",
+        "Files: 3, Impact: low, Commit: 52422ff0",
+        "Similar observer decisions in Markdown, JSON projects"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:54:30.873Z",
-        "last_updated": "2026-01-06T12:10:30.857Z"
+        "last_updated": "2026-01-06T13:57:26.507Z"
       },
       "id": "mc4flkg3bi0z7r"
     }
@@ -5441,7 +5642,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-01-06T12:10:45.251Z",
+    "exported_at": "2026-01-06T13:59:58.617Z",
     "total_entities": 45,
     "total_relations": 62,
     "description": "Coding project infrastructure and patterns"
