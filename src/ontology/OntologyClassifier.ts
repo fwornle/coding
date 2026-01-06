@@ -266,7 +266,8 @@ export class OntologyClassifier {
       );
 
       if (classification) {
-        const provider = this.extractProviderFromModel(response.model);
+        // Use provider from response if available, otherwise infer from model name
+        const provider = (response as any).provider || this.extractProviderFromModel(response.model);
         const inputTokens = response.usage?.promptTokens || 0;
         const outputTokens = response.usage?.completionTokens || 0;
         const totalTokens = inputTokens + outputTokens;

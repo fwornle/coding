@@ -1160,19 +1160,47 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             ? (() => {
                 const allSteps: StepInfo[] = []
 
-                // ALWAYS include main workflow steps first (persistence, insights, checkpoint, etc.)
-                if (currentProcess?.steps && currentProcess.steps.length > 0) {
-                  for (const step of currentProcess.steps) {
-                    allSteps.push({
-                      ...step,
-                      name: STEP_TO_AGENT[step.name] || step.name,
-                    })
-                  }
-                }
+                // Check if this is a batch workflow (has batchIterations data)
+                const isBatchWorkflow = currentProcess?.batchIterations && currentProcess.batchIterations.length > 0
 
-                // THEN add batch iteration steps if available
-                if (currentProcess?.batchIterations && currentProcess.batchIterations.length > 0) {
-                  for (const batch of currentProcess.batchIterations) {
+                if (isBatchWorkflow) {
+                  // BATCH WORKFLOW: Reorder steps into pre-batch → batch iterations → post-batch
+                  // NOTE: Be specific with patterns to avoid matching batch steps like 'operator_dedup'
+                  const finalizationStepNames = new Set([
+                    // Batch workflow finalization steps (from batch-analysis.yaml)
+                    'index_codebase', 'link_documentation', 'synthesize_code_insights',
+                    'transform_code_entities', 'final_persist', 'generate_insights',
+                    'web_search', 'final_dedup', 'final_validation',
+                    // Legacy workflow finalization steps
+                    'persist_results', 'persist_incremental',
+                    'deduplicate_insights', 'deduplicate_incremental',
+                    'validate_content', 'validate_content_incremental',
+                  ])
+                  const isPostBatchStep = (name: string) =>
+                    finalizationStepNames.has(name.toLowerCase())
+
+                  const preBatchSteps: StepInfo[] = []
+                  const postBatchSteps: StepInfo[] = []
+
+                  if (currentProcess?.steps && currentProcess.steps.length > 0) {
+                    for (const step of currentProcess.steps) {
+                      const stepInfo = {
+                        ...step,
+                        name: STEP_TO_AGENT[step.name] || step.name,
+                      }
+                      if (isPostBatchStep(step.name)) {
+                        postBatchSteps.push(stepInfo)
+                      } else {
+                        preBatchSteps.push(stepInfo)
+                      }
+                    }
+                  }
+
+                  // 1. Add pre-batch steps first
+                  allSteps.push(...preBatchSteps)
+
+                  // 2. Add batch iteration steps (already checked isBatchWorkflow above)
+                  for (const batch of currentProcess.batchIterations!) {
                     for (const step of batch.steps) {
                       allSteps.push({
                         name: `[${batch.batchId}] ${STEP_TO_AGENT[step.name] || step.name}`,
@@ -1182,6 +1210,20 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                         tokensUsed: step.tokensUsed,
                         llmProvider: step.llmProvider,
                         llmCalls: step.llmCalls,
+                      })
+                    }
+                  }
+
+                  // 3. Add post-batch steps last (persistence, dedup, validation)
+                  allSteps.push(...postBatchSteps)
+                } else {
+                  // STANDARD WORKFLOW: Show steps in their natural execution order
+                  // No reordering needed - persistence runs after its dependencies complete
+                  if (currentProcess?.steps && currentProcess.steps.length > 0) {
+                    for (const step of currentProcess.steps) {
+                      allSteps.push({
+                        ...step,
+                        name: STEP_TO_AGENT[step.name] || step.name,
                       })
                     }
                   }
