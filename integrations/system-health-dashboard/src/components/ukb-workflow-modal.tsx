@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import {
   Dialog,
@@ -257,18 +257,43 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   }, [selectedHistoricalWorkflowState])
 
   const handleNodeClick = (agentId: string) => {
-    Logger.debug(LogCategories.AGENT, `Node clicked: ${agentId}`)
+    Logger.info(LogCategories.AGENT, `Agent node clicked: ${agentId}`, {
+      agentId,
+      isOrchestrator: agentId === 'orchestrator',
+      currentTab: activeTab,
+      workflowName: activeTab === 'active'
+        ? currentProcess?.workflowName
+        : selectedHistoricalWorkflowState?.workflowName,
+    })
     dispatch(setSelectedNode(agentId))
   }
 
   const handleCloseSidebar = () => {
-    Logger.debug(LogCategories.UI, 'Closing node details sidebar')
+    Logger.debug(LogCategories.UI, 'Closing agent details sidebar', {
+      previousAgent: selectedNode,
+    })
     dispatch(setSelectedNode(null))
   }
 
   // Both active and historical use the same handler now via Redux
   const handleHistoricalNodeClick = handleNodeClick
   const handleCloseHistoricalSidebar = handleCloseSidebar
+
+  // Handler for selecting a historical workflow from the list
+  const handleSelectHistoricalWorkflow = useCallback((workflow: HistoricalWorkflow) => {
+    Logger.info(LogCategories.UKB, 'Historical workflow selected', {
+      workflowId: workflow.id,
+      workflowName: workflow.workflowName,
+      status: workflow.status,
+      team: workflow.team,
+      completedSteps: workflow.completedSteps,
+      totalSteps: workflow.totalSteps,
+      duration: workflow.duration,
+      startTime: workflow.startTime,
+      executionId: workflow.executionId,
+    })
+    dispatch(selectHistoricalWorkflow(workflow))
+  }, [dispatch])
 
   const getHealthBadge = (health: string | undefined | null) => {
     if (!health) return <Badge variant="outline">Unknown</Badge>
@@ -1001,7 +1026,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               <Card
                 key={workflow.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => dispatch(selectHistoricalWorkflow(workflow))}
+                onClick={() => handleSelectHistoricalWorkflow(workflow)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -1049,7 +1074,22 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setTraceModalOpen(true)}
+                  onClick={() => {
+                    const stepsToTrace = activeTab === 'active'
+                      ? currentProcess?.steps
+                      : historicalWorkflowDetail?.steps
+                    Logger.info(LogCategories.TRACE, 'Opening trace modal', {
+                      tab: activeTab,
+                      workflowName: activeTab === 'active'
+                        ? currentProcess?.workflowName
+                        : historicalWorkflowDetail?.workflowName,
+                      totalSteps: stepsToTrace?.length || 0,
+                      completedSteps: stepsToTrace?.filter(s => s.status === 'completed').length || 0,
+                      runningSteps: stepsToTrace?.filter(s => s.status === 'running').length || 0,
+                      failedSteps: stepsToTrace?.filter(s => s.status === 'failed').length || 0,
+                    })
+                    setTraceModalOpen(true)
+                  }}
                   className="flex items-center gap-2"
                 >
                   <Activity className="h-4 w-4" />
@@ -1079,7 +1119,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => dispatch(setActiveTab(v as 'active' | 'history'))} className="contents">
+        <Tabs value={activeTab} onValueChange={(v) => {
+          const newTab = v as 'active' | 'history'
+          Logger.info(LogCategories.UKB, `Switching to ${newTab} tab`, {
+            from: activeTab,
+            to: newTab,
+            activeProcessCount: activeProcesses.length,
+            historicalWorkflowCount: historicalWorkflows.length,
+          })
+          dispatch(setActiveTab(newTab))
+        }} className="contents">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="active" className="flex items-center gap-2">
               <Loader2 className={`h-4 w-4 ${activeProcesses.length > 0 ? 'animate-spin' : ''}`} />
@@ -1109,27 +1158,36 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         steps={
           activeTab === 'active'
             ? (() => {
-                // If we have batch iterations, flatten them into a comprehensive step list
-                // This shows each batch's steps individually for full traceability
+                const allSteps: StepInfo[] = []
+
+                // ALWAYS include main workflow steps first (persistence, insights, checkpoint, etc.)
+                if (currentProcess?.steps && currentProcess.steps.length > 0) {
+                  for (const step of currentProcess.steps) {
+                    allSteps.push({
+                      ...step,
+                      name: STEP_TO_AGENT[step.name] || step.name,
+                    })
+                  }
+                }
+
+                // THEN add batch iteration steps if available
                 if (currentProcess?.batchIterations && currentProcess.batchIterations.length > 0) {
-                  const flattenedSteps: StepInfo[] = []
                   for (const batch of currentProcess.batchIterations) {
                     for (const step of batch.steps) {
-                      flattenedSteps.push({
+                      allSteps.push({
                         name: `[${batch.batchId}] ${STEP_TO_AGENT[step.name] || step.name}`,
                         status: step.status,
                         duration: step.duration,
                         outputs: step.outputs,
+                        tokensUsed: step.tokensUsed,
+                        llmProvider: step.llmProvider,
+                        llmCalls: step.llmCalls,
                       })
                     }
                   }
-                  return flattenedSteps
                 }
-                // Fallback to high-level steps if no batch iterations
-                return (currentProcess?.steps || []).map(s => ({
-                  ...s,
-                  name: STEP_TO_AGENT[s.name] || s.name,
-                }))
+
+                return allSteps
               })()
             : historicalWorkflowDetail?.steps?.map(s => ({
                 name: s.agent || s.name,

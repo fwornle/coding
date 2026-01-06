@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import type { AggregatedSteps } from '@/store/slices/ukbSlice'
+import { Logger, LogCategories } from '@/utils/logging'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -2288,7 +2289,27 @@ function OrchestratorDetailsSidebar({
   const [isCancelling, setIsCancelling] = useState(false)
   const [cancelResult, setCancelResult] = useState<{ success: boolean; message: string } | null>(null)
 
+  // Log when orchestrator sidebar is displayed
+  useEffect(() => {
+    Logger.info(LogCategories.AGENT, 'Orchestrator sidebar opened', {
+      workflowName: process.workflowName,
+      status: process.status,
+      health: process.health,
+      completedSteps: process.completedSteps,
+      totalSteps: process.totalSteps,
+      batchProgress: process.batchProgress,
+      stepsCount: process.steps?.length || 0,
+      runningSteps: process.steps?.filter(s => s.status === 'running').length || 0,
+      failedSteps: process.steps?.filter(s => s.status === 'failed').length || 0,
+    })
+  }, [process])
+
   const handleCancelWorkflow = async (killProcesses: boolean = false) => {
+    Logger.info(LogCategories.AGENT, 'Cancel workflow requested', {
+      workflowName: process.workflowName,
+      killProcesses,
+      currentStatus: process.status,
+    })
     setIsCancelling(true)
     setCancelResult(null)
     try {
@@ -2302,6 +2323,10 @@ function OrchestratorDetailsSidebar({
       const data = await response.json()
 
       if (data.status === 'success') {
+        Logger.info(LogCategories.AGENT, 'Workflow cancelled successfully', {
+          previousWorkflow: data.data.previousWorkflow,
+          previousStatus: data.data.previousStatus,
+        })
         setCancelResult({
           success: true,
           message: `Cancelled ${data.data.previousWorkflow || 'workflow'} (was ${data.data.previousStatus})`
@@ -2309,9 +2334,11 @@ function OrchestratorDetailsSidebar({
         // Refresh the page after a short delay to show updated state
         setTimeout(() => window.location.reload(), 1500)
       } else {
+        Logger.warn(LogCategories.AGENT, 'Workflow cancel failed', { message: data.message })
         setCancelResult({ success: false, message: data.message || 'Failed to cancel' })
       }
     } catch (error) {
+      Logger.error(LogCategories.AGENT, 'Workflow cancel error', { error })
       setCancelResult({ success: false, message: `Error: ${error instanceof Error ? error.message : 'Unknown'}` })
     } finally {
       setIsCancelling(false)
@@ -2791,6 +2818,38 @@ export function UKBNodeDetailsSidebar({
   }
 
   const inferredStatus = getInferredStatus()
+
+  // Log when agent sidebar is displayed
+  useEffect(() => {
+    Logger.info(LogCategories.AGENT, `Agent sidebar opened: ${agent.name} (${agentId})`, {
+      agentId,
+      agentName: agent.name,
+      status: inferredStatus,
+      hasStepInfo: !!stepInfo,
+      stepDuration: stepInfo?.duration ? `${stepInfo.duration}ms` : '-',
+      tokensUsed: stepInfo?.tokensUsed || 0,
+      llmModel: agent.llmModel || 'none',
+      techStack: agent.techStack || 'N/A',
+      hasOutputs: stepInfo?.outputs ? Object.keys(stepInfo.outputs).length > 0 : false,
+      hasError: !!stepInfo?.error,
+      workflowName: process.workflowName,
+    })
+
+    // Log detailed step outputs at debug level
+    if (stepInfo?.outputs) {
+      Logger.debug(LogCategories.AGENT, `Agent ${agentId} outputs`, {
+        outputKeys: Object.keys(stepInfo.outputs),
+        outputs: stepInfo.outputs,
+      })
+    }
+
+    // Log error details at warn level
+    if (stepInfo?.error) {
+      Logger.warn(LogCategories.AGENT, `Agent ${agentId} has error`, {
+        error: stepInfo.error,
+      })
+    }
+  }, [agentId, agent.name, inferredStatus, stepInfo, agent.llmModel, agent.techStack, process.workflowName])
 
   const getStatusBadge = (status?: string) => {
     switch (status) {

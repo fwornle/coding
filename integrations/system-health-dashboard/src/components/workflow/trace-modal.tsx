@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import {
   FileJson,
 } from 'lucide-react'
 import type { StepInfo } from '@/store/slices/ukbSlice'
+import { Logger, LogCategories } from '@/utils/logging'
 
 interface TraceModalProps {
   open: boolean
@@ -56,6 +57,18 @@ export function TraceModal({
 }: TraceModalProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // Log when trace modal opens
+  useEffect(() => {
+    if (open) {
+      Logger.info(LogCategories.TRACE, `Trace modal opened for workflow: ${workflowName}`, {
+        totalSteps: steps.length,
+        completed: steps.filter(s => s.status === 'completed').length,
+        running: steps.filter(s => s.status === 'running').length,
+        failed: steps.filter(s => s.status === 'failed').length,
+      })
+    }
+  }, [open, workflowName, steps])
 
   // Convert steps to trace events with timing
   const { events, totalDuration, stats } = useMemo(() => {
@@ -110,10 +123,30 @@ export function TraceModal({
     const newSet = new Set(expandedIds)
     if (newSet.has(id)) {
       newSet.delete(id)
+      Logger.debug(LogCategories.TRACE, `Collapsed step details: ${id}`)
     } else {
       newSet.add(id)
+      const event = events.find(e => e.id === id)
+      Logger.debug(LogCategories.TRACE, `Expanded step details: ${id}`, {
+        status: event?.status,
+        duration: event?.duration,
+        outputs: event?.outputs ? Object.keys(event.outputs) : [],
+      })
     }
     setExpandedIds(newSet)
+  }
+
+  const handleSelectStep = (id: string) => {
+    const event = events.find(e => e.id === id)
+    Logger.info(LogCategories.TRACE, `Selected step: ${id}`, {
+      status: event?.status,
+      duration: event?.duration ? `${event.duration}ms` : '-',
+      llmProvider: event?.llmProvider || 'none',
+      tokensUsed: event?.tokensUsed || 0,
+      hasOutputs: event?.outputs ? Object.keys(event.outputs).length > 0 : false,
+      hasError: !!event?.error,
+    })
+    setSelectedId(id)
   }
 
   const formatDuration = (ms?: number): string => {
@@ -229,7 +262,7 @@ export function TraceModal({
                             ? 'bg-blue-50 border border-blue-200'
                             : 'hover:bg-muted/50'
                         }`}
-                        onClick={() => setSelectedId(event.id)}
+                        onClick={() => handleSelectStep(event.id)}
                       >
                         {/* Index */}
                         <div className="w-6 text-xs text-muted-foreground text-right">
