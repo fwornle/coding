@@ -335,7 +335,29 @@ The dashboard includes a dedicated UKB Workflow Monitor that provides visual tra
 
 ![Workflow Detail View](../images/health-monitor-multi-agent-wf-2.png)
 
-![Agent Selection and Details](../images/health-monitor-multi-agent-wf-3.png)
+**Sub-Steps Visualization:**
+
+The workflow graph now displays sub-steps for multi-step agents. Click the blue badge on an agent node to expand and view its internal processing steps:
+
+![Sub-Steps Expanded View](../images/health-monitor-multi-agent-wf-3.png)
+
+Each sub-step arc shows the step name and can be clicked to view detailed information including inputs, outputs, and LLM usage:
+
+![Sub-Step Details Sidebar](../images/health-monitor-multi-agent-wf-4.png)
+
+**Sub-Steps Features:**
+- **Auto-expand on running**: When a multi-step agent starts executing, its sub-steps automatically expand with animation
+- **Pulsing animation**: Running agents display a pulsing glow effect on their sub-step arcs
+- **Rotating indicator**: A rotating dashed circle shows active processing
+- **Click to select**: Click any sub-step arc to view its detailed information in the sidebar
+- **Inputs/Outputs**: Each sub-step shows what data it receives and produces
+- **LLM Usage**: Indicates whether the sub-step uses no LLM, fast, standard, or premium models
+
+**Execution Tracing:**
+
+![Workflow Trace Modal](../images/health-monitor-multi-agent-wf-5.png)
+
+The "View Trace" button opens the execution trace modal showing the complete timeline of all workflow steps with detailed timing, outputs, and any errors encountered.
 
 **Access:** Click the "UKB Workflow Monitor" card on the dashboard or navigate to the dedicated tab.
 
