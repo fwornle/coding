@@ -559,7 +559,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           </div>
         )}
 
-        {activeCurrentProcess && (
+        {/* Guard: Only render when workflow data is valid (has name and steps) */}
+        {activeCurrentProcess && activeCurrentProcess.workflowName && activeCurrentProcess.totalSteps > 0 && (
           <>
             {/* Process Info Header */}
             <Card className="flex-shrink-0">
@@ -720,6 +721,18 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               </div>
             </div>
           </>
+        )}
+
+        {/* Show loading state when process exists but data is incomplete */}
+        {activeCurrentProcess && (!activeCurrentProcess.workflowName || activeCurrentProcess.totalSteps === 0) && (
+          <Card className="flex-shrink-0">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Loading workflow data...</span>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </>
     )
