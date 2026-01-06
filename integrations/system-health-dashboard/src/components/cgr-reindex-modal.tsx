@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertTriangle, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react'
+import { Logger, LogCategories } from '@/utils/logging'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -50,6 +51,7 @@ export default function CGRReindexModal() {
   }
 
   const handleConfirm = async () => {
+    Logger.info(LogCategories.API, 'Starting CGR re-index')
     dispatch(reindexStart())
 
     try {
@@ -60,8 +62,11 @@ export default function CGRReindexModal() {
 
       if (!response.ok) {
         const error = await response.json()
+        Logger.error(LogCategories.API, 'Failed to start CGR re-index', { message: error.message })
         throw new Error(error.message || 'Failed to start re-index')
       }
+
+      Logger.info(LogCategories.API, 'CGR re-index started successfully, polling for completion')
 
       const checkStatus = async () => {
         try {
@@ -69,24 +74,29 @@ export default function CGRReindexModal() {
           const status = await statusRes.json()
 
           if (status.indexing === false) {
+            Logger.info(LogCategories.API, 'CGR re-index completed')
             dispatch(reindexSuccess())
             return
           }
 
+          Logger.trace(LogCategories.API, 'CGR re-index still in progress')
           setTimeout(checkStatus, 5000)
-        } catch {
+        } catch (error) {
+          Logger.warn(LogCategories.API, 'Error checking CGR status, will retry', error)
           setTimeout(checkStatus, 5000)
         }
       }
 
       setTimeout(checkStatus, 5000)
     } catch (error) {
+      Logger.error(LogCategories.API, 'CGR re-index failed', error)
       dispatch(reindexFailure(error instanceof Error ? error.message : 'Unknown error'))
     }
   }
 
   const handleClose = () => {
     if (cgr.reindexStatus === 'idle' || cgr.reindexStatus === 'completed' || cgr.reindexStatus === 'failed') {
+      Logger.debug(LogCategories.MODAL, `CGR modal closing with status: ${cgr.reindexStatus}`)
       dispatch(closeConfirmModal())
       if (cgr.reindexStatus === 'completed' || cgr.reindexStatus === 'failed') {
         dispatch(reindexReset())

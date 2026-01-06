@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, AlertTriangle, XCircle, Clock } from 'lucide-react'
+import { Logger, LogCategories } from '@/utils/logging'
 
 interface StatusItem {
   name: string
@@ -29,6 +30,19 @@ interface HealthStatusCardProps {
 }
 
 export default function HealthStatusCard({ title, icon, items, onClick, clickable }: HealthStatusCardProps) {
+  const handleCardClick = () => {
+    if (clickable && onClick) {
+      Logger.debug(LogCategories.HEALTH, `HealthStatusCard clicked: ${title}`)
+      onClick()
+    }
+  }
+
+  const handleActionClick = (e: React.MouseEvent, item: StatusItem) => {
+    e.stopPropagation()
+    Logger.debug(LogCategories.HEALTH, `Action clicked: ${item.name} - ${item.action?.label}`)
+    item.action?.onClick(e)
+  }
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'operational':
@@ -58,7 +72,7 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
   return (
     <Card
       className={clickable ? 'cursor-pointer hover:border-primary/50 transition-colors' : ''}
-      onClick={onClick}
+      onClick={handleCardClick}
     >
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
@@ -86,10 +100,7 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
                   <Button
                     size="sm"
                     variant={item.action.variant || 'outline'}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      item.action?.onClick(e)
-                    }}
+                    onClick={(e) => handleActionClick(e, item)}
                     disabled={item.action.disabled}
                     className="h-6 px-2 text-xs"
                   >

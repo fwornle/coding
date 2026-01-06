@@ -11925,27 +11925,58 @@
           "metadata": {
             "source": "workflow_persist"
           }
-        }
+        },
+        "Decision to use a comprehensive knowledge graph management system (feat: comprehensive knowledge graph management system, commit message), which has a significant impact on the project's data management and scalability"
       ],
-      "significance": 0.7,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-01-05T08:26:27.082Z",
-        "last_updated": "2026-01-05T08:26:27.082Z",
-        "significance": 7,
+        "last_updated": "2026-01-06T06:31:56.391Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2026-01-05T08:26:26.968Z",
-          "last_updated": "2026-01-05T08:26:26.968Z",
-          "created_by": "workflow_persist",
-          "version": "1.0",
+          "significance": 7,
+          "originalMetadata": {
+            "created_at": "2026-01-05T08:26:26.968Z",
+            "last_updated": "2026-01-05T08:26:26.968Z",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "heuristic",
+              "confidence": 0.94
+            },
+            "classificationConfidence": 0.94,
+            "classificationMethod": "heuristic",
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "lenient"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 100,
+              "totalIssues": 0,
+              "criticalIssues": 0,
+              "validatedAt": "2026-01-05T08:26:26.974Z",
+              "mode": "lenient"
+            },
+            "staleness_score": 100,
+            "staleness_check_at": "2026-01-05T08:26:26.974Z"
+          },
+          "source": "manual",
+          "team": "coding",
+          "created_at": "2026-01-05T08:26:27.082Z",
+          "last_updated": "2026-01-06T06:31:56.027Z",
           "ontology": {
             "ontologyName": "coding",
-            "classificationMethod": "heuristic",
+            "classificationMethod": "hybrid",
             "confidence": 0.94
           },
           "classificationConfidence": 0.94,
-          "classificationMethod": "heuristic",
+          "classificationMethod": "hybrid",
           "validation": {
             "valid": true,
             "errors": [],
@@ -11954,14 +11985,16 @@
           },
           "contentValidation": {
             "overallValid": false,
-            "overallScore": 100,
-            "totalIssues": 0,
-            "criticalIssues": 0,
-            "validatedAt": "2026-01-05T08:26:26.974Z",
+            "overallScore": 80,
+            "totalIssues": 1,
+            "criticalIssues": 1,
+            "validatedAt": "2026-01-06T06:31:56.048Z",
             "mode": "lenient"
           },
+          "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-05T08:26:26.974Z"
+          "staleness_check_at": "2026-01-06T06:31:56.048Z",
+          "staleness_method": "git-based"
         }
       },
       "source": "manual",
@@ -12394,13 +12427,20 @@
       "relationType": "contains",
       "confidence": 1,
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "SemanticinsightDecisionToUsePattern",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-06T05:41:06.671Z",
+    "last_updated": "2026-01-06T07:15:16.484Z",
     "team": "coding",
     "entity_count": 35,
-    "relation_count": 51,
+    "relation_count": 52,
     "exported_by": "GraphDatabaseService",
     "export_version": "1.0"
   }
