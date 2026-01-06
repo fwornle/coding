@@ -155,9 +155,14 @@ class HealthRefreshManager {
       if (result.status === 'success' && result.data) {
         const processes = result.data.processes || []
 
-        // Enhanced logging for multi-agent visibility
+        // Enhanced logging for multi-agent visibility - ONLY for running workflows
         if (processes.length > 0) {
           processes.forEach((p: any) => {
+            // Skip logging for completed/idle workflows to avoid console spam
+            if (p.status !== 'running') {
+              return
+            }
+
             // Basic process info
             const workflowName = p.workflowName || '(initializing)'
             const batchInfo = p.batchProgress
