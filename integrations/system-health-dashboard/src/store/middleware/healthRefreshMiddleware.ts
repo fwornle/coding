@@ -63,7 +63,10 @@ class HealthRefreshManager {
     if (!this.store) return
 
     this.refreshCount++
-    Logger.debug(LogCategories.REFRESH, `Refresh cycle #${this.refreshCount} started`)
+    // Only log every 10th refresh cycle to reduce noise
+    if (this.refreshCount % 10 === 0) {
+      Logger.trace(LogCategories.REFRESH, `Refresh cycle #${this.refreshCount}`)
+    }
 
     // Fetch health status
     await this.fetchHealthStatus()
@@ -73,8 +76,6 @@ class HealthRefreshManager {
     await this.fetchAPIQuota()
     // Fetch UKB process status
     await this.fetchUKBStatus()
-
-    Logger.debug(LogCategories.REFRESH, `Refresh cycle #${this.refreshCount} completed`)
   }
 
   private async fetchHealthStatus() {
@@ -154,16 +155,76 @@ class HealthRefreshManager {
       if (result.status === 'success' && result.data) {
         const processes = result.data.processes || []
 
-        // Log UKB process details for debugging
+        // Enhanced logging for multi-agent visibility
         if (processes.length > 0) {
           processes.forEach((p: any) => {
-            const hasValidData = p.workflowName && p.totalSteps > 0
-            Logger.debug(
+            // Basic process info
+            const workflowName = p.workflowName || '(initializing)'
+            const batchInfo = p.batchProgress
+              ? `Batch ${p.batchProgress.currentBatch}/${p.batchProgress.totalBatches}`
+              : ''
+
+            // Current step/agent info
+            const currentStep = p.currentStep || p.steps?.find((s: any) => s.status === 'running')?.name
+            const stepAgent = currentStep ? this.getAgentName(currentStep) : 'waiting'
+
+            // Log main workflow status
+            Logger.info(
               LogCategories.UKB,
-              `Process ${p.pid}: ${p.workflowName || '(no name)'} ` +
-              `[${p.completedSteps || 0}/${p.totalSteps || 0}] ` +
-              `status=${p.status} valid=${hasValidData}`
+              `📊 ${workflowName} [${p.completedSteps || 0}/${p.totalSteps || 0}] ${batchInfo}`,
+              { pid: p.pid, status: p.status, health: p.health, elapsed: `${p.elapsedSeconds || 0}s` }
             )
+
+            // Log current agent activity
+            if (currentStep && p.status === 'running') {
+              Logger.info(
+                LogCategories.AGENT,
+                `▶️ ${stepAgent}: ${this.formatStepDescription(currentStep)}`,
+                { step: currentStep }
+              )
+            }
+
+            // Log batch iteration details if available
+            if (p.batchIterations?.length > 0) {
+              const currentBatch = p.batchIterations[p.batchIterations.length - 1]
+              if (currentBatch) {
+                const runningSteps = currentBatch.steps?.filter((s: any) => s.status === 'running') || []
+                const completedSteps = currentBatch.steps?.filter((s: any) => s.status === 'completed') || []
+
+                // Log running steps
+                runningSteps.forEach((step: any) => {
+                  const agent = this.getAgentName(step.name)
+                  Logger.trace(
+                    LogCategories.BATCH,
+                    `  ⏳ [${currentBatch.batchId}] ${agent} running...`,
+                    { step: step.name, duration: step.duration }
+                  )
+                })
+
+                // Log recently completed steps with outputs
+                const recentCompleted = completedSteps.slice(-2)
+                recentCompleted.forEach((step: any) => {
+                  const agent = this.getAgentName(step.name)
+                  const outputs = this.summarizeOutputs(step.outputs)
+                  if (outputs) {
+                    Logger.trace(
+                      LogCategories.BATCH,
+                      `  ✅ [${currentBatch.batchId}] ${agent} → ${outputs}`,
+                      { step: step.name, duration: step.duration }
+                    )
+                  }
+                })
+              }
+            }
+
+            // Log accumulated stats if available
+            if (p.accumulatedStats) {
+              const stats = p.accumulatedStats
+              Logger.debug(
+                LogCategories.TRACE,
+                `📈 Stats: ${stats.totalEntities || 0} entities, ${stats.totalRelations || 0} relations, ${stats.tokensUsed || 0} tokens`
+              )
+            }
           })
         }
 
@@ -175,6 +236,70 @@ class HealthRefreshManager {
       Logger.warn(LogCategories.UKB, 'Failed to fetch UKB status:', error.message)
       this.store.dispatch(fetchUKBStatusFailure(error.message))
     }
+  }
+
+  // Map step names to friendly agent names
+  private getAgentName(stepName: string): string {
+    const agentMap: Record<string, string> = {
+      'git_history_analysis': 'Git History',
+      'vibe_history_analysis': 'Vibe History',
+      'semantic_analysis': 'Semantic Analyzer',
+      'code_graph_analysis': 'Code Graph (CGR)',
+      'ontology_classification': 'Ontology Classifier',
+      'observation_generation': 'Observation Gen',
+      'deduplication': 'Deduplication',
+      'quality_assurance': 'QA Agent',
+      'content_validation': 'Content Validator',
+      'documentation_linking': 'Doc Linker',
+      'insight_generation': 'Insight Gen',
+      'persistence': 'Persistence',
+      'checkpoint_save': 'Checkpoint',
+      'generate_batch_observations': 'Observation Gen',
+      'persist_knowledge': 'Persistence',
+      'refresh_stale_entities': 'Entity Refresh',
+    }
+    return agentMap[stepName] || stepName.replace(/_/g, ' ')
+  }
+
+  // Format step description
+  private formatStepDescription(stepName: string): string {
+    const descriptions: Record<string, string> = {
+      'git_history_analysis': 'Analyzing git commits for code changes...',
+      'vibe_history_analysis': 'Processing session logs for insights...',
+      'semantic_analysis': 'Running LLM semantic analysis...',
+      'code_graph_analysis': 'Building AST-based code graph...',
+      'ontology_classification': 'Classifying entities against ontology...',
+      'observation_generation': 'Generating knowledge observations...',
+      'deduplication': 'Removing duplicate entities...',
+      'quality_assurance': 'Validating entity quality...',
+      'content_validation': 'Checking content accuracy...',
+      'documentation_linking': 'Linking to documentation...',
+      'insight_generation': 'Creating insights and diagrams...',
+      'persistence': 'Saving to knowledge graph...',
+      'checkpoint_save': 'Saving workflow checkpoint...',
+      'generate_batch_observations': 'Generating batch observations...',
+      'persist_knowledge': 'Persisting to knowledge base...',
+      'refresh_stale_entities': 'Refreshing outdated entities...',
+    }
+    return descriptions[stepName] || `Processing ${stepName.replace(/_/g, ' ')}...`
+  }
+
+  // Summarize step outputs for logging
+  private summarizeOutputs(outputs: any): string {
+    if (!outputs) return ''
+    const parts: string[] = []
+
+    if (outputs.entitiesExtracted) parts.push(`${outputs.entitiesExtracted} entities`)
+    if (outputs.relationsExtracted) parts.push(`${outputs.relationsExtracted} relations`)
+    if (outputs.tokensUsed) parts.push(`${outputs.tokensUsed} tokens`)
+    if (outputs.classified) parts.push(`${outputs.classified} classified`)
+    if (outputs.unclassified) parts.push(`${outputs.unclassified} unclassified`)
+    if (outputs.llmCalls) parts.push(`${outputs.llmCalls} LLM calls`)
+    if (outputs.persisted) parts.push(`${outputs.persisted} persisted`)
+    if (outputs.commits) parts.push(`${outputs.commits} commits`)
+    if (outputs.sessions) parts.push(`${outputs.sessions} sessions`)
+
+    return parts.join(', ')
   }
 }
 

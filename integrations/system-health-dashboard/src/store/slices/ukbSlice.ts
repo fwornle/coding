@@ -51,6 +51,9 @@ export interface UKBProcess {
       name: string
       status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
       duration?: number
+      tokensUsed?: number
+      llmProvider?: string
+      llmCalls?: number
       outputs?: Record<string, any>
     }>
   }>
