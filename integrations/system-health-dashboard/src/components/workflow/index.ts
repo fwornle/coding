@@ -2,7 +2,8 @@
 export * from './types'
 export * from './constants'
 export * from './hooks'
-export { MultiAgentGraph, WorkflowLegend } from './multi-agent-graph'
+export { MultiAgentGraph, WorkflowLegend, AGENT_SUBSTEPS } from './multi-agent-graph'
+export type { SubStep } from './multi-agent-graph'
 export { TraceModal } from './trace-modal'
 
 // Re-export for backward compatibility

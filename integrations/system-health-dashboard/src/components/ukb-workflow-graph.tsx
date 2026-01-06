@@ -344,6 +344,80 @@ const STEP_TO_AGENT: Record<string, string> = {
   'validate_content_incremental': 'content_validation',
 }
 
+// Sub-steps configuration for each agent
+// These are the internal operations each agent performs
+interface SubStep {
+  id: string
+  name: string
+  shortName: string  // 3-4 chars for compact display
+  description: string
+}
+
+const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
+  'kg_operators': [
+    { id: 'conv', name: 'Conversational', shortName: 'Conv', description: 'Extract conversational patterns' },
+    { id: 'aggr', name: 'Aggregation', shortName: 'Aggr', description: 'Aggregate similar entities' },
+    { id: 'embed', name: 'Embedding', shortName: 'Emb', description: 'Generate embeddings' },
+    { id: 'dedup', name: 'Deduplication', shortName: 'Dup', description: 'Remove duplicates' },
+    { id: 'pred', name: 'Prediction', shortName: 'Pred', description: 'Predict relationships' },
+    { id: 'merge', name: 'Merge', shortName: 'Mrg', description: 'Merge into graph' },
+  ],
+  'semantic_analysis': [
+    { id: 'extract', name: 'Extract Entities', shortName: 'Ext', description: 'Extract entities from code' },
+    { id: 'analyze', name: 'Analyze Patterns', shortName: 'Anlz', description: 'Analyze code patterns' },
+    { id: 'relate', name: 'Build Relations', shortName: 'Rel', description: 'Build entity relationships' },
+  ],
+  'ontology_classification': [
+    { id: 'match', name: 'Match Rules', shortName: 'Mtch', description: 'Match ontology rules' },
+    { id: 'classify', name: 'LLM Classify', shortName: 'Cls', description: 'LLM-powered classification' },
+    { id: 'extend', name: 'Auto-Extend', shortName: 'Ext', description: 'Extend ontology if needed' },
+  ],
+  'git_history': [
+    { id: 'fetch', name: 'Fetch Commits', shortName: 'Ftch', description: 'Fetch commit history' },
+    { id: 'parse', name: 'Parse Diffs', shortName: 'Prs', description: 'Parse file diffs' },
+    { id: 'extract', name: 'Extract Files', shortName: 'Ext', description: 'Extract changed files' },
+  ],
+  'vibe_history': [
+    { id: 'scan', name: 'Scan Sessions', shortName: 'Scan', description: 'Scan LSL sessions' },
+    { id: 'match', name: 'Match Commits', shortName: 'Mtch', description: 'Match to commits' },
+    { id: 'context', name: 'Extract Context', shortName: 'Ctx', description: 'Extract context' },
+  ],
+  'quality_assurance': [
+    { id: 'validate', name: 'Validate Entities', shortName: 'Val', description: 'Validate entity integrity' },
+    { id: 'check', name: 'Check Duplicates', shortName: 'Chk', description: 'Check for duplicates' },
+    { id: 'score', name: 'Score Quality', shortName: 'Scr', description: 'Calculate quality scores' },
+  ],
+  'content_validation': [
+    { id: 'verify', name: 'Verify Content', shortName: 'Vrf', description: 'Verify content accuracy' },
+    { id: 'fresh', name: 'Check Freshness', shortName: 'Frsh', description: 'Check content freshness' },
+    { id: 'update', name: 'Update Scores', shortName: 'Upd', description: 'Update validation scores' },
+  ],
+  'persistence': [
+    { id: 'prepare', name: 'Prepare Data', shortName: 'Prep', description: 'Prepare for persistence' },
+    { id: 'write', name: 'Write Graph', shortName: 'Wrt', description: 'Write to graph DB' },
+    { id: 'export', name: 'Export JSON', shortName: 'Exp', description: 'Export to JSON' },
+  ],
+  'batch_checkpoint_manager': [
+    { id: 'save', name: 'Save State', shortName: 'Save', description: 'Save checkpoint state' },
+    { id: 'progress', name: 'Update Progress', shortName: 'Prog', description: 'Update progress file' },
+  ],
+  'code_graph': [
+    { id: 'parse', name: 'Parse AST', shortName: 'AST', description: 'Parse code into AST' },
+    { id: 'index', name: 'Index Entities', shortName: 'Idx', description: 'Index code entities' },
+    { id: 'link', name: 'Link Relations', shortName: 'Lnk', description: 'Link code relationships' },
+  ],
+  'deduplication': [
+    { id: 'embed', name: 'Generate Embeddings', shortName: 'Emb', description: 'Generate embeddings' },
+    { id: 'compare', name: 'Compare Similarity', shortName: 'Cmp', description: 'Compare similarity scores' },
+    { id: 'merge', name: 'Merge Duplicates', shortName: 'Mrg', description: 'Merge duplicate entities' },
+  ],
+  'insight_generation': [
+    { id: 'analyze', name: 'Analyze Data', shortName: 'Anlz', description: 'Analyze collected data' },
+    { id: 'generate', name: 'Generate Insights', shortName: 'Gen', description: 'Generate insight documents' },
+    { id: 'diagram', name: 'Create Diagrams', shortName: 'Diag', description: 'Create PlantUML diagrams' },
+  ],
+}
+
 // Edge definitions showing data flow between agents
 // IMPORTANT: Must match actual workflow dependencies in batch-analysis.yaml
 //
@@ -1173,6 +1247,9 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   const [wigglingNode, setWigglingNode] = useState<string | null>(null)
   const wiggleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Track which agent has expanded sub-steps
+  const [expandedSubStepsAgent, setExpandedSubStepsAgent] = useState<string | null>(null)
+
   const handleNodeMouseEnter = useCallback((agentId: string) => {
     // Clear any existing timeout
     if (wiggleTimeoutRef.current) {
@@ -1913,8 +1990,14 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const Icon = agent.icon
               const colors = getNodeColors(status, isSelected)
 
+              // Debug: log expanded state for this agent
+              if (AGENT_SUBSTEPS[agent.id]) {
+                console.log('[SubSteps] Agent:', agent.id, 'expandedSubStepsAgent:', expandedSubStepsAgent, 'match:', expandedSubStepsAgent === agent.id)
+              }
+
               return (
-                <Tooltip key={agent.id}>
+                <React.Fragment key={agent.id}>
+                <Tooltip>
                   <TooltipTrigger asChild>
                     <g
                       className={`cursor-pointer ${wigglingNode === agent.id ? 'animate-wiggle' : ''}`}
@@ -2005,6 +2088,48 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                           '#d1d5db'
                         }
                       />
+
+                      {/* Sub-step count badge - blue circle showing count */}
+                      {(() => {
+                        const substeps = AGENT_SUBSTEPS[agent.id]
+                        if (!substeps || substeps.length === 0) return null
+                        const isExpanded = expandedSubStepsAgent === agent.id
+                        return (
+                          <g
+                            className="cursor-pointer"
+                            style={{ pointerEvents: 'all' }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              console.log('[SubSteps] Badge clicked:', agent.id, 'isExpanded:', isExpanded, '-> setting to:', isExpanded ? null : agent.id)
+                              setExpandedSubStepsAgent(isExpanded ? null : agent.id)
+                            }}
+                          >
+                            {/* Badge background - larger hit area */}
+                            <circle
+                              cx={pos.x + 8}
+                              cy={pos.y + 8}
+                              r={10}
+                              fill={isExpanded ? '#2563eb' : '#3b82f6'}
+                              stroke="#fff"
+                              strokeWidth={2}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            {/* Badge count */}
+                            <text
+                              x={pos.x + 8}
+                              y={pos.y + 12}
+                              fontSize="10"
+                              fill="#fff"
+                              textAnchor="middle"
+                              fontWeight="bold"
+                              style={{ pointerEvents: 'none' }}
+                            >
+                              {substeps.length}
+                            </text>
+                          </g>
+                        )
+                      })()}
 
                       {/* Confidence bar - shows confidence level for completed steps */}
                       {(() => {
@@ -2185,6 +2310,101 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                     </div>
                   </TooltipContent>
                 </Tooltip>
+
+                {/* Expanded sub-steps outer ring */}
+                {expandedSubStepsAgent === agent.id && AGENT_SUBSTEPS[agent.id] && (
+                  <g className="substeps-arc">
+                    {(() => {
+                      const substeps = AGENT_SUBSTEPS[agent.id]
+                      console.log('[SubSteps] Rendering outer ring for:', agent.id, 'substeps:', substeps.length, 'pos:', pos)
+                      const centerX = pos.x + nodeWidth / 2
+                      const centerY = pos.y + nodeHeight / 2
+                      const innerRadius = Math.max(nodeWidth, nodeHeight) / 2 + 12
+                      const outerRadius = innerRadius + 24
+                      const arcSpacing = 4 // Gap between arc segments in degrees
+                      const totalArc = 300 // Total arc span in degrees (leaving gap at bottom)
+                      const startAngle = -150 // Start from upper left
+                      const arcPerStep = (totalArc - (substeps.length - 1) * arcSpacing) / substeps.length
+
+                      return substeps.map((substep, idx) => {
+                        // Calculate arc angles for this sub-step
+                        const angleStart = startAngle + idx * (arcPerStep + arcSpacing)
+                        const angleEnd = angleStart + arcPerStep
+
+                        // Convert to radians
+                        const startRad = (angleStart * Math.PI) / 180
+                        const endRad = (angleEnd * Math.PI) / 180
+
+                        // Calculate arc path points
+                        const x1 = centerX + innerRadius * Math.cos(startRad)
+                        const y1 = centerY + innerRadius * Math.sin(startRad)
+                        const x2 = centerX + outerRadius * Math.cos(startRad)
+                        const y2 = centerY + outerRadius * Math.sin(startRad)
+                        const x3 = centerX + outerRadius * Math.cos(endRad)
+                        const y3 = centerY + outerRadius * Math.sin(endRad)
+                        const x4 = centerX + innerRadius * Math.cos(endRad)
+                        const y4 = centerY + innerRadius * Math.sin(endRad)
+
+                        // Large arc flag (0 for arcs < 180 degrees)
+                        const largeArc = arcPerStep > 180 ? 1 : 0
+
+                        // Build the arc path
+                        const arcPath = `
+                          M ${x1} ${y1}
+                          L ${x2} ${y2}
+                          A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${x3} ${y3}
+                          L ${x4} ${y4}
+                          A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x1} ${y1}
+                          Z
+                        `
+
+                        // Calculate label position (middle of arc)
+                        const midAngle = ((angleStart + angleEnd) / 2 * Math.PI) / 180
+                        const labelRadius = (innerRadius + outerRadius) / 2
+                        const labelX = centerX + labelRadius * Math.cos(midAngle)
+                        const labelY = centerY + labelRadius * Math.sin(midAngle)
+
+                        return (
+                          <Tooltip key={substep.id}>
+                            <TooltipTrigger asChild>
+                              <g className="cursor-pointer">
+                                <path
+                                  d={arcPath}
+                                  fill="#3b82f6"
+                                  fillOpacity={0.85}
+                                  stroke="#2563eb"
+                                  strokeWidth={1.5}
+                                  className="transition-all duration-200 hover:fill-opacity-100"
+                                />
+                                <text
+                                  x={labelX}
+                                  y={labelY}
+                                  fontSize="8"
+                                  fill="#fff"
+                                  textAnchor="middle"
+                                  dominantBaseline="middle"
+                                  fontWeight="500"
+                                  style={{
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                                  }}
+                                >
+                                  {substep.shortName}
+                                </text>
+                              </g>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <div className="space-y-1">
+                                <div className="font-semibold">{substep.name}</div>
+                                <div className="text-xs text-muted-foreground">{substep.description}</div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        )
+                      })
+                    })()}
+                  </g>
+                )}
+                </React.Fragment>
               )
             })}
           </svg>

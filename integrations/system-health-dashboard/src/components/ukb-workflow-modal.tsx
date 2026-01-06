@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -39,7 +39,8 @@ import {
   StopCircle,
   Activity,
 } from 'lucide-react'
-import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, STEP_TO_AGENT } from './workflow'
+import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, STEP_TO_AGENT, AGENT_SUBSTEPS } from './workflow'
+import type { SubStep } from './workflow'
 import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
 import { Logger, LogCategories } from '@/utils/logging'
@@ -138,6 +139,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Trace modal state
   const [traceModalOpen, setTraceModalOpen] = useState(false)
+
+  // Selected substep state (when user clicks a substep arc)
+  const [selectedSubStep, setSelectedSubStep] = useState<SubStep | null>(null)
 
   // Cancel/clear a stuck or frozen workflow
   const handleCancelWorkflow = async (e: React.MouseEvent) => {
@@ -266,7 +270,23 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         : selectedHistoricalWorkflowState?.workflowName,
     })
     dispatch(setSelectedNode(agentId))
+    // Clear substep selection when clicking a node
+    setSelectedSubStep(null)
   }
+
+  // Handler for substep arc selection
+  const handleSubStepSelect = useCallback((agentId: string, substep: SubStep | null) => {
+    Logger.info(LogCategories.AGENT, `Substep ${substep ? 'selected' : 'cleared'}: ${substep?.name || 'none'}`, {
+      agentId,
+      substepId: substep?.id,
+      substepName: substep?.name,
+    })
+    setSelectedSubStep(substep)
+    // Also select the agent node to show sidebar
+    if (substep) {
+      dispatch(setSelectedNode(agentId))
+    }
+  }, [dispatch])
 
   const handleCloseSidebar = () => {
     Logger.debug(LogCategories.UI, 'Closing agent details sidebar', {
@@ -712,7 +732,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   key={`${activeCurrentProcess.pid}-${activeCurrentProcess.workflowName || 'workflow'}`}
                   process={activeCurrentProcess}
                   onNodeClick={handleNodeClick}
+                  onSubStepSelect={handleSubStepSelect}
                   selectedNode={selectedNode}
+                  selectedSubStepId={selectedSubStep?.id || null}
                   hideLegend
                 />
               </div>
@@ -720,11 +742,24 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               {/* Right: Details Sidebar */}
               {showSidebar && selectedNode && (
                 <div className="flex-shrink-0 overflow-auto">
-                  <UKBNodeDetailsSidebar
-                    agentId={selectedNode}
-                    process={activeCurrentProcess}
-                    onClose={handleCloseSidebar}
-                  />
+                  {selectedSubStep ? (
+                    <SubStepDetailsSidebar
+                      agentId={selectedNode}
+                      substep={selectedSubStep}
+                      onClose={() => {
+                        setSelectedSubStep(null)
+                      }}
+                      onBackToAgent={() => {
+                        setSelectedSubStep(null)
+                      }}
+                    />
+                  ) : (
+                    <UKBNodeDetailsSidebar
+                      agentId={selectedNode}
+                      process={activeCurrentProcess}
+                      onClose={handleCloseSidebar}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -976,7 +1011,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   <UKBWorkflowGraph
                     process={historicalProcessInfo}
                     onNodeClick={handleHistoricalNodeClick}
+                    onSubStepSelect={handleSubStepSelect}
                     selectedNode={selectedNode}
+                    selectedSubStepId={selectedSubStep?.id || null}
                     hideLegend
                   />
                 </div>
@@ -984,12 +1021,25 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 {/* Right: Details Sidebar */}
                 {showHistoricalSidebar && selectedNode && (
                   <div className="w-80 flex-shrink-0 overflow-auto border rounded-lg bg-background">
-                    <UKBNodeDetailsSidebar
-                      agentId={selectedNode}
-                      process={historicalProcessInfo}
-                      onClose={handleCloseHistoricalSidebar}
-                      aggregatedSteps={batchSummary?.aggregatedSteps}
-                    />
+                    {selectedSubStep ? (
+                      <SubStepDetailsSidebar
+                        agentId={selectedNode}
+                        substep={selectedSubStep}
+                        onClose={() => {
+                          setSelectedSubStep(null)
+                        }}
+                        onBackToAgent={() => {
+                          setSelectedSubStep(null)
+                        }}
+                      />
+                    ) : (
+                      <UKBNodeDetailsSidebar
+                        agentId={selectedNode}
+                        process={historicalProcessInfo}
+                        onClose={handleCloseHistoricalSidebar}
+                        aggregatedSteps={batchSummary?.aggregatedSteps}
+                      />
+                    )}
                   </div>
                 )}
               </>
@@ -1254,5 +1304,126 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         }
       />
     </Dialog>
+  )
+}
+
+// Sidebar component for substep details
+function SubStepDetailsSidebar({
+  agentId,
+  substep,
+  onClose,
+  onBackToAgent,
+}: {
+  agentId: string
+  substep: SubStep
+  onClose: () => void
+  onBackToAgent: () => void
+}) {
+  // Get agent info for context
+  const agentSubsteps = AGENT_SUBSTEPS[agentId]
+  const substepIndex = agentSubsteps?.findIndex(s => s.id === substep.id) ?? -1
+
+  // LLM usage badge color
+  const getLlmUsageBadge = (usage?: string) => {
+    switch (usage) {
+      case 'none':
+        return <Badge variant="outline" className="text-gray-500">No LLM</Badge>
+      case 'fast':
+        return <Badge className="bg-green-500 text-white">Fast LLM</Badge>
+      case 'standard':
+        return <Badge className="bg-blue-500 text-white">Standard LLM</Badge>
+      case 'premium':
+        return <Badge className="bg-purple-500 text-white">Premium LLM</Badge>
+      default:
+        return <Badge variant="outline">Unknown</Badge>
+    }
+  }
+
+  return (
+    <Card className="w-80 h-full overflow-auto">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={onBackToAgent}
+              title="Back to agent details"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <CardTitle className="text-lg">{substep.name}</CardTitle>
+          </div>
+          {getLlmUsageBadge(substep.llmUsage)}
+        </div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Sub-step {substepIndex + 1} of {agentSubsteps?.length || 0} in {agentId.replace(/_/g, ' ')}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Description */}
+        <div>
+          <div className="text-sm text-muted-foreground">{substep.description}</div>
+        </div>
+
+        <Separator />
+
+        {/* Inputs */}
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm flex items-center gap-2">
+            <ChevronRight className="h-4 w-4 text-blue-500" />
+            Inputs
+          </h4>
+          <ul className="text-sm space-y-1 pl-4">
+            {substep.inputs.map((input, idx) => (
+              <li key={idx} className="text-muted-foreground flex items-start gap-1">
+                <span className="text-blue-400">•</span>
+                {input}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Outputs */}
+        <div className="space-y-2">
+          <h4 className="font-medium text-sm flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            Outputs
+          </h4>
+          <ul className="text-sm space-y-1 pl-4">
+            {substep.outputs.map((output, idx) => (
+              <li key={idx} className="text-muted-foreground flex items-start gap-1">
+                <span className="text-green-400">•</span>
+                {output}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Technical Note */}
+        {substep.techNote && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm flex items-center gap-2">
+                <Brain className="h-4 w-4 text-purple-500" />
+                Technical Note
+              </h4>
+              <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                {substep.techNote}
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* Short Name for identification */}
+        <Separator />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>ID: {substep.id}</span>
+          <span>Short: {substep.shortName}</span>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
