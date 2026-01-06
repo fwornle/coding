@@ -723,37 +723,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           </>
         )}
 
-        {/* Show initializing state when process exists but data is incomplete */}
-        {activeCurrentProcess && (!activeCurrentProcess.workflowName || activeCurrentProcess.totalSteps === 0) && (
+        {/* Show minimal loading indicator when data is still being fetched
+            Only show for genuine first-time loads - not during refreshes */}
+        {activeCurrentProcess && !activeCurrentProcess.workflowName && !activeCurrentProcess.totalSteps && (
           <Card className="flex-shrink-0">
             <CardContent className="pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Status</div>
-                  <div className="font-medium flex items-center gap-2">
-                    <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                    <span>Initializing...</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Process ID</div>
-                  <div className="font-mono text-xs truncate">
-                    {activeCurrentProcess.pid || 'Pending...'}
-                  </div>
-                </div>
-                {activeCurrentProcess.team && (
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-1">Team</div>
-                    <div className="font-medium">{activeCurrentProcess.team}</div>
-                  </div>
-                )}
-                {activeCurrentProcess.repositoryPath && (
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-1">Repository</div>
-                    <div className="font-medium text-sm truncate">
-                      {activeCurrentProcess.repositoryPath?.split('/').slice(-2).join('/')}
-                    </div>
-                  </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Connecting to workflow...</span>
+                {activeCurrentProcess.pid && (
+                  <span className="text-xs font-mono ml-2">PID: {activeCurrentProcess.pid}</span>
                 )}
               </div>
             </CardContent>

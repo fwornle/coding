@@ -378,7 +378,35 @@ const ukbSlice = createSlice({
       state.stale = action.payload.summary?.stale || action.payload.stale || 0
       state.frozen = action.payload.summary?.frozen || action.payload.frozen || 0
       state.total = action.payload.summary?.total || action.payload.total || 0
-      state.processes = action.payload.processes || []
+
+      // Merge new processes with existing ones to preserve valid data during refreshes
+      // This prevents the "Initializing..." flash when API briefly returns incomplete data
+      const newProcesses = action.payload.processes || []
+      const existingProcessMap = new Map(state.processes.map(p => [p.pid, p]))
+
+      state.processes = newProcesses.map((newProcess: UKBProcess) => {
+        const existing = existingProcessMap.get(newProcess.pid)
+
+        // If new data has valid workflowName and totalSteps, use it entirely
+        if (newProcess.workflowName && newProcess.totalSteps > 0) {
+          return newProcess
+        }
+
+        // If we have existing valid data and new data is incomplete, merge
+        if (existing && existing.workflowName && existing.totalSteps > 0) {
+          return {
+            ...existing,
+            ...newProcess,
+            // Preserve these critical fields if new data is incomplete
+            workflowName: newProcess.workflowName || existing.workflowName,
+            totalSteps: newProcess.totalSteps > 0 ? newProcess.totalSteps : existing.totalSteps,
+          }
+        }
+
+        // Otherwise use new process as-is
+        return newProcess
+      })
+
       if (action.payload.config) {
         state.config = action.payload.config
       }

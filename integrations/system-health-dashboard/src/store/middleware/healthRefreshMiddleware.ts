@@ -19,6 +19,7 @@ import {
   fetchUKBStatusSuccess,
   fetchUKBStatusFailure,
 } from '../slices/ukbSlice'
+import { Logger, LogCategories } from '../../utils/logging'
 
 const API_PORT = process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}/api/health-verifier`
@@ -28,14 +29,18 @@ const UKB_API_URL = `http://localhost:${API_PORT}/api/ukb`
 class HealthRefreshManager {
   private refreshInterval: NodeJS.Timeout | null = null
   private store: any = null
+  private refreshCount = 0
 
   initialize(store: any) {
     this.store = store
+    Logger.info(LogCategories.REFRESH, 'HealthRefreshManager initialized')
     this.startAutoRefresh()
   }
 
   startAutoRefresh() {
     if (this.refreshInterval) return
+
+    Logger.info(LogCategories.REFRESH, 'Starting auto-refresh cycle (5s interval)')
 
     // Initial fetch
     this.fetchAllData()
@@ -50,11 +55,15 @@ class HealthRefreshManager {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval)
       this.refreshInterval = null
+      Logger.info(LogCategories.REFRESH, 'Auto-refresh stopped')
     }
   }
 
   async fetchAllData() {
     if (!this.store) return
+
+    this.refreshCount++
+    Logger.debug(LogCategories.REFRESH, `Refresh cycle #${this.refreshCount} started`)
 
     // Fetch health status
     await this.fetchHealthStatus()
@@ -64,6 +73,8 @@ class HealthRefreshManager {
     await this.fetchAPIQuota()
     // Fetch UKB process status
     await this.fetchUKBStatus()
+
+    Logger.debug(LogCategories.REFRESH, `Refresh cycle #${this.refreshCount} completed`)
   }
 
   private async fetchHealthStatus() {
@@ -141,11 +152,27 @@ class HealthRefreshManager {
 
       const result = await response.json()
       if (result.status === 'success' && result.data) {
+        const processes = result.data.processes || []
+
+        // Log UKB process details for debugging
+        if (processes.length > 0) {
+          processes.forEach((p: any) => {
+            const hasValidData = p.workflowName && p.totalSteps > 0
+            Logger.debug(
+              LogCategories.UKB,
+              `Process ${p.pid}: ${p.workflowName || '(no name)'} ` +
+              `[${p.completedSteps || 0}/${p.totalSteps || 0}] ` +
+              `status=${p.status} valid=${hasValidData}`
+            )
+          })
+        }
+
         this.store.dispatch(fetchUKBStatusSuccess(result.data))
       } else {
         throw new Error(result.message || 'Invalid response format')
       }
     } catch (error: any) {
+      Logger.warn(LogCategories.UKB, 'Failed to fetch UKB status:', error.message)
       this.store.dispatch(fetchUKBStatusFailure(error.message))
     }
   }
