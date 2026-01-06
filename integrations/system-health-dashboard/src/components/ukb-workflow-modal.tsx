@@ -42,6 +42,7 @@ import {
 import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, STEP_TO_AGENT } from './workflow'
 import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
+import { Logger, LogCategories } from '@/utils/logging'
 import {
   setActiveTab,
   setSelectedProcessIndex,
@@ -108,16 +109,20 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // Fetch step timing statistics on mount (for learned progress estimation)
   useEffect(() => {
     const fetchStatistics = async () => {
+      Logger.debug(LogCategories.API, 'Fetching workflow statistics')
       dispatch(fetchStatisticsStart())
       try {
         const response = await fetch(`${apiBaseUrl}/api/workflows/statistics`)
         if (response.ok) {
           const result = await response.json()
+          Logger.debug(LogCategories.API, 'Workflow statistics loaded', { sampleCount: result.data?.workflowTypes })
           dispatch(fetchStatisticsSuccess(result.data))
         } else {
+          Logger.warn(LogCategories.API, `Failed to fetch statistics: HTTP ${response.status}`)
           dispatch(fetchStatisticsFailure())
         }
-      } catch {
+      } catch (error) {
+        Logger.error(LogCategories.API, 'Error fetching statistics', error)
         dispatch(fetchStatisticsFailure())
       }
     }
@@ -140,31 +145,33 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     e.stopPropagation()
     e.preventDefault()
 
+    Logger.info(LogCategories.UKB, 'Cancel workflow requested by user')
+
     // Confirm before cancelling
     if (!window.confirm('Are you sure you want to cancel the workflow? This will kill the running process.')) {
+      Logger.debug(LogCategories.UKB, 'Cancel workflow aborted by user')
       return
     }
 
     setCancelLoading(true)
     try {
-      console.log('Cancelling workflow via API:', `${apiBaseUrl}/api/ukb/cancel`)
+      Logger.info(LogCategories.API, 'Cancelling workflow via API', { url: `${apiBaseUrl}/api/ukb/cancel` })
       const response = await fetch(`${apiBaseUrl}/api/ukb/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ killProcesses: true })
       })
       const data = await response.json()
-      console.log('Cancel API response:', data)
       if (data.status === 'success') {
-        console.log('Workflow cancelled:', data.data)
+        Logger.info(LogCategories.UKB, 'Workflow cancelled successfully', data.data)
         // Refresh after short delay to show updated state
         setTimeout(() => window.location.reload(), 1500)
       } else {
-        console.error('Failed to cancel workflow:', data.message)
+        Logger.error(LogCategories.UKB, 'Failed to cancel workflow', { message: data.message })
         alert(`Failed to cancel workflow: ${data.message || 'Unknown error'}`)
       }
     } catch (error) {
-      console.error('Error cancelling workflow:', error)
+      Logger.error(LogCategories.UKB, 'Error cancelling workflow', error)
       alert(`Error cancelling workflow: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setCancelLoading(false)
@@ -201,33 +208,42 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   }, [open, activeTab])
 
   const loadHistoricalWorkflows = async () => {
+    Logger.debug(LogCategories.API, 'Loading historical workflows')
     dispatch(fetchHistoryStart())
     try {
       const response = await fetch(`${apiBaseUrl}/api/ukb/history?limit=50`)
       const result = await response.json()
       if (result.status === 'success') {
+        Logger.info(LogCategories.UKB, `Loaded ${result.data?.length || 0} historical workflows`)
         dispatch(fetchHistorySuccess(result.data))
       } else {
+        Logger.warn(LogCategories.API, 'Failed to load historical workflows', { message: result.message })
         dispatch(fetchHistoryFailure('Failed to load workflows'))
       }
     } catch (error) {
-      console.error('Failed to fetch historical workflows:', error)
+      Logger.error(LogCategories.API, 'Error fetching historical workflows', error)
       dispatch(fetchHistoryFailure(String(error)))
     }
   }
 
   const loadHistoricalWorkflowDetail = async (workflowId: string) => {
+    Logger.debug(LogCategories.API, `Loading workflow detail: ${workflowId}`)
     dispatch(fetchDetailStart())
     try {
       const response = await fetch(`${apiBaseUrl}/api/ukb/history/${workflowId}`)
       const result = await response.json()
       if (result.status === 'success') {
+        Logger.info(LogCategories.UKB, `Workflow detail loaded: ${workflowId}`, {
+          steps: result.data?.steps?.length || 0,
+          status: result.data?.status
+        })
         dispatch(fetchDetailSuccess(result.data))
       } else {
+        Logger.warn(LogCategories.API, 'Failed to load workflow detail', { workflowId, message: result.message })
         dispatch(fetchDetailFailure('Failed to load workflow detail'))
       }
     } catch (error) {
-      console.error('Failed to fetch workflow detail:', error)
+      Logger.error(LogCategories.API, 'Error fetching workflow detail', { workflowId, error })
       dispatch(fetchDetailFailure(String(error)))
     }
   }
@@ -241,10 +257,12 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   }, [selectedHistoricalWorkflowState])
 
   const handleNodeClick = (agentId: string) => {
+    Logger.debug(LogCategories.AGENT, `Node clicked: ${agentId}`)
     dispatch(setSelectedNode(agentId))
   }
 
   const handleCloseSidebar = () => {
+    Logger.debug(LogCategories.UI, 'Closing node details sidebar')
     dispatch(setSelectedNode(null))
   }
 

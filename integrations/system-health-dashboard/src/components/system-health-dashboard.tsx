@@ -20,24 +20,36 @@ import {
   Zap,
   ExternalLink,
   Brain,
-  RotateCcw
+  RotateCcw,
+  Terminal
 } from 'lucide-react'
 import HealthStatusCard from './health-status-card'
 import ViolationsTable from './violations-table'
 import SystemChecksTable from './system-checks-table'
 import UKBWorkflowModal from './ukb-workflow-modal'
 import CGRReindexModal from './cgr-reindex-modal'
+import LoggingControl from './logging-control'
 import { openConfirmModal } from '@/store/slices/cgrSlice'
+import { Logger, LogCategories } from '@/utils/logging'
 
 export default function SystemHealthDashboard() {
   const dispatch = useAppDispatch()
   const healthStatus = useAppSelector((state) => state.healthStatus)
   const [ukbModalOpen, setUkbModalOpen] = useState(false)
+  const [loggingControlOpen, setLoggingControlOpen] = useState(false)
   const healthReport = useAppSelector((state) => state.healthReport)
   const autoHealing = useAppSelector((state) => state.autoHealing)
   const apiQuota = useAppSelector((state) => state.apiQuota)
   const ukb = useAppSelector((state) => state.ukb)
   const cgr = useAppSelector((state) => state.cgr)
+
+  // Log component mount
+  useEffect(() => {
+    Logger.info(LogCategories.UI, 'SystemHealthDashboard mounted')
+    return () => {
+      Logger.debug(LogCategories.UI, 'SystemHealthDashboard unmounted')
+    }
+  }, [])
 
   // Real-time age calculation - updates every second
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -397,6 +409,17 @@ export default function SystemHealthDashboard() {
               Constraint Dashboard
             </a>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              Logger.info(LogCategories.MODAL, 'Opening Logger configuration modal')
+              setLoggingControlOpen(true)
+            }}
+          >
+            <Terminal className="h-4 w-4 mr-2" />
+            Logger
+          </Button>
         </div>
       </div>
 
@@ -549,6 +572,12 @@ export default function SystemHealthDashboard() {
 
       {/* CGR Re-index Modal */}
       <CGRReindexModal />
+
+      {/* Logger Configuration Modal */}
+      <LoggingControl
+        isOpen={loggingControlOpen}
+        onClose={() => setLoggingControlOpen(false)}
+      />
     </div>
   )
 }
