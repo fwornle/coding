@@ -871,12 +871,24 @@ class SystemHealthAPIServer {
                     // Check if process is still running
                     try {
                         process.kill(pid, 0); // Signal 0 = check if process exists
-                        // Process exists, kill it
+                        // Process exists, kill it with SIGTERM first
+                        console.log(`🛑 Sending SIGTERM to workflow process PID ${pid}`);
                         process.kill(pid, 'SIGTERM');
                         killedWorkflowPid = pid;
-                        console.log(`🛑 Killed workflow process PID ${pid}`);
-                        // Give process time to terminate
-                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // Give process time to terminate gracefully
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        // Check if process is still running - if so, force kill with SIGKILL
+                        try {
+                            process.kill(pid, 0); // Check if still exists
+                            console.log(`🛑 Process ${pid} still alive after SIGTERM, sending SIGKILL`);
+                            process.kill(pid, 'SIGKILL');
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        } catch (checkErr) {
+                            // Process terminated after SIGTERM - good
+                            console.log(`✅ Process ${pid} terminated after SIGTERM`);
+                        }
                     } catch (e) {
                         if (e.code !== 'ESRCH') {
                             // ESRCH = process doesn't exist, which is fine
