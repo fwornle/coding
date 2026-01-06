@@ -95,17 +95,16 @@ export default function CGRReindexModal() {
   }
 
   const handleClose = () => {
-    if (cgr.reindexStatus === 'idle' || cgr.reindexStatus === 'completed' || cgr.reindexStatus === 'failed') {
-      Logger.debug(LogCategories.MODAL, `CGR modal closing with status: ${cgr.reindexStatus}`)
-      dispatch(closeConfirmModal())
-      if (cgr.reindexStatus === 'completed' || cgr.reindexStatus === 'failed') {
-        dispatch(reindexReset())
-      }
+    Logger.debug(LogCategories.MODAL, `CGR modal closing with status: ${cgr.reindexStatus}`)
+    dispatch(closeConfirmModal())
+    // Only reset if completed/failed - running operations continue in background
+    if (cgr.reindexStatus === 'completed' || cgr.reindexStatus === 'failed') {
+      dispatch(reindexReset())
     }
   }
 
-  const isOpen = cgr.showConfirmModal || cgr.reindexStatus === 'running' ||
-                 cgr.reindexStatus === 'completed' || cgr.reindexStatus === 'failed'
+  // Modal is only open when explicitly requested - user can close it even during running
+  const isOpen = cgr.showConfirmModal
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -209,8 +208,8 @@ export default function CGRReindexModal() {
             </>
           )}
           {cgr.reindexStatus === 'running' && (
-            <Button variant="outline" disabled>
-              Running in background...
+            <Button variant="outline" onClick={handleClose}>
+              Close (continues in background)
             </Button>
           )}
           {(cgr.reindexStatus === 'completed' || cgr.reindexStatus === 'failed') && (
