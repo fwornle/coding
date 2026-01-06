@@ -8,7 +8,7 @@
 
 import express from 'express';
 import { createServer } from 'http';
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
@@ -616,6 +616,16 @@ class SystemHealthAPIServer {
                 const isRelevant = age < 1800000 || inferredStatus === 'running';
 
                 if (isRelevant && !alreadyRegistered) {
+                    // Guard against partial reads that result in 0/0 (race condition during file writes)
+                    const completedSteps = workflowProgress.completedSteps || 0;
+                    const totalSteps = workflowProgress.totalSteps || 0;
+
+                    // Skip if we got invalid data (0/0 is not valid for a running workflow)
+                    if (totalSteps === 0 && inferredStatus === 'running') {
+                        console.warn('Skipping inline process update - got 0/0 steps (likely partial read)');
+                        // Still add the process but mark it as stale to avoid 0/0 display
+                    }
+
                     // Add a synthetic process entry for the inline MCP workflow
                     const inlineProcess = {
                         pid: 'mcp-inline',
@@ -625,8 +635,8 @@ class SystemHealthAPIServer {
                         startTime: workflowProgress.startTime,
                         lastHeartbeat: workflowProgress.lastUpdate,
                         status: inferredStatus,
-                        completedSteps: workflowProgress.completedSteps || 0,
-                        totalSteps: workflowProgress.totalSteps || 0,
+                        completedSteps: completedSteps,
+                        totalSteps: totalSteps,
                         currentStep: workflowProgress.currentStep,
                         stepsCompleted: workflowProgress.stepsCompleted || [],
                         stepsFailed: workflowProgress.stepsFailed || [],
@@ -815,16 +825,19 @@ class SystemHealthAPIServer {
 
     /**
      * Cancel/kill a running or frozen workflow
-     * Resets the workflow-progress.json and kills the workflow process
+     * Writes abort signal file AND resets workflow-progress.json
+     * For MCP-inline workflows, uses abort signal file (no PID to kill)
      */
     async handleCancelWorkflow(req, res) {
         try {
             const { killProcesses = false } = req.body;
             const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+            const abortPath = join(codingRoot, '.data', 'workflow-abort.json');
 
             let previousState = null;
             let killedProcesses = [];
             let killedWorkflowPid = null;
+            let usedAbortSignal = false;
 
             // Read current state before resetting
             if (existsSync(progressPath)) {
@@ -835,9 +848,24 @@ class SystemHealthAPIServer {
                 }
             }
 
-            // CRITICAL: Kill the workflow process FIRST using its PID
-            // This prevents the workflow from overwriting our cancelled state
-            if (killProcesses && previousState?.pid) {
+            // CRITICAL: Write abort signal file FIRST
+            // This is checked by the coordinator before every progress write
+            // Works for BOTH MCP-inline workflows and external processes
+            if (previousState?.executionId || previousState?.workflowId) {
+                const abortSignal = {
+                    abort: true,
+                    workflowId: previousState.executionId || previousState.workflowId,
+                    workflowName: previousState.workflowName,
+                    timestamp: new Date().toISOString(),
+                    reason: 'User cancelled via dashboard'
+                };
+                writeFileSync(abortPath, JSON.stringify(abortSignal, null, 2));
+                usedAbortSignal = true;
+                console.log(`🛑 Wrote abort signal for workflow: ${abortSignal.workflowId}`);
+            }
+
+            // For numeric PIDs (non-MCP-inline), also try to kill the process
+            if (killProcesses && previousState?.pid && typeof previousState.pid === 'number') {
                 try {
                     const pid = previousState.pid;
                     // Check if process is still running
@@ -860,10 +888,11 @@ class SystemHealthAPIServer {
                 }
             }
 
-            // Reset workflow progress to idle state
+            // Reset workflow progress to cancelled state
             const resetState = {
                 status: 'cancelled',
                 workflow: previousState?.workflowName || null,
+                executionId: previousState?.executionId || null,
                 previousStatus: previousState?.status || 'unknown',
                 cancelledAt: new Date().toISOString(),
                 stepsDetail: [],
@@ -878,7 +907,7 @@ class SystemHealthAPIServer {
                 killedProcesses = ukbManager.cleanupStaleProcesses(false);
             }
 
-            console.log(`🛑 Workflow cancelled: ${previousState?.workflowName || 'unknown'} (was: ${previousState?.status || 'unknown'})`);
+            console.log(`🛑 Workflow cancelled: ${previousState?.workflowName || 'unknown'} (was: ${previousState?.status || 'unknown'})${usedAbortSignal ? ' [abort signal sent]' : ''}`);
 
             res.json({
                 status: 'success',
@@ -890,6 +919,7 @@ class SystemHealthAPIServer {
                     totalSteps: previousState?.totalSteps || 0,
                     killedWorkflowPid,
                     killedStaleProcesses: killedProcesses.length,
+                    usedAbortSignal,
                     timestamp: new Date().toISOString()
                 }
             });
@@ -910,6 +940,17 @@ class SystemHealthAPIServer {
         try {
             const { workflowName = 'complete-analysis', team = 'coding', repositoryPath } = req.body;
             const repoPath = repositoryPath || codingRoot;
+
+            // Clean up any stale abort signal from previous cancelled workflow
+            const abortPath = join(codingRoot, '.data', 'workflow-abort.json');
+            if (existsSync(abortPath)) {
+                try {
+                    unlinkSync(abortPath);
+                    console.log('🧹 Cleaned up stale abort signal file');
+                } catch (e) {
+                    console.warn('Failed to cleanup abort file:', e.message);
+                }
+            }
 
             const ukbManager = new UKBProcessManager();
             const result = await ukbManager.startWorkflow(workflowName, team, repoPath);

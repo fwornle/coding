@@ -238,12 +238,18 @@ class UKBProcessManager {
       if (existsSync(CONFIG.progressPath)) {
         try {
           const progress = JSON.parse(readFileSync(CONFIG.progressPath, 'utf8'));
-          proc.completedSteps = progress.completedSteps || 0;
-          proc.totalSteps = progress.totalSteps || 0;
-          proc.currentStep = progress.currentStep || null;
+          // Only update if valid values (avoid 0/0 glitch from partial reads)
+          const newCompletedSteps = progress.completedSteps || 0;
+          const newTotalSteps = progress.totalSteps || 0;
+          // Keep previous values if new read returns 0/0 (race condition during file write)
+          if (newTotalSteps > 0 || !proc.totalSteps) {
+            proc.completedSteps = newCompletedSteps;
+            proc.totalSteps = newTotalSteps;
+          }
+          proc.currentStep = progress.currentStep || proc.currentStep || null;
           proc.lastProgress = new Date().toISOString();
         } catch (e) {
-          // Ignore progress read errors
+          // Ignore progress read errors - keep previous values
         }
       }
 

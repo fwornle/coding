@@ -66,14 +66,26 @@ export interface OntologySystem {
 /**
  * Create and initialize a complete ontology system
  *
+ * IMPORTANT: inferenceEngine is REQUIRED. No mock fallback is provided.
+ * Pass a real LLM inference engine from SemanticAnalyzer.
+ *
  * @param config - Ontology system configuration
- * @param inferenceEngine - LLM inference engine (optional, required for LLM classification)
+ * @param inferenceEngine - LLM inference engine (REQUIRED for classification)
  * @returns Initialized ontology system
+ * @throws Error if inferenceEngine is not provided
  */
 export async function createOntologySystem(
   config: OntologyConfig,
-  inferenceEngine?: UnifiedInferenceEngine
+  inferenceEngine: UnifiedInferenceEngine
 ): Promise<OntologySystem> {
+  // Validate inference engine is provided - NO MOCK FALLBACK
+  if (!inferenceEngine) {
+    throw new Error(
+      'createOntologySystem requires an inferenceEngine. ' +
+      'No mock fallback is provided. Pass a real LLM inference engine from SemanticAnalyzer.'
+    );
+  }
+
   // Create manager and initialize
   const manager = new OntologyManager(config);
   await manager.initialize();
@@ -84,22 +96,7 @@ export async function createOntologySystem(
   // Create heuristic classifier
   const heuristicClassifier = createHeuristicClassifier();
 
-  // Create main classifier (requires inference engine for LLM classification)
-  if (!inferenceEngine) {
-    // Create a mock inference engine if not provided
-    inferenceEngine = {
-      generateCompletion: async () => ({
-        content: JSON.stringify({
-          entityClass: 'Unknown',
-          confidence: 0,
-          reasoning: 'No inference engine provided',
-        }),
-        model: 'mock',
-        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-      }),
-    } as UnifiedInferenceEngine;
-  }
-
+  // Create main classifier with provided inference engine
   const classifier = new OntologyClassifier(
     manager,
     validator,
