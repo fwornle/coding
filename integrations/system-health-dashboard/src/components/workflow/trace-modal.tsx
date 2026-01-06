@@ -159,6 +159,31 @@ export function TraceModal({
     return `${minutes}m ${seconds}s`
   }
 
+  // Format model name for display - shorten common model names
+  const formatModelName = (modelOrProvider: string): string => {
+    // Handle aggregated provider lists like "groq, ollama"
+    if (modelOrProvider.includes(', ')) {
+      // Multiple providers - show as multi
+      return 'multi-llm'
+    }
+    // Clean up common model name patterns for better display
+    const model = modelOrProvider.toLowerCase()
+    if (model.includes('llama') && model.includes('70b')) return 'llama-70b'
+    if (model.includes('llama') && model.includes('8b')) return 'llama-8b'
+    if (model.includes('llama')) return 'llama'
+    if (model.includes('gemma')) return 'gemma'
+    if (model.includes('mixtral')) return 'mixtral'
+    if (model.includes('claude')) return 'claude'
+    if (model.includes('gpt-4')) return 'gpt-4'
+    if (model.includes('gpt-3')) return 'gpt-3.5'
+    if (model === 'anthropic') return 'claude'
+    if (model === 'groq') return 'groq'
+    if (model === 'ollama') return 'ollama'
+    if (model === 'openai') return 'openai'
+    // Return first 12 chars if too long
+    return modelOrProvider.length > 12 ? modelOrProvider.slice(0, 12) : modelOrProvider
+  }
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -300,11 +325,11 @@ export function TraceModal({
                           {formatDuration(event.duration)}
                         </div>
 
-                        {/* LLM indicator */}
-                        <div className="w-16 text-right">
+                        {/* LLM indicator - show specific model name */}
+                        <div className="w-24 text-right">
                           {event.llmProvider && (
-                            <Badge variant="outline" className="text-[10px] h-5">
-                              {event.llmProvider === 'anthropic' ? 'Claude' : event.llmProvider}
+                            <Badge variant="outline" className="text-[10px] h-5 truncate max-w-[90px]" title={event.llmProvider}>
+                              {formatModelName(event.llmProvider)}
                             </Badge>
                           )}
                         </div>

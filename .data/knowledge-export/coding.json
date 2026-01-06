@@ -2864,12 +2864,24 @@
         "Handles external communication (commit: 2bd52dc4)",
         "Files: 46, Impact: medium, Commit: 2bd52dc4",
         "Handles external communication (commit: 7fa7f1bf)",
-        "Files: 58, Impact: medium, Commit: 7fa7f1bf"
+        "Files: 58, Impact: medium, Commit: 7fa7f1bf",
+        "Handles external communication (commit: 564b421e)",
+        "Files: 79, Impact: high, Commit: 564b421e",
+        "Handles external communication (commit: 6e617b84)",
+        "Files: 66, Impact: medium, Commit: 6e617b84",
+        "Handles external communication (commit: 5ea43dbe)",
+        "Files: 50, Impact: medium, Commit: 5ea43dbe",
+        "Handles external communication (commit: c3006d0e)",
+        "Files: 33, Impact: low, Commit: c3006d0e",
+        "Handles external communication (commit: 5cde8a03)",
+        "Files: 41, Impact: medium, Commit: 5cde8a03",
+        "Handles external communication (commit: 5579d141)",
+        "Files: 49, Impact: medium, Commit: 5579d141"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:07.802Z",
-        "last_updated": "2026-01-06T11:58:31.969Z"
+        "last_updated": "2026-01-06T12:08:48.051Z"
       },
       "id": "mc4flkg8f9hrrq"
     },
@@ -3151,12 +3163,20 @@
         },
         "Files: 21, Impact: low, Commit: fa5b8ae9",
         "Files: 49, Impact: medium, Commit: fba3b7f8",
-        "Files: 16, Impact: low, Commit: 2bd52dc4"
+        "Files: 16, Impact: low, Commit: 2bd52dc4",
+        "Files: 23, Impact: low, Commit: 7fa7f1bf",
+        "Files: 46, Impact: medium, Commit: 564b421e",
+        "Files: 35, Impact: low, Commit: 6e617b84",
+        "Files: 4, Impact: low, Commit: c3006d0e",
+        "Similar repository decisions in Markdown, JavaScript, JSON, TypeScript projects",
+        "Files: 30, Impact: medium, Commit: 5cde8a03",
+        "Files: 29, Impact: medium, Commit: 5579d141",
+        "Files: 29, Impact: low, Commit: 5ea43dbe"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:41.369Z",
-        "last_updated": "2026-01-06T11:57:48.043Z"
+        "last_updated": "2026-01-06T12:09:57.295Z"
       },
       "id": "mc4flkg8fcjz12"
     },
@@ -3507,12 +3527,27 @@
         "Reusable UI building blocks (commit: 2bd52dc4)",
         "Files: 36, Impact: medium, Commit: 2bd52dc4",
         "Reusable UI building blocks (commit: 7fa7f1bf)",
-        "Files: 40, Impact: medium, Commit: 7fa7f1bf"
+        "Files: 40, Impact: medium, Commit: 7fa7f1bf",
+        "Reusable UI building blocks (commit: 564b421e)",
+        "Files: 59, Impact: medium, Commit: 564b421e",
+        "Reusable UI building blocks (commit: 6e617b84)",
+        "Files: 30, Impact: low, Commit: 6e617b84",
+        "Reusable UI building blocks (commit: c3006d0e)",
+        "Files: 22, Impact: low, Commit: c3006d0e",
+        "Reusable UI building blocks (commit: 5cde8a03)",
+        "Files: 33, Impact: medium, Commit: 5cde8a03",
+        "Reusable UI building blocks (commit: 5579d141)",
+        "Files: 32, Impact: medium, Commit: 5579d141",
+        "Reusable UI building blocks (commit: 5ea43dbe)",
+        "Similar component decisions in JavaScript, Markdown, JSON, TypeScript projects",
+        "Files: 35, Impact: medium, Commit: 5ea43dbe",
+        "Reusable UI building blocks (commit: 52422ff0)",
+        "Files: 27, Impact: medium, Commit: 52422ff0"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:52.821Z",
-        "last_updated": "2026-01-06T11:58:55.476Z"
+        "last_updated": "2026-01-06T12:10:40.248Z"
       },
       "id": "mc4flkg1t4zsw0"
     },
@@ -3613,12 +3648,18 @@
         "Files: 47, Impact: medium, Commit: fa5b8ae9",
         "Files: 67, Impact: medium, Commit: fba3b7f8",
         "Files: 38, Impact: medium, Commit: 2bd52dc4",
-        "Files: 43, Impact: medium, Commit: 7fa7f1bf"
+        "Files: 43, Impact: medium, Commit: 7fa7f1bf",
+        "Files: 56, Impact: medium, Commit: 564b421e",
+        "Files: 68, Impact: medium, Commit: 6e617b84",
+        "Files: 17, Impact: low, Commit: c3006d0e",
+        "Files: 34, Impact: medium, Commit: 5cde8a03",
+        "Files: 33, Impact: medium, Commit: 5579d141",
+        "Files: 31, Impact: medium, Commit: 5ea43dbe"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:11.546Z",
-        "last_updated": "2026-01-06T11:58:40.095Z"
+        "last_updated": "2026-01-06T12:09:45.180Z"
       },
       "id": "mc4flkg49raoty"
     },
@@ -3963,12 +4004,24 @@
         "Similar promise decisions in Markdown, JavaScript, TypeScript projects",
         "Files: 40, Impact: medium, Commit: 2bd52dc4",
         "Handles asynchronous operations (commit: 7fa7f1bf)",
-        "Files: 70, Impact: high, Commit: 7fa7f1bf"
+        "Files: 70, Impact: high, Commit: 7fa7f1bf",
+        "Handles asynchronous operations (commit: 564b421e)",
+        "Files: 77, Impact: high, Commit: 564b421e",
+        "Handles asynchronous operations (commit: 6e617b84)",
+        "Files: 45, Impact: medium, Commit: 6e617b84",
+        "Handles asynchronous operations (commit: c3006d0e)",
+        "Files: 12, Impact: low, Commit: c3006d0e",
+        "Handles asynchronous operations (commit: 5cde8a03)",
+        "Files: 34, Impact: medium, Commit: 5cde8a03",
+        "Handles asynchronous operations (commit: 5579d141)",
+        "Files: 43, Impact: medium, Commit: 5579d141",
+        "Handles asynchronous operations (commit: 5ea43dbe)",
+        "Files: 41, Impact: medium, Commit: 5ea43dbe"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:22.012Z",
-        "last_updated": "2026-01-06T11:58:11.029Z"
+        "last_updated": "2026-01-06T12:09:20.103Z"
       },
       "id": "mc4flkgrb6pg4"
     },
@@ -4318,18 +4371,30 @@
         "Contains business logic (commit: 2bd52dc4)",
         "Files: 46, Impact: medium, Commit: 2bd52dc4",
         "Contains business logic (commit: 7fa7f1bf)",
-        "Files: 59, Impact: medium, Commit: 7fa7f1bf"
+        "Files: 59, Impact: medium, Commit: 7fa7f1bf",
+        "Contains business logic (commit: 564b421e)",
+        "Similar service decisions in JavaScript, JSON, Markdown, TypeScript projects",
+        "Files: 74, Impact: high, Commit: 564b421e",
+        "Contains business logic (commit: 6e617b84)",
+        "Files: 44, Impact: medium, Commit: 6e617b84",
+        "Contains business logic (commit: c3006d0e)",
+        "Files: 24, Impact: low, Commit: c3006d0e",
+        "Contains business logic (commit: 5cde8a03)",
+        "Files: 44, Impact: high, Commit: 5cde8a03",
+        "Contains business logic (commit: 5579d141)",
+        "Files: 43, Impact: medium, Commit: 5579d141",
+        "Contains business logic (commit: 5ea43dbe)"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:33.610Z",
-        "last_updated": "2026-01-06T11:58:20.917Z"
+        "last_updated": "2026-01-06T12:09:08.390Z"
       },
       "id": "mc4flkggu4sm2"
     },
     {
       "name": "MiddlewareProcessesRequestsInPattern",
-      "entityType": "AnalysisArtifact",
+      "entityType": "Insight",
       "observations": [
         {
           "type": "insight",
@@ -4507,12 +4572,24 @@
         "Similar middleware decisions in Markdown, JSON, JavaScript, TypeScript projects",
         "Files: 23, Impact: low, Commit: 2bd52dc4",
         "Processes requests in a pipeline (commit: 7fa7f1bf)",
-        "Files: 29, Impact: low, Commit: 7fa7f1bf"
+        "Files: 29, Impact: low, Commit: 7fa7f1bf",
+        "Processes requests in a pipeline (commit: 564b421e)",
+        "Files: 36, Impact: low, Commit: 564b421e",
+        "Processes requests in a pipeline (commit: 6e617b84)",
+        "Files: 12, Impact: low, Commit: 6e617b84",
+        "Processes requests in a pipeline (commit: c3006d0e)",
+        "Files: 5, Impact: low, Commit: c3006d0e",
+        "Processes requests in a pipeline (commit: 5cde8a03)",
+        "Files: 15, Impact: low, Commit: 5cde8a03",
+        "Processes requests in a pipeline (commit: 5579d141)",
+        "Files: 13, Impact: low, Commit: 5579d141",
+        "Processes requests in a pipeline (commit: 5ea43dbe)",
+        "Files: 6, Impact: low, Commit: 5ea43dbe"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:43.826Z",
-        "last_updated": "2026-01-06T11:59:04.858Z"
+        "last_updated": "2026-01-06T12:10:11.338Z"
       },
       "id": "mc4flkg234nsck"
     },
@@ -4871,18 +4948,22 @@
           "metadata": {
             "source": "workflow_persist"
           }
-        }
+        },
+        "Similar factory decisions in Markdown, JavaScript, TypeScript projects",
+        "Files: 8, Impact: low, Commit: 5cde8a03",
+        "Files: 6, Impact: low, Commit: 5579d141",
+        "Files: 3, Impact: low, Commit: 5ea43dbe"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:50:33.041Z",
-        "last_updated": "2026-01-06T11:50:33.041Z"
+        "last_updated": "2026-01-06T12:10:20.203Z"
       },
       "id": "mc4flkg6ndkqb3"
     },
     {
       "name": "ObserverDefinesOnetomanyDependencyPattern",
-      "entityType": "AnalysisArtifact",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "insight",
@@ -4965,12 +5046,20 @@
           }
         },
         "Files: 5, Impact: low, Commit: 2bd52dc4",
-        "Files: 21, Impact: low, Commit: fba3b7f8"
+        "Files: 21, Impact: low, Commit: fba3b7f8",
+        "Files: 4, Impact: low, Commit: 7fa7f1bf",
+        "Files: 5, Impact: low, Commit: 564b421e",
+        "Files: 2, Impact: low, Commit: c3006d0e",
+        "Files: 1, Impact: low, Commit: 6e617b84",
+        "Files: 9, Impact: low, Commit: 5cde8a03",
+        "Similar observer decisions in TypeScript projects",
+        "Files: 3, Impact: low, Commit: 5ea43dbe",
+        "Files: 3, Impact: low, Commit: 5579d141"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:54:30.873Z",
-        "last_updated": "2026-01-06T11:57:57.912Z"
+        "last_updated": "2026-01-06T12:10:30.857Z"
       },
       "id": "mc4flkg3bi0z7r"
     }
@@ -5341,14 +5430,20 @@
       "to": "ObserverDefinesOnetomanyDependencyPattern",
       "relationType": "contains",
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "FactoryCreatesObjectsWithoutPattern",
+      "relationType": "contains",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-01-06T11:59:09.863Z",
+    "exported_at": "2026-01-06T12:10:45.251Z",
     "total_entities": 45,
-    "total_relations": 61,
+    "total_relations": 62,
     "description": "Coding project infrastructure and patterns"
   }
 }
