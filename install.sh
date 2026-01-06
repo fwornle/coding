@@ -1734,6 +1734,96 @@ EOF
     fi
 }
 
+# Install Ollama for local LLM inference (fallback when cloud APIs fail)
+install_ollama() {
+    info "Installing Ollama for local LLM inference..."
+
+    # Check if already installed
+    if command -v ollama >/dev/null 2>&1; then
+        success "✓ Ollama already installed"
+        # Ensure llama3.2:latest model is available
+        ensure_ollama_model
+        return 0
+    fi
+
+    case "$PLATFORM" in
+        macos)
+            if command -v brew >/dev/null 2>&1; then
+                info "Installing Ollama via Homebrew..."
+                if brew install ollama; then
+                    success "✓ Ollama installed via Homebrew"
+                    ensure_ollama_model
+                else
+                    warning "Failed to install Ollama via Homebrew"
+                    INSTALLATION_WARNINGS+=("Ollama: Failed to install via Homebrew")
+                    return 1
+                fi
+            else
+                # Fallback to official installer script
+                info "Installing Ollama via official script..."
+                if curl -fsSL https://ollama.com/install.sh | sh; then
+                    success "✓ Ollama installed via official script"
+                    ensure_ollama_model
+                else
+                    warning "Failed to install Ollama"
+                    INSTALLATION_WARNINGS+=("Ollama: Installation failed")
+                    return 1
+                fi
+            fi
+            ;;
+        linux)
+            info "Installing Ollama via official script..."
+            if curl -fsSL https://ollama.com/install.sh | sh; then
+                success "✓ Ollama installed"
+                ensure_ollama_model
+            else
+                warning "Failed to install Ollama"
+                INSTALLATION_WARNINGS+=("Ollama: Installation failed")
+                return 1
+            fi
+            ;;
+        windows)
+            warning "Windows: Please install Ollama manually from https://ollama.com/download"
+            INSTALLATION_WARNINGS+=("Ollama: Manual installation required on Windows")
+            return 1
+            ;;
+        *)
+            warning "Unknown platform, please install Ollama manually from https://ollama.com"
+            INSTALLATION_WARNINGS+=("Ollama: Manual installation required")
+            return 1
+            ;;
+    esac
+}
+
+# Ensure Ollama has the required model downloaded
+ensure_ollama_model() {
+    local model="llama3.2:latest"
+    info "Ensuring Ollama model '$model' is available..."
+
+    # Start ollama service if not running (needed for model operations)
+    if ! pgrep -x "ollama" >/dev/null 2>&1; then
+        info "Starting Ollama service..."
+        ollama serve >/dev/null 2>&1 &
+        sleep 2  # Give it time to start
+    fi
+
+    # Check if model exists
+    if ollama list 2>/dev/null | grep -q "llama3.2"; then
+        success "✓ Model '$model' already available"
+        return 0
+    fi
+
+    # Pull the model
+    info "Downloading model '$model' (this may take a few minutes)..."
+    if ollama pull "$model"; then
+        success "✓ Model '$model' downloaded successfully"
+    else
+        warning "Failed to download model '$model'"
+        warning "You can download it later with: ollama pull $model"
+        INSTALLATION_WARNINGS+=("Ollama: Model download failed, run 'ollama pull $model' manually")
+    fi
+}
+
 # Install Node.js dependencies for agent-agnostic functionality
 install_node_dependencies() {
     info "Installing Node.js dependencies for agent-agnostic functionality..."
@@ -1971,6 +2061,7 @@ main() {
     install_node_dependencies
     initialize_knowledge_databases
     install_plantuml
+    install_ollama
     detect_network_and_set_repos
     test_proxy_connectivity
     install_memory_visualizer
