@@ -2883,13 +2883,13 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:07.802Z",
-        "last_updated": "2026-01-06T13:58:53.008Z"
+        "last_updated": "2026-01-06T14:44:35.208Z"
       },
       "id": "mc4flkg8f9hrrq"
     },
     {
       "name": "RepositoryEncapsulatesDataAccessPattern",
-      "entityType": "Pattern",
+      "entityType": "AnalysisArtifact",
       "observations": [
         {
           "type": "insight",
@@ -3179,7 +3179,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:41.369Z",
-        "last_updated": "2026-01-06T13:59:02.902Z"
+        "last_updated": "2026-01-06T14:27:30.596Z"
       },
       "id": "mc4flkg8fcjz12"
     },
@@ -3768,7 +3768,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:52.821Z",
-        "last_updated": "2026-01-06T13:57:53.199Z"
+        "last_updated": "2026-01-06T14:31:48.548Z"
       },
       "id": "mc4flkg1t4zsw0"
     },
@@ -3887,7 +3887,7 @@
     },
     {
       "name": "PromiseHandlesAsynchronousOperationsPattern",
-      "entityType": "Pattern",
+      "entityType": "Insight",
       "observations": [
         {
           "type": "insight",
@@ -4245,7 +4245,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:22.012Z",
-        "last_updated": "2026-01-06T13:56:27.459Z"
+        "last_updated": "2026-01-06T14:44:23.321Z"
       },
       "id": "mc4flkgrb6pg4"
     },
@@ -4614,7 +4614,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:33.610Z",
-        "last_updated": "2026-01-06T13:54:31.997Z"
+        "last_updated": "2026-01-06T14:35:14.464Z"
       },
       "id": "mc4flkggu4sm2"
     },
@@ -4818,7 +4818,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:43.826Z",
-        "last_updated": "2026-01-06T13:51:31.107Z"
+        "last_updated": "2026-01-06T14:31:59.406Z"
       },
       "id": "mc4flkg234nsck"
     },
@@ -5156,7 +5156,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:50:33.041Z",
-        "last_updated": "2026-01-06T13:59:53.607Z"
+        "last_updated": "2026-01-06T14:39:39.548Z"
       },
       "id": "mc4flkg6ndkqb3"
     },
@@ -5260,7 +5260,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:54:30.873Z",
-        "last_updated": "2026-01-06T13:57:26.507Z"
+        "last_updated": "2026-01-06T14:42:04.162Z"
       },
       "id": "mc4flkg3bi0z7r"
     }
@@ -5642,7 +5642,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-01-06T14:24:06.112Z",
+    "exported_at": "2026-01-06T14:44:40.213Z",
     "total_entities": 45,
     "total_relations": 62,
     "description": "Coding project infrastructure and patterns"
