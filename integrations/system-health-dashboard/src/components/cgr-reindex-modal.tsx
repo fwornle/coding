@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAppSelector, useAppDispatch } from '@/store'
 import {
   closeConfirmModal,
@@ -25,24 +25,84 @@ import { Logger, LogCategories } from '@/utils/logging'
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
 
+interface ReindexProgress {
+  status: 'running' | 'completed' | 'failed' | 'idle'
+  phase: string | null
+  step: number
+  totalSteps: number
+  message: string
+  elapsedSeconds?: number
+  stats?: {
+    functions?: number
+    relationships?: number
+    commitShort?: string
+  }
+}
+
 export default function CGRReindexModal() {
   const dispatch = useAppDispatch()
   const cgr = useAppSelector((state) => state.cgr)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [progress, setProgress] = useState<ReindexProgress | null>(null)
+
+  // Poll for progress during reindexing
+  const pollProgress = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/cgr/progress`)
+      const data = await res.json()
+
+      if (data.status === 'success' && data.data) {
+        setProgress(data.data)
+
+        // Check if completed or failed
+        if (data.data.status === 'completed') {
+          Logger.info(LogCategories.API, 'CGR re-index completed', data.data.stats)
+          dispatch(reindexSuccess())
+          return true // Stop polling
+        }
+        if (data.data.status === 'failed') {
+          Logger.error(LogCategories.API, 'CGR re-index failed', { message: data.data.message })
+          dispatch(reindexFailure(data.data.message || 'Reindex failed'))
+          return true // Stop polling
+        }
+      }
+      return false // Continue polling
+    } catch (error) {
+      Logger.warn(LogCategories.API, 'Error polling CGR progress', error)
+      return false // Continue polling
+    }
+  }, [dispatch])
 
   useEffect(() => {
     if (cgr.reindexStatus !== 'running' || !cgr.reindexStartTime) {
       setElapsedTime(0)
+      setProgress(null)
       return
     }
 
     const startTime = new Date(cgr.reindexStartTime).getTime()
-    const interval = setInterval(() => {
+
+    // Timer for elapsed time
+    const timerInterval = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - startTime) / 1000))
     }, 1000)
 
-    return () => clearInterval(interval)
-  }, [cgr.reindexStatus, cgr.reindexStartTime])
+    // Poll for progress every 3 seconds
+    const pollInterval = setInterval(async () => {
+      const shouldStop = await pollProgress()
+      if (shouldStop) {
+        clearInterval(pollInterval)
+      }
+    }, 3000)
+
+    // Initial poll
+    pollProgress()
+
+    return () => {
+      clearInterval(timerInterval)
+      clearInterval(pollInterval)
+    }
+  }, [cgr.reindexStatus, cgr.reindexStartTime, pollProgress])
 
   const formatElapsedTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -66,28 +126,8 @@ export default function CGRReindexModal() {
         throw new Error(error.message || 'Failed to start re-index')
       }
 
-      Logger.info(LogCategories.API, 'CGR re-index started successfully, polling for completion')
-
-      const checkStatus = async () => {
-        try {
-          const statusRes = await fetch(`${API_BASE_URL}/api/cgr/status`)
-          const status = await statusRes.json()
-
-          if (status.indexing === false) {
-            Logger.info(LogCategories.API, 'CGR re-index completed')
-            dispatch(reindexSuccess())
-            return
-          }
-
-          Logger.trace(LogCategories.API, 'CGR re-index still in progress')
-          setTimeout(checkStatus, 5000)
-        } catch (error) {
-          Logger.warn(LogCategories.API, 'Error checking CGR status, will retry', error)
-          setTimeout(checkStatus, 5000)
-        }
-      }
-
-      setTimeout(checkStatus, 5000)
+      Logger.info(LogCategories.API, 'CGR re-index started successfully')
+      // Progress polling will be handled by the useEffect
     } catch (error) {
       Logger.error(LogCategories.API, 'CGR re-index failed', error)
       dispatch(reindexFailure(error instanceof Error ? error.message : 'Unknown error'))
@@ -102,6 +142,11 @@ export default function CGRReindexModal() {
       dispatch(reindexReset())
     }
   }
+
+  // Calculate progress percentage
+  const progressPercent = progress?.totalSteps && progress.totalSteps > 0
+    ? Math.round((progress.step / progress.totalSteps) * 100)
+    : Math.min((elapsedTime / 1800) * 100, 95) // Fallback to time-based
 
   // Modal is only open when explicitly requested - user can close it even during running
   const isOpen = cgr.showConfirmModal
@@ -172,19 +217,58 @@ export default function CGRReindexModal() {
 
           {cgr.reindexStatus === 'running' && (
             <div className="space-y-3">
+              {/* Timer and progress */}
               <div className="flex items-center justify-center gap-2 text-lg font-mono">
                 <Clock className="h-5 w-5 text-muted-foreground" />
-                <span>{formatElapsedTime(elapsedTime)}</span>
+                <span>{formatElapsedTime(progress?.elapsedSeconds ?? elapsedTime)}</span>
               </div>
-              <div className="text-sm text-center text-muted-foreground">
-                Elapsed time. Typical duration: 20-30 minutes.
-              </div>
+
+              {/* Current phase/message */}
+              {progress?.message && (
+                <div className="text-sm text-center font-medium text-blue-600 dark:text-blue-400">
+                  {progress.message}
+                </div>
+              )}
+
+              {/* Step indicator */}
+              {progress?.totalSteps && progress.totalSteps > 0 && (
+                <div className="text-sm text-center text-muted-foreground">
+                  Step {progress.step} of {progress.totalSteps}
+                </div>
+              )}
+
+              {/* Progress bar */}
               <div className="w-full bg-secondary rounded-full h-2">
                 <div
                   className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: Math.min((elapsedTime / 1800) * 100, 95) + '%' }}
+                  style={{ width: progressPercent + '%' }}
                 />
               </div>
+
+              {/* Phase indicator chips */}
+              {progress?.phase && (
+                <div className="flex justify-center">
+                  <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                    {progress.phase}
+                  </span>
+                </div>
+              )}
+
+              {!progress && (
+                <div className="text-sm text-center text-muted-foreground">
+                  Typical duration: 20-30 minutes
+                </div>
+              )}
+            </div>
+          )}
+
+          {cgr.reindexStatus === 'completed' && progress?.stats && (
+            <div className="text-sm space-y-1 bg-green-50 dark:bg-green-900/20 p-3 rounded-md">
+              <div><strong>Functions indexed:</strong> {progress.stats.functions?.toLocaleString()}</div>
+              <div><strong>Relationships:</strong> {progress.stats.relationships?.toLocaleString()}</div>
+              {progress.stats.commitShort && (
+                <div><strong>Commit:</strong> {progress.stats.commitShort}</div>
+              )}
             </div>
           )}
 
