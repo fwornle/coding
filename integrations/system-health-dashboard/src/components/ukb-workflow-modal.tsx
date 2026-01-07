@@ -68,6 +68,7 @@ import {
   type UKBProcess,
   type StepTimingStatistics,
   type StepInfo,
+  type WorkflowTimingStats,
 } from '@/store/slices/ukbSlice'
 
 interface UKBWorkflowModalProps {
@@ -84,6 +85,81 @@ function calculateMedian(values: number[]): number {
   if (sorted.length === 0) return 0
   const mid = Math.floor(sorted.length / 2)
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+// Get step median duration from historical stats
+function getStepMedianDuration(
+  stepName: string,
+  workflowStats: WorkflowTimingStats | null
+): number {
+  if (!workflowStats?.steps?.[stepName]) return 0
+  const step = workflowStats.steps[stepName]
+  return step.recentDurations?.length
+    ? calculateMedian(step.recentDurations)
+    : step.avgDurationMs || 0
+}
+
+/**
+ * Calculate ETA based on individual step historical durations.
+ * This is more accurate than linear interpolation because it accounts for
+ * steps with vastly different durations (e.g., persistence taking 2 mins vs git_history taking 5s).
+ *
+ * Algorithm:
+ * 1. Find currently running step(s)
+ * 2. Calculate how long the running step(s) have been executing
+ * 3. ETA = (historicalDuration - stepElapsed) for running steps + sum of pending steps' historical durations
+ */
+function calculateStepAwareEta(
+  process: UKBProcess,
+  workflowStats: WorkflowTimingStats | null,
+  totalElapsedMs: number
+): number {
+  if (!process.steps || process.steps.length === 0) {
+    return 0
+  }
+
+  // Calculate elapsed time for completed steps
+  let completedStepsDurationMs = 0
+  const runningSteps: string[] = []
+  const pendingSteps: string[] = []
+
+  for (const step of process.steps) {
+    if (step.status === 'completed' || step.status === 'skipped') {
+      // Use actual duration if available, otherwise use historical
+      completedStepsDurationMs += step.duration || getStepMedianDuration(step.name, workflowStats)
+    } else if (step.status === 'running') {
+      runningSteps.push(step.name)
+    } else if (step.status === 'pending') {
+      pendingSteps.push(step.name)
+    }
+  }
+
+  // Estimate how long running step(s) have been executing
+  // This is (total elapsed) - (completed steps duration)
+  const runningStepsElapsedMs = Math.max(0, totalElapsedMs - completedStepsDurationMs)
+
+  // Calculate remaining time for running steps
+  let etaMs = 0
+  for (const stepName of runningSteps) {
+    const historicalDuration = getStepMedianDuration(stepName, workflowStats)
+    // If no historical data, use a reasonable default based on elapsed time
+    const expectedDuration = historicalDuration > 0
+      ? historicalDuration
+      : runningStepsElapsedMs * 2 // Assume we're ~50% done if no historical data
+    // Remaining time = expected - elapsed (but at least 10% of expected remaining)
+    const remaining = Math.max(expectedDuration * 0.1, expectedDuration - runningStepsElapsedMs)
+    etaMs += remaining
+  }
+
+  // Add historical durations for pending steps
+  for (const stepName of pendingSteps) {
+    etaMs += getStepMedianDuration(stepName, workflowStats)
+  }
+
+  // Apply sanity bounds: ETA should be at least 5 seconds and at most 30 minutes
+  const MIN_ETA_MS = 5000
+  const MAX_ETA_MS = 30 * 60 * 1000
+  return Math.min(MAX_ETA_MS, Math.max(MIN_ETA_MS, etaMs))
 }
 
 export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBaseUrl = 'http://localhost:3033' }: UKBWorkflowModalProps) {
@@ -567,12 +643,14 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       // This ensures progress never appears behind actual completion
       if (usingTimeBased) {
         calculatedProgressPercent = Math.max(timeBasedProgress, stepBasedProgress)
-        // If using step-based as floor, recalculate ETA based on step progress rate
+        // If using step-based as floor, use STEP-AWARE ETA instead of linear interpolation
         if (stepBasedProgress > timeBasedProgress && elapsedMs > 0 && stepBasedProgress < 99) {
-          // Estimate remaining time based on how long the completed portion took
-          const progressPerMs = stepBasedProgress / elapsedMs
-          const remainingProgress = 100 - stepBasedProgress
-          etaMs = progressPerMs > 0 ? Math.round(remainingProgress / progressPerMs) : 0
+          // STEP-AWARE ETA: Calculate based on individual step historical durations
+          etaMs = calculateStepAwareEta(
+            activeCurrentProcess,
+            workflowStats,
+            elapsedMs
+          )
         }
       } else {
         calculatedProgressPercent = stepBasedProgress
