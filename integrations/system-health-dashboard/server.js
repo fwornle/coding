@@ -124,6 +124,7 @@ class SystemHealthAPIServer {
 
         // Code Graph RAG cache endpoints
         this.app.get('/api/cgr/status', this.handleGetCGRStatus.bind(this));
+        this.app.get('/api/cgr/progress', this.handleGetCGRProgress.bind(this));
         this.app.post('/api/cgr/reindex', this.handleCGRReindex.bind(this));
 
         // Error handling
@@ -1796,12 +1797,65 @@ class SystemHealthAPIServer {
     }
 
     /**
+     * Get CGR reindex progress
+     * Reads from the progress file written by reindex-with-metadata.sh
+     */
+    async handleGetCGRProgress(req, res) {
+        try {
+            const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
+            const progressPath = join(cgrDir, 'shared-data', 'reindex-progress.json');
+
+            if (!existsSync(progressPath)) {
+                return res.json({
+                    status: 'success',
+                    data: {
+                        status: 'idle',
+                        message: 'No reindexing in progress',
+                        phase: null,
+                        step: 0,
+                        totalSteps: 0
+                    }
+                });
+            }
+
+            const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+            const age = progress.updatedAt
+                ? Date.now() - new Date(progress.updatedAt).getTime()
+                : (progress.completedAt ? Date.now() - new Date(progress.completedAt).getTime() : 0);
+
+            // If status is running but hasn't updated in >5 minutes, mark as stale
+            let inferredStatus = progress.status;
+            if (progress.status === 'running' && age > 300000) {
+                inferredStatus = 'stale';
+            }
+
+            res.json({
+                status: 'success',
+                data: {
+                    ...progress,
+                    inferredStatus,
+                    ageMs: age,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        } catch (error) {
+            console.error('Failed to get CGR progress:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to retrieve CGR reindex progress',
+                error: error.message
+            });
+        }
+    }
+
+    /**
      * Trigger Code Graph RAG reindexing
-     * Runs the indexing command in the background
+     * Runs the indexing command AND updates cache metadata in the background
      */
     async handleCGRReindex(req, res) {
         try {
             const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
+            const reindexScript = join(cgrDir, 'scripts', 'reindex-with-metadata.sh');
 
             if (!existsSync(cgrDir)) {
                 return res.status(404).json({
@@ -1810,10 +1864,19 @@ class SystemHealthAPIServer {
                 });
             }
 
-            console.log('🔄 Starting CGR reindex...');
+            if (!existsSync(reindexScript)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'CGR reindex script not found',
+                    path: reindexScript
+                });
+            }
 
-            // Run indexing in the background using uv
-            const indexProcess = spawn('/bin/bash', ['-c', `cd "${cgrDir}" && uv run graph-code load-index "${codingRoot}"`], {
+            console.log('🔄 Starting CGR reindex with metadata update...');
+
+            // Run the reindex script that handles both indexing AND metadata update
+            // This ensures the cache-metadata.json gets updated after indexing completes
+            const indexProcess = spawn('/bin/bash', [reindexScript, codingRoot, 'coding'], {
                 cwd: cgrDir,
                 detached: true,
                 stdio: 'ignore'
@@ -1826,7 +1889,7 @@ class SystemHealthAPIServer {
                 data: {
                     startedAt: new Date().toISOString(),
                     targetRepo: codingRoot,
-                    note: 'Indexing may take 15-20 minutes. Check /api/cgr/status for updates.'
+                    note: 'Indexing may take 20-30 minutes. Cache metadata will be updated automatically after completion. Check /api/cgr/status for updates.'
                 }
             });
         } catch (error) {
