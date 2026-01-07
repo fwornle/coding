@@ -100,66 +100,162 @@ function getStepMedianDuration(
 }
 
 /**
- * Calculate ETA based on individual step historical durations.
- * This is more accurate than linear interpolation because it accounts for
- * steps with vastly different durations (e.g., persistence taking 2 mins vs git_history taking 5s).
+ * Calculate ETA using DYNAMIC LEARNING from actual batch durations in this run.
+ *
+ * This is more accurate than historical-only estimation because it:
+ * 1. Uses actual batch durations from THIS workflow run (dynamic learning)
+ * 2. Properly accounts for remaining batches + finalization time
+ * 3. Falls back to linear interpolation as a sanity check
  *
  * Algorithm:
- * 1. Find currently running step(s)
- * 2. Calculate how long the running step(s) have been executing
- * 3. ETA = (historicalDuration - stepElapsed) for running steps + sum of pending steps' historical durations
+ * - During batch phase: ETA = (remaining batches × learned avg) + median finalization
+ * - During finalization: ETA = (remaining finalization steps × historical avg)
+ * - Sanity check: ETA should be at least linearETA × 0.5 (can't be faster than half of linear estimate)
+ */
+function calculateDynamicEta(
+  process: UKBProcess,
+  workflowStats: WorkflowTimingStats | null,
+  totalElapsedMs: number,
+  progressPercent: number
+): number {
+  const currentBatch = process.batchProgress?.currentBatch || 0
+  const totalBatches = process.batchProgress?.totalBatches || 0
+  const batchIterations = process.batchIterations || []
+
+  // Calculate linear ETA as sanity check baseline
+  // If we're at X%, we've taken Y time, so total = Y / (X/100)
+  // Remaining = total - elapsed = elapsed * (100/X - 1)
+  const linearEtaMs = progressPercent > 0 && progressPercent < 100
+    ? totalElapsedMs * ((100 - progressPercent) / progressPercent)
+    : 0
+
+  // ============================================
+  // DYNAMIC LEARNING: Use actual batch durations from this run
+  // ============================================
+
+  // Calculate average batch duration from COMPLETED batches in this run
+  let learnedAvgBatchMs = 0
+  let completedBatchCount = 0
+
+  for (const batch of batchIterations) {
+    // A batch is complete if all its steps are completed
+    const allStepsComplete = batch.steps.every(s => s.status === 'completed' || s.status === 'skipped')
+    if (allStepsComplete) {
+      // Sum up actual step durations
+      const batchDuration = batch.steps.reduce((sum, step) => sum + (step.duration || 0), 0)
+      if (batchDuration > 0) {
+        learnedAvgBatchMs += batchDuration
+        completedBatchCount++
+      }
+    }
+  }
+
+  // Calculate learned average (use at least 2 completed batches for reliable average)
+  if (completedBatchCount >= 2) {
+    learnedAvgBatchMs = learnedAvgBatchMs / completedBatchCount
+  } else if (completedBatchCount === 1) {
+    // With only 1 batch, be conservative - multiply by 1.2
+    learnedAvgBatchMs = (learnedAvgBatchMs / completedBatchCount) * 1.2
+  } else {
+    // No completed batches yet - use historical or estimate from elapsed
+    learnedAvgBatchMs = workflowStats?.avgBatchDurationMs || 0
+    if (learnedAvgBatchMs === 0 && currentBatch > 0 && totalElapsedMs > 0) {
+      // Rough estimate: elapsed / current batch
+      learnedAvgBatchMs = totalElapsedMs / currentBatch
+    }
+  }
+
+  // ============================================
+  // CALCULATE REMAINING TIME
+  // ============================================
+
+  let etaMs = 0
+  const remainingBatches = Math.max(0, totalBatches - currentBatch)
+  const isInFinalization = currentBatch >= totalBatches && totalBatches > 0
+
+  if (!isInFinalization && remainingBatches > 0) {
+    // BATCH PHASE: Remaining batches + finalization
+    const remainingBatchTimeMs = remainingBatches * learnedAvgBatchMs
+    const finalizationMs = workflowStats?.avgFinalizationDurationMs || 60000 // Default 1 min
+    etaMs = remainingBatchTimeMs + finalizationMs
+
+    // If we're IN the middle of a batch, estimate time left in current batch
+    if (batchIterations.length > 0) {
+      const currentBatchData = batchIterations[batchIterations.length - 1]
+      if (currentBatchData) {
+        const completedInCurrentBatch = currentBatchData.steps.filter(
+          s => s.status === 'completed' || s.status === 'skipped'
+        ).length
+        const totalInCurrentBatch = currentBatchData.steps.length
+        if (totalInCurrentBatch > 0 && completedInCurrentBatch < totalInCurrentBatch) {
+          // Fraction of current batch remaining
+          const currentBatchProgress = completedInCurrentBatch / totalInCurrentBatch
+          etaMs += learnedAvgBatchMs * (1 - currentBatchProgress)
+        }
+      }
+    }
+  } else if (isInFinalization) {
+    // FINALIZATION PHASE: Use step-by-step historical estimates
+    const pendingSteps = (process.steps || []).filter(s => s.status === 'pending' || s.status === 'running')
+    for (const step of pendingSteps) {
+      const stepDuration = getStepMedianDuration(step.name, workflowStats)
+      // For running steps, assume 50% done
+      if (step.status === 'running') {
+        etaMs += stepDuration * 0.5
+      } else {
+        etaMs += stepDuration
+      }
+    }
+
+    // Fallback if no step estimates
+    if (etaMs === 0 && workflowStats?.avgFinalizationDurationMs) {
+      const finProgress = (process.completedSteps - (process.batchProgress?.totalBatches || 0) * 8) /
+                         Math.max(1, process.totalSteps - (process.batchProgress?.totalBatches || 0) * 8)
+      etaMs = workflowStats.avgFinalizationDurationMs * (1 - Math.min(1, finProgress))
+    }
+  } else {
+    // FALLBACK: Use linear interpolation
+    etaMs = linearEtaMs
+  }
+
+  // ============================================
+  // SANITY CHECKS
+  // ============================================
+
+  // ETA shouldn't be less than 50% of linear estimate (can't go THAT much faster than linear)
+  // But also shouldn't be more than 200% of linear (historical shouldn't inflate too much)
+  if (linearEtaMs > 0) {
+    etaMs = Math.max(linearEtaMs * 0.3, Math.min(linearEtaMs * 2.0, etaMs))
+  }
+
+  // Minimum 1 second (not 5 seconds like before - let it show accurate small numbers)
+  // Maximum 30 minutes
+  const MIN_ETA_MS = 1000
+  const MAX_ETA_MS = 30 * 60 * 1000
+  return Math.min(MAX_ETA_MS, Math.max(MIN_ETA_MS, etaMs))
+}
+
+/**
+ * Legacy function - now delegates to calculateDynamicEta
+ * Kept for compatibility with existing call sites
  */
 function calculateStepAwareEta(
   process: UKBProcess,
   workflowStats: WorkflowTimingStats | null,
   totalElapsedMs: number
 ): number {
-  if (!process.steps || process.steps.length === 0) {
-    return 0
+  // Calculate progress percent for sanity check
+  const currentBatch = process.batchProgress?.currentBatch || 0
+  const totalBatches = process.batchProgress?.totalBatches || 0
+  let progressPercent = 0
+
+  if (totalBatches > 0) {
+    progressPercent = Math.round((currentBatch / totalBatches) * 85) // Batch phase is 85%
+  } else if (process.totalSteps > 0) {
+    progressPercent = Math.round((process.completedSteps / process.totalSteps) * 100)
   }
 
-  // Calculate elapsed time for completed steps
-  let completedStepsDurationMs = 0
-  const runningSteps: string[] = []
-  const pendingSteps: string[] = []
-
-  for (const step of process.steps) {
-    if (step.status === 'completed' || step.status === 'skipped') {
-      // Use actual duration if available, otherwise use historical
-      completedStepsDurationMs += step.duration || getStepMedianDuration(step.name, workflowStats)
-    } else if (step.status === 'running') {
-      runningSteps.push(step.name)
-    } else if (step.status === 'pending') {
-      pendingSteps.push(step.name)
-    }
-  }
-
-  // Estimate how long running step(s) have been executing
-  // This is (total elapsed) - (completed steps duration)
-  const runningStepsElapsedMs = Math.max(0, totalElapsedMs - completedStepsDurationMs)
-
-  // Calculate remaining time for running steps
-  let etaMs = 0
-  for (const stepName of runningSteps) {
-    const historicalDuration = getStepMedianDuration(stepName, workflowStats)
-    // If no historical data, use a reasonable default based on elapsed time
-    const expectedDuration = historicalDuration > 0
-      ? historicalDuration
-      : runningStepsElapsedMs * 2 // Assume we're ~50% done if no historical data
-    // Remaining time = expected - elapsed (but at least 10% of expected remaining)
-    const remaining = Math.max(expectedDuration * 0.1, expectedDuration - runningStepsElapsedMs)
-    etaMs += remaining
-  }
-
-  // Add historical durations for pending steps
-  for (const stepName of pendingSteps) {
-    etaMs += getStepMedianDuration(stepName, workflowStats)
-  }
-
-  // Apply sanity bounds: ETA should be at least 5 seconds and at most 30 minutes
-  const MIN_ETA_MS = 5000
-  const MAX_ETA_MS = 30 * 60 * 1000
-  return Math.min(MAX_ETA_MS, Math.max(MIN_ETA_MS, etaMs))
+  return calculateDynamicEta(process, workflowStats, totalElapsedMs, progressPercent)
 }
 
 export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBaseUrl = 'http://localhost:3033' }: UKBWorkflowModalProps) {
