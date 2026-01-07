@@ -4,7 +4,7 @@ import React, { useMemo, useCallback, useEffect, useState } from 'react'
 import type { AgentDefinition, EdgeDefinition, ProcessInfo, StepInfo } from './types'
 import type { AggregatedSteps } from '@/store/slices/ukbSlice'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
-import { STEP_TO_AGENT, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
+import { STEP_TO_AGENT, STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
 
 interface MultiAgentGraphProps {
   process: ProcessInfo
@@ -826,10 +826,13 @@ export function MultiAgentGraph({
               const arcPerStep = (totalArc - (substeps.length - 1) * arcSpacing) / substeps.length
 
               // Check if this agent is currently running (map step names to agent IDs)
-              const isAgentRunning = process.steps?.some(s => {
+              const runningStep = process.steps?.find(s => {
                 const stepAgentId = STEP_TO_AGENT[s.name] || s.name
                 return stepAgentId === expandedSubStepsAgent && s.status === 'running'
               })
+              const isAgentRunning = !!runningStep
+              // Get the active sub-step ID from the running step
+              const activeSubStepId = runningStep ? STEP_TO_SUBSTEP[runningStep.name] : null
 
               return substeps.map((substep, idx) => {
                 const angleStart = startAngle + idx * (arcPerStep + arcSpacing)
@@ -855,6 +858,10 @@ export function MultiAgentGraph({
                 const labelY = centerY + labelRadius * Math.sin(midAngle)
 
                 const isSelected = selectedSubStepId === substep.id
+                // Check if this is the currently active/running sub-step
+                const isActiveSubStep = activeSubStepId === substep.id
+                // Use dark blue for selected OR active sub-step
+                const isHighlighted = isSelected || isActiveSubStep
                 return (
                   <g
                     key={substep.id}
@@ -866,22 +873,22 @@ export function MultiAgentGraph({
                       }
                     }}
                   >
-                    <title>{substep.name}: {substep.description}</title>
+                    <title>{substep.name}: {substep.description}{isActiveSubStep ? ' (Currently Running)' : ''}</title>
                     <path
                       d={arcPath}
-                      fill={isSelected ? '#1d4ed8' : '#3b82f6'}
-                      fillOpacity={isSelected ? 1 : 0.85}
-                      stroke={isSelected ? '#fff' : '#1d4ed8'}
-                      strokeWidth={isSelected ? 2.5 : 1.5}
-                      className={isAgentRunning ? 'animate-pulse' : ''}
-                      style={isAgentRunning ? {
-                        filter: 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.8))',
+                      fill={isHighlighted ? '#1d4ed8' : '#3b82f6'}
+                      fillOpacity={isHighlighted ? 1 : 0.85}
+                      stroke={isHighlighted ? '#fff' : '#1d4ed8'}
+                      strokeWidth={isHighlighted ? 2.5 : 1.5}
+                      className={isActiveSubStep ? 'animate-pulse' : ''}
+                      style={isActiveSubStep ? {
+                        filter: 'drop-shadow(0 0 8px rgba(29, 78, 216, 0.9))',
                       } : undefined}
                     />
                     <text
                       x={labelX}
                       y={labelY}
-                      fontSize={isSelected ? '9' : '8'}
+                      fontSize={isHighlighted ? '9' : '8'}
                       fill="#fff"
                       textAnchor="middle"
                       dominantBaseline="middle"
