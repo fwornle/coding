@@ -280,6 +280,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processes, processesSignature])
 
+  // Active process at selected index (component-level for TraceModal access)
+  // Bounded to valid range to handle when processes complete and list shrinks
+  const activeIndex = Math.min(selectedProcessIndex, Math.max(0, activeProcesses.length - 1))
+  const activeCurrentProcess = activeProcesses.length > 0 ? activeProcesses[activeIndex] : null
+
   // Fetch historical workflows when history tab is selected
   useEffect(() => {
     if (open && activeTab === 'history') {
@@ -521,9 +526,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       )
     }
 
-    // Use the active process at the selected index (bounded to valid range)
-    const activeIndex = Math.min(selectedProcessIndex, activeProcesses.length - 1)
-    const activeCurrentProcess = activeProcesses[activeIndex] || null
+    // NOTE: activeIndex and activeCurrentProcess are now defined at component level
+    // for TraceModal access (line ~285-286)
 
     // Calculate progress based on batch-weighted work distribution:
     // - Batch phase (steps 1-14 running N times) = ~85% of total work
@@ -1288,47 +1292,89 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             ? (() => {
                 const allSteps: StepInfo[] = []
 
+                // CRITICAL: Use activeCurrentProcess (displayed process) NOT currentProcess (selector)
+                // The selector uses ukb.processes[selectedProcessIndex] which may differ from
+                // activeProcesses[activeIndex] when there are completed processes in the list.
+                // This mismatch caused the trace to show wrong/empty batchIterations data.
+
                 // Check if this is a batch workflow (has batchIterations data)
-                const isBatchWorkflow = currentProcess?.batchIterations && currentProcess.batchIterations.length > 0
+                const isBatchWorkflow = activeCurrentProcess?.batchIterations && activeCurrentProcess.batchIterations.length > 0
 
                 if (isBatchWorkflow) {
-                  // BATCH WORKFLOW: Reorder steps into pre-batch → batch iterations → post-batch
-                  // NOTE: Be specific with patterns to avoid matching batch steps like 'operator_dedup'
+                  // BATCH WORKFLOW: Build steps as pre-batch → ALL batch iterations → post-batch
+                  //
+                  // CRITICAL: The 'steps' array (from stepsDetail) contains FLATTENED batch steps
+                  // which are ALSO in batchIterations. We must EXCLUDE these to avoid duplicates
+                  // and show the proper itemized trace with [batch-XXX] prefixes.
+
+                  // Pre-batch steps: Only initialization steps that run ONCE before batches
+                  const preBatchStepNames = new Set([
+                    'plan_batches', 'batch_scheduler',
+                  ])
+
+                  // Batch-phase steps: These appear in stepsDetail but belong to batchIterations
+                  // We EXCLUDE these from stepsDetail and use batchIterations instead
+                  const batchPhaseStepNames = new Set([
+                    // Extraction
+                    'extract_batch_commits', 'extract_batch_sessions',
+                    // Analysis
+                    'batch_semantic_analysis', 'generate_batch_observations',
+                    'classify_with_ontology',
+                    // Tree-KG operators
+                    'operator_conv', 'operator_aggr', 'operator_embed',
+                    'operator_dedup', 'operator_pred', 'operator_merge',
+                    // Batch checkpoint
+                    'batch_qa', 'save_batch_checkpoint',
+                    // Alternative names used in some workflows
+                    'kg_operators',
+                  ])
+
+                  // Post-batch steps: Finalization that runs ONCE after all batches
                   const finalizationStepNames = new Set([
-                    // Batch workflow finalization steps (from batch-analysis.yaml)
                     'index_codebase', 'link_documentation', 'synthesize_code_insights',
                     'transform_code_entities', 'final_persist', 'generate_insights',
                     'web_search', 'final_dedup', 'final_validation',
-                    // Legacy workflow finalization steps
+                    // Legacy names
                     'persist_results', 'persist_incremental',
                     'deduplicate_insights', 'deduplicate_incremental',
                     'validate_content', 'validate_content_incremental',
                   ])
-                  const isPostBatchStep = (name: string) =>
-                    finalizationStepNames.has(name.toLowerCase())
 
                   const preBatchSteps: StepInfo[] = []
                   const postBatchSteps: StepInfo[] = []
 
-                  if (currentProcess?.steps && currentProcess.steps.length > 0) {
-                    for (const step of currentProcess.steps) {
+                  // Categorize stepsDetail: pre-batch OR post-batch only
+                  // Skip batch-phase steps since they're already in batchIterations
+                  if (activeCurrentProcess?.steps && activeCurrentProcess.steps.length > 0) {
+                    for (const step of activeCurrentProcess.steps) {
+                      const stepNameLower = step.name.toLowerCase()
+
+                      // Skip batch-phase steps - they're in batchIterations
+                      if (batchPhaseStepNames.has(step.name)) {
+                        continue
+                      }
+
                       const stepInfo = {
                         ...step,
                         name: STEP_TO_AGENT[step.name] || step.name,
                       }
-                      if (isPostBatchStep(step.name)) {
-                        postBatchSteps.push(stepInfo)
-                      } else {
+
+                      if (preBatchStepNames.has(step.name)) {
                         preBatchSteps.push(stepInfo)
+                      } else if (finalizationStepNames.has(stepNameLower)) {
+                        postBatchSteps.push(stepInfo)
                       }
+                      // Any other steps not explicitly categorized are skipped
+                      // (they should be in batchIterations if they're batch-phase)
                     }
                   }
 
-                  // 1. Add pre-batch steps first
+                  // 1. Add pre-batch steps first (e.g., plan_batches)
                   allSteps.push(...preBatchSteps)
 
-                  // 2. Add batch iteration steps (already checked isBatchWorkflow above)
-                  for (const batch of currentProcess.batchIterations!) {
+                  // 2. Add ALL batch iteration steps with [batch-XXX] prefix
+                  // This is the ITEMIZED view showing each batch's steps
+                  for (const batch of activeCurrentProcess.batchIterations!) {
                     for (const step of batch.steps) {
                       allSteps.push({
                         name: `[${batch.batchId}] ${STEP_TO_AGENT[step.name] || step.name}`,
@@ -1342,13 +1388,13 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                     }
                   }
 
-                  // 3. Add post-batch steps last (persistence, dedup, validation)
+                  // 3. Add post-batch steps last (finalization: persistence, dedup, validation)
                   allSteps.push(...postBatchSteps)
                 } else {
                   // STANDARD WORKFLOW: Show steps in their natural execution order
                   // No reordering needed - persistence runs after its dependencies complete
-                  if (currentProcess?.steps && currentProcess.steps.length > 0) {
-                    for (const step of currentProcess.steps) {
+                  if (activeCurrentProcess?.steps && activeCurrentProcess.steps.length > 0) {
+                    for (const step of activeCurrentProcess.steps) {
                       allSteps.push({
                         ...step,
                         name: STEP_TO_AGENT[step.name] || step.name,
@@ -1372,12 +1418,12 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         }
         workflowName={
           activeTab === 'active'
-            ? currentProcess?.workflowName || 'Unknown'
+            ? activeCurrentProcess?.workflowName || 'Unknown'
             : selectedHistoricalWorkflowState?.workflowName || 'Unknown'
         }
         startTime={
           activeTab === 'active'
-            ? currentProcess?.startTime
+            ? activeCurrentProcess?.startTime
             : selectedHistoricalWorkflowState?.startTime || undefined
         }
       />

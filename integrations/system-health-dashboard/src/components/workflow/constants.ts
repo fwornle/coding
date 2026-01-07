@@ -404,6 +404,34 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'content_validation': 'content_validation',
 }
 
+// Map step names to their sub-step within an agent
+// Used to highlight the currently active sub-step in the multi-agent graph
+export const STEP_TO_SUBSTEP: Record<string, string> = {
+  // code_graph agent sub-steps
+  'index_codebase': 'index',
+  'correlate_with_codebase': 'query',
+  'synthesize_code_insights': 'analyze',
+  'transform_code_entities': 'analyze',
+  'code_graph': 'analyze',  // Generic step maps to analyze
+  // semantic_analysis agent sub-steps
+  'semantic_analysis': 'extract',
+  'batch_semantic_analysis': 'extract',
+  // kg_operators agent sub-steps
+  'operator_conversational': 'conv',
+  'operator_aggregate': 'aggr',
+  'operator_embedding': 'embed',
+  'operator_dedup': 'dedup',
+  'operator_predict': 'pred',
+  'operator_merge': 'merge',
+  // ontology_classification agent sub-steps
+  'classify_with_ontology': 'classify',
+  'ontology_classification': 'classify',
+  // persistence agent sub-steps
+  'persist_knowledge': 'persist',
+  'final_persist': 'persist',
+  'persistence': 'persist',
+}
+
 // Multi-agent system edges
 // This is NOT a DAG - orchestrators connect to all agents
 export const MULTI_AGENT_EDGES: EdgeDefinition[] = [

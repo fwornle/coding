@@ -2447,7 +2447,7 @@
     },
     {
       "name": "ApiHandlesExternalCommunicationPattern",
-      "entityType": "Insight",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "insight",
@@ -2879,12 +2879,14 @@
         "Handles external communication (commit: 5579d141)",
         "Files: 49, Impact: medium, Commit: 5579d141",
         "Handles external communication (commit: 52422ff0)",
-        "Files: 25, Impact: medium, Commit: 52422ff0"
+        "Files: 25, Impact: medium, Commit: 52422ff0",
+        "Handles external communication (commit: 8b2a8cc5)",
+        "Files: 6, Impact: high, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:07.802Z",
-        "last_updated": "2026-01-06T16:53:05.445Z"
+        "last_updated": "2026-01-07T07:57:12.461Z"
       },
       "id": "mc4flkg8f9hrrq"
     },
@@ -3175,18 +3177,19 @@
         "Files: 30, Impact: medium, Commit: 5cde8a03",
         "Files: 29, Impact: medium, Commit: 5579d141",
         "Files: 29, Impact: low, Commit: 5ea43dbe",
-        "Files: 22, Impact: medium, Commit: 52422ff0"
+        "Files: 22, Impact: medium, Commit: 52422ff0",
+        "Files: 6, Impact: high, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:41.369Z",
-        "last_updated": "2026-01-06T16:54:02.951Z"
+        "last_updated": "2026-01-07T07:56:51.819Z"
       },
       "id": "mc4flkg8fcjz12"
     },
     {
       "name": "ComponentReusableUiBuildingPattern",
-      "entityType": "AnalysisArtifact",
+      "entityType": "Insight",
       "observations": [
         {
           "type": "insight",
@@ -3764,18 +3767,20 @@
         "Similar component decisions in JavaScript, Markdown, JSON, TypeScript projects",
         "Files: 35, Impact: medium, Commit: 5ea43dbe",
         "Reusable UI building blocks (commit: 52422ff0)",
-        "Files: 29, Impact: medium, Commit: 52422ff0"
+        "Files: 29, Impact: medium, Commit: 52422ff0",
+        "Reusable UI building blocks (commit: 8b2a8cc5)",
+        "Files: 5, Impact: high, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:48:52.821Z",
-        "last_updated": "2026-01-06T14:31:48.548Z"
+        "last_updated": "2026-01-07T07:57:29.978Z"
       },
       "id": "mc4flkg1t4zsw0"
     },
     {
       "name": "DecoratorAddsBehaviorToPattern",
-      "entityType": "AnalysisArtifact",
+      "entityType": "Pattern",
       "observations": [
         {
           "type": "insight",
@@ -3877,18 +3882,19 @@
         "Files: 34, Impact: medium, Commit: 5cde8a03",
         "Files: 33, Impact: medium, Commit: 5579d141",
         "Files: 31, Impact: medium, Commit: 5ea43dbe",
-        "Files: 11, Impact: low, Commit: 52422ff0"
+        "Files: 11, Impact: low, Commit: 52422ff0",
+        "Files: 1, Impact: low, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:11.546Z",
-        "last_updated": "2026-01-06T16:34:39.548Z"
+        "last_updated": "2026-01-07T07:59:05.562Z"
       },
       "id": "mc4flkg49raoty"
     },
     {
       "name": "PromiseHandlesAsynchronousOperationsPattern",
-      "entityType": "AnalysisArtifact",
+      "entityType": "Insight",
       "observations": [
         {
           "type": "insight",
@@ -4241,12 +4247,14 @@
         "Handles asynchronous operations (commit: 5ea43dbe)",
         "Files: 41, Impact: medium, Commit: 5ea43dbe",
         "Handles asynchronous operations (commit: 52422ff0)",
-        "Files: 26, Impact: medium, Commit: 52422ff0"
+        "Files: 26, Impact: medium, Commit: 52422ff0",
+        "Handles asynchronous operations (commit: 8b2a8cc5)",
+        "Files: 4, Impact: medium, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:22.012Z",
-        "last_updated": "2026-01-06T16:55:05.177Z"
+        "last_updated": "2026-01-07T07:57:55.391Z"
       },
       "id": "mc4flkgrb6pg4"
     },
@@ -4610,12 +4618,14 @@
         "Files: 43, Impact: medium, Commit: 5579d141",
         "Contains business logic (commit: 5ea43dbe)",
         "Contains business logic (commit: 52422ff0)",
-        "Files: 19, Impact: medium, Commit: 52422ff0"
+        "Files: 19, Impact: medium, Commit: 52422ff0",
+        "Contains business logic (commit: 8b2a8cc5)",
+        "Files: 4, Impact: medium, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:33.610Z",
-        "last_updated": "2026-01-06T16:55:41.591Z"
+        "last_updated": "2026-01-07T07:58:10.818Z"
       },
       "id": "mc4flkggu4sm2"
     },
@@ -4814,12 +4824,14 @@
         "Files: 6, Impact: low, Commit: 5ea43dbe",
         "Processes requests in a pipeline (commit: 52422ff0)",
         "Files: 6, Impact: low, Commit: 52422ff0",
-        "Similar middleware decisions in Markdown, JavaScript, JSON projects"
+        "Similar middleware decisions in Markdown, JavaScript, JSON projects",
+        "Processes requests in a pipeline (commit: 8b2a8cc5)",
+        "Files: 2, Impact: low, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:49:43.826Z",
-        "last_updated": "2026-01-06T14:31:59.406Z"
+        "last_updated": "2026-01-07T07:58:54.489Z"
       },
       "id": "mc4flkg234nsck"
     },
@@ -5152,12 +5164,13 @@
         "Files: 8, Impact: low, Commit: 5cde8a03",
         "Files: 6, Impact: low, Commit: 5579d141",
         "Files: 3, Impact: low, Commit: 5ea43dbe",
-        "Files: 2, Impact: low, Commit: 52422ff0"
+        "Files: 2, Impact: low, Commit: 52422ff0",
+        "Files: 1, Impact: low, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:50:33.041Z",
-        "last_updated": "2026-01-06T14:39:39.548Z"
+        "last_updated": "2026-01-07T07:59:16.210Z"
       },
       "id": "mc4flkg6ndkqb3"
     },
@@ -5256,12 +5269,13 @@
         "Files: 3, Impact: low, Commit: 5ea43dbe",
         "Files: 3, Impact: low, Commit: 5579d141",
         "Files: 3, Impact: low, Commit: 52422ff0",
-        "Similar observer decisions in Markdown, JSON projects"
+        "Similar observer decisions in Markdown, JSON projects",
+        "Files: 2, Impact: low, Commit: 8b2a8cc5"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-01-06T11:54:30.873Z",
-        "last_updated": "2026-01-06T16:56:16.785Z"
+        "last_updated": "2026-01-07T07:58:26.912Z"
       },
       "id": "mc4flkg3bi0z7r"
     }
@@ -5643,7 +5657,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-01-06T16:56:21.791Z",
+    "exported_at": "2026-01-07T07:59:21.214Z",
     "total_entities": 45,
     "total_relations": 62,
     "description": "Coding project infrastructure and patterns"
