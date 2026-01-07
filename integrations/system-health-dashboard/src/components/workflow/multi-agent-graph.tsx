@@ -535,8 +535,8 @@ export function MultiAgentGraph({
           className={isAnimated ? 'animate-dash' : undefined}
           style={isAnimated ? { animation: 'dash 0.5s linear infinite' } : undefined}
         />
-        {/* Ordinal number badge showing edge sequence */}
-        {edge.type !== 'control' && (
+        {/* Ordinal number badge showing edge sequence - only for dataflow edges */}
+        {edge.type === 'dataflow' && idx > 0 && (
           <g>
             <circle
               cx={ordinalX}
@@ -554,7 +554,7 @@ export function MultiAgentGraph({
               fontWeight="bold"
               fill={edgeColor}
             >
-              {idx + 1}
+              {idx}
             </text>
           </g>
         )}
@@ -791,15 +791,20 @@ export function MultiAgentGraph({
 
         {/* Render edges first (behind nodes) - progressive display */}
         <g className="edges">
-          {displayEdges
-            .filter(edge => shouldShowEdge(edge))
-            .map((edge, idx) => {
+          {(() => {
+            // Filter visible edges and calculate dataflow-specific indices
+            const visibleEdges = displayEdges.filter(edge => shouldShowEdge(edge))
+            let dataflowIndex = 0
+            return visibleEdges.map((edge) => {
               // Check if this is the active control line to running agent
               const isActiveControl = edge.type === 'control' &&
                 edge.from === 'orchestrator' &&
                 edge.to === runningAgentId
-              return renderEdge(edge, idx, isActiveControl)
-            })}
+              // Use dataflow-specific index for numbering (starts at 1 for first dataflow edge)
+              const edgeNumber = edge.type === 'dataflow' ? ++dataflowIndex : -1
+              return renderEdge(edge, edgeNumber, isActiveControl)
+            })
+          })()}
         </g>
 
         {/* Render nodes */}
