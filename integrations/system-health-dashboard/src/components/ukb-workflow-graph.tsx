@@ -1278,27 +1278,84 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     return process.steps.map(s => `${s.name}:${s.status}`).join(',')
   }, [process.steps])
 
+  // Create signature for current batch to detect batch transitions
+  // When a new batch starts, this signature changes, triggering step status reset
+  const currentBatchSignature = useMemo(() => {
+    if (!process.batchIterations?.length) return ''
+    const currentBatch = process.batchIterations[process.batchIterations.length - 1]
+    const batchId = currentBatch.batchId || `batch-${process.batchIterations.length}`
+    const stepStatuses = currentBatch.steps?.map(s => `${s.name}:${s.status}`).join(',') || ''
+    return `${batchId}:${stepStatuses}`
+  }, [process.batchIterations])
+
   // KG operator child agents that should aggregate to parent kg_operators
   const KG_OPERATOR_CHILDREN = [
     'context_convolution', 'entity_aggregation', 'node_embedding',
     'deduplication_operator', 'edge_prediction', 'structure_merge'
   ]
 
+  // Batch-phase step names that repeat each batch (should use current batch status, not aggregate)
+  const BATCH_PHASE_STEPS = [
+    'git_history', 'vibe_history', 'semantic_analysis', 'kg_operators',
+    'context_convolution', 'entity_aggregation', 'node_embedding',
+    'deduplication_operator', 'edge_prediction', 'structure_merge'
+  ]
+
   // Build step status map from process data
+  // For batch workflows: Use CURRENT batch's status for batch-phase steps (reset to pending each batch)
   const stepStatusMap = useMemo(() => {
     const map: Record<string, StepInfo> = {}
+
+    // Check if this is a batch workflow with active batches
+    const currentBatch = process.batchIterations?.length
+      ? process.batchIterations[process.batchIterations.length - 1]
+      : null
+    const isBatchWorkflow = currentBatch !== null
+
+    // Build map of current batch step statuses for batch-phase agents
+    const currentBatchStepMap: Record<string, StepInfo> = {}
+    if (isBatchWorkflow && currentBatch?.steps) {
+      for (const step of currentBatch.steps) {
+        const agentId = STEP_TO_AGENT[step.name] || step.name
+        currentBatchStepMap[agentId] = { ...step }
+
+        // Aggregate KG operator child status to parent kg_operators
+        if (KG_OPERATOR_CHILDREN.includes(agentId)) {
+          const existingStatus = currentBatchStepMap['kg_operators']?.status
+          if (!existingStatus ||
+              step.status === 'running' ||
+              (step.status === 'failed' && existingStatus !== 'running') ||
+              (step.status === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
+            currentBatchStepMap['kg_operators'] = { ...step, name: 'kg_operators' }
+          }
+        }
+      }
+    }
 
     if (process.steps) {
       for (const step of process.steps) {
         const agentId = STEP_TO_AGENT[step.name] || step.name
-        // If multiple steps map to same agent, prefer the latest status
-        // Create a shallow copy to avoid mutating Redux state
-        if (!map[agentId] || step.status === 'running' || (step.status === 'completed' && map[agentId].status !== 'running')) {
-          map[agentId] = { ...step }
+
+        // For batch-phase steps in a batch workflow: use current batch status (resets each batch)
+        if (isBatchWorkflow && BATCH_PHASE_STEPS.includes(agentId)) {
+          // Use current batch status if available, otherwise show as pending
+          if (currentBatchStepMap[agentId]) {
+            map[agentId] = currentBatchStepMap[agentId]
+          } else {
+            // Step hasn't started in current batch yet - show as pending (grey)
+            map[agentId] = { ...step, status: 'pending' }
+          }
+        } else {
+          // Non-batch steps (pre-batch and finalization): use aggregate status
+          // If multiple steps map to same agent, prefer the latest status
+          // Create a shallow copy to avoid mutating Redux state
+          if (!map[agentId] || step.status === 'running' || (step.status === 'completed' && map[agentId].status !== 'running')) {
+            map[agentId] = { ...step }
+          }
         }
 
-        // Aggregate KG operator child status to parent kg_operators
-        if (KG_OPERATOR_CHILDREN.includes(agentId)) {
+        // Aggregate KG operator child status to parent kg_operators (for non-batch workflows)
+        if (!isBatchWorkflow && KG_OPERATOR_CHILDREN.includes(agentId)) {
           const existingStatus = map['kg_operators']?.status
           if (!existingStatus ||
               step.status === 'running' ||
@@ -1307,6 +1364,16 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
             map['kg_operators'] = { ...step, name: 'kg_operators' }
           }
         }
+      }
+    }
+
+    // For batch workflows: ensure kg_operators uses current batch status
+    if (isBatchWorkflow && currentBatchStepMap['kg_operators']) {
+      map['kg_operators'] = currentBatchStepMap['kg_operators']
+    } else if (isBatchWorkflow && !currentBatchStepMap['kg_operators'] && BATCH_PHASE_STEPS.some(s => s.startsWith('context_') || s.startsWith('entity_') || s.startsWith('node_') || s.startsWith('deduplication_') || s.startsWith('edge_') || s.startsWith('structure_'))) {
+      // KG operators haven't started in current batch - show as pending
+      if (map['kg_operators']) {
+        map['kg_operators'] = { ...map['kg_operators'], status: 'pending' }
       }
     }
 
@@ -1324,9 +1391,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     return map
     // Use stepsSignature instead of process.steps for reliable change detection
     // stepsSignature changes when any step's name or status changes
+    // currentBatchSignature triggers recalc when new batch starts (resets batch-phase steps to pending)
     // Also include _refreshKey and completedSteps for additional change detection
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepsSignature, process.currentStep, process.completedSteps, STEP_TO_AGENT, (process as any)._refreshKey])
+  }, [stepsSignature, currentBatchSignature, process.currentStep, process.completedSteps, STEP_TO_AGENT, (process as any)._refreshKey])
 
   // Filter agents to only those appearing in the current workflow
   // PRESERVE original row/col positions from agents.yaml (Single Source of Truth)
