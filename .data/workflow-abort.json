@@ -1,7 +1,1 @@
-{
-  "abort": true,
-  "workflowId": "batch-analysis-batch-1767802061225",
-  "workflowName": "batch-analysis",
-  "timestamp": "2026-01-07T16:46:29.011Z",
-  "reason": "User cancelled via dashboard"
-}
+{}
