@@ -770,6 +770,26 @@ class SystemHealthAPIServer {
         const failed = new Set(progress.stepsFailed || []);
         const currentStep = progress.currentStep;
 
+        // Build a map of step outputs from batchIterations (for batch workflows)
+        const stepOutputsMap = {};
+        if (progress.batchIterations && Array.isArray(progress.batchIterations)) {
+            // Search through all batches to collect step outputs
+            for (const batch of progress.batchIterations) {
+                for (const step of batch.steps || []) {
+                    if (step.outputs && Object.keys(step.outputs).length > 0) {
+                        // Keep the most recent outputs for each step
+                        stepOutputsMap[step.name] = {
+                            outputs: step.outputs,
+                            duration: step.duration,
+                            tokensUsed: step.tokensUsed,
+                            llmProvider: step.llmProvider,
+                            llmCalls: step.llmCalls
+                        };
+                    }
+                }
+            }
+        }
+
         // Build steps array with status for all known steps
         const steps = [];
         let reachedCurrent = false;
@@ -798,7 +818,12 @@ class SystemHealthAPIServer {
                 }
             }
 
-            steps.push({ name: stepName, status });
+            // Include outputs from batchIterations if available
+            const stepData = { name: stepName, status };
+            if (stepOutputsMap[stepName]) {
+                Object.assign(stepData, stepOutputsMap[stepName]);
+            }
+            steps.push(stepData);
         }
 
         // Also add any steps from completed/failed that aren't in KNOWN_STEPS
