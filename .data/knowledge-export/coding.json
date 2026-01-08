@@ -12031,58 +12031,91 @@
           }
         },
         "The decision to use a microservices architecture (as seen in knowledge-management/insights/puml/network-aware-installation-pattern.puml) allows for greater flexibility and scalability, but may introduce additional complexity and communication overhead.",
-        "The decision to use a comprehensive knowledge graph management system, as seen in the commit message 'feat: comprehensive knowledge graph management system', has a significant impact on the overall architecture and data management of the system."
+        "The decision to use a comprehensive knowledge graph management system, as seen in the commit message 'feat: comprehensive knowledge graph management system', has a significant impact on the overall architecture and data management of the system.",
+        "The decision to implement a comprehensive knowledge graph management system, as seen in commit 'feat: comprehensive knowledge graph management system', has a significant impact on the overall system's ability to manage and update knowledge bases."
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-01-05T09:16:43.200Z",
-        "last_updated": "2026-01-06T16:33:23.835Z",
+        "last_updated": "2026-01-08T13:28:22.594Z",
         "significance": 5,
         "originalMetadata": {
           "significance": 5,
           "originalMetadata": {
-            "significance": 7,
+            "significance": 5,
             "originalMetadata": {
-              "created_at": "2026-01-05T09:16:43.096Z",
-              "last_updated": "2026-01-05T09:16:43.096Z",
-              "created_by": "workflow_persist",
-              "version": "1.0",
+              "significance": 7,
+              "originalMetadata": {
+                "created_at": "2026-01-05T09:16:43.096Z",
+                "last_updated": "2026-01-05T09:16:43.096Z",
+                "created_by": "workflow_persist",
+                "version": "1.0",
+                "ontology": {
+                  "ontologyName": "coding",
+                  "classificationMethod": "heuristic",
+                  "confidence": 0.94
+                },
+                "classificationConfidence": 0.94,
+                "classificationMethod": "heuristic",
+                "validation": {
+                  "valid": true,
+                  "errors": [],
+                  "warnings": [],
+                  "mode": "lenient"
+                },
+                "contentValidation": {
+                  "overallValid": false,
+                  "overallScore": 100,
+                  "totalIssues": 0,
+                  "criticalIssues": 0,
+                  "validatedAt": "2026-01-05T09:16:43.100Z",
+                  "mode": "lenient"
+                },
+                "staleness_score": 100,
+                "staleness_check_at": "2026-01-05T09:16:43.100Z"
+              },
+              "source": "manual",
+              "team": "coding",
+              "created_at": "2026-01-05T09:16:43.200Z",
+              "last_updated": "2026-01-06T11:48:52.827Z",
               "ontology": {
                 "ontologyName": "coding",
-                "classificationMethod": "heuristic",
+                "classificationMethod": "hybrid",
                 "confidence": 0.94
               },
               "classificationConfidence": 0.94,
-              "classificationMethod": "heuristic",
+              "classificationMethod": "hybrid",
               "validation": {
                 "valid": true,
                 "errors": [],
                 "warnings": [],
-                "mode": "lenient"
+                "mode": "disabled"
               },
               "contentValidation": {
                 "overallValid": false,
-                "overallScore": 100,
-                "totalIssues": 0,
-                "criticalIssues": 0,
-                "validatedAt": "2026-01-05T09:16:43.100Z",
+                "overallScore": 80,
+                "totalIssues": 1,
+                "criticalIssues": 1,
+                "validatedAt": "2026-01-06T11:49:00.066Z",
                 "mode": "lenient"
               },
+              "invalidating_commits": [],
               "staleness_score": 100,
-              "staleness_check_at": "2026-01-05T09:16:43.100Z"
+              "staleness_check_at": "2026-01-06T11:49:00.066Z",
+              "staleness_method": "git-based"
             },
             "source": "manual",
             "team": "coding",
             "created_at": "2026-01-05T09:16:43.200Z",
-            "last_updated": "2026-01-06T11:48:52.827Z",
+            "last_updated": "2026-01-06T16:33:00.641Z",
             "ontology": {
               "ontologyName": "coding",
               "classificationMethod": "hybrid",
-              "confidence": 0.94
+              "confidence": 0.95
             },
-            "classificationConfidence": 0.94,
+            "classificationConfidence": 0.95,
             "classificationMethod": "hybrid",
             "validation": {
               "valid": true,
@@ -12095,25 +12128,24 @@
               "overallScore": 80,
               "totalIssues": 1,
               "criticalIssues": 1,
-              "validatedAt": "2026-01-06T11:49:00.066Z",
+              "validatedAt": "2026-01-06T16:33:23.783Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-01-06T11:49:00.066Z",
+            "staleness_check_at": "2026-01-06T16:33:23.783Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2026-01-05T09:16:43.200Z",
-          "last_updated": "2026-01-06T16:33:00.641Z",
+          "last_updated": "2026-01-08T13:28:22.350Z",
           "ontology": {
-            "ontologyName": "coding",
-            "classificationMethod": "hybrid",
-            "confidence": 0.95
+            "preClassified": true,
+            "originalMethod": "unknown"
           },
-          "classificationConfidence": 0.95,
-          "classificationMethod": "hybrid",
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -12125,12 +12157,12 @@
             "overallScore": 80,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-06T16:33:23.783Z",
+            "validatedAt": "2026-01-08T13:28:22.355Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-06T16:33:23.783Z",
+          "staleness_check_at": "2026-01-08T13:28:22.355Z",
           "staleness_method": "git-based"
         }
       },
@@ -21315,7 +21347,7 @@
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-08T10:25:24.790Z",
+    "last_updated": "2026-01-08T13:33:14.252Z",
     "team": "coding",
     "entity_count": 45,
     "relation_count": 62,
