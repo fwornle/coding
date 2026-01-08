@@ -173,7 +173,7 @@ constraints:
   suggestion: Use descriptive names like workflow-sequence.puml, architecture-overview.puml
 - id: plantuml-diagram-name-format
   group: plantuml
-  pattern: '@startuml\s+(?:[A-Z]|.*\s+.*|.*(?:v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[ ._-])'
+  pattern: '@startuml\s+(?:[A-Z]|[^\n]*\s[^\n]*|[^\n]*(?:v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[ ._-])'
   message: 'CRITICAL: @startuml diagram name must be lowercase-hyphenated without spaces or version suffixes (determines output PNG filename)'
   severity: critical
   enabled: true
