@@ -1295,10 +1295,8 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   ]
 
   // Batch-phase step names that repeat each batch (should use current batch status, not aggregate)
-  // These match steps with `phase: batch` in batch-analysis.yaml
   const BATCH_PHASE_STEPS = [
-    'git_history', 'vibe_history', 'semantic_analysis', 'ontology_classification',
-    'observation_generation', 'quality_assurance', 'kg_operators',
+    'git_history', 'vibe_history', 'semantic_analysis', 'kg_operators',
     'context_convolution', 'entity_aggregation', 'node_embedding',
     'deduplication_operator', 'edge_prediction', 'structure_merge'
   ]
