@@ -1,0 +1,26 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+MultiagentcoordinationpatternPattern -- "Coordinates multiple agents" 
+FullgitanalysisPattern -- "Analyzes entire codebase"
+GraphdatabasepersistencepatternPattern -- "Manages knowledge graphs"
+OntologyclassificationworkflowPattern -- "Classifies ontologies and enables semantic analysis"
+BetterfilteringandnodenamegenerationPattern -- "Generates meaningful node names and filters out irrelevant data"
+
+Large-Scale Codebase -- "Enterprise-scale codebase with 64165 code entities" 
+ImprovedcodingcopilotstartupPattern -- "Improves coding tool startup experience"
+
+Functional Programming Pattern -- "Predominantly functional architecture with 32523 standalone functions"
+
+MultiagentcoordinationpatternPattern -include> Multi-Agent Coordination
+FullgitanalysisPattern -include> Full Git Analysis
+GraphdatabasepersistencepatternPattern -include> Graph Database Persistence
+OntologyclassificationworkflowPattern -include> Ontology Classification Workflow
+BetterfilteringandnodenamegenerationPattern -include> Better Filtering and Node Name Generation
+
+Large-Scale Codebase --> modules 
+ImprovedcodingcopilotstartupPattern --> coding tools 
+
+Functional Programming Pattern --> functions, modules
+
+@enduml
