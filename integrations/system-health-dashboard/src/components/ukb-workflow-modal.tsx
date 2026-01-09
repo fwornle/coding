@@ -921,16 +921,32 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               {showSidebar && selectedNode && (
                 <div className="flex-shrink-0 overflow-auto">
                   {selectedSubStep ? (
-                    <SubStepDetailsSidebar
-                      agentId={selectedNode}
-                      substep={selectedSubStep}
-                      onClose={() => {
-                        setSelectedSubStep(null)
-                      }}
-                      onBackToAgent={() => {
-                        setSelectedSubStep(null)
-                      }}
-                    />
+                    (() => {
+                      // Find step info for this agent to get runtime data
+                      const agentStepInfo = activeCurrentProcess?.steps?.find(
+                        s => STEP_TO_AGENT[s.name] === selectedNode || s.name === selectedNode
+                      )
+                      return (
+                        <SubStepDetailsSidebar
+                          agentId={selectedNode}
+                          substep={selectedSubStep}
+                          onClose={() => {
+                            setSelectedSubStep(null)
+                          }}
+                          onBackToAgent={() => {
+                            setSelectedSubStep(null)
+                          }}
+                          stepOutputs={agentStepInfo?.outputs}
+                          stepStatus={agentStepInfo?.status}
+                          stepDuration={agentStepInfo?.duration}
+                          llmInfo={{
+                            provider: agentStepInfo?.llmProvider,
+                            tokensUsed: agentStepInfo?.tokensUsed,
+                            llmCalls: agentStepInfo?.llmCalls,
+                          }}
+                        />
+                      )
+                    })()
                   ) : (
                     <UKBNodeDetailsSidebar
                       agentId={selectedNode}
@@ -1200,16 +1216,32 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 {showHistoricalSidebar && selectedNode && (
                   <div className="w-80 flex-shrink-0 overflow-auto border rounded-lg bg-background">
                     {selectedSubStep ? (
-                      <SubStepDetailsSidebar
-                        agentId={selectedNode}
-                        substep={selectedSubStep}
-                        onClose={() => {
-                          setSelectedSubStep(null)
-                        }}
-                        onBackToAgent={() => {
-                          setSelectedSubStep(null)
-                        }}
-                      />
+                      (() => {
+                        // Find step info for this agent from historical data
+                        const agentStepInfo = historicalProcessInfo?.steps?.find(
+                          s => STEP_TO_AGENT[s.name] === selectedNode || s.name === selectedNode
+                        )
+                        return (
+                          <SubStepDetailsSidebar
+                            agentId={selectedNode}
+                            substep={selectedSubStep}
+                            onClose={() => {
+                              setSelectedSubStep(null)
+                            }}
+                            onBackToAgent={() => {
+                              setSelectedSubStep(null)
+                            }}
+                            stepOutputs={agentStepInfo?.outputs}
+                            stepStatus={agentStepInfo?.status}
+                            stepDuration={agentStepInfo?.duration}
+                            llmInfo={{
+                              provider: agentStepInfo?.llmProvider,
+                              tokensUsed: agentStepInfo?.tokensUsed,
+                              llmCalls: agentStepInfo?.llmCalls,
+                            }}
+                          />
+                        )
+                      })()
                     ) : (
                       <UKBNodeDetailsSidebar
                         agentId={selectedNode}
@@ -1527,21 +1559,124 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   )
 }
 
+// Mapping from agent+substep to output field names for runtime data display
+// This maps substep IDs to the actual output fields from workflow-progress.json
+const SUBSTEP_OUTPUT_MAPPINGS: Record<string, Record<string, { inputFields?: string[]; outputFields?: string[] }>> = {
+  'git_history': {
+    'fetch': { outputFields: ['commitsCount'] },
+    'diff': { inputFields: ['commitsCount'], outputFields: ['changeSummaries'] },
+    'extract': { outputFields: ['structuredMetadata'] },
+  },
+  'vibe_history': {
+    'fetch': { outputFields: ['sessionsCount'] },
+    'parse': { inputFields: ['sessionsCount'], outputFields: ['parsedMessages'] },
+    'extract': { outputFields: ['sessionSummaries'] },
+  },
+  'semantic_analysis': {
+    'parse': { outputFields: ['parsedSegments'] },
+    'extract': { outputFields: ['batchEntities'] },
+    'relate': { inputFields: ['batchEntities'], outputFields: ['batchRelations'] },
+    'enrich': { inputFields: ['batchEntities'], outputFields: ['enrichedEntities'] },
+  },
+  'ontology_classification': {
+    'match': { inputFields: ['batchEntities'], outputFields: ['classified'] },
+    'validate': { inputFields: ['classified'], outputFields: ['validated'] },
+    'extend': { outputFields: ['newClasses'] },
+  },
+  'kg_operators': {
+    'conv': { outputFields: ['conversationalEntities'] },
+    'aggr': { outputFields: ['aggregatedGroups'] },
+    'embed': { outputFields: ['embeddingsGenerated'] },
+    'dedup': { outputFields: ['mergedCount', 'entitiesAfter'] },
+    'pred': { outputFields: ['predictedRelations', 'relationsAfter'] },
+    'merge': { inputFields: ['entitiesAfter', 'relationsAfter'], outputFields: ['entitiesAfter', 'relationsAfter'] },
+  },
+  'quality_assurance': {
+    'validate': { inputFields: ['entitiesAfter'], outputFields: ['validationResults'] },
+    'score': { outputFields: ['qualityScores'] },
+    'report': { outputFields: ['entitiesCreated', 'relationsAdded'] },
+  },
+  'batch_scheduler': {
+    'plan': { outputFields: ['totalBatches', 'batchPlan'] },
+    'track': { outputFields: ['currentBatch', 'completedBatches'] },
+    'resume': { outputFields: ['resumedFrom', 'skippedBatches'] },
+  },
+  'observation_generator': {
+    'extract': { outputFields: ['observationsCount'] },
+    'format': { inputFields: ['observationsCount'], outputFields: ['formattedObservations'] },
+  },
+  'code_graph': {
+    'index': { outputFields: ['filesIndexed', 'symbolsFound'] },
+    'query': { outputFields: ['queryResults'] },
+    'analyze': { outputFields: ['analysisResults', 'insights'] },
+  },
+  'insight_generation': {
+    'patterns': { outputFields: ['patternsFound'] },
+    'arch': { outputFields: ['diagramsGenerated'] },
+    'docs': { outputFields: ['docsGenerated'] },
+    'synth': { outputFields: ['insightsGenerated'] },
+  },
+}
+
+// Helper to format output values for display
+function formatOutputValue(_key: string, value: any): string {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'number') return value.toLocaleString()
+  if (Array.isArray(value)) return `${value.length} items`
+  if (typeof value === 'object') return JSON.stringify(value).slice(0, 50) + '...'
+  return String(value)
+}
+
 // Sidebar component for substep details
 function SubStepDetailsSidebar({
   agentId,
   substep,
-  onClose,
+  onClose: _onClose, // Kept for API compatibility, using onBackToAgent instead
   onBackToAgent,
+  stepOutputs,
+  stepStatus,
+  stepDuration,
+  llmInfo,
 }: {
   agentId: string
   substep: SubStep
   onClose: () => void
   onBackToAgent: () => void
+  stepOutputs?: Record<string, any>
+  stepStatus?: string
+  stepDuration?: number
+  llmInfo?: { provider?: string; tokensUsed?: number; llmCalls?: number }
 }) {
   // Get agent info for context
   const agentSubsteps = AGENT_SUBSTEPS[agentId]
   const substepIndex = agentSubsteps?.findIndex(s => s.id === substep.id) ?? -1
+
+  // Get substep-specific output mapping
+  const substepMapping = SUBSTEP_OUTPUT_MAPPINGS[agentId]?.[substep.id]
+
+  // Extract actual runtime values for this substep
+  const getRuntimeInputs = (): Array<{ label: string; value: string }> => {
+    if (!stepOutputs || !substepMapping?.inputFields) return []
+    return substepMapping.inputFields
+      .filter(field => stepOutputs[field] !== undefined)
+      .map(field => ({
+        label: field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+        value: formatOutputValue(field, stepOutputs[field])
+      }))
+  }
+
+  const getRuntimeOutputs = (): Array<{ label: string; value: string }> => {
+    if (!stepOutputs || !substepMapping?.outputFields) return []
+    return substepMapping.outputFields
+      .filter(field => stepOutputs[field] !== undefined)
+      .map(field => ({
+        label: field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+        value: formatOutputValue(field, stepOutputs[field])
+      }))
+  }
+
+  const runtimeInputs = getRuntimeInputs()
+  const runtimeOutputs = getRuntimeOutputs()
 
   // LLM usage badge color
   const getLlmUsageBadge = (usage?: string) => {
@@ -1589,36 +1724,116 @@ function SubStepDetailsSidebar({
 
         <Separator />
 
-        {/* Inputs */}
+        {/* Runtime Execution Info - only show if we have data */}
+        {(stepStatus || stepDuration || llmInfo?.tokensUsed) && (
+          <>
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm flex items-center gap-2">
+                <Timer className="h-4 w-4 text-orange-500" />
+                Execution
+              </h4>
+              <div className="text-sm space-y-1 bg-muted/50 rounded p-2">
+                {stepStatus && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <span className={
+                      stepStatus === 'completed' ? 'text-green-600 font-medium' :
+                      stepStatus === 'running' ? 'text-blue-600 font-medium' :
+                      stepStatus === 'failed' ? 'text-red-600 font-medium' :
+                      'text-muted-foreground'
+                    }>
+                      {stepStatus.charAt(0).toUpperCase() + stepStatus.slice(1)}
+                    </span>
+                  </div>
+                )}
+                {stepDuration !== undefined && stepDuration > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Duration</span>
+                    <span>{stepDuration < 1000 ? `${stepDuration}ms` : `${(stepDuration / 1000).toFixed(1)}s`}</span>
+                  </div>
+                )}
+                {llmInfo?.tokensUsed !== undefined && llmInfo.tokensUsed > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tokens</span>
+                    <span>{llmInfo.tokensUsed.toLocaleString()}</span>
+                  </div>
+                )}
+                {llmInfo?.provider && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Provider</span>
+                    <span className="text-xs font-mono">{llmInfo.provider}</span>
+                  </div>
+                )}
+                {llmInfo?.llmCalls !== undefined && llmInfo.llmCalls > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">LLM Calls</span>
+                    <span>{llmInfo.llmCalls}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <Separator />
+          </>
+        )}
+
+        {/* Inputs - show runtime values if available, otherwise static descriptions */}
         <div className="space-y-2">
           <h4 className="font-medium text-sm flex items-center gap-2">
             <ChevronRight className="h-4 w-4 text-blue-500" />
             Inputs
+            {runtimeInputs.length > 0 && (
+              <Badge variant="outline" className="text-[10px] h-4 bg-blue-50 text-blue-600">Live</Badge>
+            )}
           </h4>
-          <ul className="text-sm space-y-1 pl-4">
-            {substep.inputs.map((input, idx) => (
-              <li key={idx} className="text-muted-foreground flex items-start gap-1">
-                <span className="text-blue-400">•</span>
-                {input}
-              </li>
-            ))}
-          </ul>
+          {runtimeInputs.length > 0 ? (
+            <div className="text-sm space-y-1 bg-blue-50/50 rounded p-2">
+              {runtimeInputs.map((input, idx) => (
+                <div key={idx} className="flex justify-between">
+                  <span className="text-muted-foreground">{input.label}</span>
+                  <span className="font-medium text-blue-700">{input.value}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ul className="text-sm space-y-1 pl-4">
+              {substep.inputs.map((input, idx) => (
+                <li key={idx} className="text-muted-foreground flex items-start gap-1">
+                  <span className="text-blue-400">•</span>
+                  {input}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
-        {/* Outputs */}
+        {/* Outputs - show runtime values if available, otherwise static descriptions */}
         <div className="space-y-2">
           <h4 className="font-medium text-sm flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-green-500" />
             Outputs
+            {runtimeOutputs.length > 0 && (
+              <Badge variant="outline" className="text-[10px] h-4 bg-green-50 text-green-600">Live</Badge>
+            )}
           </h4>
-          <ul className="text-sm space-y-1 pl-4">
-            {substep.outputs.map((output, idx) => (
-              <li key={idx} className="text-muted-foreground flex items-start gap-1">
-                <span className="text-green-400">•</span>
-                {output}
-              </li>
-            ))}
-          </ul>
+          {runtimeOutputs.length > 0 ? (
+            <div className="text-sm space-y-1 bg-green-50/50 rounded p-2">
+              {runtimeOutputs.map((output, idx) => (
+                <div key={idx} className="flex justify-between">
+                  <span className="text-muted-foreground">{output.label}</span>
+                  <span className="font-medium text-green-700">{output.value}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ul className="text-sm space-y-1 pl-4">
+              {substep.outputs.map((output, idx) => (
+                <li key={idx} className="text-muted-foreground flex items-start gap-1">
+                  <span className="text-green-400">•</span>
+                  {output}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Technical Note */}
