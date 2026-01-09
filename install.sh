@@ -297,8 +297,33 @@ check_dependencies() {
     
     if ! command -v node >/dev/null 2>&1; then
         missing_deps+=("node")
+    else
+        # Node.js exists - verify it actually works (catches library issues like simdjson mismatch)
+        local node_health_output
+        if ! node_health_output=$(node -e "console.log('ok')" 2>&1); then
+            echo ""
+            echo -e "${RED}╔══════════════════════════════════════════════════════════════════════╗${NC}"
+            echo -e "${RED}║                                                                      ║${NC}"
+            echo -e "${RED}║              ⚠️  NODE.JS IS BROKEN ⚠️                                  ║${NC}"
+            echo -e "${RED}║                                                                      ║${NC}"
+            echo -e "${RED}╚══════════════════════════════════════════════════════════════════════╝${NC}"
+            echo ""
+            echo -e "${YELLOW}Node.js is installed but fails to execute. This is commonly caused by${NC}"
+            echo -e "${YELLOW}Homebrew library version mismatches (e.g., libsimdjson, libuv).${NC}"
+            echo ""
+            echo -e "${CYAN}Error:${NC}"
+            echo "$node_health_output" | head -5
+            echo ""
+            echo -e "${CYAN}To fix this, try one of these options:${NC}"
+            echo -e "  ${GREEN}1.${NC} brew reinstall node"
+            echo -e "  ${GREEN}2.${NC} Use nvm instead: nvm install --lts && nvm use --lts"
+            echo -e "  ${GREEN}3.${NC} Reinstall Homebrew Node completely:"
+            echo -e "     brew uninstall node && brew install node"
+            echo ""
+            error_exit "Node.js is broken. Please fix it before running this installer."
+        fi
     fi
-    
+
     if ! command -v npm >/dev/null 2>&1; then
         missing_deps+=("npm")
     fi
@@ -2331,6 +2356,37 @@ install_constraint_monitor_hooks() {
         info "To use hooks, install from the primary coding installation"
         return 0
     fi
+
+    # NODE.JS HEALTH CHECK: Verify Node.js works before installing hooks
+    # This prevents broken hooks from crashing Claude if Node.js has library issues
+    # (e.g., Homebrew simdjson/libuv version mismatch)
+    info "Verifying Node.js health before hook installation..."
+    local node_test_output
+    if ! node_test_output=$(node -e "console.log('ok')" 2>&1); then
+        echo ""
+        echo -e "${RED}╔══════════════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${RED}║                                                                      ║${NC}"
+        echo -e "${RED}║              ⚠️  NODE.JS HEALTH CHECK FAILED ⚠️                       ║${NC}"
+        echo -e "${RED}║                                                                      ║${NC}"
+        echo -e "${RED}╚══════════════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${YELLOW}Node.js failed to execute. This is often caused by Homebrew library${NC}"
+        echo -e "${YELLOW}version mismatches (e.g., simdjson, libuv).${NC}"
+        echo ""
+        echo -e "${CYAN}Error output:${NC}"
+        echo "$node_test_output" | head -5
+        echo ""
+        echo -e "${CYAN}To fix this, try one of these options:${NC}"
+        echo -e "  ${GREEN}1.${NC} brew reinstall node"
+        echo -e "  ${GREEN}2.${NC} Use nvm instead: nvm install --lts && nvm use --lts"
+        echo -e "  ${GREEN}3.${NC} Use native Claude installer: curl -fsSL https://claude.ai/install.sh | bash"
+        echo ""
+        warning "SKIPPING hook installation to prevent Claude from crashing"
+        warning "After fixing Node.js, re-run: ./install.sh"
+        INSTALLATION_WARNINGS+=("Hooks: Skipped - Node.js health check failed")
+        return 1
+    fi
+    success "Node.js health check passed"
 
     local settings_file="$HOME/.claude/settings.json"
     local pre_hook_cmd="node $CODING_REPO/integrations/mcp-constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
