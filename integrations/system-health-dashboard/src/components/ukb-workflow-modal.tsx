@@ -923,9 +923,48 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   {selectedSubStep ? (
                     (() => {
                       // Find step info for this agent to get runtime data
-                      const agentStepInfo = activeCurrentProcess?.steps?.find(
-                        s => STEP_TO_AGENT[s.name] === selectedNode || s.name === selectedNode
-                      )
+                      // First check batchIterations for detailed outputs (most detailed for batch steps)
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      let agentStepInfo: any = undefined
+                      let combinedOutputs: Record<string, unknown> = {}
+
+                      // Search in batchIterations first (has detailed outputs for batch-phase steps)
+                      if (activeCurrentProcess?.batchIterations) {
+                        for (const batch of activeCurrentProcess.batchIterations) {
+                          const batchStep = batch.steps.find(
+                            s => STEP_TO_AGENT[s.name] === selectedNode || s.name === selectedNode
+                          )
+                          if (batchStep) {
+                            // Merge outputs from all batches for this agent (accumulate counts)
+                            if (batchStep.outputs) {
+                              Object.entries(batchStep.outputs).forEach(([key, value]) => {
+                                const existing = combinedOutputs[key]
+                                if (typeof value === 'number' && typeof existing === 'number') {
+                                  combinedOutputs[key] = existing + value  // Sum numeric values across batches
+                                } else {
+                                  combinedOutputs[key] = value  // Use latest value for non-numeric
+                                }
+                              })
+                            }
+                            // Use the last matching step for status/duration (most recent)
+                            agentStepInfo = batchStep as any
+                          }
+                        }
+                      }
+
+                      // Fall back to stepsDetail (has finalization step outputs)
+                      if (!agentStepInfo || Object.keys(combinedOutputs).length === 0) {
+                        const stepsDetailInfo = activeCurrentProcess?.steps?.find(
+                          s => STEP_TO_AGENT[s.name] === selectedNode || s.name === selectedNode
+                        )
+                        if (stepsDetailInfo) {
+                          agentStepInfo = stepsDetailInfo
+                          if (stepsDetailInfo.outputs) {
+                            combinedOutputs = { ...combinedOutputs, ...stepsDetailInfo.outputs }
+                          }
+                        }
+                      }
+
                       return (
                         <SubStepDetailsSidebar
                           agentId={selectedNode}
@@ -936,7 +975,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                           onBackToAgent={() => {
                             setSelectedSubStep(null)
                           }}
-                          stepOutputs={agentStepInfo?.outputs}
+                          stepOutputs={Object.keys(combinedOutputs).length > 0 ? combinedOutputs : agentStepInfo?.outputs}
                           stepStatus={agentStepInfo?.status}
                           stepDuration={agentStepInfo?.duration}
                           llmInfo={{
@@ -1561,61 +1600,85 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
 // Mapping from agent+substep to output field names for runtime data display
 // This maps substep IDs to the actual output fields from workflow-progress.json
+// Fields use dot notation for nested values (e.g., 'codeGraphStats.totalEntities')
 const SUBSTEP_OUTPUT_MAPPINGS: Record<string, Record<string, { inputFields?: string[]; outputFields?: string[] }>> = {
   'git_history': {
+    // extract_batch_commits outputs: { commitsCount }
     'fetch': { outputFields: ['commitsCount'] },
-    'diff': { inputFields: ['commitsCount'], outputFields: ['changeSummaries'] },
-    'extract': { outputFields: ['structuredMetadata'] },
+    'diff': { inputFields: ['commitsCount'], outputFields: ['commitsCount'] },  // Reuse commitsCount for visibility
+    'extract': { inputFields: ['commitsCount'], outputFields: ['commitsCount'] },
   },
   'vibe_history': {
+    // extract_batch_sessions outputs: { sessionsCount }
     'fetch': { outputFields: ['sessionsCount'] },
-    'parse': { inputFields: ['sessionsCount'], outputFields: ['parsedMessages'] },
-    'extract': { outputFields: ['sessionSummaries'] },
+    'parse': { inputFields: ['sessionsCount'], outputFields: ['sessionsCount'] },
+    'extract': { inputFields: ['sessionsCount'], outputFields: ['sessionsCount'] },
   },
   'semantic_analysis': {
-    'parse': { outputFields: ['parsedSegments'] },
+    // batch_semantic_analysis outputs: { batchEntities, batchRelations }
+    'parse': { outputFields: ['batchEntities'] },
     'extract': { outputFields: ['batchEntities'] },
     'relate': { inputFields: ['batchEntities'], outputFields: ['batchRelations'] },
-    'enrich': { inputFields: ['batchEntities'], outputFields: ['enrichedEntities'] },
+    'enrich': { inputFields: ['batchEntities'], outputFields: ['batchEntities', 'batchRelations'] },
   },
   'ontology_classification': {
+    // classify_with_ontology outputs: { classified, llmCalls, byClass, byMethod }
     'match': { inputFields: ['batchEntities'], outputFields: ['classified'] },
-    'validate': { inputFields: ['classified'], outputFields: ['validated'] },
-    'extend': { outputFields: ['newClasses'] },
+    'validate': { inputFields: ['classified'], outputFields: ['classified', 'llmCalls'] },
+    'extend': { outputFields: ['byClass'] },
   },
   'kg_operators': {
-    'conv': { outputFields: ['conversationalEntities'] },
-    'aggr': { outputFields: ['aggregatedGroups'] },
-    'embed': { outputFields: ['embeddingsGenerated'] },
-    'dedup': { outputFields: ['mergedCount', 'entitiesAfter'] },
-    'pred': { outputFields: ['predictedRelations', 'relationsAfter'] },
+    // kg_operators outputs: { entitiesAfter, relationsAfter }
+    'conv': { outputFields: ['entitiesAfter'] },
+    'aggr': { outputFields: ['entitiesAfter'] },
+    'embed': { outputFields: ['entitiesAfter'] },
+    'dedup': { outputFields: ['entitiesAfter'] },
+    'pred': { outputFields: ['relationsAfter'] },
     'merge': { inputFields: ['entitiesAfter', 'relationsAfter'], outputFields: ['entitiesAfter', 'relationsAfter'] },
   },
   'quality_assurance': {
-    'validate': { inputFields: ['entitiesAfter'], outputFields: ['validationResults'] },
-    'score': { outputFields: ['qualityScores'] },
+    // batch_qa outputs: { entitiesCreated, relationsAdded }
+    'validate': { inputFields: ['entitiesAfter'], outputFields: ['entitiesCreated'] },
+    'score': { outputFields: ['entitiesCreated', 'relationsAdded'] },
     'report': { outputFields: ['entitiesCreated', 'relationsAdded'] },
   },
   'batch_scheduler': {
-    'plan': { outputFields: ['totalBatches', 'batchPlan'] },
-    'track': { outputFields: ['currentBatch', 'completedBatches'] },
-    'resume': { outputFields: ['resumedFrom', 'skippedBatches'] },
+    // plan_batches has no rich outputs in batch progress, but we can show batch progress
+    'plan': { outputFields: ['totalBatches'] },
+    'track': { outputFields: ['currentBatch', 'totalBatches'] },
+    'resume': { outputFields: ['totalBatches'] },
   },
-  'observation_generator': {
+  'observation_generation': {  // Fixed: was 'observation_generator'
+    // generate_batch_observations outputs: { observationsCount }
     'extract': { outputFields: ['observationsCount'] },
-    'format': { inputFields: ['observationsCount'], outputFields: ['formattedObservations'] },
+    'format': { inputFields: ['observationsCount'], outputFields: ['observationsCount'] },
   },
   'code_graph': {
-    'index': { outputFields: ['filesIndexed', 'symbolsFound'] },
-    'query': { outputFields: ['queryResults'] },
-    'analyze': { outputFields: ['analysisResults', 'insights'] },
+    // index_codebase outputs: { codeGraphStats: { totalEntities, totalRelationships, ... } }
+    'index': { outputFields: ['codeGraphStats.totalEntities', 'codeGraphStats.totalRelationships'] },
+    'query': { inputFields: ['codeGraphStats.totalEntities'], outputFields: ['codeGraphStats.totalEntities'] },
+    'analyze': { inputFields: ['codeGraphStats.totalEntities'], outputFields: ['codeGraphStats.totalEntities', 'codeGraphStats.totalRelationships'] },
   },
   'insight_generation': {
-    'patterns': { outputFields: ['patternsFound'] },
-    'arch': { outputFields: ['diagramsGenerated'] },
-    'docs': { outputFields: ['docsGenerated'] },
-    'synth': { outputFields: ['insightsGenerated'] },
+    // generate_insights outputs: { totalInsights, insightDocuments, totalPatterns }
+    'patterns': { outputFields: ['totalPatterns'] },
+    'arch': { outputFields: ['totalInsights'] },
+    'docs': { outputFields: ['insightDocuments'] },
+    'synth': { outputFields: ['totalInsights', 'totalPatterns'] },
   },
+}
+
+// Helper to get nested property values via dot notation (e.g., 'codeGraphStats.totalEntities')
+function getNestedValue(obj: Record<string, any> | undefined, path: string): any {
+  if (!obj) return undefined
+  return path.split('.').reduce((current, key) => current?.[key], obj)
+}
+
+// Helper to format field name for display (handles dot notation)
+function formatFieldLabel(field: string): string {
+  // For nested fields like 'codeGraphStats.totalEntities', use only the last part
+  const displayName = field.includes('.') ? field.split('.').pop() || field : field
+  return displayName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
 }
 
 // Helper to format output values for display
@@ -1654,24 +1717,24 @@ function SubStepDetailsSidebar({
   // Get substep-specific output mapping
   const substepMapping = SUBSTEP_OUTPUT_MAPPINGS[agentId]?.[substep.id]
 
-  // Extract actual runtime values for this substep
+  // Extract actual runtime values for this substep (supports dot notation for nested fields)
   const getRuntimeInputs = (): Array<{ label: string; value: string }> => {
     if (!stepOutputs || !substepMapping?.inputFields) return []
     return substepMapping.inputFields
-      .filter(field => stepOutputs[field] !== undefined)
+      .filter(field => getNestedValue(stepOutputs, field) !== undefined)
       .map(field => ({
-        label: field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
-        value: formatOutputValue(field, stepOutputs[field])
+        label: formatFieldLabel(field),
+        value: formatOutputValue(field, getNestedValue(stepOutputs, field))
       }))
   }
 
   const getRuntimeOutputs = (): Array<{ label: string; value: string }> => {
     if (!stepOutputs || !substepMapping?.outputFields) return []
     return substepMapping.outputFields
-      .filter(field => stepOutputs[field] !== undefined)
+      .filter(field => getNestedValue(stepOutputs, field) !== undefined)
       .map(field => ({
-        label: field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
-        value: formatOutputValue(field, stepOutputs[field])
+        label: formatFieldLabel(field),
+        value: formatOutputValue(field, getNestedValue(stepOutputs, field))
       }))
   }
 
