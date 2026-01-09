@@ -104,7 +104,7 @@ constraints:
   message: Evolutionary naming detected - refactor original instead. (Whitelisted
     files are exempt from this rule)
   severity: error
-  enabled: false
+  enabled: true
   suggestion: Rename to descriptive functional name and refactor the original
   semantic_validation: false
   whitelist:
@@ -132,7 +132,7 @@ constraints:
   pattern: '@startuml.*\n(?!.*!include _standard-style\.puml)'
   message: PlantUML files must include the standard styling file
   severity: error
-  enabled: false
+  enabled: true
   suggestion: Add '!include _standard-style.puml' after @startuml and before content
   whitelist:
   - '*.yaml'
@@ -192,7 +192,7 @@ constraints:
   pattern: '(?:[A-Z][a-z]+[A-Z]|[A-Z]{2,}).*\.md$'
   message: 'Documentation files should use kebab-case naming: feature-name.md (only README.md and CHANGELOG.md may use uppercase)'
   severity: error
-  enabled: false
+  enabled: true
   applies_to: file_path
   suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md or ALL-CAPS-FILE.md'
   whitelist:
@@ -253,7 +253,7 @@ constraints:
   message: 'CRITICAL: Modifying PlantUML files requires documentation-style skill.
     You MUST invoke Skill tool with skill=''documentation-style'' FIRST'
   severity: error
-  enabled: false
+  enabled: true
   applies_to: content
   tool_filter:
   - Edit
@@ -304,14 +304,14 @@ constraints:
   pattern: useEffect\([^,]*,\s*\[\]
   message: useEffect with empty deps array - verify if this is intentional
   severity: info
-  enabled: false
+  enabled: true
   suggestion: Ensure useEffect dependencies are correct to avoid bugs
 - id: react-state-complexity
   group: framework_specific
   pattern: useState\([^)]*\{[^}]*\}[^)]*\)
   message: Complex object in useState - consider useReducer or separate states
   severity: warning
-  enabled: false
+  enabled: true
   suggestion: Use useReducer for complex state or separate into multiple useState
     calls
 - id: no-ukb-bash-command
