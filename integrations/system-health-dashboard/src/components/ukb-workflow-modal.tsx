@@ -364,12 +364,12 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }).join('|')
   }, [processes])
 
-  // Filter to only include truly active (running) processes
-  // Completed/failed workflows should move to History tab
+  // Filter processes for the Active tab
+  // Keep inline MCP workflows (any status) since they have batchIterations for trace
   const activeProcesses = useMemo(() => {
     return processes.filter(p =>
       p.status === 'running' ||
-      (p.isInlineMCP && p.status === 'running') || // Only show running inline MCP processes
+      p.isInlineMCP || // Keep all inline MCP workflows to preserve batchIterations for trace
       (p.isAlive && p.status !== 'completed' && p.status !== 'failed')
     )
     // Include processesSignature to ensure recalculation when any process data changes

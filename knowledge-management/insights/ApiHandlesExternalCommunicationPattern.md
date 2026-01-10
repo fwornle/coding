@@ -1,6 +1,6 @@
 # ApiHandlesExternalCommunicationPattern
 **Type:** general
-**Generated:** 2026-01-09T19:08:59.997Z
+**Generated:** 2026-01-10T09:59:10.481Z
 
 ## Pattern Overview
 api architectural decision involving 23 files with high impact; Handles external communication (commit: 9967b1a1); api changes require careful coordination across 23 files
@@ -15,13 +15,10 @@ api architectural decision involving 23 files with high impact; Handles external
 - Files: 23, Impact: high, Commit: 9967b1a1
 
 ## Development History
-Analysis of 887 commits.
+Analysis of 891 commits.
 
 ## Conversation Insights
-Analysis of 993 development sessions.
-
-## Diagrams
-![api-handles-external-communication-pattern-architecture](images/api-handles-external-communication-pattern-architecture.png)
+Analysis of 1002 development sessions.
 
 ## Related Patterns
 - **PromiseHandlesAsynchronousOperationsPattern** (general): promise architectural decision involving 20 files with high impact; Handles asynchronous operations (commit: c6c10f70); promise changes require careful coordination across 20 files

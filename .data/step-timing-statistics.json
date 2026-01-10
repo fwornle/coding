@@ -1,18 +1,17 @@
 {
   "version": 1,
-  "lastUpdated": "2026-01-10T07:01:20.635Z",
+  "lastUpdated": "2026-01-10T10:06:11.197Z",
   "workflowTypes": {
     "batch-analysis": {
-      "sampleCount": 89,
-      "lastSampleDate": "2026-01-10T07:01:20.635Z",
+      "sampleCount": 90,
+      "lastSampleDate": "2026-01-10T10:06:11.197Z",
       "steps": {
         "plan_batches": {
           "avgDurationMs": 69,
           "minDurationMs": 30,
           "maxDurationMs": 125,
-          "sampleCount": 76,
+          "sampleCount": 77,
           "recentDurations": [
-            45,
             51,
             90,
             81,
@@ -21,17 +20,17 @@
             73,
             75,
             65,
-            53
+            53,
+            68
           ],
           "isBatchStep": true
         },
         "extract_batch_commits": {
-          "avgDurationMs": 560,
+          "avgDurationMs": 540,
           "minDurationMs": 130,
           "maxDurationMs": 2676,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            344,
             322,
             359,
             409,
@@ -40,17 +39,17 @@
             583,
             433,
             399,
-            348
+            348,
+            461
           ],
           "isBatchStep": true
         },
         "extract_batch_sessions": {
-          "avgDurationMs": 1435,
+          "avgDurationMs": 1223,
           "minDurationMs": 140,
           "maxDurationMs": 2142,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            1253,
             1192,
             1149,
             1237,
@@ -59,17 +58,17 @@
             1797,
             1432,
             1414,
-            1485
+            1485,
+            376
           ],
           "isBatchStep": true
         },
         "batch_semantic_analysis": {
-          "avgDurationMs": 4682,
+          "avgDurationMs": 4630,
           "minDurationMs": 2800,
           "maxDurationMs": 29400,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            4455,
             4767,
             4328,
             4413,
@@ -78,7 +77,8 @@
             4688,
             4713,
             4428,
-            4971
+            4971,
+            4422
           ],
           "isBatchStep": true
         },
@@ -86,9 +86,8 @@
           "avgDurationMs": 4,
           "minDurationMs": 0,
           "maxDurationMs": 6170,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            1,
             1,
             2,
             4,
@@ -97,36 +96,36 @@
             3,
             1,
             3,
-            2
+            2,
+            3
           ],
           "isBatchStep": true
         },
         "operator_aggr": {
-          "avgDurationMs": 8,
+          "avgDurationMs": 7,
           "minDurationMs": 0,
           "maxDurationMs": 7070,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
             0,
             0,
-            0,
             1,
             1,
             1,
             1,
             0,
             0,
-            0
+            0,
+            1
           ],
           "isBatchStep": true
         },
         "operator_embed": {
-          "avgDurationMs": 7,
+          "avgDurationMs": 6,
           "minDurationMs": 0,
           "maxDurationMs": 5010,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            0,
             0,
             1,
             1,
@@ -135,17 +134,17 @@
             2,
             1,
             0,
+            1,
             1
           ],
           "isBatchStep": true
         },
         "operator_dedup": {
-          "avgDurationMs": 31,
+          "avgDurationMs": 25,
           "minDurationMs": 0,
           "maxDurationMs": 7070,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            0,
             1,
             0,
             1,
@@ -154,18 +153,18 @@
             1,
             0,
             1,
-            0
+            0,
+            1
           ],
           "isBatchStep": true
         },
         "operator_pred": {
-          "avgDurationMs": 5,
+          "avgDurationMs": 4,
           "minDurationMs": 0,
           "maxDurationMs": 7070,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
             0,
-            0,
             1,
             1,
             1,
@@ -173,17 +172,17 @@
             1,
             0,
             0,
-            0
+            0,
+            1
           ],
           "isBatchStep": true
         },
         "operator_merge": {
-          "avgDurationMs": 44,
+          "avgDurationMs": 36,
           "minDurationMs": 0,
           "maxDurationMs": 7070,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            1,
             2,
             4,
             6,
@@ -192,17 +191,17 @@
             7,
             2,
             4,
-            3
+            3,
+            6
           ],
           "isBatchStep": true
         },
         "batch_qa": {
-          "avgDurationMs": 14,
+          "avgDurationMs": 13,
           "minDurationMs": 1,
           "maxDurationMs": 42410,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            10,
             3,
             7,
             14,
@@ -211,17 +210,17 @@
             3,
             6,
             5,
-            1
+            1,
+            10
           ],
           "isBatchStep": true
         },
         "save_batch_checkpoint": {
-          "avgDurationMs": 13,
+          "avgDurationMs": 12,
           "minDurationMs": 1,
           "maxDurationMs": 42420,
-          "sampleCount": 64,
+          "sampleCount": 65,
           "recentDurations": [
-            1,
             4,
             5,
             7,
@@ -230,7 +229,8 @@
             2,
             3,
             7,
-            3
+            3,
+            7
           ],
           "isBatchStep": true
         },
@@ -254,12 +254,11 @@
           "isBatchStep": false
         },
         "final_persist": {
-          "avgDurationMs": 1816,
+          "avgDurationMs": 1702,
           "minDurationMs": 0,
           "maxDurationMs": 120156,
-          "sampleCount": 76,
+          "sampleCount": 77,
           "recentDurations": [
-            1448,
             1884,
             1212,
             10,
@@ -268,17 +267,17 @@
             711,
             740,
             862,
-            6
+            6,
+            1247
           ],
           "isBatchStep": false
         },
         "final_dedup": {
-          "avgDurationMs": 17,
+          "avgDurationMs": 18,
           "minDurationMs": 0,
           "maxDurationMs": 30,
-          "sampleCount": 76,
+          "sampleCount": 77,
           "recentDurations": [
-            2,
             25,
             26,
             2,
@@ -287,17 +286,17 @@
             16,
             24,
             29,
-            7
+            7,
+            21
           ],
           "isBatchStep": false
         },
         "final_validation": {
-          "avgDurationMs": 297096,
+          "avgDurationMs": 297905,
           "minDurationMs": 20,
           "maxDurationMs": 1063963,
-          "sampleCount": 70,
+          "sampleCount": 71,
           "recentDurations": [
-            300486,
             277968,
             272888,
             292247,
@@ -306,17 +305,17 @@
             300018,
             301464,
             300029,
-            300008
+            300008,
+            301140
           ],
           "isBatchStep": false
         },
         "classify_with_ontology": {
-          "avgDurationMs": 60179,
+          "avgDurationMs": 156312,
           "minDurationMs": 470,
-          "maxDurationMs": 100763,
-          "sampleCount": 61,
+          "maxDurationMs": 540844,
+          "sampleCount": 62,
           "recentDurations": [
-            50864,
             30312,
             62763,
             28441,
@@ -325,17 +324,17 @@
             81114,
             78899,
             82539,
-            54526
+            54526,
+            540844
           ],
           "isBatchStep": true
         },
         "transform_code_entities": {
-          "avgDurationMs": 30,
+          "avgDurationMs": 29,
           "minDurationMs": 0,
           "maxDurationMs": 226,
-          "sampleCount": 61,
+          "sampleCount": 62,
           "recentDurations": [
-            15,
             33,
             28,
             12,
@@ -344,17 +343,17 @@
             21,
             43,
             74,
-            1
+            1,
+            23
           ],
           "isBatchStep": false
         },
         "synthesize_code_insights": {
-          "avgDurationMs": 272983,
+          "avgDurationMs": 278394,
           "minDurationMs": 60,
           "maxDurationMs": 826083,
-          "sampleCount": 60,
+          "sampleCount": 61,
           "recentDurations": [
-            300006,
             300022,
             300016,
             300004,
@@ -363,17 +362,17 @@
             294943,
             300024,
             300023,
-            114385
+            114385,
+            300038
           ],
           "isBatchStep": false
         },
         "index_codebase": {
-          "avgDurationMs": 313,
+          "avgDurationMs": 310,
           "minDurationMs": 211,
           "maxDurationMs": 267330,
-          "sampleCount": 59,
+          "sampleCount": 60,
           "recentDurations": [
-            320,
             320,
             383,
             244,
@@ -382,17 +381,17 @@
             326,
             364,
             348,
-            274
+            274,
+            297
           ],
           "isBatchStep": false
         },
         "generate_insights": {
-          "avgDurationMs": 34789,
+          "avgDurationMs": 118632,
           "minDurationMs": 1,
-          "maxDurationMs": 267340,
-          "sampleCount": 53,
+          "maxDurationMs": 454004,
+          "sampleCount": 54,
           "recentDurations": [
-            6,
             62928,
             30898,
             2,
@@ -401,17 +400,17 @@
             68286,
             74296,
             72069,
-            1
+            1,
+            454004
           ],
           "isBatchStep": false
         },
         "link_documentation": {
-          "avgDurationMs": 1649,
+          "avgDurationMs": 1486,
           "minDurationMs": 261,
           "maxDurationMs": 2374,
-          "sampleCount": 55,
+          "sampleCount": 56,
           "recentDurations": [
-            1818,
             329,
             1521,
             1495,
@@ -420,17 +419,17 @@
             1559,
             1885,
             1981,
-            1588
+            1588,
+            836
           ],
           "isBatchStep": false
         },
         "web_search": {
-          "avgDurationMs": 930,
+          "avgDurationMs": 933,
           "minDurationMs": 4,
           "maxDurationMs": 1261,
-          "sampleCount": 55,
+          "sampleCount": 56,
           "recentDurations": [
-            872,
             940,
             970,
             926,
@@ -439,7 +438,8 @@
             983,
             867,
             959,
-            923
+            923,
+            947
           ],
           "isBatchStep": false
         },
@@ -447,9 +447,8 @@
           "avgDurationMs": 2,
           "minDurationMs": 0,
           "maxDurationMs": 10,
-          "sampleCount": 45,
+          "sampleCount": 46,
           "recentDurations": [
-            0,
             1,
             0,
             0,
@@ -458,14 +457,15 @@
             0,
             1,
             0,
-            0
+            0,
+            3
           ],
           "isBatchStep": true
         }
       },
-      "avgBatchDurationMs": 27273,
-      "avgFinalizationDurationMs": 609496,
-      "avgTotalBatches": 15
+      "avgBatchDurationMs": 33779,
+      "avgFinalizationDurationMs": 699307,
+      "avgTotalBatches": 17
     },
     "complete-analysis": {
       "sampleCount": 20,

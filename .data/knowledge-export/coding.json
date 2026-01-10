@@ -12804,14 +12804,16 @@
         "Handles external communication (commit: 8b2a8cc5)",
         "Files: 6, Impact: high, Commit: 8b2a8cc5",
         "Files: 11, Impact: medium, Commit: 8b2a8cc5",
-        "Files: 20, Impact: medium, Commit: e87ade99"
+        "Files: 20, Impact: medium, Commit: e87ade99",
+        "Details: http://localhost:8080/knowledge-management/insights/ApiHandlesExternalCommunicationPattern.md",
+        "Files: 52, Impact: high, Commit: 5ea43dbe"
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-01-06T11:48:07.802Z",
-        "last_updated": "2026-01-09T08:33:30.763Z",
+        "last_updated": "2026-01-10T09:49:52.427Z",
         "significance": 5,
         "originalMetadata": {
           "significance": 5,
@@ -12862,18 +12864,48 @@
                                                       "originalMetadata": {
                                                         "significance": 5,
                                                         "originalMetadata": {
-                                                          "significance": 9,
+                                                          "significance": 5,
                                                           "originalMetadata": {
-                                                            "created_at": "2026-01-06T11:47:57.427Z",
-                                                            "last_updated": "2026-01-06T11:47:57.427Z",
-                                                            "created_by": "workflow_persist",
-                                                            "version": "1.0",
+                                                            "significance": 9,
+                                                            "originalMetadata": {
+                                                              "created_at": "2026-01-06T11:47:57.427Z",
+                                                              "last_updated": "2026-01-06T11:47:57.427Z",
+                                                              "created_by": "workflow_persist",
+                                                              "version": "1.0",
+                                                              "ontology": {
+                                                                "ontologyName": "coding",
+                                                                "classificationMethod": "hybrid",
+                                                                "confidence": 0.9
+                                                              },
+                                                              "classificationConfidence": 0.9,
+                                                              "classificationMethod": "hybrid",
+                                                              "validation": {
+                                                                "valid": true,
+                                                                "errors": [],
+                                                                "warnings": [],
+                                                                "mode": "disabled"
+                                                              },
+                                                              "contentValidation": {
+                                                                "overallValid": false,
+                                                                "overallScore": 100,
+                                                                "totalIssues": 0,
+                                                                "criticalIssues": 0,
+                                                                "validatedAt": "2026-01-06T11:48:07.720Z",
+                                                                "mode": "lenient"
+                                                              },
+                                                              "staleness_score": 100,
+                                                              "staleness_check_at": "2026-01-06T11:48:07.720Z"
+                                                            },
+                                                            "source": "manual",
+                                                            "team": "coding",
+                                                            "created_at": "2026-01-06T11:48:07.802Z",
+                                                            "last_updated": "2026-01-06T11:53:03.117Z",
                                                             "ontology": {
                                                               "ontologyName": "coding",
                                                               "classificationMethod": "hybrid",
-                                                              "confidence": 0.9
+                                                              "confidence": 0.95
                                                             },
-                                                            "classificationConfidence": 0.9,
+                                                            "classificationConfidence": 0.95,
                                                             "classificationMethod": "hybrid",
                                                             "validation": {
                                                               "valid": true,
@@ -12883,19 +12915,21 @@
                                                             },
                                                             "contentValidation": {
                                                               "overallValid": false,
-                                                              "overallScore": 100,
-                                                              "totalIssues": 0,
-                                                              "criticalIssues": 0,
-                                                              "validatedAt": "2026-01-06T11:48:07.720Z",
+                                                              "overallScore": 80,
+                                                              "totalIssues": 1,
+                                                              "criticalIssues": 1,
+                                                              "validatedAt": "2026-01-06T11:53:15.658Z",
                                                               "mode": "lenient"
                                                             },
+                                                            "invalidating_commits": [],
                                                             "staleness_score": 100,
-                                                            "staleness_check_at": "2026-01-06T11:48:07.720Z"
+                                                            "staleness_check_at": "2026-01-06T11:53:15.658Z",
+                                                            "staleness_method": "git-based"
                                                           },
                                                           "source": "manual",
                                                           "team": "coding",
                                                           "created_at": "2026-01-06T11:48:07.802Z",
-                                                          "last_updated": "2026-01-06T11:53:03.117Z",
+                                                          "last_updated": "2026-01-06T11:54:30.880Z",
                                                           "ontology": {
                                                             "ontologyName": "coding",
                                                             "classificationMethod": "hybrid",
@@ -12914,18 +12948,18 @@
                                                             "overallScore": 80,
                                                             "totalIssues": 1,
                                                             "criticalIssues": 1,
-                                                            "validatedAt": "2026-01-06T11:53:15.658Z",
+                                                            "validatedAt": "2026-01-06T11:54:42.878Z",
                                                             "mode": "lenient"
                                                           },
                                                           "invalidating_commits": [],
                                                           "staleness_score": 100,
-                                                          "staleness_check_at": "2026-01-06T11:53:15.658Z",
+                                                          "staleness_check_at": "2026-01-06T11:54:42.878Z",
                                                           "staleness_method": "git-based"
                                                         },
                                                         "source": "manual",
                                                         "team": "coding",
                                                         "created_at": "2026-01-06T11:48:07.802Z",
-                                                        "last_updated": "2026-01-06T11:54:30.880Z",
+                                                        "last_updated": "2026-01-06T11:56:24.991Z",
                                                         "ontology": {
                                                           "ontologyName": "coding",
                                                           "classificationMethod": "hybrid",
@@ -12944,18 +12978,18 @@
                                                           "overallScore": 80,
                                                           "totalIssues": 1,
                                                           "criticalIssues": 1,
-                                                          "validatedAt": "2026-01-06T11:54:42.878Z",
+                                                          "validatedAt": "2026-01-06T11:56:39.304Z",
                                                           "mode": "lenient"
                                                         },
                                                         "invalidating_commits": [],
                                                         "staleness_score": 100,
-                                                        "staleness_check_at": "2026-01-06T11:54:42.878Z",
+                                                        "staleness_check_at": "2026-01-06T11:56:39.304Z",
                                                         "staleness_method": "git-based"
                                                       },
                                                       "source": "manual",
                                                       "team": "coding",
                                                       "created_at": "2026-01-06T11:48:07.802Z",
-                                                      "last_updated": "2026-01-06T11:56:24.991Z",
+                                                      "last_updated": "2026-01-06T11:58:20.921Z",
                                                       "ontology": {
                                                         "ontologyName": "coding",
                                                         "classificationMethod": "hybrid",
@@ -12974,24 +13008,24 @@
                                                         "overallScore": 80,
                                                         "totalIssues": 1,
                                                         "criticalIssues": 1,
-                                                        "validatedAt": "2026-01-06T11:56:39.304Z",
+                                                        "validatedAt": "2026-01-06T11:58:31.945Z",
                                                         "mode": "lenient"
                                                       },
                                                       "invalidating_commits": [],
                                                       "staleness_score": 100,
-                                                      "staleness_check_at": "2026-01-06T11:56:39.304Z",
+                                                      "staleness_check_at": "2026-01-06T11:58:31.945Z",
                                                       "staleness_method": "git-based"
                                                     },
                                                     "source": "manual",
                                                     "team": "coding",
                                                     "created_at": "2026-01-06T11:48:07.802Z",
-                                                    "last_updated": "2026-01-06T11:58:20.921Z",
+                                                    "last_updated": "2026-01-06T11:59:32.519Z",
                                                     "ontology": {
                                                       "ontologyName": "coding",
                                                       "classificationMethod": "hybrid",
-                                                      "confidence": 0.95
+                                                      "confidence": 0.9
                                                     },
-                                                    "classificationConfidence": 0.95,
+                                                    "classificationConfidence": 0.9,
                                                     "classificationMethod": "hybrid",
                                                     "validation": {
                                                       "valid": true,
@@ -13004,24 +13038,24 @@
                                                       "overallScore": 80,
                                                       "totalIssues": 1,
                                                       "criticalIssues": 1,
-                                                      "validatedAt": "2026-01-06T11:58:31.945Z",
+                                                      "validatedAt": "2026-01-06T11:59:44.578Z",
                                                       "mode": "lenient"
                                                     },
                                                     "invalidating_commits": [],
                                                     "staleness_score": 100,
-                                                    "staleness_check_at": "2026-01-06T11:58:31.945Z",
+                                                    "staleness_check_at": "2026-01-06T11:59:44.578Z",
                                                     "staleness_method": "git-based"
                                                   },
                                                   "source": "manual",
                                                   "team": "coding",
                                                   "created_at": "2026-01-06T11:48:07.802Z",
-                                                  "last_updated": "2026-01-06T11:59:32.519Z",
+                                                  "last_updated": "2026-01-06T12:01:19.649Z",
                                                   "ontology": {
                                                     "ontologyName": "coding",
                                                     "classificationMethod": "hybrid",
-                                                    "confidence": 0.9
+                                                    "confidence": 0.95
                                                   },
-                                                  "classificationConfidence": 0.9,
+                                                  "classificationConfidence": 0.95,
                                                   "classificationMethod": "hybrid",
                                                   "validation": {
                                                     "valid": true,
@@ -13034,18 +13068,18 @@
                                                     "overallScore": 80,
                                                     "totalIssues": 1,
                                                     "criticalIssues": 1,
-                                                    "validatedAt": "2026-01-06T11:59:44.578Z",
+                                                    "validatedAt": "2026-01-06T12:01:34.700Z",
                                                     "mode": "lenient"
                                                   },
                                                   "invalidating_commits": [],
                                                   "staleness_score": 100,
-                                                  "staleness_check_at": "2026-01-06T11:59:44.578Z",
+                                                  "staleness_check_at": "2026-01-06T12:01:34.700Z",
                                                   "staleness_method": "git-based"
                                                 },
                                                 "source": "manual",
                                                 "team": "coding",
                                                 "created_at": "2026-01-06T11:48:07.802Z",
-                                                "last_updated": "2026-01-06T12:01:19.649Z",
+                                                "last_updated": "2026-01-06T12:08:36.920Z",
                                                 "ontology": {
                                                   "ontologyName": "coding",
                                                   "classificationMethod": "hybrid",
@@ -13064,18 +13098,18 @@
                                                   "overallScore": 80,
                                                   "totalIssues": 1,
                                                   "criticalIssues": 1,
-                                                  "validatedAt": "2026-01-06T12:01:34.700Z",
+                                                  "validatedAt": "2026-01-06T12:08:48.016Z",
                                                   "mode": "lenient"
                                                 },
                                                 "invalidating_commits": [],
                                                 "staleness_score": 100,
-                                                "staleness_check_at": "2026-01-06T12:01:34.700Z",
+                                                "staleness_check_at": "2026-01-06T12:08:48.016Z",
                                                 "staleness_method": "git-based"
                                               },
                                               "source": "manual",
                                               "team": "coding",
                                               "created_at": "2026-01-06T11:48:07.802Z",
-                                              "last_updated": "2026-01-06T12:08:36.920Z",
+                                              "last_updated": "2026-01-06T12:10:53.691Z",
                                               "ontology": {
                                                 "ontologyName": "coding",
                                                 "classificationMethod": "hybrid",
@@ -13094,18 +13128,18 @@
                                                 "overallScore": 80,
                                                 "totalIssues": 1,
                                                 "criticalIssues": 1,
-                                                "validatedAt": "2026-01-06T12:08:48.016Z",
+                                                "validatedAt": "2026-01-06T12:11:07.635Z",
                                                 "mode": "lenient"
                                               },
                                               "invalidating_commits": [],
                                               "staleness_score": 100,
-                                              "staleness_check_at": "2026-01-06T12:08:48.016Z",
+                                              "staleness_check_at": "2026-01-06T12:11:07.635Z",
                                               "staleness_method": "git-based"
                                             },
                                             "source": "manual",
                                             "team": "coding",
                                             "created_at": "2026-01-06T11:48:07.802Z",
-                                            "last_updated": "2026-01-06T12:10:53.691Z",
+                                            "last_updated": "2026-01-06T12:45:47.982Z",
                                             "ontology": {
                                               "ontologyName": "coding",
                                               "classificationMethod": "hybrid",
@@ -13124,24 +13158,24 @@
                                               "overallScore": 80,
                                               "totalIssues": 1,
                                               "criticalIssues": 1,
-                                              "validatedAt": "2026-01-06T12:11:07.635Z",
+                                              "validatedAt": "2026-01-06T12:46:00.851Z",
                                               "mode": "lenient"
                                             },
                                             "invalidating_commits": [],
                                             "staleness_score": 100,
-                                            "staleness_check_at": "2026-01-06T12:11:07.635Z",
+                                            "staleness_check_at": "2026-01-06T12:46:00.851Z",
                                             "staleness_method": "git-based"
                                           },
                                           "source": "manual",
                                           "team": "coding",
                                           "created_at": "2026-01-06T11:48:07.802Z",
-                                          "last_updated": "2026-01-06T12:45:47.982Z",
+                                          "last_updated": "2026-01-06T12:46:57.132Z",
                                           "ontology": {
                                             "ontologyName": "coding",
                                             "classificationMethod": "hybrid",
-                                            "confidence": 0.95
+                                            "confidence": 0.85
                                           },
-                                          "classificationConfidence": 0.95,
+                                          "classificationConfidence": 0.85,
                                           "classificationMethod": "hybrid",
                                           "validation": {
                                             "valid": true,
@@ -13154,24 +13188,24 @@
                                             "overallScore": 80,
                                             "totalIssues": 1,
                                             "criticalIssues": 1,
-                                            "validatedAt": "2026-01-06T12:46:00.851Z",
+                                            "validatedAt": "2026-01-06T12:47:13.986Z",
                                             "mode": "lenient"
                                           },
                                           "invalidating_commits": [],
                                           "staleness_score": 100,
-                                          "staleness_check_at": "2026-01-06T12:46:00.851Z",
+                                          "staleness_check_at": "2026-01-06T12:47:13.986Z",
                                           "staleness_method": "git-based"
                                         },
                                         "source": "manual",
                                         "team": "coding",
                                         "created_at": "2026-01-06T11:48:07.802Z",
-                                        "last_updated": "2026-01-06T12:46:57.132Z",
+                                        "last_updated": "2026-01-06T13:55:44.566Z",
                                         "ontology": {
                                           "ontologyName": "coding",
                                           "classificationMethod": "hybrid",
-                                          "confidence": 0.85
+                                          "confidence": 0.95
                                         },
-                                        "classificationConfidence": 0.85,
+                                        "classificationConfidence": 0.95,
                                         "classificationMethod": "hybrid",
                                         "validation": {
                                           "valid": true,
@@ -13184,18 +13218,18 @@
                                           "overallScore": 80,
                                           "totalIssues": 1,
                                           "criticalIssues": 1,
-                                          "validatedAt": "2026-01-06T12:47:13.986Z",
+                                          "validatedAt": "2026-01-06T13:55:58.588Z",
                                           "mode": "lenient"
                                         },
                                         "invalidating_commits": [],
                                         "staleness_score": 100,
-                                        "staleness_check_at": "2026-01-06T12:47:13.986Z",
+                                        "staleness_check_at": "2026-01-06T13:55:58.588Z",
                                         "staleness_method": "git-based"
                                       },
                                       "source": "manual",
                                       "team": "coding",
                                       "created_at": "2026-01-06T11:48:07.802Z",
-                                      "last_updated": "2026-01-06T13:55:44.566Z",
+                                      "last_updated": "2026-01-06T13:58:37.341Z",
                                       "ontology": {
                                         "ontologyName": "coding",
                                         "classificationMethod": "hybrid",
@@ -13214,18 +13248,18 @@
                                         "overallScore": 80,
                                         "totalIssues": 1,
                                         "criticalIssues": 1,
-                                        "validatedAt": "2026-01-06T13:55:58.588Z",
+                                        "validatedAt": "2026-01-06T13:58:52.978Z",
                                         "mode": "lenient"
                                       },
                                       "invalidating_commits": [],
                                       "staleness_score": 100,
-                                      "staleness_check_at": "2026-01-06T13:55:58.588Z",
+                                      "staleness_check_at": "2026-01-06T13:58:52.978Z",
                                       "staleness_method": "git-based"
                                     },
                                     "source": "manual",
                                     "team": "coding",
                                     "created_at": "2026-01-06T11:48:07.802Z",
-                                    "last_updated": "2026-01-06T13:58:37.341Z",
+                                    "last_updated": "2026-01-06T14:37:59.066Z",
                                     "ontology": {
                                       "ontologyName": "coding",
                                       "classificationMethod": "hybrid",
@@ -13244,18 +13278,18 @@
                                       "overallScore": 80,
                                       "totalIssues": 1,
                                       "criticalIssues": 1,
-                                      "validatedAt": "2026-01-06T13:58:52.978Z",
+                                      "validatedAt": "2026-01-06T14:38:13.203Z",
                                       "mode": "lenient"
                                     },
                                     "invalidating_commits": [],
                                     "staleness_score": 100,
-                                    "staleness_check_at": "2026-01-06T13:58:52.978Z",
+                                    "staleness_check_at": "2026-01-06T14:38:13.203Z",
                                     "staleness_method": "git-based"
                                   },
                                   "source": "manual",
                                   "team": "coding",
                                   "created_at": "2026-01-06T11:48:07.802Z",
-                                  "last_updated": "2026-01-06T14:37:59.066Z",
+                                  "last_updated": "2026-01-06T14:39:39.555Z",
                                   "ontology": {
                                     "ontologyName": "coding",
                                     "classificationMethod": "hybrid",
@@ -13274,18 +13308,18 @@
                                     "overallScore": 80,
                                     "totalIssues": 1,
                                     "criticalIssues": 1,
-                                    "validatedAt": "2026-01-06T14:38:13.203Z",
+                                    "validatedAt": "2026-01-06T14:39:53.549Z",
                                     "mode": "lenient"
                                   },
                                   "invalidating_commits": [],
                                   "staleness_score": 100,
-                                  "staleness_check_at": "2026-01-06T14:38:13.203Z",
+                                  "staleness_check_at": "2026-01-06T14:39:53.549Z",
                                   "staleness_method": "git-based"
                                 },
                                 "source": "manual",
                                 "team": "coding",
                                 "created_at": "2026-01-06T11:48:07.802Z",
-                                "last_updated": "2026-01-06T14:39:39.555Z",
+                                "last_updated": "2026-01-06T14:42:04.178Z",
                                 "ontology": {
                                   "ontologyName": "coding",
                                   "classificationMethod": "hybrid",
@@ -13304,18 +13338,18 @@
                                   "overallScore": 80,
                                   "totalIssues": 1,
                                   "criticalIssues": 1,
-                                  "validatedAt": "2026-01-06T14:39:53.549Z",
+                                  "validatedAt": "2026-01-06T14:42:18.745Z",
                                   "mode": "lenient"
                                 },
                                 "invalidating_commits": [],
                                 "staleness_score": 100,
-                                "staleness_check_at": "2026-01-06T14:39:53.549Z",
+                                "staleness_check_at": "2026-01-06T14:42:18.745Z",
                                 "staleness_method": "git-based"
                               },
                               "source": "manual",
                               "team": "coding",
                               "created_at": "2026-01-06T11:48:07.802Z",
-                              "last_updated": "2026-01-06T14:42:04.178Z",
+                              "last_updated": "2026-01-06T14:44:23.328Z",
                               "ontology": {
                                 "ontologyName": "coding",
                                 "classificationMethod": "hybrid",
@@ -13334,24 +13368,24 @@
                                 "overallScore": 80,
                                 "totalIssues": 1,
                                 "criticalIssues": 1,
-                                "validatedAt": "2026-01-06T14:42:18.745Z",
+                                "validatedAt": "2026-01-06T14:44:35.182Z",
                                 "mode": "lenient"
                               },
                               "invalidating_commits": [],
                               "staleness_score": 100,
-                              "staleness_check_at": "2026-01-06T14:42:18.745Z",
+                              "staleness_check_at": "2026-01-06T14:44:35.182Z",
                               "staleness_method": "git-based"
                             },
                             "source": "manual",
                             "team": "coding",
                             "created_at": "2026-01-06T11:48:07.802Z",
-                            "last_updated": "2026-01-06T14:44:23.328Z",
+                            "last_updated": "2026-01-06T16:42:36.320Z",
                             "ontology": {
                               "ontologyName": "coding",
                               "classificationMethod": "hybrid",
-                              "confidence": 0.95
+                              "confidence": 0.92
                             },
-                            "classificationConfidence": 0.95,
+                            "classificationConfidence": 0.92,
                             "classificationMethod": "hybrid",
                             "validation": {
                               "valid": true,
@@ -13364,24 +13398,24 @@
                               "overallScore": 80,
                               "totalIssues": 1,
                               "criticalIssues": 1,
-                              "validatedAt": "2026-01-06T14:44:35.182Z",
+                              "validatedAt": "2026-01-06T16:42:54.343Z",
                               "mode": "lenient"
                             },
                             "invalidating_commits": [],
                             "staleness_score": 100,
-                            "staleness_check_at": "2026-01-06T14:44:35.182Z",
+                            "staleness_check_at": "2026-01-06T16:42:54.343Z",
                             "staleness_method": "git-based"
                           },
                           "source": "manual",
                           "team": "coding",
                           "created_at": "2026-01-06T11:48:07.802Z",
-                          "last_updated": "2026-01-06T16:42:36.320Z",
+                          "last_updated": "2026-01-06T16:43:59.966Z",
                           "ontology": {
                             "ontologyName": "coding",
                             "classificationMethod": "hybrid",
-                            "confidence": 0.92
+                            "confidence": 0.95
                           },
-                          "classificationConfidence": 0.92,
+                          "classificationConfidence": 0.95,
                           "classificationMethod": "hybrid",
                           "validation": {
                             "valid": true,
@@ -13394,18 +13428,18 @@
                             "overallScore": 80,
                             "totalIssues": 1,
                             "criticalIssues": 1,
-                            "validatedAt": "2026-01-06T16:42:54.343Z",
+                            "validatedAt": "2026-01-06T16:44:15.298Z",
                             "mode": "lenient"
                           },
                           "invalidating_commits": [],
                           "staleness_score": 100,
-                          "staleness_check_at": "2026-01-06T16:42:54.343Z",
+                          "staleness_check_at": "2026-01-06T16:44:15.298Z",
                           "staleness_method": "git-based"
                         },
                         "source": "manual",
                         "team": "coding",
                         "created_at": "2026-01-06T11:48:07.802Z",
-                        "last_updated": "2026-01-06T16:43:59.966Z",
+                        "last_updated": "2026-01-06T16:48:58.398Z",
                         "ontology": {
                           "ontologyName": "coding",
                           "classificationMethod": "hybrid",
@@ -13424,24 +13458,24 @@
                           "overallScore": 80,
                           "totalIssues": 1,
                           "criticalIssues": 1,
-                          "validatedAt": "2026-01-06T16:44:15.298Z",
+                          "validatedAt": "2026-01-06T16:49:11.804Z",
                           "mode": "lenient"
                         },
                         "invalidating_commits": [],
                         "staleness_score": 100,
-                        "staleness_check_at": "2026-01-06T16:44:15.298Z",
+                        "staleness_check_at": "2026-01-06T16:49:11.804Z",
                         "staleness_method": "git-based"
                       },
                       "source": "manual",
                       "team": "coding",
                       "created_at": "2026-01-06T11:48:07.802Z",
-                      "last_updated": "2026-01-06T16:48:58.398Z",
+                      "last_updated": "2026-01-06T16:50:39.884Z",
                       "ontology": {
                         "ontologyName": "coding",
                         "classificationMethod": "hybrid",
-                        "confidence": 0.95
+                        "confidence": 0.92
                       },
-                      "classificationConfidence": 0.95,
+                      "classificationConfidence": 0.92,
                       "classificationMethod": "hybrid",
                       "validation": {
                         "valid": true,
@@ -13454,24 +13488,24 @@
                         "overallScore": 80,
                         "totalIssues": 1,
                         "criticalIssues": 1,
-                        "validatedAt": "2026-01-06T16:49:11.804Z",
+                        "validatedAt": "2026-01-06T16:50:55.102Z",
                         "mode": "lenient"
                       },
                       "invalidating_commits": [],
                       "staleness_score": 100,
-                      "staleness_check_at": "2026-01-06T16:49:11.804Z",
+                      "staleness_check_at": "2026-01-06T16:50:55.102Z",
                       "staleness_method": "git-based"
                     },
                     "source": "manual",
                     "team": "coding",
                     "created_at": "2026-01-06T11:48:07.802Z",
-                    "last_updated": "2026-01-06T16:50:39.884Z",
+                    "last_updated": "2026-01-06T16:52:52.780Z",
                     "ontology": {
                       "ontologyName": "coding",
                       "classificationMethod": "hybrid",
-                      "confidence": 0.92
+                      "confidence": 0.95
                     },
-                    "classificationConfidence": 0.92,
+                    "classificationConfidence": 0.95,
                     "classificationMethod": "hybrid",
                     "validation": {
                       "valid": true,
@@ -13484,18 +13518,18 @@
                       "overallScore": 80,
                       "totalIssues": 1,
                       "criticalIssues": 1,
-                      "validatedAt": "2026-01-06T16:50:55.102Z",
+                      "validatedAt": "2026-01-06T16:53:05.421Z",
                       "mode": "lenient"
                     },
                     "invalidating_commits": [],
                     "staleness_score": 100,
-                    "staleness_check_at": "2026-01-06T16:50:55.102Z",
+                    "staleness_check_at": "2026-01-06T16:53:05.421Z",
                     "staleness_method": "git-based"
                   },
                   "source": "manual",
                   "team": "coding",
                   "created_at": "2026-01-06T11:48:07.802Z",
-                  "last_updated": "2026-01-06T16:52:52.780Z",
+                  "last_updated": "2026-01-07T07:54:17.095Z",
                   "ontology": {
                     "ontologyName": "coding",
                     "classificationMethod": "hybrid",
@@ -13514,18 +13548,18 @@
                     "overallScore": 80,
                     "totalIssues": 1,
                     "criticalIssues": 1,
-                    "validatedAt": "2026-01-06T16:53:05.421Z",
+                    "validatedAt": "2026-01-07T07:54:45.640Z",
                     "mode": "lenient"
                   },
                   "invalidating_commits": [],
                   "staleness_score": 100,
-                  "staleness_check_at": "2026-01-06T16:53:05.421Z",
+                  "staleness_check_at": "2026-01-07T07:54:45.640Z",
                   "staleness_method": "git-based"
                 },
                 "source": "manual",
                 "team": "coding",
                 "created_at": "2026-01-06T11:48:07.802Z",
-                "last_updated": "2026-01-07T07:54:17.095Z",
+                "last_updated": "2026-01-07T07:56:51.824Z",
                 "ontology": {
                   "ontologyName": "coding",
                   "classificationMethod": "hybrid",
@@ -13544,25 +13578,24 @@
                   "overallScore": 80,
                   "totalIssues": 1,
                   "criticalIssues": 1,
-                  "validatedAt": "2026-01-07T07:54:45.640Z",
+                  "validatedAt": "2026-01-07T07:57:12.436Z",
                   "mode": "lenient"
                 },
                 "invalidating_commits": [],
                 "staleness_score": 100,
-                "staleness_check_at": "2026-01-07T07:54:45.640Z",
+                "staleness_check_at": "2026-01-07T07:57:12.436Z",
                 "staleness_method": "git-based"
               },
               "source": "manual",
               "team": "coding",
               "created_at": "2026-01-06T11:48:07.802Z",
-              "last_updated": "2026-01-07T07:56:51.824Z",
+              "last_updated": "2026-01-07T20:55:40.849Z",
               "ontology": {
-                "ontologyName": "coding",
-                "classificationMethod": "hybrid",
-                "confidence": 0.95
+                "preClassified": true,
+                "originalMethod": "unknown"
               },
-              "classificationConfidence": 0.95,
-              "classificationMethod": "hybrid",
+              "classificationConfidence": 0.8,
+              "classificationMethod": "pre-classified-skip",
               "validation": {
                 "valid": true,
                 "errors": [],
@@ -13574,18 +13607,18 @@
                 "overallScore": 80,
                 "totalIssues": 1,
                 "criticalIssues": 1,
-                "validatedAt": "2026-01-07T07:57:12.436Z",
+                "validatedAt": "2026-01-07T20:55:40.852Z",
                 "mode": "lenient"
               },
               "invalidating_commits": [],
               "staleness_score": 100,
-              "staleness_check_at": "2026-01-07T07:57:12.436Z",
+              "staleness_check_at": "2026-01-07T20:55:40.852Z",
               "staleness_method": "git-based"
             },
             "source": "manual",
             "team": "coding",
             "created_at": "2026-01-06T11:48:07.802Z",
-            "last_updated": "2026-01-07T20:55:40.849Z",
+            "last_updated": "2026-01-09T08:33:30.442Z",
             "ontology": {
               "preClassified": true,
               "originalMethod": "unknown"
@@ -13603,18 +13636,20 @@
               "overallScore": 80,
               "totalIssues": 1,
               "criticalIssues": 1,
-              "validatedAt": "2026-01-07T20:55:40.852Z",
+              "validatedAt": "2026-01-09T08:33:30.449Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-01-07T20:55:40.852Z",
+            "staleness_check_at": "2026-01-09T08:33:30.449Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2026-01-06T11:48:07.802Z",
-          "last_updated": "2026-01-09T08:33:30.442Z",
+          "last_updated": "2026-01-10T09:49:52.254Z",
+          "validated_file_path": "/Users/q284340/Agentic/coding/knowledge-management/insights/ApiHandlesExternalCommunicationPattern.md",
+          "has_insight_document": true,
           "ontology": {
             "preClassified": true,
             "originalMethod": "unknown"
@@ -13629,15 +13664,17 @@
           },
           "contentValidation": {
             "overallValid": false,
-            "overallScore": 80,
+            "overallScore": 58,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-09T08:33:30.449Z",
+            "validatedAt": "2026-01-10T09:49:52.264Z",
             "mode": "lenient"
           },
-          "invalidating_commits": [],
-          "staleness_score": 100,
-          "staleness_check_at": "2026-01-09T08:33:30.449Z",
+          "invalidating_commits": [
+            "a13916cf"
+          ],
+          "staleness_score": 20,
+          "staleness_check_at": "2026-01-10T09:49:52.264Z",
           "staleness_method": "git-based"
         }
       },
@@ -13934,14 +13971,15 @@
         "Files: 22, Impact: medium, Commit: 52422ff0",
         "Files: 6, Impact: high, Commit: 8b2a8cc5",
         "Files: 5, Impact: low, Commit: e87ade99",
-        "Files: 34, Impact: low, Commit: 5579d141"
+        "Files: 34, Impact: low, Commit: 5579d141",
+        "Files: 32, Impact: medium, Commit: 8b2a8cc5"
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-01-06T11:48:41.369Z",
-        "last_updated": "2026-01-09T08:33:31.459Z",
+        "last_updated": "2026-01-10T09:49:52.787Z",
         "significance": 5,
         "originalMetadata": {
           "significance": 5,
@@ -13982,10 +14020,40 @@
                                             "originalMetadata": {
                                               "significance": 5,
                                               "originalMetadata": {
-                                                "created_at": "2026-01-06T11:48:32.358Z",
-                                                "last_updated": "2026-01-06T11:48:32.358Z",
-                                                "created_by": "workflow_persist",
-                                                "version": "1.0",
+                                                "significance": 5,
+                                                "originalMetadata": {
+                                                  "created_at": "2026-01-06T11:48:32.358Z",
+                                                  "last_updated": "2026-01-06T11:48:32.358Z",
+                                                  "created_by": "workflow_persist",
+                                                  "version": "1.0",
+                                                  "ontology": {
+                                                    "ontologyName": "coding",
+                                                    "classificationMethod": "hybrid",
+                                                    "confidence": 0.95
+                                                  },
+                                                  "classificationConfidence": 0.95,
+                                                  "classificationMethod": "hybrid",
+                                                  "validation": {
+                                                    "valid": true,
+                                                    "errors": [],
+                                                    "warnings": [],
+                                                    "mode": "disabled"
+                                                  },
+                                                  "contentValidation": {
+                                                    "overallValid": false,
+                                                    "overallScore": 100,
+                                                    "totalIssues": 0,
+                                                    "criticalIssues": 0,
+                                                    "validatedAt": "2026-01-06T11:48:41.365Z",
+                                                    "mode": "lenient"
+                                                  },
+                                                  "staleness_score": 100,
+                                                  "staleness_check_at": "2026-01-06T11:48:41.365Z"
+                                                },
+                                                "source": "manual",
+                                                "team": "coding",
+                                                "created_at": "2026-01-06T11:48:41.369Z",
+                                                "last_updated": "2026-01-06T11:54:04.662Z",
                                                 "ontology": {
                                                   "ontologyName": "coding",
                                                   "classificationMethod": "hybrid",
@@ -14001,25 +14069,27 @@
                                                 },
                                                 "contentValidation": {
                                                   "overallValid": false,
-                                                  "overallScore": 100,
-                                                  "totalIssues": 0,
-                                                  "criticalIssues": 0,
-                                                  "validatedAt": "2026-01-06T11:48:41.365Z",
+                                                  "overallScore": 80,
+                                                  "totalIssues": 1,
+                                                  "criticalIssues": 1,
+                                                  "validatedAt": "2026-01-06T11:54:13.743Z",
                                                   "mode": "lenient"
                                                 },
+                                                "invalidating_commits": [],
                                                 "staleness_score": 100,
-                                                "staleness_check_at": "2026-01-06T11:48:41.365Z"
+                                                "staleness_check_at": "2026-01-06T11:54:13.743Z",
+                                                "staleness_method": "git-based"
                                               },
                                               "source": "manual",
                                               "team": "coding",
                                               "created_at": "2026-01-06T11:48:41.369Z",
-                                              "last_updated": "2026-01-06T11:54:04.662Z",
+                                              "last_updated": "2026-01-06T11:55:32.257Z",
                                               "ontology": {
                                                 "ontologyName": "coding",
                                                 "classificationMethod": "hybrid",
-                                                "confidence": 0.95
+                                                "confidence": 0.85
                                               },
-                                              "classificationConfidence": 0.95,
+                                              "classificationConfidence": 0.85,
                                               "classificationMethod": "hybrid",
                                               "validation": {
                                                 "valid": true,
@@ -14032,18 +14102,18 @@
                                                 "overallScore": 80,
                                                 "totalIssues": 1,
                                                 "criticalIssues": 1,
-                                                "validatedAt": "2026-01-06T11:54:13.743Z",
+                                                "validatedAt": "2026-01-06T11:55:43.891Z",
                                                 "mode": "lenient"
                                               },
                                               "invalidating_commits": [],
                                               "staleness_score": 100,
-                                              "staleness_check_at": "2026-01-06T11:54:13.743Z",
+                                              "staleness_check_at": "2026-01-06T11:55:43.891Z",
                                               "staleness_method": "git-based"
                                             },
                                             "source": "manual",
                                             "team": "coding",
                                             "created_at": "2026-01-06T11:48:41.369Z",
-                                            "last_updated": "2026-01-06T11:55:32.257Z",
+                                            "last_updated": "2026-01-06T11:57:35.647Z",
                                             "ontology": {
                                               "ontologyName": "coding",
                                               "classificationMethod": "hybrid",
@@ -14062,24 +14132,24 @@
                                               "overallScore": 80,
                                               "totalIssues": 1,
                                               "criticalIssues": 1,
-                                              "validatedAt": "2026-01-06T11:55:43.891Z",
+                                              "validatedAt": "2026-01-06T11:57:48.003Z",
                                               "mode": "lenient"
                                             },
                                             "invalidating_commits": [],
                                             "staleness_score": 100,
-                                            "staleness_check_at": "2026-01-06T11:55:43.891Z",
+                                            "staleness_check_at": "2026-01-06T11:57:48.003Z",
                                             "staleness_method": "git-based"
                                           },
                                           "source": "manual",
                                           "team": "coding",
                                           "created_at": "2026-01-06T11:48:41.369Z",
-                                          "last_updated": "2026-01-06T11:57:35.647Z",
+                                          "last_updated": "2026-01-06T11:59:04.865Z",
                                           "ontology": {
                                             "ontologyName": "coding",
                                             "classificationMethod": "hybrid",
-                                            "confidence": 0.85
+                                            "confidence": 0.9
                                           },
-                                          "classificationConfidence": 0.85,
+                                          "classificationConfidence": 0.9,
                                           "classificationMethod": "hybrid",
                                           "validation": {
                                             "valid": true,
@@ -14092,24 +14162,24 @@
                                             "overallScore": 80,
                                             "totalIssues": 1,
                                             "criticalIssues": 1,
-                                            "validatedAt": "2026-01-06T11:57:48.003Z",
+                                            "validatedAt": "2026-01-06T11:59:20.354Z",
                                             "mode": "lenient"
                                           },
                                           "invalidating_commits": [],
                                           "staleness_score": 100,
-                                          "staleness_check_at": "2026-01-06T11:57:48.003Z",
+                                          "staleness_check_at": "2026-01-06T11:59:20.354Z",
                                           "staleness_method": "git-based"
                                         },
                                         "source": "manual",
                                         "team": "coding",
                                         "created_at": "2026-01-06T11:48:41.369Z",
-                                        "last_updated": "2026-01-06T11:59:04.865Z",
+                                        "last_updated": "2026-01-06T12:00:37.289Z",
                                         "ontology": {
                                           "ontologyName": "coding",
                                           "classificationMethod": "hybrid",
-                                          "confidence": 0.9
+                                          "confidence": 0.99
                                         },
-                                        "classificationConfidence": 0.9,
+                                        "classificationConfidence": 0.99,
                                         "classificationMethod": "hybrid",
                                         "validation": {
                                           "valid": true,
@@ -14122,24 +14192,24 @@
                                           "overallScore": 80,
                                           "totalIssues": 1,
                                           "criticalIssues": 1,
-                                          "validatedAt": "2026-01-06T11:59:20.354Z",
+                                          "validatedAt": "2026-01-06T12:00:48.657Z",
                                           "mode": "lenient"
                                         },
                                         "invalidating_commits": [],
                                         "staleness_score": 100,
-                                        "staleness_check_at": "2026-01-06T11:59:20.354Z",
+                                        "staleness_check_at": "2026-01-06T12:00:48.657Z",
                                         "staleness_method": "git-based"
                                       },
                                       "source": "manual",
                                       "team": "coding",
                                       "created_at": "2026-01-06T11:48:41.369Z",
-                                      "last_updated": "2026-01-06T12:00:37.289Z",
+                                      "last_updated": "2026-01-06T12:02:01.878Z",
                                       "ontology": {
                                         "ontologyName": "coding",
                                         "classificationMethod": "hybrid",
-                                        "confidence": 0.99
+                                        "confidence": 0.95
                                       },
-                                      "classificationConfidence": 0.99,
+                                      "classificationConfidence": 0.95,
                                       "classificationMethod": "hybrid",
                                       "validation": {
                                         "valid": true,
@@ -14152,18 +14222,18 @@
                                         "overallScore": 80,
                                         "totalIssues": 1,
                                         "criticalIssues": 1,
-                                        "validatedAt": "2026-01-06T12:00:48.657Z",
+                                        "validatedAt": "2026-01-06T12:02:13.764Z",
                                         "mode": "lenient"
                                       },
                                       "invalidating_commits": [],
                                       "staleness_score": 100,
-                                      "staleness_check_at": "2026-01-06T12:00:48.657Z",
+                                      "staleness_check_at": "2026-01-06T12:02:13.764Z",
                                       "staleness_method": "git-based"
                                     },
                                     "source": "manual",
                                     "team": "coding",
                                     "created_at": "2026-01-06T11:48:41.369Z",
-                                    "last_updated": "2026-01-06T12:02:01.878Z",
+                                    "last_updated": "2026-01-06T12:04:24.445Z",
                                     "ontology": {
                                       "ontologyName": "coding",
                                       "classificationMethod": "hybrid",
@@ -14182,24 +14252,24 @@
                                       "overallScore": 80,
                                       "totalIssues": 1,
                                       "criticalIssues": 1,
-                                      "validatedAt": "2026-01-06T12:02:13.764Z",
+                                      "validatedAt": "2026-01-06T12:04:40.523Z",
                                       "mode": "lenient"
                                     },
                                     "invalidating_commits": [],
                                     "staleness_score": 100,
-                                    "staleness_check_at": "2026-01-06T12:02:13.764Z",
+                                    "staleness_check_at": "2026-01-06T12:04:40.523Z",
                                     "staleness_method": "git-based"
                                   },
                                   "source": "manual",
                                   "team": "coding",
                                   "created_at": "2026-01-06T11:48:41.369Z",
-                                  "last_updated": "2026-01-06T12:04:24.445Z",
+                                  "last_updated": "2026-01-06T12:05:56.721Z",
                                   "ontology": {
                                     "ontologyName": "coding",
                                     "classificationMethod": "hybrid",
-                                    "confidence": 0.95
+                                    "confidence": 0.92
                                   },
-                                  "classificationConfidence": 0.95,
+                                  "classificationConfidence": 0.92,
                                   "classificationMethod": "hybrid",
                                   "validation": {
                                     "valid": true,
@@ -14212,24 +14282,24 @@
                                     "overallScore": 80,
                                     "totalIssues": 1,
                                     "criticalIssues": 1,
-                                    "validatedAt": "2026-01-06T12:04:40.523Z",
+                                    "validatedAt": "2026-01-06T12:06:11.428Z",
                                     "mode": "lenient"
                                   },
                                   "invalidating_commits": [],
                                   "staleness_score": 100,
-                                  "staleness_check_at": "2026-01-06T12:04:40.523Z",
+                                  "staleness_check_at": "2026-01-06T12:06:11.428Z",
                                   "staleness_method": "git-based"
                                 },
                                 "source": "manual",
                                 "team": "coding",
                                 "created_at": "2026-01-06T11:48:41.369Z",
-                                "last_updated": "2026-01-06T12:05:56.721Z",
+                                "last_updated": "2026-01-06T12:07:47.696Z",
                                 "ontology": {
                                   "ontologyName": "coding",
                                   "classificationMethod": "hybrid",
-                                  "confidence": 0.92
+                                  "confidence": 0.95
                                 },
-                                "classificationConfidence": 0.92,
+                                "classificationConfidence": 0.95,
                                 "classificationMethod": "hybrid",
                                 "validation": {
                                   "valid": true,
@@ -14242,18 +14312,18 @@
                                   "overallScore": 80,
                                   "totalIssues": 1,
                                   "criticalIssues": 1,
-                                  "validatedAt": "2026-01-06T12:06:11.428Z",
+                                  "validatedAt": "2026-01-06T12:08:01.134Z",
                                   "mode": "lenient"
                                 },
                                 "invalidating_commits": [],
                                 "staleness_score": 100,
-                                "staleness_check_at": "2026-01-06T12:06:11.428Z",
+                                "staleness_check_at": "2026-01-06T12:08:01.134Z",
                                 "staleness_method": "git-based"
                               },
                               "source": "manual",
                               "team": "coding",
                               "created_at": "2026-01-06T11:48:41.369Z",
-                              "last_updated": "2026-01-06T12:07:47.696Z",
+                              "last_updated": "2026-01-06T12:09:45.186Z",
                               "ontology": {
                                 "ontologyName": "coding",
                                 "classificationMethod": "hybrid",
@@ -14272,18 +14342,18 @@
                                 "overallScore": 80,
                                 "totalIssues": 1,
                                 "criticalIssues": 1,
-                                "validatedAt": "2026-01-06T12:08:01.134Z",
+                                "validatedAt": "2026-01-06T12:09:57.268Z",
                                 "mode": "lenient"
                               },
                               "invalidating_commits": [],
                               "staleness_score": 100,
-                              "staleness_check_at": "2026-01-06T12:08:01.134Z",
+                              "staleness_check_at": "2026-01-06T12:09:57.268Z",
                               "staleness_method": "git-based"
                             },
                             "source": "manual",
                             "team": "coding",
                             "created_at": "2026-01-06T11:48:41.369Z",
-                            "last_updated": "2026-01-06T12:09:45.186Z",
+                            "last_updated": "2026-01-06T12:11:07.674Z",
                             "ontology": {
                               "ontologyName": "coding",
                               "classificationMethod": "hybrid",
@@ -14302,18 +14372,18 @@
                               "overallScore": 80,
                               "totalIssues": 1,
                               "criticalIssues": 1,
-                              "validatedAt": "2026-01-06T12:09:57.268Z",
+                              "validatedAt": "2026-01-06T12:11:18.839Z",
                               "mode": "lenient"
                             },
                             "invalidating_commits": [],
                             "staleness_score": 100,
-                            "staleness_check_at": "2026-01-06T12:09:57.268Z",
+                            "staleness_check_at": "2026-01-06T12:11:18.839Z",
                             "staleness_method": "git-based"
                           },
                           "source": "manual",
                           "team": "coding",
                           "created_at": "2026-01-06T11:48:41.369Z",
-                          "last_updated": "2026-01-06T12:11:07.674Z",
+                          "last_updated": "2026-01-06T13:58:53.018Z",
                           "ontology": {
                             "ontologyName": "coding",
                             "classificationMethod": "hybrid",
@@ -14332,18 +14402,18 @@
                             "overallScore": 80,
                             "totalIssues": 1,
                             "criticalIssues": 1,
-                            "validatedAt": "2026-01-06T12:11:18.839Z",
+                            "validatedAt": "2026-01-06T13:59:02.878Z",
                             "mode": "lenient"
                           },
                           "invalidating_commits": [],
                           "staleness_score": 100,
-                          "staleness_check_at": "2026-01-06T12:11:18.839Z",
+                          "staleness_check_at": "2026-01-06T13:59:02.878Z",
                           "staleness_method": "git-based"
                         },
                         "source": "manual",
                         "team": "coding",
                         "created_at": "2026-01-06T11:48:41.369Z",
-                        "last_updated": "2026-01-06T13:58:53.018Z",
+                        "last_updated": "2026-01-06T14:27:18.664Z",
                         "ontology": {
                           "ontologyName": "coding",
                           "classificationMethod": "hybrid",
@@ -14362,18 +14432,18 @@
                           "overallScore": 80,
                           "totalIssues": 1,
                           "criticalIssues": 1,
-                          "validatedAt": "2026-01-06T13:59:02.878Z",
+                          "validatedAt": "2026-01-06T14:27:30.566Z",
                           "mode": "lenient"
                         },
                         "invalidating_commits": [],
                         "staleness_score": 100,
-                        "staleness_check_at": "2026-01-06T13:59:02.878Z",
+                        "staleness_check_at": "2026-01-06T14:27:30.566Z",
                         "staleness_method": "git-based"
                       },
                       "source": "manual",
                       "team": "coding",
                       "created_at": "2026-01-06T11:48:41.369Z",
-                      "last_updated": "2026-01-06T14:27:18.664Z",
+                      "last_updated": "2026-01-06T16:43:17.587Z",
                       "ontology": {
                         "ontologyName": "coding",
                         "classificationMethod": "hybrid",
@@ -14392,18 +14462,18 @@
                         "overallScore": 80,
                         "totalIssues": 1,
                         "criticalIssues": 1,
-                        "validatedAt": "2026-01-06T14:27:30.566Z",
+                        "validatedAt": "2026-01-06T16:43:29.875Z",
                         "mode": "lenient"
                       },
                       "invalidating_commits": [],
                       "staleness_score": 100,
-                      "staleness_check_at": "2026-01-06T14:27:30.566Z",
+                      "staleness_check_at": "2026-01-06T16:43:29.875Z",
                       "staleness_method": "git-based"
                     },
                     "source": "manual",
                     "team": "coding",
                     "created_at": "2026-01-06T11:48:41.369Z",
-                    "last_updated": "2026-01-06T16:43:17.587Z",
+                    "last_updated": "2026-01-06T16:45:01.074Z",
                     "ontology": {
                       "ontologyName": "coding",
                       "classificationMethod": "hybrid",
@@ -14422,18 +14492,18 @@
                       "overallScore": 80,
                       "totalIssues": 1,
                       "criticalIssues": 1,
-                      "validatedAt": "2026-01-06T16:43:29.875Z",
+                      "validatedAt": "2026-01-06T16:45:14.953Z",
                       "mode": "lenient"
                     },
                     "invalidating_commits": [],
                     "staleness_score": 100,
-                    "staleness_check_at": "2026-01-06T16:43:29.875Z",
+                    "staleness_check_at": "2026-01-06T16:45:14.953Z",
                     "staleness_method": "git-based"
                   },
                   "source": "manual",
                   "team": "coding",
                   "created_at": "2026-01-06T11:48:41.369Z",
-                  "last_updated": "2026-01-06T16:45:01.074Z",
+                  "last_updated": "2026-01-06T16:51:47.781Z",
                   "ontology": {
                     "ontologyName": "coding",
                     "classificationMethod": "hybrid",
@@ -14452,24 +14522,24 @@
                     "overallScore": 80,
                     "totalIssues": 1,
                     "criticalIssues": 1,
-                    "validatedAt": "2026-01-06T16:45:14.953Z",
+                    "validatedAt": "2026-01-06T16:52:01.132Z",
                     "mode": "lenient"
                   },
                   "invalidating_commits": [],
                   "staleness_score": 100,
-                  "staleness_check_at": "2026-01-06T16:45:14.953Z",
+                  "staleness_check_at": "2026-01-06T16:52:01.132Z",
                   "staleness_method": "git-based"
                 },
                 "source": "manual",
                 "team": "coding",
                 "created_at": "2026-01-06T11:48:41.369Z",
-                "last_updated": "2026-01-06T16:51:47.781Z",
+                "last_updated": "2026-01-06T16:53:51.339Z",
                 "ontology": {
                   "ontologyName": "coding",
                   "classificationMethod": "hybrid",
-                  "confidence": 0.95
+                  "confidence": 0.99
                 },
-                "classificationConfidence": 0.95,
+                "classificationConfidence": 0.99,
                 "classificationMethod": "hybrid",
                 "validation": {
                   "valid": true,
@@ -14482,24 +14552,24 @@
                   "overallScore": 80,
                   "totalIssues": 1,
                   "criticalIssues": 1,
-                  "validatedAt": "2026-01-06T16:52:01.132Z",
+                  "validatedAt": "2026-01-06T16:54:02.929Z",
                   "mode": "lenient"
                 },
                 "invalidating_commits": [],
                 "staleness_score": 100,
-                "staleness_check_at": "2026-01-06T16:52:01.132Z",
+                "staleness_check_at": "2026-01-06T16:54:02.929Z",
                 "staleness_method": "git-based"
               },
               "source": "manual",
               "team": "coding",
               "created_at": "2026-01-06T11:48:41.369Z",
-              "last_updated": "2026-01-06T16:53:51.339Z",
+              "last_updated": "2026-01-07T07:56:30.553Z",
               "ontology": {
                 "ontologyName": "coding",
                 "classificationMethod": "hybrid",
-                "confidence": 0.99
+                "confidence": 0.95
               },
-              "classificationConfidence": 0.99,
+              "classificationConfidence": 0.95,
               "classificationMethod": "hybrid",
               "validation": {
                 "valid": true,
@@ -14512,25 +14582,24 @@
                 "overallScore": 80,
                 "totalIssues": 1,
                 "criticalIssues": 1,
-                "validatedAt": "2026-01-06T16:54:02.929Z",
+                "validatedAt": "2026-01-07T07:56:50.353Z",
                 "mode": "lenient"
               },
               "invalidating_commits": [],
               "staleness_score": 100,
-              "staleness_check_at": "2026-01-06T16:54:02.929Z",
+              "staleness_check_at": "2026-01-07T07:56:50.353Z",
               "staleness_method": "git-based"
             },
             "source": "manual",
             "team": "coding",
             "created_at": "2026-01-06T11:48:41.369Z",
-            "last_updated": "2026-01-07T07:56:30.553Z",
+            "last_updated": "2026-01-09T08:33:31.255Z",
             "ontology": {
-              "ontologyName": "coding",
-              "classificationMethod": "hybrid",
-              "confidence": 0.95
+              "preClassified": true,
+              "originalMethod": "unknown"
             },
-            "classificationConfidence": 0.95,
-            "classificationMethod": "hybrid",
+            "classificationConfidence": 0.8,
+            "classificationMethod": "pre-classified-skip",
             "validation": {
               "valid": true,
               "errors": [],
@@ -14542,18 +14611,18 @@
               "overallScore": 80,
               "totalIssues": 1,
               "criticalIssues": 1,
-              "validatedAt": "2026-01-07T07:56:50.353Z",
+              "validatedAt": "2026-01-09T08:33:31.259Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-01-07T07:56:50.353Z",
+            "staleness_check_at": "2026-01-09T08:33:31.259Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2026-01-06T11:48:41.369Z",
-          "last_updated": "2026-01-09T08:33:31.255Z",
+          "last_updated": "2026-01-10T09:49:52.714Z",
           "ontology": {
             "preClassified": true,
             "originalMethod": "unknown"
@@ -14571,12 +14640,12 @@
             "overallScore": 80,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-09T08:33:31.259Z",
+            "validatedAt": "2026-01-10T09:49:52.718Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-09T08:33:31.259Z",
+          "staleness_check_at": "2026-01-10T09:49:52.718Z",
           "staleness_method": "git-based"
         }
       },
@@ -15602,14 +15671,15 @@
         "Files: 33, Impact: medium, Commit: 5579d141",
         "Files: 31, Impact: medium, Commit: 5ea43dbe",
         "Files: 11, Impact: low, Commit: 52422ff0",
-        "Files: 1, Impact: low, Commit: 8b2a8cc5"
+        "Files: 1, Impact: low, Commit: 8b2a8cc5",
+        "Files: 21, Impact: medium, Commit: 8b2a8cc5"
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-01-06T11:49:11.546Z",
-        "last_updated": "2026-01-07T07:59:05.562Z",
+        "last_updated": "2026-01-10T09:49:52.710Z",
         "significance": 5,
         "originalMetadata": {
           "significance": 5,
@@ -15666,10 +15736,40 @@
                                                             "originalMetadata": {
                                                               "significance": 5,
                                                               "originalMetadata": {
-                                                                "created_at": "2026-01-06T11:49:00.299Z",
-                                                                "last_updated": "2026-01-06T11:49:00.299Z",
-                                                                "created_by": "workflow_persist",
-                                                                "version": "1.0",
+                                                                "significance": 5,
+                                                                "originalMetadata": {
+                                                                  "created_at": "2026-01-06T11:49:00.299Z",
+                                                                  "last_updated": "2026-01-06T11:49:00.299Z",
+                                                                  "created_by": "workflow_persist",
+                                                                  "version": "1.0",
+                                                                  "ontology": {
+                                                                    "ontologyName": "coding",
+                                                                    "classificationMethod": "hybrid",
+                                                                    "confidence": 0.95
+                                                                  },
+                                                                  "classificationConfidence": 0.95,
+                                                                  "classificationMethod": "hybrid",
+                                                                  "validation": {
+                                                                    "valid": true,
+                                                                    "errors": [],
+                                                                    "warnings": [],
+                                                                    "mode": "disabled"
+                                                                  },
+                                                                  "contentValidation": {
+                                                                    "overallValid": false,
+                                                                    "overallScore": 100,
+                                                                    "totalIssues": 0,
+                                                                    "criticalIssues": 0,
+                                                                    "validatedAt": "2026-01-06T11:49:11.544Z",
+                                                                    "mode": "lenient"
+                                                                  },
+                                                                  "staleness_score": 100,
+                                                                  "staleness_check_at": "2026-01-06T11:49:11.544Z"
+                                                                },
+                                                                "source": "manual",
+                                                                "team": "coding",
+                                                                "created_at": "2026-01-06T11:49:11.546Z",
+                                                                "last_updated": "2026-01-06T11:51:03.428Z",
                                                                 "ontology": {
                                                                   "ontologyName": "coding",
                                                                   "classificationMethod": "hybrid",
@@ -15685,25 +15785,27 @@
                                                                 },
                                                                 "contentValidation": {
                                                                   "overallValid": false,
-                                                                  "overallScore": 100,
-                                                                  "totalIssues": 0,
-                                                                  "criticalIssues": 0,
-                                                                  "validatedAt": "2026-01-06T11:49:11.544Z",
+                                                                  "overallScore": 80,
+                                                                  "totalIssues": 1,
+                                                                  "criticalIssues": 1,
+                                                                  "validatedAt": "2026-01-06T11:51:14.294Z",
                                                                   "mode": "lenient"
                                                                 },
+                                                                "invalidating_commits": [],
                                                                 "staleness_score": 100,
-                                                                "staleness_check_at": "2026-01-06T11:49:11.544Z"
+                                                                "staleness_check_at": "2026-01-06T11:51:14.294Z",
+                                                                "staleness_method": "git-based"
                                                               },
                                                               "source": "manual",
                                                               "team": "coding",
                                                               "created_at": "2026-01-06T11:49:11.546Z",
-                                                              "last_updated": "2026-01-06T11:51:03.428Z",
+                                                              "last_updated": "2026-01-06T11:51:58.100Z",
                                                               "ontology": {
                                                                 "ontologyName": "coding",
                                                                 "classificationMethod": "hybrid",
-                                                                "confidence": 0.95
+                                                                "confidence": 0.9
                                                               },
-                                                              "classificationConfidence": 0.95,
+                                                              "classificationConfidence": 0.9,
                                                               "classificationMethod": "hybrid",
                                                               "validation": {
                                                                 "valid": true,
@@ -15716,24 +15818,24 @@
                                                                 "overallScore": 80,
                                                                 "totalIssues": 1,
                                                                 "criticalIssues": 1,
-                                                                "validatedAt": "2026-01-06T11:51:14.294Z",
+                                                                "validatedAt": "2026-01-06T11:52:12.173Z",
                                                                 "mode": "lenient"
                                                               },
                                                               "invalidating_commits": [],
                                                               "staleness_score": 100,
-                                                              "staleness_check_at": "2026-01-06T11:51:14.294Z",
+                                                              "staleness_check_at": "2026-01-06T11:52:12.173Z",
                                                               "staleness_method": "git-based"
                                                             },
                                                             "source": "manual",
                                                             "team": "coding",
                                                             "created_at": "2026-01-06T11:49:11.546Z",
-                                                            "last_updated": "2026-01-06T11:51:58.100Z",
+                                                            "last_updated": "2026-01-06T11:52:17.717Z",
                                                             "ontology": {
                                                               "ontologyName": "coding",
                                                               "classificationMethod": "hybrid",
-                                                              "confidence": 0.9
+                                                              "confidence": 0.95
                                                             },
-                                                            "classificationConfidence": 0.9,
+                                                            "classificationConfidence": 0.95,
                                                             "classificationMethod": "hybrid",
                                                             "validation": {
                                                               "valid": true,
@@ -15746,18 +15848,18 @@
                                                               "overallScore": 80,
                                                               "totalIssues": 1,
                                                               "criticalIssues": 1,
-                                                              "validatedAt": "2026-01-06T11:52:12.173Z",
+                                                              "validatedAt": "2026-01-06T11:52:30.182Z",
                                                               "mode": "lenient"
                                                             },
                                                             "invalidating_commits": [],
                                                             "staleness_score": 100,
-                                                            "staleness_check_at": "2026-01-06T11:52:12.173Z",
+                                                            "staleness_check_at": "2026-01-06T11:52:30.182Z",
                                                             "staleness_method": "git-based"
                                                           },
                                                           "source": "manual",
                                                           "team": "coding",
                                                           "created_at": "2026-01-06T11:49:11.546Z",
-                                                          "last_updated": "2026-01-06T11:52:17.717Z",
+                                                          "last_updated": "2026-01-06T11:52:30.231Z",
                                                           "ontology": {
                                                             "ontologyName": "coding",
                                                             "classificationMethod": "hybrid",
@@ -15776,18 +15878,18 @@
                                                             "overallScore": 80,
                                                             "totalIssues": 1,
                                                             "criticalIssues": 1,
-                                                            "validatedAt": "2026-01-06T11:52:30.182Z",
+                                                            "validatedAt": "2026-01-06T11:52:39.661Z",
                                                             "mode": "lenient"
                                                           },
                                                           "invalidating_commits": [],
                                                           "staleness_score": 100,
-                                                          "staleness_check_at": "2026-01-06T11:52:30.182Z",
+                                                          "staleness_check_at": "2026-01-06T11:52:39.661Z",
                                                           "staleness_method": "git-based"
                                                         },
                                                         "source": "manual",
                                                         "team": "coding",
                                                         "created_at": "2026-01-06T11:49:11.546Z",
-                                                        "last_updated": "2026-01-06T11:52:30.231Z",
+                                                        "last_updated": "2026-01-06T11:52:39.716Z",
                                                         "ontology": {
                                                           "ontologyName": "coding",
                                                           "classificationMethod": "hybrid",
@@ -15806,18 +15908,18 @@
                                                           "overallScore": 80,
                                                           "totalIssues": 1,
                                                           "criticalIssues": 1,
-                                                          "validatedAt": "2026-01-06T11:52:39.661Z",
+                                                          "validatedAt": "2026-01-06T11:52:50.696Z",
                                                           "mode": "lenient"
                                                         },
                                                         "invalidating_commits": [],
                                                         "staleness_score": 100,
-                                                        "staleness_check_at": "2026-01-06T11:52:39.661Z",
+                                                        "staleness_check_at": "2026-01-06T11:52:50.696Z",
                                                         "staleness_method": "git-based"
                                                       },
                                                       "source": "manual",
                                                       "team": "coding",
                                                       "created_at": "2026-01-06T11:49:11.546Z",
-                                                      "last_updated": "2026-01-06T11:52:39.716Z",
+                                                      "last_updated": "2026-01-06T11:52:50.730Z",
                                                       "ontology": {
                                                         "ontologyName": "coding",
                                                         "classificationMethod": "hybrid",
@@ -15836,18 +15938,18 @@
                                                         "overallScore": 80,
                                                         "totalIssues": 1,
                                                         "criticalIssues": 1,
-                                                        "validatedAt": "2026-01-06T11:52:50.696Z",
+                                                        "validatedAt": "2026-01-06T11:53:03.080Z",
                                                         "mode": "lenient"
                                                       },
                                                       "invalidating_commits": [],
                                                       "staleness_score": 100,
-                                                      "staleness_check_at": "2026-01-06T11:52:50.696Z",
+                                                      "staleness_check_at": "2026-01-06T11:53:03.080Z",
                                                       "staleness_method": "git-based"
                                                     },
                                                     "source": "manual",
                                                     "team": "coding",
                                                     "created_at": "2026-01-06T11:49:11.546Z",
-                                                    "last_updated": "2026-01-06T11:52:50.730Z",
+                                                    "last_updated": "2026-01-06T11:53:39.963Z",
                                                     "ontology": {
                                                       "ontologyName": "coding",
                                                       "classificationMethod": "hybrid",
@@ -15866,18 +15968,18 @@
                                                       "overallScore": 80,
                                                       "totalIssues": 1,
                                                       "criticalIssues": 1,
-                                                      "validatedAt": "2026-01-06T11:53:03.080Z",
+                                                      "validatedAt": "2026-01-06T11:53:51.776Z",
                                                       "mode": "lenient"
                                                     },
                                                     "invalidating_commits": [],
                                                     "staleness_score": 100,
-                                                    "staleness_check_at": "2026-01-06T11:53:03.080Z",
+                                                    "staleness_check_at": "2026-01-06T11:53:51.776Z",
                                                     "staleness_method": "git-based"
                                                   },
                                                   "source": "manual",
                                                   "team": "coding",
                                                   "created_at": "2026-01-06T11:49:11.546Z",
-                                                  "last_updated": "2026-01-06T11:53:39.963Z",
+                                                  "last_updated": "2026-01-06T11:54:42.934Z",
                                                   "ontology": {
                                                     "ontologyName": "coding",
                                                     "classificationMethod": "hybrid",
@@ -15896,18 +15998,18 @@
                                                     "overallScore": 80,
                                                     "totalIssues": 1,
                                                     "criticalIssues": 1,
-                                                    "validatedAt": "2026-01-06T11:53:51.776Z",
+                                                    "validatedAt": "2026-01-06T11:54:53.564Z",
                                                     "mode": "lenient"
                                                   },
                                                   "invalidating_commits": [],
                                                   "staleness_score": 100,
-                                                  "staleness_check_at": "2026-01-06T11:53:51.776Z",
+                                                  "staleness_check_at": "2026-01-06T11:54:53.564Z",
                                                   "staleness_method": "git-based"
                                                 },
                                                 "source": "manual",
                                                 "team": "coding",
                                                 "created_at": "2026-01-06T11:49:11.546Z",
-                                                "last_updated": "2026-01-06T11:54:42.934Z",
+                                                "last_updated": "2026-01-06T11:56:59.374Z",
                                                 "ontology": {
                                                   "ontologyName": "coding",
                                                   "classificationMethod": "hybrid",
@@ -15926,18 +16028,18 @@
                                                   "overallScore": 80,
                                                   "totalIssues": 1,
                                                   "criticalIssues": 1,
-                                                  "validatedAt": "2026-01-06T11:54:53.564Z",
+                                                  "validatedAt": "2026-01-06T11:57:10.200Z",
                                                   "mode": "lenient"
                                                 },
                                                 "invalidating_commits": [],
                                                 "staleness_score": 100,
-                                                "staleness_check_at": "2026-01-06T11:54:53.564Z",
+                                                "staleness_check_at": "2026-01-06T11:57:10.200Z",
                                                 "staleness_method": "git-based"
                                               },
                                               "source": "manual",
                                               "team": "coding",
                                               "created_at": "2026-01-06T11:49:11.546Z",
-                                              "last_updated": "2026-01-06T11:56:59.374Z",
+                                              "last_updated": "2026-01-06T11:58:31.974Z",
                                               "ontology": {
                                                 "ontologyName": "coding",
                                                 "classificationMethod": "hybrid",
@@ -15956,18 +16058,18 @@
                                                 "overallScore": 80,
                                                 "totalIssues": 1,
                                                 "criticalIssues": 1,
-                                                "validatedAt": "2026-01-06T11:57:10.200Z",
+                                                "validatedAt": "2026-01-06T11:58:40.054Z",
                                                 "mode": "lenient"
                                               },
                                               "invalidating_commits": [],
                                               "staleness_score": 100,
-                                              "staleness_check_at": "2026-01-06T11:57:10.200Z",
+                                              "staleness_check_at": "2026-01-06T11:58:40.054Z",
                                               "staleness_method": "git-based"
                                             },
                                             "source": "manual",
                                             "team": "coding",
                                             "created_at": "2026-01-06T11:49:11.546Z",
-                                            "last_updated": "2026-01-06T11:58:31.974Z",
+                                            "last_updated": "2026-01-06T12:00:23.223Z",
                                             "ontology": {
                                               "ontologyName": "coding",
                                               "classificationMethod": "hybrid",
@@ -15986,18 +16088,18 @@
                                               "overallScore": 80,
                                               "totalIssues": 1,
                                               "criticalIssues": 1,
-                                              "validatedAt": "2026-01-06T11:58:40.054Z",
+                                              "validatedAt": "2026-01-06T12:00:37.234Z",
                                               "mode": "lenient"
                                             },
                                             "invalidating_commits": [],
                                             "staleness_score": 100,
-                                            "staleness_check_at": "2026-01-06T11:58:40.054Z",
+                                            "staleness_check_at": "2026-01-06T12:00:37.234Z",
                                             "staleness_method": "git-based"
                                           },
                                           "source": "manual",
                                           "team": "coding",
                                           "created_at": "2026-01-06T11:49:11.546Z",
-                                          "last_updated": "2026-01-06T12:00:23.223Z",
+                                          "last_updated": "2026-01-06T12:01:09.358Z",
                                           "ontology": {
                                             "ontologyName": "coding",
                                             "classificationMethod": "hybrid",
@@ -16016,18 +16118,18 @@
                                             "overallScore": 80,
                                             "totalIssues": 1,
                                             "criticalIssues": 1,
-                                            "validatedAt": "2026-01-06T12:00:37.234Z",
+                                            "validatedAt": "2026-01-06T12:01:19.617Z",
                                             "mode": "lenient"
                                           },
                                           "invalidating_commits": [],
                                           "staleness_score": 100,
-                                          "staleness_check_at": "2026-01-06T12:00:37.234Z",
+                                          "staleness_check_at": "2026-01-06T12:01:19.617Z",
                                           "staleness_method": "git-based"
                                         },
                                         "source": "manual",
                                         "team": "coding",
                                         "created_at": "2026-01-06T11:49:11.546Z",
-                                        "last_updated": "2026-01-06T12:01:09.358Z",
+                                        "last_updated": "2026-01-06T12:03:44.892Z",
                                         "ontology": {
                                           "ontologyName": "coding",
                                           "classificationMethod": "hybrid",
@@ -16046,24 +16148,24 @@
                                           "overallScore": 80,
                                           "totalIssues": 1,
                                           "criticalIssues": 1,
-                                          "validatedAt": "2026-01-06T12:01:19.617Z",
+                                          "validatedAt": "2026-01-06T12:03:57.701Z",
                                           "mode": "lenient"
                                         },
                                         "invalidating_commits": [],
                                         "staleness_score": 100,
-                                        "staleness_check_at": "2026-01-06T12:01:19.617Z",
+                                        "staleness_check_at": "2026-01-06T12:03:57.701Z",
                                         "staleness_method": "git-based"
                                       },
                                       "source": "manual",
                                       "team": "coding",
                                       "created_at": "2026-01-06T11:49:11.546Z",
-                                      "last_updated": "2026-01-06T12:03:44.892Z",
+                                      "last_updated": "2026-01-06T12:05:28.160Z",
                                       "ontology": {
                                         "ontologyName": "coding",
                                         "classificationMethod": "hybrid",
-                                        "confidence": 0.95
+                                        "confidence": 0.85
                                       },
-                                      "classificationConfidence": 0.95,
+                                      "classificationConfidence": 0.85,
                                       "classificationMethod": "hybrid",
                                       "validation": {
                                         "valid": true,
@@ -16076,24 +16178,24 @@
                                         "overallScore": 80,
                                         "totalIssues": 1,
                                         "criticalIssues": 1,
-                                        "validatedAt": "2026-01-06T12:03:57.701Z",
+                                        "validatedAt": "2026-01-06T12:05:41.946Z",
                                         "mode": "lenient"
                                       },
                                       "invalidating_commits": [],
                                       "staleness_score": 100,
-                                      "staleness_check_at": "2026-01-06T12:03:57.701Z",
+                                      "staleness_check_at": "2026-01-06T12:05:41.946Z",
                                       "staleness_method": "git-based"
                                     },
                                     "source": "manual",
                                     "team": "coding",
                                     "created_at": "2026-01-06T11:49:11.546Z",
-                                    "last_updated": "2026-01-06T12:05:28.160Z",
+                                    "last_updated": "2026-01-06T12:07:19.428Z",
                                     "ontology": {
                                       "ontologyName": "coding",
                                       "classificationMethod": "hybrid",
-                                      "confidence": 0.85
+                                      "confidence": 0.95
                                     },
-                                    "classificationConfidence": 0.85,
+                                    "classificationConfidence": 0.95,
                                     "classificationMethod": "hybrid",
                                     "validation": {
                                       "valid": true,
@@ -16106,18 +16208,18 @@
                                       "overallScore": 80,
                                       "totalIssues": 1,
                                       "criticalIssues": 1,
-                                      "validatedAt": "2026-01-06T12:05:41.946Z",
+                                      "validatedAt": "2026-01-06T12:07:35.867Z",
                                       "mode": "lenient"
                                     },
                                     "invalidating_commits": [],
                                     "staleness_score": 100,
-                                    "staleness_check_at": "2026-01-06T12:05:41.946Z",
+                                    "staleness_check_at": "2026-01-06T12:07:35.867Z",
                                     "staleness_method": "git-based"
                                   },
                                   "source": "manual",
                                   "team": "coding",
                                   "created_at": "2026-01-06T11:49:11.546Z",
-                                  "last_updated": "2026-01-06T12:07:19.428Z",
+                                  "last_updated": "2026-01-06T12:09:31.811Z",
                                   "ontology": {
                                     "ontologyName": "coding",
                                     "classificationMethod": "hybrid",
@@ -16136,18 +16238,18 @@
                                     "overallScore": 80,
                                     "totalIssues": 1,
                                     "criticalIssues": 1,
-                                    "validatedAt": "2026-01-06T12:07:35.867Z",
+                                    "validatedAt": "2026-01-06T12:09:45.145Z",
                                     "mode": "lenient"
                                   },
                                   "invalidating_commits": [],
                                   "staleness_score": 100,
-                                  "staleness_check_at": "2026-01-06T12:07:35.867Z",
+                                  "staleness_check_at": "2026-01-06T12:09:45.145Z",
                                   "staleness_method": "git-based"
                                 },
                                 "source": "manual",
                                 "team": "coding",
                                 "created_at": "2026-01-06T11:49:11.546Z",
-                                "last_updated": "2026-01-06T12:09:31.811Z",
+                                "last_updated": "2026-01-06T12:11:30.953Z",
                                 "ontology": {
                                   "ontologyName": "coding",
                                   "classificationMethod": "hybrid",
@@ -16166,24 +16268,24 @@
                                   "overallScore": 80,
                                   "totalIssues": 1,
                                   "criticalIssues": 1,
-                                  "validatedAt": "2026-01-06T12:09:45.145Z",
+                                  "validatedAt": "2026-01-06T12:11:43.565Z",
                                   "mode": "lenient"
                                 },
                                 "invalidating_commits": [],
                                 "staleness_score": 100,
-                                "staleness_check_at": "2026-01-06T12:09:45.145Z",
+                                "staleness_check_at": "2026-01-06T12:11:43.565Z",
                                 "staleness_method": "git-based"
                               },
                               "source": "manual",
                               "team": "coding",
                               "created_at": "2026-01-06T11:49:11.546Z",
-                              "last_updated": "2026-01-06T12:11:30.953Z",
+                              "last_updated": "2026-01-06T13:50:53.116Z",
                               "ontology": {
                                 "ontologyName": "coding",
                                 "classificationMethod": "hybrid",
-                                "confidence": 0.95
+                                "confidence": 0.9
                               },
-                              "classificationConfidence": 0.95,
+                              "classificationConfidence": 0.9,
                               "classificationMethod": "hybrid",
                               "validation": {
                                 "valid": true,
@@ -16196,24 +16298,24 @@
                                 "overallScore": 80,
                                 "totalIssues": 1,
                                 "criticalIssues": 1,
-                                "validatedAt": "2026-01-06T12:11:43.565Z",
+                                "validatedAt": "2026-01-06T13:50:55.929Z",
                                 "mode": "lenient"
                               },
                               "invalidating_commits": [],
                               "staleness_score": 100,
-                              "staleness_check_at": "2026-01-06T12:11:43.565Z",
+                              "staleness_check_at": "2026-01-06T13:50:55.929Z",
                               "staleness_method": "git-based"
                             },
                             "source": "manual",
                             "team": "coding",
                             "created_at": "2026-01-06T11:49:11.546Z",
-                            "last_updated": "2026-01-06T13:50:53.116Z",
+                            "last_updated": "2026-01-06T13:52:37.742Z",
                             "ontology": {
                               "ontologyName": "coding",
                               "classificationMethod": "hybrid",
-                              "confidence": 0.9
+                              "confidence": 0.95
                             },
-                            "classificationConfidence": 0.9,
+                            "classificationConfidence": 0.95,
                             "classificationMethod": "hybrid",
                             "validation": {
                               "valid": true,
@@ -16226,18 +16328,18 @@
                               "overallScore": 80,
                               "totalIssues": 1,
                               "criticalIssues": 1,
-                              "validatedAt": "2026-01-06T13:50:55.929Z",
+                              "validatedAt": "2026-01-06T13:52:48.288Z",
                               "mode": "lenient"
                             },
                             "invalidating_commits": [],
                             "staleness_score": 100,
-                            "staleness_check_at": "2026-01-06T13:50:55.929Z",
+                            "staleness_check_at": "2026-01-06T13:52:48.288Z",
                             "staleness_method": "git-based"
                           },
                           "source": "manual",
                           "team": "coding",
                           "created_at": "2026-01-06T11:49:11.546Z",
-                          "last_updated": "2026-01-06T13:52:37.742Z",
+                          "last_updated": "2026-01-06T14:22:29.413Z",
                           "ontology": {
                             "ontologyName": "coding",
                             "classificationMethod": "hybrid",
@@ -16256,18 +16358,18 @@
                             "overallScore": 80,
                             "totalIssues": 1,
                             "criticalIssues": 1,
-                            "validatedAt": "2026-01-06T13:52:48.288Z",
+                            "validatedAt": "2026-01-06T14:22:38.833Z",
                             "mode": "lenient"
                           },
                           "invalidating_commits": [],
                           "staleness_score": 100,
-                          "staleness_check_at": "2026-01-06T13:52:48.288Z",
+                          "staleness_check_at": "2026-01-06T14:22:38.833Z",
                           "staleness_method": "git-based"
                         },
                         "source": "manual",
                         "team": "coding",
                         "created_at": "2026-01-06T11:49:11.546Z",
-                        "last_updated": "2026-01-06T14:22:29.413Z",
+                        "last_updated": "2026-01-06T14:22:38.878Z",
                         "ontology": {
                           "ontologyName": "coding",
                           "classificationMethod": "hybrid",
@@ -16286,24 +16388,24 @@
                           "overallScore": 80,
                           "totalIssues": 1,
                           "criticalIssues": 1,
-                          "validatedAt": "2026-01-06T14:22:38.833Z",
+                          "validatedAt": "2026-01-06T14:22:50.917Z",
                           "mode": "lenient"
                         },
                         "invalidating_commits": [],
                         "staleness_score": 100,
-                        "staleness_check_at": "2026-01-06T14:22:38.833Z",
+                        "staleness_check_at": "2026-01-06T14:22:50.917Z",
                         "staleness_method": "git-based"
                       },
                       "source": "manual",
                       "team": "coding",
                       "created_at": "2026-01-06T11:49:11.546Z",
-                      "last_updated": "2026-01-06T14:22:38.878Z",
+                      "last_updated": "2026-01-06T14:22:50.953Z",
                       "ontology": {
                         "ontologyName": "coding",
                         "classificationMethod": "hybrid",
-                        "confidence": 0.95
+                        "confidence": 0.9
                       },
-                      "classificationConfidence": 0.95,
+                      "classificationConfidence": 0.9,
                       "classificationMethod": "hybrid",
                       "validation": {
                         "valid": true,
@@ -16316,24 +16418,24 @@
                         "overallScore": 80,
                         "totalIssues": 1,
                         "criticalIssues": 1,
-                        "validatedAt": "2026-01-06T14:22:50.917Z",
+                        "validatedAt": "2026-01-06T14:23:03.389Z",
                         "mode": "lenient"
                       },
                       "invalidating_commits": [],
                       "staleness_score": 100,
-                      "staleness_check_at": "2026-01-06T14:22:50.917Z",
+                      "staleness_check_at": "2026-01-06T14:23:03.389Z",
                       "staleness_method": "git-based"
                     },
                     "source": "manual",
                     "team": "coding",
                     "created_at": "2026-01-06T11:49:11.546Z",
-                    "last_updated": "2026-01-06T14:22:50.953Z",
+                    "last_updated": "2026-01-06T14:23:40.994Z",
                     "ontology": {
                       "ontologyName": "coding",
                       "classificationMethod": "hybrid",
-                      "confidence": 0.9
+                      "confidence": 0.92
                     },
-                    "classificationConfidence": 0.9,
+                    "classificationConfidence": 0.92,
                     "classificationMethod": "hybrid",
                     "validation": {
                       "valid": true,
@@ -16346,24 +16448,24 @@
                       "overallScore": 80,
                       "totalIssues": 1,
                       "criticalIssues": 1,
-                      "validatedAt": "2026-01-06T14:23:03.389Z",
+                      "validatedAt": "2026-01-06T14:24:01.086Z",
                       "mode": "lenient"
                     },
                     "invalidating_commits": [],
                     "staleness_score": 100,
-                    "staleness_check_at": "2026-01-06T14:23:03.389Z",
+                    "staleness_check_at": "2026-01-06T14:24:01.086Z",
                     "staleness_method": "git-based"
                   },
                   "source": "manual",
                   "team": "coding",
                   "created_at": "2026-01-06T11:49:11.546Z",
-                  "last_updated": "2026-01-06T14:23:40.994Z",
+                  "last_updated": "2026-01-06T16:33:53.057Z",
                   "ontology": {
                     "ontologyName": "coding",
                     "classificationMethod": "hybrid",
-                    "confidence": 0.92
+                    "confidence": 0.98
                   },
-                  "classificationConfidence": 0.92,
+                  "classificationConfidence": 0.98,
                   "classificationMethod": "hybrid",
                   "validation": {
                     "valid": true,
@@ -16376,24 +16478,24 @@
                     "overallScore": 80,
                     "totalIssues": 1,
                     "criticalIssues": 1,
-                    "validatedAt": "2026-01-06T14:24:01.086Z",
+                    "validatedAt": "2026-01-06T16:34:10.759Z",
                     "mode": "lenient"
                   },
                   "invalidating_commits": [],
                   "staleness_score": 100,
-                  "staleness_check_at": "2026-01-06T14:24:01.086Z",
+                  "staleness_check_at": "2026-01-06T16:34:10.759Z",
                   "staleness_method": "git-based"
                 },
                 "source": "manual",
                 "team": "coding",
                 "created_at": "2026-01-06T11:49:11.546Z",
-                "last_updated": "2026-01-06T16:33:53.057Z",
+                "last_updated": "2026-01-06T16:34:10.818Z",
                 "ontology": {
                   "ontologyName": "coding",
                   "classificationMethod": "hybrid",
-                  "confidence": 0.98
+                  "confidence": 0.95
                 },
-                "classificationConfidence": 0.98,
+                "classificationConfidence": 0.95,
                 "classificationMethod": "hybrid",
                 "validation": {
                   "valid": true,
@@ -16406,18 +16508,18 @@
                   "overallScore": 80,
                   "totalIssues": 1,
                   "criticalIssues": 1,
-                  "validatedAt": "2026-01-06T16:34:10.759Z",
+                  "validatedAt": "2026-01-06T16:34:39.520Z",
                   "mode": "lenient"
                 },
                 "invalidating_commits": [],
                 "staleness_score": 100,
-                "staleness_check_at": "2026-01-06T16:34:10.759Z",
+                "staleness_check_at": "2026-01-06T16:34:39.520Z",
                 "staleness_method": "git-based"
               },
               "source": "manual",
               "team": "coding",
               "created_at": "2026-01-06T11:49:11.546Z",
-              "last_updated": "2026-01-06T16:34:10.818Z",
+              "last_updated": "2026-01-07T07:55:20.711Z",
               "ontology": {
                 "ontologyName": "coding",
                 "classificationMethod": "hybrid",
@@ -16436,18 +16538,18 @@
                 "overallScore": 80,
                 "totalIssues": 1,
                 "criticalIssues": 1,
-                "validatedAt": "2026-01-06T16:34:39.520Z",
+                "validatedAt": "2026-01-07T07:55:34.873Z",
                 "mode": "lenient"
               },
               "invalidating_commits": [],
               "staleness_score": 100,
-              "staleness_check_at": "2026-01-06T16:34:39.520Z",
+              "staleness_check_at": "2026-01-07T07:55:34.873Z",
               "staleness_method": "git-based"
             },
             "source": "manual",
             "team": "coding",
             "created_at": "2026-01-06T11:49:11.546Z",
-            "last_updated": "2026-01-07T07:55:20.711Z",
+            "last_updated": "2026-01-07T07:58:54.494Z",
             "ontology": {
               "ontologyName": "coding",
               "classificationMethod": "hybrid",
@@ -16466,25 +16568,24 @@
               "overallScore": 80,
               "totalIssues": 1,
               "criticalIssues": 1,
-              "validatedAt": "2026-01-07T07:55:34.873Z",
+              "validatedAt": "2026-01-07T07:59:05.540Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-01-07T07:55:34.873Z",
+            "staleness_check_at": "2026-01-07T07:59:05.540Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2026-01-06T11:49:11.546Z",
-          "last_updated": "2026-01-07T07:58:54.494Z",
+          "last_updated": "2026-01-10T09:49:52.432Z",
           "ontology": {
-            "ontologyName": "coding",
-            "classificationMethod": "hybrid",
-            "confidence": 0.95
+            "preClassified": true,
+            "originalMethod": "unknown"
           },
-          "classificationConfidence": 0.95,
-          "classificationMethod": "hybrid",
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -16496,12 +16597,12 @@
             "overallScore": 80,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-07T07:59:05.540Z",
+            "validatedAt": "2026-01-10T09:49:52.437Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-07T07:59:05.540Z",
+          "staleness_check_at": "2026-01-10T09:49:52.437Z",
           "staleness_method": "git-based"
         }
       },
@@ -21678,7 +21779,7 @@
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-10T07:01:20.583Z",
+    "last_updated": "2026-01-10T10:06:11.105Z",
     "team": "coding",
     "entity_count": 45,
     "relation_count": 63,
