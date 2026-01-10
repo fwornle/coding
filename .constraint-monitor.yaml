@@ -100,7 +100,9 @@ constraints:
   semantic_validation: true
 - id: no-evolutionary-names
   group: architecture
-  pattern: (?:class|function|const|let|var)\s+\w*(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)\w*
+  # Pattern requires evolutionary word to NOT be followed by lowercase letters
+  # This prevents false positives like "isInFinalization" or "processTestResults"
+  pattern: (?:class|function|const|let|var)\s+\w*(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)(?![a-z])
   message: Evolutionary naming detected - refactor original instead. (Whitelisted
     files are exempt from this rule)
   severity: error
