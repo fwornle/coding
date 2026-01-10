@@ -388,6 +388,15 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }, [open, activeTab])
 
+  // Auto-select orchestrator/coordinator when modal opens with active workflows
+  // This ensures the sidebar is visible immediately showing workflow overview
+  useEffect(() => {
+    if (open && activeTab === 'active' && activeProcesses.length > 0 && selectedNode === null) {
+      Logger.info(LogCategories.UI, 'Auto-selecting orchestrator node on modal open')
+      dispatch(setSelectedNode('orchestrator'))
+    }
+  }, [open, activeTab, activeProcesses.length, selectedNode, dispatch])
+
   const loadHistoricalWorkflows = async () => {
     Logger.debug(LogCategories.API, 'Loading historical workflows')
     dispatch(fetchHistoryStart())
@@ -430,10 +439,12 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   }
 
   // Fetch detail when a historical workflow is selected
+  // Auto-select orchestrator to show the workflow overview sidebar
   useEffect(() => {
     if (selectedHistoricalWorkflowState) {
       loadHistoricalWorkflowDetail(selectedHistoricalWorkflowState.id)
-      dispatch(setSelectedNode(null))
+      dispatch(setSelectedNode('orchestrator'))
+      setSelectedSubStep(null)
     }
   }, [selectedHistoricalWorkflowState])
 
@@ -1427,6 +1438,12 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             historicalWorkflowCount: historicalWorkflows.length,
           })
           dispatch(setActiveTab(newTab))
+          // Clear substep selection when switching tabs
+          setSelectedSubStep(null)
+          // Auto-select orchestrator when switching to active tab with active processes
+          if (newTab === 'active' && activeProcesses.length > 0) {
+            dispatch(setSelectedNode('orchestrator'))
+          }
         }} className="contents">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="active" className="flex items-center gap-2">
