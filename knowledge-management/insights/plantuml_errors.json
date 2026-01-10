@@ -1,8 +1,8 @@
 {
   "type": "class",
-  "name": "multiagentcoordinationpattern-pattern",
-  "error": "LLM-enhanced diagram generation failed completely. Debug info: {\n  \"type\": \"class\",\n  \"dataKeys\": [\n    \"gitAnalysis\",\n    \"vibeAnalysis\",\n    \"semanticAnalysis\",\n    \"patternCatalog\",\n    \"entityInfo\"\n  ],\n  \"dataTypes\": {\n    \"gitAnalysis\": \"object\",\n    \"vibeAnalysis\": \"object\",\n    \"semanticAnalysis\": \"object\",\n    \"patternCatalog\": \"object\",\n    \"entityInfo\": \"undefined\"\n  },\n  \"semanticAnalyzerExists\": true,\n  \"hasData\": true,\n  \"dataSize\": 18226278\n}",
-  "timestamp": "2026-01-09T08:39:46.168Z",
+  "name": "api-handles-external-communication-pattern",
+  "error": "LLM-enhanced diagram generation failed completely. Debug info: {\n  \"type\": \"class\",\n  \"dataKeys\": [\n    \"gitAnalysis\",\n    \"vibeAnalysis\",\n    \"semanticAnalysis\",\n    \"patternCatalog\",\n    \"entityInfo\"\n  ],\n  \"dataTypes\": {\n    \"gitAnalysis\": \"object\",\n    \"vibeAnalysis\": \"object\",\n    \"semanticAnalysis\": \"object\",\n    \"patternCatalog\": \"object\",\n    \"entityInfo\": \"undefined\"\n  },\n  \"semanticAnalyzerExists\": true,\n  \"hasData\": true,\n  \"dataSize\": 19047009\n}",
+  "timestamp": "2026-01-09T19:09:36.120Z",
   "dataKeys": [
     "gitAnalysis",
     "vibeAnalysis",
@@ -17,6 +17,7 @@
     "patternCatalog": "object",
     "entityInfo": "undefined"
   }
-}defined"
+}
   }
+}
 }
