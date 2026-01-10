@@ -1372,6 +1372,19 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // Extract completedBatches for tracer batch iteration display
+            let completedBatches = null;
+            if (existsSync(checkpointsPath)) {
+                try {
+                    const checkpointsData = JSON.parse(readFileSync(checkpointsPath, 'utf8'));
+                    if (checkpointsData.completedBatches?.length > 0) {
+                        completedBatches = checkpointsData.completedBatches;
+                    }
+                } catch (e) {
+                    // Already loaded above, this is just a fallback
+                }
+            }
+
             res.json({
                 status: 'success',
                 data: {
@@ -1395,7 +1408,9 @@ class SystemHealthAPIServer {
                     accumulatedStats,
                     batchSummary,
                     // Final persisted knowledge (after deduplication)
-                    persistedKnowledge
+                    persistedKnowledge,
+                    // Raw completed batches for tracer batch iteration display
+                    completedBatches
                 }
             });
         } catch (error) {
