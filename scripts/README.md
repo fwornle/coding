@@ -31,13 +31,22 @@ This directory contains utility scripts for the Coding Knowledge Management Syst
   - Starts automatic conversation logging via start-auto-logger.sh
   - Usage: Called by bin/claude-mcp wrapper (not run directly)
 
+### Testing Scripts
+
+- **`test-coding.sh`** - Comprehensive installation verification
+  - **`--check-only`** (default): Reports issues without making changes
+  - **`--interactive`**: Prompts before each repair action
+  - **`--auto-repair`**: Fixes coding-internal issues automatically
+  - Never auto-installs system packages - only suggests commands
+  - Usage: `./scripts/test-coding.sh [--check-only|--interactive|--auto-repair]`
+
 ## Organization
 
 Scripts are organized here to keep the repository root clean while maintaining easy access for the core system functionality.
 
 ### Main Scripts in Root
-- `install.sh` - Installation script
-- `uninstall.sh` - Uninstallation script
+- `install.sh` - Safe installation with confirmation prompts
+- `uninstall.sh` - Uninstallation with shell config restoration
 
 ### Command Wrappers in bin/
 - `bin/claude-mcp` - Universal wrapper (added to PATH)
