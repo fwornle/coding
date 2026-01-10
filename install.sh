@@ -45,6 +45,51 @@ PROXY_WORKING=false
 INSTALLATION_WARNINGS=()
 INSTALLATION_FAILURES=()
 SANDBOX_MODE=false
+SKIP_ALL_SYSTEM_CHANGES=false
+SKIPPED_SYSTEM_DEPS=()
+
+# Safety: Confirm before any system-level modification
+# Usage: confirm_system_change "action description" "risk warning"
+# Returns: 0 if approved, 1 if declined
+confirm_system_change() {
+    local action="$1"
+    local risk="$2"
+
+    # Skip if user already chose to skip all
+    if [[ "$SKIP_ALL_SYSTEM_CHANGES" == "true" ]]; then
+        return 1
+    fi
+
+    echo ""
+    echo -e "${YELLOW}╔══════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${YELLOW}║               SYSTEM MODIFICATION REQUEST                            ║${NC}"
+    echo -e "${YELLOW}╚══════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${CYAN}Action:${NC} $action"
+    echo ""
+    echo -e "${RED}Risk:${NC} $risk"
+    echo ""
+    echo -e "${BLUE}Options:${NC}"
+    echo -e "  ${GREEN}y${NC} = Proceed with this action"
+    echo -e "  ${YELLOW}n${NC} = Skip this action (installation continues)"
+    echo -e "  ${PURPLE}skip-all${NC} = Skip ALL remaining system modifications"
+    echo ""
+    read -p "$(echo -e ${CYAN}Your choice [y/N/skip-all]: ${NC})" response
+
+    case "$response" in
+        [yY]|[yY][eE][sS])
+            return 0
+            ;;
+        skip-all|SKIP-ALL|Skip-all)
+            SKIP_ALL_SYSTEM_CHANGES=true
+            info "Skipping all remaining system modifications"
+            return 1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
 
 # Repository URLs by network location
 # Only memory-visualizer has a CN mirror, others always use public repos
@@ -314,11 +359,13 @@ check_dependencies() {
             echo -e "${CYAN}Error:${NC}"
             echo "$node_health_output" | head -5
             echo ""
-            echo -e "${CYAN}To fix this, try one of these options:${NC}"
-            echo -e "  ${GREEN}1.${NC} brew reinstall node"
-            echo -e "  ${GREEN}2.${NC} Use nvm instead: nvm install --lts && nvm use --lts"
-            echo -e "  ${GREEN}3.${NC} Reinstall Homebrew Node completely:"
-            echo -e "     brew uninstall node && brew install node"
+            echo -e "${CYAN}Common causes and fixes:${NC}"
+            echo -e "  ${GREEN}1.${NC} Library mismatch after Homebrew update - try: brew upgrade"
+            echo -e "  ${GREEN}2.${NC} Use nvm for isolated Node management: nvm install --lts && nvm use --lts"
+            echo -e "  ${GREEN}3.${NC} Check if libsimdjson needs linking: brew link simdjson"
+            echo ""
+            echo -e "${RED}IMPORTANT:${NC} This installer will NOT attempt to fix your Node installation."
+            echo -e "           Please resolve this issue manually before proceeding."
             echo ""
             error_exit "Node.js is broken. Please fix it before running this installer."
         fi
@@ -342,18 +389,27 @@ check_dependencies() {
     
     # Install uv if missing (required for Serena MCP server)
     if ! command -v uv >/dev/null 2>&1; then
-        info "Installing uv (Python package installer, required for Serena MCP)..."
-        if curl -LsSf https://astral.sh/uv/install.sh | sh; then
-            # Source shell config to update PATH
-            export PATH="$HOME/.local/bin:$PATH"
-            if command -v uv >/dev/null 2>&1; then
-                success "uv installed successfully"
+        if confirm_system_change \
+            "Install uv (Python package installer) via curl | sh" \
+            "This downloads and executes an installer script from astral.sh. Required for Serena MCP."; then
+            info "Installing uv (Python package installer, required for Serena MCP)..."
+            if curl -LsSf https://astral.sh/uv/install.sh | sh; then
+                # Source shell config to update PATH
+                export PATH="$HOME/.local/bin:$PATH"
+                if command -v uv >/dev/null 2>&1; then
+                    success "uv installed successfully"
+                else
+                    warning "uv installed but not in PATH. You may need to restart your shell."
+                    info "Add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\""
+                fi
             else
-                warning "uv installed but not in PATH. You may need to restart your shell."
-                info "Add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\""
+                warning "Failed to install uv. Serena MCP server may not be available."
+                SKIPPED_SYSTEM_DEPS+=("uv")
             fi
         else
-            error_exit "Failed to install uv. Serena MCP server will not be available."
+            warning "Skipped uv installation. Serena MCP server may not be available."
+            SKIPPED_SYSTEM_DEPS+=("uv")
+            info "To install manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
         fi
     else
         success "uv is already installed"
@@ -1167,23 +1223,48 @@ EOF
     if grep -q "CODING_REPO.*$CODING_REPO" "$SHELL_RC" 2>/dev/null && grep -q "PATH.*$CODING_REPO/bin" "$SHELL_RC" 2>/dev/null; then
         info "Shell already configured with correct paths in $SHELL_RC"
     else
-        # Remove any existing Claude configurations to prevent duplicates
-        if [[ -f "$SHELL_RC.bak" ]]; then
-            rm -f "$SHELL_RC.bak"
+        # Ask for confirmation before modifying shell config
+        if ! confirm_system_change \
+            "Modify shell configuration file: $SHELL_RC" \
+            "This adds CODING_REPO and PATH exports. Changes can be reversed by uninstall.sh."; then
+            warning "Skipped shell configuration modification"
+            info "You can manually add these to your shell config:"
+            info "  $claude_repo_export"
+            info "  $claude_path_export"
+            SKIPPED_SYSTEM_DEPS+=("shell-config")
+        else
+            # Create timestamped backup before modification
+            local backup_file="${SHELL_RC}.coding-backup.$(date +%Y%m%d%H%M%S)"
+            cp "$SHELL_RC" "$backup_file"
+            info "Created backup: $backup_file"
+
+            # Remove any existing Claude configurations to prevent duplicates
+            if [[ -f "$SHELL_RC.bak" ]]; then
+                rm -f "$SHELL_RC.bak"
+            fi
+            # Remove existing Claude sections
+            sed -i.bak '/# Claude Knowledge Management System/,/^$/d' "$SHELL_RC" 2>/dev/null || true
+
+            # Add configuration to SINGLE shell config file with markers
+            {
+                echo ""
+                echo "# === CODING TOOLS START (installed: $(date +%Y-%m-%d)) ==="
+                echo "$claude_repo_export"
+                echo "$claude_path_export"
+                echo "# === CODING TOOLS END ==="
+                echo ""
+            } >> "$SHELL_RC"
+
+            # Verify the modification didn't break the shell config
+            if bash -n "$SHELL_RC" 2>/dev/null || zsh -n "$SHELL_RC" 2>/dev/null; then
+                success "Configuration added to $SHELL_RC"
+                info "Backup saved: $backup_file"
+            else
+                warning "Shell config may have issues - restoring backup"
+                cp "$backup_file" "$SHELL_RC"
+                INSTALLATION_WARNINGS+=("Shell config: Restored from backup due to syntax issues")
+            fi
         fi
-        # Remove existing Claude sections
-        sed -i.bak '/# Claude Knowledge Management System/,/^$/d' "$SHELL_RC" 2>/dev/null || true
-
-        # Add configuration to SINGLE shell config file
-        {
-            echo ""
-            echo "# Claude Knowledge Management System"
-            echo "$claude_repo_export"
-            echo "$claude_path_export"
-            echo ""
-        } >> "$SHELL_RC"
-
-        success "Configuration added to $SHELL_RC"
     fi
     
     # Create a cleanup script for the current shell session
@@ -1653,66 +1734,111 @@ configure_team_setup() {
 # Install PlantUML for diagram generation
 install_plantuml() {
     info "Installing PlantUML for diagram generation..."
-    
+
     # Check if already installed
     if command -v plantuml >/dev/null 2>&1; then
         success "✓ PlantUML already installed"
         return 0
     fi
-    
-    case "$PLATFORM" in
-        macos)
-            if command -v brew >/dev/null 2>&1; then
-                info "Installing PlantUML via Homebrew..."
-                if brew install plantuml; then
-                    success "✓ PlantUML installed via Homebrew"
-                else
-                    warning "Failed to install PlantUML via Homebrew, trying JAR fallback..."
-                    install_plantuml_jar
-                fi
-            else
-                warning "Homebrew not found, trying JAR fallback..."
-                install_plantuml_jar
-            fi
-            ;;
-        linux)
-            # Try package managers in order of preference
-            if command -v apt-get >/dev/null 2>&1; then
-                info "Installing PlantUML via apt-get..."
-                if sudo apt-get update && sudo apt-get install -y plantuml; then
-                    success "✓ PlantUML installed via apt-get"
-                else
-                    warning "Failed to install PlantUML via apt-get, trying JAR fallback..."
-                    install_plantuml_jar
-                fi
-            elif command -v yum >/dev/null 2>&1; then
-                info "Installing PlantUML via yum..."
-                if sudo yum install -y plantuml; then
-                    success "✓ PlantUML installed via yum"
-                else
-                    warning "Failed to install PlantUML via yum, trying JAR fallback..."
-                    install_plantuml_jar
-                fi
-            elif command -v pacman >/dev/null 2>&1; then
-                info "Installing PlantUML via pacman..."
-                if sudo pacman -S --noconfirm plantuml; then
-                    success "✓ PlantUML installed via pacman"
-                else
-                    warning "Failed to install PlantUML via pacman, trying JAR fallback..."
-                    install_plantuml_jar
-                fi
-            else
-                warning "No supported package manager found, trying JAR fallback..."
-                install_plantuml_jar
-            fi
-            ;;
-        windows)
-            warning "Windows detected, trying JAR fallback..."
+
+    # Offer choice: system package manager or self-contained JAR
+    echo ""
+    echo -e "${CYAN}PlantUML is not installed. Choose installation method:${NC}"
+    echo -e "  ${GREEN}1${NC} = Self-contained JAR in coding repo ${YELLOW}(Recommended - no system changes)${NC}"
+    echo -e "  ${GREEN}2${NC} = System package manager (brew/apt-get)"
+    echo -e "  ${GREEN}3${NC} = Skip PlantUML (diagram generation won't work)"
+    echo ""
+    read -p "$(echo -e ${CYAN}Your choice [1/2/3]: ${NC})" plantuml_choice
+
+    case "$plantuml_choice" in
+        1)
+            # Self-contained JAR - no system changes
             install_plantuml_jar
             ;;
-        *)
-            warning "Unknown platform, trying JAR fallback..."
-            install_plantuml_jar
+        2)
+            # System package manager - requires confirmation
+            case "$PLATFORM" in
+                macos)
+                    if command -v brew >/dev/null 2>&1; then
+                        if confirm_system_change \
+                            "Install PlantUML via Homebrew (brew install plantuml)" \
+                            "Homebrew may update other packages as dependencies. This can affect other tools."; then
+                            info "Installing PlantUML via Homebrew..."
+                            if brew install plantuml; then
+                                success "✓ PlantUML installed via Homebrew"
+                            else
+                                warning "Failed to install PlantUML via Homebrew, trying JAR fallback..."
+                                install_plantuml_jar
+                            fi
+                        else
+                            info "Using JAR fallback instead..."
+                            install_plantuml_jar
+                        fi
+                    else
+                        warning "Homebrew not found, using JAR fallback..."
+                        install_plantuml_jar
+                    fi
+                    ;;
+                linux)
+                    if command -v apt-get >/dev/null 2>&1; then
+                        if confirm_system_change \
+                            "Install PlantUML via apt-get (sudo apt-get install plantuml)" \
+                            "Requires sudo privileges. May install additional dependencies."; then
+                            info "Installing PlantUML via apt-get..."
+                            if sudo apt-get update && sudo apt-get install -y plantuml; then
+                                success "✓ PlantUML installed via apt-get"
+                            else
+                                warning "Failed to install PlantUML via apt-get, trying JAR fallback..."
+                                install_plantuml_jar
+                            fi
+                        else
+                            info "Using JAR fallback instead..."
+                            install_plantuml_jar
+                        fi
+                    elif command -v yum >/dev/null 2>&1; then
+                        if confirm_system_change \
+                            "Install PlantUML via yum (sudo yum install plantuml)" \
+                            "Requires sudo privileges. May install additional dependencies."; then
+                            info "Installing PlantUML via yum..."
+                            if sudo yum install -y plantuml; then
+                                success "✓ PlantUML installed via yum"
+                            else
+                                warning "Failed to install PlantUML via yum, trying JAR fallback..."
+                                install_plantuml_jar
+                            fi
+                        else
+                            info "Using JAR fallback instead..."
+                            install_plantuml_jar
+                        fi
+                    elif command -v pacman >/dev/null 2>&1; then
+                        if confirm_system_change \
+                            "Install PlantUML via pacman (sudo pacman -S plantuml)" \
+                            "Requires sudo privileges. May install additional dependencies."; then
+                            info "Installing PlantUML via pacman..."
+                            if sudo pacman -S --noconfirm plantuml; then
+                                success "✓ PlantUML installed via pacman"
+                            else
+                                warning "Failed to install PlantUML via pacman, trying JAR fallback..."
+                                install_plantuml_jar
+                            fi
+                        else
+                            info "Using JAR fallback instead..."
+                            install_plantuml_jar
+                        fi
+                    else
+                        warning "No supported package manager found, using JAR fallback..."
+                        install_plantuml_jar
+                    fi
+                    ;;
+                *)
+                    warning "Unknown platform, using JAR fallback..."
+                    install_plantuml_jar
+                    ;;
+            esac
+            ;;
+        3|*)
+            warning "Skipping PlantUML installation. Diagram generation will not work."
+            SKIPPED_SYSTEM_DEPS+=("plantuml")
             ;;
     esac
 }
@@ -1761,7 +1887,7 @@ EOF
 
 # Install Ollama for local LLM inference (fallback when cloud APIs fail)
 install_ollama() {
-    info "Installing Ollama for local LLM inference..."
+    info "Checking Ollama for local LLM inference (optional)..."
 
     # Check if already installed
     if command -v ollama >/dev/null 2>&1; then
@@ -1771,51 +1897,93 @@ install_ollama() {
         return 0
     fi
 
+    # Ollama is optional - ask if user wants to install
+    echo ""
+    echo -e "${CYAN}Ollama is not installed (optional - for local LLM fallback).${NC}"
+    echo -e "  ${GREEN}y${NC} = Install Ollama"
+    echo -e "  ${GREEN}n${NC} = Skip (coding tools will work without it)"
+    echo ""
+    read -p "$(echo -e ${CYAN}Install Ollama? [y/N]: ${NC})" install_ollama_choice
+
+    case "$install_ollama_choice" in
+        [yY]|[yY][eE][sS])
+            # Proceed with installation
+            ;;
+        *)
+            info "Skipping Ollama installation (optional component)"
+            SKIPPED_SYSTEM_DEPS+=("ollama")
+            return 0
+            ;;
+    esac
+
     case "$PLATFORM" in
         macos)
             if command -v brew >/dev/null 2>&1; then
-                info "Installing Ollama via Homebrew..."
-                if brew install ollama; then
-                    success "✓ Ollama installed via Homebrew"
-                    ensure_ollama_model
+                if confirm_system_change \
+                    "Install Ollama via Homebrew (brew install ollama)" \
+                    "Homebrew may update dependencies. This is a ~500MB+ download."; then
+                    info "Installing Ollama via Homebrew..."
+                    if brew install ollama; then
+                        success "✓ Ollama installed via Homebrew"
+                        ensure_ollama_model
+                    else
+                        warning "Failed to install Ollama via Homebrew"
+                        INSTALLATION_WARNINGS+=("Ollama: Failed to install via Homebrew")
+                        return 1
+                    fi
                 else
-                    warning "Failed to install Ollama via Homebrew"
-                    INSTALLATION_WARNINGS+=("Ollama: Failed to install via Homebrew")
-                    return 1
+                    info "Skipping Ollama installation"
+                    SKIPPED_SYSTEM_DEPS+=("ollama")
+                    return 0
                 fi
             else
-                # Fallback to official installer script
+                if confirm_system_change \
+                    "Install Ollama via official script (curl | sh)" \
+                    "This downloads and executes an installer script from ollama.com."; then
+                    info "Installing Ollama via official script..."
+                    if curl -fsSL https://ollama.com/install.sh | sh; then
+                        success "✓ Ollama installed via official script"
+                        ensure_ollama_model
+                    else
+                        warning "Failed to install Ollama"
+                        INSTALLATION_WARNINGS+=("Ollama: Installation failed")
+                        return 1
+                    fi
+                else
+                    info "Skipping Ollama installation"
+                    SKIPPED_SYSTEM_DEPS+=("ollama")
+                    return 0
+                fi
+            fi
+            ;;
+        linux)
+            if confirm_system_change \
+                "Install Ollama via official script (curl | sh)" \
+                "This downloads and executes an installer script from ollama.com."; then
                 info "Installing Ollama via official script..."
                 if curl -fsSL https://ollama.com/install.sh | sh; then
-                    success "✓ Ollama installed via official script"
+                    success "✓ Ollama installed"
                     ensure_ollama_model
                 else
                     warning "Failed to install Ollama"
                     INSTALLATION_WARNINGS+=("Ollama: Installation failed")
                     return 1
                 fi
-            fi
-            ;;
-        linux)
-            info "Installing Ollama via official script..."
-            if curl -fsSL https://ollama.com/install.sh | sh; then
-                success "✓ Ollama installed"
-                ensure_ollama_model
             else
-                warning "Failed to install Ollama"
-                INSTALLATION_WARNINGS+=("Ollama: Installation failed")
-                return 1
+                info "Skipping Ollama installation"
+                SKIPPED_SYSTEM_DEPS+=("ollama")
+                return 0
             fi
             ;;
         windows)
-            warning "Windows: Please install Ollama manually from https://ollama.com/download"
-            INSTALLATION_WARNINGS+=("Ollama: Manual installation required on Windows")
-            return 1
+            info "Windows: Ollama requires manual installation from https://ollama.com/download"
+            SKIPPED_SYSTEM_DEPS+=("ollama")
+            return 0
             ;;
         *)
-            warning "Unknown platform, please install Ollama manually from https://ollama.com"
-            INSTALLATION_WARNINGS+=("Ollama: Manual installation required")
-            return 1
+            info "Unknown platform: install Ollama manually from https://ollama.com if needed"
+            SKIPPED_SYSTEM_DEPS+=("ollama")
+            return 0
             ;;
     esac
 }
@@ -2136,7 +2304,7 @@ EOF
 show_installation_status() {
     echo ""
     echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
+
     if [[ ${#INSTALLATION_FAILURES[@]} -eq 0 && ${#INSTALLATION_WARNINGS[@]} -eq 0 ]]; then
         echo -e "${GREEN}🎉 Installation completed successfully!${NC}"
     elif [[ ${#INSTALLATION_FAILURES[@]} -eq 0 ]]; then
@@ -2144,9 +2312,18 @@ show_installation_status() {
     else
         echo -e "${RED}❌ Installation completed with some failures${NC}"
     fi
-    
+
     echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
+
+    # Show skipped system changes (important safety info)
+    if [[ ${#SKIPPED_SYSTEM_DEPS[@]} -gt 0 ]]; then
+        echo -e "\n${BLUE}ℹ️  Skipped system changes (at your request):${NC}"
+        for skipped in "${SKIPPED_SYSTEM_DEPS[@]}"; do
+            echo -e "  ${BLUE}•${NC} $skipped"
+        done
+        echo -e "  ${CYAN}These can be installed manually later if needed.${NC}"
+    fi
+
     # Show warnings
     if [[ ${#INSTALLATION_WARNINGS[@]} -gt 0 ]]; then
         echo -e "\n${YELLOW}⚠️  Warnings:${NC}"
@@ -2154,7 +2331,7 @@ show_installation_status() {
             echo -e "  ${YELLOW}•${NC} $warning"
         done
     fi
-    
+
     # Show failures
     if [[ ${#INSTALLATION_FAILURES[@]} -gt 0 ]]; then
         echo -e "\n${RED}❌ Failures:${NC}"
@@ -2170,12 +2347,12 @@ show_installation_status() {
             echo -e "${YELLOW}   2. Run installer from outside corporate network${NC}"
         fi
     fi
-    
+
     echo ""
     echo -e "${CYAN}📋 Next steps:${NC}"
     echo -e "   ${CYAN}⚡ To start using commands immediately:${NC} source .activate"
     echo -e "   ${CYAN}📖 Commands available:${NC} vkb (View Knowledge Base)"
-    
+
     if [[ ${#INSTALLATION_FAILURES[@]} -eq 0 ]]; then
         echo ""
         echo -e "${GREEN}Happy knowledge capturing! 🧠${NC}"
@@ -2376,13 +2553,15 @@ install_constraint_monitor_hooks() {
         echo -e "${CYAN}Error output:${NC}"
         echo "$node_test_output" | head -5
         echo ""
-        echo -e "${CYAN}To fix this, try one of these options:${NC}"
-        echo -e "  ${GREEN}1.${NC} brew reinstall node"
-        echo -e "  ${GREEN}2.${NC} Use nvm instead: nvm install --lts && nvm use --lts"
-        echo -e "  ${GREEN}3.${NC} Use native Claude installer: curl -fsSL https://claude.ai/install.sh | bash"
+        echo -e "${CYAN}Common causes and fixes:${NC}"
+        echo -e "  ${GREEN}1.${NC} Library mismatch after Homebrew update - try: brew upgrade"
+        echo -e "  ${GREEN}2.${NC} Use nvm for isolated Node management: nvm install --lts && nvm use --lts"
+        echo -e "  ${GREEN}3.${NC} Check if libsimdjson needs linking: brew link simdjson"
+        echo ""
+        echo -e "${RED}IMPORTANT:${NC} This installer will NOT attempt to fix your Node installation."
         echo ""
         warning "SKIPPING hook installation to prevent Claude from crashing"
-        warning "After fixing Node.js, re-run: ./install.sh"
+        warning "Please fix Node.js manually, then re-run: ./install.sh"
         INSTALLATION_WARNINGS+=("Hooks: Skipped - Node.js health check failed")
         return 1
     fi

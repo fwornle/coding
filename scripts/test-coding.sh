@@ -1,13 +1,53 @@
 #!/bin/bash
 
 # Coding Tools Installation Test & Repair Script
-# Usage: ./scripts/test-coding.sh
-# 
-# This script performs comprehensive testing of the coding tools installation
-# and automatically repairs any issues found.
+# Usage: ./scripts/test-coding.sh [--check-only|--interactive|--auto-repair]
+#
+# Modes:
+#   --check-only    (DEFAULT) Only check, never modify anything. Safe to run anytime.
+#   --interactive   Prompt before each repair action
+#   --auto-repair   Auto-repair ONLY coding-internal issues (npm install, build, etc.)
+#                   System packages (brew, apt) are NEVER auto-installed.
+#
+# This script tests the coding tools installation and reports issues.
+# System dependencies are NEVER auto-installed - only manual instructions provided.
 
 # Remove set -e to prevent script from exiting on non-critical failures
 set +e
+
+# Mode selection (default: check-only for safety)
+TEST_MODE="check-only"
+case "${1:-}" in
+    --check-only|-c)
+        TEST_MODE="check-only"
+        ;;
+    --interactive|-i)
+        TEST_MODE="interactive"
+        ;;
+    --auto-repair|-a)
+        TEST_MODE="auto-repair"
+        ;;
+    --help|-h)
+        echo "Usage: $0 [--check-only|--interactive|--auto-repair]"
+        echo ""
+        echo "Modes:"
+        echo "  --check-only, -c    (DEFAULT) Only check, never modify anything"
+        echo "  --interactive, -i   Prompt before each repair action"
+        echo "  --auto-repair, -a   Auto-repair coding-internal issues only"
+        echo ""
+        echo "System packages (node, python, brew) are NEVER auto-installed."
+        exit 0
+        ;;
+    "")
+        # Default: check-only
+        TEST_MODE="check-only"
+        ;;
+    *)
+        echo "Unknown option: $1"
+        echo "Use --help for usage information"
+        exit 1
+        ;;
+esac
 
 # Colors for output
 RED='\033[0;31m'
@@ -70,6 +110,64 @@ print_info() {
 
 print_warning() {
     echo -e "  ${YELLOW}[WARNING]${NC} $1"
+}
+
+print_suggest() {
+    echo -e "  ${CYAN}[SUGGEST]${NC} $1"
+}
+
+# Mode-aware repair function for CODING-INTERNAL issues only
+# Usage: try_repair "description" "command"
+# Returns: 0 if repaired, 1 if skipped/failed
+try_repair() {
+    local description="$1"
+    local command="$2"
+
+    case "$TEST_MODE" in
+        check-only)
+            print_suggest "To fix: $command"
+            return 1
+            ;;
+        interactive)
+            echo ""
+            echo -e "  ${YELLOW}Repair needed:${NC} $description"
+            echo -e "  ${CYAN}Command:${NC} $command"
+            read -p "  Execute repair? [y/N]: " response
+            if [[ "$response" =~ ^[yY] ]]; then
+                print_repair "$description"
+                if eval "$command"; then
+                    print_fixed "$description"
+                    return 0
+                else
+                    print_warning "Repair failed: $description"
+                    return 1
+                fi
+            else
+                print_suggest "Skipped. To fix manually: $command"
+                return 1
+            fi
+            ;;
+        auto-repair)
+            print_repair "$description"
+            if eval "$command"; then
+                print_fixed "$description"
+                return 0
+            else
+                print_warning "Repair failed: $description"
+                return 1
+            fi
+            ;;
+    esac
+}
+
+# For system packages - NEVER auto-install, only suggest
+suggest_system_install() {
+    local package="$1"
+    local install_cmd="$2"
+
+    print_fail "$package not found"
+    print_suggest "Install manually: $install_cmd"
+    echo -e "  ${RED}[IMPORTANT]${NC} System packages are never auto-installed to prevent breaking other tools."
 }
 
 # Helper function to run commands with error handling
@@ -135,6 +233,20 @@ echo -e "${BOLD}Coding root:${NC} $CODING_ROOT"
 echo -e "${BOLD}Current directory:${NC} $(pwd)"
 echo -e "${BOLD}Platform:${NC} $(uname -s)"
 
+# Show current mode
+case "$TEST_MODE" in
+    check-only)
+        echo -e "${BOLD}Mode:${NC} ${GREEN}CHECK-ONLY${NC} (safe - no modifications)"
+        ;;
+    interactive)
+        echo -e "${BOLD}Mode:${NC} ${YELLOW}INTERACTIVE${NC} (prompts before repairs)"
+        ;;
+    auto-repair)
+        echo -e "${BOLD}Mode:${NC} ${CYAN}AUTO-REPAIR${NC} (coding-internal issues only)"
+        echo -e "  ${RED}Note:${NC} System packages are NEVER auto-installed."
+        ;;
+esac
+
 # =============================================================================
 # PHASE 1: ENVIRONMENT & PREREQUISITES
 # =============================================================================
@@ -149,16 +261,12 @@ if command_exists node; then
     NODE_VERSION=$(node --version)
     print_pass "Node.js found: $NODE_VERSION"
 else
-    print_fail "Node.js not found"
-    print_repair "Installing Node.js..."
     if command_exists brew; then
-        brew install node
-        print_fixed "Node.js installed via Homebrew"
+        suggest_system_install "Node.js" "brew install node"
     elif command_exists apt-get; then
-        sudo apt-get update && sudo apt-get install -y nodejs npm
-        print_fixed "Node.js installed via apt"
+        suggest_system_install "Node.js" "sudo apt-get install -y nodejs npm"
     else
-        print_warning "Please install Node.js manually from nodejs.org"
+        suggest_system_install "Node.js" "Download from nodejs.org"
     fi
 fi
 
@@ -177,14 +285,12 @@ if command_exists python3; then
     PYTHON_VERSION=$(python3 --version)
     print_pass "Python found: $PYTHON_VERSION"
 else
-    print_fail "Python3 not found"
-    print_repair "Installing Python3..."
     if command_exists brew; then
-        brew install python3
-        print_fixed "Python3 installed via Homebrew"
+        suggest_system_install "Python3" "brew install python3"
     elif command_exists apt-get; then
-        sudo apt-get install -y python3
-        print_fixed "Python3 installed via apt"
+        suggest_system_install "Python3" "sudo apt-get install -y python3"
+    else
+        suggest_system_install "Python3" "Download from python.org"
     fi
 fi
 
@@ -194,14 +300,12 @@ if command_exists jq; then
     JQ_VERSION=$(jq --version)
     print_pass "jq found: $JQ_VERSION"
 else
-    print_fail "jq not found"
-    print_repair "Installing jq..."
     if command_exists brew; then
-        brew install jq
-        print_fixed "jq installed via Homebrew"
+        suggest_system_install "jq" "brew install jq"
     elif command_exists apt-get; then
-        sudo apt-get install -y jq
-        print_fixed "jq installed via apt"
+        suggest_system_install "jq" "sudo apt-get install -y jq"
+    else
+        suggest_system_install "jq" "Download from stedolan.github.io/jq"
     fi
 fi
 
@@ -358,20 +462,13 @@ if dir_exists "$CODING_ROOT/integrations/memory-visualizer"; then
         print_pass "Memory visualizer appears built"
     else
         print_fail "Memory visualizer not built"
-        print_repair "Building memory visualizer..."
-        cd "$CODING_ROOT/integrations/memory-visualizer"
-        if [ -f "package.json" ]; then
-            npm install && npm run build
-            print_fixed "Memory visualizer built"
-        fi
+        try_repair "Building memory visualizer" \
+            "cd $CODING_ROOT/integrations/memory-visualizer && npm install && npm run build"
     fi
 else
     print_fail "Memory visualizer submodule not found"
-    print_repair "Initializing memory visualizer submodule..."
-    cd "$CODING_ROOT"
-    git submodule update --init --recursive integrations/memory-visualizer
-    cd integrations/memory-visualizer && npm install && npm run build
-    print_fixed "Memory visualizer submodule initialized and built"
+    try_repair "Initializing memory visualizer submodule" \
+        "cd $CODING_ROOT && git submodule update --init --recursive integrations/memory-visualizer && cd integrations/memory-visualizer && npm install && npm run build"
 fi
 
 print_test "Multi-Team Knowledge Base Configuration"
