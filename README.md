@@ -7,7 +7,7 @@ A comprehensive AI-powered development toolkit featuring live session logging, r
 ## 🚀 Quick Start
 
 ```bash
-# Install the system
+# Install the system (safe - prompts before any system changes)
 ./install.sh
 
 # Start Claude Code with all features
@@ -17,6 +17,17 @@ coding
 coding --claude
 coding --copilot
 ```
+
+### Installation Safety
+
+The installer follows a **non-intrusive policy** - it will NEVER modify system tools without explicit consent:
+
+- **Confirmation prompts** before installing any system packages (Node.js, Python, jq)
+- **Skip options**: `y` (approve), `N` (skip), `skip-all` (skip all system changes)
+- **Shell config backup** with timestamped files before any modifications
+- **Syntax verification** after shell config changes
+
+![Installation Flow](docs/images/installation-flow.png)
 
 **Next Steps**: [Getting Started Guide](docs/getting-started.md)
 
@@ -251,8 +262,14 @@ See [Getting Started](docs/getting-started.md) for:
 ### Quick Health Check
 
 ```bash
-# Test all components
+# Test all components (check-only mode - safe, no modifications)
 ./scripts/test-coding.sh
+
+# Interactive mode - prompts before each repair
+./scripts/test-coding.sh --interactive
+
+# Auto-repair mode - fixes coding-internal issues only
+./scripts/test-coding.sh --auto-repair
 
 # Check MCP servers
 cd integrations/mcp-server-semantic-analysis && npm test
@@ -260,6 +277,8 @@ cd integrations/mcp-server-semantic-analysis && npm test
 # Check constraint monitor
 cd integrations/mcp-constraint-monitor && npm test
 ```
+
+**Note**: The test script defaults to `--check-only` mode and will NEVER auto-install system packages.
 
 ### Current Status
 
