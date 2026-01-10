@@ -618,9 +618,19 @@ class SystemHealthAPIServer {
                 const isRelevant = age < 1800000 || inferredStatus === 'running';
 
                 if (isRelevant && !alreadyRegistered) {
-                    // Guard against partial reads that result in 0/0 (race condition during file writes)
-                    let completedSteps = workflowProgress.completedSteps || 0;
-                    let totalSteps = workflowProgress.totalSteps || 0;
+                    // Compute totalSteps and completedSteps from stepsDetail if top-level fields are missing
+                    // The workflow progress file stores step data in stepsDetail array, not as direct fields
+                    let completedSteps = workflowProgress.completedSteps;
+                    let totalSteps = workflowProgress.totalSteps;
+
+                    if ((completedSteps === undefined || completedSteps === null || completedSteps === 0) &&
+                        workflowProgress.stepsDetail && workflowProgress.stepsDetail.length > 0) {
+                        totalSteps = workflowProgress.stepsDetail.length;
+                        completedSteps = workflowProgress.stepsDetail.filter(s => s.status === 'completed').length;
+                    }
+
+                    completedSteps = completedSteps || 0;
+                    totalSteps = totalSteps || 0;
 
                     // Check if we got invalid data (0/0 is not valid for a running workflow)
                     const isRaceCondition = totalSteps === 0 && inferredStatus === 'running';
@@ -665,8 +675,8 @@ class SystemHealthAPIServer {
                         isAlive: inferredStatus === 'running',
                         health: health,
                         heartbeatAgeSeconds: Math.round(age / 1000),
-                        progressPercent: workflowProgress.totalSteps > 0
-                            ? Math.round((workflowProgress.completedSteps / workflowProgress.totalSteps) * 100)
+                        progressPercent: totalSteps > 0
+                            ? Math.round((completedSteps / totalSteps) * 100)
                             : 0,
                         steps: this.buildStepInfo(workflowProgress),
                         isInlineMCP: true, // Flag to indicate this is an inline MCP workflow
