@@ -1,0 +1,45 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+class "Repository" as R {
+- "DataAccess"
+}
+
+class "Service" as S {
+- "BusinessLogic"
+}
+
+class "Api" as A {
+- "ExternalCommunication"
+}
+
+class "Promise" as P {
+- "AsynchronousOperations"
+}
+
+ participant "Modules" as M
+ participant "Architecture" as Arch
+
+ Repository ->> Service: "Data Access Pattern"
+ Service ->> Api: "Business Logic Pattern"
+ Api ->> Promise: "External Communication Pattern"
+ Promise ->> Api: "Asynchronous Operations Pattern"
+
+ alt "Large-Scale Codebase"
+  M ->> S: "Modular Architecture"
+  M ->> Arch: "Dependency Analysis"
+endalt
+
+ participant "Functions" as F
+ participant "Modules" as M2
+ participant "Classes" as C
+
+ Function ->> Class: "Pure Functions"
+ Class ->> Function: "Class-to-Function Ratio"
+
+ alt "Functional Programming"
+  F ->> M2: "Stand-alone Functions"
+  F ->> C: "Functions-to-Classes Ratio"
+endalt
+
+@enduml

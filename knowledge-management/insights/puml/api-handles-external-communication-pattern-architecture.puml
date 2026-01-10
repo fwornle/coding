@@ -1,0 +1,39 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Design Patterns" {
+  component "Api Handles External Communication Pattern" as aph <<api>>
+  component "Promise Handles Asynchronous Operations Pattern" as pah <<promise>>
+  component "Component Reusable UI Building Blocks" as cRUB <<component>>
+}
+
+package "Architectural Patterns" {
+  component "Middleware Processes Requests in Pipeline" as mp <<middleware>>
+  component "Observer Defines One-to-Many Dependency" as omd <<observer>>
+  component "Factory Creates Objects Without Pattern" as fac <<factory>>
+}
+
+package "General Patterns" {
+  component "Decorator Adds Behavior to Pattern" as dab <<decorator>>
+  component "Component Reusable UI Building Blocks" as cRUB <<component>>
+  component "Middleware Processes Requests in Pipeline" as mp <<middleware>>
+}
+
+component "Knowledge Graph" as kg <<storage>> {
+  database "Name" as alias
+}
+
+component "Service Interface" as si <<external>> {
+  cloud "External Service" as es
+}
+
+aph --> pah : processes
+cRUB --> aph : uses
+cRUB --> pah : uses
+mp --> aph : processes
+mp --> pah : processes
+omd --> aph : weak dependency
+fac --> aph : weak dependency
+dab --> cRUB : uses
+
+@enduml

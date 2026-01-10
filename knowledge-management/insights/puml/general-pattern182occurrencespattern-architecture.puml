@@ -1,0 +1,25 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "General Patterns" {
+    component "ApiHandlesExternalCommunicationPattern" as ap <<api>>
+    component "PromiseHandlesAsynchronousOperationsPattern" as ph <<promise>>
+    component "ServiceContainsBusinessLogicPattern" as sb <<service>>
+    component "RepositoryEncapsulatesDataAccessPattern" as re <<repository>>
+}
+
+package "Design Patterns" {
+    component "Functional Programming Pattern" as fp <<function>>
+}
+
+package "Architectural Patterns" {
+    component "Large-Scale Codebase Pattern" as lsc <<large-scale-codebase>>
+}
+
+api --> sb : "uses"
+ph --> ap : "uses"
+ap --> re : "uses"
+re --> ap : "uses"
+lsc --> fp : "has"
+
+@enduml
