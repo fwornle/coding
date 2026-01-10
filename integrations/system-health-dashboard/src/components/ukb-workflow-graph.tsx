@@ -1298,7 +1298,8 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   const BATCH_PHASE_STEPS = [
     'git_history', 'vibe_history', 'semantic_analysis', 'kg_operators',
     'context_convolution', 'entity_aggregation', 'node_embedding',
-    'deduplication_operator', 'edge_prediction', 'structure_merge'
+    'deduplication_operator', 'edge_prediction', 'structure_merge',
+    'observation_generation', 'ontology_classification'  // Also run per-batch
   ]
 
   // Build step status map from process data
