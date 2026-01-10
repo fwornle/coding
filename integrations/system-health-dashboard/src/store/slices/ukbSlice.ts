@@ -195,6 +195,31 @@ export interface PersistedKnowledge {
   deduplicationRatio: string | null
 }
 
+// Completed batch from batch-checkpoints.json (for historical tracer display)
+export interface CompletedBatch {
+  batchId: string
+  batchNumber: number
+  completedAt: string
+  commitRange?: {
+    start: string
+    end: string
+  }
+  dateRange?: {
+    start: string
+    end: string
+  }
+  stats?: {
+    commits?: number
+    sessions?: number
+    tokensUsed?: number
+    entitiesCreated?: number
+    entitiesUpdated?: number
+    relationsAdded?: number
+    duration?: number
+    operatorResults?: Record<string, { processed?: number; duration?: number; core?: number; nonCore?: number; embedded?: number; merged?: number; edgesAdded?: number; entitiesAdded?: number }>
+  }
+}
+
 // Trace event for workflow execution tracing
 export interface TraceEvent {
   id: string
@@ -230,6 +255,8 @@ export interface HistoricalWorkflowDetail extends HistoricalWorkflow {
   batchSummary?: BatchSummary | null
   // Final persisted knowledge (after deduplication)
   persistedKnowledge?: PersistedKnowledge | null
+  // Raw completed batches for tracer batch iteration display
+  completedBatches?: CompletedBatch[] | null
 }
 
 // Workflow agents definition (for status inference)

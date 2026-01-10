@@ -1626,16 +1626,144 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
                 return allSteps
               })()
-            : historicalWorkflowDetail?.steps?.map(s => ({
-                name: s.agent || s.name,
-                status: s.status === 'success' ? 'completed' : s.status as any,
-                duration: s.duration ? parseFloat(String(s.duration).replace(/s$/i, '')) * 1000 : undefined,
-                llmProvider: (s as any).llmProvider,
-                tokensUsed: (s as any).tokensUsed,
-                llmCalls: (s as any).llmCalls,
-                error: s.errors?.join('\n'),
-                outputs: s.outputs,
-              })) || []
+            : (() => {
+                // HISTORY MODE: Build steps with batch iteration grouping
+                const allSteps: StepInfo[] = []
+
+                // Check if this historical workflow has completed batches data
+                const hasCompletedBatches = historicalWorkflowDetail?.completedBatches &&
+                                           historicalWorkflowDetail.completedBatches.length > 0
+
+                if (hasCompletedBatches && historicalWorkflowDetail?.steps) {
+                  // BATCH WORKFLOW: Build steps as pre-batch → ALL batch iterations → post-batch
+                  // Similar logic to active mode, but using completedBatches for iteration grouping
+
+                  // Pre-batch step names
+                  const preBatchStepNames = new Set(['batch_scheduler', 'plan_batches'])
+
+                  // Batch-phase agent names (these repeat per batch)
+                  const batchPhaseAgentNames = new Set([
+                    'git_history', 'vibe_history', 'semantic_analysis',
+                    'observation_generation', 'ontology_classification',
+                    'kg_operators', 'context_convolution', 'entity_aggregation',
+                    'node_embedding', 'deduplication_operator', 'edge_prediction',
+                    'structure_merge', 'quality_assurance', 'batch_checkpoint_manager'
+                  ])
+
+                  // Post-batch step names (finalization)
+                  const postBatchStepNames = new Set([
+                    'code_graph', 'code_intelligence', 'documentation_linker',
+                    'persistence', 'deduplication', 'content_validation',
+                    'insight_generation', 'web_search', 'final_persist',
+                    'final_dedup', 'final_validation', 'persist_results',
+                    'deduplicate_insights', 'validate_content'
+                  ])
+
+                  const preBatchSteps: StepInfo[] = []
+                  const postBatchSteps: StepInfo[] = []
+
+                  // Categorize historical steps
+                  for (const step of historicalWorkflowDetail.steps) {
+                    const agentName = step.agent || step.name
+                    const stepInfo: StepInfo = {
+                      name: agentName,
+                      status: step.status === 'success' ? 'completed' : step.status as any,
+                      duration: step.duration ? parseFloat(String(step.duration).replace(/s$/i, '')) * 1000 : undefined,
+                      llmProvider: (step as any).llmProvider,
+                      tokensUsed: (step as any).tokensUsed,
+                      llmCalls: (step as any).llmCalls,
+                      error: step.errors?.join('\n'),
+                      outputs: step.outputs,
+                    }
+
+                    if (preBatchStepNames.has(agentName)) {
+                      preBatchSteps.push(stepInfo)
+                    } else if (postBatchStepNames.has(agentName)) {
+                      postBatchSteps.push(stepInfo)
+                    }
+                    // Skip batch-phase steps - we'll create them from completedBatches
+                  }
+
+                  // 1. Add pre-batch steps first
+                  allSteps.push(...preBatchSteps)
+
+                  // 2. Add batch iteration steps with [batch-XXX] prefix
+                  // Create a summary step for each batch (we don't have per-step detail in completedBatches)
+                  for (const batch of historicalWorkflowDetail.completedBatches!) {
+                    // For each batch, create summary entries for the key batch-phase agents
+                    const batchDuration = batch.stats?.duration || 0
+                    const batchStats = batch.stats
+
+                    // Create a single summary step per batch showing the batch's work
+                    allSteps.push({
+                      name: `[${batch.batchId}] git history`,
+                      status: 'completed',
+                      duration: batchStats?.operatorResults?.conv?.duration,
+                      outputs: { commits: batchStats?.commits || 0 },
+                    })
+
+                    if ((batchStats?.sessions || 0) > 0) {
+                      allSteps.push({
+                        name: `[${batch.batchId}] vibe history`,
+                        status: 'completed',
+                        outputs: { sessions: batchStats?.sessions || 0 },
+                      })
+                    }
+
+                    allSteps.push({
+                      name: `[${batch.batchId}] semantic analysis`,
+                      status: 'completed',
+                      outputs: {
+                        entities: batchStats?.entitiesCreated || 0,
+                        relations: batchStats?.relationsAdded || 0
+                      },
+                    })
+
+                    allSteps.push({
+                      name: `[${batch.batchId}] kg operators`,
+                      status: 'completed',
+                      duration: Object.values(batchStats?.operatorResults || {}).reduce(
+                        (sum, op) => sum + (op.duration || 0), 0
+                      ),
+                      outputs: {
+                        processed: batchStats?.operatorResults?.conv?.processed || 0,
+                        merged: batchStats?.operatorResults?.dedup?.merged || 0,
+                      },
+                    })
+
+                    allSteps.push({
+                      name: `[${batch.batchId}] batch checkpoint`,
+                      status: 'completed',
+                      duration: batchDuration,
+                      outputs: {
+                        batchNumber: batch.batchNumber,
+                        dateRange: batch.dateRange?.start ?
+                          `${new Date(batch.dateRange.start).toLocaleDateString()} - ${new Date(batch.dateRange.end || '').toLocaleDateString()}`
+                          : undefined
+                      },
+                    })
+                  }
+
+                  // 3. Add post-batch steps last
+                  allSteps.push(...postBatchSteps)
+                } else {
+                  // No batch data - show flat list (fallback)
+                  for (const step of historicalWorkflowDetail?.steps || []) {
+                    allSteps.push({
+                      name: step.agent || step.name,
+                      status: step.status === 'success' ? 'completed' : step.status as any,
+                      duration: step.duration ? parseFloat(String(step.duration).replace(/s$/i, '')) * 1000 : undefined,
+                      llmProvider: (step as any).llmProvider,
+                      tokensUsed: (step as any).tokensUsed,
+                      llmCalls: (step as any).llmCalls,
+                      error: step.errors?.join('\n'),
+                      outputs: step.outputs,
+                    })
+                  }
+                }
+
+                return allSteps
+              })()
         }
         workflowName={
           activeTab === 'active'
