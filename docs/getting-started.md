@@ -51,6 +51,41 @@ source ~/.bashrc  # or ~/.zshrc on macOS
 
 **Note**: The repository uses git submodules for integration components (memory-visualizer, semantic-analysis, browserbase, serena, constraint-monitor). The `--recurse-submodules` flag ensures all submodules are initialized during clone.
 
+### Installation Safety
+
+The installer follows a **non-intrusive installation policy**: it will NEVER modify system tools or configurations outside the coding repository without your explicit consent.
+
+**Confirmation Prompts:**
+When the installer detects missing system dependencies (Node.js, Python, jq, etc.), it will:
+1. Display what action is requested
+2. Show potential risks (e.g., "May upgrade existing packages")
+3. Ask for confirmation before proceeding
+
+**Response Options:**
+- `y` - Proceed with this specific change
+- `N` (default) - Skip this change, continue installation
+- `skip-all` - Skip ALL system-level changes for the rest of installation
+
+**Example Prompt:**
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║               SYSTEM MODIFICATION REQUEST                            ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ Action: Install Node.js via Homebrew                                 ║
+║ Risk:   This may upgrade existing packages and break other tools     ║
+╚══════════════════════════════════════════════════════════════════════╝
+Proceed? [y/N/skip-all]:
+```
+
+**Shell Configuration Backup:**
+Before modifying your shell configuration (`.bashrc`, `.zshrc`), the installer:
+1. Creates a timestamped backup (e.g., `.zshrc.coding-backup.20260110120000`)
+2. Asks for confirmation before making changes
+3. Uses clear markers (`# === CODING TOOLS START/END ===`) for easy identification
+4. Verifies the modified configuration is syntactically valid
+
+This ensures you can always restore your original shell configuration if needed.
+
 ### What Gets Installed
 
 1. **Core Commands**
@@ -201,10 +236,31 @@ The installer automatically configures Claude Code MCP settings. Manual configur
 
 ### Test Installation
 
-```bash
-# Run comprehensive test
-./scripts/test-coding.sh
+The test script operates in three modes for safety:
 
+```bash
+# Check-only mode (DEFAULT) - reports issues without making changes
+./scripts/test-coding.sh
+./scripts/test-coding.sh --check-only
+
+# Interactive mode - prompts before each repair action
+./scripts/test-coding.sh --interactive
+
+# Auto-repair mode - fixes coding-internal issues automatically
+./scripts/test-coding.sh --auto-repair
+
+# Show help
+./scripts/test-coding.sh --help
+```
+
+**Mode Descriptions:**
+- **`--check-only`** (default): Only reports issues, never modifies anything. Safe to run anytime.
+- **`--interactive`**: Asks for confirmation before each repair action.
+- **`--auto-repair`**: Automatically repairs coding-internal issues (node_modules, dist folders). Never auto-installs system packages.
+
+**Important**: The test script will NEVER auto-install system packages (Node.js, Python, jq). If these are missing, it will suggest the commands you can run manually.
+
+```bash
 # This verifies:
 # ✓ All commands available
 # ✓ MCP servers configured
@@ -217,12 +273,10 @@ The installer automatically configures Claude Code MCP settings. Manual configur
 
 ```bash
 # Test commands
-ukb --version
 vkb --version
 coding --help
 
-# Test knowledge base
-ukb "Problem: Testing, Solution: Works, Technologies: testing"
+# View the knowledge graph
 vkb  # Should open browser to http://localhost:8080
 
 # Test Claude Code integration
@@ -247,18 +301,23 @@ coding --claude    # Claude Code (default)
 coding --copilot   # GitHub CoPilot
 ```
 
-### Capture Your First Knowledge
+### Knowledge Base Updates
 
+Knowledge base updates are triggered exclusively through the MCP semantic-analysis server (accessible only via Claude Code agents with MCP access).
+
+Within a Claude Code session, use these commands:
+
+```
+# Incremental analysis (faster - recent changes only)
+"ukb" or "update knowledge base"
+
+# Full analysis (thorough - entire codebase)
+"full ukb" or "fully update knowledge base"
+```
+
+To view the knowledge graph:
 ```bash
-# Simple insight capture
-ukb "Problem: Authentication bug, Solution: Fixed JWT validation, Technologies: Node.js,JWT"
-
-# View the knowledge graph
-vkb
-
-# Update from git history (automatic analysis)
-cd /path/to/your/project
-ukb  # Analyzes recent git commits
+vkb  # Opens browser to http://localhost:8080
 ```
 
 ### Use Semantic Analysis
@@ -272,9 +331,14 @@ determine_insights {
   "depth": 10
 }
 
-# Generate project documentation
+# Generate project documentation (full analysis)
 execute_workflow {
   "workflow_name": "complete-analysis"
+}
+
+# Incremental analysis (faster, recent changes)
+execute_workflow {
+  "workflow_name": "incremental-analysis"
 }
 ```
 
@@ -365,13 +429,15 @@ ls -la .data/knowledge-export/*.json
 
 # If missing, the graph database will create them automatically
 
-# Test with simple entry
-ukb "test"
-
 # Check environment variables
 echo $CODING_TOOLS_PATH
 echo $CODING_REPO
+
+# Test knowledge base via Claude Code session
+# Run "ukb" or "update knowledge base" within Claude Code
 ```
+
+**Note**: There is no `ukb` shell command. Knowledge base updates are triggered exclusively through the MCP semantic-analysis server within Claude Code sessions.
 
 ### Memory Visualizer Won't Start
 
@@ -424,6 +490,24 @@ rm -rf .data/knowledge-export/*.json
 source ~/.bashrc
 ```
 
+### Restoring Shell Configuration
+
+If your shell configuration was modified and you want to restore it:
+
+```bash
+# Find the backup file (created during installation)
+ls -la ~/.zshrc.coding-backup.* 2>/dev/null
+ls -la ~/.bashrc.coding-backup.* 2>/dev/null
+
+# Restore from backup (replace with your actual backup file)
+cp ~/.zshrc.coding-backup.20260110120000 ~/.zshrc
+
+# Or manually remove coding tools section
+# Look for markers: # === CODING TOOLS START === and # === CODING TOOLS END ===
+```
+
+The uninstall script automatically removes the coding tools section from your shell configuration, but preserves the backup file for safety.
+
 ---
 
 ## Next Steps
@@ -445,15 +529,24 @@ source ~/.bashrc
 # Launch Claude Code with all systems
 coding
 
-# Knowledge management
-ukb "insight text"     # Add insight
-vkb                    # View knowledge graph
+# View knowledge graph
+vkb
 
-# Project analysis
-ukb                    # Auto-analyze git history (in project dir)
-
-# System verification
+# System verification (check-only mode by default)
 ./scripts/test-coding.sh
+
+# System verification with repair prompts
+./scripts/test-coding.sh --interactive
+```
+
+### Knowledge Management (within Claude Code)
+
+```
+# Update knowledge base (incremental)
+"ukb" or "update knowledge base"
+
+# Full knowledge base update
+"full ukb" or "fully update knowledge base"
 ```
 
 ### Key Directories
