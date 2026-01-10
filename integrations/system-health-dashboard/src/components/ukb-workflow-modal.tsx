@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import {
   Dialog,
@@ -396,6 +396,43 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       dispatch(setSelectedNode('orchestrator'))
     }
   }, [open, activeTab, activeProcesses.length, selectedNode, dispatch])
+
+  // Track previous step to detect step changes for auto-switching sidebar
+  const previousStepRef = useRef<string | null>(null)
+
+  // Auto-switch sidebar to currently running step when workflow progresses
+  // Users can still manually click to view other steps, but the next step change
+  // will switch the sidebar back to the new running step
+  useEffect(() => {
+    if (!open || activeTab !== 'active' || !activeCurrentProcess) return
+
+    const currentStep = activeCurrentProcess.currentStep
+    if (!currentStep) return
+
+    // Only switch if step actually changed
+    if (currentStep !== previousStepRef.current) {
+      const previousStep = previousStepRef.current
+      previousStepRef.current = currentStep
+
+      // Find the agent for the current step
+      const agentId = STEP_TO_AGENT[currentStep]
+      if (agentId) {
+        Logger.info(LogCategories.UI, 'Auto-switching sidebar to running step', {
+          previousStep,
+          currentStep,
+          agentId,
+        })
+        dispatch(setSelectedNode(agentId))
+      }
+    }
+  }, [open, activeTab, activeCurrentProcess?.currentStep, dispatch])
+
+  // Reset step tracking ref when modal closes
+  useEffect(() => {
+    if (!open) {
+      previousStepRef.current = null
+    }
+  }, [open])
 
   const loadHistoricalWorkflows = async () => {
     Logger.debug(LogCategories.API, 'Loading historical workflows')
