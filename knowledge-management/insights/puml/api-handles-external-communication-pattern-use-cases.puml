@@ -1,0 +1,30 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+actor "User" as User
+User --> usecase "Login"
+
+Class "Api" as Api
+Api - handle communication with external services
+
+Class "Promise" as Promise
+Promise - handle asynchronous operations
+
+Class "Component" as Component
+Component - reusable UI building blocks
+
+Class "Service" as Service
+Service - contains business logic
+
+Class "Observer" as Observer
+Observer --> Component
+Component --> Service
+Service --> Observer
+
+Observer --> Observer
+Observer --> Middleware
+
+Middleware --> MdwlrE
+MdwlrE --> Middleware
+
+@enduml
