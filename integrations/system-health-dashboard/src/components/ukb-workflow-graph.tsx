@@ -1319,11 +1319,19 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     const isBatchWorkflow = currentBatch !== null
 
     // Build map of current batch step statuses for batch-phase agents
+    // Handle duplicate entries by preferring better status: running > completed > failed > skipped
+    const STATUS_PRIORITY: Record<string, number> = { 'running': 4, 'completed': 3, 'failed': 2, 'skipped': 1 }
     const currentBatchStepMap: Record<string, StepInfo> = {}
     if (isBatchWorkflow && currentBatch?.steps) {
       for (const step of currentBatch.steps) {
         const agentId = STEP_TO_AGENT[step.name] || step.name
-        currentBatchStepMap[agentId] = { ...step }
+        const existingEntry = currentBatchStepMap[agentId]
+        const existingPriority = existingEntry ? (STATUS_PRIORITY[existingEntry.status] || 0) : 0
+        const newPriority = STATUS_PRIORITY[step.status] || 0
+        // Only overwrite if new status has higher priority (handles duplicate tracking bug)
+        if (!existingEntry || newPriority > existingPriority) {
+          currentBatchStepMap[agentId] = { ...step }
+        }
 
         // Aggregate KG operator child status to parent kg_operators
         if (KG_OPERATOR_CHILDREN.includes(agentId)) {
