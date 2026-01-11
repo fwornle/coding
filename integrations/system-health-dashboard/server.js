@@ -614,8 +614,12 @@ class SystemHealthAPIServer {
                     }
                 }
 
-                // Only show recent workflows (within last 30 minutes) or still "running"
-                const isRelevant = age < 1800000 || inferredStatus === 'running';
+                // FIXED: Only add workflows to active list if they are actually running
+                // Terminal states (cancelled, completed, failed) should NOT appear in active list
+                // They will appear in the History tab instead
+                const isTerminalState = ['cancelled', 'completed', 'failed'].includes(inferredStatus);
+                const isActiveState = inferredStatus === 'running' || inferredStatus === 'starting' || inferredStatus === 'cancelling';
+                const isRelevant = !isTerminalState && (isActiveState || (age < 1800000 && !isTerminalState));
 
                 if (isRelevant && !alreadyRegistered) {
                     // Compute totalSteps and completedSteps from stepsDetail if top-level fields are missing
@@ -955,24 +959,46 @@ class SystemHealthAPIServer {
                 }
             }
 
-            // Reset workflow progress to cancelled state
+            // Reset workflow progress to a CLEAN cancelled state
+            // CRITICAL: All identifying fields must be cleared to prevent zombie detection
             const resetState = {
                 status: 'cancelled',
-                workflow: previousState?.workflowName || null,
-                executionId: previousState?.executionId || null,
+                workflowName: previousState?.workflowName || null,
+                workflowId: null, // Clear to prevent ghost detection
+                executionId: null, // Clear to prevent ghost detection
+                pid: null, // Clear to prevent process lookups
                 previousStatus: previousState?.status || 'unknown',
                 cancelledAt: new Date().toISOString(),
                 stepsDetail: [],
-                lastUpdate: new Date().toISOString()
+                startTime: null, // Clear to prevent "Connecting..." state
+                lastUpdate: new Date().toISOString(),
+                // Keep some diagnostic info for history
+                _cancelledWorkflowId: previousState?.executionId || previousState?.workflowId || null,
+                _cancelledWorkflowName: previousState?.workflowName || null
             };
 
             writeFileSync(progressPath, JSON.stringify(resetState, null, 2));
+
+            // Clear the cached valid workflow progress to prevent stale data
+            this.lastValidWorkflowProgress = null;
 
             // Also cleanup any orphaned/stale processes
             if (killProcesses) {
                 const ukbManager = new UKBProcessManager();
                 killedProcesses = ukbManager.cleanupStaleProcesses(false);
             }
+
+            // Clean up abort signal file after a short delay (give coordinator time to see it)
+            setTimeout(() => {
+                try {
+                    if (existsSync(abortPath)) {
+                        unlinkSync(abortPath);
+                        console.log('🧹 Cleaned up abort signal file after cancellation');
+                    }
+                } catch (e) {
+                    console.warn('Failed to cleanup abort signal file:', e.message);
+                }
+            }, 5000);
 
             console.log(`🛑 Workflow cancelled: ${previousState?.workflowName || 'unknown'} (was: ${previousState?.status || 'unknown'})${usedAbortSignal ? ' [abort signal sent]' : ''}`);
 

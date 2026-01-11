@@ -365,13 +365,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   }, [processes])
 
   // Filter processes for the Active tab
-  // Keep inline MCP workflows (any status) since they have batchIterations for trace
+  // ONLY show workflows that are actually running - cancelled/completed/failed go to History
+  // FIX: Previously included ALL isInlineMCP workflows regardless of status, causing "zombie" workflows
   const activeProcesses = useMemo(() => {
-    return processes.filter(p =>
-      p.status === 'running' ||
-      p.isInlineMCP || // Keep all inline MCP workflows to preserve batchIterations for trace
-      (p.isAlive && p.status !== 'completed' && p.status !== 'failed')
-    )
+    return processes.filter(p => {
+      // Only consider truly active states
+      const isActiveStatus = p.status === 'running' || p.status === 'starting' || p.status === 'cancelling'
+      // For non-inline processes, also check isAlive flag
+      const isAlive = p.isAlive && p.status !== 'completed' && p.status !== 'failed' && p.status !== 'cancelled'
+      return isActiveStatus || isAlive
+    })
     // Include processesSignature to ensure recalculation when any process data changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processes, processesSignature])
