@@ -330,7 +330,10 @@ export function MultiAgentGraph({
     }
 
     // Position worker agents in outer ring
+    // Also build a map of agent ID to ring index for adjacency detection
+    const agentRingIndex: Record<string, number> = {}
     const workerPositions = workerAgents.map((agent, i) => {
+      agentRingIndex[agent.id] = i
       const angle = (i / workerAgents.length) * Math.PI * 2 - Math.PI / 2
       return {
         agent,
@@ -345,6 +348,9 @@ export function MultiAgentGraph({
       height: centerY * 2 + 120,
       centerX,
       centerY,
+      radius,
+      agentRingIndex,
+      workerCount: workerAgents.length,
     }
   }, [agents, orchestrator])
 
@@ -466,6 +472,17 @@ export function MultiAgentGraph({
     return true // Other edge types always shown
   }, [touchedAgents, stepStatusMap])
 
+  // Check if two agents are adjacent in the circular ring layout
+  const areAdjacentInRing = useCallback((fromId: string, toId: string): boolean => {
+    const fromIdx = layout.agentRingIndex[fromId]
+    const toIdx = layout.agentRingIndex[toId]
+    // Both must be in outer ring (not orchestrator)
+    if (fromIdx === undefined || toIdx === undefined) return false
+    const diff = Math.abs(fromIdx - toIdx)
+    // Adjacent if indices differ by 1, or wrap around (first and last)
+    return diff === 1 || diff === layout.workerCount - 1
+  }, [layout.agentRingIndex, layout.workerCount])
+
   // Render edge between two nodes
   // keyIdx: unique index for React key (array index)
   // displayOrdinal: number to display on dataflow edges (dataflow-specific count, or -1 to hide)
@@ -493,6 +510,117 @@ export function MultiAgentGraph({
       )
     }
 
+    // Check if this is an adjacent dataflow edge that needs outer arc routing
+    const isAdjacentDataflow = edge.type === 'dataflow' && areAdjacentInRing(edge.from, edge.to)
+
+    // Active control line gets animated dash
+    const isAnimated = isActiveControl && edge.type === 'control'
+    const edgeColor = isAnimated ? '#6366f1' : EDGE_COLORS[edge.type || 'dependency']
+
+    // For adjacent dataflow edges, draw a path that bulges outward
+    // Path: from node outer edge → outward arc → to node outer edge
+    if (isAdjacentDataflow) {
+      // Calculate angles from center to each node
+      const fromAngle = Math.atan2(fromPos.y - layout.centerY, fromPos.x - layout.centerX)
+      const toAngle = Math.atan2(toPos.y - layout.centerY, toPos.x - layout.centerX)
+
+      // Direction from layout center to each node (outward direction)
+      const fromDirX = Math.cos(fromAngle)
+      const fromDirY = Math.sin(fromAngle)
+
+      // Find intersection with rectangle boundary (half-width/height from node center)
+      const halfW = nodeWidth / 2
+      const halfH = nodeHeight / 2
+
+      // For a ray from node center in direction (dirX, dirY), find where it exits the rectangle
+      const getRectEdge = (nodeX: number, nodeY: number, dirX: number, dirY: number) => {
+        // Scale factor to reach rectangle edge
+        const scaleX = dirX !== 0 ? halfW / Math.abs(dirX) : Infinity
+        const scaleY = dirY !== 0 ? halfH / Math.abs(dirY) : Infinity
+        const scale = Math.min(scaleX, scaleY)
+        return {
+          x: nodeX + dirX * scale,
+          y: nodeY + dirY * scale
+        }
+      }
+
+      // Start point: FROM node's outer edge (facing away from layout center)
+      const startPoint = getRectEdge(fromPos.x, fromPos.y, fromDirX, fromDirY)
+
+      // Outer radius for the arc bulge (beyond the nodes)
+      const bulgeDistance = 40
+
+      // Determine arc direction (clockwise or counter-clockwise based on angular distance)
+      let angleDiff = toAngle - fromAngle
+      // Normalize to [-PI, PI]
+      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI
+      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI
+
+      // Midpoint angle for the arc apex
+      const midAngle = fromAngle + angleDiff / 2
+
+      // Calculate control point first (we need it to determine where curve arrives at TO node)
+      // Control point is outward from the midpoint between the two nodes
+      const nodeMidX = (fromPos.x + toPos.x) / 2
+      const nodeMidY = (fromPos.y + toPos.y) / 2
+      const ctrlX = nodeMidX + Math.cos(midAngle) * bulgeDistance
+      const ctrlY = nodeMidY + Math.sin(midAngle) * bulgeDistance
+
+      // End point: TO node's edge where the curve arrives FROM the control point
+      // Direction from control point to TO node center
+      const arriveDirX = toPos.x - ctrlX
+      const arriveDirY = toPos.y - ctrlY
+      const arriveLen = Math.sqrt(arriveDirX * arriveDirX + arriveDirY * arriveDirY)
+      const normArriveX = arriveDirX / arriveLen
+      const normArriveY = arriveDirY / arriveLen
+      // Get the edge where the curve arrives (negative direction = edge facing the control point)
+      const endPoint = getRectEdge(toPos.x, toPos.y, -normArriveX, -normArriveY)
+
+      // Quadratic bezier: starts at node edge, bulges outward, ends at other node edge
+      const pathD = `M ${startPoint.x} ${startPoint.y} Q ${ctrlX} ${ctrlY} ${endPoint.x} ${endPoint.y}`
+
+      // Ordinal badge position on the curve (at t=0.5)
+      const ordinalX = 0.25 * startPoint.x + 0.5 * ctrlX + 0.25 * endPoint.x
+      const ordinalY = 0.25 * startPoint.y + 0.5 * ctrlY + 0.25 * endPoint.y
+
+      return (
+        <g key={keyIdx}>
+          <path
+            d={pathD}
+            fill="none"
+            stroke={edgeColor}
+            strokeWidth={1.5}
+            opacity={0.7}
+            markerEnd="url(#arrowhead-dataflow)"
+          />
+          {/* Ordinal number badge on outer arc */}
+          {displayOrdinal > 0 && (
+            <g>
+              <circle
+                cx={ordinalX}
+                cy={ordinalY}
+                r={8}
+                fill="white"
+                stroke={edgeColor}
+                strokeWidth={1.5}
+              />
+              <text
+                x={ordinalX}
+                y={ordinalY + 3}
+                textAnchor="middle"
+                fontSize="8"
+                fontWeight="bold"
+                fill={edgeColor}
+              >
+                {displayOrdinal}
+              </text>
+            </g>
+          )}
+        </g>
+      )
+    }
+
+    // Standard edge rendering for non-adjacent edges
     // Calculate edge start/end points at node boundaries
     const dx = toPos.x - fromPos.x
     const dy = toPos.y - fromPos.y
@@ -527,15 +655,11 @@ export function MultiAgentGraph({
     const ctrlY = midY + perpY
     const pathD = `M ${startX} ${startY} Q ${ctrlX} ${ctrlY} ${endX} ${endY}`
 
-    // Active control line gets animated dash
-    const isAnimated = isActiveControl && edge.type === 'control'
-
     // Calculate ordinal badge position ON the bezier curve at t=0.5
     // Quadratic bezier: Q(t) = (1-t)²*P0 + 2*(1-t)*t*P1 + t²*P2
     // At t=0.5: Q = 0.25*start + 0.5*ctrl + 0.25*end
     const ordinalX = 0.25 * startX + 0.5 * ctrlX + 0.25 * endX
     const ordinalY = 0.25 * startY + 0.5 * ctrlY + 0.25 * endY
-    const edgeColor = isAnimated ? '#6366f1' : EDGE_COLORS[edge.type || 'dependency']
 
     return (
       <g key={keyIdx}>
@@ -546,7 +670,7 @@ export function MultiAgentGraph({
           strokeWidth={isAnimated ? 2.5 : edge.type === 'control' ? 1 : 1.5}
           strokeDasharray={edge.type === 'retry' ? '4,2' : edge.type === 'control' ? '4,4' : undefined}
           opacity={edge.type === 'control' && !isAnimated ? 0.3 : 0.7}
-          markerEnd={isAnimated ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
+          markerEnd={isAnimated ? 'url(#arrowhead-active)' : edge.type === 'dataflow' ? 'url(#arrowhead-dataflow)' : 'url(#arrowhead)'}
           className={isAnimated ? 'animate-dash' : undefined}
           style={isAnimated ? { animation: 'dash 0.5s linear infinite' } : undefined}
         />
@@ -575,7 +699,7 @@ export function MultiAgentGraph({
         )}
       </g>
     )
-  }, [getPosition, nodeWidth, nodeHeight])
+  }, [getPosition, nodeWidth, nodeHeight, areAdjacentInRing, layout.centerX, layout.centerY, layout.radius])
 
   // Render a node
   const renderNode = useCallback((position: { agent: AgentDefinition; x: number; y: number }) => {
@@ -787,6 +911,16 @@ export function MultiAgentGraph({
             orient="auto"
           >
             <polygon points="0 0, 8 3, 0 6" fill="#6366f1" />
+          </marker>
+          <marker
+            id="arrowhead-dataflow"
+            markerWidth="6"
+            markerHeight="4"
+            refX="5"
+            refY="2"
+            orient="auto"
+          >
+            <polygon points="0 0, 6 2, 0 4" fill="#10b981" />
           </marker>
           {/* Gradient for rotating substep activity indicator */}
           <linearGradient id="substep-gradient" x1="0%" y1="0%" x2="100%" y2="0%">

@@ -1209,24 +1209,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     if (selectedHistoricalWorkflowState) {
       return (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Header Bar - fixed height */}
-          <div className="flex-shrink-0 flex items-center gap-2 mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                dispatch(selectHistoricalWorkflow(null))
-              }}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Back to list
-            </Button>
-            <Separator orientation="vertical" className="h-6" />
-            <span className="text-sm font-medium truncate">{selectedHistoricalWorkflowState.executionId}</span>
-            <div className="ml-auto">{getStatusBadge(selectedHistoricalWorkflowState.status)}</div>
-          </div>
-
-          {/* Compact Info Row - fixed height */}
+          {/* Compact Info Row - no separate header bar, info moved to main header */}
           <div className="flex-shrink-0 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground mb-2 px-1">
             <span><strong>Workflow:</strong> {getWorkflowDisplayName(selectedHistoricalWorkflowState.workflowName)}</span>
             <span><strong>Team:</strong> {selectedHistoricalWorkflowState.team}</span>
@@ -1483,13 +1466,67 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] grid grid-rows-[auto_auto_1fr] gap-4 overflow-hidden">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5" />
-              UKB Workflow Monitor
-            </DialogTitle>
+      <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] grid grid-rows-[auto_1fr] gap-3 overflow-hidden">
+        <DialogHeader className="pb-0">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left side: Title + Tabs inline */}
+            <div className="flex items-center gap-4">
+              <DialogTitle className="flex items-center gap-2 shrink-0">
+                <Brain className="h-5 w-5" />
+                UKB Workflow Monitor
+              </DialogTitle>
+              <Tabs value={activeTab} onValueChange={(v) => {
+                const newTab = v as 'active' | 'history'
+                Logger.info(LogCategories.UKB, `Switching to ${newTab} tab`, {
+                  from: activeTab,
+                  to: newTab,
+                  activeProcessCount: activeProcesses.length,
+                  historicalWorkflowCount: historicalWorkflows.length,
+                })
+                dispatch(setActiveTab(newTab))
+                setSelectedSubStep(null)
+                if (newTab === 'active' && activeProcesses.length > 0) {
+                  dispatch(setSelectedNode('orchestrator'))
+                }
+              }} className="contents">
+                <TabsList className="h-8">
+                  <TabsTrigger value="active" className="flex items-center gap-1.5 text-xs px-3 h-7">
+                    <Loader2 className={`h-3 w-3 ${activeProcesses.length > 0 ? 'animate-spin' : ''}`} />
+                    Active
+                    {activeProcesses.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                        {activeProcesses.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="history" className="flex items-center gap-1.5 text-xs px-3 h-7">
+                    <History className="h-3 w-3" />
+                    History
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            {/* Center: Historical workflow context when viewing details */}
+            {activeTab === 'history' && selectedHistoricalWorkflowState && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => dispatch(selectHistoricalWorkflow(null))}
+                  className="h-7 px-2"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Back
+                </Button>
+                <Separator orientation="vertical" className="h-5" />
+                <span className="text-xs font-medium text-muted-foreground truncate max-w-[200px]">
+                  {selectedHistoricalWorkflowState.executionId}
+                </span>
+                {getStatusBadge(selectedHistoricalWorkflowState.status)}
+              </div>
+            )}
+
+            {/* Right side: Buttons */}
             <div className="flex items-center gap-2">
               {/* View Trace button - show when there are steps to trace */}
               {(currentProcess?.steps?.length || historicalWorkflowDetail?.steps?.length) && (
@@ -1570,43 +1607,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               )}
             </div>
           </div>
-          <DialogDescription>
-            Monitor active and historical UKB semantic analysis workflows
-          </DialogDescription>
         </DialogHeader>
-
-        <Tabs value={activeTab} onValueChange={(v) => {
-          const newTab = v as 'active' | 'history'
-          Logger.info(LogCategories.UKB, `Switching to ${newTab} tab`, {
-            from: activeTab,
-            to: newTab,
-            activeProcessCount: activeProcesses.length,
-            historicalWorkflowCount: historicalWorkflows.length,
-          })
-          dispatch(setActiveTab(newTab))
-          // Clear substep selection when switching tabs
-          setSelectedSubStep(null)
-          // Auto-select orchestrator when switching to active tab with active processes
-          if (newTab === 'active' && activeProcesses.length > 0) {
-            dispatch(setSelectedNode('orchestrator'))
-          }
-        }} className="contents">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="active" className="flex items-center gap-2">
-              <Loader2 className={`h-4 w-4 ${activeProcesses.length > 0 ? 'animate-spin' : ''}`} />
-              Active
-              {activeProcesses.length > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                  {activeProcesses.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              History
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
 
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           {activeTab === 'active' ? renderActiveContent() : renderHistoryContent()}
