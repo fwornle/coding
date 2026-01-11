@@ -458,11 +458,18 @@ const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'd
   { from: 'web_search', to: 'insight_generation' },
   { from: 'code_intelligence', to: 'insight_generation' },
 
-  // Phase 4 -> Phase 5: Insights -> Observations
-  { from: 'insight_generation', to: 'observation_generation' },
+  // Phase 4 -> Phase 5: Multiple sources feed Observations
+  // Observation generation takes semantic entities + git analysis + vibe sessions
+  { from: 'semantic_analysis', to: 'observation_generation', type: 'dataflow' },
+  { from: 'insight_generation', to: 'observation_generation', type: 'dataflow' },
+  { from: 'git_history', to: 'observation_generation', type: 'dataflow' },
+  { from: 'vibe_history', to: 'observation_generation', type: 'dataflow' },
 
   // Phase 5 -> Phase 6: Observations -> Ontology Classification
   { from: 'observation_generation', to: 'ontology_classification' },
+
+  // Semantic analysis also feeds Ontology directly (entities need classification)
+  { from: 'semantic_analysis', to: 'ontology_classification', type: 'dataflow' },
 
   // Documentation Semantics - runs during batch but doesn't need code_graph
   { from: 'documentation_linker', to: 'documentation_semantics' },
