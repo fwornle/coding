@@ -482,7 +482,8 @@ export const MULTI_AGENT_EDGES: EdgeDefinition[] = [
   { from: 'batch_scheduler', to: 'vibe_history', type: 'dataflow' },
   { from: 'git_history', to: 'semantic_analysis', type: 'dataflow' },
   { from: 'vibe_history', to: 'semantic_analysis', type: 'dataflow' },
-  { from: 'semantic_analysis', to: 'observation_generation', type: 'dataflow' },  // NEW: semantic → observations
+  { from: 'semantic_analysis', to: 'observation_generation', type: 'dataflow' },  // semantic → observations
+  { from: 'semantic_analysis', to: 'ontology_classification', type: 'dataflow' },  // semantic → ontology (direct)
   { from: 'observation_generation', to: 'ontology_classification', type: 'dataflow' },  // observations → classification
   { from: 'ontology_classification', to: 'kg_operators', type: 'dataflow' },
   { from: 'kg_operators', to: 'quality_assurance', type: 'dataflow' },
