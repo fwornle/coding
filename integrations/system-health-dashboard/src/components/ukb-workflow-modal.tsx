@@ -309,6 +309,12 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // Cancel workflow state
   const [cancelLoading, setCancelLoading] = useState(false)
 
+  // Single-step debugging mode state
+  const [singleStepMode, setSingleStepMode] = useState(false)
+  const [stepPaused, setStepPaused] = useState(false)
+  const [pausedAtStep, setPausedAtStep] = useState<string | null>(null)
+  const [stepAdvanceLoading, setStepAdvanceLoading] = useState(false)
+
   // Trace modal state
   const [traceModalOpen, setTraceModalOpen] = useState(false)
 
@@ -353,6 +359,72 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       setCancelLoading(false)
     }
   }
+
+  // Toggle single-step debugging mode
+  const handleToggleSingleStepMode = async (enabled: boolean) => {
+    try {
+      Logger.info(LogCategories.UKB, `Setting single-step mode: ${enabled}`)
+      const response = await fetch(`${apiBaseUrl}/api/ukb/single-step-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      })
+      const data = await response.json()
+      if (data.status === 'success') {
+        setSingleStepMode(enabled)
+        if (!enabled) {
+          setStepPaused(false)
+          setPausedAtStep(null)
+        }
+        Logger.info(LogCategories.UKB, `Single-step mode ${enabled ? 'enabled' : 'disabled'}`)
+      } else {
+        Logger.error(LogCategories.UKB, 'Failed to toggle single-step mode', data)
+      }
+    } catch (error) {
+      Logger.error(LogCategories.UKB, 'Error toggling single-step mode', error)
+    }
+  }
+
+  // Advance to next step when paused
+  const handleStepAdvance = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    setStepAdvanceLoading(true)
+    try {
+      Logger.info(LogCategories.UKB, 'Advancing to next step')
+      const response = await fetch(`${apiBaseUrl}/api/ukb/step-advance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      const data = await response.json()
+      if (data.status === 'success') {
+        setStepPaused(false)
+        Logger.info(LogCategories.UKB, 'Step advanced', data.data)
+      } else {
+        Logger.error(LogCategories.UKB, 'Failed to advance step', data)
+      }
+    } catch (error) {
+      Logger.error(LogCategories.UKB, 'Error advancing step', error)
+    } finally {
+      setStepAdvanceLoading(false)
+    }
+  }
+
+  // Update single-step state from process data
+  useEffect(() => {
+    const activeProcess = activeProcesses[activeProcessIndex]
+    if (activeProcess) {
+      // Read single-step state from process (populated from progress file)
+      const processSingleStep = (activeProcess as any).singleStepMode
+      const processStepPaused = (activeProcess as any).stepPaused
+      const processPausedAt = (activeProcess as any).pausedAtStep
+
+      if (processSingleStep !== undefined) setSingleStepMode(processSingleStep)
+      if (processStepPaused !== undefined) setStepPaused(processStepPaused)
+      if (processPausedAt !== undefined) setPausedAtStep(processPausedAt)
+    }
+  }, [activeProcesses, activeProcessIndex])
 
   // Create a signature for change detection - ensures re-renders when process data changes
   // This captures key fields that affect display: pid, status, completedSteps, _refreshKey
@@ -1447,20 +1519,54 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 </Button>
               )}
               {activeProcesses.length > 0 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleCancelWorkflow}
-                  disabled={cancelLoading}
-                  className="flex items-center gap-2"
-                >
-                  {cancelLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <StopCircle className="h-4 w-4" />
-                  )}
-                  Cancel Workflow
-                </Button>
+                <>
+                  {/* Single-step debugging controls */}
+                  <div className="flex items-center gap-2 border-r pr-3 mr-1">
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={singleStepMode}
+                        onChange={(e) => handleToggleSingleStepMode(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                      />
+                      Single-step
+                    </label>
+                    {stepPaused && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleStepAdvance}
+                        disabled={stepAdvanceLoading}
+                        className="flex items-center gap-1 h-7 px-2 text-xs bg-yellow-50 border-yellow-300 hover:bg-yellow-100"
+                        title={`Paused at: ${pausedAtStep || 'unknown'}`}
+                      >
+                        {stepAdvanceLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3" />
+                        )}
+                        Step
+                      </Button>
+                    )}
+                    {singleStepMode && !stepPaused && (
+                      <span className="text-xs text-muted-foreground">(waiting)</span>
+                    )}
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleCancelWorkflow}
+                    disabled={cancelLoading}
+                    className="flex items-center gap-2"
+                  >
+                    {cancelLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <StopCircle className="h-4 w-4" />
+                    )}
+                    Cancel Workflow
+                  </Button>
+                </>
               )}
             </div>
           </div>
