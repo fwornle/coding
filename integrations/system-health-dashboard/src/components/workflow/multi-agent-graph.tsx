@@ -506,8 +506,21 @@ export function MultiAgentGraph({
     // Curved path for better visibility
     const midX = (startX + endX) / 2
     const midY = (startY + endY) / 2
-    const perpX = -(endY - startY) * 0.1
-    const perpY = (endX - startX) * 0.1
+
+    // Calculate edge length and ensure minimum curve offset for short/adjacent edges
+    const edgeLength = Math.sqrt(dx * dx + dy * dy)
+    const minCurveOffset = 20 // Minimum perpendicular offset for visibility
+
+    // Normalize perpendicular vector and apply minimum offset
+    // Perpendicular to edge direction: rotate 90 degrees
+    const perpLen = Math.sqrt((endY - startY) ** 2 + (endX - startX) ** 2)
+    const normalizedPerpX = perpLen > 0 ? -(endY - startY) / perpLen : 0
+    const normalizedPerpY = perpLen > 0 ? (endX - startX) / perpLen : 1
+
+    // Use larger of: 10% of edge length OR minimum offset
+    const curveOffset = Math.max(edgeLength * 0.1, minCurveOffset)
+    const perpX = normalizedPerpX * curveOffset
+    const perpY = normalizedPerpY * curveOffset
 
     // Control point for quadratic bezier
     const ctrlX = midX + perpX
