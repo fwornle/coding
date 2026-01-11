@@ -467,7 +467,9 @@ export function MultiAgentGraph({
   }, [touchedAgents, stepStatusMap])
 
   // Render edge between two nodes
-  const renderEdge = useCallback((edge: EdgeDefinition, idx: number, isActiveControl: boolean = false) => {
+  // keyIdx: unique index for React key (array index)
+  // displayOrdinal: number to display on dataflow edges (dataflow-specific count, or -1 to hide)
+  const renderEdge = useCallback((edge: EdgeDefinition, keyIdx: number, isActiveControl: boolean = false, displayOrdinal: number = -1) => {
     const fromPos = getPosition(edge.from)
     const toPos = getPosition(edge.to)
 
@@ -480,7 +482,7 @@ export function MultiAgentGraph({
                       ${fromPos.x + nodeWidth/2} ${fromPos.y}`
       return (
         <path
-          key={idx}
+          key={keyIdx}
           d={path}
           fill="none"
           stroke={EDGE_COLORS[edge.type || 'dependency']}
@@ -523,7 +525,7 @@ export function MultiAgentGraph({
     const edgeColor = isAnimated ? '#6366f1' : EDGE_COLORS[edge.type || 'dependency']
 
     return (
-      <g key={idx}>
+      <g key={keyIdx}>
         <path
           d={pathD}
           fill="none"
@@ -536,7 +538,7 @@ export function MultiAgentGraph({
           style={isAnimated ? { animation: 'dash 0.5s linear infinite' } : undefined}
         />
         {/* Ordinal number badge showing edge sequence - only for dataflow edges */}
-        {edge.type === 'dataflow' && idx > 0 && (
+        {edge.type === 'dataflow' && displayOrdinal > 0 && (
           <g>
             <circle
               cx={ordinalX}
@@ -554,7 +556,7 @@ export function MultiAgentGraph({
               fontWeight="bold"
               fill={edgeColor}
             >
-              {idx}
+              {displayOrdinal}
             </text>
           </g>
         )}
@@ -795,14 +797,15 @@ export function MultiAgentGraph({
             // Filter visible edges and calculate dataflow-specific indices
             const visibleEdges = displayEdges.filter(edge => shouldShowEdge(edge))
             let dataflowIndex = 0
-            return visibleEdges.map((edge) => {
+            return visibleEdges.map((edge, idx) => {
               // Check if this is the active control line to running agent
               const isActiveControl = edge.type === 'control' &&
                 edge.from === 'orchestrator' &&
                 edge.to === runningAgentId
-              // Use dataflow-specific index for numbering (starts at 1 for first dataflow edge)
-              const edgeNumber = edge.type === 'dataflow' ? ++dataflowIndex : -1
-              return renderEdge(edge, edgeNumber, isActiveControl)
+              // Use dataflow-specific index for ordinal numbering (starts at 1 for first dataflow edge)
+              const displayOrdinal = edge.type === 'dataflow' ? ++dataflowIndex : -1
+              // Pass array index for unique key, and dataflow ordinal for display
+              return renderEdge(edge, idx, isActiveControl, displayOrdinal)
             })
           })()}
         </g>

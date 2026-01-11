@@ -428,81 +428,10 @@ const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
 // - FINALIZATION: After all batches, code_graph indexes current HEAD, correlates with historical findings
 // - This avoids temporal mismatch between old commits and current codebase state
 //
-// Edge types: 'dependency' (solid) = must complete before next, 'dataflow' (dashed) = passes data/parameters
-// 'control' (amber dashed) = feedback/retry loops from agents back to orchestrator
-const WORKFLOW_EDGES: Array<{ from: string; to: string; type?: 'dependency' | 'dataflow' | 'control'; label?: string }> = [
-  // ========== INITIALIZATION ==========
-  // Orchestrator dispatches to batch scheduler (batch workflow) or entry points (complete workflow)
-  { from: 'orchestrator', to: 'git_history', type: 'dataflow' },
-  { from: 'orchestrator', to: 'vibe_history', type: 'dataflow' },
-  { from: 'orchestrator', to: 'documentation_linker', type: 'dataflow' },
-  // NOTE: code_graph is NOT in initialization - it runs in FINALIZATION
-
-  // ========== BATCH LOOP (no code_graph here) ==========
-  // Phase 1 -> Code Intelligence: Git and Vibe feed intelligent queries
-  { from: 'git_history', to: 'code_intelligence' },
-  { from: 'vibe_history', to: 'code_intelligence' },
-
-  // Phase 1 + Code Intel -> Phase 2: Sources + intelligence feed Semantic Analysis
-  // NOTE: code_graph removed - semantic analysis is pure historical in batch loop
-  { from: 'git_history', to: 'semantic_analysis' },
-  { from: 'vibe_history', to: 'semantic_analysis' },
-  { from: 'code_intelligence', to: 'semantic_analysis' },
-  { from: 'documentation_linker', to: 'semantic_analysis' },
-
-  // Phase 2 -> Phase 3: Semantic feeds Web Search
-  { from: 'semantic_analysis', to: 'web_search' },
-
-  // Phase 3 -> Phase 4: Semantic + Web + Code Intel feed Insights
-  { from: 'semantic_analysis', to: 'insight_generation' },
-  { from: 'web_search', to: 'insight_generation' },
-  { from: 'code_intelligence', to: 'insight_generation' },
-
-  // Phase 4 -> Phase 5: Multiple sources feed Observations
-  // Observation generation takes semantic entities + git analysis + vibe sessions
-  { from: 'semantic_analysis', to: 'observation_generation', type: 'dataflow' },
-  { from: 'insight_generation', to: 'observation_generation', type: 'dataflow' },
-  { from: 'git_history', to: 'observation_generation', type: 'dataflow' },
-  { from: 'vibe_history', to: 'observation_generation', type: 'dataflow' },
-
-  // Phase 5 -> Phase 6: Observations -> Ontology Classification
-  { from: 'observation_generation', to: 'ontology_classification' },
-
-  // Semantic analysis also feeds Ontology directly (entities need classification)
-  { from: 'semantic_analysis', to: 'ontology_classification', type: 'dataflow' },
-
-  // Documentation Semantics - runs during batch but doesn't need code_graph
-  { from: 'documentation_linker', to: 'documentation_semantics' },
-
-  // Phase 6 + Doc Semantics -> Phase 7: All feed QA
-  { from: 'ontology_classification', to: 'quality_assurance' },
-  { from: 'documentation_semantics', to: 'quality_assurance' },
-
-  // ========== QA RETRY LOOPS ==========
-  // QA can send entities back for regeneration (up to 3 iterations)
-  { from: 'quality_assurance', to: 'insight_generation', type: 'control', label: 'retry' },
-  { from: 'quality_assurance', to: 'observation_generation', type: 'control', label: 'retry' },
-
-  // ========== FINALIZATION (after ALL batches) ==========
-  // QA -> Batch Checkpoint (end of batch loop)
-  { from: 'quality_assurance', to: 'batch_checkpoint_manager' },
-
-  // After all batches: Checkpoint triggers CGR indexing of CURRENT codebase
-  { from: 'batch_checkpoint_manager', to: 'code_graph' },
-
-  // CGR indexes current HEAD, synthesizes insights, correlates with historical entities
-  // Then code_graph feeds persistence with enriched + historical entities
-  { from: 'code_graph', to: 'persistence' },
-
-  // Also feed accumulated batch entities to persistence
-  { from: 'batch_checkpoint_manager', to: 'persistence', type: 'dataflow' },
-
-  // Phase 8 -> Phase 9: Persistence -> Deduplication
-  { from: 'persistence', to: 'deduplication' },
-
-  // Phase 9 -> Phase 10: Deduplication -> Content Validation
-  { from: 'deduplication', to: 'content_validation' },
-]
+// NO HARDCODED FALLBACKS - All edges MUST come from YAML via API
+// If YAML is missing edges, the graph will show empty and error will be logged
+// Edge types: 'dependency' (solid), 'dataflow' (dashed purple), 'control' (dashed amber)
+const WORKFLOW_EDGES_EMPTY: Array<{ from: string; to: string; type?: 'dependency' | 'dataflow' | 'control'; label?: string }> = []
 
 // Icon mapping for dynamic agent definitions from YAML
 const ICON_MAP: Record<string, typeof GitBranch> = {
@@ -564,10 +493,11 @@ interface WorkflowDefinitionsAPI {
 }
 
 // Hook to fetch workflow definitions from API
+// NO FALLBACKS - Errors are explicit
 function useWorkflowDefinitions(workflowName?: string) {
   const [agents, setAgents] = useState(WORKFLOW_AGENTS)
   const [orchestrator, setOrchestrator] = useState(ORCHESTRATOR_NODE)
-  const [edges, setEdges] = useState(WORKFLOW_EDGES)
+  const [edges, setEdges] = useState(WORKFLOW_EDGES_EMPTY)  // Start empty - MUST come from API
   const [stepToAgent, setStepToAgent] = useState(STEP_TO_AGENT)
   const [allWorkflows, setAllWorkflows] = useState<Array<{ name: string; edges: EdgeDefinitionAPI[] }>>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -581,7 +511,7 @@ function useWorkflowDefinitions(workflowName?: string) {
         const response = await fetch(`http://localhost:${apiPort}/api/workflows/definitions`)
 
         if (!response.ok) {
-          throw new Error(`API returned ${response.status}`)
+          throw new Error(`API returned ${response.status} - Check that server.js is running and YAML configs are valid`)
         }
 
         const data: WorkflowDefinitionsAPI = await response.json()
@@ -607,11 +537,15 @@ function useWorkflowDefinitions(workflowName?: string) {
           setAllWorkflows(data.data.workflows.map(w => ({ name: w.name, edges: w.edges })))
 
           console.log('✅ Loaded workflow definitions from API (Single Source of Truth)')
+        } else {
+          throw new Error(`API returned invalid data structure - check YAML configuration`)
         }
       } catch (err) {
-        console.warn('⚠️ Failed to fetch workflow definitions, using fallback:', err)
-        setError(err instanceof Error ? err.message : 'Unknown error')
-        // Keep using the hardcoded defaults
+        // NO FALLBACK - Log explicit error and keep empty state
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+        console.error(`❌ CRITICAL: Failed to fetch workflow definitions from YAML: ${errorMsg}`)
+        console.error('   Graph will be empty. Fix the YAML configuration or API endpoint.')
+        setError(errorMsg)
       } finally {
         setIsLoading(false)
       }
@@ -2590,10 +2524,14 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
 // Orchestrator details sidebar component
 function OrchestratorDetailsSidebar({
   process,
-  onClose
+  onClose,
+  edges,
+  agents
 }: {
   process: ProcessInfo
   onClose: () => void
+  edges: Array<{ from: string; to: string; type?: string; label?: string }>
+  agents: typeof WORKFLOW_AGENTS
 }) {
   const [isCancelling, setIsCancelling] = useState(false)
   const [cancelResult, setCancelResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -3065,10 +3003,10 @@ function OrchestratorDetailsSidebar({
         <div className="space-y-2">
           <h4 className="font-medium text-sm">Dispatches To</h4>
           <div className="flex flex-wrap gap-1">
-            {WORKFLOW_EDGES
+            {edges
               .filter(e => e.from === 'orchestrator')
               .map(e => {
-                const toAgent = WORKFLOW_AGENTS.find(a => a.id === e.to)
+                const toAgent = agents.find(a => a.id === e.to)
                 return (
                   <Badge key={e.to} variant="outline" className="text-[10px]">
                     {toAgent?.shortName || e.to}
@@ -3087,15 +3025,19 @@ export function UKBNodeDetailsSidebar({
   agentId,
   process,
   onClose,
-  aggregatedSteps
+  aggregatedSteps,
+  edges = [],
+  agents = WORKFLOW_AGENTS
 }: {
   agentId: string
   process: ProcessInfo
   onClose: () => void
   aggregatedSteps?: AggregatedSteps | null
+  edges?: Array<{ from: string; to: string; type?: string; label?: string }>
+  agents?: typeof WORKFLOW_AGENTS
 }) {
   // Compute all values unconditionally to ensure hooks are called consistently
-  const agent = WORKFLOW_AGENTS.find(a => a.id === agentId)
+  const agent = agents.find(a => a.id === agentId)
 
   // FIXED: For batch-phase steps, use current batch's status instead of top-level aggregate
   // The top-level stepsDetail may show stale "skipped" status from initial batch,
@@ -3187,7 +3129,7 @@ export function UKBNodeDetailsSidebar({
 
   // Handle orchestrator node specially - after hooks
   if (agentId === 'orchestrator') {
-    return <OrchestratorDetailsSidebar process={process} onClose={onClose} />
+    return <OrchestratorDetailsSidebar process={process} onClose={onClose} edges={edges} agents={agents} />
   }
 
   // Return null for unknown agents - after hooks
@@ -3380,33 +3322,33 @@ export function UKBNodeDetailsSidebar({
           <div className="text-xs space-y-1">
             <div className="text-muted-foreground">Receives from:</div>
             <div className="flex flex-wrap gap-1">
-              {WORKFLOW_EDGES
+              {edges
                 .filter(e => e.to === agentId)
                 .map(e => {
-                  const fromAgent = WORKFLOW_AGENTS.find(a => a.id === e.from)
+                  const fromAgent = agents.find(a => a.id === e.from)
                   return (
                     <Badge key={e.from} variant="outline" className="text-[10px]">
                       {fromAgent?.shortName || e.from}
                     </Badge>
                   )
                 })}
-              {WORKFLOW_EDGES.filter(e => e.to === agentId).length === 0 && (
+              {edges.filter(e => e.to === agentId).length === 0 && (
                 <span className="text-muted-foreground italic">None (entry point)</span>
               )}
             </div>
             <div className="text-muted-foreground mt-2">Sends to:</div>
             <div className="flex flex-wrap gap-1">
-              {WORKFLOW_EDGES
+              {edges
                 .filter(e => e.from === agentId)
                 .map(e => {
-                  const toAgent = WORKFLOW_AGENTS.find(a => a.id === e.to)
+                  const toAgent = agents.find(a => a.id === e.to)
                   return (
                     <Badge key={e.to} variant="outline" className="text-[10px]">
                       {toAgent?.shortName || e.to}
                     </Badge>
                   )
                 })}
-              {WORKFLOW_EDGES.filter(e => e.from === agentId).length === 0 && (
+              {edges.filter(e => e.from === agentId).length === 0 && (
                 <span className="text-muted-foreground italic">None (final step)</span>
               )}
             </div>
