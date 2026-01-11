@@ -1,0 +1,16 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+class "Server" as s {
+  +handleRequest(Request r)
+}
+
+participant "Middleware" as m
+participant "Factory" as f
+participant "Observer" as o
+
+m->>s: process requests
+f->>o: create objects and define one-to-many dependency
+o->>s: return results
+
+@enduml

@@ -112,6 +112,8 @@ integrations/mcp-server-browserbase/
 # Batch processing runtime state
 .data/batch-*.json
 .data/ukb-*.json
+.data/ukb-trace-reports/
+.data/step-timing-statistics.json
 
 # Ontology suggestions (runtime-generated, not needed in git)
 .data/ontologies/suggestions/
@@ -155,6 +157,9 @@ integrations/browser-access/logs/
 !.data/
 !.data/knowledge-export/
 !.data/knowledge-config.json
+
+# PlantUML validation errors (transient, regenerated on diagram validation)
+knowledge-management/insights/plantuml_errors.json
 
 # Session and conversation logs (commented out to track sessions)
 # .specstory/history/
