@@ -411,21 +411,6 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }
 
-  // Update single-step state from process data
-  useEffect(() => {
-    const activeProcess = activeProcesses[activeProcessIndex]
-    if (activeProcess) {
-      // Read single-step state from process (populated from progress file)
-      const processSingleStep = (activeProcess as any).singleStepMode
-      const processStepPaused = (activeProcess as any).stepPaused
-      const processPausedAt = (activeProcess as any).pausedAtStep
-
-      if (processSingleStep !== undefined) setSingleStepMode(processSingleStep)
-      if (processStepPaused !== undefined) setStepPaused(processStepPaused)
-      if (processPausedAt !== undefined) setPausedAtStep(processPausedAt)
-    }
-  }, [activeProcesses, activeProcessIndex])
-
   // Create a signature for change detection - ensures re-renders when process data changes
   // This captures key fields that affect display: pid, status, completedSteps, _refreshKey
   // Also include steps signature for real-time step status updates
@@ -450,6 +435,21 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     // Include processesSignature to ensure recalculation when any process data changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processes, processesSignature])
+
+  // Update single-step state from process data
+  useEffect(() => {
+    const activeProcess = activeProcesses[selectedProcessIndex]
+    if (activeProcess) {
+      // Read single-step state from process (populated from progress file)
+      const processSingleStep = (activeProcess as any).singleStepMode
+      const processStepPaused = (activeProcess as any).stepPaused
+      const processPausedAt = (activeProcess as any).pausedAtStep
+
+      if (processSingleStep !== undefined) setSingleStepMode(processSingleStep)
+      if (processStepPaused !== undefined) setStepPaused(processStepPaused)
+      if (processPausedAt !== undefined) setPausedAtStep(processPausedAt)
+    }
+  }, [activeProcesses, selectedProcessIndex])
 
   // Active process at selected index (component-level for TraceModal access)
   // Bounded to valid range to handle when processes complete and list shrinks
