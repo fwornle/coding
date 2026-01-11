@@ -103,6 +103,8 @@ class SystemHealthAPIServer {
         this.app.get('/api/ukb/processes', this.handleGetUKBProcesses.bind(this));
         this.app.post('/api/ukb/cleanup', this.handleUKBCleanup.bind(this));
         this.app.post('/api/ukb/cancel', this.handleCancelWorkflow.bind(this));
+        this.app.post('/api/ukb/single-step-mode', this.handleSingleStepMode.bind(this));
+        this.app.post('/api/ukb/step-advance', this.handleStepAdvance.bind(this));
         this.app.post('/api/ukb/start', this.handleStartUKBWorkflow.bind(this));
         this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
         this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
@@ -579,9 +581,29 @@ class SystemHealthAPIServer {
                 }
             }
 
+            // Check for active abort signal - if present, force cancelled status
+            const abortPath = join(codingRoot, '.data', 'workflow-abort.json');
+            let forceCancelled = false;
+            if (existsSync(abortPath)) {
+                try {
+                    const abortSignal = JSON.parse(readFileSync(abortPath, 'utf8'));
+                    if (abortSignal.abort) {
+                        forceCancelled = true;
+                        console.log('Active abort signal detected - forcing cancelled status');
+                    }
+                } catch {
+                    // Ignore parse errors
+                }
+            }
+
             // Check if the workflow progress represents an inline workflow
             // that is NOT already in the registered processes list
             if (workflowProgress) {
+                // ZOMBIE FIX: If abort signal exists, force cancelled status regardless of progress file
+                if (forceCancelled) {
+                    workflowProgress.status = 'cancelled';
+                }
+
                 const lastUpdate = new Date(workflowProgress.lastUpdate).getTime();
                 const age = Date.now() - lastUpdate;
                 const hasFailed = (workflowProgress.stepsFailed?.length || 0) > 0;
@@ -686,6 +708,10 @@ class SystemHealthAPIServer {
                         isInlineMCP: true, // Flag to indicate this is an inline MCP workflow
                         batchProgress: workflowProgress.batchProgress || null, // Batch progress for batch workflows
                         batchIterations: workflowProgress.batchIterations || null, // Per-batch step tracking for tracer
+                        // Single-step debugging mode state
+                        singleStepMode: workflowProgress.singleStepMode || false,
+                        stepPaused: workflowProgress.stepPaused || false,
+                        pausedAtStep: workflowProgress.pausedAtStep || null,
                     };
 
                     detailedStatus.processes.push(inlineProcess);
@@ -988,7 +1014,8 @@ class SystemHealthAPIServer {
                 killedProcesses = ukbManager.cleanupStaleProcesses(false);
             }
 
-            // Clean up abort signal file after a short delay (give coordinator time to see it)
+            // Clean up abort signal file after a longer delay (ensure coordinator sees it)
+            // Extended to 15s to handle slow step completions
             setTimeout(() => {
                 try {
                     if (existsSync(abortPath)) {
@@ -998,7 +1025,7 @@ class SystemHealthAPIServer {
                 } catch (e) {
                     console.warn('Failed to cleanup abort signal file:', e.message);
                 }
-            }, 5000);
+            }, 15000);
 
             console.log(`🛑 Workflow cancelled: ${previousState?.workflowName || 'unknown'} (was: ${previousState?.status || 'unknown'})${usedAbortSignal ? ' [abort signal sent]' : ''}`);
 
@@ -1021,6 +1048,117 @@ class SystemHealthAPIServer {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to cancel workflow',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Enable/disable single-step debugging mode for workflow execution
+     * When enabled, workflow pauses after each step and waits for step-advance signal
+     */
+    async handleSingleStepMode(req, res) {
+        try {
+            const { enabled } = req.body;
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            // Read current progress (or create empty state)
+            let progress = {};
+            if (existsSync(progressPath)) {
+                try {
+                    progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                } catch (e) {
+                    // Start fresh
+                }
+            }
+
+            // Update single-step mode state
+            progress.singleStepMode = !!enabled;
+            progress.singleStepUpdatedAt = new Date().toISOString();
+
+            // If disabling, also clear any pause state
+            if (!enabled) {
+                progress.stepPaused = false;
+                progress.pausedAtStep = null;
+            }
+
+            writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+
+            console.log(`🔧 Single-step mode ${enabled ? 'enabled' : 'disabled'}`);
+
+            res.json({
+                status: 'success',
+                data: {
+                    singleStepMode: progress.singleStepMode,
+                    timestamp: progress.singleStepUpdatedAt
+                }
+            });
+        } catch (error) {
+            console.error('Failed to set single-step mode:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to set single-step mode',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Advance to next step when in single-step mode
+     * Clears the stepPaused flag to allow workflow to continue to next step
+     */
+    async handleStepAdvance(req, res) {
+        try {
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            if (!existsSync(progressPath)) {
+                return res.status(404).json({
+                    status: 'error',
+                    message: 'No workflow in progress'
+                });
+            }
+
+            const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+
+            if (!progress.singleStepMode) {
+                return res.json({
+                    status: 'success',
+                    message: 'Single-step mode not enabled, nothing to advance',
+                    data: { singleStepMode: false }
+                });
+            }
+
+            if (!progress.stepPaused) {
+                return res.json({
+                    status: 'success',
+                    message: 'Not currently paused',
+                    data: { stepPaused: false, singleStepMode: true }
+                });
+            }
+
+            // Clear pause flag to allow advancement
+            const previousStep = progress.pausedAtStep;
+            progress.stepPaused = false;
+            progress.resumeRequestedAt = new Date().toISOString();
+            // Keep pausedAtStep for reference until next step starts
+
+            writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+
+            console.log(`▶️ Step advance requested (was paused at: ${previousStep})`);
+
+            res.json({
+                status: 'success',
+                data: {
+                    advanced: true,
+                    previousStep,
+                    timestamp: progress.resumeRequestedAt
+                }
+            });
+        } catch (error) {
+            console.error('Failed to advance step:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to advance step',
                 error: error.message
             });
         }
