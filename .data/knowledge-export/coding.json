@@ -11929,31 +11929,62 @@
           }
         },
         "Decision to use a comprehensive knowledge graph management system (feat: comprehensive knowledge graph management system, commit message), which has a significant impact on the project's data management and scalability",
-        "Decision to use a JSON-based settings file (.claude/settings.local.json) for storing configuration data, allowing for easy modification and extensibility"
+        "Decision to use a JSON-based settings file (.claude/settings.local.json) for storing configuration data, allowing for easy modification and extensibility",
+        "decision to use a knowledge graph management system: rationale is to improve knowledge management and collaboration, impact is improved team workflow"
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-01-05T08:26:27.082Z",
-        "last_updated": "2026-01-09T11:21:37.269Z",
+        "last_updated": "2026-01-10T17:08:06.743Z",
         "significance": 5,
         "originalMetadata": {
           "significance": 5,
           "originalMetadata": {
-            "significance": 7,
+            "significance": 5,
             "originalMetadata": {
-              "created_at": "2026-01-05T08:26:26.968Z",
-              "last_updated": "2026-01-05T08:26:26.968Z",
-              "created_by": "workflow_persist",
-              "version": "1.0",
+              "significance": 7,
+              "originalMetadata": {
+                "created_at": "2026-01-05T08:26:26.968Z",
+                "last_updated": "2026-01-05T08:26:26.968Z",
+                "created_by": "workflow_persist",
+                "version": "1.0",
+                "ontology": {
+                  "ontologyName": "coding",
+                  "classificationMethod": "heuristic",
+                  "confidence": 0.94
+                },
+                "classificationConfidence": 0.94,
+                "classificationMethod": "heuristic",
+                "validation": {
+                  "valid": true,
+                  "errors": [],
+                  "warnings": [],
+                  "mode": "lenient"
+                },
+                "contentValidation": {
+                  "overallValid": false,
+                  "overallScore": 100,
+                  "totalIssues": 0,
+                  "criticalIssues": 0,
+                  "validatedAt": "2026-01-05T08:26:26.974Z",
+                  "mode": "lenient"
+                },
+                "staleness_score": 100,
+                "staleness_check_at": "2026-01-05T08:26:26.974Z"
+              },
+              "source": "manual",
+              "team": "coding",
+              "created_at": "2026-01-05T08:26:27.082Z",
+              "last_updated": "2026-01-06T06:31:56.027Z",
               "ontology": {
                 "ontologyName": "coding",
-                "classificationMethod": "heuristic",
+                "classificationMethod": "hybrid",
                 "confidence": 0.94
               },
               "classificationConfidence": 0.94,
-              "classificationMethod": "heuristic",
+              "classificationMethod": "hybrid",
               "validation": {
                 "valid": true,
                 "errors": [],
@@ -11962,49 +11993,50 @@
               },
               "contentValidation": {
                 "overallValid": false,
-                "overallScore": 100,
-                "totalIssues": 0,
-                "criticalIssues": 0,
-                "validatedAt": "2026-01-05T08:26:26.974Z",
+                "overallScore": 80,
+                "totalIssues": 1,
+                "criticalIssues": 1,
+                "validatedAt": "2026-01-06T06:31:56.048Z",
                 "mode": "lenient"
               },
+              "invalidating_commits": [],
               "staleness_score": 100,
-              "staleness_check_at": "2026-01-05T08:26:26.974Z"
+              "staleness_check_at": "2026-01-06T06:31:56.048Z",
+              "staleness_method": "git-based"
             },
             "source": "manual",
             "team": "coding",
             "created_at": "2026-01-05T08:26:27.082Z",
-            "last_updated": "2026-01-06T06:31:56.027Z",
+            "last_updated": "2026-01-09T11:21:36.926Z",
             "ontology": {
-              "ontologyName": "coding",
-              "classificationMethod": "hybrid",
-              "confidence": 0.94
+              "preClassified": true,
+              "originalMethod": "unknown"
             },
-            "classificationConfidence": 0.94,
-            "classificationMethod": "hybrid",
+            "classificationConfidence": 0.8,
+            "classificationMethod": "pre-classified-skip",
             "validation": {
               "valid": true,
               "errors": [],
               "warnings": [],
-              "mode": "lenient"
+              "mode": "disabled"
             },
             "contentValidation": {
               "overallValid": false,
               "overallScore": 80,
               "totalIssues": 1,
               "criticalIssues": 1,
-              "validatedAt": "2026-01-06T06:31:56.048Z",
+              "validatedAt": "2026-01-09T11:21:36.930Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-01-06T06:31:56.048Z",
+            "staleness_check_at": "2026-01-09T11:21:36.930Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2026-01-05T08:26:27.082Z",
-          "last_updated": "2026-01-09T11:21:36.926Z",
+          "last_updated": "2026-01-10T17:08:06.658Z",
           "ontology": {
             "preClassified": true,
             "originalMethod": "unknown"
@@ -12022,12 +12054,12 @@
             "overallScore": 80,
             "totalIssues": 1,
             "criticalIssues": 1,
-            "validatedAt": "2026-01-09T11:21:36.930Z",
+            "validatedAt": "2026-01-10T17:08:06.668Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-01-09T11:21:36.930Z",
+          "staleness_check_at": "2026-01-10T17:08:06.668Z",
           "staleness_method": "git-based"
         }
       },
@@ -21811,7 +21843,7 @@
     }
   ],
   "metadata": {
-    "last_updated": "2026-01-10T12:32:27.936Z",
+    "last_updated": "2026-01-10T17:15:25.055Z",
     "team": "coding",
     "entity_count": 45,
     "relation_count": 63,
