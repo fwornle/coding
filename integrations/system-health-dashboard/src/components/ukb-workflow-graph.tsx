@@ -302,6 +302,8 @@ const STEP_TO_AGENT: Record<string, string> = {
   'extract_batch_commits': 'git_history',
   'extract_batch_sessions': 'vibe_history',
   'batch_semantic_analysis': 'semantic_analysis',
+  'generate_batch_observations': 'observation_generation',
+  'kg_operators': 'kg_operators',  // Generic step name used in batch iterations
   'operator_conv': 'kg_operators',
   'operator_aggr': 'kg_operators',
   'operator_embed': 'kg_operators',
@@ -868,9 +870,12 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
         return null
 
       case 'insight_generation':
-        const patternCount = outputs.patterns?.length || outputs.patternsGenerated || 0
+        // Check all possible pattern count fields: totalPatterns (number), patterns (array), patternsGenerated
+        const patternCount = outputs.totalPatterns || outputs.patterns?.length || outputs.patternsGenerated || 0
+        // Check all possible insight count fields: totalInsights (number), insightDocuments (array)
+        const insightCount = outputs.totalInsights || outputs.insightDocuments?.length || 0
         const diagrams = outputs.diagramsGenerated || outputs.diagrams?.length || 0
-        return `Generated ${patternCount} patterns and ${diagrams} architecture diagrams`
+        return `Generated ${insightCount} insights from ${patternCount} patterns and ${diagrams} diagrams`
 
       case 'observation_generation':
         // Check all possible property names: entitiesCount (summary), entitiesCreated (agent)
