@@ -1,0 +1,32 @@
+@startuml
+!include /Users/q284340/Agentic/coding/docs/puml/_standard-style.puml
+
+package "Design Patterns" {
+    package "General" {
+        component "Observer Defines One-To-Many Dependency Between Objects" as obs <<storage>>
+        component "Middleware Processes Requests In A Pipeline" as mid <<external>>
+        component "Factory Creates Objects Without Specifying Exact Classes" as fac
+        component "Api Handles External Communication" as apicom
+    }
+    
+    package "Architectural Patterns" {
+        component "Api Handles External Communication" as apiarch <<api>>
+        component "Promise Handles Asynchronous Operations" as prom <<storage>>
+    }
+    
+    package "Core Components" {
+        component "Knowledge Graph" as kg <<storage>>
+    }
+}
+
+package "External Services" {
+    database "Database" as db
+    cloud "Cloud Service" as cs
+    component "Middleware Processes Requests In A Pipeline" as mid <<external>>
+    component "Factory Creates Objects Without Specifying Exact Classes" as fac
+}
+
+component "Display Name" as kg <<storage>>
+component "Knowledge Graph" as kg <<storage>>
+
+@enduml
