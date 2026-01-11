@@ -3089,7 +3089,37 @@ export function UKBNodeDetailsSidebar({
 }) {
   // Compute all values unconditionally to ensure hooks are called consistently
   const agent = WORKFLOW_AGENTS.find(a => a.id === agentId)
-  const stepInfo = process.steps?.find(s => STEP_TO_AGENT[s.name] === agentId || s.name === agentId)
+
+  // FIXED: For batch-phase steps, use current batch's status instead of top-level aggregate
+  // The top-level stepsDetail may show stale "skipped" status from initial batch,
+  // while the current batch has the actual running/completed status
+  const SIDEBAR_BATCH_PHASE_STEPS = [
+    'git_history', 'vibe_history', 'semantic_analysis', 'kg_operators',
+    'context_convolution', 'entity_aggregation', 'node_embedding',
+    'deduplication_operator', 'edge_prediction', 'structure_merge',
+    'observation_generation', 'ontology_classification'
+  ]
+
+  const currentBatch = process.batchIterations?.length
+    ? process.batchIterations[process.batchIterations.length - 1]
+    : null
+  const isBatchWorkflow = currentBatch !== null
+
+  // Get step info from the correct source based on step type
+  const stepInfo = useMemo((): StepInfo | undefined => {
+    // For batch-phase steps in a batch workflow, prefer current batch status
+    if (isBatchWorkflow && SIDEBAR_BATCH_PHASE_STEPS.includes(agentId)) {
+      const batchStep = currentBatch?.steps?.find(
+        (s: any) => STEP_TO_AGENT[s.name] === agentId || s.name === agentId
+      )
+      if (batchStep) {
+        // Cast batch step to StepInfo (it may have fewer fields, which is fine)
+        return batchStep as StepInfo
+      }
+    }
+    // Fall back to top-level steps for non-batch steps or if batch step not found
+    return process.steps?.find(s => STEP_TO_AGENT[s.name] === agentId || s.name === agentId)
+  }, [agentId, isBatchWorkflow, currentBatch, process.steps])
 
   // Use same fallback logic as getNodeStatus in the graph
   const getInferredStatus = (): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
