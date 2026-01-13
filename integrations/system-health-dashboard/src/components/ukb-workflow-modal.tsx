@@ -1798,60 +1798,75 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   allSteps.push(...preBatchSteps)
 
                   // 2. Add batch iteration steps with [batch-XXX] prefix
-                  // Create a summary step for each batch (we don't have per-step detail in completedBatches)
+                  // Use detailed stepOutputs when available (new format), otherwise fall back to summary stats
                   for (const batch of historicalWorkflowDetail.completedBatches!) {
-                    // For each batch, create summary entries for the key batch-phase agents
                     const batchDuration = batch.stats?.duration || 0
                     const batchStats = batch.stats
 
-                    // Create a single summary step per batch showing the batch's work
-                    allSteps.push({
-                      name: `[${batch.batchId}] git history`,
-                      status: 'completed',
-                      duration: batchStats?.operatorResults?.conv?.duration,
-                      outputs: { commits: batchStats?.commits || 0 },
-                    })
-
-                    if ((batchStats?.sessions || 0) > 0) {
+                    // Check if we have detailed step outputs (new format with arrays of commits, sessions, etc.)
+                    if (batch.stepOutputs && batch.stepOutputs.length > 0) {
+                      // Use detailed step outputs - includes actual commit arrays, session arrays, etc.
+                      for (const step of batch.stepOutputs) {
+                        allSteps.push({
+                          name: `[${batch.batchId}] ${step.name}`,
+                          status: step.status as any,
+                          duration: step.duration,
+                          outputs: step.outputs,  // Full outputs with arrays (commits, sessions, etc.)
+                          tokensUsed: step.tokensUsed,
+                          llmProvider: step.llmProvider,
+                          llmCalls: step.llmCalls,
+                        })
+                      }
+                    } else {
+                      // Fallback: Create summary steps from batch stats (old format, backwards compatible)
                       allSteps.push({
-                        name: `[${batch.batchId}] vibe history`,
+                        name: `[${batch.batchId}] git history`,
                         status: 'completed',
-                        outputs: { sessions: batchStats?.sessions || 0 },
+                        duration: batchStats?.operatorResults?.conv?.duration,
+                        outputs: { commits: batchStats?.commits || 0 },
+                      })
+
+                      if ((batchStats?.sessions || 0) > 0) {
+                        allSteps.push({
+                          name: `[${batch.batchId}] vibe history`,
+                          status: 'completed',
+                          outputs: { sessions: batchStats?.sessions || 0 },
+                        })
+                      }
+
+                      allSteps.push({
+                        name: `[${batch.batchId}] semantic analysis`,
+                        status: 'completed',
+                        outputs: {
+                          entities: batchStats?.entitiesCreated || 0,
+                          relations: batchStats?.relationsAdded || 0
+                        },
+                      })
+
+                      allSteps.push({
+                        name: `[${batch.batchId}] kg operators`,
+                        status: 'completed',
+                        duration: Object.values(batchStats?.operatorResults || {}).reduce(
+                          (sum, op) => sum + (op.duration || 0), 0
+                        ),
+                        outputs: {
+                          processed: batchStats?.operatorResults?.conv?.processed || 0,
+                          merged: batchStats?.operatorResults?.dedup?.merged || 0,
+                        },
+                      })
+
+                      allSteps.push({
+                        name: `[${batch.batchId}] batch checkpoint`,
+                        status: 'completed',
+                        duration: batchDuration,
+                        outputs: {
+                          batchNumber: batch.batchNumber,
+                          dateRange: batch.dateRange?.start ?
+                            `${new Date(batch.dateRange.start).toLocaleDateString()} - ${new Date(batch.dateRange.end || '').toLocaleDateString()}`
+                            : undefined
+                        },
                       })
                     }
-
-                    allSteps.push({
-                      name: `[${batch.batchId}] semantic analysis`,
-                      status: 'completed',
-                      outputs: {
-                        entities: batchStats?.entitiesCreated || 0,
-                        relations: batchStats?.relationsAdded || 0
-                      },
-                    })
-
-                    allSteps.push({
-                      name: `[${batch.batchId}] kg operators`,
-                      status: 'completed',
-                      duration: Object.values(batchStats?.operatorResults || {}).reduce(
-                        (sum, op) => sum + (op.duration || 0), 0
-                      ),
-                      outputs: {
-                        processed: batchStats?.operatorResults?.conv?.processed || 0,
-                        merged: batchStats?.operatorResults?.dedup?.merged || 0,
-                      },
-                    })
-
-                    allSteps.push({
-                      name: `[${batch.batchId}] batch checkpoint`,
-                      status: 'completed',
-                      duration: batchDuration,
-                      outputs: {
-                        batchNumber: batch.batchNumber,
-                        dateRange: batch.dateRange?.start ?
-                          `${new Date(batch.dateRange.start).toLocaleDateString()} - ${new Date(batch.dateRange.end || '').toLocaleDateString()}`
-                          : undefined
-                      },
-                    })
                   }
 
                   // 3. Add post-batch steps last
