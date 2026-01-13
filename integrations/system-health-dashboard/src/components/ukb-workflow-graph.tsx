@@ -1241,6 +1241,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   ]
 
   // Batch-phase step names that repeat each batch (should use current batch status, not aggregate)
+  // ORDERED by execution sequence within each batch - used to determine which steps are pending
   const BATCH_PHASE_STEPS = [
     'git_history', 'vibe_history', 'semantic_analysis', 'kg_operators',
     'context_convolution', 'entity_aggregation', 'node_embedding',
@@ -1258,6 +1259,15 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
       ? process.batchIterations[process.batchIterations.length - 1]
       : null
     const isBatchWorkflow = currentBatch !== null
+
+    // Determine current step position in batch sequence to reset future steps
+    // This ensures when a new batch starts, steps after current position are pending
+    const currentAgentFromStep = process.currentStep
+      ? (STEP_TO_AGENT[process.currentStep] || process.currentStep)
+      : null
+    const currentBatchStepIndex = currentAgentFromStep
+      ? BATCH_PHASE_STEPS.indexOf(currentAgentFromStep)
+      : -1
 
     // Build map of current batch step statuses for batch-phase agents
     // Handle duplicate entries by preferring better status: running > completed > failed > skipped
@@ -1293,8 +1303,15 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
 
         // For batch-phase steps in a batch workflow: use current batch status (resets each batch)
         if (isBatchWorkflow && BATCH_PHASE_STEPS.includes(agentId)) {
-          // Use current batch status if available, otherwise show as pending
-          if (currentBatchStepMap[agentId]) {
+          const stepIndex = BATCH_PHASE_STEPS.indexOf(agentId)
+
+          // If this step comes AFTER the current step in the batch sequence,
+          // it hasn't run in this batch yet - force pending (prevents stale completed from previous batch)
+          if (currentBatchStepIndex >= 0 && stepIndex > currentBatchStepIndex) {
+            map[agentId] = { ...step, status: 'pending' }
+          }
+          // Otherwise, use current batch status if available
+          else if (currentBatchStepMap[agentId]) {
             map[agentId] = currentBatchStepMap[agentId]
           } else {
             // Step hasn't started in current batch yet - show as pending (grey)
