@@ -786,6 +786,14 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
         return vibeParts.join(', ')
 
       case 'semantic_analysis':
+        // Check for LLM error first - show actual error message instead of just "llmUsed: false"
+        if (outputs.llmError) {
+          const truncatedError = outputs.llmError.length > 80
+            ? outputs.llmError.slice(0, 80) + '...'
+            : outputs.llmError
+          return `⚠️ LLM Error: ${truncatedError}`
+        }
+
         // Check for batch workflow format (from summarizeStepResult): { batchEntities, batchRelations, batchId }
         const batchEntities = outputs.batchEntities || outputs.result?.entities || 0
         const batchRelations = outputs.batchRelations || outputs.result?.relations || 0
@@ -3315,6 +3323,23 @@ export function UKBNodeDetailsSidebar({
               </h4>
               <div className="text-xs bg-red-50 border border-red-200 rounded p-2 text-red-800 break-words">
                 {stepInfo.error}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* LLM Error Warning - show when LLM failed but step continued with fallback */}
+        {stepInfo?.outputs?.llmError && !stepInfo?.error && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                LLM Call Failed
+              </h4>
+              <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800 break-words">
+                <div>{stepInfo.outputs.llmError}</div>
+                <div className="text-amber-500 text-[10px] mt-1 italic">Using rule-based fallback</div>
               </div>
             </div>
           </>

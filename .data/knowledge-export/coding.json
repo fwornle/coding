@@ -2013,6 +2013,3687 @@
       "problem": {},
       "solution": {},
       "id": "mc4flkg1hkvd48"
+    },
+    {
+      "name": "ApiHandlesExternalCommunication",
+      "entityType": "ConfigurationFile",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "DO: Check `entities.js`, `settings.local.json`, `start-http-server.js` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JavaScript, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `settings.local.json`, `constraint-monitor-components.png`, `constraint-monitor-components.puml`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `settings.local.json`, `constraint-monitor-components.png`, `constraint-monitor-components.puml` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JSON, JavaScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `settings.local.json`, `combined-status-line.js`, `violation-history.json`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `settings.local.json`, `combined-status-line.js`, `violation-history.json` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JSON, JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`, `settings.local.json`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js`, `settings.local.json` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`, `statusline-health-monitor.js`, `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js`, `statusline-health-monitor.js`, `enhanced-transcript-monitor.js` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `session.json`, `IMPLEMENTATION_SUMMARY.md`, `tasks.md`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `session.json`, `IMPLEMENTATION_SUMMARY.md`, `tasks.md` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JSON, Markdown, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a.md`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a.md`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JavaScript, Markdown systems with critical reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `settings.local.json`, `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `settings.local.json`, `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `2025-11-15_1200-1300_g9b30a.md`, `combined-status-line.js`, `2025-11-15_1700-1800_g9b30a.md`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-15_1200-1300_g9b30a.md`, `combined-status-line.js`, `2025-11-15_1700-1800_g9b30a.md` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building Markdown, JavaScript, JSON, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`, `health-verifier.js`, `coding.json`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js`, `health-verifier.js`, `coding.json` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JavaScript, JSON, Markdown, TypeScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `2025-11-29_1400-1500_g9b30a.md`, `2025-11-29_1700-1800_g9b30a.md`, `2025-11-29_1800-1900_g9b30a.md`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1400-1500_g9b30a.md`, `2025-11-29_1700-1800_g9b30a.md`, `2025-11-29_1800-1900_g9b30a.md` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `2025-12-03_1000-1100_g9b30a_from-ui-template.md`, `2025-12-04_1200-1300_g9b30a.md`, `2025-12-04_1200-1300_g9b30a_from-ui-template.md`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-03_1000-1100_g9b30a_from-ui-template.md`, `2025-12-04_1200-1300_g9b30a.md`, `2025-12-04_1200-1300_g9b30a_from-ui-template.md` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `2025-12-12_0700-0800_g9b30a.md`, `package.json`, `server.js`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-12_0700-0800_g9b30a.md`, `package.json`, `server.js` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building Markdown, JSON, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `health-verifier.js`, `server.js`, `ukb-workflow-graph.tsx`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Handles external communication. This pattern was established to ensure consistent external interfaces and maintainable service contracts",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `health-verifier.js`, `server.js`, `ukb-workflow-graph.tsx` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JavaScript, Markdown, JSON, TypeScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `server.js`, `vite.config.ts`, `start-services-robust.js`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `vite.config.ts`, `start-services-robust.js` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JavaScript, TypeScript, JSON, Markdown systems with critical reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Details: http://localhost:8080/knowledge-management/insights/ApiHandlesExternalCommunication.md",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `purge-knowledge-entities.js`, `coding.json`, `ui.json`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `purge-knowledge-entities.js`, `coding.json`, `ui.json` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JavaScript, JSON, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `multi-agent-graph.tsx`, `coding.json`, `ukb-workflow-modal.tsx`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `multi-agent-graph.tsx`, `coding.json`, `ukb-workflow-modal.tsx` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JSON, Markdown, JavaScript, TypeScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with api in this codebase, changes often span multiple modules. Key files: `plantuml_errors.json`, `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx`",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `plantuml_errors.json`, `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx` when modifying api behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This api pattern is applicable when building JSON, Markdown, TypeScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:36:32.707Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:36:51.707Z",
+        "last_updated": "2026-01-13T09:11:56.720Z"
+      },
+      "id": "mc4flkg7bsozhi"
+    },
+    {
+      "name": "DecoratorAddsBehaviorToObjects",
+      "entityType": "MCPAgent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `copilot-http-server.js`, `vscode-extension.md`, `knowledge-visualizer-screenshot.png`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `copilot-http-server.js`, `vscode-extension.md`, `knowledge-visualizer-screenshot.png` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `system.js`, `copilot-http-server.js`, `agent-adapter.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `system.js`, `copilot-http-server.js`, `agent-adapter.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `copilot-http-server.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `copilot-http-server.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `constraint-monitor-components.png`, `constraint-monitor-components.puml`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `constraint-monitor-components.png`, `constraint-monitor-components.puml` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `vscode-extension.md`, `constraint-monitor-components.png`, `constraint-monitor-components.puml`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `vscode-extension.md`, `constraint-monitor-components.png`, `constraint-monitor-components.puml` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `statusline-health-monitor.js`, `enhanced-transcript-monitor.js`, `lsl-file-manager.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `statusline-health-monitor.js`, `enhanced-transcript-monitor.js`, `lsl-file-manager.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `IMPLEMENTATION_SUMMARY.md`, `.mcp.json`, `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `IMPLEMENTATION_SUMMARY.md`, `.mcp.json`, `enhanced-transcript-monitor.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building Markdown, JSON, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a.md`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a.md`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building Markdown, JSON, TypeScript, JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `2025-11-15_1200-1300_g9b30a.md`, `2025-11-15_1800-1900_g9b30a.md`, `2025-11-15_1900-2000_g9b30a.md`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-15_1200-1300_g9b30a.md`, `2025-11-15_1800-1900_g9b30a.md`, `2025-11-15_1900-2000_g9b30a.md` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building Markdown, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `health-verifier.js`, `2025-06-16_13-32Z-clarification-on-code-assistance-request.md`, `2025-06-16_14-28Z-knowledge-base-viewer-statistics.md`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `health-verifier.js`, `2025-06-16_13-32Z-clarification-on-code-assistance-request.md`, `2025-06-16_14-28Z-knowledge-base-viewer-statistics.md` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building JavaScript, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `2025-11-29_1400-1500_g9b30a.md`, `2025-11-29_1500-1600_g9b30a.md`, `GraphDatabaseService.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1400-1500_g9b30a.md`, `2025-11-29_1500-1600_g9b30a.md`, `GraphDatabaseService.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `2025-12-04_1200-1300_g9b30a_from-ui-template.md`, `start-services-robust.js`, `statusline-health-monitor.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-04_1200-1300_g9b30a_from-ui-template.md`, `start-services-robust.js`, `statusline-health-monitor.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building Markdown, JavaScript, JSON, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `2025-12-12_0700-0800_g9b30a.md`, `package.json`, `tooltip.tsx`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-12_0700-0800_g9b30a.md`, `package.json`, `tooltip.tsx` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `health-verifier.js`, `statusline-health-monitor.js`, `start-services-robust.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `health-verifier.js`, `statusline-health-monitor.js`, `start-services-robust.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `vite.config.ts`, `start-services-robust.js`, `knowledge-paths.js`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `vite.config.ts`, `start-services-robust.js`, `knowledge-paths.js` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building TypeScript, JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `2026-01-04_1100-1200_g9b30a.md`, `GraphDatabaseService.js`, `multi-agent-graph.tsx`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2026-01-04_1100-1200_g9b30a.md`, `GraphDatabaseService.js`, `multi-agent-graph.tsx` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `multi-agent-graph.tsx`, `ukb-workflow-modal.tsx`, `2026-01-07_0800-0900_g9b30a.md`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Adds behavior to objects dynamically. This pattern was established to maintain code consistency and developer experience",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `multi-agent-graph.tsx`, `ukb-workflow-modal.tsx`, `2026-01-07_0800-0900_g9b30a.md` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with decorator in this codebase, changes often span multiple modules. Key files: `ukb-workflow-modal.tsx`, `multi-agent-graph.tsx`",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-modal.tsx`, `multi-agent-graph.tsx` when modifying decorator behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This decorator pattern is applicable when building TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:36:51.720Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:37:05.123Z",
+        "last_updated": "2026-01-13T08:37:05.123Z"
+      },
+      "id": "mc4flkg3ve6gu2"
+    },
+    {
+      "name": "RepositoryEncapsulatesDataAccessLogic",
+      "entityType": "WorkflowDefinition",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "DO: Check `README.md`, `vscode-extension.md`, `entities.js` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building Markdown, JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `cli.js`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `cli.js` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `semantic-analysis-bridge.js`, `cli.js`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `semantic-analysis-bridge.js`, `cli.js` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `entities.js`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `entities.js` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `violation-history.json`, `violation-capture-service.js`, `vscode-extension.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `violation-history.json`, `violation-capture-service.js`, `vscode-extension.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building JSON, JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`, `batch-lsl-processor.js`, `simple-reindex.js`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js`, `batch-lsl-processor.js`, `simple-reindex.js` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `IMPLEMENTATION_SUMMARY.md`, `SCHEMA_MIGRATION.md`, `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `IMPLEMENTATION_SUMMARY.md`, `SCHEMA_MIGRATION.md`, `enhanced-transcript-monitor.js` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a.md`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a.md`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`, `server.js`, `system-health-dashboard.tsx`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`, `server.js`, `system-health-dashboard.tsx` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `2025-11-15_1800-1900_g9b30a.md`, `2025-11-15_1900-2000_g9b30a.md`, `2025-11-16_0700-0800_g9b30a.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-15_1800-1900_g9b30a.md`, `2025-11-15_1900-2000_g9b30a.md`, `2025-11-16_0700-0800_g9b30a.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `2025-11-20_0600-0700_g9b30a.md`, `2025-11-20_0700-0800_g9b30a.md`, `2025-11-21_0600-0700_g9b30a_from-nano-degree.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-20_0600-0700_g9b30a.md`, `2025-11-20_0700-0800_g9b30a.md`, `2025-11-21_0600-0700_g9b30a_from-nano-degree.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `2025-11-29_1500-1600_g9b30a.md`, `2025-11-29_1800-1900_g9b30a.md`, `2025-11-29_1900-2000_g9b30a.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1500-1600_g9b30a.md`, `2025-11-29_1800-1900_g9b30a.md`, `2025-11-29_1900-2000_g9b30a.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `2025-12-06_1800-1900_g9b30a_from-ui-template.md`, `2025-12-07_0800-0900_g9b30a_from-ui-template.md`, `2025-12-09_0700-0800_g9b30a_from-ui-template.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-06_1800-1900_g9b30a_from-ui-template.md`, `2025-12-07_0800-0900_g9b30a_from-ui-template.md`, `2025-12-09_0700-0800_g9b30a_from-ui-template.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `2025-12-12_0700-0800_g9b30a.md`, `server.js`, `system-health-dashboard.tsx`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-12_0700-0800_g9b30a.md`, `server.js`, `system-health-dashboard.tsx` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building Markdown, JavaScript, JSON, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `server.js`, `ukb-workflow-graph.tsx`, `2025-12-20_1000-1100_g9b30a.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `ukb-workflow-graph.tsx`, `2025-12-20_1000-1100_g9b30a.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building JavaScript, Markdown, JSON, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `server.js`, `knowledge-paths.js`, `workflow-progress.json`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `knowledge-paths.js`, `workflow-progress.json` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building JavaScript, JSON, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `ui.json`, `entities.js`, `2026-01-04_1200-1300_g9b30a.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ui.json`, `entities.js`, `2026-01-04_1200-1300_g9b30a.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building JSON, JavaScript, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `multi-agent-graph.tsx`, `ukb-workflow-modal.tsx`, `2026-01-06_1800-1900_g9b30a.md`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Encapsulates data access logic. This pattern was established to maintain code consistency and developer experience",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `multi-agent-graph.tsx`, `ukb-workflow-modal.tsx`, `2026-01-06_1800-1900_g9b30a.md` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building Markdown, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with repository in this codebase, changes often span multiple modules. Key files: `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx`, `multi-agent-graph.tsx`",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx`, `multi-agent-graph.tsx` when modifying repository behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This repository pattern is applicable when building TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:05.127Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:37:21.459Z",
+        "last_updated": "2026-01-13T08:37:21.459Z"
+      },
+      "id": "mc4flkg7vclppg"
+    },
+    {
+      "name": "ComponentReusableUiBuildingBlocks",
+      "entityType": "ConstraintRule",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "DO: Check `memory-fallback.js`, `README.md`, `vscode-extension.md` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `UkbCli.md`, `cli.js`, `memory-fallback.js`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `UkbCli.md`, `cli.js`, `memory-fallback.js` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `memory-fallback.js`, `cli.js`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `memory-fallback.js`, `cli.js` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `constraint-monitor-components.puml`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `constraint-monitor-components.puml` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `violation-history.json`, `vscode-extension.md`, `constraint-monitor-components.puml`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `violation-history.json`, `vscode-extension.md`, `constraint-monitor-components.puml` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building JSON, Markdown, JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `statusline-health-monitor.js`, `config.json`, `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `statusline-health-monitor.js`, `config.json`, `enhanced-transcript-monitor.js` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building JavaScript, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `config.json`, `IMPLEMENTATION_SUMMARY.md`, `tasks.md`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `config.json`, `IMPLEMENTATION_SUMMARY.md`, `tasks.md` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md`, `2025-10-27_1700-1800_g9b30a.md`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md`, `2025-10-27_1700-1800_g9b30a.md` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building Markdown, JSON, JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `2025-11-15_1200-1300_g9b30a.md`, `2025-11-15_1700-1800_g9b30a.md`, `2025-11-15_1800-1900_g9b30a.md`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-15_1200-1300_g9b30a.md`, `2025-11-15_1700-1800_g9b30a.md`, `2025-11-15_1800-1900_g9b30a.md` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `coding.json`, `2025-11-20_0600-0700_g9b30a.md`, `2025-11-20_0700-0800_g9b30a.md`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `coding.json`, `2025-11-20_0600-0700_g9b30a.md`, `2025-11-20_0700-0800_g9b30a.md` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `2025-11-29_1400-1500_g9b30a.md`, `2025-11-29_1800-1900_g9b30a.md`, `2025-11-29_1900-2000_g9b30a.md`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1400-1500_g9b30a.md`, `2025-11-29_1800-1900_g9b30a.md`, `2025-11-29_1900-2000_g9b30a.md` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `2025-12-04_1200-1300_g9b30a_from-ui-template.md`, `2025-12-04_0800-0900_g9b30a_from-ui-template.md`, `coding.json`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-04_1200-1300_g9b30a_from-ui-template.md`, `2025-12-04_0800-0900_g9b30a_from-ui-template.md`, `coding.json` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `2025-12-12_0700-0800_g9b30a.md`, `health-status-card.tsx`, `system-health-dashboard.tsx`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-12_0700-0800_g9b30a.md`, `health-status-card.tsx`, `system-health-dashboard.tsx` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `ukb-workflow-graph.tsx`, `status-line.md`, `README.md`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-graph.tsx`, `status-line.md`, `README.md` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building Markdown, JavaScript, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `workflow-progress.json`, `statusline-health-monitor.js`, `batch-progress.tsx`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `workflow-progress.json`, `statusline-health-monitor.js`, `batch-progress.tsx` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building JSON, JavaScript, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `purge-knowledge-entities.js`, `coding.json`, `ui.json`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `purge-knowledge-entities.js`, `coding.json`, `ui.json` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building JavaScript, JSON, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `multi-agent-graph.tsx`, `coding.json`, `ukb-workflow-modal.tsx`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Reusable UI building blocks. This pattern was established to maintain code consistency and developer experience",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `multi-agent-graph.tsx`, `coding.json`, `ukb-workflow-modal.tsx` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building JSON, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with component in this codebase, changes often span multiple modules. Key files: `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx`, `multi-agent-graph.tsx`",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx`, `multi-agent-graph.tsx` when modifying component behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This component pattern is applicable when building Markdown, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:21.465Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:37:40.426Z",
+        "last_updated": "2026-01-13T08:37:40.426Z"
+      },
+      "id": "mc4flkg2a9lzvu"
+    },
+    {
+      "name": "DecoratorAddsBehaviorObjects",
+      "entityType": "Pattern",
+      "observations": [],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:37:44.037Z",
+        "last_updated": "2026-01-13T08:37:44.037Z"
+      },
+      "id": "mc4flkg3l5lt6d"
+    },
+    {
+      "name": "KnowledgegrapharchitectureDecisionImplementingKnowledge",
+      "entityType": "AnalysisArtifact",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "KnowledgeGraphArchitecture: | Decision: Implementing a knowledge graph for comprehensive knowledge management | Rationale: To provide a scalable and flexible knowledge management system | Example: `const knowledgeGraph = new KnowledgeGraph();` | Tradeoffs: Pro: Improved knowledge management scalability; Con: Increased complexity in implementation | Evidence: commit: 2025-05-31T06:58:09.000Z - feat: comprehensive knowledge graph management system, file: knowledge-management/auto-fix-knowledge-graph.sh",
+          "date": "2026-01-13T08:37:44.042Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:37:54.493Z",
+        "last_updated": "2026-01-13T08:37:54.493Z"
+      },
+      "id": "mc4flkg7700k0w"
+    },
+    {
+      "name": "PromiseHandlesAsynchronousOperations",
+      "entityType": "GraphDatabase",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "DO: Check `copilot-http-server.js`, `semantic-analysis-bridge.js`, `copilot.js` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building JavaScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `multi-file-storage.js`, `entities.js`, `start-http-server.js`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `multi-file-storage.js`, `entities.js`, `start-http-server.js` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`, `violation-capture-service.js`, `vscode-extension.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js`, `violation-capture-service.js`, `vscode-extension.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`, `statusline-health-monitor.js`, `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js`, `statusline-health-monitor.js`, `enhanced-transcript-monitor.js` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `IMPLEMENTATION_SUMMARY.md`, `tasks.md`, `validation-report.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `IMPLEMENTATION_SUMMARY.md`, `tasks.md`, `validation-report.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building Markdown, JavaScript, TypeScript, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md`, `2025-10-27_1700-1800_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md`, `2025-10-27_1700-1800_g9b30a_from-curriculum-alignment.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building Markdown, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `2025-11-15_1200-1300_g9b30a.md`, `combined-status-line.js`, `2025-11-15_1800-1900_g9b30a.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-15_1200-1300_g9b30a.md`, `combined-status-line.js`, `2025-11-15_1800-1900_g9b30a.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building Markdown, JavaScript, TypeScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`, `health-verifier.js`, `2025-06-16_13-32Z-clarification-on-code-assistance-request.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js`, `health-verifier.js`, `2025-06-16_13-32Z-clarification-on-code-assistance-request.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building JavaScript, Markdown, TypeScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `2025-11-29_1500-1600_g9b30a.md`, `GraphDatabaseService.js`, `2025-11-29_1700-1800_g9b30a.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1500-1600_g9b30a.md`, `GraphDatabaseService.js`, `2025-11-29_1700-1800_g9b30a.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `start-services-robust.js`, `statusline-health-monitor.js`, `2025-12-07_0800-0900_g9b30a.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `start-services-robust.js`, `statusline-health-monitor.js`, `2025-12-07_0800-0900_g9b30a.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building JavaScript, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `2025-12-12_0700-0800_g9b30a.md`, `server.js`, `ukb-workflow-graph.tsx`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-12_0700-0800_g9b30a.md`, `server.js`, `ukb-workflow-graph.tsx` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building Markdown, JavaScript, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `health-verifier.js`, `server.js`, `ukb-workflow-graph.tsx`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `health-verifier.js`, `server.js`, `ukb-workflow-graph.tsx` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building JavaScript, Markdown, JSON, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `server.js`, `start-services-robust.js`, `workflow-progress.json`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `start-services-robust.js`, `workflow-progress.json` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building JavaScript, JSON, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `purge-knowledge-entities.js`, `ui.json`, `2026-01-04_1100-1200_g9b30a.md`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Handles asynchronous operations. This pattern was established to manage asynchronous operations and prevent callback complexity",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `purge-knowledge-entities.js`, `ui.json`, `2026-01-04_1100-1200_g9b30a.md` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `ukb-workflow-modal.tsx`, `server.js`, `cgr-reindex-modal.tsx`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-modal.tsx`, `server.js`, `cgr-reindex-modal.tsx` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with promise in this codebase, changes often span multiple modules. Key files: `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx`",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx` when modifying promise behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This promise pattern is applicable when building TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:37:54.500Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        "Details: http://localhost:8080/knowledge-management/insights/PromiseHandlesAsynchronousOperations.md"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:38:08.076Z",
+        "last_updated": "2026-01-13T09:11:56.730Z"
+      },
+      "id": "mc4flkg1bgm4hw"
+    },
+    {
+      "name": "ServiceContainsBusinessLogic",
+      "entityType": "GraphDatabase",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `start-http-server.js`, `coding-keywords.json`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `start-http-server.js`, `coding-keywords.json` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JavaScript, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`, `violation-capture-service.js`, `vscode-extension.md`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js`, `violation-capture-service.js`, `vscode-extension.md` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JavaScript, Markdown, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`, `statusline-health-monitor.js`, `enhanced-transcript-monitor.js`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js`, `statusline-health-monitor.js`, `enhanced-transcript-monitor.js` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `IMPLEMENTATION_SUMMARY.md`, `tasks.md`, `validation-report.md`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `IMPLEMENTATION_SUMMARY.md`, `tasks.md`, `validation-report.md` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building Markdown, JSON, JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a.md`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `enhanced-transcript-monitor.js`, `2025-10-27_1600-1700_g9b30a.md`, `2025-10-27_1600-1700_g9b30a_from-curriculum-alignment.md` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `2025-11-15_1200-1300_g9b30a.md`, `combined-status-line.js`, `2025-11-15_1700-1800_g9b30a.md`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-15_1200-1300_g9b30a.md`, `combined-status-line.js`, `2025-11-15_1700-1800_g9b30a.md` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building Markdown, JavaScript, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `combined-status-line.js`, `health-verifier.js`, `coding.json`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `combined-status-line.js`, `health-verifier.js`, `coding.json` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JavaScript, JSON, Markdown, TypeScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `2025-11-29_1400-1500_g9b30a.md`, `2025-11-29_1500-1600_g9b30a.md`, `GraphDatabaseService.js`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1400-1500_g9b30a.md`, `2025-11-29_1500-1600_g9b30a.md`, `GraphDatabaseService.js` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building Markdown, JavaScript, TypeScript, JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `start-services-robust.js`, `coding.json`, `2025-12-05_1900-2000_g9b30a.md`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `start-services-robust.js`, `coding.json`, `2025-12-05_1900-2000_g9b30a.md` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JavaScript, JSON, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `2025-12-12_0700-0800_g9b30a.md`, `server.js`, `system-health-dashboard.tsx`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-12_0700-0800_g9b30a.md`, `server.js`, `system-health-dashboard.tsx` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building Markdown, JavaScript, JSON, TypeScript systems with critical reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `health-verifier.js`, `server.js`, `ukb-workflow-graph.tsx`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `health-verifier.js`, `server.js`, `ukb-workflow-graph.tsx` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JavaScript, Markdown, JSON, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `server.js`, `start-services-robust.js`, `workflow-progress.json`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Contains business logic. This pattern was established to maintain code consistency and developer experience",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `start-services-robust.js`, `workflow-progress.json` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JavaScript, JSON, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `coding.json`, `resi.json`, `graph-hierarchy.md`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `coding.json`, `resi.json`, `graph-hierarchy.md` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JSON, Markdown, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `coding.json`, `ukb-workflow-modal.tsx`, `2026-01-06_1800-1900_g9b30a.md`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `coding.json`, `ukb-workflow-modal.tsx`, `2026-01-06_1800-1900_g9b30a.md` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with service in this codebase, changes often span multiple modules. Key files: `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx`, `coding.json`",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-modal.tsx`, `ukb-workflow-graph.tsx`, `coding.json` when modifying service behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This service pattern is applicable when building JSON systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:08.078Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        "Details: http://localhost:8080/knowledge-management/insights/ServiceContainsBusinessLogic.md"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:38:26.731Z",
+        "last_updated": "2026-01-13T09:11:56.729Z"
+      },
+      "id": "mc4flkggeilmy"
+    },
+    {
+      "name": "MiddlewareProcessesRequestsInA",
+      "entityType": "AnalysisArtifact",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `ReduxStateManagementPattern.md`, `CrossProjectLoggingPattern.md`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Processes requests in a pipeline. This pattern was established to maintain code consistency and developer experience",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ReduxStateManagementPattern.md`, `CrossProjectLoggingPattern.md` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `copilot-http-server.js`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `copilot-http-server.js` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `copilot-http-server.js`, `insights.js`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `copilot-http-server.js`, `insights.js` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `index.js`, `copilot-http-server.js`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `index.js`, `copilot-http-server.js` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `tasks-template.md`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `tasks-template.md` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `statusline-health-monitor.js`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `statusline-health-monitor.js` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `AgentAgnosticCache.js`, `UnifiedInferenceEngine.js`, `statusline-health-monitor.js`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `AgentAgnosticCache.js`, `UnifiedInferenceEngine.js`, `statusline-health-monitor.js` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `2025-09-26_1100-1200_g9b30a.md`, `2025-09-26_1100-1200_g9b30a_from-curriculum-alignment.md`, `2025-09-26_1200-1300_g9b30a.md`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-09-26_1100-1200_g9b30a.md`, `2025-09-26_1100-1200_g9b30a_from-curriculum-alignment.md`, `2025-09-26_1200-1300_g9b30a.md` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-08_1300-1400_g9b30a.md`, `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building Markdown, JSON, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `2025-11-15_1200-1300_g9b30a.md`, `2025-11-15_1700-1800_g9b30a.md`, `2025-11-15_1800-1900_g9b30a.md`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-15_1200-1300_g9b30a.md`, `2025-11-15_1700-1800_g9b30a.md`, `2025-11-15_1800-1900_g9b30a.md` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building Markdown, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `2025-11-20_0600-0700_g9b30a.md`, `2025-11-20_0700-0800_g9b30a.md`, `2025-11-21_0600-0700_g9b30a.md`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-20_0600-0700_g9b30a.md`, `2025-11-20_0700-0800_g9b30a.md`, `2025-11-21_0600-0700_g9b30a.md` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `2025-11-29_1900-2000_g9b30a.md`, `express-server.js`, `2025-11-30_0600-0700_g9b30a.md`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1900-2000_g9b30a.md`, `express-server.js`, `2025-11-30_0600-0700_g9b30a.md` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building Markdown, JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `start-services-robust.js`, `statusline-health-monitor.js`, `package.json`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `start-services-robust.js`, `statusline-health-monitor.js`, `package.json` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building JavaScript, JSON, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `2025-12-12_0700-0800_g9b30a.md`, `package.json`, `server.js`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-12_0700-0800_g9b30a.md`, `package.json`, `server.js` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building Markdown, JSON, JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `server.js`, `statusline-health-monitor.js`, `start-services-robust.js`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `statusline-health-monitor.js`, `start-services-robust.js` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This middleware pattern is applicable when building JavaScript, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `server.js`, `start-services-robust.js`, `statusline-health-monitor.js`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `start-services-robust.js`, `statusline-health-monitor.js` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `server.js`, `2026-01-05_1900-2000_g9b30a.md`, `2026-01-06_0600-0700_g9b30a.md`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `2026-01-05_1900-2000_g9b30a.md`, `2026-01-06_0600-0700_g9b30a.md` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with middleware in this codebase, changes often span multiple modules. Key files: `server.js`, `2026-01-09_0700-0800_g9b30a.md`, `api-handles-external-communication-pattern-architecture.puml`",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `2026-01-09_0700-0800_g9b30a.md`, `api-handles-external-communication-pattern-architecture.puml` when modifying middleware behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:38:26.735Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:38:40.851Z",
+        "last_updated": "2026-01-13T08:38:40.851Z"
+      },
+      "id": "mc4flkg1rv4k1f"
+    },
+    {
+      "name": "ObserverDefinesOnetomanyDependencyBetween",
+      "entityType": "WorkflowDefinition",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `insights.js`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Defines one-to-many dependency between objects. This pattern was established to maintain code consistency and developer experience",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `insights.js` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This observer pattern is applicable when building JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `IMPLEMENTATION_SUMMARY.md`, `2025-10-19_1600-1700_g9b30a.md`, `continuous-learning-system.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `IMPLEMENTATION_SUMMARY.md`, `2025-10-19_1600-1700_g9b30a.md`, `continuous-learning-system.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This observer pattern is applicable when building Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `2025-09-26_1100-1200_g9b30a.md`, `2025-09-26_1100-1200_g9b30a_from-curriculum-alignment.md`, `2025-09-26_1200-1300_g9b30a_from-curriculum-alignment.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-09-26_1100-1200_g9b30a.md`, `2025-09-26_1100-1200_g9b30a_from-curriculum-alignment.md`, `2025-09-26_1200-1300_g9b30a_from-curriculum-alignment.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `2025-11-08_1400-1500_g9b30a.md`, `provider.tsx`, `2025-11-14_1400-1500_g9b30a.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-08_1400-1500_g9b30a.md`, `provider.tsx`, `2025-11-14_1400-1500_g9b30a.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `2025-11-15_1800-1900_g9b30a.md`, `2025-11-16_1600-1700_g9b30a.md`, `StateDrivenAnimationPipelinePattern.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-15_1800-1900_g9b30a.md`, `2025-11-16_1600-1700_g9b30a.md`, `StateDrivenAnimationPipelinePattern.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `2025-11-21_0600-0700_g9b30a_from-nano-degree.md`, `2025-11-21_0800-0900_g9b30a.md`, `2025-11-22_1000-1100_g9b30a.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-21_0600-0700_g9b30a_from-nano-degree.md`, `2025-11-21_0800-0900_g9b30a.md`, `2025-11-22_1000-1100_g9b30a.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `2025-11-29_1900-2000_g9b30a.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1900-2000_g9b30a.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `2025-12-04_1200-1300_g9b30a_from-ui-template.md`, `2025-12-06_1900-2000_g9b30a_from-ui-template.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-04_1200-1300_g9b30a_from-ui-template.md`, `2025-12-06_1900-2000_g9b30a_from-ui-template.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `ukb-workflow-graph.tsx`, `2025-12-13_0900-1000_g9b30a_from-ui-template.md`, `2025-12-13_1200-1300_g9b30a.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-graph.tsx`, `2025-12-13_0900-1000_g9b30a_from-ui-template.md`, `2025-12-13_1200-1300_g9b30a.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `ukb-workflow-graph.tsx`, `2025-12-20_1000-1100_g9b30a.md`, `2025-12-18_0700-0800_g9b30a_from-ui-template.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-graph.tsx`, `2025-12-20_1000-1100_g9b30a.md`, `2025-12-18_0700-0800_g9b30a_from-ui-template.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `ukb-workflow-graph.tsx`, `constants.ts`, `multi-agent-graph.tsx`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-graph.tsx`, `constants.ts`, `multi-agent-graph.tsx` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This observer pattern is applicable when building TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `ukb-workflow-graph.tsx`, `multi-agent-graph.tsx`, `constants.ts`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukb-workflow-graph.tsx`, `multi-agent-graph.tsx`, `constants.ts` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with observer in this codebase, changes often span multiple modules. Key files: `multi-agent-graph.tsx`, `constants.ts`, `2026-01-07_0900-1000_g9b30a.md`",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `multi-agent-graph.tsx`, `constants.ts`, `2026-01-07_0900-1000_g9b30a.md` when modifying observer behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This observer pattern is applicable when building TypeScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T08:39:14.663Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:39:30.223Z",
+        "last_updated": "2026-01-13T08:39:30.223Z"
+      },
+      "id": "mc4flkg3l01k8v"
+    },
+    {
+      "name": "FactoryCreatesObjectsWithout",
+      "entityType": "Insight",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "factory: Creates objects without specifying exact classes",
+          "date": "2026-01-13T08:39:30.231Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:39:50.111Z",
+        "last_updated": "2026-01-13T08:39:50.111Z"
+      },
+      "id": "mc4flkg7vqh61r"
+    },
+    {
+      "name": "ObserverDefinesOneMany",
+      "entityType": "Constraint",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "observer: Defines one-to-many dependency between objects",
+          "date": "2026-01-13T08:39:50.114Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T08:40:06.739Z",
+        "last_updated": "2026-01-13T08:40:06.739Z"
+      },
+      "id": "mc4flkglqxjgd"
+    },
+    {
+      "name": "FactoryCreatesObjectsWithoutSpecifying",
+      "entityType": "Insight",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `specstory-adapter.js`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Creates objects without specifying exact classes. This pattern was established to maintain code consistency and developer experience",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `specstory-adapter.js` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This factory pattern is applicable when building JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `copilot-http-server.js`, `VSCodeToolIntegrationPattern.md`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `copilot-http-server.js`, `VSCodeToolIntegrationPattern.md` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This factory pattern is applicable when building JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `copilot-http-server.js`, `relations.js`, `cli.js`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `copilot-http-server.js`, `relations.js`, `cli.js` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `cli.js`, `copilot-http-server.js`, `specstory-adapter.js`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `cli.js`, `copilot-http-server.js`, `specstory-adapter.js` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `copilot-http-server.js`, `cli.js`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `copilot-http-server.js`, `cli.js` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `batch-lsl-processor.js`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `batch-lsl-processor.js` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `2025-10-19_1700-1800_g9b30a.md`, `2025-10-20_1400-1500_g9b30a.md`, `2025-10-21_0600-0700_g9b30a.md`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-10-19_1700-1800_g9b30a.md`, `2025-10-20_1400-1500_g9b30a.md`, `2025-10-21_0600-0700_g9b30a.md` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This factory pattern is applicable when building Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `2025-09-26_1100-1200_g9b30a.md`, `2025-09-26_1100-1200_g9b30a_from-curriculum-alignment.md`, `2025-09-26_1200-1300_g9b30a.md`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-09-26_1100-1200_g9b30a.md`, `2025-09-26_1100-1200_g9b30a_from-curriculum-alignment.md`, `2025-09-26_1200-1300_g9b30a.md` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`, `server.js`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-08_1400-1500_g9b30a.md`, `2025-11-08_1400-1500_g9b30a_from-curriculum-alignment.md`, `server.js` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This factory pattern is applicable when building Markdown, JavaScript systems with standard reliability requirements",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `2025-11-16_0800-0900_g9b30a.md`, `server.js`, `express-server.js`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-16_0800-0900_g9b30a.md`, `server.js`, `express-server.js` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `2025-11-20_0700-0800_g9b30a.md`, `2025-11-22_1500-1600_g9b30a.md`, `2025-11-22_1700-1800_g9b30a.md`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-20_0700-0800_g9b30a.md`, `2025-11-22_1500-1600_g9b30a.md`, `2025-11-22_1700-1800_g9b30a.md` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `2025-11-29_1900-2000_g9b30a.md`, `express-server.js`, `2025-11-30_0700-0800_g9b30a.md`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-11-29_1900-2000_g9b30a.md`, `express-server.js`, `2025-11-30_0700-0800_g9b30a.md` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `2025-12-12_0700-0800_g9b30a.md`, `server.js`, `2025-12-12_1500-1600_g9b30a.md`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `2025-12-12_0700-0800_g9b30a.md`, `server.js`, `2025-12-12_1500-1600_g9b30a.md` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This factory pattern is applicable when building Markdown, JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `server.js`, `2025-12-20_1200-1300_g9b30a_from-nano-degree.md`, `2025-12-20_1700-1800_g9b30a_from-nano-degree.md`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `2025-12-20_1200-1300_g9b30a_from-nano-degree.md`, `2025-12-20_1700-1800_g9b30a_from-nano-degree.md` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This factory pattern is applicable when building JavaScript, Markdown, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `server.js`, `2025-12-27_1200-1300_g9b30a.md`, `ukbSlice.ts`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `2025-12-27_1200-1300_g9b30a.md`, `ukbSlice.ts` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `ukbSlice.ts`, `server.js`, `2026-01-06_1500-1600_g9b30a.md`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `ukbSlice.ts`, `server.js`, `2026-01-06_1500-1600_g9b30a.md` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This factory pattern is applicable when building TypeScript, JavaScript, Markdown systems with standard reliability requirements",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "When working with factory in this codebase, changes often span multiple modules. Key files: `server.js`, `ukbSlice.ts`",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DO: Check `server.js`, `ukbSlice.ts` when modifying factory behavior. DON'T: Make isolated changes without verifying related modules",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "This factory pattern is applicable when building JavaScript, TypeScript systems with standard reliability requirements",
+          "date": "2026-01-13T09:11:56.449Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T09:12:14.155Z",
+        "last_updated": "2026-01-13T09:12:14.155Z"
+      },
+      "id": "mc4flkg65efhni"
+    },
+    {
+      "name": "ComprehensiveknowledgemanagementsystemDecisionUseComprehensive",
+      "entityType": "Decision",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ComprehensiveKnowledgeManagementSystem: | Decision: To use a comprehensive knowledge management system | Rationale: To improve the management and updating of the knowledge base with session learnings | Example: `knowledge-management/auto-fix-knowledge-graph.sh` | Tradeoffs: Pro: Better knowledge management and updating; Con: More complex system with additional scripts | Evidence: commit: 2025-05-31T06:58:09.000Z - feat: comprehensive knowledge graph management system, file: knowledge-management/auto-fix-knowledge-graph.sh",
+          "date": "2026-01-13T13:01:00.923Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T13:01:04.097Z",
+        "last_updated": "2026-01-13T13:01:04.097Z"
+      },
+      "id": "mc4flkg933o6cl"
+    },
+    {
+      "name": "MultiprojectsemanticclassifierpatternProblemHowClassify",
+      "entityType": "Pattern",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "MultiProjectSemanticClassifierPattern: | Problem: How to classify projects semantically | Solution: Implement a multi-project semantic classifier using embeddings | Example: `const classifier = new MultiProjectSemanticClassifier(); classifier.classify(project);` | DO: ALWAYS use embeddings for semantic classification; Use a reliable classifier for multi-project classification | DON'T: NEVER use a single-project classifier for multi-project classification; Avoid using a classifier without embeddings | Evidence: commit: 2025-10-16T13:50:48.000Z - feat: multi-project semantic classifier (embeddings), file: scripts/reliable-classifier.js",
+          "date": "2026-01-13T13:01:04.109Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T13:01:06.302Z",
+        "last_updated": "2026-01-13T13:01:06.302Z"
+      },
+      "id": "mc4flkg2w77gv2"
+    },
+    {
+      "name": "MicroservicesarchitectureDecisionUsingMicroservices",
+      "entityType": "Decision",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "MicroservicesArchitecture: | Decision: Using microservices architecture for the system | Rationale: To achieve scalability, flexibility, and maintainability | Example: `const services = [new Service1(), new Service2()];` | Tradeoffs: Pro: Better scalability and flexibility; Con: Increased complexity and communication overhead | Evidence: commit: abc123 - Implemented microservices architecture",
+          "date": "2026-01-13T13:01:04.109Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T13:01:06.647Z",
+        "last_updated": "2026-01-13T13:01:06.647Z"
+      },
+      "id": "mc4flkg6ri89bj"
+    },
+    {
+      "name": "ConstraintmonitorpatternProblemHowMonitor",
+      "entityType": "Constraint",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ConstraintMonitorPattern: | Problem: How to monitor constraints in a project | Solution: Implement a constraint monitor using a .constraint-monitor.yaml file | Example: `const monitor = new ConstraintMonitor(); monitor.update(constraints);` | DO: ALWAYS use a .constraint-monitor.yaml file to define constraints; Use a constraint monitor to update constraints | DON'T: NEVER hardcode constraints in the code; Avoid using a constraint monitor without a .constraint-monitor.yaml file | Evidence: commit: 2025-10-11T15:46:47.000Z - fix: remove Test keyword from no-evolutionary-names constraint, file: .constraint-monitor.yaml",
+          "date": "2026-01-13T13:01:04.109Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T13:01:06.649Z",
+        "last_updated": "2026-01-13T13:01:06.649Z"
+      },
+      "id": "mc4flkg24eouly"
+    },
+    {
+      "name": "ModularconstraintmonitorarchitectureDecisionUseModular",
+      "entityType": "Decision",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ModularConstraintMonitorArchitecture: | Decision: Use a modular architecture for the constraint monitor | Rationale: To improve maintainability and scalability | Example: `const monitor = new ConstraintMonitor(); monitor.update(constraints);` | Tradeoffs: Pro: Better maintainability and scalability; Con: More complex architecture | Evidence: commit: 2025-10-11T15:46:47.000Z - fix: remove Test keyword from no-evolutionary-names constraint, file: .constraint-monitor.yaml",
+          "date": "2026-01-13T13:01:04.109Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T13:01:06.652Z",
+        "last_updated": "2026-01-13T13:01:06.652Z"
+      },
+      "id": "mc4flkg3g467rv"
+    },
+    {
+      "name": "RealtimetrajectoryanalyzerpatternProblemHowAnalyze",
+      "entityType": "TrajectoryState",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "RealTimeTrajectoryAnalyzerPattern: | Problem: How to analyze trajectories in real-time | Solution: Implement a RealTimeTrajectoryAnalyzer class with a heartbeat to keep live-state.json fresh | Example: `const analyzer = new RealTimeTrajectoryAnalyzer(); analyzer.heartbeat();` | DO: ALWAYS use a heartbeat to update live-state.json; Use memoization for expensive computations | DON'T: NEVER access live-state.json directly without the analyzer; Avoid inline object creation in the analyzer | Evidence: commit: 2025-10-07T12:04:45.000Z - fix: add heartbeat to keep live-state.json fresh, file: src/live-logging/RealTimeTrajectoryAnalyzer.js",
+          "date": "2026-01-13T13:01:04.109Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T13:01:07.033Z",
+        "last_updated": "2026-01-13T13:01:07.033Z"
+      },
+      "id": "mc4flkg1neqhib"
+    },
+    {
+      "name": "RealtimetrajectoryanalysisarchitectureDecisionUseReal",
+      "entityType": "Decision",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "RealTimeTrajectoryAnalysisArchitecture: | Decision: Use a real-time trajectory analysis architecture | Rationale: To improve the accuracy of trajectory analysis | Example: `const analyzer = new RealTimeTrajectoryAnalyzer(); analyzer.heartbeat();` | Tradeoffs: Pro: More accurate trajectory analysis; Con: More complex architecture | Evidence: commit: 2025-10-07T12:04:45.000Z - fix: add heartbeat to keep live-state.json fresh, file: src/live-logging/RealTimeTrajectoryAnalyzer.js",
+          "date": "2026-01-13T13:01:04.109Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-01-13T13:01:07.402Z",
+        "last_updated": "2026-01-13T13:01:07.402Z"
+      },
+      "id": "mc4flkg2bddnco"
     }
   ],
   "relations": [
@@ -2321,14 +6002,68 @@
       "to": "Coding",
       "relationType": "related-to",
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ObserverDefinesOnetomanyDependencyBetween",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "MiddlewareProcessesRequestsInA",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ApiHandlesExternalCommunication",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "RepositoryEncapsulatesDataAccessLogic",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ComponentReusableUiBuildingBlocks",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ServiceContainsBusinessLogic",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "PromiseHandlesAsynchronousOperations",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "DecoratorAddsBehaviorToObjects",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "FactoryCreatesObjectsWithoutSpecifying",
+      "relationType": "contains",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-01-13T06:59:16.871Z",
-    "total_entities": 23,
-    "total_relations": 51,
+    "exported_at": "2026-01-13T13:01:12.406Z",
+    "total_entities": 43,
+    "total_relations": 60,
     "description": "Coding project infrastructure and patterns"
   }
 }
