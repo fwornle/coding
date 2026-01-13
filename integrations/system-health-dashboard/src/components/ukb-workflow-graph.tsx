@@ -1487,18 +1487,22 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   }
 
   // Returns fill and stroke colors for SVG nodes with better contrast
-  const getNodeColors = (status: string, isSelected: boolean): { fill: string; stroke: string; textColor: string } => {
+  // Running = GREEN with bold outline (same as completed but with thicker stroke)
+  // Completed = GREEN (no bold outline)
+  // Pending = GREY
+  const getNodeColors = (status: string, isSelected: boolean): { fill: string; stroke: string; textColor: string; strokeWidth: number } => {
     switch (status) {
       case 'running':
-        return { fill: '#dbeafe', stroke: '#3b82f6', textColor: '#1e3a8a' } // blue-100, blue-500, blue-900
+        // GREEN with bold outline - same green as completed but thicker stroke indicates "active"
+        return { fill: '#166534', stroke: '#22c55e', textColor: '#ffffff', strokeWidth: 4 } // green-800, green-500 (brighter for visibility), white, BOLD
       case 'completed':
-        return { fill: '#166534', stroke: '#15803d', textColor: '#ffffff' } // green-800, green-700, white
+        return { fill: '#166534', stroke: '#15803d', textColor: '#ffffff', strokeWidth: 2 } // green-800, green-700, white
       case 'failed':
-        return { fill: '#fee2e2', stroke: '#ef4444', textColor: '#7f1d1d' } // red-100, red-500, red-900
+        return { fill: '#fee2e2', stroke: '#ef4444', textColor: '#7f1d1d', strokeWidth: 2 } // red-100, red-500, red-900
       case 'skipped':
-        return { fill: '#f3f4f6', stroke: '#9ca3af', textColor: '#6b7280' } // gray-100, gray-400, gray-500
+        return { fill: '#f3f4f6', stroke: '#9ca3af', textColor: '#6b7280', strokeWidth: 2 } // gray-100, gray-400, gray-500
       default:
-        return { fill: '#f9fafb', stroke: '#d1d5db', textColor: '#4b5563' } // gray-50, gray-300, gray-600
+        return { fill: '#f9fafb', stroke: '#d1d5db', textColor: '#4b5563', strokeWidth: 2 } // gray-50, gray-300, gray-600 (pending)
     }
   }
 
@@ -2059,6 +2063,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                       onMouseLeave={handleNodeMouseLeave}
                     >
                       {/* Node background - using direct SVG colors for better control */}
+                      {/* strokeWidth varies: 4px for running (bold), 2px for others */}
                       <rect
                         x={pos.x}
                         y={pos.y}
@@ -2067,12 +2072,12 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         rx={8}
                         fill={colors.fill}
                         stroke={colors.stroke}
-                        strokeWidth={2}
-                        className="transition-all duration-150 group-hover:stroke-[3px]"
+                        strokeWidth={colors.strokeWidth}
+                        className="transition-all duration-150"
                         style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
                       />
 
-                      {/* Selection ring */}
+                      {/* Selection ring - shown when user clicks on a node */}
                       {isSelected && (
                         <rect
                           x={pos.x - 3}
@@ -2087,18 +2092,20 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         />
                       )}
 
-                      {/* Running animation */}
+                      {/* Running animation - green glow with pulsing effect */}
+                      {/* The bold outline is already in the base rect; this adds the animation */}
                       {status === 'running' && (
                         <rect
-                          x={pos.x}
-                          y={pos.y}
-                          width={nodeWidth}
-                          height={nodeHeight}
-                          rx={8}
+                          x={pos.x - 2}
+                          y={pos.y - 2}
+                          width={nodeWidth + 4}
+                          height={nodeHeight + 4}
+                          rx={10}
                           fill="none"
-                          stroke="#3b82f6"
+                          stroke="#22c55e"
                           strokeWidth={2}
                           className="animate-pulse"
+                          style={{ opacity: 0.7 }}
                         />
                       )}
 
