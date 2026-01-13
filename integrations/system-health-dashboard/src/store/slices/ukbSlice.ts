@@ -195,6 +195,17 @@ export interface PersistedKnowledge {
   deduplicationRatio: string | null
 }
 
+// Detailed step output for history view (includes actual commit arrays, session arrays, etc.)
+export interface BatchStepOutput {
+  name: string
+  status: string
+  duration?: number
+  outputs?: Record<string, any>  // Full outputs with arrays (commits, sessions, etc.)
+  tokensUsed?: number
+  llmProvider?: string
+  llmCalls?: number
+}
+
 // Completed batch from batch-checkpoints.json (for historical tracer display)
 export interface CompletedBatch {
   batchId: string
@@ -218,6 +229,8 @@ export interface CompletedBatch {
     duration?: number
     operatorResults?: Record<string, { processed?: number; duration?: number; core?: number; nonCore?: number; embedded?: number; merged?: number; edgesAdded?: number; entitiesAdded?: number }>
   }
+  /** Detailed step outputs for history view - includes arrays of commits, sessions, etc. */
+  stepOutputs?: BatchStepOutput[]
 }
 
 // Trace event for workflow execution tracing
