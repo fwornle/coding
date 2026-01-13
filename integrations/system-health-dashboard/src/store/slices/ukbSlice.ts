@@ -204,6 +204,7 @@ export interface BatchStepOutput {
   tokensUsed?: number
   llmProvider?: string
   llmCalls?: number
+  llmError?: string  // Actual error message when LLM calls fail (e.g., "out of credit")
 }
 
 // Completed batch from batch-checkpoints.json (for historical tracer display)
