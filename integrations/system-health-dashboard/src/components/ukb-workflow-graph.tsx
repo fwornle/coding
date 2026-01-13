@@ -613,6 +613,9 @@ interface ProcessInfo {
   health: 'healthy' | 'stale' | 'frozen' | 'dead'
   progressPercent: number
   steps?: StepInfo[]
+  // Single-step debugging mode state
+  stepPaused?: boolean
+  pausedAtStep?: string | null
   batchProgress?: {
     currentBatch: number
     totalBatches: number
@@ -666,7 +669,7 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
   agentId: string;
   outputs: Record<string, any>;
   aggregatedSteps?: AggregatedSteps | null;
-  status?: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  status?: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'paused';
 }) {
   const getSummary = (): string | null => {
     // Handle non-completed states with informative messages
@@ -675,6 +678,9 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
     }
     if (status === 'running') {
       return '🔄 Currently processing...'
+    }
+    if (status === 'paused') {
+      return '⏸️ Paused in single-step mode (click Step to continue)'
     }
     if (status === 'skipped') {
       return '⏭️ Skipped (not required for this workflow)'
@@ -1431,7 +1437,16 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     }
   }, [WORKFLOW_AGENTS, WORKFLOW_EDGES])
 
-  const getNodeStatus = (agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
+  const getNodeStatus = (agentId: string): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'paused' => {
+    // Check if this agent's step is currently paused in single-step mode
+    if (process.stepPaused && process.pausedAtStep) {
+      // Map the pausedAtStep (workflow step name) to agent ID
+      const pausedAgentId = STEP_TO_AGENT[process.pausedAtStep] || process.pausedAtStep
+      if (pausedAgentId === agentId) {
+        return 'paused'
+      }
+    }
+
     const stepInfo = stepStatusMap[agentId]
     if (stepInfo) return stepInfo.status
 
@@ -1489,12 +1504,16 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   // Returns fill and stroke colors for SVG nodes with better contrast
   // Running = GREEN with bold outline (same as completed but with thicker stroke)
   // Completed = GREEN (no bold outline)
+  // Paused = AMBER with bold pulsing outline (single-step mode paused)
   // Pending = GREY
   const getNodeColors = (status: string, isSelected: boolean): { fill: string; stroke: string; textColor: string; strokeWidth: number } => {
     switch (status) {
       case 'running':
         // GREEN with bold outline - same green as completed but thicker stroke indicates "active"
         return { fill: '#166534', stroke: '#22c55e', textColor: '#ffffff', strokeWidth: 4 } // green-800, green-500 (brighter for visibility), white, BOLD
+      case 'paused':
+        // AMBER with bold outline - clearly shows single-step mode pause state
+        return { fill: '#92400e', stroke: '#f59e0b', textColor: '#ffffff', strokeWidth: 4 } // amber-800, amber-500, white, BOLD
       case 'completed':
         return { fill: '#166534', stroke: '#15803d', textColor: '#ffffff', strokeWidth: 2 } // green-800, green-700, white
       case 'failed':
@@ -1510,6 +1529,9 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     switch (status) {
       case 'running':
         return <Loader2 className="h-3 w-3 animate-spin" />
+      case 'paused':
+        // Amber pause icon with subtle pulse animation
+        return <StopCircle className="h-3 w-3 text-amber-500 animate-pulse" />
       case 'completed':
         return <CheckCircle2 className="h-3 w-3" />
       case 'failed':
@@ -2633,6 +2655,8 @@ function OrchestratorDetailsSidebar({
     switch (status) {
       case 'running':
         return <Badge className="bg-blue-500">Running</Badge>
+      case 'paused':
+        return <Badge className="bg-amber-500 animate-pulse">Paused</Badge>
       case 'completed':
         return <Badge className="bg-green-500">Completed</Badge>
       case 'failed':
@@ -3108,7 +3132,15 @@ export function UKBNodeDetailsSidebar({
   }, [agentId, isBatchWorkflow, currentBatch, process.steps])
 
   // Use same fallback logic as getNodeStatus in the graph
-  const getInferredStatus = (): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' => {
+  const getInferredStatus = (): 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'paused' => {
+    // Check if this agent's step is currently paused in single-step mode
+    if (process.stepPaused && process.pausedAtStep) {
+      const pausedAgentId = STEP_TO_AGENT[process.pausedAtStep] || process.pausedAtStep
+      if (pausedAgentId === agentId) {
+        return 'paused'
+      }
+    }
+
     if (stepInfo?.status) return stepInfo.status as any
 
     // For batch workflows, check if we have aggregated data for this agent - means it was processed
@@ -3178,6 +3210,8 @@ export function UKBNodeDetailsSidebar({
     switch (status) {
       case 'running':
         return <Badge className="bg-blue-500">Running</Badge>
+      case 'paused':
+        return <Badge className="bg-amber-500 animate-pulse">Paused</Badge>
       case 'completed':
         return <Badge className="bg-green-500">Completed</Badge>
       case 'failed':
@@ -3242,6 +3276,7 @@ export function UKBNodeDetailsSidebar({
                 inferredStatus === 'completed' ? 'text-green-600 font-medium' :
                 inferredStatus === 'failed' ? 'text-red-600 font-medium' :
                 inferredStatus === 'running' ? 'text-blue-600 font-medium' :
+                inferredStatus === 'paused' ? 'text-amber-600 font-medium animate-pulse' :
                 'text-muted-foreground'
               }>
                 {inferredStatus.charAt(0).toUpperCase() + inferredStatus.slice(1)}
