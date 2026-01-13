@@ -1333,13 +1333,18 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     }
 
     // Infer current step from process.currentStep
+    // Only override to 'running' if step hasn't already completed/failed (prevents resetting completed steps)
     if (process.currentStep) {
       const currentAgentId = STEP_TO_AGENT[process.currentStep] || process.currentStep
-      if (map[currentAgentId]) {
-        // Create a new object with updated status to avoid mutating frozen state
-        map[currentAgentId] = { ...map[currentAgentId], status: 'running' }
-      } else {
-        map[currentAgentId] = { name: process.currentStep, status: 'running' }
+      const existingStatus = map[currentAgentId]?.status
+      // Don't override completed/failed steps - they should retain their final status
+      if (existingStatus !== 'completed' && existingStatus !== 'failed') {
+        if (map[currentAgentId]) {
+          // Create a new object with updated status to avoid mutating frozen state
+          map[currentAgentId] = { ...map[currentAgentId], status: 'running' }
+        } else {
+          map[currentAgentId] = { name: process.currentStep, status: 'running' }
+        }
       }
     }
 
