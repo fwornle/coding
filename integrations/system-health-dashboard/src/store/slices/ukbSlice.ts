@@ -320,6 +320,12 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'validate_project_entities': 'content_validation',
 }
 
+// Sub-step selection for sidebar display
+interface SelectedSubStep {
+  agentId: string
+  substepId: string
+}
+
 interface UKBState {
   // Active workflows
   loading: boolean
@@ -341,6 +347,22 @@ interface UKBState {
   activeTab: 'active' | 'history'
   selectedProcessIndex: number
   selectedNode: string | null
+
+  // Single-step debugging mode (MVI: Single source of truth)
+  // singleStepMode: User's preference (can only be changed by checkbox toggle)
+  // singleStepModeExplicit: True if user explicitly set it this session (prevents server overwrite)
+  // stepPaused: Server-reported pause state (from coordinator via progress file)
+  // pausedAtStep: The step where workflow is paused (from server)
+  singleStepMode: boolean
+  singleStepModeExplicit: boolean
+  stepPaused: boolean
+  pausedAtStep: string | null
+
+  // Sub-step UI state (MVI: Single source of truth for visualization)
+  // expandedSubStepsAgent: Which agent's sub-steps arc is expanded (null = none)
+  // selectedSubStep: Which sub-step is selected for sidebar display
+  expandedSubStepsAgent: string | null
+  selectedSubStep: SelectedSubStep | null
 
   // Historical workflows
   historicalWorkflows: HistoricalWorkflow[]
@@ -382,6 +404,16 @@ const initialState: UKBState = {
   activeTab: 'active',
   selectedProcessIndex: 0,
   selectedNode: null,
+
+  // Single-step debugging mode (MVI: initialized from server on first poll)
+  singleStepMode: false,
+  singleStepModeExplicit: false,
+  stepPaused: false,
+  pausedAtStep: null,
+
+  // Sub-step UI state
+  expandedSubStepsAgent: null,
+  selectedSubStep: null,
 
   // Historical workflows
   historicalWorkflows: [],
@@ -557,6 +589,54 @@ const ukbSlice = createSlice({
     selectTraceEvent(state, action: PayloadAction<string | undefined>) {
       state.trace.selectedEventId = action.payload
     },
+
+    // ========================================
+    // Single-step mode actions (MVI: ONLY way to change single-step state)
+    // ========================================
+
+    // Toggle single-step mode - called ONLY from checkbox or step button
+    setSingleStepMode(state, action: PayloadAction<{ enabled: boolean; explicit: boolean }>) {
+      state.singleStepMode = action.payload.enabled
+      state.singleStepModeExplicit = action.payload.explicit
+    },
+
+    // Sync pause state from server (coordinator via progress file)
+    // This does NOT change singleStepMode itself - only stepPaused and pausedAtStep
+    syncStepPauseFromServer(state, action: PayloadAction<{ paused: boolean; pausedAt: string | null }>) {
+      state.stepPaused = action.payload.paused
+      state.pausedAtStep = action.payload.pausedAt
+    },
+
+    // Sync single-step mode from server ONLY if user hasn't explicitly set it
+    syncSingleStepFromServer(state, action: PayloadAction<boolean>) {
+      // CRITICAL: Only sync from server if user hasn't explicitly changed it this session
+      if (!state.singleStepModeExplicit) {
+        state.singleStepMode = action.payload
+      }
+    },
+
+    // Reset explicit flag (e.g., when modal closes or workflow ends)
+    resetSingleStepExplicit(state) {
+      state.singleStepModeExplicit = false
+    },
+
+    // ========================================
+    // Sub-step UI actions (MVI: Single source of truth for visualization)
+    // ========================================
+
+    // Set which agent's sub-steps arc is expanded (null = none)
+    setExpandedSubStepsAgent(state, action: PayloadAction<string | null>) {
+      state.expandedSubStepsAgent = action.payload
+      // Clear selected sub-step when changing expanded agent
+      if (action.payload === null) {
+        state.selectedSubStep = null
+      }
+    },
+
+    // Set selected sub-step for sidebar display
+    setSelectedSubStep(state, action: PayloadAction<SelectedSubStep | null>) {
+      state.selectedSubStep = action.payload
+    },
   },
 })
 
@@ -585,6 +665,14 @@ export const {
   updateTraceEvent,
   clearTraces,
   selectTraceEvent,
+  // Single-step mode actions (MVI)
+  setSingleStepMode,
+  syncStepPauseFromServer,
+  syncSingleStepFromServer,
+  resetSingleStepExplicit,
+  // Sub-step UI actions (MVI)
+  setExpandedSubStepsAgent,
+  setSelectedSubStep,
 } = ukbSlice.actions
 
 // Selectors
@@ -850,6 +938,55 @@ export const selectTraceStats = createSelector(
       totalCost,
     }
   }
+)
+
+// ========================================
+// Single-step mode selectors (MVI)
+// ========================================
+
+export const selectSingleStepMode = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.singleStepMode
+)
+
+export const selectSingleStepModeExplicit = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.singleStepModeExplicit
+)
+
+export const selectStepPaused = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.stepPaused
+)
+
+export const selectPausedAtStep = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.pausedAtStep
+)
+
+// Combined selector for single-step debugging state
+export const selectSingleStepState = createSelector(
+  [selectUkbState],
+  (ukb) => ({
+    singleStepMode: ukb.singleStepMode,
+    singleStepModeExplicit: ukb.singleStepModeExplicit,
+    stepPaused: ukb.stepPaused,
+    pausedAtStep: ukb.pausedAtStep,
+  })
+)
+
+// ========================================
+// Sub-step UI selectors (MVI)
+// ========================================
+
+export const selectExpandedSubStepsAgent = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.expandedSubStepsAgent
+)
+
+export const selectSelectedSubStep = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.selectedSubStep
 )
 
 export default ukbSlice.reducer

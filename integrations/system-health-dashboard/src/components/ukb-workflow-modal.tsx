@@ -64,6 +64,20 @@ import {
   selectAccumulatedStats,
   selectPersistedKnowledge,
   selectStepTimingStatistics,
+  // Single-step mode actions (MVI)
+  setSingleStepMode,
+  syncStepPauseFromServer,
+  syncSingleStepFromServer,
+  resetSingleStepExplicit,
+  setExpandedSubStepsAgent,
+  setSelectedSubStep,
+  // Single-step mode selectors (MVI)
+  selectSingleStepMode,
+  selectSingleStepModeExplicit,
+  selectStepPaused,
+  selectPausedAtStep,
+  selectExpandedSubStepsAgent,
+  selectSelectedSubStep,
   type HistoricalWorkflow,
   type UKBProcess,
   type StepTimingStatistics,
@@ -309,17 +323,34 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   // Cancel workflow state
   const [cancelLoading, setCancelLoading] = useState(false)
 
-  // Single-step debugging mode state
-  const [singleStepMode, setSingleStepMode] = useState(false)
-  const [stepPaused, setStepPaused] = useState(false)
-  const [pausedAtStep, setPausedAtStep] = useState<string | null>(null)
-  const [stepAdvanceLoading, setStepAdvanceLoading] = useState(false)
+  // Single-step debugging mode state (MVI: from Redux store)
+  const singleStepMode = useSelector(selectSingleStepMode)
+  const singleStepModeExplicit = useSelector(selectSingleStepModeExplicit)
+  const stepPaused = useSelector(selectStepPaused)
+  const pausedAtStep = useSelector(selectPausedAtStep)
+  const [stepAdvanceLoading, setStepAdvanceLoading] = useState(false)  // Local UI state only
 
   // Trace modal state
   const [traceModalOpen, setTraceModalOpen] = useState(false)
 
-  // Selected substep state (when user clicks a substep arc)
-  const [selectedSubStep, setSelectedSubStep] = useState<SubStep | null>(null)
+  // Selected substep state (MVI: from Redux store)
+  const selectedSubStepRedux = useSelector(selectSelectedSubStep)
+  // Map Redux state to SubStep type used by component
+  const selectedSubStep: SubStep | null = useMemo(() => {
+    if (!selectedSubStepRedux) return null
+    const agent = AGENT_SUBSTEPS[selectedSubStepRedux.agentId as keyof typeof AGENT_SUBSTEPS]
+    if (!agent) return null
+    return agent.find(s => s.id === selectedSubStepRedux.substepId) || null
+  }, [selectedSubStepRedux])
+
+  // Helper to dispatch setSelectedSubStep action (converts SubStep to Redux format)
+  const dispatchSetSelectedSubStep = useCallback((substep: SubStep | null, agentId?: string) => {
+    if (substep && agentId) {
+      dispatch(setSelectedSubStep({ agentId, substepId: substep.id }))
+    } else {
+      dispatch(setSelectedSubStep(null))
+    }
+  }, [dispatch])
 
   // Cancel/clear a stuck or frozen workflow
   const handleCancelWorkflow = async (e: React.MouseEvent) => {
@@ -360,10 +391,15 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }
 
-  // Toggle single-step debugging mode
+  // Toggle single-step debugging mode (MVI: dispatches Redux action)
   const handleToggleSingleStepMode = async (enabled: boolean) => {
     try {
       Logger.info(LogCategories.UKB, `Setting single-step mode: ${enabled}`)
+
+      // CRITICAL: Mark that user has explicitly set this value via Redux
+      // This prevents server polling from overwriting user's choice
+      dispatch(setSingleStepMode({ enabled, explicit: true }))
+
       const response = await fetch(`${apiBaseUrl}/api/ukb/single-step-mode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -371,21 +407,24 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       })
       const data = await response.json()
       if (data.status === 'success') {
-        setSingleStepMode(enabled)
+        // State already set optimistically above
         if (!enabled) {
-          setStepPaused(false)
-          setPausedAtStep(null)
+          dispatch(syncStepPauseFromServer({ paused: false, pausedAt: null }))
         }
         Logger.info(LogCategories.UKB, `Single-step mode ${enabled ? 'enabled' : 'disabled'}`)
       } else {
+        // Revert on failure
+        dispatch(setSingleStepMode({ enabled: !enabled, explicit: false }))
         Logger.error(LogCategories.UKB, 'Failed to toggle single-step mode', data)
       }
     } catch (error) {
+      // Revert on error
+      dispatch(setSingleStepMode({ enabled: !enabled, explicit: false }))
       Logger.error(LogCategories.UKB, 'Error toggling single-step mode', error)
     }
   }
 
-  // Advance to next step when paused
+  // Advance to next step when paused (MVI: dispatches Redux action)
   const handleStepAdvance = async (e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
@@ -399,7 +438,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       })
       const data = await response.json()
       if (data.status === 'success') {
-        setStepPaused(false)
+        dispatch(syncStepPauseFromServer({ paused: false, pausedAt: null }))
         Logger.info(LogCategories.UKB, 'Step advanced', data.data)
       } else {
         Logger.error(LogCategories.UKB, 'Failed to advance step', data)
@@ -436,7 +475,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processes, processesSignature])
 
-  // Update single-step state from process data
+  // Sync single-step state from server process data (MVI: dispatches Redux actions)
+  // CRITICAL: Only sync singleStepMode from server if user hasn't explicitly set it
+  // stepPaused and pausedAtStep ARE server state and should always sync
   useEffect(() => {
     const activeProcess = activeProcesses[selectedProcessIndex]
     if (activeProcess) {
@@ -445,11 +486,20 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       const processStepPaused = (activeProcess as any).stepPaused
       const processPausedAt = (activeProcess as any).pausedAtStep
 
-      if (processSingleStep !== undefined) setSingleStepMode(processSingleStep)
-      if (processStepPaused !== undefined) setStepPaused(processStepPaused)
-      if (processPausedAt !== undefined) setPausedAtStep(processPausedAt)
+      // ONLY sync singleStepMode if user hasn't explicitly changed it in this session
+      // singleStepModeExplicit is from Redux store
+      if (!singleStepModeExplicit && processSingleStep !== undefined) {
+        dispatch(syncSingleStepFromServer(processSingleStep))
+      }
+      // stepPaused and pausedAtStep are server-controlled state, always sync via Redux
+      if (processStepPaused !== undefined || processPausedAt !== undefined) {
+        dispatch(syncStepPauseFromServer({
+          paused: processStepPaused ?? false,
+          pausedAt: processPausedAt ?? null
+        }))
+      }
     }
-  }, [activeProcesses, selectedProcessIndex])
+  }, [activeProcesses, selectedProcessIndex, singleStepModeExplicit, dispatch])
 
   // Active process at selected index (component-level for TraceModal access)
   // Bounded to valid range to handle when processes complete and list shrinks
@@ -556,9 +606,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     if (selectedHistoricalWorkflowState) {
       loadHistoricalWorkflowDetail(selectedHistoricalWorkflowState.id)
       dispatch(setSelectedNode('orchestrator'))
-      setSelectedSubStep(null)
+      dispatchSetSelectedSubStep(null)
     }
-  }, [selectedHistoricalWorkflowState])
+  }, [selectedHistoricalWorkflowState, dispatchSetSelectedSubStep])
 
   const handleNodeClick = (agentId: string) => {
     Logger.info(LogCategories.AGENT, `Agent node clicked: ${agentId}`, {
@@ -571,22 +621,22 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     })
     dispatch(setSelectedNode(agentId))
     // Clear substep selection when clicking a node
-    setSelectedSubStep(null)
+    dispatchSetSelectedSubStep(null)
   }
 
-  // Handler for substep arc selection
+  // Handler for substep arc selection (MVI: dispatches to Redux)
   const handleSubStepSelect = useCallback((agentId: string, substep: SubStep | null) => {
     Logger.info(LogCategories.AGENT, `Substep ${substep ? 'selected' : 'cleared'}: ${substep?.name || 'none'}`, {
       agentId,
       substepId: substep?.id,
       substepName: substep?.name,
     })
-    setSelectedSubStep(substep)
+    dispatchSetSelectedSubStep(substep, agentId)
     // Also select the agent node to show sidebar
     if (substep) {
       dispatch(setSelectedNode(agentId))
     }
-  }, [dispatch])
+  }, [dispatch, dispatchSetSelectedSubStep])
 
   const handleCloseSidebar = () => {
     Logger.debug(LogCategories.UI, 'Closing agent details sidebar', {
@@ -1093,10 +1143,10 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                           agentId={selectedNode}
                           substep={selectedSubStep}
                           onClose={() => {
-                            setSelectedSubStep(null)
+                            dispatchSetSelectedSubStep(null)
                           }}
                           onBackToAgent={() => {
-                            setSelectedSubStep(null)
+                            dispatchSetSelectedSubStep(null)
                           }}
                           stepOutputs={Object.keys(combinedOutputs).length > 0 ? combinedOutputs : agentStepInfo?.outputs}
                           stepStatus={agentStepInfo?.status}
@@ -1371,10 +1421,10 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                             agentId={selectedNode}
                             substep={selectedSubStep}
                             onClose={() => {
-                              setSelectedSubStep(null)
+                              dispatchSetSelectedSubStep(null)
                             }}
                             onBackToAgent={() => {
-                              setSelectedSubStep(null)
+                              dispatchSetSelectedSubStep(null)
                             }}
                             stepOutputs={agentStepInfo?.outputs}
                             stepStatus={agentStepInfo?.status}
@@ -1484,7 +1534,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   historicalWorkflowCount: historicalWorkflows.length,
                 })
                 dispatch(setActiveTab(newTab))
-                setSelectedSubStep(null)
+                dispatchSetSelectedSubStep(null)
                 if (newTab === 'active' && activeProcesses.length > 0) {
                   dispatch(setSelectedNode('orchestrator'))
                 }
