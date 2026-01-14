@@ -709,8 +709,10 @@ class SystemHealthAPIServer {
                         batchProgress: workflowProgress.batchProgress || null, // Batch progress for batch workflows
                         batchIterations: workflowProgress.batchIterations || null, // Per-batch step tracking for tracer
                         // Single-step debugging mode state
-                        singleStepMode: workflowProgress.singleStepMode || false,
-                        stepPaused: workflowProgress.stepPaused || false,
+                        // CRITICAL: Preserve actual values - don't default to false as this causes UI sync issues
+                        // The UI will handle undefined values appropriately
+                        singleStepMode: workflowProgress.singleStepMode === true,  // Explicit boolean, false if undefined
+                        stepPaused: workflowProgress.stepPaused === true,          // Explicit boolean
                         pausedAtStep: workflowProgress.pausedAtStep || null,
                     };
 

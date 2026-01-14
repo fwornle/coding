@@ -194,7 +194,7 @@ export const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
       outputs: ['Key insights', 'Recommendations'],
       llmUsage: 'premium', techNote: 'Premium LLM synthesis' },
   ],
-  'observation_generator': [
+  'observation_generation': [
     { id: 'extract', name: 'Observation Extraction', shortName: 'Ext',
       description: 'Extract observations from analyzed content',
       inputs: ['Semantic analysis', 'Entity context'],
