@@ -1256,11 +1256,13 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
 
   // Batch-phase step names that repeat each batch (should use current batch status, not aggregate)
   // ORDERED by execution sequence within each batch - used to determine which steps are pending
+  // IMPORTANT: This list must match the actual batch loop sequence in coordinator.ts
   const BATCH_PHASE_STEPS = [
-    'git_history', 'vibe_history', 'semantic_analysis', 'kg_operators',
-    'context_convolution', 'entity_aggregation', 'node_embedding',
+    'git_history', 'vibe_history', 'semantic_analysis',
+    'observation_generation', 'ontology_classification',
+    'kg_operators', 'context_convolution', 'entity_aggregation', 'node_embedding',
     'deduplication_operator', 'edge_prediction', 'structure_merge',
-    'observation_generation', 'ontology_classification'  // Also run per-batch
+    'quality_assurance', 'batch_checkpoint_manager'  // batch_qa and save_batch_checkpoint
   ]
 
   // Build step status map from process data
@@ -1632,6 +1634,16 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                 <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b" />
               </marker>
               <marker
+                id="arrowhead-paused"
+                markerWidth="10"
+                markerHeight="7"
+                refX="9"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b" className="animate-pulse" />
+              </marker>
+              <marker
                 id="arrowhead-self"
                 markerWidth="10"
                 markerHeight="7"
@@ -1779,8 +1791,11 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const toStatus = edge.to === 'orchestrator'
                 ? (process.status === 'running' ? 'running' : 'completed')
                 : getNodeStatus(edge.to)
-              const isActive = fromStatus === 'completed' && toStatus === 'running'
+              // Edge is active when source is done and target is running OR paused (single-step mode)
+              const isActive = fromStatus === 'completed' && (toStatus === 'running' || toStatus === 'paused')
               const isCompleted = fromStatus === 'completed' && toStatus === 'completed'
+              // Special state: edge to paused node shows amber (waiting for user action)
+              const isPausedTarget = toStatus === 'paused'
 
               // Different colors for edge types
               // IMPORTANT: Check edge TYPE first (control, dataflow), then STATUS
@@ -1799,6 +1814,10 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                 strokeColor = '#a855f7'
                 markerEnd = 'url(#arrowhead-dataflow)'
                 strokeDasharray = '4,2'
+              } else if (isPausedTarget) {
+                // Dependency edges: amber pulsing when target is paused (single-step mode)
+                strokeColor = '#f59e0b'  // amber-500
+                markerEnd = 'url(#arrowhead-paused)'
               } else if (isActive) {
                 // Dependency edges: blue when active
                 strokeColor = '#3b82f6'
@@ -1813,7 +1832,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                 markerEnd = 'url(#arrowhead)'
               }
 
-              const strokeWidth = isActive ? 2 : 1.5
+              const strokeWidth = (isActive || isPausedTarget) ? 2 : 1.5
 
               // Create path based on direction
               let path: string
@@ -3103,11 +3122,13 @@ export function UKBNodeDetailsSidebar({
   // FIXED: For batch-phase steps, use current batch's status instead of top-level aggregate
   // The top-level stepsDetail may show stale "skipped" status from initial batch,
   // while the current batch has the actual running/completed status
+  // IMPORTANT: This list must match BATCH_PHASE_STEPS in the main graph component
   const SIDEBAR_BATCH_PHASE_STEPS = [
-    'git_history', 'vibe_history', 'semantic_analysis', 'kg_operators',
-    'context_convolution', 'entity_aggregation', 'node_embedding',
+    'git_history', 'vibe_history', 'semantic_analysis',
+    'observation_generation', 'ontology_classification',
+    'kg_operators', 'context_convolution', 'entity_aggregation', 'node_embedding',
     'deduplication_operator', 'edge_prediction', 'structure_merge',
-    'observation_generation', 'ontology_classification'
+    'quality_assurance', 'batch_checkpoint_manager'
   ]
 
   const currentBatch = process.batchIterations?.length
