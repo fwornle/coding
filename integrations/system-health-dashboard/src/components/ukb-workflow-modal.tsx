@@ -71,6 +71,9 @@ import {
   resetSingleStepExplicit,
   setExpandedSubStepsAgent,
   setSelectedSubStep,
+  // LLM Mock mode actions (MVI)
+  setMockLLM,
+  syncMockLLMFromServer,
   // Single-step mode selectors (MVI)
   selectSingleStepMode,
   selectSingleStepModeExplicit,
@@ -78,6 +81,9 @@ import {
   selectPausedAtStep,
   selectExpandedSubStepsAgent,
   selectSelectedSubStep,
+  // LLM Mock mode selectors (MVI)
+  selectMockLLM,
+  selectMockLLMExplicit,
   type HistoricalWorkflow,
   type UKBProcess,
   type StepTimingStatistics,
@@ -330,6 +336,10 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const pausedAtStep = useSelector(selectPausedAtStep)
   const [stepAdvanceLoading, setStepAdvanceLoading] = useState(false)  // Local UI state only
 
+  // LLM Mock mode state (MVI: from Redux store)
+  const mockLLM = useSelector(selectMockLLM)
+  const mockLLMExplicit = useSelector(selectMockLLMExplicit)
+
   // Trace modal state
   const [traceModalOpen, setTraceModalOpen] = useState(false)
 
@@ -450,6 +460,35 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }
 
+  // Toggle LLM mock mode (MVI: dispatches Redux action)
+  const handleToggleMockLLM = async (enabled: boolean) => {
+    try {
+      Logger.info(LogCategories.UKB, `Setting LLM mock mode: ${enabled}`)
+
+      // CRITICAL: Mark that user has explicitly set this value via Redux
+      // This prevents server polling from overwriting user's choice
+      dispatch(setMockLLM({ enabled, explicit: true }))
+
+      const response = await fetch(`${apiBaseUrl}/api/ukb/mock-llm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      })
+      const data = await response.json()
+      if (data.status === 'success') {
+        Logger.info(LogCategories.UKB, `LLM mock mode ${enabled ? 'enabled' : 'disabled'}`)
+      } else {
+        // Revert on failure
+        dispatch(setMockLLM({ enabled: !enabled, explicit: false }))
+        Logger.error(LogCategories.UKB, 'Failed to toggle LLM mock mode', data)
+      }
+    } catch (error) {
+      // Revert on error
+      dispatch(setMockLLM({ enabled: !enabled, explicit: false }))
+      Logger.error(LogCategories.UKB, 'Error toggling LLM mock mode', error)
+    }
+  }
+
   // Create a signature for change detection - ensures re-renders when process data changes
   // This captures key fields that affect display: pid, status, completedSteps, _refreshKey
   // Also include steps signature for real-time step status updates
@@ -498,13 +537,78 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           pausedAt: processPausedAt ?? null
         }))
       }
+
+      // Sync mockLLM state from server (similar logic)
+      const processMockLLM = (activeProcess as any).mockLLM
+      const processMockLLMDelay = (activeProcess as any).mockLLMDelay
+      if (!mockLLMExplicit && processMockLLM !== undefined) {
+        dispatch(syncMockLLMFromServer({
+          enabled: processMockLLM,
+          delay: processMockLLMDelay ?? 500
+        }))
+      }
     }
-  }, [activeProcesses, selectedProcessIndex, singleStepModeExplicit, dispatch])
+  }, [activeProcesses, selectedProcessIndex, singleStepModeExplicit, mockLLMExplicit, dispatch])
 
   // Active process at selected index (component-level for TraceModal access)
   // Bounded to valid range to handle when processes complete and list shrinks
   const activeIndex = Math.min(selectedProcessIndex, Math.max(0, activeProcesses.length - 1))
   const activeCurrentProcess = activeProcesses.length > 0 ? activeProcesses[activeIndex] : null
+
+  // Transform process for graph: use CURRENT BATCH status for batch-phase steps
+  // This prevents showing cumulative "all green" status from previous batches
+  const processForGraph = useMemo(() => {
+    if (!activeCurrentProcess) return null
+
+    // If no batchIterations, use process as-is
+    const batchIterations = activeCurrentProcess.batchIterations
+    if (!batchIterations || batchIterations.length === 0) {
+      return activeCurrentProcess
+    }
+
+    // Get current batch's steps (last batch in array)
+    const currentBatch = batchIterations[batchIterations.length - 1]
+    if (!currentBatch?.steps) {
+      return activeCurrentProcess
+    }
+
+    // Batch-phase step names that should use current batch status
+    // These repeat per-batch and should NOT show green from previous batches
+    const batchPhaseStepNames = new Set([
+      'extract_batch_commits', 'extract_batch_sessions',
+      'batch_semantic_analysis', 'generate_batch_observations',
+      'classify_with_ontology',
+      'operator_conv', 'operator_aggr', 'operator_embed',
+      'operator_dedup', 'operator_pred', 'operator_merge',
+      'batch_qa', 'save_batch_checkpoint',
+    ])
+
+    // Build step status from current batch
+    const currentBatchStepStatus = new Map<string, typeof currentBatch.steps[0]>()
+    for (const step of currentBatch.steps) {
+      currentBatchStepStatus.set(step.name, step)
+    }
+
+    // Transform steps array: use current batch status for batch-phase steps
+    const transformedSteps = (activeCurrentProcess.steps || []).map(step => {
+      if (batchPhaseStepNames.has(step.name)) {
+        // Use current batch status, or 'pending' if not in current batch yet
+        const currentStatus = currentBatchStepStatus.get(step.name)
+        if (currentStatus) {
+          return { ...step, status: currentStatus.status }
+        }
+        // Step not yet reached in current batch - mark as pending
+        return { ...step, status: 'pending' as const }
+      }
+      // Non-batch steps (pre-batch, post-batch): keep original status
+      return step
+    })
+
+    return {
+      ...activeCurrentProcess,
+      steps: transformedSteps,
+    }
+  }, [activeCurrentProcess])
 
   // Fetch historical workflows when history tab is selected
   useEffect(() => {
@@ -1078,10 +1182,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               </div>
 
               {/* Center: Workflow Graph - key only changes on workflow identity, not step updates */}
+              {/* Use processForGraph which has current-batch-only status for batch-phase steps */}
               <div className="flex-1 min-w-0 h-full">
                 <UKBWorkflowGraph
                   key={`${activeCurrentProcess.pid}-${activeCurrentProcess.workflowName || 'workflow'}`}
-                  process={activeCurrentProcess}
+                  process={processForGraph || activeCurrentProcess}
                   onNodeClick={handleNodeClick}
                   onSubStepSelect={handleSubStepSelect}
                   selectedNode={selectedNode}
@@ -1607,6 +1712,21 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               )}
               {activeProcesses.length > 0 && (
                 <>
+                  {/* LLM Mock mode control */}
+                  <div className="flex items-center gap-2 border-r pr-3 mr-1">
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" title="Use mock LLM responses for testing without API calls">
+                      <input
+                        type="checkbox"
+                        checked={mockLLM}
+                        onChange={(e) => handleToggleMockLLM(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500 focus:ring-orange-400 cursor-pointer"
+                      />
+                      Mock LLM
+                    </label>
+                    {mockLLM && (
+                      <span className="text-xs text-orange-500 font-medium">(active)</span>
+                    )}
+                  </div>
                   {/* Single-step debugging controls */}
                   <div className="flex items-center gap-2 border-r pr-3 mr-1">
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">

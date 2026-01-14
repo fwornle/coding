@@ -358,6 +358,11 @@ interface UKBState {
   stepPaused: boolean
   pausedAtStep: string | null
 
+  // LLM Mock mode for frontend testing without real API calls
+  mockLLM: boolean
+  mockLLMExplicit: boolean
+  mockLLMDelay: number
+
   // Sub-step UI state (MVI: Single source of truth for visualization)
   // expandedSubStepsAgent: Which agent's sub-steps arc is expanded (null = none)
   // selectedSubStep: Which sub-step is selected for sidebar display
@@ -410,6 +415,11 @@ const initialState: UKBState = {
   singleStepModeExplicit: false,
   stepPaused: false,
   pausedAtStep: null,
+
+  // LLM Mock mode (MVI: initialized from server on first poll)
+  mockLLM: false,
+  mockLLMExplicit: false,
+  mockLLMDelay: 500,
 
   // Sub-step UI state
   expandedSubStepsAgent: null,
@@ -621,6 +631,33 @@ const ukbSlice = createSlice({
     },
 
     // ========================================
+    // LLM Mock mode actions (MVI: ONLY way to change mock state)
+    // ========================================
+
+    // Toggle LLM mock mode - called ONLY from checkbox
+    setMockLLM(state, action: PayloadAction<{ enabled: boolean; explicit: boolean; delay?: number }>) {
+      state.mockLLM = action.payload.enabled
+      state.mockLLMExplicit = action.payload.explicit
+      if (action.payload.delay !== undefined) {
+        state.mockLLMDelay = action.payload.delay
+      }
+    },
+
+    // Sync mock LLM from server ONLY if user hasn't explicitly set it
+    syncMockLLMFromServer(state, action: PayloadAction<{ enabled: boolean; delay: number }>) {
+      // CRITICAL: Only sync from server if user hasn't explicitly changed it this session
+      if (!state.mockLLMExplicit) {
+        state.mockLLM = action.payload.enabled
+        state.mockLLMDelay = action.payload.delay
+      }
+    },
+
+    // Reset explicit flag (e.g., when modal closes or workflow ends)
+    resetMockLLMExplicit(state) {
+      state.mockLLMExplicit = false
+    },
+
+    // ========================================
     // Sub-step UI actions (MVI: Single source of truth for visualization)
     // ========================================
 
@@ -670,6 +707,10 @@ export const {
   syncStepPauseFromServer,
   syncSingleStepFromServer,
   resetSingleStepExplicit,
+  // LLM Mock mode actions (MVI)
+  setMockLLM,
+  syncMockLLMFromServer,
+  resetMockLLMExplicit,
   // Sub-step UI actions (MVI)
   setExpandedSubStepsAgent,
   setSelectedSubStep,
@@ -972,6 +1013,35 @@ export const selectSingleStepState = createSelector(
     singleStepModeExplicit: ukb.singleStepModeExplicit,
     stepPaused: ukb.stepPaused,
     pausedAtStep: ukb.pausedAtStep,
+  })
+)
+
+// ========================================
+// LLM Mock mode selectors (MVI)
+// ========================================
+
+export const selectMockLLM = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.mockLLM
+)
+
+export const selectMockLLMExplicit = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.mockLLMExplicit
+)
+
+export const selectMockLLMDelay = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.mockLLMDelay
+)
+
+// Combined selector for LLM mock state
+export const selectMockLLMState = createSelector(
+  [selectUkbState],
+  (ukb) => ({
+    mockLLM: ukb.mockLLM,
+    mockLLMExplicit: ukb.mockLLMExplicit,
+    mockLLMDelay: ukb.mockLLMDelay,
   })
 )
 

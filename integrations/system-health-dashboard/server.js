@@ -105,6 +105,7 @@ class SystemHealthAPIServer {
         this.app.post('/api/ukb/cancel', this.handleCancelWorkflow.bind(this));
         this.app.post('/api/ukb/single-step-mode', this.handleSingleStepMode.bind(this));
         this.app.post('/api/ukb/step-advance', this.handleStepAdvance.bind(this));
+        this.app.post('/api/ukb/mock-llm', this.handleMockLLM.bind(this));
         this.app.post('/api/ukb/start', this.handleStartUKBWorkflow.bind(this));
         this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
         this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
@@ -714,6 +715,9 @@ class SystemHealthAPIServer {
                         singleStepMode: workflowProgress.singleStepMode === true,  // Explicit boolean, false if undefined
                         stepPaused: workflowProgress.stepPaused === true,          // Explicit boolean
                         pausedAtStep: workflowProgress.pausedAtStep || null,
+                        // LLM Mock mode for frontend testing
+                        mockLLM: workflowProgress.mockLLM === true,
+                        mockLLMDelay: workflowProgress.mockLLMDelay || 500,
                     };
 
                     detailedStatus.processes.push(inlineProcess);
@@ -1161,6 +1165,57 @@ class SystemHealthAPIServer {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to advance step',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Enable/disable LLM mock mode for workflow execution
+     * When enabled, all LLM calls return plausible mock data instead of making real API calls
+     * Useful for testing frontend logic without incurring API costs
+     */
+    async handleMockLLM(req, res) {
+        try {
+            const { enabled, delay } = req.body;
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            // Read current progress (or create empty state)
+            let progress = {};
+            if (existsSync(progressPath)) {
+                try {
+                    progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                } catch (e) {
+                    // Start fresh
+                }
+            }
+
+            // Update mock LLM mode state
+            progress.mockLLM = !!enabled;
+            progress.mockLLMUpdatedAt = new Date().toISOString();
+
+            // Optional: custom delay for mock responses (default 500ms)
+            if (delay !== undefined && typeof delay === 'number') {
+                progress.mockLLMDelay = Math.max(0, Math.min(5000, delay)); // Clamp between 0-5000ms
+            }
+
+            writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+
+            console.log(`🔧 LLM Mock mode ${enabled ? 'enabled' : 'disabled'}${delay ? ` (delay: ${delay}ms)` : ''}`);
+
+            res.json({
+                status: 'success',
+                data: {
+                    mockLLM: progress.mockLLM,
+                    mockLLMDelay: progress.mockLLMDelay || 500,
+                    timestamp: progress.mockLLMUpdatedAt
+                }
+            });
+        } catch (error) {
+            console.error('Failed to set LLM mock mode:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to set LLM mock mode',
                 error: error.message
             });
         }
