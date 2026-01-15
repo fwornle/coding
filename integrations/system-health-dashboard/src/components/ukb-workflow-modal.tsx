@@ -599,7 +599,15 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
       if (currentBatch?.steps && batchPhaseStepNames.has(step.name)) {
         // Use current batch status, or 'pending' if not in current batch yet
-        const currentStatus = currentBatchStepStatus.get(step.name)
+        // NOTE: Operator steps (operator_conv, etc.) are aggregated as 'kg_operators' in batch steps
+        // So we need to check both the individual step name AND the parent agent name
+        let currentStatus = currentBatchStepStatus.get(step.name)
+
+        // For operator_* steps, also check kg_operators (aggregated in batch)
+        if (!currentStatus && step.name.startsWith('operator_')) {
+          currentStatus = currentBatchStepStatus.get('kg_operators')
+        }
+
         if (currentStatus) {
           return { ...step, status: currentStatus.status as StepInfo['status'] }
         }
