@@ -598,13 +598,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       }
 
       // Special case: pausedAtStep='kg_operators' but steps are individual operator_* steps
-      // Mark the first incomplete operator step (or first one if all complete) as 'running'
-      if (singleStepMode && stepPaused && pausedAtStep === 'kg_operators' && step.name.startsWith('operator_')) {
-        // Check if this operator step should be marked as running
-        // We mark it running if: it's not completed yet, OR it's the last operator step
-        if (step.status !== 'completed' || step.name === 'operator_merge') {
-          return { ...step, status: 'running' as StepInfo['status'] }
-        }
+      // Mark operator_conv as 'running' to ensure kg_operators agent shows as active
+      if (singleStepMode && stepPaused && pausedAtStep === 'kg_operators' && step.name === 'operator_conv') {
+        return { ...step, status: 'running' as StepInfo['status'] }
       }
 
       if (currentBatch?.steps && batchPhaseStepNames.has(step.name)) {

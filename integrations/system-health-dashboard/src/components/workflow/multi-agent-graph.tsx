@@ -361,10 +361,17 @@ export function MultiAgentGraph({
   ]
 
   // Build step status map and count steps per agent
+  // CRITICAL: Use process.currentStep to determine running agent, not just step.status
+  // This ensures graph stays in sync with sidebar when currentStep updates before step status
   const { stepStatusMap, stepCountMap, agentsInWorkflow } = useMemo(() => {
     const statusMap: Record<string, StepInfo> = {}
     const countMap: Record<string, number> = {}
     const agentSet = new Set<string>()
+
+    // Determine the currently running agent from currentStep (source of truth for what's active)
+    const currentStepAgentId = process.currentStep
+      ? (stepToAgent[process.currentStep] || process.currentStep)
+      : null
 
     if (process.steps) {
       for (const step of process.steps) {
@@ -372,9 +379,15 @@ export function MultiAgentGraph({
         agentSet.add(agentId)
         countMap[agentId] = (countMap[agentId] || 0) + 1
 
+        // Determine effective status: if this agent is for currentStep, force 'running'
+        // This fixes lag where currentStep updates before step.status
+        const effectiveStatus = (currentStepAgentId === agentId && step.status === 'pending')
+          ? 'running'
+          : step.status
+
         // Keep most relevant status (running > completed > pending > failed)
-        if (!statusMap[agentId] || step.status === 'running' || (step.status === 'completed' && statusMap[agentId].status !== 'running')) {
-          statusMap[agentId] = { ...step }
+        if (!statusMap[agentId] || effectiveStatus === 'running' || (effectiveStatus === 'completed' && statusMap[agentId].status !== 'running')) {
+          statusMap[agentId] = { ...step, status: effectiveStatus as StepInfo['status'] }
         }
 
         // Aggregate KG operator child status to parent kg_operators
@@ -384,16 +397,27 @@ export function MultiAgentGraph({
           // Aggregate status: running > failed > completed > pending
           const existingStatus = statusMap['kg_operators']?.status
           if (!existingStatus ||
-              step.status === 'running' ||
-              (step.status === 'failed' && existingStatus !== 'running') ||
-              (step.status === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
-            statusMap['kg_operators'] = { ...step, name: 'kg_operators' }
+              effectiveStatus === 'running' ||
+              (effectiveStatus === 'failed' && existingStatus !== 'running') ||
+              (effectiveStatus === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
+            statusMap['kg_operators'] = { ...step, name: 'kg_operators', status: effectiveStatus as StepInfo['status'] }
           }
         }
       }
     }
+
+    // Also ensure currentStep's agent is marked as running even if no step found yet
+    // This handles edge case where currentStep references a step not in steps[] array
+    if (currentStepAgentId && !statusMap[currentStepAgentId]) {
+      agentSet.add(currentStepAgentId)
+      statusMap[currentStepAgentId] = {
+        name: process.currentStep || currentStepAgentId,
+        status: 'running',
+      }
+    }
+
     return { stepStatusMap: statusMap, stepCountMap: countMap, agentsInWorkflow: agentSet }
-  }, [process.steps, stepToAgent])
+  }, [process.steps, process.currentStep, stepToAgent])
 
   // Get step count for an agent (how many workflow steps this agent handles)
   const getStepCount = useCallback((agentId: string): number => {
