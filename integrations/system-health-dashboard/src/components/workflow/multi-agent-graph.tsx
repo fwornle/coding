@@ -4,7 +4,7 @@ import React, { useMemo, useCallback, useEffect, useState } from 'react'
 import type { AgentDefinition, EdgeDefinition, ProcessInfo, StepInfo } from './types'
 import type { AggregatedSteps } from '@/store/slices/ukbSlice'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
-import { STEP_TO_AGENT, STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
+import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
 
 interface MultiAgentGraphProps {
   process: ProcessInfo
@@ -275,13 +275,13 @@ export function MultiAgentGraph({
     // Find any running step whose agent has substeps defined
     const runningStepWithSubsteps = process.steps?.find(step => {
       // Map step name to agent ID using STEP_TO_AGENT
-      const agentId = STEP_TO_AGENT[step.name] || step.name
+      const agentId = stepToAgent[step.name] || step.name
       return step.status === 'running' && AGENT_SUBSTEPS[agentId]
     })
 
     if (runningStepWithSubsteps) {
       // Map step name to agent ID
-      const agentId = STEP_TO_AGENT[runningStepWithSubsteps.name] || runningStepWithSubsteps.name
+      const agentId = stepToAgent[runningStepWithSubsteps.name] || runningStepWithSubsteps.name
       // Auto-expand if not already expanded (don't override user's manual toggle)
       if (expandedSubStepsAgent !== agentId) {
         setExpandedSubStepsAgent(agentId)
@@ -292,7 +292,7 @@ export function MultiAgentGraph({
       const wasAutoExpanded = expandedSubStepsAgent === autoExpandedAgent
       // Check if any step mapping to this agent is still running
       const agentStillRunning = process.steps?.some(s => {
-        const stepAgentId = STEP_TO_AGENT[s.name] || s.name
+        const stepAgentId = stepToAgent[s.name] || s.name
         return stepAgentId === autoExpandedAgent && s.status === 'running'
       })
       if (wasAutoExpanded && !agentStillRunning) {
@@ -980,14 +980,15 @@ export function MultiAgentGraph({
               const startAngle = -150
               const arcPerStep = (totalArc - (substeps.length - 1) * arcSpacing) / substeps.length
 
-              // Check if this agent is currently running (map step names to agent IDs)
-              const runningStep = process.steps?.find(s => {
-                const stepAgentId = STEP_TO_AGENT[s.name] || s.name
-                return stepAgentId === expandedSubStepsAgent && s.status === 'running'
+              // Check if this agent is currently running or completed (map step names to agent IDs)
+              const agentStep = process.steps?.find(s => {
+                const stepAgentId = stepToAgent[s.name] || s.name
+                return stepAgentId === expandedSubStepsAgent && (s.status === 'running' || s.status === 'completed')
               })
-              const isAgentRunning = !!runningStep
+              const isAgentRunning = agentStep?.status === 'running'
+              const isAgentCompleted = agentStep?.status === 'completed'
               // Get the active sub-step ID from the running step
-              const activeSubStepId = runningStep ? STEP_TO_SUBSTEP[runningStep.name] : null
+              const activeSubStepId = isAgentRunning && agentStep ? STEP_TO_SUBSTEP[agentStep.name] : null
 
               return substeps.map((substep, idx) => {
                 const angleStart = startAngle + idx * (arcPerStep + arcSpacing)
@@ -1015,8 +1016,22 @@ export function MultiAgentGraph({
                 const isSelected = selectedSubStepId === substep.id
                 // Check if this is the currently active/running sub-step
                 const isActiveSubStep = activeSubStepId === substep.id
-                // Use dark blue for selected OR active sub-step
-                const isHighlighted = isSelected || isActiveSubStep
+                // Determine visual state: completed (green), active (blue pulse), or default (blue)
+                const isHighlighted = isSelected || isActiveSubStep || isAgentCompleted
+
+                // Colors based on state
+                let fillColor = '#3b82f6'  // default blue
+                let strokeColor = '#1d4ed8'
+                if (isAgentCompleted) {
+                  fillColor = '#22c55e'  // green-500
+                  strokeColor = '#16a34a'  // green-600
+                } else if (isActiveSubStep || isSelected) {
+                  fillColor = '#1d4ed8'  // dark blue
+                  strokeColor = '#fff'
+                }
+
+                const statusText = isAgentCompleted ? ' (Completed)' : isActiveSubStep ? ' (Currently Running)' : ''
+
                 return (
                   <g
                     key={substep.id}
@@ -1028,16 +1043,18 @@ export function MultiAgentGraph({
                       }
                     }}
                   >
-                    <title>{substep.name}: {substep.description}{isActiveSubStep ? ' (Currently Running)' : ''}</title>
+                    <title>{substep.name}: {substep.description}{statusText}</title>
                     <path
                       d={arcPath}
-                      fill={isHighlighted ? '#1d4ed8' : '#3b82f6'}
+                      fill={fillColor}
                       fillOpacity={isHighlighted ? 1 : 0.85}
-                      stroke={isHighlighted ? '#fff' : '#1d4ed8'}
+                      stroke={strokeColor}
                       strokeWidth={isHighlighted ? 2.5 : 1.5}
                       className={isActiveSubStep ? 'animate-pulse' : ''}
                       style={isActiveSubStep ? {
                         filter: 'drop-shadow(0 0 8px rgba(29, 78, 216, 0.9))',
+                      } : isAgentCompleted ? {
+                        filter: 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.5))',
                       } : undefined}
                     />
                     <text
@@ -1061,7 +1078,7 @@ export function MultiAgentGraph({
               const position = layout.positions.find(p => p.agent.id === expandedSubStepsAgent)
               if (!position) return null
               const isAgentRunning = process.steps?.some(s => {
-                const stepAgentId = STEP_TO_AGENT[s.name] || s.name
+                const stepAgentId = stepToAgent[s.name] || s.name
                 return stepAgentId === expandedSubStepsAgent && s.status === 'running'
               })
               if (!isAgentRunning) return null

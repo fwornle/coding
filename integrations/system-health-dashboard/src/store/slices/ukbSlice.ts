@@ -1,4 +1,5 @@
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit'
+import { STEP_TO_AGENT as FALLBACK_STEP_TO_AGENT } from '@/components/workflow/constants'
 
 // Step status type
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -283,41 +284,19 @@ export const WORKFLOW_AGENTS = [
   'persistence', 'deduplication', 'content_validation'
 ] as const
 
-// Step name to agent ID mapping
-export const STEP_TO_AGENT: Record<string, string> = {
-  'analyze_git_history': 'git_history',
-  'analyze_recent_changes': 'git_history',
-  'analyze_vibe_history': 'vibe_history',
-  'analyze_recent_vibes': 'vibe_history',
-  'index_codebase': 'code_graph',
-  'index_recent_code': 'code_graph',
-  'transform_code_entities': 'code_graph',
-  'transform_code_entities_incremental': 'code_graph',
-  'code_intelligence': 'code_intelligence',
-  'analyze_code_intelligence': 'code_intelligence',
-  'link_documentation': 'documentation_linker',
-  'transform_doc_links': 'documentation_linker',
-  'semantic_analysis': 'semantic_analysis',
-  'analyze_semantics': 'semantic_analysis',
-  'web_search': 'web_search',
-  'generate_insights': 'insight_generation',
-  'generate_pattern_insights': 'insight_generation',
-  'generate_observations': 'observation_generation',
-  'classify_with_ontology': 'ontology_classification',
-  'analyze_documentation_semantics': 'documentation_semantics',
-  'analyze_documentation_semantics_incremental': 'documentation_semantics',
-  'quality_assurance': 'quality_assurance',
-  'validate_incremental_qa': 'quality_assurance',
-  'persist_results': 'persistence',
-  'persist_incremental': 'persistence',
-  'persist_code_entities': 'persistence',
-  'deduplicate_insights': 'deduplication',
-  'deduplicate_incremental': 'deduplication',
-  'validate_content': 'content_validation',
-  'validate_content_incremental': 'content_validation',
-  'validate_entity_content': 'content_validation',
-  'validate_all_entities': 'content_validation',
-  'validate_project_entities': 'content_validation',
+// Step name to agent ID mapping - re-export from constants for backward compatibility
+// The actual mappings now come from Redux workflowConfig slice (loaded from API)
+export { STEP_TO_AGENT } from '@/components/workflow/constants'
+
+// Helper to get step-to-agent mapping with fallback
+// Used by selectors that need to access mappings from state
+const getStepToAgentMapping = (workflowConfigStepMappings: Record<string, string> | undefined, stepName: string): string => {
+  // Use workflowConfig mappings if available and initialized
+  if (workflowConfigStepMappings && Object.keys(workflowConfigStepMappings).length > 0) {
+    return workflowConfigStepMappings[stepName] || stepName
+  }
+  // Fallback to constants
+  return FALLBACK_STEP_TO_AGENT[stepName] || stepName
 }
 
 // Sub-step selection for sidebar display
@@ -719,6 +698,10 @@ export const {
 // Selectors
 const selectUkbState = (state: { ukb: UKBState }) => state.ukb
 
+// Selector to get stepMappings from workflowConfig slice with fallback
+const selectStepMappings = (state: { workflowConfig?: { stepMappings: Record<string, string> } }) =>
+  state.workflowConfig?.stepMappings || FALLBACK_STEP_TO_AGENT
+
 export const selectProcesses = createSelector(
   [selectUkbState],
   (ukb) => ukb.processes
@@ -829,10 +812,11 @@ export const selectHistoricalProcessInfo = createSelector(
 export const selectNodeStatus = createSelector(
   [
     selectUkbState,
+    selectStepMappings,
     (_: any, agentId: string) => agentId,
     (_: any, __: string, isHistorical: boolean) => isHistorical
   ],
-  (ukb, agentId, isHistorical): { status: StepStatus; stepInfo: StepInfo | null } => {
+  (ukb, stepMappings, agentId, isHistorical): { status: StepStatus; stepInfo: StepInfo | null } => {
     const process = isHistorical
       ? (ukb.historicalWorkflowDetail ? {
           completedSteps: ukb.historicalWorkflowDetail.completedSteps,
@@ -855,7 +839,7 @@ export const selectNodeStatus = createSelector(
 
     // Find step info for this agent
     const stepInfo = process.steps?.find(
-      s => STEP_TO_AGENT[s.name] === agentId || s.name === agentId
+      s => (stepMappings[s.name] || s.name) === agentId || s.name === agentId
     ) as StepInfo | undefined
 
     if (stepInfo?.status) {
@@ -872,7 +856,7 @@ export const selectNodeStatus = createSelector(
       return { status: 'completed', stepInfo: stepInfo as StepInfo || null }
     }
     if (agentIndex === process.completedSteps && process.currentStep) {
-      const currentAgentId = STEP_TO_AGENT[process.currentStep] || process.currentStep
+      const currentAgentId = stepMappings[process.currentStep] || process.currentStep
       if (currentAgentId === agentId) {
         return { status: 'running', stepInfo: stepInfo as StepInfo || null }
       }
@@ -886,9 +870,10 @@ export const selectNodeStatus = createSelector(
 export const selectStepStatusMap = createSelector(
   [
     selectUkbState,
+    selectStepMappings,
     (_: any, isHistorical: boolean) => isHistorical
   ],
-  (ukb, isHistorical): Record<string, StepInfo> => {
+  (ukb, stepMappings, isHistorical): Record<string, StepInfo> => {
     const process = isHistorical
       ? (ukb.historicalWorkflowDetail ? {
           completedSteps: ukb.historicalWorkflowDetail.completedSteps,
@@ -912,7 +897,7 @@ export const selectStepStatusMap = createSelector(
 
     if (process.steps) {
       for (const step of process.steps) {
-        const agentId = STEP_TO_AGENT[step.name] || step.name
+        const agentId = stepMappings[step.name] || step.name
         if (!map[agentId] || step.status === 'running' ||
             (step.status === 'completed' && map[agentId].status !== 'running')) {
           map[agentId] = { ...step }
@@ -922,7 +907,7 @@ export const selectStepStatusMap = createSelector(
 
     // Infer current step from process.currentStep
     if (process.currentStep) {
-      const currentAgentId = STEP_TO_AGENT[process.currentStep] || process.currentStep
+      const currentAgentId = stepMappings[process.currentStep] || process.currentStep
       if (map[currentAgentId]) {
         map[currentAgentId] = { ...map[currentAgentId], status: 'running' }
       } else {
