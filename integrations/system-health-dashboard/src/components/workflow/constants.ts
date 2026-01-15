@@ -370,12 +370,12 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'batch_semantic_analysis': 'semantic_analysis',
   'generate_batch_observations': 'observation_generation',  // NEW: batch phase observation generation
   'classify_with_ontology': 'ontology_classification',
-  'operator_conv': 'context_convolution',
-  'operator_aggr': 'entity_aggregation',
-  'operator_embed': 'node_embedding',
-  'operator_dedup': 'deduplication_operator',
-  'operator_pred': 'edge_prediction',
-  'operator_merge': 'structure_merge',
+  'operator_conv': 'kg_operators',
+  'operator_aggr': 'kg_operators',
+  'operator_embed': 'kg_operators',
+  'operator_dedup': 'kg_operators',
+  'operator_pred': 'kg_operators',
+  'operator_merge': 'kg_operators',
   'batch_qa': 'quality_assurance',
   'save_batch_checkpoint': 'batch_checkpoint_manager',
   'index_codebase': 'code_graph',
@@ -416,12 +416,15 @@ export const STEP_TO_SUBSTEP: Record<string, string> = {
   // semantic_analysis agent sub-steps
   'semantic_analysis': 'extract',
   'batch_semantic_analysis': 'extract',
+  // observation_generation agent sub-steps
+  'generate_observations': 'extract',
+  'generate_batch_observations': 'extract',
   // kg_operators agent sub-steps
-  'operator_conversational': 'conv',
-  'operator_aggregate': 'aggr',
-  'operator_embedding': 'embed',
+  'operator_conv': 'conv',
+  'operator_aggr': 'aggr',
+  'operator_embed': 'embed',
   'operator_dedup': 'dedup',
-  'operator_predict': 'pred',
+  'operator_pred': 'pred',
   'operator_merge': 'merge',
   // ontology_classification agent sub-steps
   'classify_with_ontology': 'classify',

@@ -1,79 +1,60 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
-import type { AgentDefinition, EdgeDefinition, WorkflowDefinitionsAPI } from './types'
-import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, MULTI_AGENT_EDGES, ICON_MAP } from './constants'
+import type { AgentDefinition, EdgeDefinition } from './types'
+import { useAppSelector, useAppDispatch } from '@/store'
+import {
+  selectAgents,
+  selectOrchestrator,
+  selectEdges,
+  selectStepMappings,
+  selectWorkflowConfigLoading,
+  selectWorkflowConfigError,
+  selectWorkflowConfigInitialized,
+  setWorkflowEdges,
+} from '@/store/slices/workflowConfigSlice'
+import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, MULTI_AGENT_EDGES } from './constants'
 
-// Hook to fetch workflow definitions from API with fallback to constants
+// Hook to get workflow definitions from Redux (populated by API with fallback to constants)
 export function useWorkflowDefinitions(workflowName?: string) {
-  const [agents, setAgents] = useState<AgentDefinition[]>(WORKFLOW_AGENTS)
-  const [orchestrator, setOrchestrator] = useState<AgentDefinition>(ORCHESTRATOR_NODE)
-  const [edges, setEdges] = useState<EdgeDefinition[]>(MULTI_AGENT_EDGES)
-  const [stepToAgent, setStepToAgent] = useState(STEP_TO_AGENT)
-  const [allWorkflows, setAllWorkflows] = useState<Array<{ name: string; edges: EdgeDefinition[] }>>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const dispatch = useAppDispatch()
 
-  useEffect(() => {
-    async function fetchDefinitions() {
-      try {
-        const apiPort = 3033
-        const response = await fetch(`http://localhost:${apiPort}/api/workflows/definitions`)
-
-        if (!response.ok) {
-          throw new Error(`API returned ${response.status}`)
-        }
-
-        const data: WorkflowDefinitionsAPI = await response.json()
-
-        if (data.status === 'success' && data.data) {
-          // Transform agents to include icon component
-          const transformedAgents = data.data.agents.map(agent => ({
-            ...agent,
-            icon: ICON_MAP[agent.icon] || ICON_MAP.Code,
-          })) as AgentDefinition[]
-          setAgents(transformedAgents)
-
-          // Transform orchestrator
-          setOrchestrator({
-            ...data.data.orchestrator,
-            icon: ICON_MAP[data.data.orchestrator.icon] || ICON_MAP.Play,
-          } as AgentDefinition)
-
-          // Update step mappings
-          setStepToAgent(data.data.stepMappings)
-
-          // Store all workflows
-          setAllWorkflows(data.data.workflows.map(w => ({
-            name: w.name,
-            edges: w.edges as EdgeDefinition[]
-          })))
-
-          console.log('Loaded workflow definitions from API')
-        }
-      } catch (err) {
-        console.warn('Failed to fetch workflow definitions, using fallback:', err)
-        setError(err instanceof Error ? err.message : 'Unknown error')
-        // Keep using the constants as fallback
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchDefinitions()
-  }, [])
+  // Read from Redux store
+  const agents = useAppSelector(selectAgents)
+  const orchestrator = useAppSelector(selectOrchestrator)
+  const edges = useAppSelector(selectEdges)
+  const stepToAgent = useAppSelector(selectStepMappings)
+  const isLoading = useAppSelector(selectWorkflowConfigLoading)
+  const error = useAppSelector(selectWorkflowConfigError)
+  const initialized = useAppSelector(selectWorkflowConfigInitialized)
 
   // Update edges when workflow name changes
   useEffect(() => {
-    if (workflowName && allWorkflows.length > 0) {
-      const workflow = allWorkflows.find(w => w.name === workflowName)
-      if (workflow) {
-        setEdges(workflow.edges)
-      }
+    if (workflowName && initialized) {
+      dispatch(setWorkflowEdges({ workflowName }))
     }
-  }, [workflowName, allWorkflows])
+  }, [workflowName, initialized, dispatch])
 
-  return { agents, orchestrator, edges, stepToAgent, isLoading, error }
+  // Return fallback values if not initialized
+  if (!initialized) {
+    return {
+      agents: WORKFLOW_AGENTS,
+      orchestrator: ORCHESTRATOR_NODE,
+      edges: MULTI_AGENT_EDGES,
+      stepToAgent: STEP_TO_AGENT,
+      isLoading: true,
+      error: null
+    }
+  }
+
+  return {
+    agents: agents.length > 0 ? agents : WORKFLOW_AGENTS,
+    orchestrator: orchestrator || ORCHESTRATOR_NODE,
+    edges: edges.length > 0 ? edges : MULTI_AGENT_EDGES,
+    stepToAgent: Object.keys(stepToAgent).length > 0 ? stepToAgent : STEP_TO_AGENT,
+    isLoading,
+    error
+  }
 }
 
 // Hook to preserve scroll position across re-renders

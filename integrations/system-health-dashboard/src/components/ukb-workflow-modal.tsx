@@ -39,7 +39,7 @@ import {
   StopCircle,
   Activity,
 } from 'lucide-react'
-import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, STEP_TO_AGENT, AGENT_SUBSTEPS } from './workflow'
+import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, useWorkflowDefinitions } from './workflow'
 import type { SubStep } from './workflow'
 import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
@@ -280,6 +280,9 @@ function calculateStepAwareEta(
 
 export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBaseUrl = 'http://localhost:3033' }: UKBWorkflowModalProps) {
   const dispatch = useDispatch()
+
+  // Workflow config from Redux (populated from API with fallback to constants)
+  const { stepToAgent } = useWorkflowDefinitions()
 
   // Redux state
   const selectedProcessIndex = useSelector((state: RootState) => state.ukb.selectedProcessIndex)
@@ -557,20 +560,15 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Transform process for graph: use CURRENT BATCH status for batch-phase steps
   // This prevents showing cumulative "all green" status from previous batches
+  // Also handles single-step mode by marking paused step as 'running' for visual feedback
   const processForGraph = useMemo(() => {
     if (!activeCurrentProcess) return null
 
-    // If no batchIterations, use process as-is
+    // Get current batch's steps (last batch in array) if available
     const batchIterations = activeCurrentProcess.batchIterations
-    if (!batchIterations || batchIterations.length === 0) {
-      return activeCurrentProcess
-    }
-
-    // Get current batch's steps (last batch in array)
-    const currentBatch = batchIterations[batchIterations.length - 1]
-    if (!currentBatch?.steps) {
-      return activeCurrentProcess
-    }
+    const currentBatch = batchIterations && batchIterations.length > 0
+      ? batchIterations[batchIterations.length - 1]
+      : null
 
     // Batch-phase step names that should use current batch status
     // These repeat per-batch and should NOT show green from previous batches
@@ -584,31 +582,45 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     ])
 
     // Build step status from current batch
-    const currentBatchStepStatus = new Map<string, typeof currentBatch.steps[0]>()
-    for (const step of currentBatch.steps) {
-      currentBatchStepStatus.set(step.name, step)
+    const currentBatchStepStatus = new Map<string, { name: string; status: string; duration?: number; outputs?: Record<string, any> }>()
+    if (currentBatch?.steps) {
+      for (const step of currentBatch.steps) {
+        currentBatchStepStatus.set(step.name, step)
+      }
     }
 
     // Transform steps array: use current batch status for batch-phase steps
+    // Also mark paused step as 'running' in single-step mode for visual feedback
     const transformedSteps = (activeCurrentProcess.steps || []).map(step => {
-      if (batchPhaseStepNames.has(step.name)) {
+      // In single-step mode, mark the paused step as 'running' for visual feedback
+      if (singleStepMode && stepPaused && pausedAtStep === step.name) {
+        return { ...step, status: 'running' as StepInfo['status'] }
+      }
+
+      if (currentBatch?.steps && batchPhaseStepNames.has(step.name)) {
         // Use current batch status, or 'pending' if not in current batch yet
         const currentStatus = currentBatchStepStatus.get(step.name)
         if (currentStatus) {
-          return { ...step, status: currentStatus.status }
+          return { ...step, status: currentStatus.status as StepInfo['status'] }
         }
         // Step not yet reached in current batch - mark as pending
-        return { ...step, status: 'pending' as const }
+        return { ...step, status: 'pending' as StepInfo['status'] }
       }
       // Non-batch steps (pre-batch, post-batch): keep original status
       return step
     })
 
+    // Also set currentStep to pausedAtStep in single-step mode for arrow animation
+    const effectiveCurrentStep = (singleStepMode && stepPaused && pausedAtStep)
+      ? pausedAtStep
+      : activeCurrentProcess.currentStep
+
     return {
       ...activeCurrentProcess,
       steps: transformedSteps,
+      currentStep: effectiveCurrentStep,
     }
-  }, [activeCurrentProcess])
+  }, [activeCurrentProcess, singleStepMode, stepPaused, pausedAtStep])
 
   // Fetch historical workflows when history tab is selected
   useEffect(() => {
@@ -628,33 +640,55 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Track previous step to detect step changes for auto-switching sidebar
   const previousStepRef = useRef<string | null>(null)
+  const previousAgentRef = useRef<string | null>(null)
 
-  // Auto-switch sidebar to currently running step when workflow progresses
+  // Get expanded sub-steps agent from Redux
+  const expandedSubStepsAgent = useSelector(selectExpandedSubStepsAgent)
+
+  // Auto-switch sidebar to currently running/paused step when workflow progresses
+  // In single-step mode, use pausedAtStep as the source of truth
   // Users can still manually click to view other steps, but the next step change
   // will switch the sidebar back to the new running step
   useEffect(() => {
     if (!open || activeTab !== 'active' || !activeCurrentProcess) return
 
-    const currentStep = activeCurrentProcess.currentStep
-    if (!currentStep) return
+    // In single-step mode, prefer pausedAtStep over currentStep
+    const effectiveStep = (singleStepMode && pausedAtStep)
+      ? pausedAtStep
+      : activeCurrentProcess.currentStep
+
+    if (!effectiveStep) return
 
     // Only switch if step actually changed
-    if (currentStep !== previousStepRef.current) {
+    if (effectiveStep !== previousStepRef.current) {
       const previousStep = previousStepRef.current
-      previousStepRef.current = currentStep
+      previousStepRef.current = effectiveStep
 
       // Find the agent for the current step
-      const agentId = STEP_TO_AGENT[currentStep]
+      const agentId = stepToAgent[effectiveStep] || effectiveStep
       if (agentId) {
-        Logger.info(LogCategories.UI, 'Auto-switching sidebar to running step', {
+        Logger.info(LogCategories.UI, 'Auto-switching sidebar to running/paused step', {
           previousStep,
-          currentStep,
+          currentStep: effectiveStep,
           agentId,
+          singleStepMode,
+          pausedAtStep,
         })
         dispatch(setSelectedNode(agentId))
+
+        // Auto-close sub-steps if we moved to a different agent
+        const previousAgentId = previousStep ? (stepToAgent[previousStep] || previousStep) : null
+        if (previousAgentId && previousAgentId !== agentId && expandedSubStepsAgent === previousAgentId) {
+          Logger.info(LogCategories.UI, 'Auto-closing sub-steps from previous agent', {
+            previousAgent: previousAgentId,
+            newAgent: agentId,
+          })
+          dispatch(setExpandedSubStepsAgent(null))
+        }
+        previousAgentRef.current = agentId
       }
     }
-  }, [open, activeTab, activeCurrentProcess?.currentStep, dispatch])
+  }, [open, activeTab, activeCurrentProcess?.currentStep, singleStepMode, pausedAtStep, expandedSubStepsAgent, dispatch])
 
   // Reset step tracking ref when modal closes
   useEffect(() => {
@@ -1210,7 +1244,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                       if (activeCurrentProcess?.batchIterations) {
                         for (const batch of activeCurrentProcess.batchIterations) {
                           const batchStep = batch.steps.find(
-                            s => STEP_TO_AGENT[s.name] === selectedNode || s.name === selectedNode
+                            s => stepToAgent[s.name] === selectedNode || s.name === selectedNode
                           )
                           if (batchStep) {
                             // Merge outputs from all batches for this agent (accumulate counts)
@@ -1233,7 +1267,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                       // Fall back to stepsDetail (has finalization step outputs)
                       if (!agentStepInfo || Object.keys(combinedOutputs).length === 0) {
                         const stepsDetailInfo = activeCurrentProcess?.steps?.find(
-                          s => STEP_TO_AGENT[s.name] === selectedNode || s.name === selectedNode
+                          s => stepToAgent[s.name] === selectedNode || s.name === selectedNode
                         )
                         if (stepsDetailInfo) {
                           agentStepInfo = stepsDetailInfo
@@ -1519,7 +1553,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                       (() => {
                         // Find step info for this agent from historical data
                         const agentStepInfo = historicalProcessInfo?.steps?.find(
-                          s => STEP_TO_AGENT[s.name] === selectedNode || s.name === selectedNode
+                          s => stepToAgent[s.name] === selectedNode || s.name === selectedNode
                         )
                         return (
                           <SubStepDetailsSidebar
@@ -1857,7 +1891,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
                       const stepInfo = {
                         ...step,
-                        name: STEP_TO_AGENT[step.name] || step.name,
+                        name: stepToAgent[step.name] || step.name,
                       }
 
                       if (preBatchStepNames.has(step.name)) {
@@ -1878,7 +1912,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   for (const batch of activeCurrentProcess.batchIterations!) {
                     for (const step of batch.steps) {
                       allSteps.push({
-                        name: `[${batch.batchId}] ${STEP_TO_AGENT[step.name] || step.name}`,
+                        name: `[${batch.batchId}] ${stepToAgent[step.name] || step.name}`,
                         status: step.status,
                         duration: step.duration,
                         outputs: step.outputs,
@@ -1898,7 +1932,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                     for (const step of activeCurrentProcess.steps) {
                       allSteps.push({
                         ...step,
-                        name: STEP_TO_AGENT[step.name] || step.name,
+                        name: stepToAgent[step.name] || step.name,
                       })
                     }
                   }
