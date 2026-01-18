@@ -18,7 +18,7 @@ class ClaudeConversationExtractor {
   }
 
   getProjectKey(projectPath) {
-    // Claude Code converts paths like /Users/q284340/Agentic/coding to -Users-q284340-Agentic-coding
+    // Claude Code converts paths like /Users/username/Agentic/coding to -Users-username-Agentic-coding
     return projectPath.replace(/\//g, '-');
   }
 

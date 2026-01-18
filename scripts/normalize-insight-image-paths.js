@@ -2,8 +2,12 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const insightsDir = '/Users/q284340/Agentic/coding/knowledge-management/insights';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const scriptRoot = path.resolve(__dirname, '..');
+const insightsDir = path.join(scriptRoot, 'knowledge-management', 'insights');
 
 // Read all markdown files
 const mdFiles = fs.readdirSync(insightsDir)

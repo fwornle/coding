@@ -10,7 +10,7 @@
  *
  * Examples:
  *   node simple-reindex.js
- *   node simple-reindex.js --lsl /Users/q284340/Agentic/curriculum-alignment curriculum_alignment
+ *   node simple-reindex.js --lsl ~/Agentic/curriculum-alignment curriculum_alignment
  */
 
 import { QdrantClient } from '@qdrant/js-client-rest';
@@ -296,7 +296,7 @@ if (args.length > 0 && args[0] === '--lsl') {
   // LSL mode: node simple-reindex.js --lsl <project-path> <collection-name>
   if (args.length < 3) {
     console.error('❌ Usage: node simple-reindex.js --lsl <project-path> <collection-name>');
-    console.error('   Example: node simple-reindex.js --lsl /Users/q284340/Agentic/curriculum-alignment curriculum_alignment');
+    console.error('   Example: node simple-reindex.js --lsl ~/Agentic/curriculum-alignment curriculum_alignment');
     process.exit(1);
   }
 

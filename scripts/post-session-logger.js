@@ -7,9 +7,14 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import os from 'os';
 import { AutoInsightTrigger } from './auto-insight-trigger.js';
 import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const scriptRoot = path.resolve(__dirname, '..');
 
 class PostSessionLogger {
   constructor(projectPath, codingRepo, sessionId) {
@@ -481,7 +486,7 @@ async function main() {
   }
 
   const projectPath = process.argv[2] || process.cwd();
-  const codingRepo = process.argv[3] || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+  const codingRepo = process.argv[3] || process.env.CODING_REPO || scriptRoot;
   const sessionId = process.argv[4] || `session-${Date.now()}`;
 
   const logger = new PostSessionLogger(projectPath, codingRepo, sessionId);

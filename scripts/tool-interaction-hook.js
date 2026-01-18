@@ -6,7 +6,12 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const scriptRoot = join(__dirname, '..');
 
 // Read tool interaction data from stdin or process arguments
 async function processToolInteraction() {
@@ -37,7 +42,7 @@ async function processToolInteraction() {
     }
 
     // Check if we're in a coding environment with required services
-    const codingRepo = process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    const codingRepo = process.env.CODING_REPO || scriptRoot;
     const hookFilePath = join(codingRepo, '.mcp-sync/tool-interaction-hook.js');
 
     // Fail gracefully if hook file doesn't exist (running outside coding environment)

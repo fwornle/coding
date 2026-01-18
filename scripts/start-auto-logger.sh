@@ -4,8 +4,11 @@
 # This script monitors Claude Code activity and logs conversations to .specstory/history
 # Enhanced to detect coding-related content and route to appropriate project
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Default coding repo is one level up from scripts directory
+DEFAULT_CODING_REPO="${CODING_TOOLS_PATH:-${CODING_REPO:-$(dirname "$SCRIPT_DIR")}}"
 PROJECT_PATH="${1:-$(pwd)}"
-CODING_REPO="${2:-${CODING_REPO:-/Users/q284340/Agentic/coding}}"
+CODING_REPO="${2:-$DEFAULT_CODING_REPO}"
 shift 2  # Remove PROJECT_PATH and CODING_REPO from arguments
 CLAUDE_ARGS="$@"
 
@@ -60,7 +63,7 @@ class SmartClaudeLogger {
     
     // File paths that indicate coding work
     const codingPaths = [
-      '/users/q284340/agentic/coding',
+      codingRepo.toLowerCase(),
       '~/agentic/coding',
       'coding/',
       '.specstory',
@@ -185,7 +188,7 @@ ${assistantMessage}
 
 // Initialize logger
 const projectPath = process.argv[2] || process.cwd();
-const codingRepo = process.argv[3] || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+const codingRepo = process.argv[3] || process.env.CODING_REPO || process.env.CODING_TOOLS_PATH || path.join(process.env.HOME, 'Agentic', 'coding');
 const logger = new SmartClaudeLogger(projectPath, codingRepo);
 
 // Create readline interface for stdin

@@ -13,12 +13,17 @@
 import { promises as fs } from 'fs';
 import fsSync from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import lockfile from 'proper-lockfile';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const scriptRoot = path.resolve(__dirname, '..');
+
 class ProcessStateManager {
   constructor(options = {}) {
-    this.codingRoot = options.codingRoot || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    this.codingRoot = options.codingRoot || process.env.CODING_REPO || scriptRoot;
     this.registryPath = path.join(this.codingRoot, '.live-process-registry.json');
     this.lockOptions = {
       stale: 5000, // Consider lock stale after 5 seconds

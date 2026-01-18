@@ -6,9 +6,16 @@
 
 import PathAnalyzer from './src/live-logging/PathAnalyzer.js';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const codingRepo = '/Users/q284340/Agentic/coding';
-const projectPath = '/Users/q284340/Agentic/curriculum-alignment';
+// Derive paths dynamically
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// This file is at: tests/unit/test-path-analyzer-integration.js
+// Coding root is 2 levels up
+const codingRepo = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || path.resolve(__dirname, '../..');
+// Default test project path (sibling of coding in ~/Agentic)
+const projectPath = process.env.TEST_PROJECT_PATH || path.resolve(path.dirname(codingRepo), 'curriculum-alignment');
 
 console.log('🧪 Testing PathAnalyzer integration...\n');
 

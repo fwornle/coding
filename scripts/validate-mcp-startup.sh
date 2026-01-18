@@ -8,6 +8,10 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Derive coding directory from script location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODING_DIR="${CODING_TOOLS_PATH:-${CODING_REPO:-$(dirname "$SCRIPT_DIR")}}"
+
 TIMEOUT=30
 RETRY_INTERVAL=2
 
@@ -106,7 +110,7 @@ while [ $(($(date +%s) - start_time)) -lt $TIMEOUT ]; do
     # Show progress and helpful information
     if [ $check_count -eq 1 ]; then
         echo -e "${BLUE}💡 Waiting for VKB Server to bind to port 8080...${NC}"
-        echo -e "${BLUE}   Check ${CODING_DIR:-/Users/q284340/Agentic/coding}/vkb-server.log for startup errors${NC}"
+        echo -e "${BLUE}   Check ${CODING_DIR}/vkb-server.log for startup errors${NC}"
     fi
 
     echo -e "${YELLOW}⏳ $services_ok/$total_services services ready, retrying in ${RETRY_INTERVAL}s... (${remaining}s left)${NC}"

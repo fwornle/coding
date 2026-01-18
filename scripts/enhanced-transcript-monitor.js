@@ -63,7 +63,7 @@ let redactor = null;
 // Initialize redactor with configuration
 async function initializeRedactor() {
   if (!redactor) {
-    const codingPath = process.env.CODING_TOOLS_PATH || '/Users/q284340/Agentic/coding';
+    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
     redactor = new ConfigurableRedactor({
       configPath: path.join(codingPath, '.specstory', 'config', 'redaction-patterns.json'),
       debug: false
@@ -195,7 +195,7 @@ class EnhancedTranscriptMonitor {
     try {
       const projectName = path.basename(this.config.projectPath);
       const userHash = UserHashGenerator.generateHash({ debug: false });
-      const codingRepo = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+      const codingRepo = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
 
       this.classificationLogger = new ClassificationLogger({
         projectPath: this.config.projectPath, // CRITICAL: Pass projectPath for correct log directory
@@ -219,7 +219,7 @@ class EnhancedTranscriptMonitor {
    */
   getCentralizedHealthFile(projectPath) {
     // Get coding project path
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
     
     // Create project-specific health file name based on project path
     const projectName = path.basename(projectPath);
@@ -233,7 +233,7 @@ class EnhancedTranscriptMonitor {
    * Get state file path for persisting lastProcessedUuid
    */
   getStateFilePath() {
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
     const projectName = path.basename(this.config.projectPath);
     const stateFileName = `${projectName}-transcript-monitor-state.json`;
     return path.join(codingPath, '.health', stateFileName);
@@ -402,7 +402,7 @@ class EnhancedTranscriptMonitor {
 
   async initializeReliableCodingClassifier() {
     try {
-      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
       
       this.reliableCodingClassifier = new ReliableCodingClassifier({
         projectPath: this.config.projectPath,
@@ -1225,7 +1225,7 @@ class EnhancedTranscriptMonitor {
    * (2b) If running outside coding -> check redirect status
    */
   async determineTargetProject(exchangeOrPromptSet) {
-    const codingPath = process.env.CODING_TOOLS_PATH || '/Users/q284340/Agentic/coding';
+    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
     
     // Handle both single exchange and prompt set array  
     const exchanges = Array.isArray(exchangeOrPromptSet) ? exchangeOrPromptSet : [exchangeOrPromptSet];
@@ -1273,11 +1273,15 @@ class EnhancedTranscriptMonitor {
     // Regular 'all' mode logic:
     
     // Check if we're running from coding directory
-    if (this.config.projectPath.includes('/coding')) {
+    // CRITICAL: Return this.config.projectPath (not codingPath) to ensure path equality check
+    // in getSessionFilePath() works correctly and doesn't create _from-coding redirect files
+    // Use basename check to avoid false positives like "/my-coding-project"
+    const projectBasename = path.basename(this.config.projectPath);
+    if (projectBasename === 'coding') {
       if (isSept14Debug) {
         console.log(`   ✅ ROUTING TO CODING PROJECT - running from coding directory`);
       }
-      return codingPath;
+      return this.config.projectPath;  // Use actual project path, not computed codingPath
     }
     
     // Running from outside coding - check redirect status
@@ -2061,7 +2065,7 @@ class EnhancedTranscriptMonitor {
     
     // Check for coding-related file paths and operations
     const codingPaths = [
-      '/users/q284340/agentic/coding/',
+      codingRoot.toLowerCase() + '/',
       'coding/scripts/',
       'coding/bin/',
       'coding/src/',
@@ -2701,7 +2705,7 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
     }
 
     // Also clear redirected session files in coding project if different
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
     if (targetProject !== codingPath) {
       const codingHistoryDir = path.join(codingPath, '.specstory', 'history');
       if (fs.existsSync(codingHistoryDir)) {

@@ -59,7 +59,7 @@ class StatusLineHealthMonitor {
    */
   getCentralizedHealthFile(projectPath) {
     // Get coding project path
-    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || this.codingRepoPath;
     
     // Create project-specific health file name based on project path
     const projectName = path.basename(projectPath);
@@ -168,12 +168,12 @@ class StatusLineHealthMonitor {
 
       if (psOutput && psOutput.trim()) {
         for (const line of psOutput.trim().split('\n')) {
-          // Format: PID enhanced-transcript-monitor.js /Users/q284340/Agentic/PROJECT
-          // Try multiple patterns for robustness
+          // Format: PID enhanced-transcript-monitor.js /path/to/Agentic/PROJECT
+          // Try multiple patterns for robustness - no hardcoded user paths
           const patterns = [
-            /enhanced-transcript-monitor\.js\s+\/Users\/q284340\/Agentic\/([^\s]+)/,
+            /enhanced-transcript-monitor\.js\s+\S+\/Agentic\/([^\s/]+)/,  // Generic: any path with /Agentic/
             /\/Agentic\/([^\s/]+)(?:\s|$)/,  // Fallback: just extract project after /Agentic/
-            /PROJECT_PATH=\/Users\/q284340\/Agentic\/([^\s]+)/  // Handle env var format
+            /PROJECT_PATH=\S+\/Agentic\/([^\s/]+)/  // Handle env var format
           ];
 
           for (const pattern of patterns) {
@@ -252,7 +252,7 @@ class StatusLineHealthMonitor {
               const parts = lsofOutput.trim().split(/\s+/);
               const cwdPath = parts[parts.length - 1]; // Last column is the path
 
-              // Extract project name from path like /Users/q284340/Agentic/nano-degree
+              // Extract project name from path like ~/Agentic/nano-degree
               const agenticMatch = cwdPath.match(/\/Agentic\/([^/\s]+)/);
               if (agenticMatch) {
                 claudeSessions.add(agenticMatch[1]);
@@ -316,6 +316,12 @@ class StatusLineHealthMonitor {
     // Get projects with running Claude sessions (even without monitors)
     const claudeSessions = await this.getRunningClaudeSessions();
 
+    // Dynamic path computation - no hardcoded user paths!
+    const agenticDir = path.dirname(this.codingRepoPath);
+    const homeDir = process.env.HOME;
+    const escapedAgenticPath = agenticDir.replace(/\//g, '-').replace(/^-/, '');
+    const claudeProjectPrefix = `-${escapedAgenticPath}-`;
+
     try {
       // Method 1: Registry-based discovery (preferred when available)
       // STABILITY FIX: Also filter by running monitors to ensure consistency
@@ -327,7 +333,7 @@ class StatusLineHealthMonitor {
           if (!runningMonitors.has(projectName)) {
             // No monitor running - show as dormant/sleeping with special icon
             // Check if there's a recent transcript to determine if session is known
-            const claudeProjectDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects', `-Users-q284340-Agentic-${projectName}`);
+            const claudeProjectDir = path.join(homeDir, '.claude', 'projects', `${claudeProjectPrefix}${projectName}`);
             if (fs.existsSync(claudeProjectDir)) {
               try {
                 const transcriptFiles = fs.readdirSync(claudeProjectDir)
@@ -369,16 +375,16 @@ class StatusLineHealthMonitor {
       
       // Method 2: Dynamic discovery via Claude transcript files (discovers unregistered sessions)
       // IMPORTANT: Only show sessions with running transcript monitors
-      const claudeProjectsDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects');
+      const claudeProjectsDir = path.join(process.env.HOME, '.claude', 'projects');
 
       if (fs.existsSync(claudeProjectsDir)) {
-        const projectDirs = fs.readdirSync(claudeProjectsDir).filter(dir => dir.startsWith('-Users-q284340-Agentic-'));
+        const projectDirs = fs.readdirSync(claudeProjectsDir).filter(dir => dir.startsWith(claudeProjectPrefix));
 
         for (const projectDir of projectDirs) {
           const projectDirPath = path.join(claudeProjectsDir, projectDir);
 
-          // Extract project name from directory: "-Users-q284340-Agentic-curriculum-alignment" -> "curriculum-alignment"
-          const projectName = projectDir.replace(/^-Users-q284340-Agentic-/, '');
+          // Extract project name from directory dynamically
+          const projectName = projectDir.slice(claudeProjectPrefix.length);
 
           // Skip if already found via registry
           if (sessions[projectName]) continue;
@@ -418,7 +424,7 @@ class StatusLineHealthMonitor {
           }
 
           // Check if this project has a centralized health file FIRST
-          const projectPath = `/Users/q284340/Agentic/${projectName}`;
+          const projectPath = path.join(agenticDir, projectName);
           const centralizedHealthFile = this.getCentralizedHealthFile(projectPath);
 
           if (fs.existsSync(centralizedHealthFile)) {
@@ -504,14 +510,20 @@ class StatusLineHealthMonitor {
         }
       }
       
-      // Method 3: Fallback hardcoded check for known project directories (using centralized health files)
-      const commonProjectDirs = [
-        this.codingRepoPath, // Current coding directory
-        '/Users/q284340/Agentic/ui-template',
-        '/Users/q284340/Agentic/curriculum-alignment',
-        '/Users/q284340/Agentic/nano-degree',
-        '/Users/q284340/Agentic/virtual-validation'
-      ];
+      // Method 3: Dynamic discovery of project directories in Agentic parent folder
+      // Scan the parent directory for other potential projects
+      const commonProjectDirs = [this.codingRepoPath];
+      try {
+        const siblingDirs = fs.readdirSync(agenticDir)
+          .filter(name => {
+            const fullPath = path.join(agenticDir, name);
+            return fs.statSync(fullPath).isDirectory() && name !== 'coding';
+          })
+          .map(name => path.join(agenticDir, name));
+        commonProjectDirs.push(...siblingDirs);
+      } catch (e) {
+        // Skip if can't read agentic directory
+      }
 
       for (const projectDir of commonProjectDirs) {
         const projectName = path.basename(projectDir);
@@ -522,7 +534,7 @@ class StatusLineHealthMonitor {
         // Check if monitor is running for this project
         if (!runningMonitors.has(projectName)) {
           // No monitor running - check if session has recent transcript activity
-          const claudeProjectDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects', `-Users-q284340-Agentic-${projectName}`);
+          const claudeProjectDir = path.join(homeDir, '.claude', 'projects', `${claudeProjectPrefix}${projectName}`);
           if (fs.existsSync(claudeProjectDir)) {
             try {
               const transcriptFiles = fs.readdirSync(claudeProjectDir)
@@ -595,7 +607,7 @@ class StatusLineHealthMonitor {
 
     for (const [projectName, sessionData] of Object.entries(sessions)) {
       // Check health file for transcript age
-      const projectPath = `/Users/q284340/Agentic/${projectName}`;
+      const projectPath = path.join(agenticDir, projectName);
       const healthFile = this.getCentralizedHealthFile(projectPath);
 
       if (fs.existsSync(healthFile)) {
@@ -704,7 +716,10 @@ class StatusLineHealthMonitor {
       }
 
       // Otherwise, check transcript activity as fallback
-      const claudeProjectDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects', `-Users-q284340-Agentic-${projectName}`);
+      // Compute Claude project directory dynamically
+      const agenticDir = path.dirname(this.codingRepoPath);
+      const escapedAgenticPath = agenticDir.replace(/\//g, '-').replace(/^-/, '');
+      const claudeProjectDir = path.join(process.env.HOME, '.claude', 'projects', `-${escapedAgenticPath}-${projectName}`);
 
       if (fs.existsSync(claudeProjectDir)) {
         try {

@@ -617,8 +617,7 @@ class PathAnalyzer {
       process.env.CODING_TOOLS_PATH,
       path.join(process.env.HOME || '', 'Agentic', 'coding'),
       path.join(process.env.HOME || '', 'Claude', 'coding'),
-      path.join(process.cwd(), 'coding'),
-      '/Users/q284340/Agentic/coding' // Fallback for development
+      path.join(process.cwd(), 'coding')
     ].filter(Boolean);
     
     for (const candidatePath of candidatePaths) {

@@ -523,6 +523,12 @@ class HealthVerifier extends EventEmitter {
   async discoverActiveProjects() {
     const projects = new Set();
 
+    // Dynamic path computation - no hardcoded user paths
+    const agenticDir = path.dirname(this.codingRoot);
+    const homeDir = process.env.HOME;
+    const escapedAgenticPath = agenticDir.replace(/\//g, '-').replace(/^-/, '');
+    const claudeProjectPrefix = `-${escapedAgenticPath}-`;
+
     // Source 1: PSM registry
     try {
       const registry = await this.psm.getAllServices();
@@ -544,7 +550,7 @@ class HealthVerifier extends EventEmitter {
         for (const file of files) {
           const match = file.match(/^(.+)-transcript-monitor-health\.json$/);
           if (match) {
-            const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+            const projectPath = path.join(agenticDir, match[1]);
             if (fsSync.existsSync(projectPath)) {
               projects.add(projectPath);
             }
@@ -557,13 +563,15 @@ class HealthVerifier extends EventEmitter {
 
     // Source 3: Claude transcript directories with recent activity (< 24 hours)
     try {
-      const claudeProjectsDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects');
+      if (!homeDir) throw new Error('HOME not set');
+      const claudeProjectsDir = path.join(homeDir, '.claude', 'projects');
       if (fsSync.existsSync(claudeProjectsDir)) {
         const dirs = fsSync.readdirSync(claudeProjectsDir);
         for (const dir of dirs) {
-          const match = dir.match(/^-Users-q284340-Agentic-(.+)$/);
-          if (match) {
-            const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+          if (!dir.startsWith(claudeProjectPrefix)) continue;
+          const projectName = dir.slice(claudeProjectPrefix.length);
+          if (projectName) {
+            const projectPath = path.join(agenticDir, projectName);
             if (fsSync.existsSync(projectPath)) {
               const transcriptDir = path.join(claudeProjectsDir, dir);
               const jsonlFiles = fsSync.readdirSync(transcriptDir).filter(f => f.endsWith('.jsonl'));
