@@ -1,7 +1,7 @@
 #!/bin/bash
 # Activate Agent-Agnostic Coding Tools environment
-export CODING_REPO="/Users/q284340/Agentic/coding"
-export PATH="/Users/q284340/Agentic/coding/bin:$PATH"
+export CODING_REPO="/Users/Q284340/Agentic/coding"
+export PATH="/Users/Q284340/Agentic/coding/bin:$PATH"
 echo "✅ Agent-Agnostic Coding Tools environment activated!"
 echo "Commands 'vkb' and 'coding' are now available."
 echo ""
