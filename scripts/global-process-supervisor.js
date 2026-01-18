@@ -17,12 +17,17 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import ProcessStateManager from './process-state-manager.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const scriptRoot = path.resolve(__dirname, '..');
+
 class GlobalProcessSupervisor {
   constructor(options = {}) {
-    this.codingRoot = options.codingRoot || process.env.CODING_REPO || '/Users/q284340/Agentic/coding';
+    this.codingRoot = options.codingRoot || process.env.CODING_REPO || scriptRoot;
     this.psm = new ProcessStateManager({ codingRoot: this.codingRoot });
     this.serviceName = 'global-process-supervisor';
 
@@ -117,12 +122,13 @@ class GlobalProcessSupervisor {
       const healthDir = path.join(this.codingRoot, '.health');
       const files = fs.readdirSync(healthDir);
 
+      const agenticDir = path.dirname(this.codingRoot); // Parent of coding repo (e.g., ~/Agentic)
       for (const file of files) {
         const match = file.match(/^(.+)-transcript-monitor-health\.json$/);
         if (match) {
           const projectName = match[1];
-          // Convert project name to full path
-          const projectPath = `/Users/q284340/Agentic/${projectName}`;
+          // Convert project name to full path using dynamic path resolution
+          const projectPath = path.join(agenticDir, projectName);
           if (fs.existsSync(projectPath)) {
             projects.push(projectPath);
           }
@@ -140,15 +146,23 @@ class GlobalProcessSupervisor {
   getProjectsFromClaudeTranscripts() {
     const projects = [];
     try {
-      const claudeProjectsDir = path.join(process.env.HOME || '/Users/q284340', '.claude', 'projects');
+      const homeDir = process.env.HOME;
+      if (!homeDir) return projects;
+
+      const claudeProjectsDir = path.join(homeDir, '.claude', 'projects');
       if (!fs.existsSync(claudeProjectsDir)) return projects;
+
+      // Build dynamic pattern based on actual Agentic directory
+      const agenticDir = path.dirname(this.codingRoot);
+      const escapedAgenticPath = agenticDir.replace(/\//g, '-').replace(/^-/, '');
+      const agenticPattern = new RegExp(`^-${escapedAgenticPath}-(.+)$`);
 
       const dirs = fs.readdirSync(claudeProjectsDir);
       for (const dir of dirs) {
-        // Match pattern: -Users-q284340-Agentic-{projectName}
-        const match = dir.match(/^-Users-q284340-Agentic-(.+)$/);
+        // Match pattern dynamically based on actual agentic directory
+        const match = dir.match(agenticPattern);
         if (match) {
-          const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+          const projectPath = path.join(agenticDir, match[1]);
           if (fs.existsSync(projectPath)) {
             // Check if transcripts exist and are recent (< 24 hours)
             const transcriptDir = path.join(claudeProjectsDir, dir);
@@ -640,7 +654,7 @@ Options:
   --help, -h      Show this help
 
 Environment:
-  CODING_REPO     Path to coding repository (default: /Users/q284340/Agentic/coding)
+  CODING_REPO     Path to coding repository (default: script directory parent)
 `);
     process.exit(0);
   }

@@ -7,12 +7,17 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const scriptRoot = path.resolve(__dirname, '..');
 
 // Load timezone from central config
 function getTimezone() {
   try {
-    const envPath = path.join(process.env.CODING_TOOLS_PATH || '/Users/q284340/Agentic/coding', '.env');
+    const envPath = path.join(process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || scriptRoot, '.env');
     if (fs.existsSync(envPath)) {
       const envContent = fs.readFileSync(envPath, 'utf8');
       const timezoneMatch = envContent.match(/TIMEZONE=(.+)/);
@@ -77,7 +82,7 @@ export function getTimeWindow(localDate) {
   // Load session duration from config (default 60 minutes)
   let sessionDurationMs = 3600000; // 60 minutes default
   try {
-    const configPath = '/Users/q284340/Agentic/coding/config/live-logging-config.json';
+    const configPath = path.join(process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || scriptRoot, 'config', 'live-logging-config.json');
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       sessionDurationMs = config.live_logging.session_duration || 3600000;
@@ -106,7 +111,7 @@ export function getShortTimeWindow(localDate) {
   // Load session duration from config (default 60 minutes)
   let sessionDurationMs = 3600000; // 60 minutes default
   try {
-    const configPath = '/Users/q284340/Agentic/coding/config/live-logging-config.json';
+    const configPath = path.join(process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || scriptRoot, 'config', 'live-logging-config.json');
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       sessionDurationMs = config.live_logging.session_duration || 3600000;

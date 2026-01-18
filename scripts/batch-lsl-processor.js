@@ -45,7 +45,7 @@ class BatchLSLProcessor {
   constructor(options = {}) {
     // CRITICAL FIX: Always resolve to absolute paths, regardless of where script runs
     this.projectPath = path.resolve(options.projectPath || process.cwd());
-    this.codingRepo = path.resolve(options.codingRepo || '/Users/q284340/Agentic/coding');
+    this.codingRepo = path.resolve(options.codingRepo || process.env.CODING_REPO || path.resolve(__dirname, '..'));
     this.batchMode = options.batchMode || false; // If true, only create foreign files
     this.timeWindow = options.timeWindow || null; // { start: Date, end: Date }
     this.retryAttempts = options.retryAttempts || 3;
@@ -1861,7 +1861,7 @@ Examples:
   batch-lsl-processor.js post-session
   batch-lsl-processor.js from-transcripts ~/.claude/projects/my-project
   batch-lsl-processor.js retroactive 2025-09-13 2025-09-14
-  batch-lsl-processor.js foreign-only /Users/q284340/Agentic/nano-degree
+  batch-lsl-processor.js foreign-only ~/Agentic/nano-degree
   batch-lsl-processor.js regenerate-markdown 2025-10-06
 `);
     process.exit(1);
@@ -1871,7 +1871,7 @@ Examples:
   const options = {
     // CRITICAL FIX: Resolve paths immediately to ensure absolute paths
     projectPath: path.resolve(process.env.PROJECT_PATH || process.cwd()),
-    codingRepo: path.resolve(process.env.CODING_REPO || '/Users/q284340/Agentic/coding'),
+    codingRepo: path.resolve(process.env.CODING_REPO || path.resolve(__dirname, '..')),
     sessionDuration: parseInt(process.env.SESSION_DURATION) || 3600000,
     retryAttempts: parseInt(process.env.RETRY_ATTEMPTS) || 3
   };

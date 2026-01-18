@@ -15,7 +15,7 @@ async function test() {
   const codingTest = {
     userMessage: 'Can you help me fix the enhanced-transcript-monitor.js file? It seems to have an issue with the classification system.',
     assistantMessage: 'Let me read the file and analyze the issue.',
-    fileOperations: ['/Users/q284340/Agentic/coding/scripts/enhanced-transcript-monitor.js'],
+    fileOperations: ['scripts/enhanced-transcript-monitor.js'],
     exchanges: [{
       userMessage: 'Can you help me fix the enhanced-transcript-monitor.js file?',
       assistantMessage: 'Let me read the file and analyze the issue.'

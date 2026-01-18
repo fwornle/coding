@@ -1251,11 +1251,12 @@ class ReliableCodingClassifier {
    */
   detectCodingRepo() {
     const possiblePaths = [
+      process.env.CODING_REPO,
+      process.env.CODING_TOOLS_PATH,
       path.join(process.env.HOME, 'Agentic', 'coding'),
       path.join(process.env.HOME, 'Claude', 'coding'),
-      path.join(process.cwd(), 'coding'),
-      '/Users/q284340/Agentic/coding' // Fallback
-    ];
+      path.join(process.cwd(), 'coding')
+    ].filter(Boolean);
     
     for (const p of possiblePaths) {
       if (fs.existsSync(p) && fs.existsSync(path.join(p, 'CLAUDE.md'))) {

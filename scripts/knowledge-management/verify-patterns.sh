@@ -5,7 +5,11 @@
 set -euo pipefail
 
 # Configuration
-CLAUDE_REPO="${CODING_TOOLS_PATH:-/Users/q284340/Agentic/coding}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# This script is at: scripts/knowledge-management/verify-patterns.sh
+# Coding root is 2 levels up
+DEFAULT_REPO="$(dirname "$(dirname "$SCRIPT_DIR")")"
+CLAUDE_REPO="${CODING_TOOLS_PATH:-${CODING_REPO:-$DEFAULT_REPO}}"
 KNOWLEDGE_EXPORT_DIR="$CLAUDE_REPO/.data/knowledge-export"
 VERIFICATION_REPORT="/tmp/pattern-verification-$(date +%Y%m%d_%H%M%S).md"
 

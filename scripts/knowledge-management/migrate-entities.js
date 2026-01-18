@@ -107,7 +107,7 @@ function migrateEntity(entity) {
     entityType: entity.entityType || entity.type,
     metadata: {
       significance: entity.significance || 5,
-      author: entity.author || 'q284340',
+      author: entity.author || 'system',
       project: entity.project || null,
       created: entity.created || new Date().toISOString(),
       last_used: null,

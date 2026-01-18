@@ -7,16 +7,22 @@
  */
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const scriptRoot = join(__dirname, '..');
 
 class ViolationCaptureService {
   constructor() {
-    // Use fixed coding directory path to ensure consistency across different working directories
-    const codingDir = '/Users/q284340/Agentic/coding';
+    // Use dynamic coding directory path
+    const codingDir = process.env.CODING_REPO || scriptRoot;
     this.violationsPath = join(codingDir, '.mcp-sync/session-violations.jsonl');
     this.persistencePath = join(codingDir, '.mcp-sync/violation-history.json');
+    this.codingDir = codingDir;
     this.sessionId = this.generateSessionId();
-    
+
     this.ensureDirectories();
   }
 
@@ -25,8 +31,7 @@ class ViolationCaptureService {
   }
 
   ensureDirectories() {
-    const codingDir = '/Users/q284340/Agentic/coding';
-    const syncDir = join(codingDir, '.mcp-sync');
+    const syncDir = join(this.codingDir, '.mcp-sync');
     if (!existsSync(syncDir)) {
       mkdirSync(syncDir, { recursive: true });
     }

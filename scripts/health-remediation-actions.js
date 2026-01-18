@@ -15,14 +15,19 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import ProcessStateManager from './process-state-manager.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const scriptRoot = join(__dirname, '..');
 
 const execAsync = promisify(exec);
 
 export class HealthRemediationActions {
   constructor(options = {}) {
-    this.codingRoot = options.codingRoot || '/Users/q284340/Agentic/coding';
+    this.codingRoot = options.codingRoot || process.env.CODING_REPO || scriptRoot;
     this.psm = new ProcessStateManager({ codingRoot: this.codingRoot });
     this.debug = options.debug || false;
 

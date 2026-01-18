@@ -1052,6 +1052,12 @@ class CombinedStatusLine {
     try {
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
 
+      // Dynamic path computation - no hardcoded user paths
+      const agenticDir = dirname(codingPath);
+      const homeDir = process.env.HOME;
+      const escapedAgenticPath = agenticDir.replace(/\//g, '-').replace(/^-/, '');
+      const claudeProjectPrefix = `-${escapedAgenticPath}-`;
+
       // Rate limit: Only check every 60 seconds to avoid spawning storms
       const now = Date.now();
       if (this._lastAllMonitorCheck && now - this._lastAllMonitorCheck < 60000) {
@@ -1087,7 +1093,7 @@ class CombinedStatusLine {
           for (const file of files) {
             const match = file.match(/^(.+)-transcript-monitor-health\.json$/);
             if (match) {
-              const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+              const projectPath = join(agenticDir, match[1]);
               if (existsSync(projectPath)) {
                 projects.add(projectPath);
               }
@@ -1100,13 +1106,15 @@ class CombinedStatusLine {
 
       // Source 3: Claude transcript directories with recent activity
       try {
-        const claudeProjectsDir = join(process.env.HOME || '/Users/q284340', '.claude', 'projects');
+        if (!homeDir) throw new Error('HOME not set');
+        const claudeProjectsDir = join(homeDir, '.claude', 'projects');
         if (existsSync(claudeProjectsDir)) {
           const dirs = fs.readdirSync(claudeProjectsDir);
           for (const dir of dirs) {
-            const match = dir.match(/^-Users-q284340-Agentic-(.+)$/);
-            if (match) {
-              const projectPath = `/Users/q284340/Agentic/${match[1]}`;
+            if (!dir.startsWith(claudeProjectPrefix)) continue;
+            const projectName = dir.slice(claudeProjectPrefix.length);
+            if (projectName) {
+              const projectPath = join(agenticDir, projectName);
               if (existsSync(projectPath)) {
                 // Check for recent transcript activity (last 6 hours)
                 const transcriptDir = join(claudeProjectsDir, dir);
@@ -1605,11 +1613,11 @@ class CombinedStatusLine {
       if (psOutput && psOutput.trim()) {
         for (const line of psOutput.trim().split('\n')) {
           // Extract project name from command line
-          // Format: PID node enhanced-transcript-monitor.js /Users/q284340/Agentic/PROJECT
+          // Format: PID node enhanced-transcript-monitor.js /path/to/Agentic/PROJECT
           const patterns = [
-            /enhanced-transcript-monitor\.js\s+\/Users\/q284340\/Agentic\/([^\s]+)/,
-            /\/Agentic\/([^\s/]+)(?:\s|$)/,
-            /PROJECT_PATH=\/Users\/q284340\/Agentic\/([^\s]+)/
+            /enhanced-transcript-monitor\.js\s+\S+\/Agentic\/([^\s/]+)/,  // Generic: any path with /Agentic/
+            /\/Agentic\/([^\s/]+)(?:\s|$)/,  // Fallback: just extract project after /Agentic/
+            /PROJECT_PATH=\S+\/Agentic\/([^\s/]+)/  // Handle env var format
           ];
 
           for (const pattern of patterns) {

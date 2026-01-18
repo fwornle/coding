@@ -2,10 +2,15 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const scriptRoot = path.resolve(__dirname, '..');
 
 // Read the list of files that need direction added
 const fileListPath = '/tmp/needs_horizontal.txt';
-const pumlDir = '/Users/q284340/Agentic/coding/docs/presentation/puml';
+const pumlDir = path.join(scriptRoot, 'docs', 'presentation', 'puml');
 
 const files = fs.readFileSync(fileListPath, 'utf-8')
   .split('\n')

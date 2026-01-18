@@ -342,7 +342,7 @@ class StatusLineIntegrator {
       process.env.CODING_REPO,
       process.env.CODING_TOOLS_PATH,
       path.join(process.env.HOME || '', 'Agentic', 'coding'),
-      '/Users/q284340/Agentic/coding'
+      path.join(process.cwd(), 'coding')
     ].filter(Boolean);
     
     for (const candidate of candidates) {

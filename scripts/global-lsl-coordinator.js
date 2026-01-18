@@ -29,7 +29,7 @@ const execAsync = promisify(exec);
 class GlobalLSLCoordinator {
   constructor(options = {}) {
     this.debug = options.debug || false;
-    this.codingRepoPath = options.codingRepoPath || '/Users/q284340/Agentic/coding';
+    this.codingRepoPath = options.codingRepoPath || process.env.CODING_REPO || path.resolve(__dirname, '..');
     this.registryPath = path.join(this.codingRepoPath, '.global-lsl-registry.json');
     this.healthCheckInterval = options.healthCheckInterval || 30000; // 30 seconds
     this.maxMonitorAge = options.maxMonitorAge || 3600000; // 1 hour max stale

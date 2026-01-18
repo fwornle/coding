@@ -29,7 +29,7 @@ class ClassificationLogger {
   constructor(options = {}) {
     // CRITICAL FIX: Always use absolute paths from projectPath, never process.cwd()
     const projectPath = options.projectPath ? path.resolve(options.projectPath) : null;
-    const codingRepo = options.codingRepo ? path.resolve(options.codingRepo) : path.resolve('/Users/q284340/Agentic/coding');
+    const codingRepo = options.codingRepo ? path.resolve(options.codingRepo) : (process.env.CODING_REPO || path.resolve(__dirname, '..'));
 
     // Determine logDir from projectPath if provided, otherwise use explicit logDir or fall back to coding repo
     if (options.logDir) {
