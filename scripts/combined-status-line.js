@@ -307,9 +307,34 @@ class CombinedStatusLine {
 
       const services = JSON.parse(readFileSync(servicesPath, 'utf8'));
       const cmStatus = services.constraint_monitor;
-      
+
+      // If services file shows degraded, verify with actual API
       if (!cmStatus || cmStatus.status !== '✅ FULLY OPERATIONAL') {
-        return { status: 'degraded', compliance: 0, violations: 0 };
+        try {
+          // Direct API health check to see if service has recovered
+          const apiCheck = execSync('curl -s http://localhost:3031/api/health 2>/dev/null', {
+            timeout: 2000,
+            encoding: 'utf8'
+          });
+          const apiHealth = JSON.parse(apiCheck);
+
+          if (apiHealth.status === 'healthy' && apiHealth.enforcement?.healthy) {
+            // Service recovered - update the stale file
+            services.constraint_monitor = {
+              status: '✅ FULLY OPERATIONAL',
+              dashboard_port: 3030,
+              api_port: 3031,
+              health: 'healthy',
+              last_check: new Date().toISOString()
+            };
+            writeFileSync(servicesPath, JSON.stringify(services, null, 2));
+            // Continue to get detailed status below
+          } else {
+            return { status: 'degraded', compliance: 0, violations: 0 };
+          }
+        } catch (apiError) {
+          return { status: 'degraded', compliance: 0, violations: 0 };
+        }
       }
 
       // Get detailed constraint status
