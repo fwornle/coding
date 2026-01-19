@@ -1426,6 +1426,80 @@ class StatusLineHealthMonitor {
   }
 
   /**
+   * Get System Health Dashboard health status
+   * Monitors the health dashboard UI (3032) and API (3033)
+   */
+  async getHealthDashboardHealth() {
+    try {
+      const uiPort = 3032;
+      const apiPort = 3033;
+      let healthIssues = [];
+      let healthStatus = 'healthy';
+
+      // Check UI port (3032)
+      let uiResponding = false;
+      try {
+        const uiCheck = await Promise.race([
+          execAsync(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${uiPort} --max-time 2`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+        ]);
+        const uiStatus = parseInt(uiCheck.stdout.trim());
+        uiResponding = uiStatus >= 200 && uiStatus < 500;
+      } catch (error) {
+        uiResponding = false;
+      }
+
+      // Check API port (3033)
+      let apiResponding = false;
+      try {
+        const apiCheck = await Promise.race([
+          execAsync(`curl -s http://localhost:${apiPort}/api/health --max-time 2`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+        ]);
+        const apiData = JSON.parse(apiCheck.stdout.trim());
+        apiResponding = apiData.status === 'success';
+      } catch (error) {
+        apiResponding = false;
+      }
+
+      // Determine overall health
+      if (!uiResponding && !apiResponding) {
+        return {
+          status: 'unhealthy',
+          icon: '🔴',
+          details: 'Dashboard offline (UI:3032, API:3033)'
+        };
+      } else if (!uiResponding) {
+        return {
+          status: 'warning',
+          icon: '🟡',
+          details: 'Dashboard UI down (3032)'
+        };
+      } else if (!apiResponding) {
+        return {
+          status: 'warning',
+          icon: '🟡',
+          details: 'Dashboard API down (3033)'
+        };
+      }
+
+      return {
+        status: 'healthy',
+        icon: '✅',
+        details: 'Dashboard OK (UI:3032, API:3033)'
+      };
+
+    } catch (error) {
+      this.log(`Health dashboard check error: ${error.message}`, 'DEBUG');
+      return {
+        status: 'unknown',
+        icon: '❓',
+        details: 'Health check failed'
+      };
+    }
+  }
+
+  /**
    * Auto-heal constraint monitor service when issues are detected
    */
   async autoHealConstraintMonitor(healthStatus) {
@@ -1696,7 +1770,7 @@ class StatusLineHealthMonitor {
   /**
    * Format status line display
    */
-  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth) {
+  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth) {
     let statusLine = '';
 
     // Global Coding Monitor with reason code if not healthy
@@ -1761,6 +1835,16 @@ class StatusLineHealthMonitor {
       }
     }
 
+    // Health Dashboard (UI:3032, API:3033) - always show since it's core infrastructure
+    if (healthDashboardHealth) {
+      if (healthDashboardHealth.icon === '🟡' || healthDashboardHealth.icon === '🔴') {
+        const reason = this.getShortReason(healthDashboardHealth.details || healthDashboardHealth.status);
+        statusLine += ` [Dash:${healthDashboardHealth.icon}(${reason})]`;
+      } else {
+        statusLine += ` [Dash:${healthDashboardHealth.icon}]`;
+      }
+    }
+
     return statusLine;
   }
 
@@ -1769,18 +1853,19 @@ class StatusLineHealthMonitor {
    */
   async updateStatusLine() {
     try {
-      // Gather health data from all components (including new database, VKB, and browser-access checks)
-      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth] = await Promise.all([
+      // Gather health data from all components (including new database, VKB, browser-access, and health dashboard checks)
+      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth] = await Promise.all([
         this.getGlobalCodingMonitorHealth(),
         this.getProjectSessionsHealth(),
         this.getConstraintMonitorHealth(),
         this.getDatabaseHealth(),
         this.getVKBServerHealth(),
-        this.getBrowserAccessHealth()
+        this.getBrowserAccessHealth(),
+        this.getHealthDashboardHealth()
       ]);
 
       // Format status line
-      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth);
+      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth);
 
       // Only update if changed to avoid unnecessary updates
       if (statusLine !== this.lastStatus) {
@@ -1811,6 +1896,7 @@ class StatusLineHealthMonitor {
           console.log(`  Database: ${databaseHealth.status} - ${databaseHealth.details}`);
           console.log(`  VKB: ${vkbHealth.status} - ${vkbHealth.details}`);
           console.log(`  Browser Access: ${browserAccessHealth.status} - ${browserAccessHealth.details}`);
+          console.log(`  Health Dashboard: ${healthDashboardHealth.status} - ${healthDashboardHealth.details}`);
           console.log('='.repeat(80) + '\n');
         }
       }

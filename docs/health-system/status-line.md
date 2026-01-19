@@ -27,6 +27,27 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `[📚✅]` - **Knowledge System**: Knowledge extraction status
 - `📋17-18` - **LSL Time Window**: Session time range (HHMM-HHMM)
 
+### Internal Health Status (Raw Output)
+
+The statusline-health-monitor writes detailed health to `.logs/statusline-health-status.txt`:
+
+```
+[GCM:✅] [Sessions: C:🟢] [Guards:✅] [DB:✅] [VKB:✅] [Browser:✅] [Dash:✅]
+```
+
+**Internal Components**:
+| Label | Ports | Service | Description |
+|-------|-------|---------|-------------|
+| `GCM` | - | Global Process Supervisor | Session coordinator and auto-restart |
+| `Sessions` | - | Transcript Monitors | Per-project Claude session health |
+| `Guards` | 3030/3031 | Constraint Monitor | Dashboard and API for code quality |
+| `DB` | - | Databases | LevelDB, SQLite, Qdrant, Memgraph |
+| `VKB` | 8080 | Knowledge Visualization | Graph visualization server |
+| `Browser` | 3847 | Browser Automation | SSE server for parallel sessions |
+| `Dash` | 3032/3033 | System Health Dashboard | UI and API for health monitoring |
+
+**Icons**: ✅ healthy, 🟡 warning (with reason), 🔴 unhealthy (with reason), ❓ unknown
+
 ### API Quota Monitoring
 
 The status line displays LLM provider availability using a simple, consistent format.
