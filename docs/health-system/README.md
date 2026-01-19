@@ -154,9 +154,10 @@ The health system is built on interconnected components with active supervision:
 
 ### Services
 - **VKB Server** - Knowledge visualization (port 8080)
-- **Constraint Monitor** - Code quality enforcement (port 3031)
-- **Dashboard Server** - Health dashboard (port 3030)
-- **Health API** - Self-monitoring API (port 3033)
+- **Constraint Monitor Dashboard** - Code quality UI (port 3030)
+- **Constraint Monitor API** - Code quality enforcement (port 3031)
+- **System Health Dashboard UI** - Health monitoring UI (port 3032)
+- **System Health Dashboard API** - Health monitoring API (port 3033)
 
 ### Processes
 - Stale PID detection
