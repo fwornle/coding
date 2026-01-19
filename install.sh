@@ -2539,11 +2539,11 @@ install_enhanced_lsl() {
     fi
 }
 
-# Install slash commands from .specstory/commands to global Claude commands folder
+# Install slash commands from .claude/commands to global Claude commands folder
 install_slash_commands() {
     echo -e "\n${CYAN}📝 Installing Claude slash commands...${NC}"
 
-    local commands_source="$CODING_REPO/.specstory/commands"
+    local commands_source="$CODING_REPO/.claude/commands"
     local commands_target="$HOME/.claude/commands"
 
     # Create global commands directory if it doesn't exist
@@ -2567,7 +2567,7 @@ install_slash_commands() {
             info "No slash commands found in $commands_source"
         fi
     else
-        info "No .specstory/commands directory found (skipping slash commands)"
+        info "No .claude/commands directory found (skipping slash commands)"
     fi
 }
 
