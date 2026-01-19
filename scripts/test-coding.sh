@@ -1614,16 +1614,18 @@ fi
 print_check "shadcn/ui MCP Server (Professional UI Components)"
 SHADCN_MCP_DIR="$CODING_ROOT/integrations/shadcn-mcp"
 
-# Check for shadcn CLI availability first
+# Check for shadcn CLI availability first (skip slow network checks)
 print_check "shadcn CLI availability"
-if command_exists pnpm && pnpm dlx shadcn@latest --help >/dev/null 2>&1; then
-    print_pass "shadcn CLI available via pnpm dlx"
+# Note: pnpm dlx / npx shadcn@latest downloads on-the-fly and can hang
+# Instead, just check if pnpm or npx are available - shadcn runs via MCP anyway
+if command_exists pnpm; then
+    print_pass "shadcn CLI available via pnpm dlx (pnpm installed)"
     SHADCN_CLI_AVAILABLE=true
-elif command_exists npx && npx shadcn@latest --help >/dev/null 2>&1; then
-    print_pass "shadcn CLI available via npx"
+elif command_exists npx; then
+    print_pass "shadcn CLI available via npx (npm installed)"
     SHADCN_CLI_AVAILABLE=true
 else
-    print_warning "shadcn CLI not easily accessible"
+    print_warning "Neither pnpm nor npx found - shadcn CLI not accessible"
     SHADCN_CLI_AVAILABLE=false
 fi
 
