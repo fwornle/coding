@@ -1157,8 +1157,90 @@ DCEOF
 
     download_cgr_cache
 
+    # Reindex CGR cache if stale (requires Docker for Memgraph)
+    reindex_cgr_if_needed() {
+        local staleness_script="$CODE_GRAPH_RAG_DIR/scripts/check-cache-staleness.sh"
+        local reindex_script="$CODE_GRAPH_RAG_DIR/scripts/reindex-with-metadata.sh"
+
+        # Check if staleness script exists
+        if [[ ! -x "$staleness_script" ]]; then
+            info "CGR staleness check script not found, skipping reindex"
+            return 0
+        fi
+
+        # Check cache staleness
+        info "Checking CGR cache freshness..."
+        local staleness_json
+        staleness_json=$("$staleness_script" "$CODING_REPO" 2>/dev/null) || true
+
+        local is_stale=$(echo "$staleness_json" | jq -r '.is_stale // true' 2>/dev/null)
+        local commits_behind=$(echo "$staleness_json" | jq -r '.commits_behind // "unknown"' 2>/dev/null)
+
+        if [[ "$is_stale" != "true" ]]; then
+            success "CGR cache is fresh"
+            return 0
+        fi
+
+        info "CGR cache is stale ($commits_behind commits behind)"
+
+        # Check if Docker is available
+        if ! command -v docker &>/dev/null; then
+            warning "Docker not available - CGR reindex skipped"
+            info "  Run manually: cd integrations/code-graph-rag && docker-compose up -d && ./scripts/reindex-with-metadata.sh"
+            return 0
+        fi
+
+        # Check if Docker daemon is running
+        if ! docker info &>/dev/null; then
+            warning "Docker daemon not running - CGR reindex skipped"
+            info "  Start Docker and run: cd integrations/code-graph-rag && docker-compose up -d && ./scripts/reindex-with-metadata.sh"
+            return 0
+        fi
+
+        info "Starting Memgraph for CGR reindex..."
+        cd "$CODE_GRAPH_RAG_DIR"
+
+        # Start Memgraph container
+        if ! docker-compose up -d 2>/dev/null; then
+            warning "Failed to start Memgraph - CGR reindex skipped"
+            cd "$CODING_REPO"
+            return 0
+        fi
+
+        # Wait for Memgraph to be ready (max 30 seconds)
+        info "Waiting for Memgraph to be ready..."
+        local max_wait=30
+        local waited=0
+        while ! docker-compose exec -T memgraph mgconsole -c "RETURN 1" &>/dev/null; do
+            sleep 1
+            ((waited++))
+            if [[ $waited -ge $max_wait ]]; then
+                warning "Memgraph not ready after ${max_wait}s - CGR reindex skipped"
+                cd "$CODING_REPO"
+                return 0
+            fi
+        done
+
+        success "Memgraph ready"
+
+        # Run reindex
+        info "Reindexing CGR cache (this may take a few minutes)..."
+        if [[ -x "$reindex_script" ]]; then
+            if "$reindex_script" "$CODING_REPO" "coding" 2>&1 | tail -5; then
+                success "CGR cache reindexed successfully"
+            else
+                warning "CGR reindex had issues - check logs in integrations/code-graph-rag/shared-data/reindex.log"
+            fi
+        else
+            warning "Reindex script not executable"
+        fi
+
+        cd "$CODING_REPO"
+    }
+
+    reindex_cgr_if_needed
+
     success "code-graph-rag installed"
-    info "  - Start Memgraph: cd integrations/code-graph-rag && docker-compose up -d"
     info "  - Memgraph Lab: http://localhost:3100"
     info "  - MCP server: uv run graph-code mcp-server"
 

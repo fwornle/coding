@@ -85,18 +85,25 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
           {items.map((item, idx) => (
             <div
               key={idx}
-              className="flex items-center justify-between"
+              className="flex flex-col gap-1"
               title={item.tooltip || ''}
             >
-              <div className="flex items-center gap-2">
-                {getStatusIcon(item.status)}
-                <div>
-                  <div className="font-medium text-sm">{item.name}</div>
-                  <div className="text-xs text-muted-foreground">{item.description}</div>
+              {/* Main row: icon + name/description + badge */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(item.status)}
+                  <div>
+                    <div className="font-medium text-sm">{item.name}</div>
+                    <div className="text-xs text-muted-foreground">{item.description}</div>
+                  </div>
                 </div>
+                <span title={item.tooltip || ''}>
+                  {getStatusBadge(item.status)}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                {item.action && (
+              {/* Action button row (below, if action exists) */}
+              {item.action && (
+                <div className="flex justify-start pl-6">
                   <Button
                     size="sm"
                     variant={item.action.variant || 'outline'}
@@ -107,11 +114,8 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
                     {item.action.icon}
                     {item.action.label}
                   </Button>
-                )}
-                <span title={item.tooltip || ''}>
-                  {getStatusBadge(item.status)}
-                </span>
-              </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
