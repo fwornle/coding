@@ -1461,16 +1461,69 @@ setup_project_level_mcp_config() {
     fi
 }
 
-# Initialize shared memory - DEPRECATED (v2.0+)
-# Knowledge is now managed by GraphDB (Graphology + LevelDB) with exports to .data/knowledge-export/
-# This function is kept for backward compatibility but does nothing
+# Initialize knowledge management system
+# Imports knowledge from git-tracked JSON exports into GraphDB (LevelDB)
+# This is critical for fresh installs where LevelDB is empty but JSON exports exist
 initialize_shared_memory() {
     echo -e "\n${CYAN}📝 Initializing knowledge management...${NC}"
 
-    # The initialize-knowledge-system.js script already initializes GraphDB
-    # and creates .data/knowledge-export/*.json files
     info "Knowledge management is handled by GraphDB (see .data/knowledge-graph/)"
     info "Team-specific exports available at .data/knowledge-export/*.json"
+
+    # Check if JSON exports exist but LevelDB is empty (fresh install scenario)
+    local json_exports_exist=false
+    local leveldb_empty=true
+
+    # Check for ANY JSON exports (coding.json, ui.json, resi.json, etc.)
+    local json_count=0
+    if [[ -d "$CODING_REPO/.data/knowledge-export" ]]; then
+        json_count=$(find "$CODING_REPO/.data/knowledge-export" -name "*.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "$json_count" -gt 0 ]]; then
+            json_exports_exist=true
+            info "Found $json_count JSON export file(s) to import"
+        fi
+    fi
+
+    # Check if LevelDB has data (look for .ldb files with content or non-empty .log files)
+    if [[ -d "$CODING_REPO/.data/knowledge-graph" ]]; then
+        local log_size=0
+        for log_file in "$CODING_REPO/.data/knowledge-graph"/*.log; do
+            if [[ -f "$log_file" ]]; then
+                local size=$(stat -f%z "$log_file" 2>/dev/null || stat -c%s "$log_file" 2>/dev/null || echo "0")
+                if [[ "$size" -gt 100 ]]; then
+                    leveldb_empty=false
+                    break
+                fi
+            fi
+        done
+    fi
+
+    # Import from JSON if exports exist and LevelDB is empty
+    if [[ "$json_exports_exist" == "true" && "$leveldb_empty" == "true" ]]; then
+        info "Importing knowledge from JSON exports into GraphDB..."
+
+        # Ensure bin directory is in PATH for graph-sync
+        export PATH="$CODING_REPO/bin:$PATH"
+
+        # Run graph-sync import (without file watchers using a simple timeout)
+        if command -v node >/dev/null 2>&1; then
+            cd "$CODING_REPO"
+            # Run import and capture output
+            if timeout 60 node bin/graph-sync import 2>&1 | grep -E "^✓|entities|relations" | head -10; then
+                success "Knowledge imported from JSON exports to GraphDB"
+            else
+                warn "Knowledge import encountered issues (non-fatal)"
+            fi
+            cd - > /dev/null
+        else
+            warn "Node.js not available - skipping knowledge import"
+        fi
+    elif [[ "$json_exports_exist" == "true" ]]; then
+        info "GraphDB already has data, skipping JSON import"
+    else
+        info "No JSON exports found - knowledge will be created as you work"
+    fi
+
     success "Knowledge management system ready"
 }
 

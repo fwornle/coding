@@ -69,6 +69,12 @@
   ],
   "relations": [
     {
+      "from": "CollectiveKnowledge",
+      "to": "Normalisa",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
       "from": "StreamProcessingPattern",
       "to": "Normalisa",
       "relationType": "implemented_in",
@@ -90,9 +96,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "resi",
-    "exported_at": "2026-01-04T09:58:47.256Z",
+    "exported_at": "2026-01-19T06:38:15.234Z",
     "total_entities": 4,
-    "total_relations": 3,
+    "total_relations": 4,
     "description": "Resi project patterns"
   }
 }

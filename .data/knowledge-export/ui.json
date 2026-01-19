@@ -530,6 +530,18 @@
   ],
   "relations": [
     {
+      "from": "CollectiveKnowledge",
+      "to": "Timeline",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
+      "from": "CollectiveKnowledge",
+      "to": "DynArch",
+      "relationType": "related-to",
+      "metadata": {}
+    },
+    {
       "from": "ViewportCullingPattern",
       "to": "Timeline",
       "relationType": "implemented_in",
@@ -611,9 +623,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "ui",
-    "exported_at": "2026-01-04T08:58:59.474Z",
+    "exported_at": "2026-01-19T06:38:15.236Z",
     "total_entities": 12,
-    "total_relations": 13,
+    "total_relations": 15,
     "description": "UI/frontend patterns"
   }
 }
