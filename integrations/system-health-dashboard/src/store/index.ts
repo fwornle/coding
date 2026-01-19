@@ -32,11 +32,18 @@ export const store: any = configureStore({
     getDefaultMiddleware({
       serializableCheck: {
         // Ignore these action types
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        ignoredActions: [
+          'persist/PERSIST',
+          'persist/REHYDRATE',
+          'workflowConfig/initialize/fulfilled',
+          'workflowConfig/initialize/rejected',
+          'workflowConfig/useFallbackConfig',
+        ],
         // Ignore these field paths in all actions
-        ignoredActionsPaths: ['meta.arg', 'payload.timestamp'],
+        ignoredActionsPaths: ['meta.arg', 'payload.timestamp', 'payload.orchestrator', 'payload.agents'],
         // Ignore these paths in the state
-        ignoredPaths: ['items.dates'],
+        // workflowConfig stores React components (LucideIcons) in orchestrator.icon and agents[].icon
+        ignoredPaths: ['items.dates', 'workflowConfig.orchestrator', 'workflowConfig.agents'],
       },
     })
       .concat(healthRefreshMiddleware as any)
