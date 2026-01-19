@@ -419,6 +419,36 @@ check_dependencies() {
     if [[ "$PLATFORM" == "macos" ]]; then
         if ! command -v brew >/dev/null 2>&1; then
             warning "Homebrew not found. Some installations may require manual setup."
+        else
+            # Check for GNU coreutils (provides timeout command needed by test scripts)
+            if ! command -v timeout >/dev/null 2>&1; then
+                if confirm_system_change \
+                    "Install GNU coreutils via Homebrew (brew install coreutils)" \
+                    "Provides the 'timeout' command needed for test scripts. Safe to install."; then
+                    info "Installing GNU coreutils (for timeout command)..."
+                    if brew install coreutils; then
+                        # Add gnubin to PATH for this session
+                        export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+                        success "GNU coreutils installed successfully"
+                        info "Adding gnubin to PATH in shell config..."
+                        # Add to shell config if not already there
+                        if ! grep -q "coreutils/libexec/gnubin" "$SHELL_RC" 2>/dev/null; then
+                            echo '' >> "$SHELL_RC"
+                            echo '# GNU coreutils (provides timeout, etc.)' >> "$SHELL_RC"
+                            echo 'export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"' >> "$SHELL_RC"
+                        fi
+                    else
+                        warning "Failed to install GNU coreutils. Some test scripts may not work."
+                        SKIPPED_SYSTEM_DEPS+=("coreutils")
+                    fi
+                else
+                    warning "Skipped coreutils installation. timeout command may not be available."
+                    SKIPPED_SYSTEM_DEPS+=("coreutils")
+                    info "To install manually: brew install coreutils"
+                fi
+            else
+                success "GNU coreutils (timeout) is already available"
+            fi
         fi
     fi
     
