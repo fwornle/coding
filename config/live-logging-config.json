@@ -304,8 +304,11 @@
       "description": "xAI provides $25 free credits. Adjust if you've added more."
     },
     "groq": {
-      "prepaidCredits": null,
-      "description": "Groq has free tier with rate limits. No credit tracking needed."
+      "billingType": "monthly",
+      "monthlySpend": 2,
+      "billingMonth": "JAN",
+      "spendLimit": null,
+      "description": "Groq monthly billing. Update monthlySpend from console.groq.com. billingMonth is 3-letter month abbrev. Set billingType to 'free' for free tier."
     },
     "google": {
       "prepaidCredits": null,

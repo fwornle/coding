@@ -169,11 +169,11 @@ The health system is built on interconnected components with active supervision:
 - **Suspicious Activity** - Detects stuck or stale monitors
 
 ### API Quota
-- **Groq** - Free tier quota (7.2M tokens/day, 14.4K RPM)
+- **Groq** - Free tier (`Gq●`) or monthly billing (`Gq$2JAN`)
 - **Google Gemini** - Free tier quota (15 RPM, 1M TPD)
-- **Anthropic Claude** - Billing-based (estimated status)
-- **OpenAI** - Billing-based (estimated status)
-- **X.AI (Grok)** - Free credits monitoring ($25)
+- **Anthropic Claude** - Prepaid credits (`A$18`) or billing-based
+- **OpenAI** - Prepaid credits or billing-based
+- **X.AI (Grok)** - Free credits monitoring (`X$25`)
 
 ## How It Works
 
@@ -217,13 +217,13 @@ cat .health/verification-status.json | jq '.'
 The status line appears automatically in Claude Code:
 
 ```
-[C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq● A$18 X$25] [📚✅] [🏥✅] 📋17-18
+[C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq$2JAN A$18 X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
 **Components:**
 - `[C🟢 UT🫒]` - Active sessions with activity icons (sleeping sessions hidden)
 - `[🛡️ 67% 🔍EX]` - Constraint compliance percentage + trajectory state
-- `[Gq● A$18 X$25]` - API quota status (providers with data)
+- `[Gq$2JAN A$18 X$25]` - API quota status (Groq $2 spent in Jan, etc.)
 - `[📚✅]` - Knowledge system status (icons only, no counts)
 - `[🏥✅]` - Unified health (GCM + Health Verifier + Enforcement)
 - `📋17-18` - LSL time window (HHMM-HHMM)

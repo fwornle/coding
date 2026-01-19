@@ -11,7 +11,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 ### Example Display
 
 ```
-[🏥✅] [Gq● A$18 O○ X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$2JAN A$18 O○ X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Reading the Status Line
@@ -20,7 +20,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Components**:
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
-- `[Gq● A$18 O○ X$25]` - **API Quota**: LLM provider availability (see below)
+- `[Gq$2JAN A$18 O○ X$25]` - **API Quota**: LLM provider availability (see below)
 - `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
 - `🛡️ 67%` - **Constraint Compliance**: Code quality compliance percentage
 - `🔍 EX` - **Trajectory State**: Current development activity
@@ -34,7 +34,7 @@ The status line displays LLM provider availability using a simple, consistent fo
 **Format**: `[Provider$X ...]` or `[Provider● ...]`
 
 **Provider Abbreviations**:
-- `Gq` - Groq (free tier: 7.2M tokens/day, 14.4K RPM)
+- `Gq` - Groq (free tier or monthly billing)
 - `Ggl` - Google Gemini (free tier: 15 RPM, 1M TPD)
 - `A` - Anthropic Claude (requires Admin API key for usage data)
 - `O` - OpenAI (requires Admin API key for usage data)
@@ -44,6 +44,7 @@ The status line displays LLM provider availability using a simple, consistent fo
 
 | Scenario | Display | Meaning |
 |----------|---------|---------|
+| Monthly billing (Groq) | `Gq$2JAN` | $2 spent in January |
 | Prepaid credits configured | `A$18` | $18 remaining of prepaid amount |
 | Free tier (Groq, Google) | `Gq●` | Available (rate-limited only) |
 | No admin key | `O○` | Cannot get usage data |
@@ -56,24 +57,39 @@ The status line displays LLM provider availability using a simple, consistent fo
 - `○` (empty) - <12.5% remaining or no data
 
 **Examples**:
-- `[Gq● A$18 O○ X$25]` - Groq free/available, Anthropic $18 left, OpenAI no key, xAI $25 left
-- `[Gq● A$5 X$2]` - Low credits on Anthropic and xAI
+- `[Gq$2JAN A$18 O○ X$25]` - Groq $2 spent in Jan, Anthropic $18 left, OpenAI no key, xAI $25 left
+- `[Gq● A$5 X$2]` - Groq free tier, low credits on Anthropic and xAI
 - `[A◐ O◔]` - Anthropic at ~50%, OpenAI at ~25% (percentage mode)
 
 **Configuration**:
 
-To show remaining dollars, set `prepaidCredits` in `config/live-logging-config.json`:
+Configure provider credits in `config/live-logging-config.json`:
+
 ```json
 "provider_credits": {
+  "groq": {
+    "billingType": "monthly",
+    "monthlySpend": 2,
+    "billingMonth": "JAN",
+    "spendLimit": null
+  },
   "anthropic": { "prepaidCredits": 20 },
   "openai": { "prepaidCredits": 50 },
   "xai": { "prepaidCredits": 25 }
 }
 ```
 
-**Admin API Keys** (required for usage tracking):
+**Groq Billing Types**:
+- `"billingType": "free"` - Free tier, shows pie symbol (`Gq●`)
+- `"billingType": "monthly"` - Monthly billing, shows spend + month (`Gq$2JAN`)
+  - `monthlySpend` - Current month spend (update from console.groq.com)
+  - `billingMonth` - 3-letter month abbreviation (JAN, FEB, etc.)
+  - `spendLimit` - Optional spend limit for warnings
+
+**Admin API Keys** (required for real-time usage tracking):
 - Anthropic: `ANTHROPIC_ADMIN_API_KEY` - Get at console.anthropic.com → Settings → Admin API Keys
 - OpenAI: `OPENAI_ADMIN_API_KEY` - Get at platform.openai.com/settings/organization/admin-keys
+- Groq: No public billing API yet - update `monthlySpend` manually from console.groq.com
 
 ### Unified Health Status Indicator
 
@@ -241,12 +257,12 @@ The status line displays information for **multiple active Claude Code sessions*
 
 **Single Active Session**:
 ```
-[🏥✅] [Gq● A$18] [C🟢] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$2JAN A$18] [C🟢] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Multiple Active Sessions**:
 ```
-[🏥⚠️] [Gq● A$18 X$25] [C🟢 UT🫒 CA🌲] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥⚠️] [Gq$2JAN A$18 X$25] [C🟢 UT🫒 CA🌲] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 Where:
@@ -388,7 +404,7 @@ coding
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥⚠️] [Gq● A$18 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+# [🏥⚠️] [Gq$2JAN A$18 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Troubleshooting
