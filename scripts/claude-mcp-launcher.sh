@@ -166,8 +166,28 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
                 echo -e "${YELLOW}⏳ Analyzing Claude Code conversation history (this may take 5-10 seconds)...${NC}"
                 
                 # Capture logger output to extract the actual file path
-                local logger_output=$(timeout 15s node "$FALLBACK_LOGGER" "$(pwd)" "$CODING_REPO_DIR" 2>&1)
-                local logger_exit_code=$?
+                # Note: Using background job with wait instead of 'timeout' (not available on macOS)
+                node "$FALLBACK_LOGGER" "$(pwd)" "$CODING_REPO_DIR" 2>&1 &
+                local node_pid=$!
+
+                # Wait up to 15 seconds for the logger to complete
+                local wait_count=0
+                while kill -0 "$node_pid" 2>/dev/null && [[ $wait_count -lt 15 ]]; do
+                    sleep 1
+                    ((wait_count++))
+                done
+
+                # If still running, kill it
+                if kill -0 "$node_pid" 2>/dev/null; then
+                    kill "$node_pid" 2>/dev/null
+                    wait "$node_pid" 2>/dev/null
+                    local logger_exit_code=124  # Timeout exit code
+                    local logger_output="Logger timed out after 15 seconds"
+                else
+                    wait "$node_pid"
+                    local logger_exit_code=$?
+                    local logger_output=""  # Output already displayed directly
+                fi
                 
                 # Display the logger output (which includes progress messages)
                 echo "$logger_output"

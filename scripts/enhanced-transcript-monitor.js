@@ -1226,11 +1226,11 @@ class EnhancedTranscriptMonitor {
    */
   async determineTargetProject(exchangeOrPromptSet) {
     const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || codingRoot;
-    
-    // Handle both single exchange and prompt set array  
+
+    // Handle both single exchange and prompt set array
     const exchanges = Array.isArray(exchangeOrPromptSet) ? exchangeOrPromptSet : [exchangeOrPromptSet];
     const firstExchange = exchanges[0];
-    
+
     // DEBUG: Check for ALL Sept 14 07:xx timeframe (not just 07:12)
     const isSept14Debug = firstExchange.timestamp && firstExchange.timestamp.includes('2025-09-14T07:');
     if (isSept14Debug) {
@@ -1238,7 +1238,7 @@ class EnhancedTranscriptMonitor {
       console.log(`   First exchange timestamp: ${firstExchange.timestamp}`);
       console.log(`   Mode: ${this.config.mode}`);
       console.log(`   Project path: ${this.config.projectPath}`);
-      
+
       // Log ALL exchanges in the prompt set
       for (let i = 0; i < exchanges.length; i++) {
         console.log(`   Exchange ${i+1}: ${exchanges[i].timestamp}`);
@@ -1247,7 +1247,17 @@ class EnhancedTranscriptMonitor {
         }
       }
     }
-    
+
+    // CRITICAL: Check if we're running from coding directory FIRST (applies to ALL modes)
+    // This prevents _from-coding redirect files when already in the coding project
+    const projectBasename = path.basename(this.config.projectPath);
+    if (projectBasename === 'coding') {
+      if (isSept14Debug) {
+        console.log(`   ✅ ROUTING TO CODING PROJECT - running from coding directory (applies to all modes)`);
+      }
+      return this.config.projectPath;  // Use actual project path, not computed codingPath
+    }
+
     // Handle foreign mode: Only process coding-related exchanges and route them to coding project
     if (this.config.mode === 'foreign') {
       // Check ALL exchanges in the prompt set for coding content
@@ -1270,21 +1280,8 @@ class EnhancedTranscriptMonitor {
       return null; // Skip if no coding exchanges found in foreign mode
     }
     
-    // Regular 'all' mode logic:
-    
-    // Check if we're running from coding directory
-    // CRITICAL: Return this.config.projectPath (not codingPath) to ensure path equality check
-    // in getSessionFilePath() works correctly and doesn't create _from-coding redirect files
-    // Use basename check to avoid false positives like "/my-coding-project"
-    const projectBasename = path.basename(this.config.projectPath);
-    if (projectBasename === 'coding') {
-      if (isSept14Debug) {
-        console.log(`   ✅ ROUTING TO CODING PROJECT - running from coding directory`);
-      }
-      return this.config.projectPath;  // Use actual project path, not computed codingPath
-    }
-    
-    // Running from outside coding - check redirect status
+    // Regular 'all' mode logic - running from outside coding
+    // (coding directory case is handled above, before mode check)
     // Check ALL exchanges for coding content (not just first one)
     for (const exchange of exchanges) {
       if (await this.isCodingRelated(exchange)) {
@@ -1436,13 +1433,18 @@ class EnhancedTranscriptMonitor {
    */
   getSessionFilePath(targetProject, tranche) {
     const currentProjectName = path.basename(this.config.projectPath);
-    
+
     // CRITICAL FIX: Use the original exchange timestamp directly, not reconstructed from tranche
     // The tranche object should preserve the original exchange timestamp
-    const timestamp = tranche.originalTimestamp || 
+    const timestamp = tranche.originalTimestamp ||
       new Date(`${tranche.date}T${tranche.timeString.split('-')[0].slice(0,2)}:${tranche.timeString.split('-')[0].slice(2)}:00.000Z`).getTime();
-    
-    if (targetProject === this.config.projectPath) {
+
+    // CRITICAL: Normalize paths before comparison to avoid false mismatches
+    // (e.g., trailing slashes, symlinks, or different path resolutions)
+    const resolvedTarget = path.resolve(targetProject);
+    const resolvedProject = path.resolve(this.config.projectPath);
+
+    if (resolvedTarget === resolvedProject) {
       // Local project - use generateLSLFilename with same target/source
       const filename = generateLSLFilename(timestamp, currentProjectName, targetProject, targetProject);
       return path.join(targetProject, '.specstory', 'history', filename);
