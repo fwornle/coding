@@ -375,31 +375,44 @@ fi
 # Check environment variables
 print_test "Environment variables"
 
-print_check "CODING_TOOLS_PATH variable"
-if [ -n "$CODING_TOOLS_PATH" ]; then
-    print_pass "CODING_TOOLS_PATH set to: $CODING_TOOLS_PATH"
+# Determine the correct shell config file
+if [[ "$SHELL" == *"zsh"* ]]; then
+    SHELL_RC="$HOME/.zshrc"
 else
-    if [[ "$SANDBOX_MODE" == "true" ]]; then
-        print_warning "CODING_TOOLS_PATH not set (expected in sandbox mode)"
-        print_info "Sandbox installations use .activate file instead of global env vars"
-    else
-        print_fail "CODING_TOOLS_PATH not set"
-        print_repair "Setting up environment variables..."
-        export CODING_TOOLS_PATH="$CODING_ROOT"
-        echo "export CODING_TOOLS_PATH=\"$CODING_ROOT\"" >> ~/.bashrc
-        print_fixed "CODING_TOOLS_PATH set to $CODING_ROOT"
-    fi
+    SHELL_RC="$HOME/.bashrc"
+fi
+
+# Helper function to check if variable is configured in shell profile
+var_in_shell_config() {
+    local var_name="$1"
+    grep -q "export ${var_name}=" "$SHELL_RC" 2>/dev/null
+}
+
+print_check "CODING_TOOLS_PATH variable"
+if [ -n "$CODING_TOOLS_PATH" ] && [ "$CODING_TOOLS_PATH" != "/path/to/coding/repo" ]; then
+    print_pass "CODING_TOOLS_PATH set to: $CODING_TOOLS_PATH"
+elif var_in_shell_config "CODING_TOOLS_PATH"; then
+    print_pass "CODING_TOOLS_PATH configured in $SHELL_RC (not inherited by this process)"
+    export CODING_TOOLS_PATH="$CODING_ROOT"
+elif [[ "$SANDBOX_MODE" == "true" ]]; then
+    print_warning "CODING_TOOLS_PATH not set (expected in sandbox mode)"
+    print_info "Sandbox installations use .activate file instead of global env vars"
+    export CODING_TOOLS_PATH="$CODING_ROOT"
+else
+    print_info "CODING_TOOLS_PATH not configured (optional - using CODING_REPO)"
+    export CODING_TOOLS_PATH="$CODING_ROOT"
 fi
 
 print_check "CODING_REPO variable"
 if [ -n "$CODING_REPO" ]; then
     print_pass "CODING_REPO set to: $CODING_REPO"
-else
-    print_fail "CODING_REPO not set"
-    print_repair "Setting up CODING_REPO..."
+elif var_in_shell_config "CODING_REPO"; then
+    print_pass "CODING_REPO configured in $SHELL_RC (not inherited by this process)"
     export CODING_REPO="$CODING_ROOT"
-    echo "export CODING_REPO=\"$CODING_ROOT\"" >> ~/.bashrc
-    print_fixed "CODING_REPO set to $CODING_ROOT"
+else
+    print_warning "CODING_REPO not configured in $SHELL_RC"
+    print_info "Add to $SHELL_RC: export CODING_REPO=\"$CODING_ROOT\""
+    export CODING_REPO="$CODING_ROOT"
 fi
 
 print_check "KNOWLEDGE_BASE_PATH variable"
@@ -416,21 +429,21 @@ else
     print_info "CODING_DOCS_PATH not set (will use default: $CODING_ROOT/docs)"
 fi
 
-# Check PATH
+# Check PATH - check both current process and shell config
 print_check "PATH includes coding tools"
-if echo "$PATH" | grep -q "$CODING_ROOT"; then
+if echo "$PATH" | grep -q "$CODING_ROOT/bin"; then
     print_pass "Coding tools in PATH"
+elif grep -q "PATH.*$CODING_ROOT/bin" "$SHELL_RC" 2>/dev/null || grep -q 'PATH.*coding/bin' "$SHELL_RC" 2>/dev/null; then
+    print_pass "Coding tools PATH configured in $SHELL_RC (not inherited by this process)"
+    export PATH="$CODING_ROOT/bin:$PATH"
+elif [[ "$SANDBOX_MODE" == "true" ]]; then
+    print_warning "Coding tools not in PATH (expected in sandbox mode)"
+    print_info "Sandbox installations use .activate file instead of modifying shell config"
+    export PATH="$CODING_ROOT/bin:$PATH"
 else
-    if [[ "$SANDBOX_MODE" == "true" ]]; then
-        print_warning "Coding tools not in PATH (expected in sandbox mode)"
-        print_info "Sandbox installations use .activate file instead of modifying ~/.bashrc"
-    else
-        print_fail "Coding tools not in PATH"
-        print_repair "Adding coding tools to PATH..."
-        export PATH="$CODING_ROOT/bin:$CODING_ROOT/knowledge-management:$PATH"
-        echo "export PATH=\"$CODING_ROOT/bin:$CODING_ROOT/knowledge-management:\$PATH\"" >> ~/.bashrc
-        print_fixed "Added coding tools to PATH"
-    fi
+    print_warning "Coding tools PATH not configured in $SHELL_RC"
+    print_info "Add to $SHELL_RC: export PATH=\"$CODING_ROOT/bin:\$PATH\""
+    export PATH="$CODING_ROOT/bin:$PATH"
 fi
 
 # =============================================================================
@@ -641,11 +654,12 @@ print_test "GitHub Copilot availability"
 print_check "VSCode installation"
 if command_exists code; then
     print_pass "VSCode command found"
-    VSCODE_VERSION=$(code --version | head -n1)
+    # Note: 2>/dev/null suppresses SIGPIPE errors when piping VSCode output
+    VSCODE_VERSION=$(code --version 2>/dev/null | head -n1)
     print_info "VSCode version: $VSCODE_VERSION"
-    
+
     print_check "GitHub Copilot extension"
-    COPILOT_EXTENSIONS=$(code --list-extensions | grep -i copilot || echo "none")
+    COPILOT_EXTENSIONS=$(code --list-extensions 2>/dev/null | grep -i copilot || echo "none")
     if [ "$COPILOT_EXTENSIONS" != "none" ]; then
         print_pass "GitHub Copilot extensions found:"
         echo "$COPILOT_EXTENSIONS" | while read ext; do
@@ -655,9 +669,9 @@ if command_exists code; then
         print_warning "No GitHub Copilot extensions found"
         print_info "Install GitHub Copilot extension in VSCode if you plan to use it"
     fi
-    
+
     print_check "VSCode Knowledge Management Bridge extension"
-    KM_EXTENSION=$(code --list-extensions | grep -i km-copilot || echo "not found")
+    KM_EXTENSION=$(code --list-extensions 2>/dev/null | grep -i km-copilot || echo "not found")
     if [ "$KM_EXTENSION" != "not found" ]; then
         print_pass "KM Copilot Bridge extension found: $KM_EXTENSION"
         
@@ -1293,7 +1307,7 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     timeout 10s npm run api >/dev/null 2>&1 &
     API_PID=$!
     sleep 3
-    
+
     if kill -0 $API_PID 2>/dev/null; then
         print_pass "Dashboard API server can start"
         
@@ -1393,7 +1407,7 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     # Test professional dashboard startup
     print_check "Professional Dashboard startup test"
     cd "$DASHBOARD_DIR"
-    
+
     # Test if professional dashboard can start (brief test)
     timeout 15s npm run dev >/dev/null 2>&1 &
     DASHBOARD_PID=$!
@@ -1435,7 +1449,7 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     # Test real-time violation monitoring
     if [ -f "$CONSTRAINT_MONITOR_DIR/scripts/enhanced-constraint-endpoint.js" ]; then
         print_pass "Enhanced constraint endpoint for real-time monitoring found"
-        
+
         # Test enhanced violation history
         cd "$CONSTRAINT_MONITOR_DIR"
         if timeout 10s node -e "const endpoint = require('./scripts/enhanced-constraint-endpoint.js'); endpoint.getEnhancedViolationHistory(5).then(h => console.log('History OK:', h.total_count >= 0));" 2>/dev/null; then
@@ -1443,7 +1457,7 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
         else
             print_warning "Enhanced violation history system may have issues"
         fi
-        
+
         # Test live session violations
         if timeout 10s node -e "const endpoint = require('./scripts/enhanced-constraint-endpoint.js'); endpoint.getLiveSessionViolations().then(v => console.log('Live OK:', typeof v === 'object'));" 2>/dev/null; then
             print_pass "Live session violation monitoring functional"
@@ -1502,11 +1516,11 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     
     # Advanced integration testing
     print_check "Advanced constraint monitor integration testing"
-    
+
     # Test constraint monitor CLI integration
     if command_exists node; then
         cd "$CONSTRAINT_MONITOR_DIR"
-        
+
         # Test if constraint monitor can be started programmatically
         print_check "Programmatic constraint monitor startup"
         if timeout 10s node -e "const { ConfigManager } = require('./src/utils/config-manager.js'); const config = new ConfigManager(); console.log('Config OK');" 2>/dev/null; then
@@ -1514,7 +1528,7 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
         else
             print_warning "Constraint monitor configuration system may have issues"
         fi
-        
+
         # Test constraint engine functionality
         print_check "Constraint engine functionality"
         if timeout 10s node -e "const { ConstraintEngine } = require('./src/engines/constraint-engine.js'); const engine = new ConstraintEngine(); console.log('Engine OK');" 2>/dev/null; then
@@ -1522,7 +1536,7 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
         else
             print_warning "Constraint engine may have initialization issues"
         fi
-        
+
         # Test status generator for dashboard
         print_check "Status generator for professional dashboard"
         if timeout 10s node -e "const { StatusGenerator } = require('./src/status/status-generator.js'); const gen = new StatusGenerator(); console.log('Status OK');" 2>/dev/null; then
@@ -1557,7 +1571,7 @@ if dir_exists "$SERENA_DIR"; then
     print_check "Serena virtual environment"
     if [ -d "$SERENA_DIR/.venv" ]; then
         print_pass "Serena virtual environment exists"
-        
+
         # Test if serena can be imported
         print_check "Serena package import test"
         cd "$SERENA_DIR"
@@ -1575,7 +1589,7 @@ if dir_exists "$SERENA_DIR"; then
             print_fail "uv package manager not found - required for Serena"
         fi
     fi
-    
+
     print_check "Serena MCP server functionality"
     if [ -f "$SERENA_DIR/pyproject.toml" ] && [ -d "$SERENA_DIR/.venv" ]; then
         cd "$SERENA_DIR"
@@ -2061,7 +2075,7 @@ fi
 
 # Test VSCode Extension Bridge integration
 print_check "VSCode Extension Bridge integration test"
-if command_exists code && code --list-extensions | grep -q km-copilot; then
+if command_exists code && code --list-extensions 2>/dev/null | grep -q km-copilot; then
     # Check if fallback services can be reached (for VSCode extension)
     if command_exists curl && curl -s http://localhost:8765/health >/dev/null 2>&1; then
         print_pass "VSCode Extension Bridge can reach fallback services"
@@ -2160,10 +2174,10 @@ else
     AGENT_STATUS="${AGENT_STATUS}❌ Claude Code (not installed)\n"
 fi
 
-# Check GitHub Copilot
-if command_exists code && code --list-extensions | grep -q copilot; then
+# Check GitHub Copilot (2>/dev/null suppresses SIGPIPE errors)
+if command_exists code && code --list-extensions 2>/dev/null | grep -q copilot; then
     AVAILABLE_AGENTS+=("GitHub Copilot")
-    if code --list-extensions | grep -q km-copilot; then
+    if code --list-extensions 2>/dev/null | grep -q km-copilot; then
         AGENT_STATUS="${AGENT_STATUS}✅ GitHub Copilot (with KM Bridge)\n"
     else
         AGENT_STATUS="${AGENT_STATUS}⚠️  GitHub Copilot (KM Bridge not installed)\n"
