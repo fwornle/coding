@@ -191,6 +191,17 @@
         "description": "Ensure sufficient disk space for operations",
         "auto_heal": false,
         "recommendation": "Clear old logs, exports, or expand storage"
+      },
+      "services_running_file": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "file_exists_valid_json",
+        "path": ".services-running.json",
+        "required_fields": ["timestamp", "services", "semantic_analysis", "vkb_server"],
+        "description": "Services status file required for status line API indicator",
+        "auto_heal": true,
+        "auto_heal_action": "regenerate_services_file",
+        "recommendation": "File will be auto-regenerated from health checks"
       }
     }
   },
