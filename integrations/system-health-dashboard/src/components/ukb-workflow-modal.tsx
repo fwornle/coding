@@ -438,6 +438,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   }
 
   // Advance to next step when paused (MVI: dispatches Redux action)
+  // After advancing, poll rapidly to catch the new pause state faster
   const handleStepAdvance = async (e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
@@ -453,6 +454,41 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       if (data.status === 'success') {
         dispatch(syncStepPauseFromServer({ paused: false, pausedAt: null }))
         Logger.info(LogCategories.UKB, 'Step advanced', data.data)
+
+        // Rapidly poll for new pause state (every 500ms, up to 8 times = 4 seconds)
+        // This catches the new pause state much faster than waiting for the 5s polling interval
+        const pollForNewPause = async (attempts: number = 0) => {
+          if (attempts >= 8) {
+            Logger.trace(LogCategories.UKB, 'Step advance poll timeout, regular polling will continue')
+            return
+          }
+          try {
+            await new Promise(resolve => setTimeout(resolve, 500))
+            const progressResponse = await fetch(`${apiBaseUrl}/api/ukb/processes`)
+            const progressData = await progressResponse.json()
+            if (progressData.status === 'success' && progressData.data?.processes?.length > 0) {
+              const activeProcess = progressData.data.processes.find((p: any) => p.status === 'running')
+              if (activeProcess?.stepPaused && activeProcess?.pausedAtStep) {
+                Logger.info(LogCategories.UKB, 'Detected new pause state', {
+                  pausedAt: activeProcess.pausedAtStep,
+                  attempts: attempts + 1
+                })
+                dispatch(syncStepPauseFromServer({
+                  paused: true,
+                  pausedAt: activeProcess.pausedAtStep
+                }))
+                return // Found new pause state
+              }
+            }
+            // Continue polling if not yet paused
+            pollForNewPause(attempts + 1)
+          } catch (pollError) {
+            Logger.trace(LogCategories.UKB, 'Step advance poll error', pollError)
+            pollForNewPause(attempts + 1)
+          }
+        }
+        // Start rapid polling in background (don't await)
+        pollForNewPause()
       } else {
         Logger.error(LogCategories.UKB, 'Failed to advance step', data)
       }
@@ -1782,7 +1818,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                         type="checkbox"
                         checked={singleStepMode}
                         onChange={(e) => handleToggleSingleStepMode(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-500 focus:ring-blue-400 accent-blue-500 cursor-pointer"
                       />
                       Single-step
                     </label>
