@@ -277,14 +277,18 @@ export default function SystemHealthDashboard() {
         provider.status === 'low' || provider.status === 'degraded' ? 'warning' :
         provider.status === 'critical' ? 'error' : 'offline'
 
-      // Description: show remaining $ if prepaid, or availability status
+      // Description: show remaining $ if prepaid, spent $ if monthly, or availability status
       let description = ''
+      const spentAmount = provider.cost && typeof provider.cost.total === 'number' ? provider.cost.total : null
       if (remainingCredits !== null) {
         // Has prepaid credits configured - show remaining $
         description = `$${Math.round(remainingCredits)} remaining`
       } else if (provider.cacheStrategy === 'free-tier') {
         // Free tier provider
         description = 'Free tier (available)'
+      } else if (provider.cacheStrategy === 'config-monthly' && spentAmount !== null) {
+        // Monthly billing - show spent amount this month
+        description = `$${Math.round(spentAmount)} spent`
       } else if (provider.quota.remaining === 'N/A') {
         // No admin key configured
         description = 'No admin key'

@@ -22,7 +22,7 @@ interface ProviderQuota {
     tokensPerDay?: number
   } | null
   lastChecked: string
-  cacheStrategy: 'real-time' | 'estimated' | 'free-tier'
+  cacheStrategy: 'real-time' | 'estimated' | 'free-tier' | 'config-monthly'
 }
 
 interface APIQuotaState {
