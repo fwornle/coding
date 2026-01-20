@@ -143,6 +143,11 @@ class HealthVerifier extends EventEmitter {
       const processChecks = await this.verifyProcesses();
       checks.push(...processChecks);
 
+      // Priority Check 4: File Health
+      this.log('Checking file health...');
+      const fileChecks = await this.verifyFiles();
+      checks.push(...fileChecks);
+
       // Auto-Healing: Attempt to fix violations
       if (this.autoHealingEnabled) {
         this.log('Starting auto-healing for detected issues...');
@@ -159,6 +164,7 @@ class HealthVerifier extends EventEmitter {
           recheckResults.push(...await this.verifyDatabases());
           recheckResults.push(...await this.verifyServices());
           recheckResults.push(...await this.verifyProcesses());
+          recheckResults.push(...await this.verifyFiles());
 
           // CRITICAL FIX: Replace old checks with recheck results instead of appending
           // This prevents duplicate violations when a service becomes healthy after auto-healing
@@ -722,6 +728,122 @@ class HealthVerifier extends EventEmitter {
           status: 'passed',
           severity: 'info',
           message: 'No stale PIDs detected',
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
+    return checks;
+  }
+
+  /**
+   * Verify file-based health rules
+   * Checks .services-running.json existence and validity
+   */
+  async verifyFiles() {
+    const checks = [];
+    const fileRules = this.rules.rules.files;
+
+    // Check: services_running_file
+    if (fileRules?.services_running_file?.enabled) {
+      const rule = fileRules.services_running_file;
+      const filePath = path.join(this.codingRoot, rule.path);
+
+      try {
+        if (!fs.existsSync(filePath)) {
+          checks.push({
+            category: 'files',
+            check: 'services_running_file',
+            check_id: `services_running_file_${Date.now()}`,
+            status: 'warning',
+            severity: rule.severity,
+            message: 'Services status file missing (.services-running.json)',
+            details: {
+              path: filePath,
+              issue: 'file_not_found'
+            },
+            auto_heal: rule.auto_heal,
+            auto_heal_action: rule.auto_heal_action,
+            recommendation: rule.recommendation,
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          // File exists, validate JSON and required fields
+          const content = fs.readFileSync(filePath, 'utf8');
+          let data;
+          try {
+            data = JSON.parse(content);
+          } catch (parseError) {
+            checks.push({
+              category: 'files',
+              check: 'services_running_file',
+              check_id: `services_running_file_${Date.now()}`,
+              status: 'warning',
+              severity: rule.severity,
+              message: 'Services status file has invalid JSON',
+              details: {
+                path: filePath,
+                issue: 'invalid_json',
+                error: parseError.message
+              },
+              auto_heal: rule.auto_heal,
+              auto_heal_action: rule.auto_heal_action,
+              recommendation: rule.recommendation,
+              timestamp: new Date().toISOString()
+            });
+            return checks;
+          }
+
+          // Check required fields
+          const requiredFields = rule.required_fields || [];
+          const missingFields = requiredFields.filter(field => !(field in data));
+
+          if (missingFields.length > 0) {
+            checks.push({
+              category: 'files',
+              check: 'services_running_file',
+              check_id: `services_running_file_${Date.now()}`,
+              status: 'warning',
+              severity: rule.severity,
+              message: `Services status file missing required fields: ${missingFields.join(', ')}`,
+              details: {
+                path: filePath,
+                issue: 'missing_fields',
+                missing_fields: missingFields
+              },
+              auto_heal: rule.auto_heal,
+              auto_heal_action: rule.auto_heal_action,
+              recommendation: rule.recommendation,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            checks.push({
+              category: 'files',
+              check: 'services_running_file',
+              check_id: `services_running_file_${Date.now()}`,
+              status: 'passed',
+              severity: 'info',
+              message: 'Services status file valid',
+              details: {
+                path: filePath,
+                services_count: data.services?.length || 0
+              },
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      } catch (error) {
+        checks.push({
+          category: 'files',
+          check: 'services_running_file',
+          check_id: `services_running_file_${Date.now()}`,
+          status: 'error',
+          severity: 'error',
+          message: `Error checking services status file: ${error.message}`,
+          details: {
+            path: filePath,
+            error: error.message
+          },
           timestamp: new Date().toISOString()
         });
       }

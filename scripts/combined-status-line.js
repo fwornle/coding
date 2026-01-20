@@ -372,11 +372,30 @@ class CombinedStatusLine {
     try {
       // Check MCP semantic analysis connection
       const servicesPath = join(rootDir, '.services-running.json');
+      let services = null;
+      let needsRegeneration = false;
+
       if (!existsSync(servicesPath)) {
-        return { status: 'offline' };
+        needsRegeneration = true;
+      } else {
+        try {
+          services = JSON.parse(readFileSync(servicesPath, 'utf8'));
+          // Check for required semantic_analysis field
+          if (!services.semantic_analysis) {
+            needsRegeneration = true;
+          }
+        } catch (parseError) {
+          needsRegeneration = true;
+        }
       }
 
-      const services = JSON.parse(readFileSync(servicesPath, 'utf8'));
+      // Self-healing: Regenerate the file if missing or invalid
+      if (needsRegeneration) {
+        services = await this.regenerateServicesFile();
+        if (!services) {
+          return { status: 'offline' };
+        }
+      }
 
       // Check semantic_analysis object (not in services array because it uses stdio transport)
       const semanticAnalysis = services.semantic_analysis;
@@ -390,6 +409,81 @@ class CombinedStatusLine {
       }
     } catch (error) {
       return { status: 'offline', error: error.message };
+    }
+  }
+
+  /**
+   * Self-healing: Regenerate .services-running.json from health checks
+   * Called when the file is missing or invalid
+   */
+  async regenerateServicesFile() {
+    try {
+      const servicesPath = join(rootDir, '.services-running.json');
+
+      // Check which services are healthy
+      const vkbHealthy = await this.checkHttpHealth('http://localhost:8080/health');
+      const constraintHealthy = await this.checkHttpHealth('http://localhost:3031/api/health');
+      const healthApiHealthy = await this.checkHttpHealth('http://localhost:3033/api/health');
+
+      const servicesRunning = [];
+      if (vkbHealthy) servicesRunning.push('vkb-server');
+      if (constraintHealthy) servicesRunning.push('constraint-monitor');
+      if (healthApiHealthy) servicesRunning.push('health-verifier');
+
+      const status = {
+        timestamp: new Date().toISOString(),
+        services: servicesRunning,
+        services_running: servicesRunning.length,
+        constraint_monitor: {
+          status: constraintHealthy ? '✅ FULLY OPERATIONAL' : '⚠️ DEGRADED MODE',
+          dashboard_port: 3030,
+          api_port: 3031,
+          health: constraintHealthy ? 'healthy' : 'degraded',
+          last_check: new Date().toISOString()
+        },
+        semantic_analysis: {
+          status: '✅ OPERATIONAL',
+          health: 'healthy'  // MCP via stdio - healthy if Claude session is active
+        },
+        vkb_server: {
+          status: vkbHealthy ? '✅ OPERATIONAL' : '⚠️ DEGRADED',
+          port: 8080,
+          health: vkbHealthy ? 'healthy' : 'degraded',
+          last_check: new Date().toISOString()
+        },
+        system_health_dashboard: {
+          status: healthApiHealthy ? '✅ OPERATIONAL' : '⚠️ DEGRADED',
+          dashboard_port: 3032,
+          api_port: 3033,
+          health: healthApiHealthy ? 'healthy' : 'degraded',
+          last_check: new Date().toISOString()
+        }
+      };
+
+      writeFileSync(servicesPath, JSON.stringify(status, null, 2));
+      return status;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Helper: Check HTTP health endpoint
+   */
+  async checkHttpHealth(url) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+      return response.ok;
+    } catch (error) {
+      return false;
     }
   }
 

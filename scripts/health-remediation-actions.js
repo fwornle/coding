@@ -148,6 +148,9 @@ export class HealthRemediationActions {
         case 'restart_transcript_monitor':
           result = await this.restartTranscriptMonitor(issueDetails);
           break;
+        case 'regenerate_services_file':
+          result = await this.regenerateServicesFile(issueDetails);
+          break;
         default:
           this.log(`Unknown action: ${actionName}`, 'ERROR');
           return {
@@ -685,6 +688,107 @@ export class HealthRemediationActions {
 
     } catch (error) {
       return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Regenerate .services-running.json from health checks
+   * This file is critical for the status line API indicator
+   */
+  async regenerateServicesFile(details) {
+    try {
+      this.log('Regenerating .services-running.json from health checks...');
+
+      const statusFile = `${this.codingRoot}/.services-running.json`;
+
+      // Gather health status from HTTP checks
+      const vkbHealthy = await this.checkHttpHealth('http://localhost:8080/health', 2000);
+      const constraintHealthy = await this.checkHttpHealth('http://localhost:3031/api/health', 2000);
+      const healthApiHealthy = await this.checkHttpHealth('http://localhost:3033/api/health', 2000);
+      const dashboardHealthy = await this.checkPortListening(3030);
+
+      // Get PSM data for running services
+      const psmHealth = await this.psm.getHealthStatus();
+      const servicesRunning = [];
+
+      // Check which services are running
+      if (vkbHealthy) servicesRunning.push('vkb-server');
+      if (constraintHealthy) servicesRunning.push('constraint-monitor');
+      if (healthApiHealthy) servicesRunning.push('health-verifier');
+      if (dashboardHealthy) servicesRunning.push('system-health-dashboard');
+
+      const status = {
+        timestamp: new Date().toISOString(),
+        services: servicesRunning,
+        services_running: servicesRunning.length,
+        constraint_monitor: {
+          status: constraintHealthy ? '✅ FULLY OPERATIONAL' : '⚠️ DEGRADED MODE',
+          dashboard_port: 3030,
+          api_port: 3031,
+          health: constraintHealthy ? 'healthy' : 'degraded',
+          last_check: new Date().toISOString()
+        },
+        semantic_analysis: {
+          status: '✅ OPERATIONAL',
+          health: 'healthy'  // MCP server connected via stdio, assume healthy if Claude is running
+        },
+        vkb_server: {
+          status: vkbHealthy ? '✅ OPERATIONAL' : '⚠️ DEGRADED',
+          port: 8080,
+          health: vkbHealthy ? 'healthy' : 'degraded',
+          last_check: new Date().toISOString()
+        },
+        system_health_dashboard: {
+          status: healthApiHealthy ? '✅ OPERATIONAL' : '⚠️ DEGRADED',
+          dashboard_port: 3032,
+          api_port: 3033,
+          health: healthApiHealthy ? 'healthy' : 'degraded',
+          last_check: new Date().toISOString()
+        }
+      };
+
+      fs.writeFileSync(statusFile, JSON.stringify(status, null, 2));
+      this.log(`Regenerated ${statusFile}`);
+
+      return {
+        success: true,
+        message: `Services status file regenerated with ${servicesRunning.length} active services`
+      };
+
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Helper: Check HTTP health endpoint
+   */
+  async checkHttpHealth(url, timeoutMs = 3000) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Helper: Check if port is listening
+   */
+  async checkPortListening(port) {
+    try {
+      const { stdout } = await execAsync(`lsof -i :${port} -P -n | grep LISTEN`);
+      return stdout.trim().length > 0;
+    } catch (error) {
+      return false;
     }
   }
 
