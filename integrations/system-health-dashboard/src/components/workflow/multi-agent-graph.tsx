@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useCallback, useEffect, useState } from 'react'
+import React, { useMemo, useCallback, useEffect, useState, useRef } from 'react'
 import type { AgentDefinition, EdgeDefinition, ProcessInfo, StepInfo } from './types'
 import type { AggregatedSteps } from '@/store/slices/ukbSlice'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
@@ -269,26 +269,56 @@ export function MultiAgentGraph({
   const [expandedSubStepsAgent, setExpandedSubStepsAgent] = useState<string | null>(null)
   // Track if expansion was triggered automatically (by running status)
   const [autoExpandedAgent, setAutoExpandedAgent] = useState<string | null>(null)
+  // Track the last seen step statuses to detect transitions
+  const lastStepStatusesRef = useRef<Map<string, string>>(new Map())
 
-  // Auto-expand substeps when a multi-step agent starts running
+  // Auto-expand substeps when a multi-step agent is active (running or recently started)
+  // Enhanced logic for free-flight mode: also detect agents where steps just completed
   useEffect(() => {
-    // Find any running step whose agent has substeps defined
-    const runningStepWithSubsteps = process.steps?.find(step => {
-      // Map step name to agent ID using STEP_TO_AGENT
-      const agentId = stepToAgent[step.name] || step.name
-      return step.status === 'running' && AGENT_SUBSTEPS[agentId]
-    })
+    if (!process.steps) return
 
-    if (runningStepWithSubsteps) {
-      // Map step name to agent ID
-      const agentId = stepToAgent[runningStepWithSubsteps.name] || runningStepWithSubsteps.name
+    // Build current status map and detect active agent
+    const currentStatuses = new Map<string, string>()
+    let activeAgentWithSubsteps: string | null = null
+    let recentlyActiveAgent: string | null = null
+
+    for (const step of process.steps) {
+      const agentId = stepToAgent[step.name] || step.name
+      const hasSubsteps = AGENT_SUBSTEPS[agentId]
+      currentStatuses.set(step.name, step.status)
+
+      // Priority 1: Running step with substeps
+      if (step.status === 'running' && hasSubsteps) {
+        activeAgentWithSubsteps = agentId
+      }
+
+      // Priority 2: Step that just transitioned to running or completed (for free-flight mode)
+      // This catches fast-completing steps that the UI might miss
+      if (hasSubsteps) {
+        const lastStatus = lastStepStatusesRef.current.get(step.name)
+        if (lastStatus !== step.status) {
+          // Step status changed - this agent is active
+          if (step.status === 'running' || step.status === 'completed') {
+            recentlyActiveAgent = agentId
+          }
+        }
+      }
+    }
+
+    // Update ref for next comparison
+    lastStepStatusesRef.current = currentStatuses
+
+    // Determine which agent to expand
+    const agentToExpand = activeAgentWithSubsteps || recentlyActiveAgent
+
+    if (agentToExpand) {
       // Auto-expand if not already expanded (don't override user's manual toggle)
-      if (expandedSubStepsAgent !== agentId) {
-        setExpandedSubStepsAgent(agentId)
-        setAutoExpandedAgent(agentId)
+      if (expandedSubStepsAgent !== agentToExpand) {
+        setExpandedSubStepsAgent(agentToExpand)
+        setAutoExpandedAgent(agentToExpand)
       }
     } else if (autoExpandedAgent) {
-      // Collapse if we auto-expanded and agent is no longer running
+      // Collapse if we auto-expanded and agent is no longer active
       const wasAutoExpanded = expandedSubStepsAgent === autoExpandedAgent
       // Check if any step mapping to this agent is still running
       const agentStillRunning = process.steps?.some(s => {
@@ -300,7 +330,7 @@ export function MultiAgentGraph({
         setAutoExpandedAgent(null)
       }
     }
-  }, [process.steps, expandedSubStepsAgent, autoExpandedAgent])
+  }, [process.steps, expandedSubStepsAgent, autoExpandedAgent, stepToAgent])
 
   // Attach scroll listener to save position on user scroll
   useEffect(() => {
