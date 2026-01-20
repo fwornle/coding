@@ -750,7 +750,7 @@ class HealthVerifier extends EventEmitter {
       const filePath = path.join(this.codingRoot, rule.path);
 
       try {
-        if (!fs.existsSync(filePath)) {
+        if (!fsSync.existsSync(filePath)) {
           checks.push({
             category: 'files',
             check: 'services_running_file',
@@ -769,7 +769,7 @@ class HealthVerifier extends EventEmitter {
           });
         } else {
           // File exists, validate JSON and required fields
-          const content = fs.readFileSync(filePath, 'utf8');
+          const content = fsSync.readFileSync(filePath, 'utf8');
           let data;
           try {
             data = JSON.parse(content);

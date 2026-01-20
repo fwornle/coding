@@ -30,25 +30,152 @@ class HealthRefreshManager {
   private refreshInterval: NodeJS.Timeout | null = null
   private store: any = null
   private refreshCount = 0
+  private sseConnection: EventSource | null = null
+  private lastSSEUpdate: number = 0
 
   initialize(store: any) {
     this.store = store
     Logger.info(LogCategories.REFRESH, 'HealthRefreshManager initialized')
     this.startAutoRefresh()
+    this.connectSSE()
+  }
+
+  /**
+   * Connect to SSE stream for real-time UKB workflow updates
+   * This supplements the polling with instant state change notifications
+   */
+  private connectSSE() {
+    if (typeof window === 'undefined') return // SSR check
+
+    try {
+      const sseUrl = `http://localhost:${process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.SYSTEM_HEALTH_API_PORT || '3033'}/api/ukb/stream`
+      this.sseConnection = new EventSource(sseUrl)
+
+      this.sseConnection.onopen = () => {
+        Logger.info(LogCategories.REFRESH, 'SSE connection established for real-time workflow updates')
+      }
+
+      this.sseConnection.onmessage = (event) => {
+        try {
+          const workflowProgress = JSON.parse(event.data)
+          this.lastSSEUpdate = Date.now()
+
+          if (workflowProgress) {
+            // Debug: Log every SSE update to track frequency
+            console.log(`[SSE] ${new Date().toISOString().slice(11,23)} step=${workflowProgress.currentStep} details=${workflowProgress.stepsDetail?.length || 0}`)
+            // Transform SSE data to match the expected format and dispatch update
+            this.handleSSEWorkflowUpdate(workflowProgress)
+          }
+        } catch (error) {
+          // Ignore parse errors - could be heartbeat
+        }
+      }
+
+      this.sseConnection.onerror = (error) => {
+        Logger.warn(LogCategories.REFRESH, 'SSE connection error, reconnecting in 2s...', error)
+        // Close the failed connection
+        if (this.sseConnection) {
+          this.sseConnection.close()
+          this.sseConnection = null
+        }
+        // Reconnect after a delay
+        setTimeout(() => {
+          Logger.info(LogCategories.REFRESH, 'Attempting SSE reconnection...')
+          this.connectSSE()
+        }, 2000)
+      }
+    } catch (error) {
+      Logger.warn(LogCategories.REFRESH, 'Failed to establish SSE connection', error)
+    }
+  }
+
+  /**
+   * Handle real-time workflow progress from SSE
+   * Transforms the raw progress data and dispatches Redux action
+   */
+  private handleSSEWorkflowUpdate(progress: any) {
+    if (!this.store || !progress) return
+
+    // Build a synthetic process object similar to what the REST API returns
+    // This allows the Redux slice to handle it the same way
+    const isTerminalState = ['cancelled', 'completed', 'failed'].includes(progress.status)
+
+    if (isTerminalState) {
+      // Terminal state - let normal polling handle cleanup
+      return
+    }
+
+    // Calculate step counts from stepsDetail
+    let completedSteps = progress.completedSteps || 0
+    let totalSteps = progress.totalSteps || 0
+
+    if ((completedSteps === 0 || totalSteps === 0) && progress.stepsDetail?.length > 0) {
+      totalSteps = progress.stepsDetail.length
+      completedSteps = progress.stepsDetail.filter((s: any) => s.status === 'completed').length
+    }
+
+    const inlineProcess = {
+      pid: 'mcp-inline',
+      workflowName: progress.workflowName,
+      team: progress.team || 'unknown',
+      repositoryPath: progress.repositoryPath,
+      startTime: progress.startTime,
+      lastHeartbeat: progress.lastUpdate,
+      status: progress.status,
+      completedSteps,
+      totalSteps,
+      currentStep: progress.currentStep,
+      stepsCompleted: progress.stepsCompleted || [],
+      stepsFailed: progress.stepsFailed || [],
+      elapsedSeconds: progress.elapsedSeconds || 0,
+      logFile: null,
+      isAlive: progress.status === 'running',
+      health: 'healthy',
+      heartbeatAgeSeconds: 0,
+      progressPercent: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
+      steps: progress.stepsDetail || [],
+      isInlineMCP: true,
+      batchProgress: progress.batchProgress || null,
+      batchIterations: progress.batchIterations || null,
+      singleStepMode: progress.singleStepMode === true,
+      stepPaused: progress.stepPaused === true,
+      pausedAtStep: progress.pausedAtStep || null,
+      mockLLM: progress.mockLLM === true,
+      mockLLMDelay: progress.mockLLMDelay || 500,
+      _refreshKey: `mcp-inline-${Date.now()}`, // Force React re-render
+    }
+
+    // Dispatch update with fresh data
+    this.store.dispatch(fetchUKBStatusSuccess({
+      summary: { total: 1, running: 1, stale: 0, frozen: 0, dead: 0 },
+      processes: [inlineProcess],
+      _lastRefresh: Date.now(),
+      _fromSSE: true, // Flag to indicate this came from SSE
+    }))
+
+    Logger.trace(LogCategories.UKB, `SSE update: ${progress.workflowName} [${completedSteps}/${totalSteps}]`)
+  }
+
+  disconnectSSE() {
+    if (this.sseConnection) {
+      this.sseConnection.close()
+      this.sseConnection = null
+      Logger.info(LogCategories.REFRESH, 'SSE connection closed')
+    }
   }
 
   startAutoRefresh() {
     if (this.refreshInterval) return
 
-    Logger.info(LogCategories.REFRESH, 'Starting auto-refresh cycle (5s interval)')
+    Logger.info(LogCategories.REFRESH, 'Starting auto-refresh cycle (1s interval for smooth workflow updates)')
 
     // Initial fetch
     this.fetchAllData()
 
-    // Auto-refresh every 5 seconds
+    // Auto-refresh every 1 second for smooth workflow visualization
     this.refreshInterval = setInterval(() => {
       this.fetchAllData()
-    }, 5000)
+    }, 1000)
   }
 
   stopAutoRefresh() {
@@ -57,6 +184,7 @@ class HealthRefreshManager {
       this.refreshInterval = null
       Logger.info(LogCategories.REFRESH, 'Auto-refresh stopped')
     }
+    this.disconnectSSE()
   }
 
   async fetchAllData() {
