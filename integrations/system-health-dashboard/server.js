@@ -8,7 +8,7 @@
 
 import express from 'express';
 import { createServer } from 'http';
-import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
@@ -109,6 +109,9 @@ class SystemHealthAPIServer {
         this.app.post('/api/ukb/start', this.handleStartUKBWorkflow.bind(this));
         this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
         this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
+
+        // SSE endpoint for real-time workflow state updates
+        this.app.get('/api/ukb/stream', this.handleUKBStream.bind(this));
 
         // Workflow definitions endpoint (Single Source of Truth)
         this.app.get('/api/workflows/definitions', this.handleGetWorkflowDefinitions.bind(this));
@@ -781,6 +784,70 @@ class SystemHealthAPIServer {
                 error: error.message
             });
         }
+    }
+
+    /**
+     * SSE endpoint for real-time workflow state updates
+     * Uses file system watching to push updates immediately when workflow state changes
+     */
+    handleUKBStream(req, res) {
+        // Set up SSE headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+        res.flushHeaders();
+
+        const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+        let lastContent = '';
+        let watcher = null;
+        let debounceTimer = null;
+
+        // Send initial state
+        const sendUpdate = () => {
+            try {
+                if (existsSync(progressPath)) {
+                    const content = readFileSync(progressPath, 'utf8');
+                    // Only send if content changed
+                    if (content !== lastContent) {
+                        lastContent = content;
+                        const progress = JSON.parse(content);
+                        console.log(`[SSE-TX] ${new Date().toISOString().slice(11,23)} step=${progress.currentStep} details=${progress.stepsDetail?.length || 0}`);
+                        res.write(`data: ${JSON.stringify(progress)}\n\n`);
+                    }
+                } else {
+                    // No workflow running
+                    if (lastContent !== 'null') {
+                        lastContent = 'null';
+                        res.write(`data: null\n\n`);
+                    }
+                }
+            } catch (error) {
+                // Ignore read errors during rapid updates
+            }
+        };
+
+        // Send initial state immediately
+        sendUpdate();
+
+        // Use fast polling (100ms) instead of fs.watch which is unreliable on macOS
+        // This provides responsive real-time updates for workflow visualization
+        const pollInterval = setInterval(sendUpdate, 100);
+
+        // Send heartbeat every 15 seconds to keep connection alive
+        const heartbeat = setInterval(() => {
+            try {
+                res.write(': heartbeat\n\n');
+            } catch {
+                // Connection closed
+            }
+        }, 15000);
+
+        // Cleanup on connection close
+        req.on('close', () => {
+            clearInterval(pollInterval);
+            clearInterval(heartbeat);
+        });
     }
 
     /**
