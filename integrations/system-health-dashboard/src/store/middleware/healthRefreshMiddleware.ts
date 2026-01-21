@@ -167,15 +167,15 @@ class HealthRefreshManager {
   startAutoRefresh() {
     if (this.refreshInterval) return
 
-    Logger.info(LogCategories.REFRESH, 'Starting auto-refresh cycle (1s interval for smooth workflow updates)')
+    Logger.info(LogCategories.REFRESH, 'Starting auto-refresh cycle (500ms interval for smooth workflow updates)')
 
     // Initial fetch
     this.fetchAllData()
 
-    // Auto-refresh every 1 second for smooth workflow visualization
+    // Auto-refresh every 500ms for smooth workflow visualization
     this.refreshInterval = setInterval(() => {
       this.fetchAllData()
-    }, 1000)
+    }, 500)
   }
 
   stopAutoRefresh() {
