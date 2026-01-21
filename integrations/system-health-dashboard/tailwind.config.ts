@@ -14,9 +14,21 @@ const config: Config = {
           '25%': { transform: 'translateX(-2px)' },
           '75%': { transform: 'translateX(2px)' },
         },
+        'completion-glow': {
+          '0%': { filter: 'brightness(1) drop-shadow(0 0 0px transparent)' },
+          '30%': { filter: 'brightness(1.3) drop-shadow(0 0 8px #22c55e)' },
+          '100%': { filter: 'brightness(1) drop-shadow(0 0 0px transparent)' },
+        },
+        'step-pop': {
+          '0%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.05)' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         wiggle: 'wiggle 0.3s ease-in-out 2',
+        'completion-glow': 'completion-glow 0.8s ease-out',
+        'step-pop': 'step-pop 0.4s ease-out',
       },
       borderRadius: {
         lg: 'var(--radius)',

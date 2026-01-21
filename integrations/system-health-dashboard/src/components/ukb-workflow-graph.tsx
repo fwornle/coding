@@ -2114,7 +2114,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         fill={colors.fill}
                         stroke={colors.stroke}
                         strokeWidth={colors.strokeWidth}
-                        className="transition-all duration-150"
+                        className="transition-all duration-500 ease-in-out"
                         style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
                       />
 
@@ -2177,7 +2177,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         </div>
                       </foreignObject>
 
-                      {/* Status indicator */}
+                      {/* Status indicator - with smooth transition for visual feedback */}
                       <circle
                         cx={pos.x + nodeWidth - 8}
                         cy={pos.y + 8}
@@ -2188,6 +2188,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                           status === 'failed' ? '#ef4444' :
                           '#d1d5db'
                         }
+                        className="transition-all duration-500 ease-in-out"
                       />
 
                       {/* Sub-step count badge - blue circle showing count */}
