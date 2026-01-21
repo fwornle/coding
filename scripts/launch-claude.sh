@@ -84,11 +84,26 @@ if [ -f "$CODING_REPO/.env.ports" ]; then
   set +a
 fi
 
+# Check if Docker daemon is actually ready (not just client installed)
+# IMPORTANT: docker info succeeds with just client info, docker ps requires daemon
+docker_daemon_ready() {
+  docker ps >/dev/null 2>&1
+}
+
 # Ensure Docker is running (required for Qdrant vector search)
 ensure_docker_running() {
-  if docker info >/dev/null 2>&1; then
-    log "✅ Docker is already running"
+  # First check if daemon is fully ready (use docker ps, not docker info!)
+  if docker_daemon_ready; then
+    log "✅ Docker daemon is running"
     return 0
+  fi
+
+  # Check if Docker is in a stale/broken state (processes exist but daemon not responding)
+  if ps aux | grep -q "[c]om.docker.backend"; then
+    log "⚠️  Docker processes exist but daemon not responding - force restarting..."
+    pkill -9 -f "Docker" 2>/dev/null
+    pkill -9 -f "com.docker" 2>/dev/null
+    sleep 2
   fi
 
   log "🐳 Docker not running - attempting to start Docker Desktop..."
@@ -98,16 +113,16 @@ ensure_docker_running() {
     log "   Starting Docker Desktop..."
     open -a "Docker" 2>/dev/null
 
-    log "⏳ Waiting for Docker to start (max 60 seconds)..."
-    for i in {1..60}; do
-      if docker info >/dev/null 2>&1; then
-        log "✅ Docker started successfully after ${i} seconds"
+    log "⏳ Waiting for Docker daemon (max 30 seconds)..."
+    for i in {1..30}; do
+      if docker_daemon_ready; then
+        log "✅ Docker daemon ready after ${i} seconds"
         return 0
       fi
       sleep 1
     done
 
-    log "❌ Docker failed to start after 60 seconds"
+    log "❌ Docker daemon not ready after 30 seconds"
     log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
     log "💡 Please start Docker Desktop manually for full functionality"
     return 1
