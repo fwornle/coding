@@ -87,6 +87,7 @@ Detailed standalone documentation for specific systems:
 ### Configuration & Setup
 - **[Multi-Team Knowledge Base Setup](multi-team-setup.md)** - Team-based knowledge organization
 - **[Custom Slash Commands](slash-commands.md)** - `/sl` (session logs) and `/lg` (live guardrails)
+- **[Docker Mode Transition](docker-mode-transition.md)** - Safe switching between native and Docker deployment modes
 
 ---
 

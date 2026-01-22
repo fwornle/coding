@@ -23,20 +23,30 @@ coding --copilot
 For containerized deployment with persistent services:
 
 ```bash
-# Enable Docker mode (one-time setup)
-touch .docker-mode
+# Switch to Docker mode (safe transition with health monitoring)
+coding --switch-to-docker
 
-# Start Claude - Docker services start automatically
+# Start Claude - Docker services are already running
 coding --claude
+
+# Check current mode
+coding --mode-status
 ```
 
-That's it. The launcher auto-detects Docker mode and starts containers for you.
+The transition system ensures safe mode switching with:
+- Automatic pause of health monitors during transition
+- Graceful service shutdown with data flush
+- Automatic rollback on failure
+- Multi-session support
 
 **Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers.
 
-**To switch back to native mode**: `rm .docker-mode`
+**To switch back to native mode**:
+```bash
+coding --switch-to-native
+```
 
-See [Docker Deployment Guide](docker/README.md) for details.
+See [Docker Mode Transition](docs/docker-mode-transition.md) for architecture details and [Docker Deployment Guide](docker/README.md) for container configuration.
 
 ### Installation Safety
 
@@ -335,6 +345,7 @@ Copyright © 2025 Frank Wornle
 
 - **Documentation Hub**: [docs/README.md](docs/README.md)
 - **Installation Guide**: [docs/getting-started.md](docs/getting-started.md)
+- **Docker Mode Transition**: [docs/docker-mode-transition.md](docs/docker-mode-transition.md)
 - **Docker Deployment**: [docker/README.md](docker/README.md)
 - **System Overview**: [docs/system-overview.md](docs/system-overview.md)
 - **Core Systems**: [docs/core-systems/](docs/core-systems/)
