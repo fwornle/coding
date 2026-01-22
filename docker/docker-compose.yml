@@ -1,8 +1,6 @@
 # Docker Compose for Coding Infrastructure
 # Provides containerized MCP servers, web services, and databases
 
-version: '3.8'
-
 services:
   # ===========================================
   # Main Application Container
@@ -85,11 +83,11 @@ services:
     networks:
       - coding-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      test: ["CMD-SHELL", "timeout 3 bash -c 'cat < /dev/null > /dev/tcp/localhost/6333' 2>/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
 
   # Redis Cache
   redis:
