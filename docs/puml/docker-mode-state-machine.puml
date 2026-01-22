@@ -1,0 +1,75 @@
+@startuml docker-mode-state-machine
+!include _standard-style.puml
+
+title Docker Mode State Machine\nService Deployment States
+
+[*] --> NativeMode : Initial State\n(default)
+
+state NativeMode {
+  state "Services Running" as native_running
+  state "Health Monitored" as native_healthy
+
+  native_running --> native_healthy : health check pass
+  native_healthy --> native_running : auto-heal triggered
+}
+
+state DockerMode {
+  state "Containers Running" as docker_running
+  state "Health Monitored" as docker_healthy
+
+  docker_running --> docker_healthy : health check pass
+  docker_healthy --> docker_running : container restart
+}
+
+state TransitionInProgress {
+  state "Lock Created" as lock_created
+  state "Monitors Paused" as monitors_paused
+  state "Stopping Source" as stopping
+  state "Starting Target" as starting
+  state "Health Check" as health_check
+
+  lock_created --> monitors_paused : SIGUSR2 broadcast
+  monitors_paused --> stopping : source services
+  stopping --> starting : ports released
+  starting --> health_check : services up
+  health_check --> [*] : healthy
+  health_check --> RollingBack : timeout/failure
+}
+
+state RollingBack {
+  state "Kill Partial" as kill_partial
+  state "Restore Previous" as restore
+
+  kill_partial --> restore : cleanup
+  restore --> [*] : previous mode restored
+}
+
+NativeMode --> TransitionInProgress : coding --switch-to-docker
+TransitionInProgress --> DockerMode : transition success
+
+DockerMode --> TransitionInProgress : coding --switch-to-native
+TransitionInProgress --> NativeMode : transition success
+
+TransitionInProgress --> NativeMode : rollback (from native)
+TransitionInProgress --> DockerMode : rollback (from docker)
+
+note right of NativeMode
+  Services run as Node.js processes
+  - VKB Server (localhost:8080)
+  - Semantic Analysis (localhost:8081)
+  - Constraint Monitor (localhost:8083)
+end note
+
+note right of DockerMode
+  Services run in Docker containers
+  - Single coding-services container
+  - Volume-mounted data
+  - Same port exposure
+end note
+
+note bottom of TransitionInProgress
+  .transition-in-progress lock file
+  prevents health monitor interference
+end note
+
+@enduml

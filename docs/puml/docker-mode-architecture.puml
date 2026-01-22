@@ -1,0 +1,67 @@
+@startuml docker-mode-architecture
+!include _standard-style.puml
+
+title Docker Mode Architecture\nNative vs Docker Service Deployment
+
+top to bottom direction
+
+actor "Developer" as dev
+actor "Claude Code" as claude
+
+package "Native Mode" as native_pkg {
+  component "VKB Server\n(localhost:8080)" <<core>> as vkb_native
+  component "Semantic Analysis\n(localhost:8081)" <<core>> as sem_native
+  component "Constraint Monitor\n(localhost:8083)" <<core>> as cm_native
+  database "LevelDB\n(.data/)" <<storage>> as level_native
+  database "Qdrant\n(Docker container)" <<storage>> as qdrant
+}
+
+package "Docker Mode" as docker_pkg {
+  component "coding-services\nContainer" <<infra>> as container {
+    component "VKB Server\n(8080)" <<core>> as vkb_docker
+    component "Semantic Analysis\n(8081)" <<core>> as sem_docker
+    component "Constraint Monitor\n(8083)" <<core>> as cm_docker
+  }
+  database "LevelDB\n(volume mount)" <<storage>> as level_docker
+}
+
+package "Health Monitoring" as health_pkg {
+  component "StatusLine\nHealth Monitor" <<util>> as statusline
+  component "Health Verifier" <<util>> as verifier
+  component "Global Process\nSupervisor" <<util>> as supervisor
+}
+
+package "Transition Orchestrator" as transition_pkg {
+  component "docker-mode-transition.js" <<core>> as orchestrator
+  file ".transition-in-progress" as lock_file
+  file ".docker-mode" as mode_marker
+}
+
+dev --> claude : starts session
+claude --> orchestrator : coding --switch-to-docker
+
+orchestrator --> lock_file : creates lock
+orchestrator ASYNC_LINE statusline : SIGUSR2 (pause)
+orchestrator ASYNC_LINE verifier : SIGUSR2 (pause)
+orchestrator ASYNC_LINE supervisor : SIGUSR2 (pause)
+
+orchestrator --> native_pkg : stops services
+orchestrator --> docker_pkg : starts containers
+orchestrator --> mode_marker : creates/removes
+
+statusline --> lock_file : checks lock
+verifier --> lock_file : checks lock
+supervisor --> lock_file : checks lock
+
+note right of lock_file
+  Lock file prevents health
+  monitors from auto-restarting
+  services during transition
+end note
+
+note bottom of mode_marker
+  Presence indicates Docker mode
+  Absence indicates Native mode
+end note
+
+@enduml

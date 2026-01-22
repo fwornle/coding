@@ -42,6 +42,11 @@ OPTIONS:
   --verbose          Enable verbose logging
   --help             Show this help
 
+MODE SWITCHING:
+  --switch-to-docker Switch all sessions from native to Docker mode
+  --switch-to-native Switch all sessions from Docker to native mode
+  --mode-status      Show current mode and transition status
+
 EXAMPLES:
   coding-agent --lsl-status           # Show LSL system status
   coding-agent --lsl-validate         # Run LSL system validation  coding-agent                    # Use best available agent
@@ -104,6 +109,15 @@ while [[ $# -gt 0 ]]; do
       ;;
     --lsl-validate)
       exec node "$SCRIPT_DIR/../tests/integration/full-system-validation.test.js"
+      ;;
+    --switch-to-docker)
+      exec node "$SCRIPT_DIR/../scripts/docker-mode-transition.js" to-docker --verbose
+      ;;
+    --switch-to-native)
+      exec node "$SCRIPT_DIR/../scripts/docker-mode-transition.js" to-native --verbose
+      ;;
+    --mode-status)
+      exec node "$SCRIPT_DIR/../scripts/docker-mode-transition.js" status
       ;;
     --help|-h)
       show_help

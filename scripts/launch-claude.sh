@@ -17,6 +17,33 @@ log() {
 }
 
 # ============================================
+# Docker Mode Transition Check
+# ============================================
+
+# Wait if a mode transition is in progress
+check_transition_lock() {
+  local lock_file="$CODING_REPO/.transition-in-progress"
+  local wait_count=0
+  local max_wait=60  # Max 60 seconds wait
+
+  while [ -f "$lock_file" ] && [ $wait_count -lt $max_wait ]; do
+    if [ $wait_count -eq 0 ]; then
+      log "⏳ Docker mode transition in progress, waiting..."
+    fi
+    sleep 1
+    ((wait_count++))
+  done
+
+  if [ -f "$lock_file" ]; then
+    log "⚠️  Transition still in progress after ${max_wait}s, proceeding anyway..."
+  elif [ $wait_count -gt 0 ]; then
+    log "✅ Transition complete, continuing startup"
+  fi
+}
+
+check_transition_lock
+
+# ============================================
 # Docker Mode Detection
 # ============================================
 DOCKER_MODE=false

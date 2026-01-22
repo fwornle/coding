@@ -20,6 +20,7 @@ import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import ProcessStateManager from './process-state-manager.js';
+import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,6 +52,10 @@ class StatusLineHealthMonitor {
     this.psm = new ProcessStateManager({ codingRoot: this.codingRepoPath });
     this.serviceName = 'statusline-health-monitor';
     this.healthRefreshInterval = null;
+
+    // Docker mode transition state
+    this.monitoringPaused = false;
+    this.transitionData = null;
 
     this.ensureLogDirectory();
   }
@@ -1756,7 +1761,24 @@ class StatusLineHealthMonitor {
    */
   async autoHealConstraintMonitor(healthStatus) {
     if (!this.autoHealEnabled) return false;
-    
+
+    // Skip auto-healing during Docker mode transition
+    if (this.monitoringPaused) {
+      this.log('Auto-healing skipped - Docker mode transition in progress', 'DEBUG');
+      return false;
+    }
+
+    // Also check lock file directly (in case signal was missed)
+    try {
+      const transitionLocked = await isTransitionLocked();
+      if (transitionLocked) {
+        this.log('Auto-healing skipped - transition lock detected', 'DEBUG');
+        return false;
+      }
+    } catch {
+      // Continue if check fails (fail open)
+    }
+
     const serviceKey = 'constraint-monitor';
     const now = Date.now();
     
@@ -1919,6 +1941,23 @@ class StatusLineHealthMonitor {
   async autoHealVKBServer(healthStatus) {
     if (!this.autoHealEnabled) return false;
 
+    // Skip auto-healing during Docker mode transition
+    if (this.monitoringPaused) {
+      this.log('Auto-healing skipped - Docker mode transition in progress', 'DEBUG');
+      return false;
+    }
+
+    // Also check lock file directly (in case signal was missed)
+    try {
+      const transitionLocked = await isTransitionLocked();
+      if (transitionLocked) {
+        this.log('Auto-healing skipped - transition lock detected', 'DEBUG');
+        return false;
+      }
+    } catch {
+      // Continue if check fails (fail open)
+    }
+
     const serviceKey = 'vkb-server';
     const now = Date.now();
 
@@ -2022,6 +2061,12 @@ class StatusLineHealthMonitor {
    */
   formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth = null) {
     let statusLine = '';
+
+    // Show transition status if in progress
+    if (this.monitoringPaused && this.transitionData) {
+      const { fromMode, toMode } = this.transitionData;
+      statusLine += `[🔄 TRANSITIONING: ${fromMode} → ${toMode}] `;
+    }
 
     // Global Coding Monitor with reason code if not healthy
     if (gcmHealth.icon === '🟡' || gcmHealth.icon === '🔴') {
@@ -2457,6 +2502,27 @@ class StatusLineHealthMonitor {
 
     // Register with PSM
     await this.registerWithPSM();
+
+    // Install Docker mode transition signal handlers
+    process.on('SIGUSR2', async () => {
+      this.monitoringPaused = true;
+      try {
+        this.transitionData = await getTransitionLockData();
+      } catch {
+        this.transitionData = { fromMode: 'unknown', toMode: 'unknown' };
+      }
+      this.log('⏸️  Monitoring PAUSED (Docker mode transition in progress)', 'WARN');
+      // Update status to show transition
+      await this.updateStatusLine();
+    });
+
+    process.on('SIGUSR1', () => {
+      this.monitoringPaused = false;
+      this.transitionData = null;
+      this.log('▶️  Monitoring RESUMED (Docker mode transition complete)');
+      // Force status update after transition
+      this.updateStatusLine();
+    });
 
     // Initial update
     await this.updateStatusLine();
