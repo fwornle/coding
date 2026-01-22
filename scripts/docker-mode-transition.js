@@ -28,8 +28,11 @@ const TRANSITION_LOCK_FILE = path.join(scriptRoot, '.transition-in-progress');
 // Transition timeout (5 minutes)
 const TRANSITION_TIMEOUT_MS = 5 * 60 * 1000;
 
-// Health check timeout
-const HEALTH_CHECK_TIMEOUT_MS = 60 * 1000;
+// Health check timeout (must exceed Docker's start_period of 120s for coding-services)
+const HEALTH_CHECK_TIMEOUT_MS = 150 * 1000;
+
+// Docker startup timeout (wait for Docker Desktop to start)
+const DOCKER_STARTUP_TIMEOUT_MS = 45 * 1000;
 
 class DockerModeTransition {
   constructor(options = {}) {
@@ -218,6 +221,94 @@ class DockerModeTransition {
   }
 
   /**
+   * Check if Docker daemon is ready (not just client)
+   */
+  isDockerDaemonReady() {
+    try {
+      execSync('docker ps', { encoding: 'utf8', stdio: 'pipe' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Ensure Docker Desktop is running before attempting Docker operations
+   * Mirrors the ensure_docker_running() logic from launch-claude.sh
+   */
+  async ensureDockerRunning() {
+    // Quick check if already running
+    if (this.isDockerDaemonReady()) {
+      this.log('Docker daemon is already running');
+      return true;
+    }
+
+    this.log('Docker daemon not running - attempting to start Docker Desktop...');
+
+    // Check for stale Docker processes
+    try {
+      const psOutput = execSync('ps aux | grep -c "[c]om.docker.backend" || echo "0"', {
+        encoding: 'utf8',
+        stdio: 'pipe'
+      }).trim();
+
+      if (parseInt(psOutput) > 0) {
+        this.log('Found stale Docker processes - force restarting...', 'warn');
+        execSync('pkill -9 -f "Docker" 2>/dev/null || true', { stdio: 'pipe' });
+        execSync('pkill -9 -f "com.docker" 2>/dev/null || true', { stdio: 'pipe' });
+        await this.sleep(2000);
+      }
+    } catch {
+      // Ignore errors from ps/pkill
+    }
+
+    // Try to start Docker Desktop (macOS)
+    const dockerAppPath = '/Applications/Docker.app';
+    try {
+      await fs.access(dockerAppPath);
+    } catch {
+      this.log('Docker Desktop not found at /Applications/Docker.app', 'error');
+      this.log('Install Docker Desktop: https://www.docker.com/products/docker-desktop');
+      return false;
+    }
+
+    // Start Docker Desktop
+    this.log('Starting Docker Desktop...');
+    try {
+      execSync('open -a "Docker"', { stdio: 'pipe' });
+    } catch (error) {
+      this.log(`Failed to launch Docker Desktop: ${error.message}`, 'error');
+      return false;
+    }
+
+    // Wait for Docker daemon to become ready
+    this.log(`Waiting for Docker daemon (max ${DOCKER_STARTUP_TIMEOUT_MS / 1000} seconds)...`);
+    const startTime = Date.now();
+    let lastLogTime = startTime;
+
+    while (Date.now() - startTime < DOCKER_STARTUP_TIMEOUT_MS) {
+      if (this.isDockerDaemonReady()) {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        this.log(`Docker daemon ready after ${elapsed} seconds`);
+        return true;
+      }
+
+      // Log progress every 10 seconds
+      if (Date.now() - lastLogTime >= 10000) {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        this.log(`Still waiting for Docker daemon... (${elapsed}s elapsed)`);
+        lastLogTime = Date.now();
+      }
+
+      await this.sleep(1000);
+    }
+
+    const elapsed = Math.round(DOCKER_STARTUP_TIMEOUT_MS / 1000);
+    this.log(`Docker daemon not ready after ${elapsed} seconds`, 'error');
+    return false;
+  }
+
+  /**
    * Stop native services gracefully
    */
   async stopNativeServices() {
@@ -226,6 +317,8 @@ class DockerModeTransition {
 
     // Services to stop in reverse dependency order
     const servicesToStop = [
+      'system-health-dashboard-frontend',
+      'system-health-dashboard-api',
       'vkb-server',
       'semantic-analysis-server',
       'constraint-monitor',
@@ -272,9 +365,13 @@ class DockerModeTransition {
 
     // Also check for processes by script pattern (in case not registered in PSM)
     const scriptPatterns = [
+      { pattern: 'system-health-dashboard-frontend', port: 3032 },
+      { pattern: 'system-health-dashboard-api', port: 3033 },
       { pattern: 'vkb-server', port: 8080 },
       { pattern: 'semantic-analysis-server', port: 8081 },
-      { pattern: 'constraint-monitor', port: 8083 }
+      { pattern: 'constraint-monitor', port: 8083 },
+      { pattern: 'browser-access', port: 3847 },
+      { pattern: 'sse-server', port: 3847 }
     ];
 
     for (const { pattern, port } of scriptPatterns) {
@@ -291,17 +388,90 @@ class DockerModeTransition {
           // Process may have exited
         }
       }
-
-      // Release port if still in use
-      try {
-        execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null || true`, { encoding: 'utf8' });
-      } catch {
-        // Port may not be in use
-      }
     }
 
     // Clean up PSM dead processes
     await this.psm.cleanupDeadProcesses();
+
+    // FIRST: Stop standalone Docker containers that may have been started by native mode services
+    // This MUST happen BEFORE port killing to properly release Docker-managed ports
+    // Native mode uses different container names than docker-compose mode:
+    // - Constraint Monitor: constraint-monitor-redis, constraint-monitor-qdrant
+    // - Code Graph RAG: code-graph-rag-memgraph-1, code-graph-rag-lab-1
+    if (this.isDockerDaemonReady()) {
+      this.log('Stopping standalone Docker containers from native mode...');
+
+      const containerPatterns = [
+        'constraint-monitor-',  // Redis, Qdrant from constraint monitor
+        'code-graph-rag-',      // Memgraph, Lab from code-graph-rag
+        'coding-'               // Any coding- prefixed containers
+      ];
+
+      try {
+        const runningContainers = execSync('docker ps --format "{{.Names}}"', {
+          encoding: 'utf8',
+          stdio: 'pipe'
+        }).trim().split('\n').filter(Boolean);
+
+        for (const containerName of runningContainers) {
+          if (containerPatterns.some(pattern => containerName.startsWith(pattern))) {
+            try {
+              this.log(`Stopping standalone container: ${containerName}...`);
+              execSync(`docker stop ${containerName} 2>/dev/null || true`, {
+                encoding: 'utf8',
+                stdio: 'pipe',
+                timeout: 15000
+              });
+              execSync(`docker rm ${containerName} 2>/dev/null || true`, {
+                encoding: 'utf8',
+                stdio: 'pipe'
+              });
+              this.log(`Stopped ${containerName}`);
+            } catch (error) {
+              this.log(`Warning: Could not stop ${containerName}: ${error.message}`, 'warn');
+            }
+          }
+        }
+      } catch (error) {
+        this.log(`Warning: Could not list/stop containers: ${error.message}`, 'warn');
+      }
+
+      // Give Docker time to release port bindings
+      await this.sleep(2000);
+    } else {
+      this.log('Docker not running - skipping container cleanup', 'warn');
+    }
+
+    // THEN: Release any remaining ports (non-Docker native processes)
+    // Only kill ports NOT typically owned by Docker containers
+    const nativePorts = [
+      8080,   // VKB Server
+      3032,   // Health Dashboard HTTP
+      3033,   // Health Dashboard WebSocket
+      3847,   // Browser Access SSE
+      3848,   // Semantic Analysis SSE
+      3849,   // Constraint Monitor SSE
+      3850    // Code-Graph-RAG SSE
+    ];
+
+    this.log('Releasing native service ports...');
+    for (const port of nativePorts) {
+      try {
+        const pids = execSync(`lsof -ti:${port} 2>/dev/null || true`, {
+          encoding: 'utf8'
+        }).trim();
+
+        if (pids) {
+          this.log(`Releasing port ${port} (PIDs: ${pids.split('\n').join(', ')})...`);
+          execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null || true`, {
+            encoding: 'utf8',
+            stdio: 'pipe'
+          });
+        }
+      } catch {
+        // Port may not be in use or already released
+      }
+    }
 
     this.log(`Stopped ${stoppedServices.length} native services`);
     return stoppedServices;
@@ -313,6 +483,12 @@ class DockerModeTransition {
   async stopDockerContainers() {
     this.log('Stopping Docker containers...');
     await this.updateLockStatus('stopping_docker');
+
+    // Check if Docker is running before trying to stop containers
+    if (!this.isDockerDaemonReady()) {
+      this.log('Docker daemon not running - no containers to stop');
+      return;
+    }
 
     try {
       const dockerDir = path.join(this.codingRoot, 'docker');
@@ -362,6 +538,12 @@ class DockerModeTransition {
     await this.updateLockStatus('starting_docker');
 
     try {
+      // First ensure Docker Desktop is running
+      const dockerReady = await this.ensureDockerRunning();
+      if (!dockerReady) {
+        throw new Error('Docker daemon is not available - please start Docker Desktop');
+      }
+
       const dockerDir = path.join(this.codingRoot, 'docker');
       const composeFile = path.join(dockerDir, 'docker-compose.yml');
 
@@ -496,6 +678,16 @@ class DockerModeTransition {
     await this.createLockFile(fromMode, targetMode, sessions.map(s => s.id));
 
     try {
+      // CRITICAL: If transitioning TO Docker, ensure Docker is running BEFORE stopping native services
+      // Native mode uses Docker containers (Qdrant, Redis, Memgraph) that need Docker to be running to stop properly
+      if (targetMode === 'docker') {
+        this.log('Ensuring Docker is available for transition...');
+        const dockerReady = await this.ensureDockerRunning();
+        if (!dockerReady) {
+          throw new Error('Docker daemon is not available - cannot proceed with transition');
+        }
+      }
+
       // Broadcast pause signal to health monitors
       const signalCount = await this.broadcastPauseSignal();
       this.log(`Paused ${signalCount} health monitor(s)`);
