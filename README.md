@@ -23,19 +23,18 @@ coding --copilot
 For containerized deployment with persistent services:
 
 ```bash
-# Enable Docker mode
+# Enable Docker mode (one-time setup)
 touch .docker-mode
 
-# Start services via Docker Compose
-docker compose -f docker/docker-compose.yml up -d
-
-# Launch Claude (auto-detects Docker mode)
+# Start Claude - Docker services start automatically
 coding --claude
 ```
 
+That's it. The launcher auto-detects Docker mode and starts containers for you.
+
 **Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers.
 
-**Ports**: 3847 (browser-access), 3848 (semantic-analysis), 3849 (constraint-monitor), 3850 (code-graph-rag)
+**To switch back to native mode**: `rm .docker-mode`
 
 See [Docker Deployment Guide](docker/README.md) for details.
 
