@@ -59,6 +59,17 @@ deactivate PSM
 StartScript -> StartScript : spawn vkb-server
 StartScript --> StartScript : new PID
 
+note right
+  **VKB Lazy Initialization:**
+  1. Express server starts immediately
+  2. /health returns {status: 'starting'}
+  3. DB init runs in background
+  4. /health returns {status: 'ready'}
+end note
+
+StartScript -> StartScript : GET /health
+note right: Health check passes immediately\n(status: starting or ready)
+
 StartScript -> PSM : registerService('vkb-server', PID)
 activate PSM
 PSM -> Registry : write with lock

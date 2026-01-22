@@ -20,6 +20,7 @@ import fs from 'fs';
 import { spawn, exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
+import http from 'http';
 import {
   startServiceWithRetry,
   createHttpHealthCheck,
@@ -293,9 +294,10 @@ const SERVICE_CONFIGS = {
     name: 'VKB Server',
     required: true, // REQUIRED - must start successfully
     maxRetries: 3,
-    timeout: 30000, // VKB can take longer to start
+    timeout: 30000, // VKB server uses LAZY INITIALIZATION - Express starts immediately
+    // The server responds to /health within 1-2 seconds, then initializes DB/data in background
     startFn: async () => {
-      console.log(`[VKB] Starting VKB server on port ${PORTS.VKB}...`);
+      console.log(`[VKB] Starting VKB server on port ${PORTS.VKB} (lazy initialization)...`);
 
       // Check if already running globally (parallel session detection)
       const isRunning = await psm.isServiceRunning('vkb-server', 'global');
@@ -362,7 +364,50 @@ const SERVICE_CONFIGS = {
     },
     healthCheckFn: async (result) => {
       if (result.skipRegistration) return true;
-      return createHttpHealthCheck(PORTS.VKB, '/health')(result);
+
+      // VKB uses lazy initialization - /health returns immediately with status
+      // We accept both 'starting' and 'ready' states as healthy (server is alive)
+      return new Promise((resolve) => {
+        const client = http.request({
+          host: 'localhost',
+          port: PORTS.VKB,
+          method: 'GET',
+          path: '/health',
+          timeout: 5000
+        }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              try {
+                const healthData = JSON.parse(data);
+                const status = healthData.status || 'unknown';
+                const ready = healthData.ready ? 'ready' : 'initializing';
+                console.log(`[VKB] Health check passed (status: ${status}, ${ready})`);
+              } catch {
+                console.log('[VKB] Health check passed');
+              }
+              resolve(true);
+            } else {
+              console.log(`[VKB] Health check failed: HTTP ${res.statusCode}`);
+              resolve(false);
+            }
+          });
+        });
+
+        client.on('error', (error) => {
+          console.log(`[VKB] Health check error: ${error.message}`);
+          resolve(false);
+        });
+
+        client.on('timeout', () => {
+          console.log('[VKB] Health check timeout');
+          client.destroy();
+          resolve(false);
+        });
+
+        client.end();
+      });
     }
   },
 
