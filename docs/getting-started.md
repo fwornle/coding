@@ -11,6 +11,7 @@ Complete guide to installing, configuring, and using the unified semantic analys
 - **npm** - Package manager
 - **jq** - JSON processor
 - **macOS, Linux, or Windows** (via WSL/Git Bash)
+- **Docker** (optional) - For containerized deployment
 
 ### Install Prerequisites
 
@@ -137,6 +138,85 @@ git submodule update --init integrations/serena
 - `integrations/mcp-server-semantic-analysis` (Own repo - SSH)
 - `integrations/serena` (Third-party - HTTPS)
 - `integrations/mcp-server-browserbase` (Third-party - HTTPS)
+
+---
+
+## Docker Deployment (Alternative)
+
+For teams or users who prefer containerized deployments, the coding system supports Docker mode with HTTP/SSE transport for MCP servers.
+
+### Benefits of Docker Mode
+
+- **Persistent Services**: MCP servers run continuously, surviving session restarts
+- **Shared Browser Automation**: Multiple Claude sessions share the same browser instance
+- **Isolated Databases**: Qdrant, Redis, and Memgraph run in containers
+- **Consistent Environment**: Same behavior across different machines
+
+### Docker Prerequisites
+
+```bash
+# macOS
+brew install --cask docker
+
+# Linux
+curl -fsSL https://get.docker.com | sh
+```
+
+### Enable Docker Mode
+
+```bash
+# Option 1: Create marker file
+touch .docker-mode
+
+# Option 2: Set environment variable
+export CODING_DOCKER_MODE=true
+```
+
+### Start Services
+
+```bash
+# Start all containers
+docker compose -f docker/docker-compose.yml up -d
+
+# Verify health
+docker compose -f docker/docker-compose.yml ps
+curl http://localhost:3848/health  # semantic-analysis
+curl http://localhost:3847/health  # browser-access
+```
+
+### Launch Claude
+
+```bash
+# Auto-detects Docker mode and uses stdio proxies
+coding --claude
+```
+
+### Docker Port Mapping
+
+| Service | Port | Protocol |
+|---------|------|----------|
+| Browser Access SSE | 3847 | HTTP/SSE |
+| Semantic Analysis SSE | 3848 | HTTP/SSE |
+| Constraint Monitor SSE | 3849 | HTTP/SSE |
+| Code Graph RAG SSE | 3850 | HTTP/SSE |
+| VKB Server | 8080 | HTTP |
+| Qdrant | 6333/6334 | HTTP/gRPC |
+| Redis | 6379 | TCP |
+| Memgraph | 7687/3100 | Bolt/HTTP |
+
+### Switch Between Modes
+
+```bash
+# Enable Docker mode
+touch .docker-mode
+docker compose -f docker/docker-compose.yml up -d
+
+# Disable Docker mode (return to native)
+rm .docker-mode
+docker compose -f docker/docker-compose.yml down
+```
+
+See [Docker Deployment Guide](../docker/README.md) for detailed configuration.
 
 ---
 
@@ -468,6 +548,41 @@ nslookup github.com
 curl -x http://proxy:8080 -I https://github.com
 
 # See network setup section above
+```
+
+### Docker Mode Issues
+
+```bash
+# Check if Docker mode is enabled
+ls -la .docker-mode
+echo $CODING_DOCKER_MODE
+
+# Check container status
+docker compose -f docker/docker-compose.yml ps
+
+# View container logs
+docker compose -f docker/docker-compose.yml logs -f coding-services
+
+# Check MCP SSE server health
+curl http://localhost:3848/health  # semantic-analysis
+curl http://localhost:3847/health  # browser-access
+curl http://localhost:3849/health  # constraint-monitor
+curl http://localhost:3850/health  # code-graph-rag
+
+# Restart containers
+docker compose -f docker/docker-compose.yml restart
+
+# Rebuild containers (after code changes)
+docker compose -f docker/docker-compose.yml build --no-cache
+docker compose -f docker/docker-compose.yml up -d
+```
+
+**Port Conflicts**: If ports 3847-3850 are already in use:
+```bash
+# Find process using port
+lsof -i :3848
+
+# Stop conflicting process or change ports in .env.ports
 ```
 
 ---

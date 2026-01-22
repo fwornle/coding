@@ -174,6 +174,46 @@ Once integrated with Claude Code, you can use natural language commands like:
 3. **Use browser automation** with natural language commands
 4. **Stop Chrome**: `pkill -f 'remote-debugging-port=9222'`
 
+## Docker Deployment
+
+Browser-access is designed for containerized deployment as part of the coding infrastructure Docker setup.
+
+### Container Configuration
+
+In Docker mode, the browser-access SSE server runs inside the `coding-services` container:
+
+```yaml
+# docker-compose.yml excerpt
+coding-services:
+  ports:
+    - "3847:3847"  # Browser-access SSE
+  environment:
+    - BROWSER_ACCESS_PORT=3847
+```
+
+### Port Mapping
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 3847 | SSE Server | Browser automation MCP server |
+| 9222 | Chrome CDP | Chrome DevTools Protocol (external) |
+
+### Health Check
+
+```bash
+curl http://localhost:3847/health
+# {"status":"ok","sessions":0,"stagehandInitialized":false}
+```
+
+### Shared Browser Instance
+
+In Docker mode, browser-access is particularly valuable because:
+- **Single SSE server** serves multiple parallel Claude sessions
+- **Shared Stagehand instance** avoids CDP conflicts
+- **Persistent server** survives individual session restarts
+
+See the parent [Docker Deployment Guide](../../docker/README.md) for full containerization setup.
+
 ## Troubleshooting
 
 ### Server shows as "failed" in MCP list

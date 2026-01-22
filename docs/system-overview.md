@@ -309,6 +309,51 @@ extract_patterns {
 
 ---
 
+## Deployment Options
+
+The Coding system supports two deployment modes:
+
+### Native Mode (Default)
+
+MCP servers run as native stdio processes, started and managed by Claude CLI.
+
+```bash
+coding --claude
+```
+
+**Characteristics:**
+- Simple setup, no Docker required
+- Lower memory footprint
+- Processes restart with each session
+- Best for individual developers
+
+### Docker Mode (Containerized)
+
+MCP servers run as HTTP/SSE services in Docker containers with persistent operation.
+
+```bash
+touch .docker-mode
+docker compose -f docker/docker-compose.yml up -d
+coding --claude
+```
+
+![Docker Architecture](images/docker-architecture.png)
+
+**Architecture:**
+- **Host**: Claude CLI + lightweight stdio proxies
+- **Containers**: MCP SSE servers on ports 3847-3850
+- **Databases**: Qdrant (6333), Redis (6379), Memgraph (7687)
+
+**Characteristics:**
+- Persistent services across sessions
+- Shared browser automation across parallel Claude sessions
+- Better resource isolation
+- Best for teams and multi-session workflows
+
+See [Docker Deployment Guide](../docker/README.md) for detailed setup.
+
+---
+
 ## System Requirements
 
 - **Node.js 18+** - All components are Node.js based

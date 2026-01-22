@@ -11,6 +11,7 @@
 7. [Advanced Troubleshooting](#advanced-troubleshooting)
 8. [Performance Tuning](#performance-tuning)
 9. [Emergency Procedures](#emergency-procedures)
+10. [Docker Mode Troubleshooting](#docker-mode-troubleshooting)
 
 ## Quick Diagnostic Commands
 
@@ -935,6 +936,328 @@ rsync -av --delete .specstory/ ~/lsl-sync/
 # Monitor for changes and sync
 fswatch .specstory/ | xargs -I {} rsync -av .specstory/ ~/lsl-sync/
 ```
+
+## Docker Mode Troubleshooting
+
+### 1. Container Health Issues
+
+**Symptoms:**
+- MCP servers show as "failed" in Claude Code
+- Container not starting or crashing
+- Health check endpoints not responding
+
+**Diagnosis:**
+```bash
+# Check container status
+docker compose -f docker/docker-compose.yml ps
+
+# Check container logs
+docker compose -f docker/docker-compose.yml logs coding-services
+
+# Test health endpoints
+curl http://localhost:3847/health  # Browser Access
+curl http://localhost:3848/health  # Semantic Analysis
+curl http://localhost:3849/health  # Constraint Monitor
+curl http://localhost:3850/health  # Code Graph RAG
+```
+
+**Solutions:**
+
+**A. Restart Containers:**
+```bash
+# Stop and restart all services
+docker compose -f docker/docker-compose.yml down
+docker compose -f docker/docker-compose.yml up -d
+
+# Wait for services to be healthy
+docker compose -f docker/docker-compose.yml ps --format "table {{.Name}}\t{{.Status}}"
+```
+
+**B. Check Container Logs:**
+```bash
+# View real-time logs
+docker compose -f docker/docker-compose.yml logs -f coding-services
+
+# Check specific service startup
+docker compose -f docker/docker-compose.yml logs coding-services | grep -E "(Starting|Listening|Error)"
+```
+
+**C. Rebuild Container:**
+```bash
+# Force rebuild without cache
+docker compose -f docker/docker-compose.yml build --no-cache
+docker compose -f docker/docker-compose.yml up -d
+```
+
+### 2. MCP SSE Connection Issues
+
+**Symptoms:**
+- Claude Code cannot connect to MCP servers
+- "Connection refused" errors
+- Stdio proxy timeouts
+
+**Diagnosis:**
+```bash
+# Check if ports are listening
+lsof -i :3847  # Browser Access
+lsof -i :3848  # Semantic Analysis
+lsof -i :3849  # Constraint Monitor
+lsof -i :3850  # Code Graph RAG
+
+# Test SSE endpoints
+curl -v http://localhost:3848/health
+
+# Check proxy configuration
+cat ~/.claude.json | jq '.mcpServers'
+```
+
+**Solutions:**
+
+**A. Verify Docker Mode is Active:**
+```bash
+# Check for Docker mode marker
+ls -la .docker-mode
+
+# Or check environment variable
+echo $CODING_DOCKER_MODE
+
+# Create marker if missing
+touch .docker-mode
+```
+
+**B. Verify MCP Configuration:**
+```bash
+# Regenerate Docker MCP config
+./scripts/generate-docker-mcp-config.sh
+
+# Verify proxy paths are correct
+cat ~/.claude.json | jq '.mcpServers."semantic-analysis".args'
+```
+
+**C. Check Proxy Process:**
+```bash
+# The stdio proxy should connect to the SSE server
+# Test manually:
+SEMANTIC_ANALYSIS_SSE_URL=http://localhost:3848 node integrations/mcp-server-semantic-analysis/dist/stdio-proxy.js
+```
+
+### 3. Port Mapping Problems
+
+**Symptoms:**
+- "Port already in use" errors
+- Services binding to wrong interfaces
+- Cannot access services from host
+
+**Diagnosis:**
+```bash
+# Check port usage
+lsof -i :3847-3850 | grep LISTEN
+lsof -i :6333  # Qdrant
+lsof -i :6379  # Redis
+lsof -i :7687  # Memgraph
+
+# Check Docker port mappings
+docker compose -f docker/docker-compose.yml ps --format "table {{.Name}}\t{{.Ports}}"
+```
+
+**Solutions:**
+
+**A. Stop Conflicting Services:**
+```bash
+# Kill processes using required ports
+for port in 3847 3848 3849 3850; do
+  pid=$(lsof -ti :$port)
+  [ -n "$pid" ] && kill $pid
+done
+
+# Restart Docker services
+docker compose -f docker/docker-compose.yml up -d
+```
+
+**B. Use Alternative Ports:**
+```bash
+# Update .env.ports with different ports
+cat >> .env.ports << EOF
+BROWSER_ACCESS_SSE_PORT=4847
+SEMANTIC_ANALYSIS_SSE_PORT=4848
+CONSTRAINT_MONITOR_SSE_PORT=4849
+CODE_GRAPH_RAG_SSE_PORT=4850
+EOF
+
+# Restart with new ports
+docker compose -f docker/docker-compose.yml up -d
+```
+
+### 4. Volume Mount Issues
+
+**Symptoms:**
+- Data not persisting after container restart
+- Permission denied errors
+- Missing configuration files in container
+
+**Diagnosis:**
+```bash
+# Check volume mounts
+docker inspect coding-services | jq '.[0].Mounts'
+
+# Verify data directories exist
+ls -la .data/
+ls -la .specstory/
+
+# Check permissions inside container
+docker exec coding-services ls -la /coding/.data/
+```
+
+**Solutions:**
+
+**A. Fix Directory Permissions:**
+```bash
+# Ensure directories exist with correct permissions
+mkdir -p .data/knowledge-graph
+mkdir -p .specstory/history
+chmod -R 755 .data/ .specstory/
+
+# Restart containers
+docker compose -f docker/docker-compose.yml restart
+```
+
+**B. Verify Volume Configuration:**
+```yaml
+# docker-compose.yml volumes should include:
+volumes:
+  - ${CODING_REPO:-.}/.data:/coding/.data
+  - ${CODING_REPO:-.}/.specstory:/coding/.specstory
+  - ${HOME}/Agentic:/workspace
+```
+
+### 5. Database Container Issues
+
+**Symptoms:**
+- Qdrant, Redis, or Memgraph not connecting
+- Database initialization failures
+- Slow queries or timeouts
+
+**Diagnosis:**
+```bash
+# Check database containers
+docker compose -f docker/docker-compose.yml ps | grep -E "(qdrant|redis|memgraph)"
+
+# Test database connectivity
+curl http://localhost:6333/collections  # Qdrant
+redis-cli -p 6379 ping              # Redis (if redis-cli installed)
+docker exec memgraph cypher-shell -u memgraph -p memgraph "MATCH (n) RETURN count(n);"
+```
+
+**Solutions:**
+
+**A. Restart Database Containers:**
+```bash
+# Restart specific database
+docker compose -f docker/docker-compose.yml restart qdrant
+docker compose -f docker/docker-compose.yml restart redis
+docker compose -f docker/docker-compose.yml restart memgraph
+```
+
+**B. Check Database Logs:**
+```bash
+docker compose -f docker/docker-compose.yml logs qdrant
+docker compose -f docker/docker-compose.yml logs memgraph
+```
+
+**C. Reset Database Data:**
+```bash
+# WARNING: This will delete all data!
+docker compose -f docker/docker-compose.yml down -v
+docker compose -f docker/docker-compose.yml up -d
+```
+
+### 6. Switching Between Native and Docker Mode
+
+**Symptoms:**
+- Confusion about which mode is active
+- Mixed configuration issues
+- Services from wrong mode running
+
+**Diagnosis:**
+```bash
+# Check current mode
+if [ -f .docker-mode ] || [ "$CODING_DOCKER_MODE" = "true" ]; then
+  echo "Docker mode active"
+else
+  echo "Native mode active"
+fi
+
+# Check for native services running
+ps aux | grep -E "(semantic-analysis|constraint-monitor)" | grep -v grep
+
+# Check for Docker services
+docker compose -f docker/docker-compose.yml ps
+```
+
+**Solutions:**
+
+**A. Switch to Docker Mode:**
+```bash
+# Stop native services
+./bin/stop-services.sh
+
+# Enable Docker mode
+touch .docker-mode
+
+# Start Docker services
+docker compose -f docker/docker-compose.yml up -d
+
+# Regenerate MCP config
+./scripts/generate-docker-mcp-config.sh
+```
+
+**B. Switch to Native Mode:**
+```bash
+# Stop Docker services
+docker compose -f docker/docker-compose.yml down
+
+# Disable Docker mode
+rm -f .docker-mode
+unset CODING_DOCKER_MODE
+
+# Start native services
+./bin/start-services.sh
+```
+
+### 7. Docker Quick Reference
+
+**Essential Commands:**
+```bash
+# Start all Docker services
+docker compose -f docker/docker-compose.yml up -d
+
+# Stop all Docker services
+docker compose -f docker/docker-compose.yml down
+
+# View logs
+docker compose -f docker/docker-compose.yml logs -f
+
+# Check health of all services
+for port in 3847 3848 3849 3850; do
+  echo "Port $port: $(curl -s http://localhost:$port/health | jq -r '.status // "failed"')"
+done
+
+# Full restart
+docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml up -d
+```
+
+**Port Reference:**
+| Port | Service | Health Check |
+|------|---------|--------------|
+| 3847 | Browser Access SSE | `curl http://localhost:3847/health` |
+| 3848 | Semantic Analysis SSE | `curl http://localhost:3848/health` |
+| 3849 | Constraint Monitor SSE | `curl http://localhost:3849/health` |
+| 3850 | Code Graph RAG SSE | `curl http://localhost:3850/health` |
+| 6333 | Qdrant | `curl http://localhost:6333/collections` |
+| 6379 | Redis | `redis-cli ping` |
+| 7687 | Memgraph | Bolt protocol |
+
+---
 
 ## Contact and Support
 

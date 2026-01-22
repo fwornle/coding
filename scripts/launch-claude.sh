@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Launch Claude Code with MCP configuration
+# Supports both native and Docker modes
 
 set -e
 
@@ -14,6 +15,31 @@ source "$SCRIPT_DIR/agent-common-setup.sh"
 log() {
   echo "[Claude] $1"
 }
+
+# ============================================
+# Docker Mode Detection
+# ============================================
+DOCKER_MODE=false
+
+# Check for Docker mode marker file
+if [ -f "$CODING_REPO/.docker-mode" ]; then
+  DOCKER_MODE=true
+  log "🐳 Docker mode enabled (via .docker-mode marker)"
+fi
+
+# Check for running coding-services container
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "coding-services"; then
+  DOCKER_MODE=true
+  log "🐳 Docker mode enabled (coding-services container running)"
+fi
+
+# Allow forcing Docker mode via environment variable
+if [ "$CODING_DOCKER_MODE" = "true" ]; then
+  DOCKER_MODE=true
+  log "🐳 Docker mode enabled (via CODING_DOCKER_MODE env)"
+fi
+
+export CODING_DOCKER_MODE="$DOCKER_MODE"
 
 # Generate unique session ID for this Claude session
 SESSION_ID="claude-$$-$(date +%s)"
@@ -136,13 +162,17 @@ ensure_docker_running() {
 
 # Check and start Docker before starting services
 if ! ensure_docker_running; then
+  if [ "$DOCKER_MODE" = true ]; then
+    log "❌ Docker mode requires Docker to be running"
+    exit 1
+  fi
   log "⚠️ WARNING: Continuing in DEGRADED mode without Docker/Qdrant"
   log "   Knowledge base will work but without semantic search capabilities"
 fi
 
-# Start all services using simple startup script BEFORE monitoring verification
-# Services need to be running for the monitoring verifier to check them
-log "Starting coding services for Claude..."
+# ============================================
+# Start Services (Docker or Native mode)
+# ============================================
 
 # Check if Node.js is available
 if ! command -v node &> /dev/null; then
@@ -150,10 +180,55 @@ if ! command -v node &> /dev/null; then
   exit 1
 fi
 
-# Start services using the simple startup script (from coding repo)
-if ! "$CODING_REPO/start-services.sh"; then
-  log "Error: Failed to start services"
-  exit 1
+if [ "$DOCKER_MODE" = true ]; then
+  # Docker mode: Start services via docker compose
+  log "🐳 Starting coding services via Docker..."
+
+  DOCKER_DIR="$CODING_REPO/docker"
+
+  if [ ! -f "$DOCKER_DIR/docker-compose.yml" ]; then
+    log "Error: Docker compose file not found at $DOCKER_DIR/docker-compose.yml"
+    exit 1
+  fi
+
+  # Export environment variables for docker compose
+  export CODING_REPO
+
+  # Start containers
+  if ! docker compose -f "$DOCKER_DIR/docker-compose.yml" up -d; then
+    log "Error: Failed to start Docker containers"
+    exit 1
+  fi
+
+  # Wait for health check
+  log "⏳ Waiting for coding-services to be healthy..."
+  for i in {1..60}; do
+    if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+      log "✅ coding-services healthy after ${i} seconds"
+      break
+    fi
+    if [ $i -eq 60 ]; then
+      log "❌ coding-services health check failed after 60 seconds"
+      log "   Check logs: docker compose -f $DOCKER_DIR/docker-compose.yml logs"
+      exit 1
+    fi
+    sleep 1
+  done
+
+  # Generate Docker MCP config if it doesn't exist or is outdated
+  if [ ! -f "$CODING_REPO/claude-code-mcp-docker.json" ] || \
+     [ "$CODING_REPO/docker/docker-compose.yml" -nt "$CODING_REPO/claude-code-mcp-docker.json" ]; then
+    log "Generating Docker MCP configuration..."
+    "$SCRIPT_DIR/generate-docker-mcp-config.sh" || log "Warning: Could not generate Docker MCP config"
+  fi
+else
+  # Native mode: Start services using simple startup script
+  log "Starting coding services for Claude (native mode)..."
+
+  if ! "$CODING_REPO/start-services.sh"; then
+    log "Error: Failed to start services"
+    exit 1
+  fi
 fi
 
 # Brief wait for services to stabilize
@@ -174,12 +249,25 @@ agent_common_init "$TARGET_PROJECT_DIR" "$CODING_REPO"
 
 # Find MCP config (always from coding repo)
 MCP_CONFIG=""
-if [ -f "$CODING_REPO/claude-code-mcp-processed.json" ]; then
-  MCP_CONFIG="$CODING_REPO/claude-code-mcp-processed.json"
-elif [ -f "$HOME/.config/claude/claude_desktop_config.json" ]; then
-  MCP_CONFIG="$HOME/.config/claude/claude_desktop_config.json"
-elif [ -f "$HOME/Library/Application Support/Claude/claude_desktop_config.json" ]; then
-  MCP_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+if [ "$DOCKER_MODE" = true ]; then
+  # Docker mode: Use Docker-specific MCP config with stdio proxies
+  if [ -f "$CODING_REPO/claude-code-mcp-docker.json" ]; then
+    MCP_CONFIG="$CODING_REPO/claude-code-mcp-docker.json"
+    log "Using Docker MCP config: $MCP_CONFIG"
+  else
+    log "Warning: Docker MCP config not found, using default"
+  fi
+fi
+
+# Fall back to standard configs
+if [ -z "$MCP_CONFIG" ]; then
+  if [ -f "$CODING_REPO/claude-code-mcp-processed.json" ]; then
+    MCP_CONFIG="$CODING_REPO/claude-code-mcp-processed.json"
+  elif [ -f "$HOME/.config/claude/claude_desktop_config.json" ]; then
+    MCP_CONFIG="$HOME/.config/claude/claude_desktop_config.json"
+  elif [ -f "$HOME/Library/Application Support/Claude/claude_desktop_config.json" ]; then
+    MCP_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+  fi
 fi
 
 if [ -z "$MCP_CONFIG" ]; then

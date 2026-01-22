@@ -1426,6 +1426,258 @@ class StatusLineHealthMonitor {
   }
 
   /**
+   * Check if running in Docker mode
+   * Docker mode is detected by:
+   * - CODING_DOCKER_MODE environment variable
+   * - .docker-mode marker file
+   * - running coding-services container
+   */
+  isDockerMode() {
+    // Check environment variable
+    if (process.env.CODING_DOCKER_MODE === 'true') {
+      return true;
+    }
+    // Check marker file
+    const markerFile = path.join(this.codingRepoPath, '.docker-mode');
+    if (fs.existsSync(markerFile)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get Semantic Analysis SSE Server health status (Docker mode)
+   * Monitors the semantic-analysis MCP SSE server on port 3848
+   */
+  async getSemanticAnalysisSSEHealth() {
+    try {
+      const port = parseInt(process.env.SEMANTIC_ANALYSIS_SSE_PORT || '3848', 10);
+
+      // Check health endpoint
+      try {
+        const healthResponse = await Promise.race([
+          execAsync(`curl -s http://localhost:${port}/health --max-time 3`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500))
+        ]);
+
+        const healthData = JSON.parse(healthResponse.stdout.trim());
+
+        if (healthData.status === 'ok' || healthData.status === 'healthy') {
+          return {
+            status: 'healthy',
+            icon: '✅',
+            details: `SSE :${port} OK`
+          };
+        } else {
+          return {
+            status: 'warning',
+            icon: '🟡',
+            details: `SSE :${port} ${healthData.status}`
+          };
+        }
+      } catch (healthError) {
+        // Check if port is at least listening
+        try {
+          const portCheck = await execAsync(`lsof -i :${port} -sTCP:LISTEN | grep -q LISTEN && echo "listening" || echo "not_listening"`, {
+            timeout: 2000
+          });
+          if (portCheck.stdout.includes('listening')) {
+            return {
+              status: 'warning',
+              icon: '🟡',
+              details: `SSE :${port} no health response`
+            };
+          }
+        } catch (portCheckError) {
+          this.log(`Port check error for semantic-analysis: ${portCheckError.message}`, 'DEBUG');
+        }
+
+        return {
+          status: 'inactive',
+          icon: '⚪',
+          details: `SSE :${port} not running`
+        };
+      }
+    } catch (error) {
+      this.log(`Semantic Analysis SSE health check error: ${error.message}`, 'DEBUG');
+      return {
+        status: 'unknown',
+        icon: '❓',
+        details: 'Health check failed'
+      };
+    }
+  }
+
+  /**
+   * Get Constraint Monitor SSE Server health status (Docker mode)
+   * Monitors the constraint-monitor MCP SSE server on port 3849
+   */
+  async getConstraintMonitorSSEHealth() {
+    try {
+      const port = parseInt(process.env.CONSTRAINT_MONITOR_SSE_PORT || '3849', 10);
+
+      // Check if port is listening (SSE server may not have a separate health endpoint)
+      try {
+        const portCheck = await execAsync(`lsof -i :${port} -sTCP:LISTEN | grep -q LISTEN && echo "listening" || echo "not_listening"`, {
+          timeout: 2000
+        });
+
+        if (portCheck.stdout.includes('listening')) {
+          // Try health endpoint if available
+          try {
+            const healthResponse = await Promise.race([
+              execAsync(`curl -s http://localhost:${port}/health --max-time 2`),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+            ]);
+            const healthData = JSON.parse(healthResponse.stdout.trim());
+            if (healthData.status === 'ok' || healthData.status === 'healthy') {
+              return {
+                status: 'healthy',
+                icon: '✅',
+                details: `SSE :${port} OK`
+              };
+            }
+          } catch (healthEndpointError) {
+            // No health endpoint, but port is listening - log for debugging
+            this.log(`Constraint monitor SSE has no health endpoint (port listening): ${healthEndpointError.message}`, 'DEBUG');
+          }
+
+          return {
+            status: 'healthy',
+            icon: '✅',
+            details: `SSE :${port} listening`
+          };
+        } else {
+          return {
+            status: 'inactive',
+            icon: '⚪',
+            details: `SSE :${port} not running`
+          };
+        }
+      } catch (error) {
+        return {
+          status: 'inactive',
+          icon: '⚪',
+          details: `SSE :${port} not running`
+        };
+      }
+    } catch (error) {
+      this.log(`Constraint Monitor SSE health check error: ${error.message}`, 'DEBUG');
+      return {
+        status: 'unknown',
+        icon: '❓',
+        details: 'Health check failed'
+      };
+    }
+  }
+
+  /**
+   * Get Code Graph RAG SSE Server health status (Docker mode)
+   * Monitors the code-graph-rag MCP SSE server on port 3850
+   */
+  async getCodeGraphRAGSSEHealth() {
+    try {
+      const port = parseInt(process.env.CODE_GRAPH_RAG_SSE_PORT || '3850', 10);
+
+      // Check health endpoint
+      try {
+        const healthResponse = await Promise.race([
+          execAsync(`curl -s http://localhost:${port}/health --max-time 3`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500))
+        ]);
+
+        const healthData = JSON.parse(healthResponse.stdout.trim());
+
+        if (healthData.status === 'ok' || healthData.status === 'healthy') {
+          return {
+            status: 'healthy',
+            icon: '✅',
+            details: `SSE :${port} OK`
+          };
+        } else {
+          return {
+            status: 'warning',
+            icon: '🟡',
+            details: `SSE :${port} ${healthData.status}`
+          };
+        }
+      } catch (healthError) {
+        // Check if port is at least listening
+        try {
+          const portCheck = await execAsync(`lsof -i :${port} -sTCP:LISTEN | grep -q LISTEN && echo "listening" || echo "not_listening"`, {
+            timeout: 2000
+          });
+          if (portCheck.stdout.includes('listening')) {
+            return {
+              status: 'warning',
+              icon: '🟡',
+              details: `SSE :${port} no health response`
+            };
+          }
+        } catch (portCheckError) {
+          this.log(`Port check error for code-graph-rag: ${portCheckError.message}`, 'DEBUG');
+        }
+
+        return {
+          status: 'inactive',
+          icon: '⚪',
+          details: `SSE :${port} not running`
+        };
+      }
+    } catch (error) {
+      this.log(`Code Graph RAG SSE health check error: ${error.message}`, 'DEBUG');
+      return {
+        status: 'unknown',
+        icon: '❓',
+        details: 'Health check failed'
+      };
+    }
+  }
+
+  /**
+   * Get all Docker MCP SSE server health statuses
+   * Returns combined health for semantic-analysis, constraint-monitor, code-graph-rag
+   */
+  async getDockerMCPHealth() {
+    if (!this.isDockerMode()) {
+      return null; // Not in Docker mode, skip these checks
+    }
+
+    const [saHealth, cmHealth, cgrHealth] = await Promise.all([
+      this.getSemanticAnalysisSSEHealth(),
+      this.getConstraintMonitorSSEHealth(),
+      this.getCodeGraphRAGSSEHealth()
+    ]);
+
+    // Combine statuses
+    const allHealthy = [saHealth, cmHealth, cgrHealth].every(h => h.status === 'healthy');
+    const anyUnhealthy = [saHealth, cmHealth, cgrHealth].some(h => h.status === 'unhealthy' || h.status === 'warning');
+    const allInactive = [saHealth, cmHealth, cgrHealth].every(h => h.status === 'inactive');
+
+    let overallStatus, overallIcon;
+    if (allInactive) {
+      overallStatus = 'inactive';
+      overallIcon = '⚪';
+    } else if (allHealthy) {
+      overallStatus = 'healthy';
+      overallIcon = '✅';
+    } else if (anyUnhealthy) {
+      overallStatus = 'warning';
+      overallIcon = '🟡';
+    } else {
+      overallStatus = 'healthy';
+      overallIcon = '✅';
+    }
+
+    return {
+      status: overallStatus,
+      icon: overallIcon,
+      details: `SA:${saHealth.icon} CM:${cmHealth.icon} CGR:${cgrHealth.icon}`,
+      individual: { semantic: saHealth, constraint: cmHealth, codeGraph: cgrHealth }
+    };
+  }
+
+  /**
    * Get System Health Dashboard health status
    * Monitors the health dashboard UI (3032) and API (3033)
    */
@@ -1766,11 +2018,9 @@ class StatusLineHealthMonitor {
 
   /**
    * Format status line display
+   * @param {Object} dockerMCPHealth - Docker MCP SSE servers health (null if not in Docker mode)
    */
-  /**
-   * Format status line display
-   */
-  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth) {
+  formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth = null) {
     let statusLine = '';
 
     // Global Coding Monitor with reason code if not healthy
@@ -1845,6 +2095,15 @@ class StatusLineHealthMonitor {
       }
     }
 
+    // Docker MCP SSE Servers (only shown in Docker mode)
+    if (dockerMCPHealth && dockerMCPHealth.status !== 'inactive') {
+      if (dockerMCPHealth.icon === '🟡' || dockerMCPHealth.icon === '🔴') {
+        statusLine += ` [🐳MCP:${dockerMCPHealth.icon}(${dockerMCPHealth.details})]`;
+      } else {
+        statusLine += ` [🐳MCP:${dockerMCPHealth.icon}]`;
+      }
+    }
+
     return statusLine;
   }
 
@@ -1853,19 +2112,20 @@ class StatusLineHealthMonitor {
    */
   async updateStatusLine() {
     try {
-      // Gather health data from all components (including new database, VKB, browser-access, and health dashboard checks)
-      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth] = await Promise.all([
+      // Gather health data from all components (including new database, VKB, browser-access, health dashboard, and Docker MCP checks)
+      const [gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth] = await Promise.all([
         this.getGlobalCodingMonitorHealth(),
         this.getProjectSessionsHealth(),
         this.getConstraintMonitorHealth(),
         this.getDatabaseHealth(),
         this.getVKBServerHealth(),
         this.getBrowserAccessHealth(),
-        this.getHealthDashboardHealth()
+        this.getHealthDashboardHealth(),
+        this.getDockerMCPHealth()
       ]);
 
       // Format status line
-      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth);
+      const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth);
 
       // Only update if changed to avoid unnecessary updates
       if (statusLine !== this.lastStatus) {
@@ -1897,6 +2157,14 @@ class StatusLineHealthMonitor {
           console.log(`  VKB: ${vkbHealth.status} - ${vkbHealth.details}`);
           console.log(`  Browser Access: ${browserAccessHealth.status} - ${browserAccessHealth.details}`);
           console.log(`  Health Dashboard: ${healthDashboardHealth.status} - ${healthDashboardHealth.details}`);
+          if (dockerMCPHealth) {
+            console.log(`  Docker MCP: ${dockerMCPHealth.status} - ${dockerMCPHealth.details}`);
+            if (dockerMCPHealth.individual) {
+              console.log(`    Semantic Analysis: ${dockerMCPHealth.individual.semantic.status} - ${dockerMCPHealth.individual.semantic.details}`);
+              console.log(`    Constraint Monitor SSE: ${dockerMCPHealth.individual.constraint.status} - ${dockerMCPHealth.individual.constraint.details}`);
+              console.log(`    Code Graph RAG: ${dockerMCPHealth.individual.codeGraph.status} - ${dockerMCPHealth.individual.codeGraph.details}`);
+            }
+          }
           console.log('='.repeat(80) + '\n');
         }
       }

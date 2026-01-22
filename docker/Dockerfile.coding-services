@@ -1,0 +1,120 @@
+# Multi-stage Dockerfile for coding-services container
+# Contains all MCP servers (HTTP/SSE) and web services
+
+# ============================================================
+# Stage 1: Base image with Node.js 22 + Python 3.11
+# ============================================================
+FROM node:22-bookworm AS base
+
+# Install Python 3.11 and system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    supervisor \
+    curl \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python
+
+# Install uv for Python dependency management
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+WORKDIR /coding
+
+# ============================================================
+# Stage 2: Node.js dependencies
+# ============================================================
+FROM base AS node-deps
+
+# Copy package files for all Node.js integrations
+COPY package.json package-lock.json ./
+COPY integrations/mcp-server-semantic-analysis/package.json ./integrations/mcp-server-semantic-analysis/
+COPY integrations/mcp-constraint-monitor/package.json ./integrations/mcp-constraint-monitor/
+COPY integrations/browser-access/package.json ./integrations/browser-access/
+COPY integrations/system-health-dashboard/package.json ./integrations/system-health-dashboard/
+
+# Install all Node.js dependencies
+RUN npm ci --workspaces --include-workspace-root
+
+# ============================================================
+# Stage 3: Python dependencies
+# ============================================================
+FROM base AS python-deps
+
+WORKDIR /coding/integrations/code-graph-rag
+
+# Copy Python project files
+COPY integrations/code-graph-rag/pyproject.toml ./
+COPY integrations/code-graph-rag/uv.lock* ./
+
+# Create virtual environment and install dependencies
+RUN uv venv .venv && \
+    . .venv/bin/activate && \
+    uv pip install -e ".[treesitter-full]"
+
+# ============================================================
+# Stage 4: Build TypeScript projects
+# ============================================================
+FROM node-deps AS builder
+
+# Copy all source code
+COPY integrations/ ./integrations/
+COPY src/ ./src/
+COPY tsconfig.json ./
+
+# Build TypeScript projects
+RUN npm run build --workspace=integrations/mcp-server-semantic-analysis || true
+RUN npm run build --workspace=integrations/browser-access || true
+RUN npm run build --workspace=integrations/system-health-dashboard || true
+
+# ============================================================
+# Stage 5: Production image
+# ============================================================
+FROM base AS production
+
+WORKDIR /coding
+
+# Copy Node.js modules and builds
+COPY --from=builder /coding/node_modules ./node_modules
+COPY --from=builder /coding/integrations ./integrations
+COPY --from=builder /coding/src ./src
+
+# Copy Python virtual environment
+COPY --from=python-deps /coding/integrations/code-graph-rag/.venv ./integrations/code-graph-rag/.venv
+COPY integrations/code-graph-rag/ ./integrations/code-graph-rag/
+
+# Copy configuration files
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Copy .env.example as template
+COPY .env.example ./.env.example
+
+# Create data directories
+RUN mkdir -p /coding/.data /coding/.specstory
+
+# Environment variables for service ports
+ENV SEMANTIC_ANALYSIS_PORT=3848 \
+    BROWSER_ACCESS_PORT=3847 \
+    CONSTRAINT_MONITOR_PORT=3849 \
+    CODE_GRAPH_RAG_PORT=3850 \
+    VKB_PORT=8080 \
+    HEALTH_DASHBOARD_PORT=3032 \
+    HEALTH_DASHBOARD_WS_PORT=3033
+
+# Expose all service ports
+EXPOSE 3847 3848 3849 3850 8080 3032 3033
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf", "-n"]

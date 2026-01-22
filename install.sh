@@ -1896,6 +1896,72 @@ configure_team_setup() {
     info "Knowledge is managed by GraphDB at .data/knowledge-graph/ (auto-persisted)"
 }
 
+# Configure Docker mode for containerized MCP servers
+configure_docker_mode() {
+    echo -e "\n${CYAN}🐳 Docker Mode Configuration${NC}"
+    echo ""
+    echo -e "Docker mode runs MCP servers in containers via HTTP/SSE transport."
+    echo -e "This provides better isolation and simplified deployment."
+    echo ""
+    echo -e "  ${GREEN}1${NC} = Enable Docker mode (recommended for production)"
+    echo -e "  ${GREEN}2${NC} = Use native mode (default, servers run directly on host)"
+    echo -e "  ${GREEN}3${NC} = Skip (decide later)"
+    echo ""
+    read -p "$(echo -e ${CYAN}Your choice [1/2/3]: ${NC})" docker_choice
+
+    case "$docker_choice" in
+        1)
+            info "Enabling Docker mode..."
+
+            # Check Docker availability
+            if ! command -v docker &>/dev/null; then
+                warning "Docker not found. Install Docker first: https://www.docker.com/products/docker-desktop"
+                INSTALLATION_WARNINGS+=("Docker mode: Docker not installed")
+                return 1
+            fi
+
+            if ! docker info &>/dev/null; then
+                warning "Docker daemon not running. Start Docker Desktop first."
+                INSTALLATION_WARNINGS+=("Docker mode: Docker daemon not running")
+                return 1
+            fi
+
+            # Create marker file
+            touch "$CODING_REPO/.docker-mode"
+            success "Docker mode enabled via .docker-mode marker"
+
+            # Build Docker infrastructure if compose file exists
+            if [[ -f "$CODING_REPO/docker/docker-compose.yml" ]]; then
+                info "Building Docker images (this may take a few minutes)..."
+                if docker compose -f "$CODING_REPO/docker/docker-compose.yml" build; then
+                    success "Docker images built successfully"
+                else
+                    warning "Docker build had issues - you may need to build manually"
+                    INSTALLATION_WARNINGS+=("Docker mode: Build had warnings")
+                fi
+            fi
+
+            # Generate Docker MCP config
+            if [[ -x "$CODING_REPO/scripts/generate-docker-mcp-config.sh" ]]; then
+                info "Generating Docker MCP configuration..."
+                "$CODING_REPO/scripts/generate-docker-mcp-config.sh" || warning "Could not generate Docker MCP config"
+            fi
+
+            success "Docker mode configured"
+            info "  Use 'coding --claude' to start services in Docker mode"
+            info "  Use 'rm .docker-mode' to switch back to native mode"
+            ;;
+        2)
+            info "Using native mode (default)"
+            rm -f "$CODING_REPO/.docker-mode" 2>/dev/null || true
+            ;;
+        3|*)
+            info "Skipping Docker mode configuration"
+            info "  To enable later: touch $CODING_REPO/.docker-mode"
+            ;;
+    esac
+}
+
 # Install PlantUML for diagram generation
 install_plantuml() {
     info "Installing PlantUML for diagram generation..."
@@ -2431,6 +2497,7 @@ main() {
     install_shadcn_mcp
     install_mcp_servers
     install_code_graph_rag
+    configure_docker_mode
     create_command_wrappers
     setup_unified_launcher
     configure_shell_environment
