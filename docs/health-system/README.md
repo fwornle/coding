@@ -159,6 +159,13 @@ The health system is built on interconnected components with active supervision:
 - **System Health Dashboard UI** - Health monitoring UI (port 3032)
 - **System Health Dashboard API** - Health monitoring API (port 3033)
 
+### Docker MCP Servers (Docker Mode Only)
+When running in Docker mode, the health system also monitors MCP SSE servers:
+- **Semantic Analysis SSE** - AI analysis server (port 3848)
+- **Constraint Monitor SSE** - Constraint enforcement MCP (port 3849)
+- **Code Graph RAG SSE** - Code graph analysis MCP (port 3850)
+- **Browser Access SSE** - Browser automation MCP (port 3847)
+
 ### Processes
 - Stale PID detection
 - Zombie cleanup
@@ -217,11 +224,19 @@ cat .health/verification-status.json | jq '.'
 
 The status line appears automatically in Claude Code:
 
+**Native Mode:**
 ```
 [C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq$2JAN A$18 X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
+**Docker Mode:**
+```
+[🐳] [🐳MCP:✅] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq$2JAN A$18 X$25] [📚✅] [🏥✅] 📋17-18
+```
+
 **Components:**
+- `[🐳]` - Docker mode indicator (only shown when running in Docker mode)
+- `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, CGR=Code Graph RAG
 - `[C🟢 UT🫒]` - Active sessions with activity icons (sleeping sessions hidden)
 - `[🛡️ 67% 🔍EX]` - Constraint compliance percentage + trajectory state
 - `[Gq$2JAN A$18 X$25]` - API quota status (Groq $2 spent in Jan, etc.)

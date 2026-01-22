@@ -18,6 +18,27 @@ coding --claude
 coding --copilot
 ```
 
+### 🐳 Docker Deployment (Optional)
+
+For containerized deployment with persistent services:
+
+```bash
+# Enable Docker mode
+touch .docker-mode
+
+# Start services via Docker Compose
+docker compose -f docker/docker-compose.yml up -d
+
+# Launch Claude (auto-detects Docker mode)
+coding --claude
+```
+
+**Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers.
+
+**Ports**: 3847 (browser-access), 3848 (semantic-analysis), 3849 (constraint-monitor), 3850 (code-graph-rag)
+
+See [Docker Deployment Guide](docker/README.md) for details.
+
 ### Installation Safety
 
 The installer follows a **non-intrusive policy** - it will NEVER modify system tools without explicit consent:
@@ -49,6 +70,7 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 - **Claude Code** - Full MCP server integration
 - **GitHub CoPilot** - Enhanced VSCode integration with fallback services
 - **Agent-Agnostic** - Same features regardless of AI assistant
+- **Docker Support** - Containerized deployment with HTTP/SSE transport for MCP servers
 
 ---
 
@@ -314,6 +336,7 @@ Copyright © 2025 Frank Wornle
 
 - **Documentation Hub**: [docs/README.md](docs/README.md)
 - **Installation Guide**: [docs/getting-started.md](docs/getting-started.md)
+- **Docker Deployment**: [docker/README.md](docker/README.md)
 - **System Overview**: [docs/system-overview.md](docs/system-overview.md)
 - **Core Systems**: [docs/core-systems/](docs/core-systems/)
 - **Integrations**: [docs/integrations/](docs/integrations/)

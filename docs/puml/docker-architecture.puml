@@ -1,0 +1,101 @@
+@startuml docker-architecture
+!include _standard-style.puml
+
+title Docker Architecture for Coding Infrastructure
+top to bottom direction
+
+' ============================================
+' HOST SYSTEM
+' ============================================
+rectangle "HOST (Native)" as host #F5F5F5 {
+    component "Claude CLI" as claude <<cli>>
+
+    package "Stdio Proxies" <<util>> {
+        component "semantic-analysis\nproxy" as sa_proxy <<util>>
+        component "browser-access\nproxy" as ba_proxy <<util>>
+        component "constraint-monitor\nproxy" as cm_proxy <<util>>
+        component "code-graph-rag\nproxy" as cgr_proxy <<util>>
+    }
+}
+
+note right of host
+  Lightweight bridges
+  Connect stdio to HTTP/SSE
+end note
+
+' ============================================
+' DOCKER CONTAINERS
+' ============================================
+rectangle "DOCKER CONTAINERS" as docker #E3F2FD {
+
+    package "coding-services" <<core>> {
+        package "MCP Servers (HTTP/SSE)" {
+            component "semantic-analysis\n:3848" as sa_sse <<api>>
+            component "browser-access\n:3847" as ba_sse <<api>>
+            component "constraint-monitor\n:3849" as cm_sse <<api>>
+            component "code-graph-rag\n:3850" as cgr_sse <<api>>
+        }
+
+        package "Web Services" {
+            component "VKB Server\n:8080" as vkb <<api>>
+            component "Health Dashboard\n:3032/:3033" as health <<api>>
+        }
+    }
+
+    package "Databases" <<storage>> {
+        database "Qdrant\n:6333/:6334" as qdrant
+        database "Redis\n:6379" as redis
+        database "Memgraph\n:7687/:3100" as memgraph
+    }
+}
+
+' ============================================
+' VOLUME MOUNTS
+' ============================================
+rectangle "Volume Mounts" as volumes #FFF9C4 {
+    storage "/coding/.data" as data_vol
+    storage "/coding/.specstory" as specstory_vol
+    storage "/workspace (ro)" as workspace_vol
+}
+
+' ============================================
+' CONNECTIONS
+' ============================================
+
+' Claude to Proxies (stdio)
+claude SYNC_LINE sa_proxy : stdio
+claude SYNC_LINE ba_proxy : stdio
+claude SYNC_LINE cm_proxy : stdio
+claude SYNC_LINE cgr_proxy : stdio
+
+' Proxies to SSE Servers (HTTP)
+sa_proxy ASYNC_LINE sa_sse : HTTP/SSE
+ba_proxy ASYNC_LINE ba_sse : HTTP/SSE
+cm_proxy ASYNC_LINE cm_sse : HTTP/SSE
+cgr_proxy ASYNC_LINE cgr_sse : HTTP/SSE
+
+' MCP Servers to Databases
+sa_sse DATA_LINE qdrant
+cm_sse DATA_LINE qdrant
+cm_sse DATA_LINE redis
+cgr_sse DATA_LINE memgraph
+
+' Web Services to Databases
+vkb DATA_LINE qdrant
+
+' Volume Connections
+docker ..> data_vol : bind mount
+docker ..> specstory_vol : bind mount
+docker ..> workspace_vol : read-only
+
+' ============================================
+' LEGEND
+' ============================================
+legend right
+    |= Arrow |= Meaning |
+    | Red solid | stdio (sync) |
+    | Green dashed | HTTP/SSE (async) |
+    | Orange | data flow |
+endlegend
+
+@enduml

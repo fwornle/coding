@@ -171,10 +171,60 @@ See [API Contract](../integrations/api-reference.md) for complete details.
 
 ---
 
+## Deployment Modes
+
+The Coding system supports two deployment modes:
+
+### Native Mode (Default)
+
+MCP servers run as native stdio processes, started and managed by Claude CLI:
+
+- **Pros**: Simple setup, no Docker required, lower memory footprint
+- **Cons**: Processes restart with each session
+- **Best for**: Individual developers, single-machine setups
+
+### Docker Mode (Containerized)
+
+MCP servers run as HTTP/SSE services in Docker containers:
+
+![Docker Architecture](../images/docker-architecture.png)
+
+**Architecture:**
+- **Host**: Claude CLI + lightweight stdio proxies
+- **Container**: MCP SSE servers (semantic-analysis:3848, browser-access:3847, constraint-monitor:3849, code-graph-rag:3850)
+- **Databases**: Qdrant:6333, Redis:6379, Memgraph:7687
+
+**Pros**:
+- Persistent services across sessions
+- Shared browser automation across parallel Claude sessions
+- Better resource isolation
+- Easy database management
+
+**Cons**: Docker required, slightly higher memory footprint
+
+**Best for**: Teams, multi-session workflows, CI/CD environments
+
+**Enable Docker mode:**
+```bash
+# Create marker file
+touch .docker-mode
+
+# Or set environment variable
+export CODING_DOCKER_MODE=true
+
+# Start services
+coding --claude
+```
+
+See [docker/README.md](../../docker/README.md) for detailed Docker deployment instructions.
+
+---
+
 ## Architecture Diagrams
 
 Key architecture diagrams are located in `docs/puml/`:
 
+- **Docker Architecture** - [puml](../puml/docker-architecture.puml) | [png](../images/docker-architecture.png)
 - **Agent-Agnostic Architecture (Components)** - [puml](../puml/agent-agnostic-architecture-components.puml) | [png](../images/agent-agnostic-architecture-components.png)
 - **Agent-Agnostic Architecture (Sequence)** - [puml](../puml/agent-agnostic-architecture-sequence.puml) | [png](../images/agent-agnostic-architecture-sequence.png)
 - **Agent Integration Flow** - [puml](../puml/agent-integration-flow.puml) | [png](../images/agent-integration-flow.png)

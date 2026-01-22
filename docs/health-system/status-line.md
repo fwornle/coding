@@ -10,15 +10,23 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 ### Example Display
 
+**Native Mode:**
 ```
 [🏥✅] [Gq$2JAN A$18 O○ X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
+**Docker Mode:**
+```
+[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [Gq$2JAN A$18 O○ X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+```
+
 ### Reading the Status Line
 
-**Format**: `[🏥 health] [api-quota] [sessions] [🛡️ compliance trajectory] [📚 knowledge] 📋time`
+**Format**: `[🐳] [🐳MCP:health] [🏥 health] [api-quota] [sessions] [🛡️ compliance trajectory] [📚 knowledge] 📋time`
 
 **Components**:
+- `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
+- `[🐳MCP:SA✅CM✅CGR✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
 - `[Gq$2JAN A$18 O○ X$25]` - **API Quota**: LLM provider availability (see below)
 - `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
@@ -111,6 +119,35 @@ Configure provider credits in `config/live-logging-config.json`:
 - Anthropic: `ANTHROPIC_ADMIN_API_KEY` - Get at console.anthropic.com → Settings → Admin API Keys
 - OpenAI: `OPENAI_ADMIN_API_KEY` - Get at platform.openai.com/settings/organization/admin-keys
 - Groq: No public billing API yet - update `monthlySpend` manually from console.groq.com
+
+### Docker Mode Indicator
+
+When running in Docker mode, the status line displays additional indicators for containerized services.
+
+**Docker Mode Detection:**
+Docker mode is detected when:
+- The `.docker-mode` marker file exists in the coding repository
+- OR the `CODING_DOCKER_MODE=true` environment variable is set
+
+**Docker MCP Health Display** (`[🐳MCP:...]`):
+
+| Abbreviation | Service | Port | Health Check |
+|--------------|---------|------|--------------|
+| `SA` | Semantic Analysis | 3848 | `http://localhost:3848/health` |
+| `CM` | Constraint Monitor | 3849 | `http://localhost:3849/health` |
+| `CGR` | Code Graph RAG | 3850 | `http://localhost:3850/health` |
+
+**Status Icons:**
+- `✅` - Service healthy and responding
+- `❌` - Service down or not responding
+- `⚠️` - Service responding but with issues
+
+**Examples:**
+- `[🐳MCP:SA✅CM✅CGR✅]` - All Docker MCP services healthy
+- `[🐳MCP:SA✅CM❌CGR✅]` - Constraint Monitor is down
+- `[🐳MCP:SA⚠️CM✅CGR✅]` - Semantic Analysis has issues
+
+**Note:** Browser Access (port 3847) is not shown in the abbreviated display but is monitored as part of the internal health system.
 
 ### Unified Health Status Indicator
 
@@ -487,6 +524,39 @@ node scripts/combined-status-line.js --test-abbreviations
 
 # Manual abbreviation override in config
 # Edit config/status-line-config.json
+```
+
+**Docker MCP services showing unhealthy?**
+
+```bash
+# Check if Docker containers are running
+docker compose -f docker/docker-compose.yml ps
+
+# Test individual health endpoints
+curl http://localhost:3848/health  # Semantic Analysis
+curl http://localhost:3849/health  # Constraint Monitor
+curl http://localhost:3850/health  # Code Graph RAG
+
+# Check container logs for errors
+docker compose -f docker/docker-compose.yml logs coding-services
+
+# Restart Docker services if needed
+docker compose -f docker/docker-compose.yml restart
+```
+
+**Docker mode not detected?**
+
+```bash
+# Check for Docker mode marker
+ls -la .docker-mode
+
+# Or check environment variable
+echo $CODING_DOCKER_MODE
+
+# Enable Docker mode
+touch .docker-mode
+# OR
+export CODING_DOCKER_MODE=true
 ```
 
 ## Terminal Title Broadcasting

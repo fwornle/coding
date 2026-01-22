@@ -39,6 +39,25 @@ class CombinedStatusLine {
     this.config = config;
   }
 
+  /**
+   * Check if running in Docker mode
+   * Docker mode is detected by:
+   * - CODING_DOCKER_MODE environment variable
+   * - .docker-mode marker file
+   */
+  isDockerMode() {
+    // Check environment variable
+    if (process.env.CODING_DOCKER_MODE === 'true') {
+      return true;
+    }
+    // Check marker file
+    const markerFile = join(rootDir, '.docker-mode');
+    if (existsSync(markerFile)) {
+      return true;
+    }
+    return false;
+  }
+
   async generateStatus() {
     try {
       const now = Date.now();
@@ -1474,6 +1493,11 @@ class CombinedStatusLine {
       if (overallColor === 'green') overallColor = 'yellow';
     } else {
       parts.push('[🏥💤]'); // Offline
+    }
+
+    // Docker Mode Indicator - show whale emoji when in Docker mode
+    if (this.isDockerMode()) {
+      parts.push('[🐳]');
     }
 
     // API Provider Status - SECOND in status line (Multi-provider display with bar chart emojis)
