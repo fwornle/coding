@@ -20,6 +20,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import ProcessStateManager from './process-state-manager.js';
+import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,6 +48,7 @@ class GlobalProcessSupervisor {
     this.heartbeatTimer = null;
     this.heartbeatPath = path.join(this.codingRoot, '.health', 'supervisor-heartbeat.json');
     this.logPath = path.join(this.codingRoot, '.logs', 'global-process-supervisor.log');
+    this.monitoringPaused = false; // Paused during Docker mode transitions
 
     // Global services to monitor
     this.globalServices = [
@@ -360,6 +362,22 @@ class GlobalProcessSupervisor {
   async restartGlobalService(serviceConfig) {
     const { name, script, args } = serviceConfig;
 
+    // Check for Docker mode transition - skip restarts during transition
+    if (this.monitoringPaused) {
+      this.log(`${name} restart skipped - Docker mode transition in progress`, 'DEBUG');
+      return false;
+    }
+
+    try {
+      const transitionLocked = await isTransitionLocked();
+      if (transitionLocked) {
+        this.log(`${name} restart skipped - Docker mode transition in progress`, 'DEBUG');
+        return false;
+      }
+    } catch {
+      // Continue if check fails (fail open)
+    }
+
     // Check cooldown and rate limits
     if (this.isInCooldown(name)) {
       this.log(`${name} is in cooldown, skipping restart`, 'DEBUG');
@@ -457,6 +475,24 @@ class GlobalProcessSupervisor {
    */
   async supervisionLoop() {
     if (!this.running) return;
+
+    // Check for Docker mode transition - skip supervision during transition
+    if (this.monitoringPaused) {
+      this.log('Supervision check skipped - Docker mode transition in progress', 'DEBUG');
+      return;
+    }
+
+    // Also check lock file directly (in case signal was missed)
+    try {
+      const transitionLocked = await isTransitionLocked();
+      if (transitionLocked) {
+        const lockData = await getTransitionLockData();
+        this.log(`Supervision check skipped - transition in progress: ${lockData?.fromMode} → ${lockData?.toMode}`, 'DEBUG');
+        return;
+      }
+    } catch {
+      // Continue if check fails (fail open)
+    }
 
     try {
       this.log('Running supervision check...', 'DEBUG');
@@ -578,6 +614,17 @@ class GlobalProcessSupervisor {
     process.on('unhandledRejection', (reason) => {
       this.log(`Unhandled rejection: ${reason}`, 'ERROR');
       // Don't exit - keep supervising
+    });
+
+    // Docker mode transition signal handlers
+    process.on('SIGUSR2', () => {
+      this.monitoringPaused = true;
+      this.log('⏸️  Supervision PAUSED (Docker mode transition in progress)', 'WARN');
+    });
+
+    process.on('SIGUSR1', () => {
+      this.monitoringPaused = false;
+      this.log('▶️  Supervision RESUMED (Docker mode transition complete)');
     });
 
     // Write initial heartbeat

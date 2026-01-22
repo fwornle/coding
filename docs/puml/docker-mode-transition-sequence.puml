@@ -1,0 +1,88 @@
+@startuml docker-mode-transition-sequence
+!include _standard-style.puml
+
+title Docker Mode Transition Flow\nNative → Docker (with Rollback)
+
+participant "User" as user
+participant "bin/coding" as cli
+participant "DockerModeTransition" as transition
+participant "Health Monitors" as health
+participant "Native Services" as native
+participant "Docker Compose" as docker
+participant "PSM" as psm
+
+== Check Prerequisites ==
+user -> cli : coding --switch-to-docker
+activate cli
+cli -> transition : transition('docker')
+activate transition
+
+transition -> transition : isTransitionInProgress()
+note right: Check for existing lock
+
+transition -> transition : getCurrentMode()
+note right: Read .docker-mode marker
+
+== Create Lock & Pause Monitoring ==
+transition -> transition : createLockFile()
+note right
+  {
+    "startTime": "...",
+    "fromMode": "native",
+    "toMode": "docker",
+    "pid": 12345,
+    "status": "in_progress"
+  }
+end note
+
+transition -> health : SIGUSR2 (pause)
+note right: All monitors pause\nauto-healing
+
+== Stop Native Services ==
+transition -> psm : getAllServices()
+transition -> native : SIGTERM (graceful)
+native --> transition : stopped
+
+transition -> transition : sleep(2000)
+note right: Wait for port release
+
+== Start Docker Mode ==
+transition -> transition : setDockerMode(true)
+note right: Create .docker-mode marker
+
+transition -> docker : docker compose up -d
+docker --> transition : containers started
+
+== Health Verification ==
+transition -> transition : waitForHealthy()
+loop max 60 seconds
+  transition -> docker : GET /health
+  alt healthy
+    transition --> transition : success
+  else not ready
+    transition -> transition : sleep(2000)
+  end
+end
+
+alt Health Check PASSED
+  transition -> transition : removeLockFile()
+  transition -> health : SIGUSR1 (resume)
+  transition --> cli : success
+  cli --> user : ✅ Transition complete
+
+else Health Check FAILED
+  == Rollback ==
+  transition -> transition : rollback('native')
+  transition -> docker : docker compose down
+  transition -> native : start-services.sh
+  transition -> transition : setDockerMode(false)
+  transition -> transition : removeLockFile()
+  transition -> health : SIGUSR1 (resume)
+  transition --> cli : failed (rolled back)
+  cli --> user : ❌ Failed, rolled back
+end
+
+deactivate transition
+deactivate cli
+
+@enduml

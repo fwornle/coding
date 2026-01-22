@@ -26,6 +26,7 @@ import { fileURLToPath } from 'url';
 import { EventEmitter } from 'events';
 import ProcessStateManager from './process-state-manager.js';
 import HealthRemediationActions from './health-remediation-actions.js';
+import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -63,6 +64,7 @@ class HealthVerifier extends EventEmitter {
     this.lastReport = null;
     this.healingHistory = new Map(); // Track healing attempts per action
     this.autoHealingEnabled = this.rules.auto_healing.enabled;
+    this.monitoringPaused = false; // Paused during Docker mode transitions
 
     // Ensure directories exist
     this.ensureDirectories();
@@ -124,6 +126,25 @@ class HealthVerifier extends EventEmitter {
   async verify() {
     const startTime = Date.now();
     this.log('Starting health verification');
+
+    // Check for Docker mode transition in progress
+    if (this.monitoringPaused) {
+      this.log('Health verification paused - Docker mode transition in progress');
+      return { status: 'paused', reason: 'Docker mode transition in progress' };
+    }
+
+    // Also check lock file directly (in case signal was missed)
+    try {
+      const transitionLocked = await isTransitionLocked();
+      if (transitionLocked) {
+        const lockData = await getTransitionLockData();
+        this.log(`Health verification skipped - transition in progress: ${lockData?.fromMode} → ${lockData?.toMode}`);
+        return { status: 'paused', reason: 'Docker mode transition in progress', lockData };
+      }
+    } catch (error) {
+      // Continue if check fails (fail open)
+      this.log(`Transition lock check failed: ${error.message}`, 'WARN');
+    }
 
     try {
       let checks = [];  // Use let since checks may be reassigned during auto-healing recheck
@@ -1447,6 +1468,17 @@ class HealthVerifier extends EventEmitter {
       // Don't exit immediately - let watchdog decide
     });
 
+    // Install signal handlers for Docker mode transition
+    process.on('SIGUSR2', () => {
+      this.monitoringPaused = true;
+      this.log('⏸️  Monitoring PAUSED (Docker mode transition in progress)', 'WARN');
+    });
+
+    process.on('SIGUSR1', () => {
+      this.monitoringPaused = false;
+      this.log('▶️  Monitoring RESUMED (Docker mode transition complete)');
+    });
+
     // Register this instance with PSM
     try {
       await this.psm.registerService({
@@ -1574,6 +1606,23 @@ class HealthVerifier extends EventEmitter {
       skippedCount: 0,
       actions: []
     };
+
+    // Check for Docker mode transition - skip healing during transition
+    if (this.monitoringPaused) {
+      this.log('Auto-healing skipped - Docker mode transition in progress');
+      return results;
+    }
+
+    try {
+      const transitionLocked = await isTransitionLocked();
+      if (transitionLocked) {
+        const lockData = await getTransitionLockData();
+        this.log(`Auto-healing skipped - transition in progress: ${lockData?.fromMode} → ${lockData?.toMode}`);
+        return results;
+      }
+    } catch {
+      // Continue if check fails (fail open)
+    }
 
     // Find all violations that have auto_heal enabled
     const healableViolations = checks.filter(c =>
