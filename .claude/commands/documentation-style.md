@@ -83,15 +83,20 @@ OPTIONAL_LINE ' Gray dotted - optional paths
 
 ### Generating PNGs from PlantUML
 
-Use the PlantUML JAR or online service:
+Use the `plantuml` command-line tool (installed via Homebrew):
 
 ```bash
-# Local generation (preferred)
-java -jar plantuml.jar -tpng docs/puml/diagram-name.puml
+# Local generation using plantuml CLI (preferred)
+plantuml -tpng docs/puml/diagram-name.puml -o ../images/
+
+# Generate all diagrams in a directory
+plantuml -tpng docs/puml/*.puml -o ../images/
 
 # Or use the docs script if available
 ./scripts/generate-diagrams.sh
 ```
+
+**Note:** The `plantuml` CLI is installed via `brew install plantuml` and handles Java dependencies automatically.
 
 ### PNG Naming
 
