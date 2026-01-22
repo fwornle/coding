@@ -637,22 +637,120 @@ Common error codes and their meanings:
 
 ## HTTP API Endpoints
 
-When running, VKB-CLI exposes several HTTP endpoints for integration:
+When running, VKB-CLI exposes several HTTP endpoints for integration.
 
-### Health Check
+### Startup State & Health
+
+VKB uses a **lazy initialization pattern** where the HTTP server starts immediately and initialization happens in the background. This enables robust health checks during startup.
+
+#### Liveness Check (Health)
 ```
 GET /health
 ```
+
+Returns immediately with startup state. Always returns HTTP 200 if server process is alive.
+
+**Response during startup:**
+```json
+{
+  "status": "starting",
+  "timestamp": "2026-01-22T09:00:00.000Z",
+  "startupTimeMs": 1250,
+  "ready": false,
+  "details": {
+    "databaseManagerReady": true,
+    "dataProcessorReady": false
+  }
+}
+```
+
+**Response when ready:**
+```json
+{
+  "status": "ready",
+  "timestamp": "2026-01-22T09:00:05.000Z",
+  "startupTimeMs": 5234,
+  "ready": true
+}
+```
+
+**Response on error (server still serves cached data):**
+```json
+{
+  "status": "error",
+  "timestamp": "2026-01-22T09:00:05.000Z",
+  "startupTimeMs": 5234,
+  "ready": false,
+  "error": "Failed to connect to GraphDB"
+}
+```
+
+#### Readiness Check
+```
+GET /ready
+```
+
+Returns HTTP 200 only when fully initialized. Returns HTTP 503 during startup.
+
+**Response when ready (HTTP 200):**
+```json
+{
+  "status": "ready",
+  "timestamp": "2026-01-22T09:00:05.000Z",
+  "startupTimeMs": 5234,
+  "ready": true
+}
+```
+
+**Response during startup (HTTP 503):**
+```json
+{
+  "status": "starting",
+  "timestamp": "2026-01-22T09:00:00.000Z",
+  "startupTimeMs": 1250,
+  "ready": false,
+  "details": {
+    "databaseManagerReady": true,
+    "dataProcessorReady": false
+  }
+}
+```
+
+#### Database Health Check
+```
+GET /api/health
+```
+
+Comprehensive database connectivity check. Returns detailed backend status.
 
 **Response:**
 ```json
 {
   "status": "healthy",
-  "uptime": 135000,
-  "version": "2.0.0",
-  "timestamp": "2025-06-20T10:30:00.000Z"
+  "backends": {
+    "graphDB": { "available": true, "entities": 45, "relations": 123 },
+    "sqlite": { "available": true },
+    "qdrant": { "available": true, "collections": 4 }
+  },
+  "timestamp": "2026-01-22T09:00:05.000Z"
 }
 ```
+
+### Startup State Diagram
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  starting   │ ──► │    ready    │     │    error    │
+│             │     │             │     │             │
+│ HTTP alive  │     │ Fully init  │     │ Init failed │
+│ Init in bg  │     │ All backends│     │ Cached data │
+└─────────────┘     └─────────────┘     └─────────────┘
+     │                                        ▲
+     └────────────────────────────────────────┘
+                  (on init error)
+```
+
+### Legacy Health Check
 
 ### Server Status
 ```

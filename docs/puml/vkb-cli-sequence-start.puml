@@ -1,69 +1,130 @@
 @startuml vkb-cli-sequence-start
 !include _standard-style.puml
 
-title VKB Server Startup Sequence
+title VKB Server Startup Sequence\n(Lazy Initialization Pattern)
 
 actor User
-participant "vkb\n(bash)" as vkb
+participant "coding\n(bash)" as coding
+participant "start-services-\nrobust.js" as starter
 participant "vkb-cli.js" as vkbcli
-participant "CLI\n(Commander)" as cli
 participant "VKBServer" as server
+participant "Express\nServer" as express
+participant "StartupState" as state
+participant "DatabaseManager" as dbmgr
 participant "DataProcessor" as dataproc
-participant "ServerManager" as servermgr
-participant "Python HTTP\nServer" as python
-participant "Browser" as browser
 
-User -> vkb: vkb start
-activate vkb
-vkb -> vkbcli: node vkb-cli.js server start
+User -> coding: coding / claude-mcp
+activate coding
+coding -> starter: startServices()
+activate starter
+
+== Phase 1: Fast Server Start (1-2 seconds) ==
+
+starter -> vkbcli: spawn VKB server
 activate vkbcli
-vkbcli -> cli: spawn process
-activate cli
 
-cli -> server: new VKBServer()
+vkbcli -> server: new VKBServer()
 activate server
-server -> server: initialize components
+server -> server: parse config,\ncreate components
 
-cli -> server: start()
-server -> servermgr: isRunning()
-activate servermgr
-servermgr -> servermgr: check PID file
-servermgr -> servermgr: check port 8080
-servermgr --> server: false (not running)
-deactivate servermgr
+vkbcli -> server: start()
+
+server -> state: createStartupState()
+activate state
+state -> state: status = 'starting'
+state --> server: startupState
+
+note right of state
+  **Startup States:**
+  • starting - Express alive, init in progress
+  • ready - Fully initialized
+  • error - Init failed (still serves cached data)
+end note
+
+server -> express: startExpressServer()
+activate express
+express -> express: register API routes
+express -> express: register /health endpoint
+express -> express: register /ready endpoint
+express -> express: bind to port 8080
+express --> server: HTTP server instance
+
+server --> vkbcli: {success, pid, url}
+
+== Phase 2: Health Check (Immediate Pass) ==
+
+starter -> express: GET /health
+activate express
+express -> state: toJSON()
+state --> express: {status: 'starting', ready: false}
+express --> starter: 200 OK
+deactivate express
+
+note over starter
+  **Health check passes immediately**
+  Server is alive (liveness check)
+  even though initialization continues
+end note
+
+starter --> coding: ✅ VKB started
+deactivate starter
+
+== Phase 3: Background Initialization (Non-blocking) ==
+
+server ->> server: initializeInBackground()
+note right: Runs async, does\nnot block startup
+
+server -> dbmgr: initialize()
+activate dbmgr
+dbmgr -> dbmgr: connect Qdrant
+dbmgr -> dbmgr: connect SQLite
+dbmgr -> dbmgr: connect GraphDB
+dbmgr --> server: initialized
+deactivate dbmgr
+
+server -> state: updateDetail('databaseManagerReady', true)
 
 server -> dataproc: prepareData()
 activate dataproc
 dataproc -> dataproc: validate paths
-dataproc -> dataproc: create km symlink
-dataproc -> dataproc: process memory.json
-dataproc -> dataproc: write NDJSON
+dataproc -> dataproc: export from GraphDB
+dataproc -> dataproc: write memory.json
 dataproc --> server: success
 deactivate dataproc
 
-server -> servermgr: start()
-activate servermgr
-servermgr -> python: spawn process
-activate python
-python -> python: bind to port 8080
-python --> servermgr: PID
-servermgr -> servermgr: save PID file
-servermgr -> servermgr: waitForServer()
-servermgr --> server: {success: true, pid: 12345}
-deactivate servermgr
+server -> state: updateDetail('dataProcessorReady', true)
+server -> state: setReady()
+state -> state: status = 'ready'
 
-server --> cli: {url: "http://localhost:8080", pid: 12345}
-cli -> browser: open URL
-activate browser
+note over state
+  **Total startup time:**
+  ~200-500ms for HTTP server
+  ~5-15s for full initialization
 
-cli --> vkbcli: exit(0)
-deactivate cli
-vkbcli --> vkb: exit(0)
+  Health checks pass immediately!
+end note
+
+== Readiness Check (After Full Init) ==
+
+User -> express: GET /ready
+activate express
+express -> state: toJSON()
+state --> express: {status: 'ready', ready: true}
+express --> User: 200 OK
+deactivate express
+
+deactivate state
+deactivate server
 deactivate vkbcli
-vkb --> User: Server started at http://localhost:8080
-deactivate vkb
+deactivate coding
 
-note over python: Running in background
-note over browser: Displays knowledge graph
+note over coding, dataproc
+  **Lazy Initialization Benefits:**
+  • Health checks pass within 1-2 seconds
+  • No timeout failures during slow DB init
+  • Server responds immediately for liveness
+  • /ready endpoint for readiness checks
+  • Graceful degradation on init errors
+end note
 
 @enduml
