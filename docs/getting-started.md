@@ -165,30 +165,30 @@ curl -fsSL https://get.docker.com | sh
 ### Enable Docker Mode
 
 ```bash
-# Option 1: Create marker file
+# Create marker file (one-time setup)
 touch .docker-mode
 
-# Option 2: Set environment variable
-export CODING_DOCKER_MODE=true
+# That's it! Now just launch Claude
+coding --claude
 ```
 
-### Start Services
+The `coding --claude` command automatically:
+1. Detects Docker mode via the `.docker-mode` marker file
+2. Starts all containers via Docker Compose
+3. Waits for health checks to pass
+4. Launches Claude with the Docker MCP configuration
+
+**Alternative**: You can also set `export CODING_DOCKER_MODE=true` instead of the marker file.
+
+### Verify Health (Optional)
 
 ```bash
-# Start all containers
-docker compose -f docker/docker-compose.yml up -d
-
-# Verify health
+# Check container status
 docker compose -f docker/docker-compose.yml ps
+
+# Check MCP server health endpoints
 curl http://localhost:3848/health  # semantic-analysis
 curl http://localhost:3847/health  # browser-access
-```
-
-### Launch Claude
-
-```bash
-# Auto-detects Docker mode and uses stdio proxies
-coding --claude
 ```
 
 ### Docker Port Mapping
@@ -209,11 +209,12 @@ coding --claude
 ```bash
 # Enable Docker mode
 touch .docker-mode
-docker compose -f docker/docker-compose.yml up -d
+coding --claude   # Services start automatically
 
 # Disable Docker mode (return to native)
 rm .docker-mode
-docker compose -f docker/docker-compose.yml down
+docker compose -f docker/docker-compose.yml down  # Stop containers
+coding --claude   # Now runs in native mode
 ```
 
 See [Docker Deployment Guide](../docker/README.md) for detailed configuration.

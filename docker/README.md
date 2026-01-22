@@ -29,27 +29,27 @@ This directory contains Docker configuration for containerized deployment of the
 ### 1. Enable Docker Mode
 
 ```bash
-# Create marker file in coding repo
-touch /path/to/coding/.docker-mode
-
-# Or set environment variable
-export CODING_DOCKER_MODE=true
+# Create marker file in coding repo (one-time setup)
+touch .docker-mode
 ```
 
-### 2. Start Services
+### 2. Launch Claude
 
 ```bash
-# Start all containers
-docker compose -f docker/docker-compose.yml up -d
-
-# Or use the coding launcher (auto-detects Docker mode)
+# That's it! Services start automatically
 coding --claude
 ```
 
-### 3. Verify Health
+The launcher automatically:
+- Detects Docker mode via `.docker-mode` marker
+- Starts all containers via `docker compose`
+- Waits for health checks to pass
+- Configures MCP servers to use stdio proxies
+
+### 3. Verify Health (Optional)
 
 ```bash
-# Check container health
+# Check container status
 docker compose -f docker/docker-compose.yml ps
 
 # Check MCP server health endpoints
