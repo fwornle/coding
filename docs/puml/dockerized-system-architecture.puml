@@ -1,0 +1,95 @@
+@startuml dockerized-system-architecture
+!include _standard-style.puml
+
+title Coding System - Docker Container Architecture
+
+top to bottom direction
+
+' External actors
+actor "Developer" as dev
+actor "Claude Code\n(CLI Agent)" as claude
+
+' Host machine context
+rectangle "Host Machine (macOS)" as host {
+  component "Docker Desktop" <<infra>> as docker
+  component "Claude Code CLI" <<cli>> as cli
+
+  rectangle "Bind Mounts" as mounts {
+    folder ".data/" as data_mount
+    folder ".specstory/" as spec_mount
+    folder ".env" as env_mount
+    folder "~/Agentic/" as workspace_mount
+  }
+}
+
+' Docker network
+rectangle "Docker Network: coding-network (bridge)" as network {
+
+  ' Main application container
+  rectangle "coding-services\n(docker-coding-services)" <<infra>> as cs_container {
+    component "Supervisord" <<infra>> as supervisor
+
+    rectangle "MCP Servers (SSE)" as mcp_group {
+      component "Semantic Analysis\n:3848" <<api>> as sem
+      component "Browser Access\n:3847" <<api>> as browser
+      component "Constraint Monitor\n:3849" <<api>> as constraint
+      component "Code-Graph-RAG\n:3850" <<api>> as cgr
+    }
+
+    rectangle "Web Services" as web_group {
+      component "VKB Server\n:8080" <<core>> as vkb
+      component "Health Dashboard API\n:3033" <<api>> as health_api
+      component "Health Dashboard UI\n:3032" <<api>> as health_ui
+    }
+
+    rectangle "Monitoring" as mon_group {
+      component "Health Verifier\n(daemon)" <<util>> as verifier
+    }
+  }
+
+  ' Database containers
+  database "Qdrant\n:6333/:6334\n(Vector DB)" <<storage>> as qdrant
+  database "Redis\n:6379\n(Cache)" <<storage>> as redis
+  database "Memgraph\n:7687\n(Graph DB)" <<storage>> as memgraph
+}
+
+' Docker managed volumes
+rectangle "Docker Volumes" as volumes {
+  storage "qdrant-data" as qvol
+  storage "redis-data" as rvol
+  storage "memgraph-data" as mvol
+}
+
+' Connections
+dev --> cli : uses
+cli --> claude : powers
+claude ASYNC_LINE sem : "SSE/HTTP"
+claude ASYNC_LINE browser : "SSE/HTTP"
+claude ASYNC_LINE constraint : "SSE/HTTP"
+claude ASYNC_LINE cgr : "SSE/HTTP"
+
+dev --> health_ui : "http://localhost:3032"
+dev --> vkb : "http://localhost:8080"
+
+supervisor --> mcp_group : manages
+supervisor --> web_group : manages
+supervisor --> mon_group : manages
+
+sem --> qdrant : "vectors"
+sem --> redis : "cache"
+cgr --> memgraph : "code graph"
+vkb --> qdrant : "search"
+constraint --> qdrant : "embeddings"
+constraint --> redis : "state"
+verifier DATA_LINE health_api : "status files"
+
+qdrant --> qvol
+redis --> rvol
+memgraph --> mvol
+
+data_mount ..> cs_container : "/coding/.data"
+spec_mount ..> cs_container : "/coding/.specstory"
+env_mount ..> cs_container : "/coding/.env"
+workspace_mount ..> cs_container : "/workspace (ro)"
+
+@enduml

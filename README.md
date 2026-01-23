@@ -46,7 +46,11 @@ The transition system ensures safe mode switching with:
 coding --switch-to-native
 ```
 
-See [Docker Mode Transition](docs/docker-mode-transition.md) for architecture details and [Docker Deployment Guide](docker/README.md) for container configuration.
+The Docker stack runs 4 containers (coding-services, Qdrant, Memgraph, Redis) with 8 internal services managed by supervisord, using ~1.75 GB memory total.
+
+![Docker Container Architecture](docs/images/dockerized-system-architecture.png)
+
+See [Architecture Report](docs/architecture-report.md) for full system overview, [Docker Mode Transition](docs/docker-mode-transition.md) for switching details, and [Docker Deployment Guide](docker/README.md) for container configuration.
 
 ### Installation Safety
 
@@ -345,6 +349,7 @@ Copyright © 2025 Frank Wornle
 
 - **Documentation Hub**: [docs/README.md](docs/README.md)
 - **Installation Guide**: [docs/getting-started.md](docs/getting-started.md)
+- **Docker Architecture**: [docs/architecture-report.md](docs/architecture-report.md)
 - **Docker Mode Transition**: [docs/docker-mode-transition.md](docs/docker-mode-transition.md)
 - **Docker Deployment**: [docker/README.md](docker/README.md)
 - **System Overview**: [docs/system-overview.md](docs/system-overview.md)
