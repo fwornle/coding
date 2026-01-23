@@ -2,28 +2,25 @@
 # Contains all MCP servers (HTTP/SSE) and web services
 
 # ============================================================
-# Stage 1: Base image with Node.js 22 + Python 3.11
+# Stage 1: Base image with Node.js 22 + Python 3.12 (via uv)
 # ============================================================
 FROM node:22-bookworm AS base
 
-# Install Python 3.11 and system dependencies
+# Install system dependencies (Python provided via uv below)
 RUN apt-get update && apt-get install -y \
-    python3.11 \
-    python3.11-venv \
-    python3-pip \
     supervisor \
     curl \
     git \
     build-essential \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
-
-# Create symlinks for python
-RUN ln -sf /usr/bin/python3.11 /usr/bin/python3 \
-    && ln -sf /usr/bin/python3.11 /usr/bin/python
 
 # Install uv for Python dependency management
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
+
+# Install Python 3.12 via uv (required by code-graph-rag which needs Python>=3.12)
+RUN uv python install 3.12
 
 WORKDIR /coding
 
@@ -61,12 +58,11 @@ WORKDIR /coding/integrations/code-graph-rag
 # Copy all Python project files (needed for editable install)
 COPY integrations/code-graph-rag/ ./
 
-# Create virtual environment and install dependencies
-RUN uv venv .venv && \
+# Create virtual environment with Python 3.12 and install dependencies
+RUN uv venv --python 3.12 .venv && \
     . .venv/bin/activate && \
-    uv pip install -e ".[treesitter-full]" 2>/dev/null || \
-    uv pip install -e "." 2>/dev/null || \
-    echo "Python deps installation skipped - will retry in production stage"
+    uv pip install -e "." && \
+    uv pip install -e ".[treesitter-full]" || true
 
 # ============================================================
 # Stage 4: Build TypeScript projects
@@ -76,7 +72,12 @@ FROM node-deps AS builder
 # Copy all source code
 COPY integrations/ ./integrations/
 COPY src/ ./src/
+COPY lib/ ./lib/
+COPY scripts/ukb-process-manager.js ./scripts/ukb-process-manager.js
 COPY tsconfig.json ./
+
+# Install VKB server dependencies
+RUN cd lib/vkb-server && npm install --ignore-scripts 2>/dev/null || true
 
 # Build TypeScript projects (run build in each directory)
 RUN cd integrations/mcp-server-semantic-analysis && npm run build 2>/dev/null || true
@@ -94,6 +95,8 @@ WORKDIR /coding
 COPY --from=builder /coding/node_modules ./node_modules
 COPY --from=builder /coding/integrations ./integrations
 COPY --from=builder /coding/src ./src
+COPY --from=builder /coding/lib ./lib
+COPY --from=builder /coding/scripts ./scripts
 
 # Copy Python virtual environment
 COPY --from=python-deps /coding/integrations/code-graph-rag/.venv ./integrations/code-graph-rag/.venv
