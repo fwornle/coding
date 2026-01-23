@@ -448,7 +448,15 @@ class SystemHealthAPIServer {
             console.log(`🔄 Restart request received for service: ${serviceName}, action: ${action}`);
 
             // Map service check names to restart commands
-            const restartCommands = {
+            // Docker mode uses supervisorctl; native mode uses npm/bin commands
+            const isDocker = existsSync('/.dockerenv');
+            const restartCommands = isDocker ? {
+                vkb_server: 'supervisorctl restart web-services:vkb-server',
+                constraint_monitor: 'supervisorctl restart mcp-servers:constraint-monitor',
+                dashboard_server: 'supervisorctl restart web-services:health-dashboard-frontend',
+                health_dashboard_api: 'supervisorctl restart web-services:health-dashboard',
+                health_dashboard_frontend: 'supervisorctl restart web-services:health-dashboard-frontend',
+            } : {
                 vkb_server: `cd "${codingRoot}" && bin/vkb restart`,
                 constraint_monitor: `cd "${codingRoot}/integrations/mcp-constraint-monitor" && npm run restart`,
                 dashboard_server: `cd "${codingRoot}/integrations/system-health-dashboard" && npm run restart`,

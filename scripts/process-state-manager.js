@@ -550,9 +550,10 @@ class ProcessStateManager {
       health.levelDB.locked = false;
     }
 
-    // Check Qdrant availability
+    // Check Qdrant availability (use QDRANT_URL env var for Docker networking)
     try {
-      const response = await fetch('http://localhost:6333/readyz', {
+      const qdrantBase = process.env.QDRANT_URL || 'http://localhost:6333';
+      const response = await fetch(`${qdrantBase}/readyz`, {
         method: 'GET',
         signal: AbortSignal.timeout(2000)
       });

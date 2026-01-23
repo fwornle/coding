@@ -34,15 +34,15 @@ const healthStatusSlice = createSlice({
       state.loading = true
       state.error = null
     },
-    fetchHealthStatusSuccess(state, action: PayloadAction<Omit<HealthStatusState, 'loading' | 'error' | 'lastFetch'>>) {
-      state.overallStatus = action.payload.overallStatus
-      state.violationCount = action.payload.violationCount
-      state.criticalCount = action.payload.criticalCount
-      state.lastUpdate = action.payload.lastUpdate
+    fetchHealthStatusSuccess(state, action: PayloadAction<Partial<Omit<HealthStatusState, 'loading' | 'error' | 'lastFetch'>>>) {
+      state.overallStatus = action.payload.overallStatus || state.overallStatus || 'offline'
+      state.violationCount = action.payload.violationCount ?? state.violationCount
+      state.criticalCount = action.payload.criticalCount ?? state.criticalCount
+      state.lastUpdate = action.payload.lastUpdate ?? state.lastUpdate
       state.lastFetch = new Date().toISOString()  // Track when we fetched
-      state.autoHealingActive = action.payload.autoHealingActive
-      state.status = action.payload.status
-      state.ageMs = action.payload.ageMs
+      state.autoHealingActive = action.payload.autoHealingActive ?? state.autoHealingActive
+      state.status = action.payload.status || state.status || 'offline'
+      state.ageMs = action.payload.ageMs ?? state.ageMs
       state.loading = false
       state.error = null
     },

@@ -49,6 +49,9 @@ coverage
 docs/
 *.md
 !README.md
+!knowledge-management/insights/*.md
+!knowledge-management/insights/images/
+!knowledge-management/insights/images/*
 
 # Development files
 .env
@@ -69,8 +72,11 @@ Thumbs.db
 # Serena memories and cache
 .serena
 
-# Knowledge management insights (large)
-knowledge-management/insights/
+# Knowledge management (exclude non-insight files)
+knowledge-management/ckb/
+knowledge-management/ukb-original/
+knowledge-management/vkb/
+knowledge-management/schemas/
 
 # Session history
 .specstory/

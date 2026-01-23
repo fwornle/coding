@@ -72,15 +72,61 @@ class HealthVerifier extends EventEmitter {
 
   /**
    * Load health verification rules
+   * In Docker mode, applies port and service overrides for containerized environment
    */
   loadRules() {
     try {
       const rulesFile = path.join(__dirname, '..', 'config', 'health-verification-rules.json');
       const rulesData = fsSync.readFileSync(rulesFile, 'utf8');
-      return JSON.parse(rulesData);
+      const rules = JSON.parse(rulesData);
+
+      // Apply Docker-specific overrides
+      if (fsSync.existsSync('/.dockerenv')) {
+        console.log('[HealthVerifier] Docker mode detected - applying rule overrides');
+        this.applyDockerOverrides(rules);
+      }
+
+      return rules;
     } catch (error) {
       console.error(`Failed to load health rules: ${error.message}`);
       throw new Error('Health verification rules not found or invalid');
+    }
+  }
+
+  /**
+   * Apply Docker-specific overrides to health verification rules
+   * In Docker, services run on different ports and some checks are not applicable
+   */
+  applyDockerOverrides(rules) {
+    const services = rules.rules.services;
+    const databases = rules.rules.databases;
+
+    // Constraint monitor uses CONSTRAINT_MONITOR_PORT (3849) in Docker, not 3031
+    if (services.constraint_monitor) {
+      const port = process.env.CONSTRAINT_MONITOR_PORT || '3849';
+      services.constraint_monitor.endpoint = `http://localhost:${port}/health`;
+      services.constraint_monitor.port = parseInt(port);
+    }
+
+    // Dashboard server check (port 3030) doesn't exist in Docker
+    // The health_dashboard_frontend check (port 3032) covers it
+    if (services.dashboard_server) {
+      services.dashboard_server.enabled = false;
+    }
+
+    // LevelDB lock check: VKB owns the lock legitimately in Docker - disable entirely
+    if (databases.leveldb_lock_check) {
+      databases.leveldb_lock_check.enabled = false;
+    }
+
+    // Transcript monitor (LSL) doesn't run in Docker
+    if (services.enhanced_transcript_monitor) {
+      services.enhanced_transcript_monitor.enabled = false;
+    }
+
+    // Qdrant is a separate container - adjust endpoint if env var set
+    if (databases.qdrant_availability && process.env.QDRANT_URL) {
+      databases.qdrant_availability.endpoint = `${process.env.QDRANT_URL}/readyz`;
     }
   }
 
@@ -1429,12 +1475,15 @@ class HealthVerifier extends EventEmitter {
     }
 
     // Check for existing instance (singleton enforcement)
-    const existing = await this.checkExistingInstance();
-    if (existing.running) {
-      this.log(`Another health-verifier instance is already running (PID: ${existing.pid})`);
-      console.log(`⚠️  Health verifier already running (PID: ${existing.pid})`);
-      console.log('   Use "health-verifier stop" first if you want to restart.');
-      return;
+    // Skip in Docker mode - supervisord manages the process lifecycle
+    if (!fsSync.existsSync('/.dockerenv')) {
+      const existing = await this.checkExistingInstance();
+      if (existing.running) {
+        this.log(`Another health-verifier instance is already running (PID: ${existing.pid})`);
+        console.log(`⚠️  Health verifier already running (PID: ${existing.pid})`);
+        console.log('   Use "health-verifier stop" first if you want to restart.');
+        return;
+      }
     }
 
     this.running = true;

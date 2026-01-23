@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     git \
     build-essential \
     cmake \
+    lsof \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for Python dependency management
@@ -73,7 +74,9 @@ FROM node-deps AS builder
 COPY integrations/ ./integrations/
 COPY src/ ./src/
 COPY lib/ ./lib/
-COPY scripts/ukb-process-manager.js ./scripts/ukb-process-manager.js
+COPY knowledge-management/insights/ ./knowledge-management/insights/
+COPY scripts/ ./scripts/
+COPY config/ ./config/
 COPY tsconfig.json ./
 
 # Install VKB server dependencies
@@ -100,6 +103,8 @@ COPY --from=builder /coding/integrations ./integrations
 COPY --from=builder /coding/src ./src
 COPY --from=builder /coding/lib ./lib
 COPY --from=builder /coding/scripts ./scripts
+COPY --from=builder /coding/config ./config
+COPY --from=builder /coding/knowledge-management ./knowledge-management
 
 # Copy Python virtual environment
 COPY --from=python-deps /coding/integrations/code-graph-rag/.venv ./integrations/code-graph-rag/.venv
@@ -114,7 +119,7 @@ RUN chmod +x /entrypoint.sh
 COPY .env.example ./.env.example
 
 # Create data directories
-RUN mkdir -p /coding/.data /coding/.specstory
+RUN mkdir -p /coding/.data /coding/.specstory /coding/.health
 
 # Environment variables for service ports
 ENV SEMANTIC_ANALYSIS_PORT=3848 \

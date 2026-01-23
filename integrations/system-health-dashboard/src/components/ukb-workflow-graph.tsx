@@ -665,12 +665,13 @@ interface UKBWorkflowGraphProps {
  * Shows meaningful, human-readable descriptions of what the step produced.
  * Returns appropriate messages for steps that haven't run yet.
  */
-function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
+function StepResultSummary({ agentId, outputs: rawOutputs, aggregatedSteps, status }: {
   agentId: string;
   outputs: Record<string, any>;
   aggregatedSteps?: AggregatedSteps | null;
   status?: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'paused';
 }) {
+  const outputs = rawOutputs || {}
   const getSummary = (): string | null => {
     // Handle non-completed states with informative messages
     if (status === 'pending') {
@@ -1014,7 +1015,8 @@ function StepResultSummary({ agentId, outputs, aggregatedSteps, status }: {
  * Expandable details view for step outputs.
  * Shows arrays with expandable item lists and handles nested objects.
  */
-function StepResultDetails({ outputs }: { outputs: Record<string, any> }) {
+function StepResultDetails({ outputs: rawOutputs }: { outputs: Record<string, any> }) {
+  const outputs = rawOutputs || {}
   const [expandedKeys, setExpandedKeys] = React.useState<Set<string>>(new Set())
 
   const toggleExpand = (key: string) => {
@@ -3301,7 +3303,7 @@ export function UKBNodeDetailsSidebar({
                 inferredStatus === 'paused' ? 'text-amber-600 font-medium animate-pulse' :
                 'text-muted-foreground'
               }>
-                {inferredStatus.charAt(0).toUpperCase() + inferredStatus.slice(1)}
+                {(inferredStatus || 'pending').charAt(0).toUpperCase() + (inferredStatus || 'pending').slice(1)}
               </span>
             </div>
 
