@@ -89,6 +89,12 @@ export class GraphDatabaseService extends EventEmitter {
         const { spawn } = await import('child_process');
         const lsof = spawn('lsof', [lockPath]);
 
+        // Handle spawn errors (e.g. lsof not installed in Docker)
+        let spawnError = null;
+        lsof.on('error', (err) => {
+          spawnError = err;
+        });
+
         let output = '';
         lsof.stdout.on('data', (data) => {
           output += data.toString();
@@ -99,6 +105,7 @@ export class GraphDatabaseService extends EventEmitter {
         await Promise.race([
           new Promise((resolve) => {
             lsof.on('close', () => resolve());
+            lsof.on('error', () => resolve()); // Resolve on spawn error (e.g. lsof not found)
           }),
           new Promise((_, reject) => {
             setTimeout(() => {
@@ -114,6 +121,11 @@ export class GraphDatabaseService extends EventEmitter {
             throw err;
           }
         });
+
+        // If lsof wasn't available, skip the check silently
+        if (spawnError) {
+          throw new Error('SKIP'); // Caught below - proceeds normally
+        }
 
         if (output.trim()) {
           const lines = output.split('\n').filter(line => line.trim());

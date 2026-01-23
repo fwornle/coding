@@ -142,7 +142,8 @@ export class DatabaseManager extends EventEmitter {
   async initializeQdrant() {
     try {
       this.qdrant = new QdrantClient({
-        url: `http://${this.qdrantConfig.host}:${this.qdrantConfig.port}`
+        url: `http://${this.qdrantConfig.host}:${this.qdrantConfig.port}`,
+        checkCompatibility: false  // Skip version check (fails through proxies)
       });
 
       // Test connection

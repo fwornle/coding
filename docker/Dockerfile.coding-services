@@ -79,6 +79,9 @@ COPY tsconfig.json ./
 # Install VKB server dependencies
 RUN cd lib/vkb-server && npm install --ignore-scripts 2>/dev/null || true
 
+# Rebuild native bindings for the container's architecture
+RUN npm rebuild better-sqlite3 classic-level 2>/dev/null || true
+
 # Build TypeScript projects (run build in each directory)
 RUN cd integrations/mcp-server-semantic-analysis && npm run build 2>/dev/null || true
 RUN cd integrations/browser-access && npm run build 2>/dev/null || true
