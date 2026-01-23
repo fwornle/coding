@@ -238,8 +238,10 @@ class HealthRefreshManager {
       }
 
       const result = await response.json()
-      if (result.status === 'success' && result.data) {
+      if (result.status === 'success' && result.data && result.data.summary) {
         this.store.dispatch(fetchHealthReportSuccess(result.data))
+      } else if (result.status === 'success') {
+        // No full report available (health verifier not running) - leave report as null
       } else {
         throw new Error(result.message || 'Invalid response format')
       }

@@ -435,7 +435,7 @@ export default function SystemHealthDashboard() {
               {getStatusIcon()}
               <div>
                 <CardTitle className="text-2xl">
-                  {healthStatus.overallStatus.charAt(0).toUpperCase() + healthStatus.overallStatus.slice(1)}
+                  {(healthStatus.overallStatus || 'offline').charAt(0).toUpperCase() + (healthStatus.overallStatus || 'offline').slice(1)}
                 </CardTitle>
                 <CardDescription>
                   {healthStatus.lastFetch ? (

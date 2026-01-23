@@ -2374,7 +2374,7 @@ function SubStepDetailsSidebar({
                       stepStatus === 'failed' ? 'text-red-600 font-medium' :
                       'text-muted-foreground'
                     }>
-                      {stepStatus.charAt(0).toUpperCase() + stepStatus.slice(1)}
+                      {(stepStatus || 'pending').charAt(0).toUpperCase() + (stepStatus || 'pending').slice(1)}
                     </span>
                   </div>
                 )}
