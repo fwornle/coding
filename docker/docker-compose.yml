@@ -32,6 +32,9 @@ services:
       - REDIS_URL=redis://redis:6379
       - MEMGRAPH_HOST=memgraph
       - MEMGRAPH_PORT=7687
+      # Bypass corporate proxy for internal Docker networking
+      - no_proxy=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph
+      - NO_PROXY=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph
       # Project paths (mapped via volumes)
       - TARGET_REPO_PATH=/workspace
       - CODING_ROOT=/coding

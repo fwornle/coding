@@ -57,12 +57,18 @@ echo "=== All databases ready ==="
 # Environment setup
 # ===========================================
 
-# Load .env file if it exists
+# Load .env file if it exists (only set vars not already defined by docker-compose)
 if [ -f /coding/.env ]; then
-    echo "Loading environment from /coding/.env"
-    set -a
-    source /coding/.env
-    set +a
+    echo "Loading environment from /coding/.env (non-conflicting vars only)"
+    while IFS='=' read -r key value; do
+        # Skip comments, empty lines, and vars already set by docker-compose
+        [[ "$key" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$key" ]] && continue
+        key=$(echo "$key" | xargs)  # trim whitespace
+        if [ -z "${!key}" ]; then
+            export "$key=$value"
+        fi
+    done < /coding/.env
 fi
 
 # Activate Python virtual environment for code-graph-rag

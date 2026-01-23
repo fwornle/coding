@@ -37,9 +37,10 @@ export class KnowledgeQueryService {
    * @returns {Promise<Array>} Array of knowledge entities
    */
   async queryEntities(options = {}) {
-    // Delegate to graph database if available
-    if (this.graphDatabase) {
-      return await this.graphDatabase.queryEntities(options);
+    // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
+    const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
+    if (graphDB) {
+      return await graphDB.queryEntities(options);
     }
 
     // Fallback to SQLite
@@ -168,9 +169,10 @@ export class KnowledgeQueryService {
    * @returns {Promise<Array>} Array of relations
    */
   async queryRelations(options = {}) {
-    // Delegate to graph database if available
-    if (this.graphDatabase) {
-      return await this.graphDatabase.queryRelations(options);
+    // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
+    const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
+    if (graphDB) {
+      return await graphDB.queryRelations(options);
     }
 
     // Fallback to SQLite
@@ -254,9 +256,10 @@ export class KnowledgeQueryService {
    * @returns {Promise<Object>} Statistics object
    */
   async getStatistics(options = {}) {
-    // Delegate to graph database if available
-    if (this.graphDatabase) {
-      return await this.graphDatabase.getStatistics(options);
+    // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
+    const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
+    if (graphDB) {
+      return await graphDB.getStatistics(options);
     }
 
     // Fallback to SQLite
@@ -340,10 +343,11 @@ export class KnowledgeQueryService {
    * @returns {Promise<Array>} Array of team names with counts
    */
   async getTeams() {
-    // Delegate to graph database if available
-    if (this.graphDatabase) {
+    // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
+    const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
+    if (graphDB) {
       console.log('[KnowledgeQueryService] Using GraphDB for teams');
-      return await this.graphDatabase.getTeams();
+      return await graphDB.getTeams();
     }
 
     console.log('[KnowledgeQueryService] GraphDB not available, using SQLite fallback');
@@ -415,8 +419,9 @@ export class KnowledgeQueryService {
    * @returns {Promise<string>} ID of stored entity
    */
   async storeEntity(entity) {
-    // Delegate to graph database if available
-    if (this.graphDatabase) {
+    // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
+    const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
+    if (graphDB) {
       const {
         entityName,
         entityType,
@@ -444,7 +449,7 @@ export class KnowledgeQueryService {
         metadata
       };
 
-      const nodeId = await this.graphDatabase.storeEntity(graphEntity, { team });
+      const nodeId = await graphDB.storeEntity(graphEntity, { team });
 
       if (this.debug) {
         console.log(`[KnowledgeQueryService] Stored entity in graph: ${entityName} (${nodeId})`);
@@ -517,8 +522,9 @@ export class KnowledgeQueryService {
    * @returns {Promise<string>} ID of stored relation
    */
   async storeRelation(relation) {
-    // Delegate to graph database if available
-    if (this.graphDatabase) {
+    // Delegate to graph database if available (check both constructor-provided and lazy-initialized)
+    const graphDB = this.graphDatabase || this.databaseManager?.graphDB;
+    if (graphDB) {
       const {
         fromEntityName,
         toEntityName,
@@ -538,7 +544,7 @@ export class KnowledgeQueryService {
         throw new Error('Relation requires fromEntityName/fromEntityId and toEntityName/toEntityId');
       }
 
-      await this.graphDatabase.storeRelationship(fromName, toName, relationType, {
+      await graphDB.storeRelationship(fromName, toName, relationType, {
         team,
         confidence,
         metadata
