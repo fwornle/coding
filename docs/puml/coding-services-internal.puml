@@ -1,0 +1,136 @@
+@startuml coding-services-internal
+!include _standard-style.puml
+
+title Coding Services Container - Internal Architecture
+
+top to bottom direction
+
+' The container boundary
+rectangle "coding-services container" as container {
+
+  component "Supervisord\n(Process Manager)" <<infra>> as supervisor
+
+  ' ============================================
+  ' MCP Servers Group
+  ' ============================================
+  package "MCP Servers (group: mcp-servers)" as mcp_pkg {
+
+    component "Semantic Analysis\nPort 3848 (SSE)" <<agent>> as sem {
+    }
+    note right of sem
+      LLM-powered code analysis
+      Pattern extraction
+      UKB workflow engine
+      Ontology classification
+    end note
+
+    component "Browser Access\nPort 3847 (SSE)" <<api>> as browser {
+    }
+    note right of browser
+      Web page fetching
+      Content extraction
+      Screenshot capture
+    end note
+
+    component "Constraint Monitor\nPort 3849 (SSE)" <<core>> as constraint {
+    }
+    note right of constraint
+      Code quality rules
+      Real-time enforcement
+      Violation tracking
+    end note
+
+    component "Code-Graph-RAG\nPort 3850 (SSE)\n[Python 3.12]" <<agent>> as cgr {
+    }
+    note right of cgr
+      AST-based code indexing
+      Tree-sitter parsing
+      Call graph analysis
+      Natural language queries
+    end note
+  }
+
+  ' ============================================
+  ' Web Services Group
+  ' ============================================
+  package "Web Services (group: web-services)" as web_pkg {
+
+    component "VKB Server\nPort 8080 (HTTP)" <<core>> as vkb {
+    }
+    note right of vkb
+      Knowledge graph viewer
+      Graph visualization (D3.js)
+      Entity CRUD API
+      Insight document serving
+      LevelDB + Graphology
+    end note
+
+    component "Health Dashboard API\nPort 3033 (HTTP/WS)" <<api>> as health_api {
+    }
+    note right of health_api
+      Health verification data
+      UKB workflow monitoring
+      SSE real-time updates
+      API quota checking
+      Service restart API
+    end note
+
+    component "Health Dashboard Frontend\nPort 3032 (HTTP)" <<api>> as health_ui {
+    }
+    note right of health_ui
+      React + Redux + Vite
+      Real-time health status
+      Workflow visualization
+      Auto-refresh (500ms)
+    end note
+  }
+
+  ' ============================================
+  ' Monitoring Group
+  ' ============================================
+  package "Monitoring (group: monitoring)" as mon_pkg {
+
+    component "Health Verifier\n(15s interval daemon)" <<util>> as verifier {
+    }
+    note right of verifier
+      Database health checks
+      Service availability
+      Process monitoring
+      Auto-healing actions
+      Docker-aware remediation
+    end note
+  }
+
+  ' ============================================
+  ' Shared Resources
+  ' ============================================
+  package "Shared Resources" as shared {
+    folder ".data/knowledge-graph/" as kgdata
+    folder ".health/" as healthdata
+    folder ".services-running.json" as svcfile
+    folder "config/" as config
+  }
+}
+
+' Process management
+supervisor --> sem : "autostart\nautorestart"
+supervisor --> browser : "autostart\nautorestart"
+supervisor --> constraint : "autostart\nautorestart"
+supervisor --> cgr : "autostart\nautorestart"
+supervisor --> vkb : "autostart\nautorestart"
+supervisor --> health_api : "autostart\nautorestart"
+supervisor --> health_ui : "autostart\nautorestart"
+supervisor --> verifier : "autostart\nautorestart"
+
+' Internal data flows
+vkb --> kgdata : "read/write"
+verifier --> healthdata : "reports"
+verifier --> svcfile : "regenerate"
+verifier --> config : "rules"
+health_api --> healthdata : "serve"
+health_ui DATA_LINE health_api : "fetch API data"
+
+' Cross-service communication
+verifier CONTROL_LINE supervisor : "supervisorctl\nrestart"
+
+@enduml

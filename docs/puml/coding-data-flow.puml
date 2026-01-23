@@ -1,0 +1,105 @@
+@startuml coding-data-flow
+!include _standard-style.puml
+
+title Coding System - Data Flow & Service Interactions
+
+left to right direction
+
+' ============================================
+' External Actors
+' ============================================
+actor "Developer" as dev
+actor "Claude Code" as claude
+
+' ============================================
+' MCP Communication Layer
+' ============================================
+rectangle "MCP Protocol (SSE/HTTP)" as mcp_layer {
+  interface ":3848" as p3848
+  interface ":3847" as p3847
+  interface ":3849" as p3849
+  interface ":3850" as p3850
+}
+
+' ============================================
+' Core Services
+' ============================================
+rectangle "AI & Analysis Services" as ai_services {
+  component "Semantic\nAnalysis" <<agent>> as sem
+  component "Code-Graph\nRAG" <<agent>> as cgr
+  component "Constraint\nMonitor" <<core>> as cm
+  component "Browser\nAccess" <<api>> as ba
+}
+
+' ============================================
+' Knowledge Pipeline
+' ============================================
+rectangle "Knowledge Management Pipeline" as km_pipe {
+  component "UKB Workflow\nEngine" <<core>> as ukb
+  component "Ontology\nClassifier" <<agent>> as onto
+  component "Entity\nRefresh" <<util>> as refresh
+}
+
+' ============================================
+' Storage Layer
+' ============================================
+rectangle "Storage Layer" as storage {
+  database "Qdrant\n(Vectors)" <<storage>> as qdrant
+  database "Redis\n(Cache/State)" <<storage>> as redis
+  database "Memgraph\n(Code Graph)" <<storage>> as memgraph
+  database "LevelDB\n(Knowledge Graph)" <<storage>> as leveldb
+}
+
+' ============================================
+' Visualization & Monitoring
+' ============================================
+rectangle "UI & Monitoring" as ui_layer {
+  component "VKB Viewer\n:8080" <<core>> as vkb
+  component "Health Dashboard\n:3032" <<api>> as health
+  component "Memgraph Lab\n:3100" <<external>> as mglab
+}
+
+' ============================================
+' Connections - MCP Layer
+' ============================================
+claude --> p3848
+claude --> p3847
+claude --> p3849
+claude --> p3850
+
+p3848 --> sem
+p3847 --> ba
+p3849 --> cm
+p3850 --> cgr
+
+' ============================================
+' Connections - Service to Storage
+' ============================================
+sem DATA_LINE qdrant : "embeddings\n& search"
+sem DATA_LINE redis : "response\ncache"
+cgr DATA_LINE memgraph : "AST nodes\n& relations"
+cm DATA_LINE qdrant : "constraint\nembeddings"
+cm DATA_LINE redis : "enforcement\nstate"
+
+' ============================================
+' Knowledge Pipeline Flows
+' ============================================
+sem --> ukb : "triggers"
+ukb --> onto : "classify"
+ukb --> refresh : "validate"
+ukb DATA_LINE leveldb : "persist entities"
+ukb DATA_LINE qdrant : "index vectors"
+onto DATA_LINE qdrant : "similarity"
+
+' ============================================
+' UI Connections
+' ============================================
+dev --> vkb : "browse\nknowledge"
+dev --> health : "monitor\nsystem"
+dev --> mglab : "explore\ncode graph"
+
+vkb DATA_LINE leveldb : "graph data"
+vkb DATA_LINE qdrant : "search"
+health DATA_LINE sem : "workflow\nstatus"
+
+@enduml
