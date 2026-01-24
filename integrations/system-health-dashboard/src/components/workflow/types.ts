@@ -49,6 +49,7 @@ export interface ProcessInfo {
   status: string
   completedSteps: number
   totalSteps: number
+  batchPhaseStepCount?: number  // Derived from workflow YAML (replaces hardcoded BATCH_STEP_COUNT)
   currentStep?: string | null
   steps?: StepInfo[]
   // Multi-agent orchestration data - matches UKBProcess structure

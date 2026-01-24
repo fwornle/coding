@@ -1653,7 +1653,7 @@ class CombinedStatusLine {
         .replace('(ended)', '')
         .trim();
       
-      parts.push(`📋${compactTarget}`);
+      parts.push(`[📋${compactTarget}]`);
     }
     
     const statusText = parts.join(' ');
