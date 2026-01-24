@@ -1221,6 +1221,11 @@ class SystemHealthAPIServer {
             const previousStep = progress.pausedAtStep;
             progress.stepPaused = false;
             progress.resumeRequestedAt = new Date().toISOString();
+            // Handle step-into substeps mode
+            // When stepInto is true, the coordinator will pause at sub-step boundaries
+            if (req.body && req.body.stepInto !== undefined) {
+                progress.stepIntoSubsteps = !!req.body.stepInto;
+            }
             // Keep pausedAtStep for reference until next step starts
 
             writeFileSync(progressPath, JSON.stringify(progress, null, 2));

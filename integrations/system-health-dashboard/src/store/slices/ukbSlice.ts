@@ -27,6 +27,7 @@ export interface UKBProcess {
   status: string
   completedSteps: number
   totalSteps: number
+  batchPhaseStepCount?: number  // Derived from workflow YAML (replaces hardcoded BATCH_STEP_COUNT)
   currentStep: string | null
   logFile: string | null
   isAlive: boolean

@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  ChevronsRight,
   Timer,
   Server,
   GitBranch,
@@ -437,6 +438,13 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     }
   }
 
+  // Steps that have sub-steps (from workflow YAML config)
+  const STEPS_WITH_SUBSTEPS = new Set([
+    'semantic_analysis',
+    'observation_generation',
+    'ontology_classification',
+  ])
+
   // Advance to next step when paused (MVI: dispatches Redux action)
   // After advancing, poll rapidly to catch the new pause state faster
   const handleStepAdvance = async (e: React.MouseEvent) => {
@@ -445,10 +453,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
     setStepAdvanceLoading(true)
     try {
-      Logger.info(LogCategories.UKB, 'Advancing to next step')
+      Logger.info(LogCategories.UKB, 'Advancing to next step (step over)')
       const response = await fetch(`${apiBaseUrl}/api/ukb/step-advance`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stepInto: false })
       })
       const data = await response.json()
       if (data.status === 'success') {
@@ -494,6 +503,57 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       }
     } catch (error) {
       Logger.error(LogCategories.UKB, 'Error advancing step', error)
+    } finally {
+      setStepAdvanceLoading(false)
+    }
+  }
+
+  // Step into sub-steps: advances and enables sub-step pausing
+  const handleStepInto = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    setStepAdvanceLoading(true)
+    try {
+      Logger.info(LogCategories.UKB, 'Stepping into sub-steps')
+      const response = await fetch(`${apiBaseUrl}/api/ukb/step-advance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stepInto: true })
+      })
+      const data = await response.json()
+      if (data.status === 'success') {
+        dispatch(syncStepPauseFromServer({ paused: false, pausedAt: null }))
+        Logger.info(LogCategories.UKB, 'Stepped into sub-steps', data.data)
+
+        // Rapidly poll for new pause state at sub-step level
+        const pollForNewPause = async (attempts: number = 0) => {
+          if (attempts >= 12) return // Sub-steps may be quick, poll a bit longer
+          try {
+            await new Promise(resolve => setTimeout(resolve, 400))
+            const progressResponse = await fetch(`${apiBaseUrl}/api/ukb/processes`)
+            const progressData = await progressResponse.json()
+            if (progressData.status === 'success' && progressData.data?.processes?.length > 0) {
+              const activeProcess = progressData.data.processes.find((p: any) => p.status === 'running')
+              if (activeProcess?.stepPaused && activeProcess?.pausedAtStep) {
+                dispatch(syncStepPauseFromServer({
+                  paused: true,
+                  pausedAt: activeProcess.pausedAtStep
+                }))
+                return
+              }
+            }
+            pollForNewPause(attempts + 1)
+          } catch {
+            pollForNewPause(attempts + 1)
+          }
+        }
+        pollForNewPause()
+      } else {
+        Logger.error(LogCategories.UKB, 'Failed to step into', data)
+      }
+    } catch (error) {
+      Logger.error(LogCategories.UKB, 'Error stepping into sub-steps', error)
     } finally {
       setStepAdvanceLoading(false)
     }
@@ -987,9 +1047,10 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     // for TraceModal access (line ~285-286)
 
     // Calculate progress based on batch-weighted work distribution:
-    // - Batch phase (steps 1-14 running N times) = ~85% of total work
-    // - Finalization phase (steps 15-23 running once) = ~15% of total work
-    const BATCH_STEP_COUNT = 14
+    // - Batch phase (initialization + batch steps, running N times) = ~85% of total work
+    // - Finalization phase (remaining steps, running once) = ~15% of total work
+    // Derive batch step count from workflow config (via progress file) instead of hardcoding
+    const BATCH_STEP_COUNT = activeCurrentProcess?.batchPhaseStepCount || 14
     const BATCH_WEIGHT = 0.85
 
     // Get workflow-specific timing statistics for time-based progress
@@ -1831,21 +1892,40 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                       Single-step
                     </label>
                     {stepPaused && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleStepAdvance}
-                        disabled={stepAdvanceLoading}
-                        className="flex items-center gap-1 h-7 px-2 text-xs bg-yellow-50 border-yellow-300 hover:bg-yellow-100"
-                        title={`Paused at: ${pausedAtStep || 'unknown'}`}
-                      >
-                        {stepAdvanceLoading ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <ChevronRight className="h-3 w-3" />
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleStepAdvance}
+                          disabled={stepAdvanceLoading}
+                          className="flex items-center gap-1 h-7 px-2 text-xs bg-yellow-50 border-yellow-300 hover:bg-yellow-100"
+                          title={`Step over: ${pausedAtStep || 'unknown'}`}
+                        >
+                          {stepAdvanceLoading ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                          Step
+                        </Button>
+                        {pausedAtStep && STEPS_WITH_SUBSTEPS.has(pausedAtStep) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleStepInto}
+                            disabled={stepAdvanceLoading}
+                            className="flex items-center gap-1 h-7 px-2 text-xs bg-blue-50 border-blue-300 hover:bg-blue-100"
+                            title={`Step into sub-steps of: ${pausedAtStep}`}
+                          >
+                            {stepAdvanceLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <ChevronsRight className="h-3 w-3" />
+                            )}
+                            Into
+                          </Button>
                         )}
-                        Step
-                      </Button>
+                      </>
                     )}
                     {singleStepMode && !stepPaused && (
                       <span className="text-xs text-muted-foreground">(waiting)</span>

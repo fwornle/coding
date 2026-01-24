@@ -365,14 +365,19 @@ const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
     { id: 'merge', name: 'Merge', shortName: 'Mrg', description: 'Merge into graph' },
   ],
   'semantic_analysis': [
-    { id: 'extract', name: 'Extract Entities', shortName: 'Ext', description: 'Extract entities from code' },
-    { id: 'analyze', name: 'Analyze Patterns', shortName: 'Anlz', description: 'Analyze code patterns' },
-    { id: 'relate', name: 'Build Relations', shortName: 'Rel', description: 'Build entity relationships' },
+    { id: 'sem_data_prep', name: 'Data Preparation', shortName: 'Prep', description: 'Prepare commits & sessions for analysis' },
+    { id: 'sem_llm_analysis', name: 'LLM Analysis', shortName: 'LLM', description: 'Semantic analysis via LLM' },
+    { id: 'sem_observation_gen', name: 'Observation Gen', shortName: 'Obs', description: 'Generate structured observations' },
+    { id: 'sem_entity_transform', name: 'Entity Transform', shortName: 'Ent', description: 'Transform to KG entities' },
+  ],
+  'observation_generation': [
+    { id: 'obs_llm_generate', name: 'LLM Generate', shortName: 'LLM', description: 'Generate observations via LLM' },
+    { id: 'obs_accumulate', name: 'Accumulate', shortName: 'Acc', description: 'Accumulate batch observations' },
   ],
   'ontology_classification': [
-    { id: 'match', name: 'Match Rules', shortName: 'Mtch', description: 'Match ontology rules' },
-    { id: 'classify', name: 'LLM Classify', shortName: 'Cls', description: 'LLM-powered classification' },
-    { id: 'extend', name: 'Auto-Extend', shortName: 'Ext', description: 'Extend ontology if needed' },
+    { id: 'onto_data_prep', name: 'Data Preparation', shortName: 'Prep', description: 'Prepare entities for classification' },
+    { id: 'onto_llm_classify', name: 'LLM Classify', shortName: 'Cls', description: 'LLM-powered ontology classification' },
+    { id: 'onto_apply_results', name: 'Apply Results', shortName: 'Aply', description: 'Apply classifications to entities' },
   ],
   'git_history': [
     { id: 'fetch', name: 'Fetch Commits', shortName: 'Ftch', description: 'Fetch commit history' },
@@ -608,6 +613,7 @@ interface ProcessInfo {
   status: string
   completedSteps: number
   totalSteps: number
+  batchPhaseStepCount?: number  // Derived from workflow YAML (replaces hardcoded BATCH_STEP_COUNT)
   currentStep: string | null
   _refreshKey?: string  // Server-generated key to force UI updates
   health: 'healthy' | 'stale' | 'frozen' | 'dead'
@@ -1953,7 +1959,8 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const isCompleted = process.status === 'completed'
               const Icon = ORCHESTRATOR_NODE.icon
               // Calculate progress based on batch-weighted work distribution
-              const BATCH_STEP_COUNT = 14
+              // Derive batch step count from workflow config instead of hardcoding
+              const BATCH_STEP_COUNT = process.batchPhaseStepCount || 14
               const BATCH_WEIGHT = 0.85
               let orchestratorProgress = 0
               if (process.totalSteps > 0) {
@@ -2468,15 +2475,27 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                         const labelX = centerX + labelRadius * Math.cos(midAngle)
                         const labelY = centerY + labelRadius * Math.sin(midAngle)
 
+                        // Determine sub-step status from stepsDetail (process.steps)
+                        const stepInfo = process.steps?.find(s => s.name === substep.id)
+                        const substepStatus = stepInfo?.status || 'pending'
+                        const statusColors: Record<string, { fill: string; stroke: string; text: string }> = {
+                          completed: { fill: '#22c55e', stroke: '#16a34a', text: '#fff' },
+                          running: { fill: '#3b82f6', stroke: '#2563eb', text: '#fff' },
+                          failed: { fill: '#ef4444', stroke: '#dc2626', text: '#fff' },
+                          skipped: { fill: '#f59e0b', stroke: '#d97706', text: '#fff' },
+                          pending: { fill: '#e5e7eb', stroke: '#9ca3af', text: '#6b7280' },
+                        }
+                        const colors = statusColors[substepStatus] || statusColors.pending
+
                         return (
                           <Tooltip key={substep.id}>
                             <TooltipTrigger asChild>
                               <g className="cursor-pointer">
                                 <path
                                   d={arcPath}
-                                  fill="#3b82f6"
+                                  fill={colors.fill}
                                   fillOpacity={0.85}
-                                  stroke="#2563eb"
+                                  stroke={colors.stroke}
                                   strokeWidth={1.5}
                                   className="transition-all duration-200 hover:fill-opacity-100"
                                 />
@@ -2484,12 +2503,12 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                                   x={labelX}
                                   y={labelY}
                                   fontSize="8"
-                                  fill="#fff"
+                                  fill={colors.text}
                                   textAnchor="middle"
                                   dominantBaseline="middle"
                                   fontWeight="500"
                                   style={{
-                                    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                                    textShadow: substepStatus !== 'pending' ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'
                                   }}
                                 >
                                   {substep.shortName}
@@ -2500,6 +2519,7 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                               <div className="space-y-1">
                                 <div className="font-semibold">{substep.name}</div>
                                 <div className="text-xs text-muted-foreground">{substep.description}</div>
+                                <div className="text-xs font-medium capitalize">{substepStatus}</div>
                               </div>
                             </TooltipContent>
                           </Tooltip>
@@ -2689,10 +2709,10 @@ function OrchestratorDetailsSidebar({
   }
 
   // Calculate progress based on actual work distribution:
-  // - Batch phase (steps 1-14 running 23× each) = ~85% of total work
-  // - Finalization phase (steps 15-23 running once) = ~15% of total work
-  // At batch 5/23, we're ~22% done, not 57%!
-  const BATCH_STEP_COUNT = 14  // Steps that repeat per batch
+  // - Batch phase (initialization + batch steps, running N times) = ~85% of total work
+  // - Finalization phase (remaining steps, running once) = ~15% of total work
+  // Derive batch step count from workflow config instead of hardcoding
+  const BATCH_STEP_COUNT = process.batchPhaseStepCount || 14
   const BATCH_WEIGHT = 0.85    // Batch phase is ~85% of total work
 
   const progressPercent = useMemo(() => {
