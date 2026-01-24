@@ -1610,7 +1610,7 @@ class CombinedStatusLine {
         parts.push(`[📚${stateIcon}]`);
       }
     } else if (knowledge.status === 'disabled') {
-      parts.push('[📚⏸️]'); // Disabled
+      parts.push('[📚⏸️ ]'); // Disabled - extra space compensates for emoji width (FE0F renders 2-cols)
     } else {
       parts.push('[📚❌]'); // Offline
       if (overallColor === 'green') overallColor = 'yellow';
