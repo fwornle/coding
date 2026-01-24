@@ -100,6 +100,14 @@ export interface WorkflowDefinitionsAPI {
     orchestrator: AgentDefinitionAPI
     agents: AgentDefinitionAPI[]
     stepMappings: Record<string, string>
+    substepIdMappings: Record<string, string>
+    agentSubSteps: Record<string, Array<{
+      id: string
+      name: string
+      shortName: string
+      description: string
+      llmUsage?: string
+    }>>
     workflows: Array<{
       name: string
       workflow: { name: string; version: string; description: string }

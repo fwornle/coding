@@ -110,9 +110,22 @@ export const initializeWorkflowConfig = createAsyncThunk(
         icon: ICON_MAP[data.data.orchestrator.icon] || ICON_MAP.Play,
       } as AgentDefinition
 
-      // Parse agent sub-steps from YAML if available
-      // For now, use fallback - Phase 4 will extend YAML to include these
-      const agentSubSteps = FALLBACK_AGENT_SUBSTEPS
+      // Agent substeps from YAML (with fallback for backward compatibility)
+      const apiAgentSubSteps = data.data.agentSubSteps
+      const agentSubSteps: AgentSubSteps = apiAgentSubSteps && Object.keys(apiAgentSubSteps).length > 0
+        ? Object.fromEntries(
+            Object.entries(apiAgentSubSteps).map(([agentId, steps]) => [
+              agentId,
+              steps.map(s => ({ ...s, llmUsage: s.llmUsage as SubStep['llmUsage'] }))
+            ])
+          )
+        : FALLBACK_AGENT_SUBSTEPS
+
+      // Substep ID mappings from YAML (with fallback)
+      const apiSubstepIdMappings = data.data.substepIdMappings
+      const stepToSubStep = apiSubstepIdMappings && Object.keys(apiSubstepIdMappings).length > 0
+        ? apiSubstepIdMappings
+        : STEP_TO_SUBSTEP
 
       // Store all workflows
       const allWorkflows = data.data.workflows.map(w => ({
@@ -124,7 +137,7 @@ export const initializeWorkflowConfig = createAsyncThunk(
         orchestrator: transformedOrchestrator,
         agents: transformedAgents,
         stepMappings: data.data.stepMappings,
-        stepToSubStep: STEP_TO_SUBSTEP, // Will come from API in Phase 4
+        stepToSubStep,
         agentSubSteps,
         allWorkflows,
       }

@@ -621,8 +621,9 @@ class SystemHealthAPIServer {
                 const hasFailed = (workflowProgress.stepsFailed?.length || 0) > 0;
 
                 // Check if this workflow is already represented in registered processes
+                // Only consider ALIVE processes - dead/failed ones should not block detection
                 const alreadyRegistered = detailedStatus.processes.some(
-                    p => p.workflowName === workflowProgress.workflowName && p.pid !== 'mcp-inline'
+                    p => p.workflowName === workflowProgress.workflowName && p.pid !== 'mcp-inline' && p.isAlive
                 );
 
                 // Determine the actual status:
@@ -729,6 +730,8 @@ class SystemHealthAPIServer {
                         // LLM Mock mode for frontend testing
                         mockLLM: workflowProgress.mockLLM === true,
                         mockLLMDelay: workflowProgress.mockLLMDelay || 500,
+                        // Batch phase step count (derived from workflow YAML)
+                        batchPhaseStepCount: workflowProgress.batchPhaseStepCount || null,
                     };
 
                     detailedStatus.processes.push(inlineProcess);
@@ -2342,6 +2345,8 @@ class SystemHealthAPIServer {
                     orchestrator: agentsYaml.orchestrator,
                     agents: agentsYaml.agents,
                     stepMappings: agentsYaml.step_mappings,
+                    substepIdMappings: agentsYaml.substep_id_mappings || {},
+                    agentSubSteps: agentsYaml.agent_substeps || {},
                     workflows: workflows
                 }
             });

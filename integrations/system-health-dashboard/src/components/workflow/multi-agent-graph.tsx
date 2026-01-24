@@ -121,6 +121,18 @@ export const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
       outputs: ['New class suggestions', 'Extension rationale'],
       llmUsage: 'premium', techNote: 'Premium LLM for ontology design' },
   ],
+  'observation_generation': [
+    { id: 'generate', name: 'LLM Generate', shortName: 'Gen',
+      description: 'Generate structured observations from semantic analysis using LLM',
+      inputs: ['Semantic analysis results', 'Batch context'],
+      outputs: ['Raw observations', 'Confidence scores'],
+      llmUsage: 'premium', techNote: 'Premium LLM for observation synthesis' },
+    { id: 'accumulate', name: 'Accumulate', shortName: 'Acc',
+      description: 'Accumulate and deduplicate observations across batch iterations',
+      inputs: ['New observations', 'Existing observations'],
+      outputs: ['Merged observation set', 'Dedup statistics'],
+      llmUsage: 'none', techNote: 'In-memory accumulation' },
+  ],
   'git_history': [
     { id: 'fetch', name: 'Commit Fetching', shortName: 'Ftc',
       description: 'Fetch commit history from git repository',
@@ -194,18 +206,6 @@ export const AGENT_SUBSTEPS: Record<string, SubStep[]> = {
       outputs: ['Key insights', 'Recommendations'],
       llmUsage: 'premium', techNote: 'Premium LLM synthesis' },
   ],
-  'observation_generation': [
-    { id: 'extract', name: 'Observation Extraction', shortName: 'Ext',
-      description: 'Extract observations from analyzed content',
-      inputs: ['Semantic analysis', 'Entity context'],
-      outputs: ['Raw observations', 'Source links'],
-      llmUsage: 'fast', techNote: 'Fast observation extraction' },
-    { id: 'format', name: 'Observation Formatting', shortName: 'Fmt',
-      description: 'Format observations for knowledge graph storage',
-      inputs: ['Raw observations'],
-      outputs: ['Formatted observations', 'Entity links'],
-      llmUsage: 'none', techNote: 'Template-based formatting' },
-  ],
   'vibe_history': [
     { id: 'fetch', name: 'Session Fetching', shortName: 'Ftc',
       description: 'Fetch conversation sessions from transcript files',
@@ -261,7 +261,15 @@ export function MultiAgentGraph({
       onNodeClick(agentId)
     }
   }, [onNodeSelect, onNodeClick])
-  const { agents, orchestrator, edges, stepToAgent, isLoading } = useWorkflowDefinitions(process.workflowName)
+  const { agents, orchestrator, edges, stepToAgent, stepToSubStep, agentSubSteps, isLoading } = useWorkflowDefinitions(process.workflowName)
+  // Merge YAML-provided substeps with hardcoded fallback (AGENT_SUBSTEPS)
+  const effectiveAgentSubSteps = Object.keys(agentSubSteps).length > 0
+    ? agentSubSteps as Record<string, SubStep[]>
+    : AGENT_SUBSTEPS
+  // Merge YAML-provided substep ID mappings with hardcoded fallback
+  const effectiveStepToSubStep = Object.keys(stepToSubStep).length > 0
+    ? stepToSubStep
+    : STEP_TO_SUBSTEP
   const { scrollRef, saveScrollPosition } = useScrollPreservation()
   const { wigglingNode, handleNodeMouseEnter, handleNodeMouseLeave } = useNodeWiggle()
 
@@ -284,7 +292,7 @@ export function MultiAgentGraph({
 
     for (const step of process.steps) {
       const agentId = stepToAgent[step.name] || step.name
-      const hasSubsteps = AGENT_SUBSTEPS[agentId]
+      const hasSubsteps = effectiveAgentSubSteps[agentId]
       currentStatuses.set(step.name, step.status)
 
       // Priority 1: Running step with substeps
@@ -815,7 +823,7 @@ export function MultiAgentGraph({
             </text>
 
             {/* Step count badge - only shown for agents WITHOUT defined substeps */}
-            {stepCount > 1 && !AGENT_SUBSTEPS[agent.id] && (
+            {stepCount > 1 && !effectiveAgentSubSteps[agent.id] && (
               <g transform={`translate(${nodeWidth - 4}, -4)`}>
                 <circle r={8} className="fill-indigo-500" />
                 <text
@@ -855,7 +863,7 @@ export function MultiAgentGraph({
             )}
 
             {/* Sub-steps badge - blue circle showing count, click to expand AND select agent */}
-            {AGENT_SUBSTEPS[agent.id] && (
+            {effectiveAgentSubSteps[agent.id] && (
               <g
                 style={{ cursor: 'pointer' }}
                 onClick={(e) => {
@@ -894,7 +902,7 @@ export function MultiAgentGraph({
                   fontWeight="bold"
                   style={{ pointerEvents: 'none' }}
                 >
-                  {AGENT_SUBSTEPS[agent.id].length}
+                  {effectiveAgentSubSteps[agent.id].length}
                 </text>
               </g>
             )}
@@ -1017,14 +1025,14 @@ export function MultiAgentGraph({
         </g>
 
         {/* Render expanded sub-steps arc overlay (above all nodes for z-order) */}
-        {expandedSubStepsAgent && AGENT_SUBSTEPS[expandedSubStepsAgent] && (
+        {expandedSubStepsAgent && effectiveAgentSubSteps[expandedSubStepsAgent] && (
           <g className="substeps-arc-overlay">
             {(() => {
               const position = layout.positions.find(p => p.agent.id === expandedSubStepsAgent)
               if (!position) return null
 
               const { x, y } = position
-              const substeps = AGENT_SUBSTEPS[expandedSubStepsAgent]
+              const substeps = effectiveAgentSubSteps[expandedSubStepsAgent]
               const centerX = x
               const centerY = y
               const innerRadius = Math.max(nodeWidth, nodeHeight) / 2 + 10
@@ -1034,15 +1042,22 @@ export function MultiAgentGraph({
               const startAngle = -150
               const arcPerStep = (totalArc - (substeps.length - 1) * arcSpacing) / substeps.length
 
-              // Check if this agent is currently running or completed (map step names to agent IDs)
-              const agentStep = process.steps?.find(s => {
+              // Find ALL steps belonging to this agent and build per-substep status map
+              const agentSteps = (process.steps || []).filter(s => {
                 const stepAgentId = stepToAgent[s.name] || s.name
-                return stepAgentId === expandedSubStepsAgent && (s.status === 'running' || s.status === 'completed')
+                return stepAgentId === expandedSubStepsAgent
               })
-              const isAgentRunning = agentStep?.status === 'running'
-              const isAgentCompleted = agentStep?.status === 'completed'
-              // Get the active sub-step ID from the running step
-              const activeSubStepId = isAgentRunning && agentStep ? STEP_TO_SUBSTEP[agentStep.name] : null
+              const substepStatuses = new Map<string, string>()
+              for (const step of agentSteps) {
+                const substepId = effectiveStepToSubStep[step.name]
+                if (substepId) {
+                  substepStatuses.set(substepId, step.status)
+                }
+              }
+              const isAgentRunning = agentSteps.some(s => s.status === 'running')
+              // Agent is fully completed only if ALL its substeps are done (no running ones left)
+              const isAgentCompleted = !isAgentRunning && agentSteps.length > 0 &&
+                agentSteps.every(s => s.status === 'completed' || s.status === 'skipped')
 
               return substeps.map((substep, idx) => {
                 const angleStart = startAngle + idx * (arcPerStep + arcSpacing)
@@ -1068,15 +1083,17 @@ export function MultiAgentGraph({
                 const labelY = centerY + labelRadius * Math.sin(midAngle)
 
                 const isSelected = selectedSubStepId === substep.id
-                // Check if this is the currently active/running sub-step
-                const isActiveSubStep = activeSubStepId === substep.id
+                // Per-substep status from runtime data
+                const substepStatus = substepStatuses.get(substep.id)
+                const isSubstepCompleted = substepStatus === 'completed'
+                const isActiveSubStep = substepStatus === 'running'
                 // Determine visual state: completed (green), active (blue pulse), or default (blue)
-                const isHighlighted = isSelected || isActiveSubStep || isAgentCompleted
+                const isHighlighted = isSelected || isActiveSubStep || isSubstepCompleted || isAgentCompleted
 
-                // Colors based on state
+                // Colors based on per-substep state
                 let fillColor = '#3b82f6'  // default blue
                 let strokeColor = '#1d4ed8'
-                if (isAgentCompleted) {
+                if (isSubstepCompleted || isAgentCompleted) {
                   fillColor = '#22c55e'  // green-500
                   strokeColor = '#16a34a'  // green-600
                 } else if (isActiveSubStep || isSelected) {
@@ -1084,7 +1101,7 @@ export function MultiAgentGraph({
                   strokeColor = '#fff'
                 }
 
-                const statusText = isAgentCompleted ? ' (Completed)' : isActiveSubStep ? ' (Currently Running)' : ''
+                const statusText = isSubstepCompleted || isAgentCompleted ? ' (Completed)' : isActiveSubStep ? ' (Currently Running)' : ''
 
                 return (
                   <g
