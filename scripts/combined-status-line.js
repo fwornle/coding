@@ -1557,7 +1557,7 @@ class CombinedStatusLine {
             }
             return `${displayAbbrev}${health.icon}`;
           })
-          .join(' ');
+          .join('');
 
         parts.push(`[${sessionStatuses}]`);
 
@@ -1636,24 +1636,29 @@ class CombinedStatusLine {
     }
     // Don't show anything when no UKB processes are running (cleaner status line)
 
-    // Add redirect indicator if active (compact)
-    if (redirectStatus && redirectStatus.active) {
-      // Shorten common target names for compactness
-      const target = redirectStatus.target
-        .replace('coding', 'cod')
-        .replace('nano-degree', 'nano');
-      parts.push(`→${target}`);
-    }
-
-    // Add live log target filename inline at the end (readable format)
+    // Add live log target with optional redirect indicator
     if (liveLogTarget && liveLogTarget !== '----') {
-      // Keep the full time window but remove redundant text
       let compactTarget = liveLogTarget
         .replace('-session', '')
         .replace('(ended)', '')
         .trim();
-      
-      parts.push(`[📋${compactTarget}]`);
+
+      // Include redirect target inside the log block if active
+      let redirectSuffix = '';
+      if (redirectStatus && redirectStatus.active) {
+        const target = redirectStatus.target
+          .replace('coding', 'cod')
+          .replace('nano-degree', 'nano');
+        redirectSuffix = `→${target}`;
+      }
+
+      parts.push(`[📋${compactTarget}${redirectSuffix}]`);
+    } else if (redirectStatus && redirectStatus.active) {
+      // Show redirect even without live log
+      const target = redirectStatus.target
+        .replace('coding', 'cod')
+        .replace('nano-degree', 'nano');
+      parts.push(`[→${target}]`);
     }
     
     const statusText = parts.join(' ');
@@ -1682,7 +1687,8 @@ class CombinedStatusLine {
       'curriculum': 'CU',
       'alignment': 'AL',
       'nano': 'N',
-      'ui-template': 'UT'
+      'ui-template': 'UT',
+      'balance': 'BL'
     };
     
     // Check for exact match first
@@ -1731,7 +1737,8 @@ class CombinedStatusLine {
       'CU': 'curriculum',
       'AL': 'alignment',
       'N': 'nano',
-      'UT': 'ui-template'
+      'UT': 'ui-template',
+      'BL': 'balance'
     };
 
     const upperAbbrev = abbrev.toUpperCase();
