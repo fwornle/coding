@@ -3,6 +3,9 @@
 .AppleDouble
 .LSOverride
 
+# Machine-specific MCP config (contains absolute paths)
+claude-code-mcp-docker.json
+
 # Editor directories and files
 .idea
 .vscode
