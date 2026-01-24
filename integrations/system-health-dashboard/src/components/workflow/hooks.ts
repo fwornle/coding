@@ -8,12 +8,14 @@ import {
   selectOrchestrator,
   selectEdges,
   selectStepMappings,
+  selectStepToSubStep,
+  selectAgentSubSteps,
   selectWorkflowConfigLoading,
   selectWorkflowConfigError,
   selectWorkflowConfigInitialized,
   setWorkflowEdges,
 } from '@/store/slices/workflowConfigSlice'
-import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, MULTI_AGENT_EDGES } from './constants'
+import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, STEP_TO_SUBSTEP, MULTI_AGENT_EDGES } from './constants'
 
 // Hook to get workflow definitions from Redux (populated by API with fallback to constants)
 export function useWorkflowDefinitions(workflowName?: string) {
@@ -24,6 +26,8 @@ export function useWorkflowDefinitions(workflowName?: string) {
   const orchestrator = useAppSelector(selectOrchestrator)
   const edges = useAppSelector(selectEdges)
   const stepToAgent = useAppSelector(selectStepMappings)
+  const stepToSubStep = useAppSelector(selectStepToSubStep)
+  const agentSubSteps = useAppSelector(selectAgentSubSteps)
   const isLoading = useAppSelector(selectWorkflowConfigLoading)
   const error = useAppSelector(selectWorkflowConfigError)
   const initialized = useAppSelector(selectWorkflowConfigInitialized)
@@ -42,6 +46,8 @@ export function useWorkflowDefinitions(workflowName?: string) {
       orchestrator: ORCHESTRATOR_NODE,
       edges: MULTI_AGENT_EDGES,
       stepToAgent: STEP_TO_AGENT,
+      stepToSubStep: STEP_TO_SUBSTEP,
+      agentSubSteps: {} as Record<string, Array<{ id: string; name: string; shortName: string; description: string; llmUsage?: string }>>,
       isLoading: true,
       error: null
     }
@@ -52,6 +58,8 @@ export function useWorkflowDefinitions(workflowName?: string) {
     orchestrator: orchestrator || ORCHESTRATOR_NODE,
     edges: edges.length > 0 ? edges : MULTI_AGENT_EDGES,
     stepToAgent: Object.keys(stepToAgent).length > 0 ? stepToAgent : STEP_TO_AGENT,
+    stepToSubStep: Object.keys(stepToSubStep).length > 0 ? stepToSubStep : STEP_TO_SUBSTEP,
+    agentSubSteps,
     isLoading,
     error
   }

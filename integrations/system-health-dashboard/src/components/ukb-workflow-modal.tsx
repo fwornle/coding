@@ -1082,8 +1082,11 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       // STEP-COUNT PROGRESS: Calculate weighted step-based progress as a floor
       // This ensures progress never appears behind what's actually completed
       let stepBasedProgress = 0
-      const isInFinalization = completedSteps > BATCH_STEP_COUNT ||
-                               (currentBatch === totalBatches && totalBatches > 0)
+      // Only enter finalization when more steps are completed than the batch phase has
+      // (the coordinator's substep exclusion ensures completedSteps stays <= BATCH_STEP_COUNT during batch phase)
+      // Note: Do NOT use currentBatch === totalBatches - that's true during the last batch
+      // but we're still processing, which causes premature 85%+ jumps
+      const isInFinalization = completedSteps > BATCH_STEP_COUNT
 
       if (isInFinalization) {
         // Finalization phase: 85% (all batches) + finalization progress × 15%

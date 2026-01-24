@@ -370,6 +370,16 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'batch_semantic_analysis': 'semantic_analysis',
   'generate_batch_observations': 'observation_generation',  // NEW: batch phase observation generation
   'classify_with_ontology': 'ontology_classification',
+  // Runtime substeps (from batch workflow YAML) mapped to their parent agent
+  'sem_data_prep': 'semantic_analysis',
+  'sem_llm_analysis': 'semantic_analysis',
+  'sem_observation_gen': 'semantic_analysis',
+  'sem_entity_transform': 'semantic_analysis',
+  'obs_llm_generate': 'observation_generation',
+  'obs_accumulate': 'observation_generation',
+  'onto_data_prep': 'ontology_classification',
+  'onto_llm_classify': 'ontology_classification',
+  'onto_apply_results': 'ontology_classification',
   'operator_conv': 'kg_operators',
   'operator_aggr': 'kg_operators',
   'operator_embed': 'kg_operators',
@@ -413,12 +423,18 @@ export const STEP_TO_SUBSTEP: Record<string, string> = {
   'synthesize_code_insights': 'analyze',
   'transform_code_entities': 'analyze',
   'code_graph': 'analyze',  // Generic step maps to analyze
-  // semantic_analysis agent sub-steps
+  // semantic_analysis agent sub-steps (main step + runtime substeps from batch YAML)
   'semantic_analysis': 'extract',
   'batch_semantic_analysis': 'extract',
-  // observation_generation agent sub-steps
-  'generate_observations': 'extract',
-  'generate_batch_observations': 'extract',
+  'sem_data_prep': 'parse',
+  'sem_llm_analysis': 'extract',
+  'sem_observation_gen': 'relate',
+  'sem_entity_transform': 'enrich',
+  // observation_generation agent sub-steps (main step + runtime substeps)
+  'generate_observations': 'generate',
+  'generate_batch_observations': 'generate',
+  'obs_llm_generate': 'generate',
+  'obs_accumulate': 'accumulate',
   // kg_operators agent sub-steps
   'operator_conv': 'conv',
   'operator_aggr': 'aggr',
@@ -426,9 +442,12 @@ export const STEP_TO_SUBSTEP: Record<string, string> = {
   'operator_dedup': 'dedup',
   'operator_pred': 'pred',
   'operator_merge': 'merge',
-  // ontology_classification agent sub-steps
-  'classify_with_ontology': 'classify',
-  'ontology_classification': 'classify',
+  // ontology_classification agent sub-steps (main step + runtime substeps)
+  'classify_with_ontology': 'match',
+  'ontology_classification': 'match',
+  'onto_data_prep': 'match',
+  'onto_llm_classify': 'validate',
+  'onto_apply_results': 'extend',
   // persistence agent sub-steps
   'persist_knowledge': 'persist',
   'final_persist': 'persist',
