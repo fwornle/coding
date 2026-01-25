@@ -1899,8 +1899,7 @@ async function main() {
   try {
     const timeout = setTimeout(() => {
       console.error('⚠️ SYS:TIMEOUT - Status line generation took >4s');
-      console.log('⚠️ SYS:TIMEOUT');
-      process.exit(1);
+      process.stdout.write('⚠️ SYS:TIMEOUT\n', () => process.exit(1));
     }, 4000);
 
     const statusLine = new CombinedStatusLine();
@@ -1910,14 +1909,15 @@ async function main() {
 
     // Claude Code status line expects plain text output
     // Rich features like tooltips may need different configuration
-    console.log(status.text);
-    process.exit(0);
+    // Use explicit stdout.write with callback to ensure complete flush before exit
+    process.stdout.write(status.text + '\n', () => {
+      process.exit(0);
+    });
   } catch (error) {
     // CRITICAL: Log actual error to stderr so we can debug, not silent failure!
     console.error(`⚠️ FATAL ERROR in status line generation: ${error.message}`);
     console.error(error.stack);
-    console.log('⚠️ SYS:ERR');
-    process.exit(1);
+    process.stdout.write('⚠️ SYS:ERR\n', () => process.exit(1));
   }
 }
 
