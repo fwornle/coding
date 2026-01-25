@@ -27,9 +27,25 @@ const scriptRoot = join(__dirname, '..');
 const execAsync = promisify(exec);
 
 /**
- * Detect if running inside a Docker container
+ * Detect if running in Docker mode
+ * Checks multiple indicators:
+ * 1. CODING_DOCKER_MODE environment variable (set by launch-claude.sh)
+ * 2. .docker-mode marker file in coding repo
+ * 3. /.dockerenv (when running inside container)
  */
 function isDockerMode() {
+  // Environment variable takes precedence (set by launch scripts)
+  if (process.env.CODING_DOCKER_MODE === 'true') {
+    return true;
+  }
+
+  // Check for .docker-mode marker file
+  const codingRoot = process.env.CODING_REPO || scriptRoot;
+  if (existsSync(join(codingRoot, '.docker-mode'))) {
+    return true;
+  }
+
+  // Running inside container
   return existsSync('/.dockerenv');
 }
 
