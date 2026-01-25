@@ -122,21 +122,20 @@ if [ "$DOCKER_MODE" = true ]; then
           DOCKER_LAUNCH_START=$(date +%s)
           DOCKER_FRESH_START=true
 
-          # Use open -F to bring to foreground (important: user may need to accept dialogs!)
+          # Use open -F to bring to foreground
           open -F -a "Docker" 2>/dev/null
 
-          # Brief wait to let process start
-          sleep 2
+          # Wait for process to appear (takes 3-5s normally)
+          sleep 5
 
           # Verify process started
           DOCKER_PIDS=$(pgrep -f "Docker Desktop" 2>/dev/null || true)
           if [ -n "$DOCKER_PIDS" ]; then
             log "   ✓ Docker Desktop started (PIDs: $DOCKER_PIDS)"
-            # Bring to front again in case there's a dialog
-            osascript -e 'tell application "Docker" to activate' 2>/dev/null || true
           else
-            log "❌ Docker Desktop failed to start"
-            log "💡 Please start Docker Desktop manually"
+            log "⚠️  Docker Desktop process not found after 5s"
+            log "💡 Check if Docker Desktop window appeared"
+            log "💡 If not, try starting it manually from Applications"
           fi
         fi
       fi
