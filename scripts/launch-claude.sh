@@ -68,6 +68,43 @@ fi
 
 export CODING_DOCKER_MODE="$DOCKER_MODE"
 
+# ============================================
+# Platform Detection
+# ============================================
+PLATFORM="$(uname -s)"
+case "$PLATFORM" in
+  Darwin) PLATFORM="macos" ;;
+  Linux)  PLATFORM="linux" ;;
+  *)      PLATFORM="unknown" ;;
+esac
+
+# Early Docker launch: start Docker immediately so it boots in parallel with setup
+# NOTE: We do NOT kill Docker processes here - that's destructive and breaks other sessions
+DOCKER_LAUNCH_START=""
+if [ "$DOCKER_MODE" = true ]; then
+  if ! docker ps >/dev/null 2>&1; then
+    # Docker daemon not responding - try to start it (platform-specific)
+    if [ "$PLATFORM" = "macos" ]; then
+      # macOS: Use Docker Desktop
+      if [ -d "/Applications/Docker.app" ]; then
+        log "🐳 Starting Docker Desktop early (will check readiness later)..."
+        open -a "Docker" 2>/dev/null
+        DOCKER_LAUNCH_START=$(date +%s)
+      fi
+    elif [ "$PLATFORM" = "linux" ]; then
+      # Linux: Try systemd first, then direct dockerd
+      if command -v systemctl &>/dev/null && systemctl is-enabled docker &>/dev/null; then
+        log "🐳 Starting Docker via systemd (will check readiness later)..."
+        sudo systemctl start docker 2>/dev/null || true
+        DOCKER_LAUNCH_START=$(date +%s)
+      elif command -v dockerd &>/dev/null; then
+        log "🐳 Docker daemon available but not running - please start manually"
+        log "💡 Try: sudo systemctl start docker  OR  sudo dockerd &"
+      fi
+    fi
+  fi
+fi
+
 # Generate unique session ID for this Claude session
 SESSION_ID="claude-$$-$(date +%s)"
 export CLAUDE_SESSION_ID="$SESSION_ID"
@@ -144,6 +181,9 @@ docker_daemon_ready() {
 }
 
 # Ensure Docker is running (required for Qdrant vector search)
+# Total timeout budget: 90 seconds (accounts for early launch if already started)
+DOCKER_TIMEOUT_TOTAL=90
+
 ensure_docker_running() {
   # First check if daemon is fully ready (use docker ps, not docker info!)
   if docker_daemon_ready; then
@@ -151,39 +191,83 @@ ensure_docker_running() {
     return 0
   fi
 
-  # Check if Docker is in a stale/broken state (processes exist but daemon not responding)
-  if ps aux | grep -q "[c]om.docker.backend"; then
-    log "⚠️  Docker processes exist but daemon not responding - force restarting..."
-    pkill -9 -f "Docker" 2>/dev/null
-    pkill -9 -f "com.docker" 2>/dev/null
-    sleep 2
+  # Calculate remaining wait time if Docker was launched early
+  local wait_seconds=$DOCKER_TIMEOUT_TOTAL
+  if [ -n "$DOCKER_LAUNCH_START" ]; then
+    local now=$(date +%s)
+    local elapsed=$((now - DOCKER_LAUNCH_START))
+    wait_seconds=$((DOCKER_TIMEOUT_TOTAL - elapsed))
+    if [ $wait_seconds -le 0 ]; then
+      log "❌ Docker daemon not ready after ${DOCKER_TIMEOUT_TOTAL} seconds (launched early)"
+      log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
+      show_docker_help
+      return 1
+    fi
+    log "⏳ Docker was launched ${elapsed}s ago, waiting up to ${wait_seconds}s more..."
+  else
+    # Docker was not launched early - try to start it now (platform-specific)
+    log "🐳 Docker not running - attempting to start..."
+
+    if [ "$PLATFORM" = "macos" ]; then
+      # macOS: Use Docker Desktop
+      if [ -d "/Applications/Docker.app" ]; then
+        log "   Starting Docker Desktop..."
+        open -a "Docker" 2>/dev/null
+      else
+        log "❌ Docker Desktop not found at /Applications/Docker.app"
+        log "💡 Install Docker Desktop: https://www.docker.com/products/docker-desktop"
+        return 1
+      fi
+    elif [ "$PLATFORM" = "linux" ]; then
+      # Linux: Try systemd, then manual
+      if command -v systemctl &>/dev/null; then
+        log "   Starting Docker via systemd..."
+        if ! sudo systemctl start docker 2>/dev/null; then
+          log "❌ Failed to start Docker via systemd"
+          log "💡 Try manually: sudo systemctl start docker"
+          return 1
+        fi
+      else
+        log "❌ Docker not running and systemctl not available"
+        log "💡 Start Docker daemon manually: sudo dockerd &"
+        return 1
+      fi
+    else
+      log "❌ Unsupported platform: $PLATFORM"
+      log "💡 Please start Docker manually"
+      return 1
+    fi
+
+    log "⏳ Waiting for Docker daemon (max ${wait_seconds} seconds)..."
   fi
 
-  log "🐳 Docker not running - attempting to start Docker Desktop..."
-
-  # Try to start Docker Desktop on macOS
-  if [ -d "/Applications/Docker.app" ]; then
-    log "   Starting Docker Desktop..."
-    open -a "Docker" 2>/dev/null
-
-    log "⏳ Waiting for Docker daemon (max 30 seconds)..."
-    for i in {1..30}; do
-      if docker_daemon_ready; then
-        log "✅ Docker daemon ready after ${i} seconds"
-        return 0
+  # Poll for Docker readiness
+  for ((i=1; i<=wait_seconds; i++)); do
+    if docker_daemon_ready; then
+      local total_elapsed=$i
+      if [ -n "$DOCKER_LAUNCH_START" ]; then
+        total_elapsed=$(($(date +%s) - DOCKER_LAUNCH_START))
       fi
-      sleep 1
-    done
+      log "✅ Docker daemon ready after ${total_elapsed} seconds"
+      return 0
+    fi
+    sleep 1
+  done
 
-    log "❌ Docker daemon not ready after 30 seconds"
-    log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
+  log "❌ Docker daemon not ready after ${DOCKER_TIMEOUT_TOTAL} seconds"
+  log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
+  show_docker_help
+  return 1
+}
+
+# Helper to show platform-specific Docker help
+show_docker_help() {
+  if [ "$PLATFORM" = "macos" ]; then
     log "💡 Please start Docker Desktop manually for full functionality"
-    return 1
+  elif [ "$PLATFORM" = "linux" ]; then
+    log "💡 Please start Docker: sudo systemctl start docker"
   else
-    log "❌ Docker Desktop not found at /Applications/Docker.app"
-    log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
-    log "💡 Install Docker Desktop: https://www.docker.com/products/docker-desktop"
-    return 1
+    log "💡 Please start Docker manually"
   fi
 }
 
