@@ -1764,13 +1764,13 @@ class StatusLineHealthMonitor {
 
     // Skip auto-healing in Docker mode - services run in containers, not native
     if (this.isDockerMode()) {
-      this.log('Auto-healing skipped - Docker mode active (services run in containers)', 'DEBUG');
+      this.log('🐳 Auto-healing SKIPPED for constraint-monitor - Docker mode active (services run in containers)', 'INFO');
       return false;
     }
 
     // Skip auto-healing during Docker mode transition
     if (this.monitoringPaused) {
-      this.log('Auto-healing skipped - Docker mode transition in progress', 'DEBUG');
+      this.log('⏸️  Auto-healing SKIPPED for constraint-monitor - Docker mode transition in progress', 'INFO');
       return false;
     }
 
@@ -1778,7 +1778,7 @@ class StatusLineHealthMonitor {
     try {
       const transitionLocked = await isTransitionLocked();
       if (transitionLocked) {
-        this.log('Auto-healing skipped - transition lock detected', 'DEBUG');
+        this.log('🔒 Auto-healing SKIPPED for constraint-monitor - transition lock detected', 'INFO');
         return false;
       }
     } catch {
@@ -1949,13 +1949,13 @@ class StatusLineHealthMonitor {
 
     // Skip auto-healing in Docker mode - services run in containers, not native
     if (this.isDockerMode()) {
-      this.log('Auto-healing skipped - Docker mode active (services run in containers)', 'DEBUG');
+      this.log('🐳 Auto-healing SKIPPED for VKB server - Docker mode active (services run in containers)', 'INFO');
       return false;
     }
 
     // Skip auto-healing during Docker mode transition
     if (this.monitoringPaused) {
-      this.log('Auto-healing skipped - Docker mode transition in progress', 'DEBUG');
+      this.log('⏸️  Auto-healing SKIPPED for VKB server - Docker mode transition in progress', 'INFO');
       return false;
     }
 
@@ -1963,7 +1963,7 @@ class StatusLineHealthMonitor {
     try {
       const transitionLocked = await isTransitionLocked();
       if (transitionLocked) {
-        this.log('Auto-healing skipped - transition lock detected', 'DEBUG');
+        this.log('🔒 Auto-healing SKIPPED for VKB server - transition lock detected', 'INFO');
         return false;
       }
     } catch {
@@ -2508,6 +2508,14 @@ class StatusLineHealthMonitor {
    */
   async start() {
     this.log('🚀 Starting StatusLine Health Monitor...');
+
+    // Log Docker mode status at startup for diagnostics
+    const dockerMode = this.isDockerMode();
+    this.log(`📦 Docker mode: ${dockerMode ? 'ENABLED (auto-heal will skip native services)' : 'disabled (native mode)'}`);
+    if (dockerMode) {
+      this.log(`   - Auto-healing for VKB/constraint-monitor: DISABLED in Docker mode`);
+      this.log(`   - Services should run in containers, not native processes`);
+    }
 
     // Write PID file for shell script compatibility
     this.writePidFile();
