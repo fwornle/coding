@@ -82,11 +82,13 @@ The health system is built on interconnected components with active supervision:
 - **Only shows sessions with running transcript monitors**
 - Outputs to: `.logs/statusline-health-status.txt`
 
-### CombinedStatusLine (`scripts/combined-status-line.js`) - Status Display + Fallback
-- Displays health status in Claude Code status bar
+### CombinedStatusLine (`scripts/combined-status-line.js`) - Master Supervisor + Status Display
+- **Master supervisor** - runs on every Claude prompt
+- **`ensureGlobalProcessSupervisorRunning()`** - Ensures GPS is running
+- **`ensureStatuslineHealthMonitorRunning()`** - Ensures SHM is running
 - **`ensureAllTranscriptMonitorsRunning()`** - Fallback supervisor for all projects
-- 60-second rate limiting to prevent restart storms
-- Acts as backup if GlobalProcessSupervisor is not running
+- Displays health status in Claude Code status bar
+- Guarantees service recovery even if GPS dies
 
 ### EnhancedTranscriptMonitor (`scripts/enhanced-transcript-monitor.js`) - Per-Project
 - Real-time transcript monitoring per project
@@ -196,6 +198,52 @@ When running in Docker mode, the health system also monitors MCP SSE servers:
 6. Status updated in dashboard and status line
 
 **Detailed Flow**: See [Enhanced Health Monitoring](./enhanced-health-monitoring.md)
+
+## Docker Mode Support
+
+The health system is fully Docker-aware and adapts its behavior based on the deployment mode.
+
+### Docker Mode Detection
+
+![Docker Health Detection](../images/docker-health-detection.png)
+
+The system detects Docker mode using a 3-tier priority check:
+
+1. **Environment Variable** (highest priority): `CODING_DOCKER_MODE=true`
+2. **Marker File**: `.docker-mode` file in coding repo root
+3. **Container Detection**: `/.dockerenv` file (inside containers)
+
+This detection is used by:
+- `health-verifier.js` - Adapts CGR cache checks
+- `health-remediation-actions.js` - Uses appropriate restart commands
+- `statusline-health-monitor.js` - Includes Docker MCP health
+
+### CGR Cache Staleness in Docker
+
+In Docker mode, the `.git` directory is not mounted (for performance), so the CGR cache staleness check cannot count commits behind. Instead:
+
+- **Native Mode**: Runs `cgr-cache-staleness.sh` to count commits since last index
+- **Docker Mode**: Reads `cache-metadata.json` directly for cached commit info
+
+The dashboard displays:
+- Native: "CGR cache: 5 commits behind" or "Current"
+- Docker: "coding @ abc123" (shows cached commit, staleness unknown)
+
+### Service Supervision Hierarchy
+
+![Supervisor Restart Hierarchy](../images/supervisor-restart-hierarchy.png)
+
+The health system uses a **3-layer resilience architecture** to ensure services stay running:
+
+| Layer | Component | Trigger | What It Supervises |
+|-------|-----------|---------|-------------------|
+| 1 | CombinedStatusLine | Every Claude prompt | GlobalProcessSupervisor, StatusLineHealthMonitor |
+| 2 | GlobalProcessSupervisor | 30s loop | HealthVerifier, StatusLineHealthMonitor, TranscriptMonitors |
+| 3 | HealthVerifier | 60s loop | Databases, Services, Processes |
+
+**Key Guarantee**: If any service dies, it will be restarted within:
+- 30 seconds (by GlobalProcessSupervisor)
+- Or the next Claude prompt (by CombinedStatusLine as master supervisor)
 
 ## Quick Start
 

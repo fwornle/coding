@@ -1,0 +1,80 @@
+@startuml supervisor-restart-hierarchy
+!include _standard-style.puml
+
+title Service Supervision Hierarchy\n3-Layer Resilience Architecture
+
+top to bottom direction
+
+package "Layer 1: Master Supervisor (Per-Prompt)" #E8F5E8 {
+  component [CombinedStatusLine] as CSL <<core>>
+  note right of CSL
+    **Runs on EVERY Claude prompt**
+    - ensureGlobalProcessSupervisorRunning()
+    - ensureStatuslineHealthMonitorRunning()
+    - ensureAllTranscriptMonitorsRunning()
+    - Checks PSM + heartbeat freshness
+  end note
+}
+
+package "Layer 2: Active Supervisor (30s Loop)" #E6F3FF {
+  component [GlobalProcessSupervisor] as GPS <<infra>>
+  note right of GPS
+    **30-second supervision loop**
+    - Monitors health-verifier
+    - Monitors statusline-health-monitor
+    - Dynamic project discovery
+    - 5-min cooldown per service
+    - Max 10 restarts/hour
+  end note
+}
+
+package "Layer 3: Health Services" #FFF9E6 {
+  component [HealthVerifier] as HV <<core>>
+  component [StatusLineHealthMonitor] as SHM <<core>>
+
+  note bottom of HV
+    60s verification cycle
+    Docker-aware checks
+    Auto-healing triggers
+  end note
+
+  note bottom of SHM
+    15s status updates
+    Health file aggregation
+    Claude status bar output
+  end note
+}
+
+package "Layer 4: Per-Project Monitors" #FFE8F4 {
+  component [EnhancedTranscriptMonitor\n(per project)] as ETM <<per_project>>
+}
+
+' Supervision relationships
+CSL -[#2E7D32,thickness=3]-> GPS : **ensures running**
+CSL -[#2E7D32,thickness=2]-> SHM : ensures running
+CSL -[#2E7D32,thickness=1,dashed]-> ETM : fallback restart
+
+GPS -[#1565C0,thickness=2]-> HV : supervises & restarts
+GPS -[#1565C0,thickness=2]-> SHM : supervises & restarts
+GPS -[#1565C0,thickness=2]-> ETM : supervises & restarts
+
+legend right
+  |= Layer |= Component |= Trigger |= Recovery Time |
+  | 1 | CombinedStatusLine | Every prompt | Immediate |
+  | 2 | GlobalProcessSupervisor | 30s loop | < 30s |
+  | 3 | HealthVerifier | Supervised | < 30s |
+  | 3 | StatusLineHealthMonitor | Supervised | < 30s |
+  | 4 | EnhancedTranscriptMonitor | Supervised | < 30s |
+endlegend
+
+note as N1
+  **Resilience Guarantee**:
+  If ANY service dies, it will be restarted within:
+  - 30 seconds (by GlobalProcessSupervisor)
+  - Or next Claude prompt (by CombinedStatusLine)
+
+  If GlobalProcessSupervisor itself dies:
+  - Next Claude prompt restarts it immediately
+end note
+
+@enduml

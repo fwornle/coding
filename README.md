@@ -38,8 +38,14 @@ The transition system ensures safe mode switching with:
 - Graceful service shutdown with data flush
 - Automatic rollback on failure
 - Multi-session support
+- Docker-aware health verification (CGR cache, service restarts)
 
 **Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers.
+
+**Health System Adaptation**: The health verifier automatically detects Docker mode and adapts:
+- CGR cache staleness uses `cache-metadata.json` fallback (no `.git` access)
+- Service restarts use Docker-appropriate commands
+- Dashboard shows cached commit info instead of staleness count
 
 **To switch back to native mode**:
 ```bash
@@ -93,11 +99,13 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 
 #### [🏥 Health System](docs/health-system/)
 Automatic health monitoring and self-healing with real-time dashboard
-- Pre-prompt health verification
-- Auto-healing failed services
-- Dashboard at `http://localhost:3030`
-- 4-layer monitoring architecture
+- Pre-prompt health verification with 3-layer resilience
+- Auto-healing failed services (Docker-aware)
+- Dashboard at `http://localhost:3032`
+- Service supervision hierarchy ensures services stay running
 - **[📊 Status Line System](docs/health-system/status-line.md)** - Real-time indicators in Claude Code status bar
+
+![Health Supervision Hierarchy](docs/images/supervisor-restart-hierarchy.png)
 
 #### [📋 Live Session Logging (LSL)](docs/lsl/)
 Real-time conversation classification and routing with security redaction

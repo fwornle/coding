@@ -46,9 +46,11 @@ package "Status Aggregation Layer" {
     - Health file aggregation
   end note
   note right of CSL
-    **Status Display**
+    **Status Display + Master Supervisor**
+    - ensureGlobalProcessSupervisorRunning()
+    - ensureStatuslineHealthMonitorRunning()
     - ensureAllTranscriptMonitorsRunning()
-    - Fallback supervisor (60s rate limit)
+    - Runs on every Claude prompt
   end note
 }
 
@@ -108,6 +110,8 @@ SHM --> Health_Files : aggregates
 SHM --> Verify_Status : reads
 CSL --> SHM : queries status
 CSL --> ETM : ensures running (fallback)
+CSL --> GPS : **ensures running (master)**
+CSL --> SHM : ensures running
 
 ' Per-project monitoring
 ETM --> Health_Files : writes health
@@ -120,10 +124,10 @@ LLC --> PSM : uses
 
 legend right
   |= Component |= Responsibility |= Check Interval |
+  | CombinedStatusLine | **Master supervisor** - ensures GPS + SHM running | Every prompt |
   | GlobalProcessSupervisor | Active supervision, restart dead services | 30s |
-  | HealthVerifier | Multi-project health verification | 60s |
+  | HealthVerifier | Multi-project health verification (Docker-aware) | 60s |
   | StatusLineHealthMonitor | Status aggregation & display | 15s |
-  | CombinedStatusLine | Fallback restart + display | 60s (fallback) |
   | EnhancedTranscriptMonitor | Per-project LSL & health | 2s |
 endlegend
 
