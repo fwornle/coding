@@ -81,21 +81,41 @@ esac
 # Early Docker launch: start Docker immediately so it boots in parallel with setup
 # NOTE: We do NOT kill Docker processes here - that's destructive and breaks other sessions
 DOCKER_LAUNCH_START=""
+DOCKER_FRESH_START=false
 if [ "$DOCKER_MODE" = true ]; then
   if ! docker ps >/dev/null 2>&1; then
     # Docker daemon not responding - try to start it (platform-specific)
     if [ "$PLATFORM" = "macos" ]; then
-      # macOS: Check for Docker Desktop crash state before trying to start
-      # If Docker.app is running but daemon isn't responding, it may be crashed
+      # macOS: Check for Docker Desktop state
       if pgrep -q "Docker Desktop"; then
-        # Docker Desktop process exists but daemon not responding - likely crashed
-        log "⚠️  Docker Desktop appears hung or crashed (process exists but daemon not responding)"
-        log "💡 Please quit Docker Desktop manually and restart it"
-        log "💡 If it keeps crashing, try: Docker Desktop → Reset to factory defaults"
+        # Docker Desktop process exists but daemon not responding
+        # Wait a few seconds - it might just be starting up
+        log "⏳ Docker Desktop process found, waiting for daemon to respond..."
+        sleep 5
+        if ! docker ps >/dev/null 2>&1; then
+          # Still not responding - likely crashed or hung
+          log "⚠️  Docker Desktop appears hung or crashed (process exists but daemon not responding)"
+          log "💡 Please quit Docker Desktop manually and restart it"
+          log "💡 If it keeps crashing, try: Docker Desktop → Reset to factory defaults"
+        fi
       elif [ -d "/Applications/Docker.app" ]; then
-        log "🐳 Starting Docker Desktop early (will check readiness later)..."
+        log "🐳 Starting Docker Desktop (this may take a moment)..."
         open -a "Docker" 2>/dev/null
         DOCKER_LAUNCH_START=$(date +%s)
+        DOCKER_FRESH_START=true
+        # Wait briefly and verify Docker Desktop process started
+        sleep 3
+        if ! pgrep -q "Docker Desktop"; then
+          log "⚠️  Docker Desktop didn't start - retrying..."
+          open -a "Docker" 2>/dev/null
+          sleep 3
+        fi
+        if pgrep -q "Docker Desktop"; then
+          log "✅ Docker Desktop process started, waiting for daemon..."
+        else
+          log "❌ Failed to start Docker Desktop"
+          log "💡 Please start Docker Desktop manually from Applications"
+        fi
       fi
     elif [ "$PLATFORM" = "linux" ]; then
       # Linux: Try systemd first, then direct dockerd
@@ -187,8 +207,9 @@ docker_daemon_ready() {
 }
 
 # Ensure Docker is running (required for Qdrant vector search)
-# Total timeout budget: 90 seconds (accounts for early launch if already started)
-DOCKER_TIMEOUT_TOTAL=90
+# Timeout: 90 seconds normally, 150 seconds for fresh starts (after reset/first install)
+DOCKER_TIMEOUT_NORMAL=90
+DOCKER_TIMEOUT_FRESH=150
 
 ensure_docker_running() {
   # First check if daemon is fully ready (use docker ps, not docker info!)
@@ -197,14 +218,21 @@ ensure_docker_running() {
     return 0
   fi
 
+  # Use longer timeout for fresh Docker starts (after factory reset, first install)
+  local timeout=$DOCKER_TIMEOUT_NORMAL
+  if [ "$DOCKER_FRESH_START" = true ]; then
+    timeout=$DOCKER_TIMEOUT_FRESH
+    log "📦 Fresh Docker Desktop start detected - using extended timeout (${timeout}s)"
+  fi
+
   # Calculate remaining wait time if Docker was launched early
-  local wait_seconds=$DOCKER_TIMEOUT_TOTAL
+  local wait_seconds=$timeout
   if [ -n "$DOCKER_LAUNCH_START" ]; then
     local now=$(date +%s)
     local elapsed=$((now - DOCKER_LAUNCH_START))
-    wait_seconds=$((DOCKER_TIMEOUT_TOTAL - elapsed))
+    wait_seconds=$((timeout - elapsed))
     if [ $wait_seconds -le 0 ]; then
-      log "❌ Docker daemon not ready after ${DOCKER_TIMEOUT_TOTAL} seconds (launched early)"
+      log "❌ Docker daemon not ready after ${timeout} seconds (launched early)"
       log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
       show_docker_help
       return 1
@@ -252,7 +280,8 @@ ensure_docker_running() {
     log "⏳ Waiting for Docker daemon (max ${wait_seconds} seconds)..."
   fi
 
-  # Poll for Docker readiness
+  # Poll for Docker readiness with progress updates
+  local last_update=0
   for ((i=1; i<=wait_seconds; i++)); do
     if docker_daemon_ready; then
       local total_elapsed=$i
@@ -262,10 +291,16 @@ ensure_docker_running() {
       log "✅ Docker daemon ready after ${total_elapsed} seconds"
       return 0
     fi
+    # Show progress every 20 seconds
+    if [ $((i - last_update)) -ge 20 ]; then
+      local remaining=$((wait_seconds - i))
+      log "⏳ Still waiting for Docker daemon... (${remaining}s remaining)"
+      last_update=$i
+    fi
     sleep 1
   done
 
-  log "❌ Docker daemon not ready after ${DOCKER_TIMEOUT_TOTAL} seconds"
+  log "❌ Docker daemon not ready after ${timeout} seconds"
   log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
   show_docker_help
   return 1
@@ -310,8 +345,6 @@ fi
 
 if [ "$DOCKER_MODE" = true ]; then
   # Docker mode: Start services via docker compose
-  log "🐳 Starting coding services via Docker..."
-
   DOCKER_DIR="$CODING_REPO/docker"
 
   if [ ! -f "$DOCKER_DIR/docker-compose.yml" ]; then
@@ -319,29 +352,37 @@ if [ "$DOCKER_MODE" = true ]; then
     exit 1
   fi
 
-  # Export environment variables for docker compose
-  export CODING_REPO
+  # Check if containers are already healthy - skip docker compose if so
+  # This prevents Docker destabilization when starting a second session
+  if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+    log "✅ coding-services already running and healthy - reusing existing containers"
+  else
+    log "🐳 Starting coding services via Docker..."
 
-  # Start containers
-  if ! docker compose -f "$DOCKER_DIR/docker-compose.yml" up -d; then
-    log "Error: Failed to start Docker containers"
-    exit 1
-  fi
+    # Export environment variables for docker compose
+    export CODING_REPO
 
-  # Wait for health check
-  log "⏳ Waiting for coding-services to be healthy..."
-  for i in {1..60}; do
-    if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
-      log "✅ coding-services healthy after ${i} seconds"
-      break
-    fi
-    if [ $i -eq 60 ]; then
-      log "❌ coding-services health check failed after 60 seconds"
-      log "   Check logs: docker compose -f $DOCKER_DIR/docker-compose.yml logs"
+    # Start containers
+    if ! docker compose -f "$DOCKER_DIR/docker-compose.yml" up -d; then
+      log "Error: Failed to start Docker containers"
       exit 1
     fi
-    sleep 1
-  done
+
+    # Wait for health check
+    log "⏳ Waiting for coding-services to be healthy..."
+    for i in {1..60}; do
+      if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+        log "✅ coding-services healthy after ${i} seconds"
+        break
+      fi
+      if [ $i -eq 60 ]; then
+        log "❌ coding-services health check failed after 60 seconds"
+        log "   Check logs: docker compose -f $DOCKER_DIR/docker-compose.yml logs"
+        exit 1
+      fi
+      sleep 1
+    done
+  fi
 
   # Generate Docker MCP config if it doesn't exist or is outdated
   if [ ! -f "$CODING_REPO/claude-code-mcp-docker.json" ] || \
