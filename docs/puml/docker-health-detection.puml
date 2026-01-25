@@ -1,0 +1,90 @@
+@startuml docker-health-detection
+!include _standard-style.puml
+
+title Docker Mode Detection in Health System
+autonumber
+
+participant "HealthVerifier\n(health-verifier.js)" as HV
+participant "isDockerMode()" as DM
+participant "Environment" as ENV
+participant "FileSystem" as FS
+participant "CGR Cache Check" as CGR
+database "cache-metadata.json" as META
+
+== Docker Mode Detection ==
+
+HV -> DM: Check Docker mode
+activate DM
+
+DM -> ENV: Check CODING_DOCKER_MODE
+alt CODING_DOCKER_MODE === 'true'
+  ENV --> DM: true
+  DM --> HV: **Docker Mode**
+else Not set
+  DM -> FS: Check .docker-mode marker file
+  alt File exists
+    FS --> DM: exists
+    DM --> HV: **Docker Mode**
+  else File not found
+    DM -> FS: Check /.dockerenv
+    alt File exists (inside container)
+      FS --> DM: exists
+      DM --> HV: **Docker Mode**
+    else Not in container
+      FS --> DM: not found
+      DM --> HV: **Native Mode**
+    end
+  end
+end
+deactivate DM
+
+== CGR Cache Staleness Check ==
+
+HV -> CGR: checkCGRCacheStaleness()
+activate CGR
+
+CGR -> DM: isDockerMode()
+DM --> CGR: mode
+
+alt Docker Mode
+  note right of CGR
+    In Docker mode, .git directory
+    is not available, so we cannot
+    count commits behind.
+  end note
+
+  CGR -> FS: Read cache-metadata.json
+  alt File exists
+    FS --> CGR: metadata
+    CGR -> META: Extract cached_commit, indexed_at, stats
+    META --> CGR: details
+    CGR --> HV: **PASSED**\n"CGR cache @ abc123 (staleness unknown - Docker mode)"
+  else File not found
+    CGR --> HV: **PASSED**\n"CGR cache check skipped (Docker mode)"
+  end
+
+else Native Mode
+  CGR -> FS: Run cgr-cache-staleness.sh
+  note right of FS
+    Script uses git to count
+    commits since last index
+  end note
+
+  alt < 10 commits behind
+    FS --> CGR: staleness info
+    CGR --> HV: **PASSED**\n"CGR cache current"
+  else >= 10 commits behind
+    FS --> CGR: staleness warning
+    CGR --> HV: **WARNING**\n"CGR cache stale: N commits behind"
+  end
+end
+deactivate CGR
+
+legend right
+  |= Detection Method |= Priority |= Where Used |
+  | CODING_DOCKER_MODE env | 1st | Set by launch-claude.sh |
+  | .docker-mode marker | 2nd | Created when switching modes |
+  | /.dockerenv | 3rd | Exists inside Docker containers |
+endlegend
+
+@enduml
