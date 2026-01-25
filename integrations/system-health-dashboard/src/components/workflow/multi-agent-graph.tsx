@@ -1,8 +1,16 @@
 'use client'
 
 import React, { useMemo, useCallback, useEffect, useState, useRef } from 'react'
+import { useSelector } from 'react-redux'
 import type { AgentDefinition, EdgeDefinition, ProcessInfo, StepInfo } from './types'
 import type { AggregatedSteps } from '@/store/slices/ukbSlice'
+import {
+  selectIsEventDrivenMode,
+  selectExecutionStepStatuses,
+  selectExecutionSubstepStatuses,
+  selectExecutionCurrentStep,
+  selectExecutionCurrentSubstep,
+} from '@/store/slices/ukbSlice'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
 import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
 
@@ -262,14 +270,43 @@ export function MultiAgentGraph({
     }
   }, [onNodeSelect, onNodeClick])
   const { agents, orchestrator, edges, stepToAgent, stepToSubStep, agentSubSteps, isLoading } = useWorkflowDefinitions(process.workflowName)
+
+  // Event-driven mode: get step statuses from Redux when available
+  const isEventDrivenMode = useSelector(selectIsEventDrivenMode)
+  const executionStepStatuses = useSelector(selectExecutionStepStatuses)
+  const executionSubstepStatuses = useSelector(selectExecutionSubstepStatuses)
+  const executionCurrentStep = useSelector(selectExecutionCurrentStep)
+  const executionCurrentSubstep = useSelector(selectExecutionCurrentSubstep)
+
   // Merge YAML-provided substeps with hardcoded fallback (AGENT_SUBSTEPS)
+  // NOTE: AGENT_SUBSTEPS is a DEPRECATED fallback - prefer YAML-provided definitions
   const effectiveAgentSubSteps = Object.keys(agentSubSteps).length > 0
     ? agentSubSteps as Record<string, SubStep[]>
     : AGENT_SUBSTEPS
   // Merge YAML-provided substep ID mappings with hardcoded fallback
+  // NOTE: STEP_TO_SUBSTEP is a DEPRECATED fallback - prefer YAML-provided definitions
   const effectiveStepToSubStep = Object.keys(stepToSubStep).length > 0
     ? stepToSubStep
     : STEP_TO_SUBSTEP
+
+  // Compute effective process steps: prefer event-driven state when available
+  const effectiveSteps = useMemo((): StepInfo[] => {
+    if (isEventDrivenMode && Object.keys(executionStepStatuses).length > 0) {
+      // Convert event-driven step statuses to StepInfo array
+      return Object.values(executionStepStatuses).map(s => ({
+        name: s.name,
+        status: s.status,
+        duration: s.duration,
+        tokensUsed: s.tokensUsed,
+        llmProvider: s.llmProvider,
+        llmCalls: s.llmCalls,
+        error: s.error,
+        outputs: s.outputs as Record<string, any>,
+      }))
+    }
+    // Fallback to process.steps (polling-based)
+    return process.steps || []
+  }, [isEventDrivenMode, executionStepStatuses, process.steps])
   const { scrollRef, saveScrollPosition } = useScrollPreservation()
   const { wigglingNode, handleNodeMouseEnter, handleNodeMouseLeave } = useNodeWiggle()
 
@@ -283,14 +320,14 @@ export function MultiAgentGraph({
   // Auto-expand substeps when a multi-step agent is active (running or recently started)
   // Enhanced logic for free-flight mode: also detect agents where steps just completed
   useEffect(() => {
-    if (!process.steps) return
+    if (effectiveSteps.length === 0) return
 
     // Build current status map and detect active agent
     const currentStatuses = new Map<string, string>()
     let activeAgentWithSubsteps: string | null = null
     let recentlyActiveAgent: string | null = null
 
-    for (const step of process.steps) {
+    for (const step of effectiveSteps) {
       const agentId = stepToAgent[step.name] || step.name
       const hasSubsteps = effectiveAgentSubSteps[agentId]
       currentStatuses.set(step.name, step.status)
@@ -329,7 +366,7 @@ export function MultiAgentGraph({
       // Collapse if we auto-expanded and agent is no longer active
       const wasAutoExpanded = expandedSubStepsAgent === autoExpandedAgent
       // Check if any step mapping to this agent is still running
-      const agentStillRunning = process.steps?.some(s => {
+      const agentStillRunning = effectiveSteps.some(s => {
         const stepAgentId = stepToAgent[s.name] || s.name
         return stepAgentId === autoExpandedAgent && s.status === 'running'
       })
@@ -338,7 +375,7 @@ export function MultiAgentGraph({
         setAutoExpandedAgent(null)
       }
     }
-  }, [process.steps, expandedSubStepsAgent, autoExpandedAgent, stepToAgent])
+  }, [effectiveSteps, expandedSubStepsAgent, autoExpandedAgent, stepToAgent])
 
   // Attach scroll listener to save position on user scroll
   useEffect(() => {
@@ -411,35 +448,34 @@ export function MultiAgentGraph({
       ? (stepToAgent[process.currentStep] || process.currentStep)
       : null
 
-    if (process.steps) {
-      for (const step of process.steps) {
-        const agentId = stepToAgent[step.name] || step.name
-        agentSet.add(agentId)
-        countMap[agentId] = (countMap[agentId] || 0) + 1
+    // Use effectiveSteps (prefers event-driven state over polling-based)
+    for (const step of effectiveSteps) {
+      const agentId = stepToAgent[step.name] || step.name
+      agentSet.add(agentId)
+      countMap[agentId] = (countMap[agentId] || 0) + 1
 
-        // Determine effective status: if this agent is for currentStep, force 'running'
-        // This fixes lag where currentStep updates before step.status
-        const effectiveStatus = (currentStepAgentId === agentId && step.status === 'pending')
-          ? 'running'
-          : step.status
+      // Determine effective status: if this agent is for currentStep, force 'running'
+      // This fixes lag where currentStep updates before step.status
+      const stepEffectiveStatus = (currentStepAgentId === agentId && step.status === 'pending')
+        ? 'running'
+        : step.status
 
-        // Keep most relevant status (running > completed > pending > failed)
-        if (!statusMap[agentId] || effectiveStatus === 'running' || (effectiveStatus === 'completed' && statusMap[agentId].status !== 'running')) {
-          statusMap[agentId] = { ...step, status: effectiveStatus as StepInfo['status'] }
-        }
+      // Keep most relevant status (running > completed > pending > failed)
+      if (!statusMap[agentId] || stepEffectiveStatus === 'running' || (stepEffectiveStatus === 'completed' && statusMap[agentId].status !== 'running')) {
+        statusMap[agentId] = { ...step, status: stepEffectiveStatus as StepInfo['status'] }
+      }
 
-        // Aggregate KG operator child status to parent kg_operators
-        if (KG_OPERATOR_CHILDREN.includes(agentId)) {
-          agentSet.add('kg_operators')
-          countMap['kg_operators'] = (countMap['kg_operators'] || 0) + 1
-          // Aggregate status: running > failed > completed > pending
-          const existingStatus = statusMap['kg_operators']?.status
-          if (!existingStatus ||
-              effectiveStatus === 'running' ||
-              (effectiveStatus === 'failed' && existingStatus !== 'running') ||
-              (effectiveStatus === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
-            statusMap['kg_operators'] = { ...step, name: 'kg_operators', status: effectiveStatus as StepInfo['status'] }
-          }
+      // Aggregate KG operator child status to parent kg_operators
+      if (KG_OPERATOR_CHILDREN.includes(agentId)) {
+        agentSet.add('kg_operators')
+        countMap['kg_operators'] = (countMap['kg_operators'] || 0) + 1
+        // Aggregate status: running > failed > completed > pending
+        const existingStatus = statusMap['kg_operators']?.status
+        if (!existingStatus ||
+            stepEffectiveStatus === 'running' ||
+            (stepEffectiveStatus === 'failed' && existingStatus !== 'running') ||
+            (stepEffectiveStatus === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
+          statusMap['kg_operators'] = { ...step, name: 'kg_operators', status: stepEffectiveStatus as StepInfo['status'] }
         }
       }
     }
@@ -455,7 +491,7 @@ export function MultiAgentGraph({
     }
 
     return { stepStatusMap: statusMap, stepCountMap: countMap, agentsInWorkflow: agentSet }
-  }, [process.steps, process.currentStep, stepToAgent])
+  }, [effectiveSteps, process.currentStep, stepToAgent])
 
   // Get step count for an agent (how many workflow steps this agent handles)
   const getStepCount = useCallback((agentId: string): number => {
@@ -1043,7 +1079,8 @@ export function MultiAgentGraph({
               const arcPerStep = (totalArc - (substeps.length - 1) * arcSpacing) / substeps.length
 
               // Find ALL steps belonging to this agent and build per-substep status map
-              const agentSteps = (process.steps || []).filter(s => {
+              // Uses effectiveSteps (prefers event-driven state over polling-based)
+              const agentSteps = effectiveSteps.filter(s => {
                 const stepAgentId = stepToAgent[s.name] || s.name
                 return stepAgentId === expandedSubStepsAgent
               })
@@ -1148,7 +1185,8 @@ export function MultiAgentGraph({
             {(() => {
               const position = layout.positions.find(p => p.agent.id === expandedSubStepsAgent)
               if (!position) return null
-              const isAgentRunning = process.steps?.some(s => {
+              // Use effectiveSteps (prefers event-driven state over polling-based)
+              const isAgentRunning = effectiveSteps.some(s => {
                 const stepAgentId = stepToAgent[s.name] || s.name
                 return stepAgentId === expandedSubStepsAgent && s.status === 'running'
               })

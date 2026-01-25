@@ -1,6 +1,88 @@
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit'
 import { STEP_TO_AGENT as FALLBACK_STEP_TO_AGENT } from '@/components/workflow/constants'
 
+// Event-driven workflow types
+// Note: These types are copied from workflow-events.ts to avoid cross-package imports
+// Keep in sync with the coordinator's event types
+
+export type EventStepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
+
+export interface EventStepStatusInfo {
+  name: string
+  status: EventStepStatus
+  agent: string
+  duration?: number
+  tokensUsed?: number
+  llmProvider?: string
+  llmCalls?: number
+  error?: string
+  outputs?: Record<string, unknown>
+}
+
+export interface EventSubstepStatusInfo {
+  substepId: string
+  status: EventStepStatus
+  duration?: number
+  tokensUsed?: number
+  llmProvider?: string
+}
+
+export interface EventBatchProgress {
+  currentBatch: number
+  totalBatches: number
+  batchId?: string
+}
+
+// Event-driven execution state (single source of truth for active workflow)
+export interface WorkflowExecutionState {
+  workflowId: string | null
+  workflowName: string | null
+  status: 'idle' | 'running' | 'paused' | 'completed' | 'failed'
+  currentStep: string | null
+  currentSubstep: string | null
+  stepStatuses: Record<string, EventStepStatusInfo>
+  substepStatuses: Record<string, Record<string, EventSubstepStatusInfo>>
+  batchProgress: EventBatchProgress | null
+  batchPhaseSteps: string[]  // Names of steps that repeat per batch (from YAML)
+  startTime: string | null
+  lastUpdate: string | null
+}
+
+// Workflow preferences (shared between polling and event-driven modes)
+export interface WorkflowPreferencesState {
+  singleStepMode: boolean
+  singleStepModeExplicit: boolean
+  stepIntoSubsteps: boolean
+  mockLLM: boolean
+  mockLLMExplicit: boolean
+  mockLLMDelay: number
+}
+
+// Default execution state
+const initialExecutionState: WorkflowExecutionState = {
+  workflowId: null,
+  workflowName: null,
+  status: 'idle',
+  currentStep: null,
+  currentSubstep: null,
+  stepStatuses: {},
+  substepStatuses: {},
+  batchProgress: null,
+  batchPhaseSteps: [],
+  startTime: null,
+  lastUpdate: null,
+}
+
+// Default preferences state
+const initialPreferencesState: WorkflowPreferencesState = {
+  singleStepMode: false,
+  singleStepModeExplicit: false,
+  stepIntoSubsteps: false,
+  mockLLM: false,
+  mockLLMExplicit: false,
+  mockLLMDelay: 500,
+}
+
 // Step status type
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
 
@@ -328,7 +410,16 @@ interface UKBState {
   selectedProcessIndex: number
   selectedNode: string | null
 
-  // Single-step debugging mode (MVI: Single source of truth)
+  // ============================================
+  // Event-Driven Execution State (NEW)
+  // Single source of truth for active workflow state
+  // Populated by WebSocket events from coordinator
+  // ============================================
+  execution: WorkflowExecutionState
+  preferences: WorkflowPreferencesState
+
+  // Single-step debugging mode (LEGACY - kept for backward compatibility during migration)
+  // TODO: Remove after full migration to event-driven execution
   // singleStepMode: User's preference (can only be changed by checkbox toggle)
   // singleStepModeExplicit: True if user explicitly set it this session (prevents server overwrite)
   // stepPaused: Server-reported pause state (from coordinator via progress file)
@@ -390,13 +481,17 @@ const initialState: UKBState = {
   selectedProcessIndex: 0,
   selectedNode: null,
 
-  // Single-step debugging mode (MVI: initialized from server on first poll)
+  // Event-driven execution state (NEW)
+  execution: { ...initialExecutionState },
+  preferences: { ...initialPreferencesState },
+
+  // Single-step debugging mode (LEGACY - kept for backward compatibility)
   singleStepMode: false,
   singleStepModeExplicit: false,
   stepPaused: false,
   pausedAtStep: null,
 
-  // LLM Mock mode (MVI: initialized from server on first poll)
+  // LLM Mock mode (LEGACY - kept for backward compatibility)
   mockLLM: false,
   mockLLMExplicit: false,
   mockLLMDelay: 500,
@@ -654,6 +749,320 @@ const ukbSlice = createSlice({
     setSelectedSubStep(state, action: PayloadAction<SelectedSubStep | null>) {
       state.selectedSubStep = action.payload
     },
+
+    // ========================================
+    // Event-Driven Workflow Actions (NEW)
+    // These handle WebSocket events from the coordinator
+    // ========================================
+
+    // Handle WORKFLOW_STARTED event
+    handleWorkflowStarted(state, action: PayloadAction<{
+      workflowId: string
+      workflowName: string
+      team: string
+      repositoryPath: string
+      startTime: string
+      batchPhaseSteps: string[]
+      preferences: {
+        singleStepMode: boolean
+        stepIntoSubsteps: boolean
+        mockLLM: boolean
+        mockLLMDelay: number
+      }
+    }>) {
+      const { workflowId, workflowName, startTime, batchPhaseSteps, preferences } = action.payload
+      state.execution = {
+        workflowId,
+        workflowName,
+        status: 'running',
+        currentStep: null,
+        currentSubstep: null,
+        stepStatuses: {},
+        substepStatuses: {},
+        batchProgress: null,
+        batchPhaseSteps,
+        startTime,
+        lastUpdate: startTime,
+      }
+      // Sync preferences from coordinator (only if not explicitly set by user)
+      if (!state.preferences.singleStepModeExplicit) {
+        state.preferences.singleStepMode = preferences.singleStepMode
+        state.preferences.stepIntoSubsteps = preferences.stepIntoSubsteps
+      }
+      if (!state.preferences.mockLLMExplicit) {
+        state.preferences.mockLLM = preferences.mockLLM
+        state.preferences.mockLLMDelay = preferences.mockLLMDelay
+      }
+    },
+
+    // Handle STEP_STARTED event
+    handleStepStarted(state, action: PayloadAction<{
+      workflowId: string
+      stepName: string
+      agent: string
+      timestamp: string
+    }>) {
+      const { stepName, agent, timestamp } = action.payload
+      state.execution.currentStep = stepName
+      state.execution.currentSubstep = null
+      state.execution.stepStatuses[stepName] = {
+        name: stepName,
+        status: 'running',
+        agent,
+      }
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Handle STEP_COMPLETED event
+    handleStepCompleted(state, action: PayloadAction<{
+      workflowId: string
+      stepName: string
+      agent: string
+      duration: number
+      tokensUsed?: number
+      llmProvider?: string
+      llmCalls?: number
+      outputs?: Record<string, unknown>
+      timestamp: string
+    }>) {
+      const { stepName, agent, duration, tokensUsed, llmProvider, llmCalls, outputs, timestamp } = action.payload
+      state.execution.stepStatuses[stepName] = {
+        name: stepName,
+        status: 'completed',
+        agent,
+        duration,
+        tokensUsed,
+        llmProvider,
+        llmCalls,
+        outputs,
+      }
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Handle STEP_FAILED event
+    handleStepFailed(state, action: PayloadAction<{
+      workflowId: string
+      stepName: string
+      agent: string
+      error: string
+      duration: number
+      timestamp: string
+    }>) {
+      const { stepName, agent, error, duration, timestamp } = action.payload
+      state.execution.stepStatuses[stepName] = {
+        name: stepName,
+        status: 'failed',
+        agent,
+        duration,
+        error,
+      }
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Handle SUBSTEP_STARTED event
+    handleSubstepStarted(state, action: PayloadAction<{
+      workflowId: string
+      stepName: string
+      substepId: string
+      timestamp: string
+    }>) {
+      const { stepName, substepId, timestamp } = action.payload
+      state.execution.currentSubstep = substepId
+      if (!state.execution.substepStatuses[stepName]) {
+        state.execution.substepStatuses[stepName] = {}
+      }
+      state.execution.substepStatuses[stepName][substepId] = {
+        substepId,
+        status: 'running',
+      }
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Handle SUBSTEP_COMPLETED event
+    handleSubstepCompleted(state, action: PayloadAction<{
+      workflowId: string
+      stepName: string
+      substepId: string
+      duration: number
+      tokensUsed?: number
+      llmProvider?: string
+      timestamp: string
+    }>) {
+      const { stepName, substepId, duration, tokensUsed, llmProvider, timestamp } = action.payload
+      if (!state.execution.substepStatuses[stepName]) {
+        state.execution.substepStatuses[stepName] = {}
+      }
+      state.execution.substepStatuses[stepName][substepId] = {
+        substepId,
+        status: 'completed',
+        duration,
+        tokensUsed,
+        llmProvider,
+      }
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Handle BATCH_STARTED event
+    handleBatchStarted(state, action: PayloadAction<{
+      workflowId: string
+      batchId: string
+      batchNumber: number
+      totalBatches: number
+      timestamp: string
+    }>) {
+      const { batchId, batchNumber, totalBatches, timestamp } = action.payload
+      state.execution.batchProgress = {
+        currentBatch: batchNumber,
+        totalBatches,
+        batchId,
+      }
+      // Reset batch-phase step statuses for new batch
+      for (const stepName of state.execution.batchPhaseSteps) {
+        if (state.execution.stepStatuses[stepName]) {
+          state.execution.stepStatuses[stepName] = {
+            ...state.execution.stepStatuses[stepName],
+            status: 'pending',
+          }
+        }
+        // Clear substep statuses for batch-phase steps
+        delete state.execution.substepStatuses[stepName]
+      }
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Handle BATCH_COMPLETED event
+    handleBatchCompleted(state, action: PayloadAction<{
+      workflowId: string
+      batchId: string
+      batchNumber: number
+      timestamp: string
+    }>) {
+      const { timestamp } = action.payload
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Handle WORKFLOW_PAUSED event
+    handleWorkflowPaused(state, action: PayloadAction<{
+      workflowId: string
+      pausedAtStep: string
+      pausedAtSubstep?: string
+      reason: 'single_step' | 'manual' | 'error'
+      timestamp: string
+    }>) {
+      const { pausedAtStep, pausedAtSubstep, timestamp } = action.payload
+      state.execution.status = 'paused'
+      state.execution.currentStep = pausedAtStep
+      if (pausedAtSubstep) {
+        state.execution.currentSubstep = pausedAtSubstep
+      }
+      state.execution.lastUpdate = timestamp
+      // Also sync to legacy state for backward compatibility
+      state.stepPaused = true
+      state.pausedAtStep = pausedAtStep
+    },
+
+    // Handle WORKFLOW_RESUMED event
+    handleWorkflowResumed(state, action: PayloadAction<{
+      workflowId: string
+      resumedAtStep: string
+      timestamp: string
+    }>) {
+      const { timestamp } = action.payload
+      state.execution.status = 'running'
+      state.execution.lastUpdate = timestamp
+      // Also sync to legacy state for backward compatibility
+      state.stepPaused = false
+    },
+
+    // Handle WORKFLOW_COMPLETED event
+    handleWorkflowCompleted(state, action: PayloadAction<{
+      workflowId: string
+      duration: number
+      timestamp: string
+    }>) {
+      const { timestamp } = action.payload
+      state.execution.status = 'completed'
+      state.execution.lastUpdate = timestamp
+      // Reset explicit flags when workflow ends
+      state.preferences.singleStepModeExplicit = false
+      state.preferences.mockLLMExplicit = false
+    },
+
+    // Handle WORKFLOW_FAILED event
+    handleWorkflowFailed(state, action: PayloadAction<{
+      workflowId: string
+      error: string
+      failedAtStep?: string
+      timestamp: string
+    }>) {
+      const { timestamp } = action.payload
+      state.execution.status = 'failed'
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Handle PREFERENCES_UPDATED event (confirmation from coordinator)
+    handlePreferencesUpdated(state, action: PayloadAction<{
+      workflowId: string
+      preferences: {
+        singleStepMode?: boolean
+        stepIntoSubsteps?: boolean
+        mockLLM?: boolean
+        mockLLMDelay?: number
+      }
+      timestamp: string
+    }>) {
+      const { preferences, timestamp } = action.payload
+      // Only update if not explicitly set by user
+      if (preferences.singleStepMode !== undefined && !state.preferences.singleStepModeExplicit) {
+        state.preferences.singleStepMode = preferences.singleStepMode
+      }
+      if (preferences.stepIntoSubsteps !== undefined && !state.preferences.singleStepModeExplicit) {
+        state.preferences.stepIntoSubsteps = preferences.stepIntoSubsteps
+      }
+      if (preferences.mockLLM !== undefined && !state.preferences.mockLLMExplicit) {
+        state.preferences.mockLLM = preferences.mockLLM
+      }
+      if (preferences.mockLLMDelay !== undefined && !state.preferences.mockLLMExplicit) {
+        state.preferences.mockLLMDelay = preferences.mockLLMDelay
+      }
+      state.execution.lastUpdate = timestamp
+    },
+
+    // Reset execution state (when workflow ends or modal closes)
+    resetExecutionState(state) {
+      state.execution = { ...initialExecutionState }
+    },
+
+    // Set preferences from UI (marks as explicit to prevent server overwrite)
+    setWorkflowPreferences(state, action: PayloadAction<{
+      singleStepMode?: boolean
+      stepIntoSubsteps?: boolean
+      mockLLM?: boolean
+      mockLLMDelay?: number
+    }>) {
+      const { singleStepMode, stepIntoSubsteps, mockLLM, mockLLMDelay } = action.payload
+      if (singleStepMode !== undefined) {
+        state.preferences.singleStepMode = singleStepMode
+        state.preferences.singleStepModeExplicit = true
+        // Also sync to legacy state
+        state.singleStepMode = singleStepMode
+        state.singleStepModeExplicit = true
+      }
+      if (stepIntoSubsteps !== undefined) {
+        state.preferences.stepIntoSubsteps = stepIntoSubsteps
+      }
+      if (mockLLM !== undefined) {
+        state.preferences.mockLLM = mockLLM
+        state.preferences.mockLLMExplicit = true
+        // Also sync to legacy state
+        state.mockLLM = mockLLM
+        state.mockLLMExplicit = true
+      }
+      if (mockLLMDelay !== undefined) {
+        state.preferences.mockLLMDelay = mockLLMDelay
+        state.mockLLMDelay = mockLLMDelay
+      }
+    },
   },
 })
 
@@ -682,18 +1091,34 @@ export const {
   updateTraceEvent,
   clearTraces,
   selectTraceEvent,
-  // Single-step mode actions (MVI)
+  // Single-step mode actions (MVI - LEGACY)
   setSingleStepMode,
   syncStepPauseFromServer,
   syncSingleStepFromServer,
   resetSingleStepExplicit,
-  // LLM Mock mode actions (MVI)
+  // LLM Mock mode actions (MVI - LEGACY)
   setMockLLM,
   syncMockLLMFromServer,
   resetMockLLMExplicit,
   // Sub-step UI actions (MVI)
   setExpandedSubStepsAgent,
   setSelectedSubStep,
+  // Event-driven workflow actions (NEW)
+  handleWorkflowStarted,
+  handleStepStarted,
+  handleStepCompleted,
+  handleStepFailed,
+  handleSubstepStarted,
+  handleSubstepCompleted,
+  handleBatchStarted,
+  handleBatchCompleted,
+  handleWorkflowPaused,
+  handleWorkflowResumed,
+  handleWorkflowCompleted,
+  handleWorkflowFailed,
+  handlePreferencesUpdated,
+  resetExecutionState,
+  setWorkflowPreferences,
 } = ukbSlice.actions
 
 // Selectors
@@ -1043,6 +1468,130 @@ export const selectExpandedSubStepsAgent = createSelector(
 export const selectSelectedSubStep = createSelector(
   [selectUkbState],
   (ukb) => ukb.selectedSubStep
+)
+
+// ========================================
+// Event-Driven Execution Selectors (NEW)
+// ========================================
+
+export const selectExecution = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution
+)
+
+export const selectExecutionStatus = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.status
+)
+
+export const selectExecutionWorkflowId = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.workflowId
+)
+
+export const selectExecutionCurrentStep = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.currentStep
+)
+
+export const selectExecutionCurrentSubstep = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.currentSubstep
+)
+
+export const selectExecutionStepStatuses = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.stepStatuses
+)
+
+export const selectExecutionSubstepStatuses = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.substepStatuses
+)
+
+export const selectExecutionBatchProgress = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.batchProgress
+)
+
+export const selectExecutionBatchPhaseSteps = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.batchPhaseSteps
+)
+
+export const selectWorkflowPreferences = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.preferences
+)
+
+// Combined selector for step status by name (event-driven)
+export const selectStepStatusByName = createSelector(
+  [selectExecutionStepStatuses, (_: any, stepName: string) => stepName],
+  (stepStatuses, stepName): EventStepStatusInfo | null => {
+    return stepStatuses[stepName] || null
+  }
+)
+
+// Combined selector for substep statuses of a step (event-driven)
+export const selectSubstepStatusesByStep = createSelector(
+  [selectExecutionSubstepStatuses, (_: any, stepName: string) => stepName],
+  (substepStatuses, stepName): Record<string, EventSubstepStatusInfo> => {
+    return substepStatuses[stepName] || {}
+  }
+)
+
+// Selector to check if using event-driven mode (workflow has started via events)
+export const selectIsEventDrivenMode = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.execution.workflowId !== null
+)
+
+// Convert event-driven execution state to UKBProcess format for UI compatibility
+export const selectExecutionAsProcess = createSelector(
+  [selectUkbState],
+  (ukb): UKBProcess | null => {
+    const exec = ukb.execution
+    if (!exec.workflowId) return null
+
+    const steps: StepInfo[] = Object.values(exec.stepStatuses).map(s => ({
+      name: s.name,
+      status: s.status,
+      duration: s.duration,
+      tokensUsed: s.tokensUsed,
+      llmProvider: s.llmProvider,
+      llmCalls: s.llmCalls,
+      error: s.error,
+      outputs: s.outputs as Record<string, any>,
+    }))
+
+    const completedSteps = steps.filter(s => s.status === 'completed').length
+
+    return {
+      pid: exec.workflowId,
+      workflowName: exec.workflowName || 'unknown',
+      team: 'coding',
+      repositoryPath: '',
+      startTime: exec.startTime || '',
+      lastHeartbeat: exec.lastUpdate || '',
+      status: exec.status,
+      completedSteps,
+      totalSteps: Object.keys(exec.stepStatuses).length,
+      currentStep: exec.currentStep,
+      logFile: null,
+      isAlive: exec.status === 'running' || exec.status === 'paused',
+      health: exec.status === 'running' ? 'healthy' : exec.status === 'paused' ? 'stale' : 'dead',
+      heartbeatAgeSeconds: 0,
+      progressPercent: Object.keys(exec.stepStatuses).length > 0
+        ? Math.round((completedSteps / Object.keys(exec.stepStatuses).length) * 100)
+        : 0,
+      steps,
+      batchProgress: exec.batchProgress ? {
+        currentBatch: exec.batchProgress.currentBatch,
+        totalBatches: exec.batchProgress.totalBatches,
+        batchId: exec.batchProgress.batchId,
+      } : undefined,
+    }
+  }
 )
 
 export default ukbSlice.reducer

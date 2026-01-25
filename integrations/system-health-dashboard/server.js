@@ -8,6 +8,7 @@
 
 import express from 'express';
 import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
 import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -64,6 +65,11 @@ class SystemHealthAPIServer {
         this.lastAutoVerifyTime = null; // Track last auto-triggered verification to rate limit
         this.lastValidWorkflowProgress = null; // Cache for last valid workflow progress (to avoid 0/0 race conditions)
 
+        // WebSocket state for event-driven workflow updates
+        this.wss = null; // WebSocket server instance
+        this.wsClients = new Set(); // Connected WebSocket clients
+        this.workflowEventBuffer = []; // Buffer for events before clients connect
+
         this.setupMiddleware();
         this.setupRoutes();
     }
@@ -110,8 +116,10 @@ class SystemHealthAPIServer {
         this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
         this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
 
-        // SSE endpoint for real-time workflow state updates
+        // SSE endpoint for real-time workflow state updates (LEGACY - kept for backward compatibility)
         this.app.get('/api/ukb/stream', this.handleUKBStream.bind(this));
+
+        // Note: WebSocket endpoint /api/ukb/ws is handled via WebSocketServer upgrade (see start() method)
 
         // Workflow definitions endpoint (Single Source of Truth)
         this.app.get('/api/workflows/definitions', this.handleGetWorkflowDefinitions.bind(this));
@@ -1225,9 +1233,11 @@ class SystemHealthAPIServer {
             progress.stepPaused = false;
             progress.resumeRequestedAt = new Date().toISOString();
             // Handle step-into substeps mode
-            // When stepInto is true, the coordinator will pause at sub-step boundaries
-            if (req.body && req.body.stepInto !== undefined) {
-                progress.stepIntoSubsteps = !!req.body.stepInto;
+            // Only SET stepIntoSubsteps=true when "Into" is clicked
+            // "Step" button (stepInto: false) should NOT reset the flag - this allows
+            // continuing to step through sub-steps after entering sub-step mode
+            if (req.body && req.body.stepInto === true) {
+                progress.stepIntoSubsteps = true;
             }
             // Keep pausedAtStep for reference until next step starts
 
@@ -2312,6 +2322,9 @@ class SystemHealthAPIServer {
         return new Promise((resolve, reject) => {
             this.server = createServer(this.app);
 
+            // Setup WebSocket server for bidirectional workflow events
+            this.setupWebSocketServer();
+
             this.server.listen(this.port, (error) => {
                 if (error) {
                     console.error('❌ Failed to start System Health API server', { error: error.message, port: this.port });
@@ -2320,12 +2333,401 @@ class SystemHealthAPIServer {
                     console.log('✅ System Health API server started', {
                         port: this.port,
                         dashboardUrl: `http://localhost:${this.dashboardPort}`,
-                        apiUrl: `http://localhost:${this.port}/api`
+                        apiUrl: `http://localhost:${this.port}/api`,
+                        wsUrl: `ws://localhost:${this.port}/api/ukb/ws`
                     });
                     resolve();
                 }
             });
         });
+    }
+
+    /**
+     * Setup WebSocket server for bidirectional workflow event communication
+     * Handles events from coordinator and commands from dashboard
+     */
+    setupWebSocketServer() {
+        this.wss = new WebSocketServer({ noServer: true });
+
+        // Handle WebSocket upgrade requests
+        this.server.on('upgrade', (request, socket, head) => {
+            const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+
+            if (pathname === '/api/ukb/ws') {
+                this.wss.handleUpgrade(request, socket, head, (ws) => {
+                    this.wss.emit('connection', ws, request);
+                });
+            } else {
+                socket.destroy();
+            }
+        });
+
+        // Handle new WebSocket connections
+        this.wss.on('connection', (ws, request) => {
+            console.log('[WebSocket] Client connected');
+            this.wsClients.add(ws);
+
+            // Send any buffered events to new client
+            for (const event of this.workflowEventBuffer) {
+                this.sendToClient(ws, event);
+            }
+
+            // Handle incoming commands from dashboard
+            ws.on('message', (data) => {
+                try {
+                    const command = JSON.parse(data.toString());
+                    this.handleWorkflowCommand(command);
+                } catch (error) {
+                    console.error('[WebSocket] Failed to parse command:', error);
+                }
+            });
+
+            // Handle client disconnect
+            ws.on('close', () => {
+                console.log('[WebSocket] Client disconnected');
+                this.wsClients.delete(ws);
+            });
+
+            ws.on('error', (error) => {
+                console.error('[WebSocket] Client error:', error);
+                this.wsClients.delete(ws);
+            });
+
+            // Send heartbeat every 30 seconds
+            const heartbeatInterval = setInterval(() => {
+                if (ws.readyState === ws.OPEN) {
+                    this.sendToClient(ws, {
+                        type: 'HEARTBEAT',
+                        payload: {
+                            workflowId: null,
+                            status: 'idle',
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
+            }, 30000);
+
+            ws.on('close', () => clearInterval(heartbeatInterval));
+        });
+
+        // Setup file watcher to forward coordinator progress updates as events
+        this.setupWorkflowProgressWatcher();
+    }
+
+    /**
+     * Watch workflow progress file and convert changes to WebSocket events
+     * This bridges the file-based coordinator with the event-driven dashboard
+     */
+    setupWorkflowProgressWatcher() {
+        const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+        let lastContent = '';
+        let lastStepStatuses = {};
+
+        // Poll progress file and emit events for changes
+        const pollInterval = setInterval(() => {
+            try {
+                if (!existsSync(progressPath)) {
+                    if (lastContent !== '') {
+                        // Workflow ended - emit completion or reset
+                        this.broadcastEvent({
+                            type: 'WORKFLOW_COMPLETED',
+                            payload: {
+                                workflowId: 'unknown',
+                                duration: 0,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                        lastContent = '';
+                        lastStepStatuses = {};
+                    }
+                    return;
+                }
+
+                const content = readFileSync(progressPath, 'utf8');
+                if (content === lastContent) return;
+
+                const progress = JSON.parse(content);
+                const newContent = content;
+
+                // Detect workflow start
+                if (lastContent === '' && progress.status === 'running') {
+                    this.broadcastEvent({
+                        type: 'WORKFLOW_STARTED',
+                        payload: {
+                            workflowId: progress.workflowId || 'unknown',
+                            workflowName: progress.workflowName || 'unknown',
+                            team: progress.team || 'coding',
+                            repositoryPath: progress.repositoryPath || '',
+                            startTime: progress.startTime || new Date().toISOString(),
+                            batchPhaseSteps: progress.batchPhaseSteps || [],
+                            preferences: {
+                                singleStepMode: progress.singleStepMode || false,
+                                stepIntoSubsteps: progress.stepIntoSubsteps || false,
+                                mockLLM: progress.mockLLM || false,
+                                mockLLMDelay: progress.mockLLMDelay || 500
+                            }
+                        }
+                    });
+                }
+
+                // Detect step changes from stepsDetail
+                if (progress.stepsDetail) {
+                    for (const step of progress.stepsDetail) {
+                        const prevStatus = lastStepStatuses[step.name];
+
+                        if (!prevStatus && step.status === 'running') {
+                            // Step started
+                            this.broadcastEvent({
+                                type: 'STEP_STARTED',
+                                payload: {
+                                    workflowId: progress.workflowId || 'unknown',
+                                    stepName: step.name,
+                                    agent: step.agent || step.name,
+                                    stepIndex: progress.stepsDetail.indexOf(step),
+                                    timestamp: new Date().toISOString()
+                                }
+                            });
+                        } else if (prevStatus === 'running' && step.status === 'completed') {
+                            // Step completed
+                            this.broadcastEvent({
+                                type: 'STEP_COMPLETED',
+                                payload: {
+                                    workflowId: progress.workflowId || 'unknown',
+                                    stepName: step.name,
+                                    agent: step.agent || step.name,
+                                    stepIndex: progress.stepsDetail.indexOf(step),
+                                    duration: step.duration || 0,
+                                    tokensUsed: step.tokensUsed,
+                                    llmProvider: step.llmProvider,
+                                    llmCalls: step.llmCalls,
+                                    outputs: step.outputs,
+                                    timestamp: new Date().toISOString()
+                                }
+                            });
+                        } else if (prevStatus === 'running' && step.status === 'failed') {
+                            // Step failed
+                            this.broadcastEvent({
+                                type: 'STEP_FAILED',
+                                payload: {
+                                    workflowId: progress.workflowId || 'unknown',
+                                    stepName: step.name,
+                                    agent: step.agent || step.name,
+                                    stepIndex: progress.stepsDetail.indexOf(step),
+                                    error: step.error || 'Unknown error',
+                                    duration: step.duration || 0,
+                                    timestamp: new Date().toISOString()
+                                }
+                            });
+                        }
+
+                        lastStepStatuses[step.name] = step.status;
+                    }
+                }
+
+                // Detect pause state
+                if (progress.stepPaused && !JSON.parse(lastContent || '{}').stepPaused) {
+                    this.broadcastEvent({
+                        type: 'WORKFLOW_PAUSED',
+                        payload: {
+                            workflowId: progress.workflowId || 'unknown',
+                            pausedAtStep: progress.pausedAtStep || progress.currentStep || 'unknown',
+                            reason: 'single_step',
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                } else if (!progress.stepPaused && JSON.parse(lastContent || '{}').stepPaused) {
+                    this.broadcastEvent({
+                        type: 'WORKFLOW_RESUMED',
+                        payload: {
+                            workflowId: progress.workflowId || 'unknown',
+                            resumedAtStep: progress.currentStep || 'unknown',
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
+
+                // Detect workflow completion
+                if (progress.status === 'completed' && JSON.parse(lastContent || '{}').status !== 'completed') {
+                    this.broadcastEvent({
+                        type: 'WORKFLOW_COMPLETED',
+                        payload: {
+                            workflowId: progress.workflowId || 'unknown',
+                            duration: progress.elapsedSeconds ? progress.elapsedSeconds * 1000 : 0,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
+
+                // Detect workflow failure
+                if (progress.status === 'failed' && JSON.parse(lastContent || '{}').status !== 'failed') {
+                    this.broadcastEvent({
+                        type: 'WORKFLOW_FAILED',
+                        payload: {
+                            workflowId: progress.workflowId || 'unknown',
+                            error: progress.error || 'Unknown error',
+                            failedAtStep: progress.currentStep,
+                            duration: progress.elapsedSeconds ? progress.elapsedSeconds * 1000 : 0,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
+
+                lastContent = newContent;
+            } catch (error) {
+                // Ignore read errors during rapid updates
+            }
+        }, 100);
+
+        // Cleanup on server stop
+        this.server.on('close', () => clearInterval(pollInterval));
+    }
+
+    /**
+     * Send a message to a specific WebSocket client
+     */
+    sendToClient(ws, message) {
+        if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify(message));
+        }
+    }
+
+    /**
+     * Broadcast an event to all connected WebSocket clients
+     */
+    broadcastEvent(event) {
+        const message = JSON.stringify(event);
+        console.log(`[WebSocket-TX] ${event.type}`);
+
+        for (const client of this.wsClients) {
+            if (client.readyState === client.OPEN) {
+                client.send(message);
+            }
+        }
+
+        // Buffer recent events for new clients (keep last 50)
+        this.workflowEventBuffer.push(event);
+        if (this.workflowEventBuffer.length > 50) {
+            this.workflowEventBuffer.shift();
+        }
+    }
+
+    /**
+     * Handle workflow commands from dashboard
+     * Writes to progress file for coordinator to read (temporary bridge)
+     */
+    async handleWorkflowCommand(command) {
+        console.log(`[WebSocket-RX] Command: ${command.type}`);
+        const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+        try {
+            switch (command.type) {
+                case 'STEP_ADVANCE':
+                    // Write resume signal to progress file (same as existing handleStepAdvance)
+                    if (existsSync(progressPath)) {
+                        const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                        progress.resumeRequestedAt = new Date().toISOString();
+                        writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+                        console.log('[WebSocket] Step advance requested');
+                    }
+                    break;
+
+                case 'SET_SINGLE_STEP_MODE':
+                    if (existsSync(progressPath)) {
+                        const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                        progress.singleStepMode = command.payload.enabled;
+                        progress.singleStepUpdatedAt = new Date().toISOString();
+                        writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+                        console.log(`[WebSocket] Single-step mode set to: ${command.payload.enabled}`);
+                        // Confirm the change
+                        this.broadcastEvent({
+                            type: 'PREFERENCES_UPDATED',
+                            payload: {
+                                workflowId: progress.workflowId || 'unknown',
+                                preferences: { singleStepMode: command.payload.enabled },
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                    }
+                    break;
+
+                case 'SET_STEP_INTO_SUBSTEPS':
+                    if (existsSync(progressPath)) {
+                        const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                        progress.stepIntoSubsteps = command.payload.enabled;
+                        writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+                        console.log(`[WebSocket] Step-into-substeps set to: ${command.payload.enabled}`);
+                        this.broadcastEvent({
+                            type: 'PREFERENCES_UPDATED',
+                            payload: {
+                                workflowId: progress.workflowId || 'unknown',
+                                preferences: { stepIntoSubsteps: command.payload.enabled },
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                    }
+                    break;
+
+                case 'SET_MOCK_LLM':
+                    if (existsSync(progressPath)) {
+                        const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                        progress.mockLLM = command.payload.enabled;
+                        if (command.payload.delay !== undefined) {
+                            progress.mockLLMDelay = command.payload.delay;
+                        }
+                        progress.mockLLMUpdatedAt = new Date().toISOString();
+                        writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+                        console.log(`[WebSocket] Mock LLM set to: ${command.payload.enabled}`);
+                        this.broadcastEvent({
+                            type: 'PREFERENCES_UPDATED',
+                            payload: {
+                                workflowId: progress.workflowId || 'unknown',
+                                preferences: {
+                                    mockLLM: command.payload.enabled,
+                                    mockLLMDelay: command.payload.delay
+                                },
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                    }
+                    break;
+
+                case 'CANCEL_WORKFLOW':
+                    // Write abort signal
+                    const abortPath = join(codingRoot, '.data', 'workflow-abort.json');
+                    writeFileSync(abortPath, JSON.stringify({
+                        abort: true,
+                        workflowId: command.payload.workflowId,
+                        reason: command.payload.reason || 'User cancelled',
+                        timestamp: new Date().toISOString()
+                    }, null, 2));
+                    console.log('[WebSocket] Workflow cancel requested');
+                    break;
+
+                case 'PAUSE_WORKFLOW':
+                    if (existsSync(progressPath)) {
+                        const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                        progress.singleStepMode = true;
+                        progress.singleStepUpdatedAt = new Date().toISOString();
+                        writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+                        console.log('[WebSocket] Workflow pause requested');
+                    }
+                    break;
+
+                case 'RESUME_WORKFLOW':
+                    if (existsSync(progressPath)) {
+                        const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                        progress.resumeRequestedAt = new Date().toISOString();
+                        writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+                        console.log('[WebSocket] Workflow resume requested');
+                    }
+                    break;
+
+                default:
+                    console.warn(`[WebSocket] Unknown command type: ${command.type}`);
+            }
+        } catch (error) {
+            console.error(`[WebSocket] Failed to handle command ${command.type}:`, error);
+        }
     }
 
     async stop() {
