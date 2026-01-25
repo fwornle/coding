@@ -1125,19 +1125,42 @@ class HealthVerifier extends EventEmitter {
    * Note: Skipped in Docker mode because .git directory isn't available in containers
    */
   async checkCGRCacheStaleness() {
-    // Skip in Docker mode - .git directory not available in containers
+    const cgrDir = path.join(this.codingRoot, 'integrations', 'code-graph-rag');
+    const metadataFile = path.join(cgrDir, 'shared-data', 'cache-metadata.json');
+
+    // Skip staleness check in Docker mode - .git directory not available
+    // But still try to read cache metadata to show cached commit info
     if (isDockerMode()) {
+      let details = { skipped_reason: 'docker_mode' };
+      let message = 'CGR cache check skipped (Docker mode - no .git access)';
+
+      // Try to read cache metadata for display
+      if (fsSync.existsSync(metadataFile)) {
+        try {
+          const metadata = JSON.parse(fsSync.readFileSync(metadataFile, 'utf-8'));
+          details = {
+            ...details,
+            repo_name: metadata.repo_name,
+            cached_commit: metadata.commit_short || metadata.commit_hash?.substring(0, 7),
+            indexed_at: metadata.indexed_at,
+            stats: metadata.stats
+          };
+          message = `CGR cache @ ${details.cached_commit} (staleness unknown - Docker mode)`;
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+
       return {
         category: 'databases',
         check: 'cgr_cache',
         status: 'passed',
         severity: 'info',
-        message: 'CGR cache check skipped (Docker mode - no .git access)',
-        details: { skipped_reason: 'docker_mode' }
+        message,
+        details
       };
     }
 
-    const cgrDir = path.join(this.codingRoot, 'integrations', 'code-graph-rag');
     const stalenessScript = path.join(cgrDir, 'scripts', 'check-cache-staleness.sh');
 
     // Check if script exists
