@@ -283,7 +283,26 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const dispatch = useDispatch()
 
   // Workflow config from Redux (populated from API with fallback to constants)
-  const { stepToAgent } = useWorkflowDefinitions()
+  const { stepToAgent, agentSubSteps } = useWorkflowDefinitions()
+
+  // Compute which steps have sub-steps dynamically from workflow config
+  // A step has substeps if: 1) it's an agent with substeps, or 2) it maps to an agent with substeps
+  const stepsWithSubsteps = useMemo(() => {
+    const steps = new Set<string>()
+    // Add all agents that have substeps defined
+    for (const agentId of Object.keys(agentSubSteps)) {
+      if (agentSubSteps[agentId]?.length > 0) {
+        steps.add(agentId)
+      }
+    }
+    // Add step names that map to agents with substeps
+    for (const [stepName, agentId] of Object.entries(stepToAgent)) {
+      if (agentSubSteps[agentId]?.length > 0) {
+        steps.add(stepName)
+      }
+    }
+    return steps
+  }, [agentSubSteps, stepToAgent])
 
   // Redux state
   const selectedProcessIndex = useSelector((state: RootState) => state.ukb.selectedProcessIndex)
@@ -339,6 +358,18 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const stepPaused = useSelector(selectStepPaused)
   const pausedAtStep = useSelector(selectPausedAtStep)
   const [stepAdvanceLoading, setStepAdvanceLoading] = useState(false)  // Local UI state only
+
+  // DEBUG: Log pausedAtStep and whether "Step Into" button should appear
+  useEffect(() => {
+    const hasSubsteps = pausedAtStep ? stepsWithSubsteps.has(pausedAtStep) : false
+    console.log('[UKB-DEBUG] Step pause state:', {
+      stepPaused,
+      pausedAtStep,
+      hasSubsteps,
+      stepsWithSubsteps: Array.from(stepsWithSubsteps),
+      shouldShowStepIntoButton: stepPaused && pausedAtStep && hasSubsteps
+    })
+  }, [stepPaused, pausedAtStep, stepsWithSubsteps])
 
   // LLM Mock mode state (MVI: from Redux store)
   const mockLLM = useSelector(selectMockLLM)
@@ -437,19 +468,6 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       Logger.error(LogCategories.UKB, 'Error toggling single-step mode', error)
     }
   }
-
-  // Steps that have sub-steps (from workflow YAML config)
-  // Includes both direct agent names AND batch step names used in batch workflows
-  const STEPS_WITH_SUBSTEPS = new Set([
-    // Direct agent names (complete-analysis workflow)
-    'semantic_analysis',
-    'observation_generation',
-    'ontology_classification',
-    // Batch step names (batch-analysis workflow)
-    'batch_semantic_analysis',
-    'generate_batch_observations',
-    'classify_with_ontology',
-  ])
 
   // Advance to next step when paused (MVI: dispatches Redux action)
   // After advancing, poll rapidly to catch the new pause state faster
@@ -1917,7 +1935,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                           )}
                           Step
                         </Button>
-                        {pausedAtStep && STEPS_WITH_SUBSTEPS.has(pausedAtStep) && (
+                        {pausedAtStep && stepsWithSubsteps.has(pausedAtStep) && (
                           <Button
                             variant="outline"
                             size="sm"

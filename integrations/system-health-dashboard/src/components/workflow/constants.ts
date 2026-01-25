@@ -361,7 +361,16 @@ export const WORKFLOW_AGENTS: AgentDefinition[] = [
   },
 ]
 
-// Step name to agent ID mapping
+/**
+ * Step name to agent ID mapping
+ *
+ * @deprecated This hardcoded mapping is a fallback for when YAML definitions
+ * haven't loaded yet. Prefer using useWorkflowDefinitions() hook which loads
+ * mappings from the server's agents.yaml configuration.
+ *
+ * The event-driven architecture (ukbSlice.execution) should be the primary
+ * source of truth for step statuses during workflow execution.
+ */
 export const STEP_TO_AGENT: Record<string, string> = {
   // Batch workflow steps
   'plan_batches': 'batch_scheduler',
@@ -414,8 +423,17 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'content_validation': 'content_validation',
 }
 
-// Map step names to their sub-step within an agent
-// Used to highlight the currently active sub-step in the multi-agent graph
+/**
+ * Map step names to their sub-step within an agent
+ * Used to highlight the currently active sub-step in the multi-agent graph
+ *
+ * @deprecated This hardcoded mapping is a fallback for when YAML definitions
+ * haven't loaded yet. Prefer using useWorkflowDefinitions() hook which loads
+ * substep_id_mappings from the server's agents.yaml configuration.
+ *
+ * The event-driven architecture (ukbSlice.execution.substepStatuses) should be
+ * the primary source of truth for substep statuses during workflow execution.
+ */
 export const STEP_TO_SUBSTEP: Record<string, string> = {
   // code_graph agent sub-steps
   'index_codebase': 'index',
