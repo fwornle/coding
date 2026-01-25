@@ -83,6 +83,9 @@ class CombinedStatusLine {
       // Ensure statusline health monitor daemon is running (global singleton)
       await this.ensureStatuslineHealthMonitorRunning();
 
+      // Ensure global process supervisor is running (watches health-verifier & statusline-health-monitor)
+      await this.ensureGlobalProcessSupervisorRunning();
+
       const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus, ukbStatus);
 
       this.statusCache = status;
@@ -1455,6 +1458,112 @@ class CombinedStatusLine {
     } catch (error) {
       if (process.env.DEBUG_STATUS) {
         console.error('DEBUG: Failed to start statusline health monitor:', error.message);
+      }
+    }
+  }
+
+
+  /**
+   * Ensure global-process-supervisor is running
+   * This supervisor watches health-verifier and statusline-health-monitor
+   * and restarts them if they die
+   */
+  async ensureGlobalProcessSupervisorRunning() {
+    try {
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+
+      // Check PSM for existing healthy instance
+      try {
+        const ProcessStateManager = (await import('./process-state-manager.js')).default;
+        const psm = new ProcessStateManager();
+        await psm.initialize();
+
+        // Check if global-process-supervisor is running
+        const isRunning = await psm.isServiceRunning('global-process-supervisor', 'global');
+
+        if (isRunning) {
+          // Already running, nothing to do
+          if (process.env.DEBUG_STATUS) {
+            console.error('DEBUG: Global process supervisor already running via PSM');
+          }
+          return;
+        }
+      } catch (psmError) {
+        if (process.env.DEBUG_STATUS) {
+          console.error('DEBUG: PSM check failed:', psmError.message);
+        }
+        // Fall through to heartbeat check
+      }
+
+      // Fallback: Check heartbeat file freshness
+      const heartbeatFile = join(codingPath, '.health', 'supervisor-heartbeat.json');
+
+      if (existsSync(heartbeatFile)) {
+        try {
+          const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf8'));
+          const age = Date.now() - new Date(heartbeat.timestamp).getTime();
+
+          // If heartbeat updated in last 60 seconds, supervisor is likely running
+          if (age < 60000) {
+            if (process.env.DEBUG_STATUS) {
+              console.error('DEBUG: Supervisor heartbeat fresh, likely running');
+            }
+            return;
+          }
+        } catch {
+          // Ignore heartbeat read errors
+        }
+      }
+
+      // Supervisor not running or stale - start it
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Global process supervisor not detected, starting...');
+      }
+      await this.startGlobalProcessSupervisor();
+    } catch (error) {
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Error checking global process supervisor:', error.message);
+      }
+    }
+  }
+
+  /**
+   * Start the global process supervisor daemon
+   */
+  async startGlobalProcessSupervisor() {
+    try {
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+      const supervisorScript = join(codingPath, 'scripts', 'global-process-supervisor.js');
+
+      if (!existsSync(supervisorScript)) {
+        if (process.env.DEBUG_STATUS) {
+          console.error('DEBUG: Global process supervisor script not found');
+        }
+        return;
+      }
+
+      const { spawn } = await import('child_process');
+
+      // Start supervisor in daemon mode
+      const supervisor = spawn('node', [supervisorScript, '--daemon'], {
+        detached: true,
+        stdio: 'ignore',
+        cwd: codingPath,
+        env: {
+          ...process.env,
+          CODING_REPO: codingPath
+        }
+      });
+
+      supervisor.unref(); // Allow parent to exit without waiting
+
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Started global process supervisor with PID:', supervisor.pid);
+      }
+
+    } catch (error) {
+      if (process.env.DEBUG_STATUS) {
+        console.error('DEBUG: Failed to start global process supervisor:', error.message);
       }
     }
   }
