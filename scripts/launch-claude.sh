@@ -85,8 +85,14 @@ if [ "$DOCKER_MODE" = true ]; then
   if ! docker ps >/dev/null 2>&1; then
     # Docker daemon not responding - try to start it (platform-specific)
     if [ "$PLATFORM" = "macos" ]; then
-      # macOS: Use Docker Desktop
-      if [ -d "/Applications/Docker.app" ]; then
+      # macOS: Check for Docker Desktop crash state before trying to start
+      # If Docker.app is running but daemon isn't responding, it may be crashed
+      if pgrep -q "Docker Desktop"; then
+        # Docker Desktop process exists but daemon not responding - likely crashed
+        log "⚠️  Docker Desktop appears hung or crashed (process exists but daemon not responding)"
+        log "💡 Please quit Docker Desktop manually and restart it"
+        log "💡 If it keeps crashing, try: Docker Desktop → Reset to factory defaults"
+      elif [ -d "/Applications/Docker.app" ]; then
         log "🐳 Starting Docker Desktop early (will check readiness later)..."
         open -a "Docker" 2>/dev/null
         DOCKER_LAUNCH_START=$(date +%s)
@@ -209,8 +215,13 @@ ensure_docker_running() {
     log "🐳 Docker not running - attempting to start..."
 
     if [ "$PLATFORM" = "macos" ]; then
-      # macOS: Use Docker Desktop
-      if [ -d "/Applications/Docker.app" ]; then
+      # macOS: Check for crashed Docker Desktop first
+      if pgrep -q "Docker Desktop"; then
+        log "⚠️  Docker Desktop process exists but daemon not responding"
+        log "💡 Docker Desktop may have crashed - please quit and restart it manually"
+        log "💡 Check for error dialog in Docker Desktop window"
+        return 1
+      elif [ -d "/Applications/Docker.app" ]; then
         log "   Starting Docker Desktop..."
         open -a "Docker" 2>/dev/null
       else
@@ -264,6 +275,12 @@ ensure_docker_running() {
 show_docker_help() {
   if [ "$PLATFORM" = "macos" ]; then
     log "💡 Please start Docker Desktop manually for full functionality"
+    # Check if Docker Desktop process exists (might be crashed)
+    if pgrep -q "Docker Desktop"; then
+      log "⚠️  Docker Desktop process found but daemon not responding - may have crashed"
+      log "💡 Try: Quit Docker Desktop, then restart it"
+      log "💡 If crashes persist: Docker Desktop → Troubleshoot → Reset to factory defaults"
+    fi
   elif [ "$PLATFORM" = "linux" ]; then
     log "💡 Please start Docker: sudo systemctl start docker"
   else

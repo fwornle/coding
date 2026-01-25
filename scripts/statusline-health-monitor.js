@@ -1762,6 +1762,12 @@ class StatusLineHealthMonitor {
   async autoHealConstraintMonitor(healthStatus) {
     if (!this.autoHealEnabled) return false;
 
+    // Skip auto-healing in Docker mode - services run in containers, not native
+    if (this.isDockerMode()) {
+      this.log('Auto-healing skipped - Docker mode active (services run in containers)', 'DEBUG');
+      return false;
+    }
+
     // Skip auto-healing during Docker mode transition
     if (this.monitoringPaused) {
       this.log('Auto-healing skipped - Docker mode transition in progress', 'DEBUG');
@@ -1940,6 +1946,12 @@ class StatusLineHealthMonitor {
    */
   async autoHealVKBServer(healthStatus) {
     if (!this.autoHealEnabled) return false;
+
+    // Skip auto-healing in Docker mode - services run in containers, not native
+    if (this.isDockerMode()) {
+      this.log('Auto-healing skipped - Docker mode active (services run in containers)', 'DEBUG');
+      return false;
+    }
 
     // Skip auto-healing during Docker mode transition
     if (this.monitoringPaused) {
