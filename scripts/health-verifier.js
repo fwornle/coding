@@ -1122,8 +1122,21 @@ class HealthVerifier extends EventEmitter {
 
   /**
    * Check code-graph-rag cache staleness
+   * Note: Skipped in Docker mode because .git directory isn't available in containers
    */
   async checkCGRCacheStaleness() {
+    // Skip in Docker mode - .git directory not available in containers
+    if (isDockerMode()) {
+      return {
+        category: 'databases',
+        check: 'cgr_cache',
+        status: 'passed',
+        severity: 'info',
+        message: 'CGR cache check skipped (Docker mode - no .git access)',
+        details: { skipped_reason: 'docker_mode' }
+      };
+    }
+
     const cgrDir = path.join(this.codingRoot, 'integrations', 'code-graph-rag');
     const stalenessScript = path.join(cgrDir, 'scripts', 'check-cache-staleness.sh');
 
