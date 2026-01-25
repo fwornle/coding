@@ -32,6 +32,34 @@ import { runIfMain } from '../lib/utils/esm-cli.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * Detect if running in Docker mode
+ * Checks multiple indicators:
+ * 1. CODING_DOCKER_MODE environment variable (set by launch-claude.sh)
+ * 2. .docker-mode marker file in coding repo
+ * 3. /.dockerenv (when running inside container)
+ */
+function isDockerMode() {
+  // Check environment variable first (set by launch-claude.sh)
+  if (process.env.CODING_DOCKER_MODE === 'true') {
+    return true;
+  }
+
+  // Check for .docker-mode marker file (created when user enables Docker mode)
+  const codingRoot = path.resolve(__dirname, '..');
+  const dockerModeMarker = path.join(codingRoot, '.docker-mode');
+  if (fsSync.existsSync(dockerModeMarker)) {
+    return true;
+  }
+
+  // Check /.dockerenv (when running inside the container itself)
+  if (fsSync.existsSync('/.dockerenv')) {
+    return true;
+  }
+
+  return false;
+}
+
 class HealthVerifier extends EventEmitter {
   constructor(options = {}) {
     super();
@@ -81,7 +109,7 @@ class HealthVerifier extends EventEmitter {
       const rules = JSON.parse(rulesData);
 
       // Apply Docker-specific overrides
-      if (fsSync.existsSync('/.dockerenv')) {
+      if (isDockerMode()) {
         console.log('[HealthVerifier] Docker mode detected - applying rule overrides');
         this.applyDockerOverrides(rules);
       }
@@ -1476,7 +1504,7 @@ class HealthVerifier extends EventEmitter {
 
     // Check for existing instance (singleton enforcement)
     // Skip in Docker mode - supervisord manages the process lifecycle
-    if (!fsSync.existsSync('/.dockerenv')) {
+    if (!isDockerMode()) {
       const existing = await this.checkExistingInstance();
       if (existing.running) {
         this.log(`Another health-verifier instance is already running (PID: ${existing.pid})`);
