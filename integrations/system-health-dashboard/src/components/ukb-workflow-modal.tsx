@@ -439,10 +439,16 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   }
 
   // Steps that have sub-steps (from workflow YAML config)
+  // Includes both direct agent names AND batch step names used in batch workflows
   const STEPS_WITH_SUBSTEPS = new Set([
+    // Direct agent names (complete-analysis workflow)
     'semantic_analysis',
     'observation_generation',
     'ontology_classification',
+    // Batch step names (batch-analysis workflow)
+    'batch_semantic_analysis',
+    'generate_batch_observations',
+    'classify_with_ontology',
   ])
 
   // Advance to next step when paused (MVI: dispatches Redux action)
