@@ -2061,13 +2061,45 @@ class SystemHealthAPIServer {
     /**
      * Get Code Graph RAG cache status
      * Runs the staleness check script and returns cache status
+     * Falls back to cache-metadata.json if script fails (e.g., no .git in Docker)
      */
     async handleGetCGRStatus(req, res) {
         try {
             const cgrDir = join(codingRoot, 'integrations', 'code-graph-rag');
             const stalenessScript = join(cgrDir, 'scripts', 'check-cache-staleness.sh');
+            const metadataFile = join(cgrDir, 'shared-data', 'cache-metadata.json');
+
+            // Helper to read cache metadata as fallback
+            const readCacheMetadata = () => {
+                if (existsSync(metadataFile)) {
+                    try {
+                        const metadata = JSON.parse(readFileSync(metadataFile, 'utf-8'));
+                        return {
+                            available: true,
+                            cacheStatus: 'unknown',
+                            isStale: null,  // Can't determine without git
+                            commitsBehind: null,
+                            cachedCommit: metadata.commit_short || metadata.commit_hash?.substring(0, 7),
+                            currentCommit: null,  // Can't get without git
+                            indexedAt: metadata.indexed_at,
+                            repoName: metadata.repo_name,
+                            stats: metadata.stats,
+                            message: 'Cache exists (staleness check unavailable - no git access)',
+                            timestamp: new Date().toISOString()
+                        };
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return null;
+            };
 
             if (!existsSync(stalenessScript)) {
+                // No script - try reading metadata directly
+                const metadata = readCacheMetadata();
+                if (metadata) {
+                    return res.json({ status: 'success', data: metadata });
+                }
                 return res.json({
                     status: 'success',
                     data: {
@@ -2125,8 +2157,14 @@ class SystemHealthAPIServer {
                         });
                         return;
                     } catch (parseError) {
-                        // Fall through to error case
+                        // Fall through to fallback
                     }
+                }
+
+                // Fallback: try reading cache metadata directly (useful in Docker where .git isn't available)
+                const metadata = readCacheMetadata();
+                if (metadata) {
+                    return res.json({ status: 'success', data: metadata });
                 }
 
                 res.json({
