@@ -83,49 +83,97 @@ esac
 DOCKER_LAUNCH_START=""
 DOCKER_FRESH_START=false
 if [ "$DOCKER_MODE" = true ]; then
-  if ! docker ps >/dev/null 2>&1; then
-    # Docker daemon not responding - try to start it (platform-specific)
-    if [ "$PLATFORM" = "macos" ]; then
-      # macOS: Check for Docker Desktop state
-      if pgrep -q "Docker Desktop"; then
-        # Docker Desktop process exists but daemon not responding
-        # Wait a few seconds - it might just be starting up
-        log "⏳ Docker Desktop process found, waiting for daemon to respond..."
-        sleep 5
-        if ! docker ps >/dev/null 2>&1; then
-          # Still not responding - likely crashed or hung
-          log "⚠️  Docker Desktop appears hung or crashed (process exists but daemon not responding)"
-          log "💡 Please quit Docker Desktop manually and restart it"
-          log "💡 If it keeps crashing, try: Docker Desktop → Reset to factory defaults"
-        fi
-      elif [ -d "/Applications/Docker.app" ]; then
-        log "🐳 Starting Docker Desktop (this may take a moment)..."
-        open -a "Docker" 2>/dev/null
-        DOCKER_LAUNCH_START=$(date +%s)
-        DOCKER_FRESH_START=true
-        # Wait briefly and verify Docker Desktop process started
-        sleep 3
-        if ! pgrep -q "Docker Desktop"; then
-          log "⚠️  Docker Desktop didn't start - retrying..."
-          open -a "Docker" 2>/dev/null
-          sleep 3
-        fi
-        if pgrep -q "Docker Desktop"; then
-          log "✅ Docker Desktop process started, waiting for daemon..."
+  log "🔍 Checking Docker status..."
+
+  # Check if docker client is installed
+  if ! command -v docker &>/dev/null; then
+    log "❌ Docker client not found in PATH"
+    log "💡 Install Docker Desktop: https://www.docker.com/products/docker-desktop"
+  else
+    log "   ✓ Docker client installed: $(command -v docker)"
+
+    # Try to connect to daemon and capture error
+    DOCKER_PS_OUTPUT=$(docker ps 2>&1)
+    DOCKER_PS_EXIT=$?
+
+    if [ $DOCKER_PS_EXIT -eq 0 ]; then
+      log "   ✓ Docker daemon is responding"
+    else
+      log "   ✗ Docker daemon not responding (exit code: $DOCKER_PS_EXIT)"
+      log "   ✗ Error: ${DOCKER_PS_OUTPUT:0:200}"  # First 200 chars of error
+
+      # Platform-specific diagnostics and startup
+      if [ "$PLATFORM" = "macos" ]; then
+        # Check Docker Desktop installation
+        if [ -d "/Applications/Docker.app" ]; then
+          log "   ✓ Docker Desktop installed at /Applications/Docker.app"
         else
-          log "❌ Failed to start Docker Desktop"
-          log "💡 Please start Docker Desktop manually from Applications"
+          log "   ✗ Docker Desktop NOT found at /Applications/Docker.app"
+          log "💡 Install Docker Desktop: https://www.docker.com/products/docker-desktop"
         fi
-      fi
-    elif [ "$PLATFORM" = "linux" ]; then
-      # Linux: Try systemd first, then direct dockerd
-      if command -v systemctl &>/dev/null && systemctl is-enabled docker &>/dev/null; then
-        log "🐳 Starting Docker via systemd (will check readiness later)..."
-        sudo systemctl start docker 2>/dev/null || true
-        DOCKER_LAUNCH_START=$(date +%s)
-      elif command -v dockerd &>/dev/null; then
-        log "🐳 Docker daemon available but not running - please start manually"
-        log "💡 Try: sudo systemctl start docker  OR  sudo dockerd &"
+
+        # Check Docker Desktop process
+        DOCKER_PIDS=$(pgrep -f "Docker Desktop" 2>/dev/null || true)
+        if [ -n "$DOCKER_PIDS" ]; then
+          log "   ✓ Docker Desktop process running (PIDs: $DOCKER_PIDS)"
+          # Process exists but daemon not responding - wait a bit
+          log "⏳ Docker Desktop process found, waiting 5s for daemon to respond..."
+          sleep 5
+          if docker ps >/dev/null 2>&1; then
+            log "   ✓ Docker daemon now responding after wait"
+          else
+            # Still not responding - likely crashed or hung
+            log "⚠️  Docker Desktop appears hung or crashed (process exists but daemon not responding)"
+            log "💡 Please quit Docker Desktop manually and restart it"
+            log "💡 If it keeps crashing, try: Docker Desktop → Reset to factory defaults"
+          fi
+        elif [ -d "/Applications/Docker.app" ]; then
+          # Docker Desktop not running but installed - start it
+          log "   ✗ Docker Desktop process NOT running"
+          log "🐳 Starting Docker Desktop (this may take a moment)..."
+
+          # Capture output from open command
+          OPEN_OUTPUT=$(open -a "Docker" 2>&1)
+          OPEN_EXIT=$?
+          DOCKER_LAUNCH_START=$(date +%s)
+          DOCKER_FRESH_START=true
+
+          if [ $OPEN_EXIT -ne 0 ]; then
+            log "   ⚠️  'open -a Docker' returned exit code $OPEN_EXIT"
+            log "   ⚠️  Output: $OPEN_OUTPUT"
+          else
+            log "   ✓ 'open -a Docker' command succeeded"
+          fi
+
+          # Wait briefly and verify Docker Desktop process started
+          sleep 3
+          DOCKER_PIDS=$(pgrep -f "Docker Desktop" 2>/dev/null || true)
+          if [ -z "$DOCKER_PIDS" ]; then
+            log "   ⚠️  Docker Desktop process not found after 3s - retrying..."
+            open -a "Docker" 2>/dev/null
+            sleep 3
+            DOCKER_PIDS=$(pgrep -f "Docker Desktop" 2>/dev/null || true)
+          fi
+
+          if [ -n "$DOCKER_PIDS" ]; then
+            log "   ✓ Docker Desktop process started (PIDs: $DOCKER_PIDS)"
+            log "⏳ Waiting for Docker daemon to be ready..."
+          else
+            log "❌ Failed to start Docker Desktop process"
+            log "💡 Please start Docker Desktop manually from Applications"
+            log "💡 Check Console.app for Docker Desktop crash logs"
+          fi
+        fi
+      elif [ "$PLATFORM" = "linux" ]; then
+        # Linux: Try systemd first, then direct dockerd
+        if command -v systemctl &>/dev/null && systemctl is-enabled docker &>/dev/null; then
+          log "🐳 Starting Docker via systemd (will check readiness later)..."
+          sudo systemctl start docker 2>/dev/null || true
+          DOCKER_LAUNCH_START=$(date +%s)
+        elif command -v dockerd &>/dev/null; then
+          log "🐳 Docker daemon available but not running - please start manually"
+          log "💡 Try: sudo systemctl start docker  OR  sudo dockerd &"
+        fi
       fi
     fi
   fi
@@ -280,7 +328,7 @@ ensure_docker_running() {
     log "⏳ Waiting for Docker daemon (max ${wait_seconds} seconds)..."
   fi
 
-  # Poll for Docker readiness with progress updates
+  # Poll for Docker readiness with progress updates and diagnostics
   local last_update=0
   for ((i=1; i<=wait_seconds; i++)); do
     if docker_daemon_ready; then
@@ -291,16 +339,45 @@ ensure_docker_running() {
       log "✅ Docker daemon ready after ${total_elapsed} seconds"
       return 0
     fi
-    # Show progress every 20 seconds
+    # Show progress and diagnostics every 20 seconds
     if [ $((i - last_update)) -ge 20 ]; then
       local remaining=$((wait_seconds - i))
       log "⏳ Still waiting for Docker daemon... (${remaining}s remaining)"
+
+      # Show diagnostic info
+      if [ "$PLATFORM" = "macos" ]; then
+        local docker_pids=$(pgrep -f "Docker Desktop" 2>/dev/null || true)
+        if [ -n "$docker_pids" ]; then
+          log "   Docker Desktop PIDs: $docker_pids"
+        else
+          log "   ⚠️  Docker Desktop process not found!"
+        fi
+        # Check socket
+        if [ -S "$HOME/.docker/run/docker.sock" ]; then
+          log "   Docker socket exists at ~/.docker/run/docker.sock"
+        elif [ -S "/var/run/docker.sock" ]; then
+          log "   Docker socket exists at /var/run/docker.sock"
+        else
+          log "   ⚠️  Docker socket not found"
+        fi
+      fi
+
       last_update=$i
     fi
     sleep 1
   done
 
+  # Timeout reached - show detailed diagnostics
   log "❌ Docker daemon not ready after ${timeout} seconds"
+  log "🔍 Final diagnostic info:"
+  if [ "$PLATFORM" = "macos" ]; then
+    local docker_pids=$(pgrep -f "Docker Desktop" 2>/dev/null || true)
+    log "   Docker Desktop PIDs: ${docker_pids:-NONE}"
+    log "   Socket ~/.docker/run/docker.sock: $([ -S "$HOME/.docker/run/docker.sock" ] && echo "EXISTS" || echo "NOT FOUND")"
+    log "   Socket /var/run/docker.sock: $([ -S "/var/run/docker.sock" ] && echo "EXISTS" || echo "NOT FOUND")"
+    local docker_error=$(docker ps 2>&1)
+    log "   docker ps error: ${docker_error:0:150}"
+  fi
   log "⚠️  Vector search features will be DISABLED (Qdrant unavailable)"
   show_docker_help
   return 1
