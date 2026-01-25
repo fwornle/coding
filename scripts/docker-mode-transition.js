@@ -31,8 +31,8 @@ const TRANSITION_TIMEOUT_MS = 5 * 60 * 1000;
 // Health check timeout (must exceed Docker's start_period of 120s for coding-services)
 const HEALTH_CHECK_TIMEOUT_MS = 150 * 1000;
 
-// Docker startup timeout (wait for Docker Desktop to start)
-const DOCKER_STARTUP_TIMEOUT_MS = 45 * 1000;
+// Docker startup timeout (wait for Docker Desktop to start - cold starts can take 60-90s)
+const DOCKER_STARTUP_TIMEOUT_MS = 90 * 1000;
 
 class DockerModeTransition {
   constructor(options = {}) {
@@ -233,8 +233,19 @@ class DockerModeTransition {
   }
 
   /**
-   * Ensure Docker Desktop is running before attempting Docker operations
-   * Mirrors the ensure_docker_running() logic from launch-claude.sh
+   * Detect platform (macos, linux, or unknown)
+   */
+  getPlatform() {
+    const platform = process.platform;
+    if (platform === 'darwin') return 'macos';
+    if (platform === 'linux') return 'linux';
+    return 'unknown';
+  }
+
+  /**
+   * Ensure Docker daemon is running before attempting Docker operations
+   * Supports both macOS (Docker Desktop) and Linux (systemd/native daemon)
+   * NOTE: We do NOT kill Docker processes - that's destructive and breaks other sessions
    */
   async ensureDockerRunning() {
     // Quick check if already running
@@ -243,41 +254,43 @@ class DockerModeTransition {
       return true;
     }
 
-    this.log('Docker daemon not running - attempting to start Docker Desktop...');
+    const platform = this.getPlatform();
+    this.log(`Docker daemon not running - attempting to start (platform: ${platform})...`);
 
-    // Check for stale Docker processes
-    try {
-      const psOutput = execSync('ps aux | grep -c "[c]om.docker.backend" || echo "0"', {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      }).trim();
-
-      if (parseInt(psOutput) > 0) {
-        this.log('Found stale Docker processes - force restarting...', 'warn');
-        execSync('pkill -9 -f "Docker" 2>/dev/null || true', { stdio: 'pipe' });
-        execSync('pkill -9 -f "com.docker" 2>/dev/null || true', { stdio: 'pipe' });
-        await this.sleep(2000);
+    if (platform === 'macos') {
+      // macOS: Use Docker Desktop
+      const dockerAppPath = '/Applications/Docker.app';
+      try {
+        await fs.access(dockerAppPath);
+      } catch {
+        this.log('Docker Desktop not found at /Applications/Docker.app', 'error');
+        this.log('Install Docker Desktop: https://www.docker.com/products/docker-desktop');
+        return false;
       }
-    } catch {
-      // Ignore errors from ps/pkill
-    }
 
-    // Try to start Docker Desktop (macOS)
-    const dockerAppPath = '/Applications/Docker.app';
-    try {
-      await fs.access(dockerAppPath);
-    } catch {
-      this.log('Docker Desktop not found at /Applications/Docker.app', 'error');
-      this.log('Install Docker Desktop: https://www.docker.com/products/docker-desktop');
-      return false;
-    }
-
-    // Start Docker Desktop
-    this.log('Starting Docker Desktop...');
-    try {
-      execSync('open -a "Docker"', { stdio: 'pipe' });
-    } catch (error) {
-      this.log(`Failed to launch Docker Desktop: ${error.message}`, 'error');
+      this.log('Starting Docker Desktop...');
+      try {
+        execSync('open -a "Docker"', { stdio: 'pipe' });
+      } catch (error) {
+        this.log(`Failed to launch Docker Desktop: ${error.message}`, 'error');
+        return false;
+      }
+    } else if (platform === 'linux') {
+      // Linux: Try systemd first
+      try {
+        // Check if systemd is available and docker service exists
+        execSync('systemctl is-enabled docker 2>/dev/null', { stdio: 'pipe' });
+        this.log('Starting Docker via systemd...');
+        execSync('sudo systemctl start docker', { stdio: 'pipe' });
+      } catch {
+        // systemd not available or docker not a systemd service
+        this.log('systemd docker service not available', 'warn');
+        this.log('Please start Docker manually: sudo dockerd &');
+        return false;
+      }
+    } else {
+      this.log(`Unsupported platform: ${platform}`, 'error');
+      this.log('Please start Docker manually');
       return false;
     }
 
@@ -305,6 +318,11 @@ class DockerModeTransition {
 
     const elapsed = Math.round(DOCKER_STARTUP_TIMEOUT_MS / 1000);
     this.log(`Docker daemon not ready after ${elapsed} seconds`, 'error');
+    if (platform === 'macos') {
+      this.log('Please start Docker Desktop manually');
+    } else if (platform === 'linux') {
+      this.log('Please start Docker: sudo systemctl start docker');
+    }
     return false;
   }
 

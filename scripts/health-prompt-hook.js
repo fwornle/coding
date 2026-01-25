@@ -127,7 +127,7 @@ function triggerAsyncVerification() {
     }
 
     try {
-        const child = spawn('node', [VERIFIER_SCRIPT, '--auto-heal'], {
+        const child = spawn('node', [VERIFIER_SCRIPT, 'verify'], {
             detached: true,
             stdio: 'ignore',
             cwd: codingRoot,
