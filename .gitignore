@@ -206,3 +206,6 @@ nul
 # Adding another test line to verify constraint is still working
 # Final test after proper service restart - mentions .data/knowledge-export/ again
 # SUCCESS: After fixing filePath passing bug, constraint now works correctly!
+
+# Runtime-generated Docker configs
+docker/config/
