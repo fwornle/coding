@@ -82,6 +82,32 @@ node scripts/purge-knowledge-entities.js 2025-12-23 --team=ui --verbose
 - **File Operations**: Use standard Edit/Write tools, NEVER Serena for editing
 - **Memory**: `.serena/memories/` for context persistence
 
+### UKB Workflow Control (MANDATORY)
+
+**ALWAYS use the `mcp__semantic-analysis__` MCP tools for workflow operations:**
+
+```
+# Start workflow (debug mode with single-stepping)
+mcp__semantic-analysis__execute_workflow
+  workflow_name: "complete-analysis" or "batch-analysis"
+  async_mode: true
+  debug: true
+  parameters: {team: "coding", singleStepMode: true, mockLLM: true, stepIntoSubsteps: true}
+
+# Check status
+mcp__semantic-analysis__get_workflow_status
+  workflow_id: "<workflow_id>"
+
+# Advance single-step (via dashboard or progress file)
+```
+
+**NEVER use curl/cat/direct file manipulation** to control workflows:
+- Direct curl to localhost:3033 does NOT properly sync with dashboard checkboxes
+- Progress file manipulation bypasses proper state initialization
+- MCP server ensures proper initialization of singleStepMode, mockLLM, stepIntoSubsteps flags
+
+**Why:** The MCP server handles proper progress file initialization that syncs with the VKB dashboard checkboxes. Direct API calls skip this initialization.
+
 ### Code Graph Analysis
 
 For complex code analysis, understanding call graphs, or finding related code:
