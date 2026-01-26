@@ -168,15 +168,26 @@ class UKBProcessManager {
     const mcpServerPath = join(codingRoot, 'integrations', 'mcp-server-semantic-analysis', 'dist', 'cli.js');
 
     // Create a wrapper script that calls the MCP tool
-    // Note: executeWorkflow() handles initialization internally via initializeAgents()
+    // Note: Both executeWorkflow() and executeBatchWorkflow() handle initialization internally via initializeAgents()
+    // For batch workflows (batch-analysis, complete-analysis, incremental-analysis), use executeBatchWorkflow()
+    const batchWorkflows = ['batch-analysis', 'complete-analysis', 'incremental-analysis'];
+    const isBatchWorkflow = batchWorkflows.includes(workflowName);
+
     const wrapperScript = `
       import { CoordinatorAgent } from '${join(codingRoot, 'integrations', 'mcp-server-semantic-analysis', 'dist', 'agents', 'coordinator.js')}';
 
       const coordinator = new CoordinatorAgent('${repositoryPath}', '${team}');
-      const result = await coordinator.executeWorkflow('${workflowName}', {
-        repositoryPath: '${repositoryPath}',
-        team: '${team}'
-      });
+      // Use executeBatchWorkflow for batch workflows, executeWorkflow for standard workflows
+      const isBatch = ${isBatchWorkflow};
+      const result = isBatch
+        ? await coordinator.executeBatchWorkflow('${workflowName}', {
+            repositoryPath: '${repositoryPath}',
+            team: '${team}'
+          })
+        : await coordinator.executeWorkflow('${workflowName}', {
+            repositoryPath: '${repositoryPath}',
+            team: '${team}'
+          });
       console.log(JSON.stringify(result, null, 2));
     `;
 
