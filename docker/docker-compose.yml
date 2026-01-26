@@ -54,6 +54,7 @@ services:
       # Persistent data
       - ${CODING_REPO:-.}/.data:/coding/.data
       - ${CODING_REPO:-.}/.specstory:/coding/.specstory
+      - ${CODING_REPO:-.}/.git:/coding/.git:ro
       # Workspace access (host repos)
       - ${HOME}/Agentic:/workspace:ro
       # Config file

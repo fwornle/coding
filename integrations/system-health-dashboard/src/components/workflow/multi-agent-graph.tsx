@@ -1122,23 +1122,30 @@ export function MultiAgentGraph({
                 const isSelected = selectedSubStepId === substep.id
                 // Per-substep status from runtime data
                 const substepStatus = substepStatuses.get(substep.id)
-                const isSubstepCompleted = substepStatus === 'completed'
+                const isSubstepCompleted = substepStatus === 'completed' || substepStatus === 'skipped'
                 const isActiveSubStep = substepStatus === 'running'
-                // Determine visual state: completed (green), active (blue pulse), or default (blue)
+                const isPending = !substepStatus || substepStatus === 'pending'
+                // Determine visual state: completed (green), active (dark blue), pending (light blue)
                 const isHighlighted = isSelected || isActiveSubStep || isSubstepCompleted || isAgentCompleted
 
-                // Colors based on per-substep state
-                let fillColor = '#3b82f6'  // default blue
-                let strokeColor = '#1d4ed8'
+                // Colors based on per-substep state:
+                // - Completed: green (#22c55e)
+                // - Active/Running: dark blue (#1d4ed8) with glow
+                // - Pending (not yet started): light blue (#93c5fd)
+                let fillColor = '#93c5fd'  // light blue for pending (default)
+                let strokeColor = '#60a5fa'  // blue-400 stroke for pending
                 if (isSubstepCompleted || isAgentCompleted) {
                   fillColor = '#22c55e'  // green-500
                   strokeColor = '#16a34a'  // green-600
-                } else if (isActiveSubStep || isSelected) {
-                  fillColor = '#1d4ed8'  // dark blue
+                } else if (isActiveSubStep) {
+                  fillColor = '#1d4ed8'  // dark blue-700 for active
                   strokeColor = '#fff'
+                } else if (isSelected && isPending) {
+                  fillColor = '#60a5fa'  // blue-400 for selected pending
+                  strokeColor = '#3b82f6'
                 }
 
-                const statusText = isSubstepCompleted || isAgentCompleted ? ' (Completed)' : isActiveSubStep ? ' (Currently Running)' : ''
+                const statusText = isSubstepCompleted || isAgentCompleted ? ' (Completed)' : isActiveSubStep ? ' (Currently Running)' : ' (Pending)'
 
                 return (
                   <g
@@ -1155,13 +1162,13 @@ export function MultiAgentGraph({
                     <path
                       d={arcPath}
                       fill={fillColor}
-                      fillOpacity={isHighlighted ? 1 : 0.85}
+                      fillOpacity={isPending && !isSelected ? 0.7 : 1}
                       stroke={strokeColor}
-                      strokeWidth={isHighlighted ? 2.5 : 1.5}
+                      strokeWidth={isActiveSubStep ? 3 : isSubstepCompleted ? 2 : 1.5}
                       className={isActiveSubStep ? 'animate-pulse' : ''}
                       style={isActiveSubStep ? {
-                        filter: 'drop-shadow(0 0 8px rgba(29, 78, 216, 0.9))',
-                      } : isAgentCompleted ? {
+                        filter: 'drop-shadow(0 0 10px rgba(29, 78, 216, 0.9))',
+                      } : isSubstepCompleted ? {
                         filter: 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.5))',
                       } : undefined}
                     />

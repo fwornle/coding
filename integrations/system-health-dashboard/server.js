@@ -1233,11 +1233,12 @@ class SystemHealthAPIServer {
             progress.stepPaused = false;
             progress.resumeRequestedAt = new Date().toISOString();
             // Handle step-into substeps mode
-            // Only SET stepIntoSubsteps=true when "Into" is clicked
-            // "Step" button (stepInto: false) should NOT reset the flag - this allows
-            // continuing to step through sub-steps after entering sub-step mode
+            // "Into" button: Set stepIntoSubsteps=true to pause at each sub-step
+            // "Step" button: Set stepIntoSubsteps=false to skip sub-steps and go to next main step
             if (req.body && req.body.stepInto === true) {
                 progress.stepIntoSubsteps = true;
+            } else if (req.body && req.body.stepInto === false) {
+                progress.stepIntoSubsteps = false;
             }
             // Keep pausedAtStep for reference until next step starts
 
@@ -1319,7 +1320,16 @@ class SystemHealthAPIServer {
      */
     async handleStartUKBWorkflow(req, res) {
         try {
-            const { workflowName = 'complete-analysis', team = 'coding', repositoryPath } = req.body;
+            const {
+                workflowName = 'complete-analysis',
+                team = 'coding',
+                repositoryPath,
+                // Debug/testing options
+                singleStepMode = false,
+                mockLLM = false,
+                mockLLMDelay = 500,
+                maxBatches
+            } = req.body;
             const repoPath = repositoryPath || codingRoot;
 
             // Clean up any stale abort signal from previous cancelled workflow
@@ -1332,6 +1342,24 @@ class SystemHealthAPIServer {
                     console.warn('Failed to cleanup abort file:', e.message);
                 }
             }
+
+            // Initialize progress file with debug/test settings BEFORE starting workflow
+            // This ensures the coordinator sees these settings from the very first step
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+            const initialProgress = {
+                status: 'starting',
+                workflowName,
+                team,
+                repositoryPath: repoPath,
+                // Debug/testing settings must be set BEFORE workflow starts
+                singleStepMode: !!singleStepMode,
+                mockLLM: !!mockLLM,
+                mockLLMDelay: mockLLMDelay || 500,
+                startTime: new Date().toISOString(),
+                lastUpdate: new Date().toISOString()
+            };
+            writeFileSync(progressPath, JSON.stringify(initialProgress, null, 2));
+            console.log(`🎬 Initialized progress file with singleStepMode=${singleStepMode}, mockLLM=${mockLLM}`);
 
             const ukbManager = new UKBProcessManager();
             const result = await ukbManager.startWorkflow(workflowName, team, repoPath);
