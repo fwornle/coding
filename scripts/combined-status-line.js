@@ -1646,10 +1646,10 @@ class CombinedStatusLine {
     }
 
     // Sessions Display (without separate GCM indicator - merged into 🏥)
-    // Filter out sleeping/inactive sessions (>24h)
+    // Show all sessions - inactive ones display with dark icons (💤/⚫)
+    // Only remove sessions when the Claude session is actually closed/exited
     if (globalHealth && globalHealth.status !== 'error') {
-      const sessionEntries = Object.entries(globalHealth.sessions || {})
-        .filter(([_, health]) => !['sleeping', 'inactive'].includes(health.status) && health.icon !== '💤' && health.icon !== '⚫');
+      const sessionEntries = Object.entries(globalHealth.sessions || {});
 
       if (sessionEntries.length > 0) {
         const currentProject = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
