@@ -89,12 +89,12 @@ if [ "$DOCKER_MODE" = true ]; then
   if ! command -v docker &>/dev/null; then
     log "❌ Docker client not found in PATH"
     log "💡 Install Docker Desktop: https://www.docker.com/products/docker-desktop"
-  elif docker ps >/dev/null 2>&1; then
+  elif timeout 5 docker ps >/dev/null 2>&1; then
     # Docker is already running - nothing to do
     log "   ✓ Docker daemon is responding"
   else
     # Docker client exists but daemon not running
-    DOCKER_PS_ERROR=$(docker ps 2>&1)
+    DOCKER_PS_ERROR=$(timeout 5 docker ps 2>&1 || echo "Docker daemon not responding")
     log "   ✗ Docker daemon not responding"
     log "   ✗ Error: ${DOCKER_PS_ERROR:0:150}"
 
@@ -111,7 +111,7 @@ if [ "$DOCKER_MODE" = true ]; then
           log "   Docker Desktop process running (PIDs: $DOCKER_PIDS)"
           log "⏳ Waiting 5s for daemon..."
           sleep 5
-          if ! docker ps >/dev/null 2>&1; then
+          if ! timeout 5 docker ps >/dev/null 2>&1; then
             log "⚠️  Docker Desktop running but daemon not responding - may be crashed/hung"
             log "💡 Check Docker Desktop window for error dialogs"
             log "💡 Try: Quit Docker Desktop and restart it"
@@ -222,8 +222,9 @@ fi
 
 # Check if Docker daemon is actually ready (not just client installed)
 # IMPORTANT: docker info succeeds with just client info, docker ps requires daemon
+# Uses timeout to prevent hanging when daemon is unresponsive (e.g., after reboot)
 docker_daemon_ready() {
-  docker ps >/dev/null 2>&1
+  timeout 5 docker ps >/dev/null 2>&1
 }
 
 # Ensure Docker is running (required for Qdrant vector search)
