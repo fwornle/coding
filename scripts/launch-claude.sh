@@ -54,8 +54,8 @@ if [ -f "$CODING_REPO/.docker-mode" ]; then
   log "🐳 Docker mode enabled (via .docker-mode marker)"
 fi
 
-# Check for running coding-services container
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "coding-services"; then
+# Check for running coding-services container (with timeout to prevent hang if Docker not running)
+if timeout 5 docker ps --format '{{.Names}}' 2>/dev/null | grep -q "coding-services"; then
   DOCKER_MODE=true
   log "🐳 Docker mode enabled (coding-services container running)"
 fi
