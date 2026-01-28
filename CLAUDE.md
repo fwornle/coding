@@ -82,6 +82,39 @@ node scripts/purge-knowledge-entities.js 2025-12-23 --team=ui --verbose
 - **File Operations**: Use standard Edit/Write tools, NEVER Serena for editing
 - **Memory**: `.serena/memories/` for context persistence
 
+### Playwright for E2E Testing (Browser UIs)
+
+Use the Playwright MCP tools for visual verification and e2e testing of browser-based UIs:
+
+**Available Tools:**
+- `mcp__playwright__browser_navigate` - Navigate to URL
+- `mcp__playwright__browser_snapshot` - Get accessibility tree (preferred for actions)
+- `mcp__playwright__browser_take_screenshot` - Capture visual screenshot
+- `mcp__playwright__browser_click` - Click elements by ref
+- `mcp__playwright__browser_fill_form` - Fill form inputs
+
+**Usage Pattern:**
+```
+# 1. Navigate to the UI
+mcp__playwright__browser_navigate url="http://localhost:3032"
+
+# 2. Take snapshot to get element refs
+mcp__playwright__browser_snapshot
+
+# 3. Interact with elements using refs from snapshot
+mcp__playwright__browser_click ref="e42" element="Submit button"
+
+# 4. Take screenshot for visual documentation
+mcp__playwright__browser_take_screenshot filename="feature-screenshot.png"
+```
+
+**Screenshots:** Saved to `.playwright-mcp/` directory. Copy to docs folder as needed.
+
+**Best Practices:**
+- Use `browser_snapshot` (accessibility tree) for reliable element targeting
+- Include descriptive `element` parameter for click actions
+- Close browser with `browser_close` when done
+
 ### UKB Workflow Control (MANDATORY)
 
 **ALWAYS use the `mcp__semantic-analysis__` MCP tools for workflow operations:**
