@@ -777,6 +777,19 @@ class SystemHealthAPIServer {
 
                         // Build step info array for the graph visualization
                         proc.steps = this.buildStepInfo(workflowProgress);
+
+                        // Single-step debugging mode state (must include for all processes, not just inline)
+                        proc.singleStepMode = workflowProgress.singleStepMode === true;
+                        proc.stepPaused = workflowProgress.stepPaused === true;
+                        proc.pausedAtStep = workflowProgress.pausedAtStep || null;
+                        proc.stepIntoSubsteps = workflowProgress.stepIntoSubsteps === true;
+
+                        // LLM Mock mode
+                        proc.mockLLM = workflowProgress.mockLLM === true;
+                        proc.mockLLMDelay = workflowProgress.mockLLMDelay || 500;
+
+                        // Batch phase step count
+                        proc.batchPhaseStepCount = workflowProgress.batchPhaseStepCount || null;
                     }
                 }
             }

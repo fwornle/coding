@@ -326,6 +326,22 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
     return steps
   }, [stepToAgent, stepToSubStep])
 
+  // Reverse mapping: visual substep ID (e.g., 'parse') → runtime step name (e.g., 'sem_data_prep')
+  // Also includes agent context: { visualSubstepId, agentId } → runtimeStepName
+  const substepToRuntimeStep = useMemo(() => {
+    const mapping = new Map<string, string>()
+    // stepToSubStep maps: runtimeStepName → visualSubstepId
+    // We need the reverse: visualSubstepId → runtimeStepName
+    // Since multiple agents might have same visual substep IDs, we key by "agentId:visualSubstepId"
+    for (const [runtimeStepName, visualSubstepId] of Object.entries(stepToSubStep)) {
+      const agentId = stepToAgent[runtimeStepName]
+      if (agentId) {
+        mapping.set(`${agentId}:${visualSubstepId}`, runtimeStepName)
+      }
+    }
+    return mapping
+  }, [stepToSubStep, stepToAgent])
+
   // Redux state
   const selectedProcessIndex = useSelector((state: RootState) => state.ukb.selectedProcessIndex)
   const selectedNode = useSelector((state: RootState) => state.ukb.selectedNode)
@@ -493,17 +509,25 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Advance to next step when paused (MVI: dispatches Redux action)
   // After advancing, poll rapidly to catch the new pause state faster
+  // CRITICAL FIX: If we're inside substeps (selectedSubStep is set), send stepInto: true
+  // to advance to the NEXT substep, not skip to the next major step
   const handleStepAdvance = async (e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
 
     setStepAdvanceLoading(true)
     try {
-      Logger.info(LogCategories.UKB, 'Advancing to next step (step over)')
+      // If we're currently viewing a substep (sidebar shows substep details),
+      // we want to step to the next substep, not skip to the next major step
+      const shouldStepInto = selectedSubStep !== null
+
+      Logger.info(LogCategories.UKB, shouldStepInto
+        ? 'Advancing to next sub-step (inside substeps)'
+        : 'Advancing to next step (step over)')
       const response = await fetch(`${apiBaseUrl}/api/ukb/step-advance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stepInto: false })
+        body: JSON.stringify({ stepInto: shouldStepInto })
       })
       const data = await response.json()
       if (data.status === 'success') {
@@ -1415,45 +1439,50 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                 <div className="flex-shrink-0 overflow-auto">
                   {selectedSubStep ? (
                     (() => {
-                      // Find step info for this agent to get runtime data
-                      // First check batchIterations for detailed outputs (most detailed for batch steps)
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      let agentStepInfo: any = undefined
-                      let combinedOutputs: Record<string, unknown> = {}
+                      // Find runtime step info for this SPECIFIC substep (not just the parent agent)
+                      // Use reverse mapping: visualSubstepId → runtimeStepName
+                      const runtimeStepName = substepToRuntimeStep.get(`${selectedNode}:${selectedSubStep.id}`)
 
-                      // Search in batchIterations first (has detailed outputs for batch-phase steps)
-                      if (activeCurrentProcess?.batchIterations) {
-                        for (const batch of activeCurrentProcess.batchIterations) {
-                          const batchStep = batch.steps.find(
-                            s => stepToAgent[s.name] === selectedNode || s.name === selectedNode
-                          )
-                          if (batchStep) {
-                            // Merge outputs from all batches for this agent (accumulate counts)
-                            if (batchStep.outputs) {
-                              Object.entries(batchStep.outputs).forEach(([key, value]) => {
-                                const existing = combinedOutputs[key]
-                                if (typeof value === 'number' && typeof existing === 'number') {
-                                  combinedOutputs[key] = existing + value  // Sum numeric values across batches
-                                } else {
-                                  combinedOutputs[key] = value  // Use latest value for non-numeric
-                                }
-                              })
-                            }
-                            // Use the last matching step for status/duration (most recent)
-                            agentStepInfo = batchStep as any
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      let substepStepInfo: any = undefined
+                      let substepOutputs: Record<string, unknown> = {}
+
+                      // Search for the specific runtime substep in stepsDetail first (most current batch)
+                      if (runtimeStepName && activeCurrentProcess?.steps) {
+                        const stepInfo = activeCurrentProcess.steps.find(
+                          s => s.name === runtimeStepName
+                        )
+                        if (stepInfo) {
+                          substepStepInfo = stepInfo
+                          if (stepInfo.outputs) {
+                            substepOutputs = { ...stepInfo.outputs }
                           }
                         }
                       }
 
-                      // Fall back to stepsDetail (has finalization step outputs)
-                      if (!agentStepInfo || Object.keys(combinedOutputs).length === 0) {
-                        const stepsDetailInfo = activeCurrentProcess?.steps?.find(
+                      // If not found in stepsDetail, search batchIterations for the substep
+                      if (!substepStepInfo && runtimeStepName && activeCurrentProcess?.batchIterations) {
+                        for (const batch of activeCurrentProcess.batchIterations) {
+                          const batchSubstep = batch.steps.find(s => s.name === runtimeStepName)
+                          if (batchSubstep) {
+                            // Use the last matching substep for status/duration (most recent batch)
+                            substepStepInfo = batchSubstep as any
+                            if (batchSubstep.outputs) {
+                              substepOutputs = { ...batchSubstep.outputs }
+                            }
+                          }
+                        }
+                      }
+
+                      // Fall back to parent agent's step info if substep not found
+                      if (!substepStepInfo) {
+                        const agentStepInfo = activeCurrentProcess?.steps?.find(
                           s => stepToAgent[s.name] === selectedNode || s.name === selectedNode
                         )
-                        if (stepsDetailInfo) {
-                          agentStepInfo = stepsDetailInfo
-                          if (stepsDetailInfo.outputs) {
-                            combinedOutputs = { ...combinedOutputs, ...stepsDetailInfo.outputs }
+                        if (agentStepInfo) {
+                          substepStepInfo = agentStepInfo
+                          if (agentStepInfo.outputs) {
+                            substepOutputs = { ...agentStepInfo.outputs }
                           }
                         }
                       }
@@ -1468,13 +1497,13 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                           onBackToAgent={() => {
                             dispatchSetSelectedSubStep(null)
                           }}
-                          stepOutputs={Object.keys(combinedOutputs).length > 0 ? combinedOutputs : agentStepInfo?.outputs}
-                          stepStatus={agentStepInfo?.status}
-                          stepDuration={agentStepInfo?.duration}
+                          stepOutputs={Object.keys(substepOutputs).length > 0 ? substepOutputs : substepStepInfo?.outputs}
+                          stepStatus={substepStepInfo?.status}
+                          stepDuration={substepStepInfo?.duration}
                           llmInfo={{
-                            provider: agentStepInfo?.llmProvider,
-                            tokensUsed: agentStepInfo?.tokensUsed,
-                            llmCalls: agentStepInfo?.llmCalls,
+                            provider: substepStepInfo?.llmProvider,
+                            tokensUsed: substepStepInfo?.tokensUsed,
+                            llmCalls: substepStepInfo?.llmCalls,
                           }}
                         />
                       )
@@ -1732,10 +1761,21 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   <div className="w-80 flex-shrink-0 overflow-auto border rounded-lg bg-background">
                     {selectedSubStep ? (
                       (() => {
-                        // Find step info for this agent from historical data
-                        const agentStepInfo = historicalProcessInfo?.steps?.find(
-                          s => stepToAgent[s.name] === selectedNode || s.name === selectedNode
-                        )
+                        // Find runtime step info for this SPECIFIC substep from historical data
+                        const runtimeStepName = substepToRuntimeStep.get(`${selectedNode}:${selectedSubStep.id}`)
+
+                        // First try to find the specific runtime substep
+                        let substepStepInfo = runtimeStepName
+                          ? historicalProcessInfo?.steps?.find(s => s.name === runtimeStepName)
+                          : undefined
+
+                        // Fall back to parent agent's step info if substep not found
+                        if (!substepStepInfo) {
+                          substepStepInfo = historicalProcessInfo?.steps?.find(
+                            s => stepToAgent[s.name] === selectedNode || s.name === selectedNode
+                          )
+                        }
+
                         return (
                           <SubStepDetailsSidebar
                             agentId={selectedNode}
@@ -1746,13 +1786,13 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                             onBackToAgent={() => {
                               dispatchSetSelectedSubStep(null)
                             }}
-                            stepOutputs={agentStepInfo?.outputs}
-                            stepStatus={agentStepInfo?.status}
-                            stepDuration={agentStepInfo?.duration}
+                            stepOutputs={substepStepInfo?.outputs}
+                            stepStatus={substepStepInfo?.status}
+                            stepDuration={substepStepInfo?.duration}
                             llmInfo={{
-                              provider: agentStepInfo?.llmProvider,
-                              tokensUsed: agentStepInfo?.tokensUsed,
-                              llmCalls: agentStepInfo?.llmCalls,
+                              provider: substepStepInfo?.llmProvider,
+                              tokensUsed: substepStepInfo?.tokensUsed,
+                              llmCalls: substepStepInfo?.llmCalls,
                             }}
                           />
                         )
