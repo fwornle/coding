@@ -64,6 +64,11 @@
         "MEMGRAPH_HOST": "localhost",
         "MEMGRAPH_PORT": "7687"
       }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": {}
     }
   }
 }
