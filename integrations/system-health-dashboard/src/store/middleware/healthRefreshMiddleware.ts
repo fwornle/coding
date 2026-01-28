@@ -18,6 +18,7 @@ import {
   fetchUKBStatusStart,
   fetchUKBStatusSuccess,
   fetchUKBStatusFailure,
+  syncStepPauseFromServer,
 } from '../slices/ukbSlice'
 import { Logger, LogCategories } from '../../utils/logging'
 
@@ -151,6 +152,14 @@ class HealthRefreshManager {
       processes: [inlineProcess],
       _lastRefresh: Date.now(),
       _fromSSE: true, // Flag to indicate this came from SSE
+    }))
+
+    // CRITICAL: Also sync pausedAtStep to top-level state for auto-selection effect
+    // The auto-selection in ukb-workflow-modal depends on selectPausedAtStep (top-level state),
+    // not on process.pausedAtStep, so we must sync them
+    this.store.dispatch(syncStepPauseFromServer({
+      paused: progress.stepPaused === true,
+      pausedAt: progress.pausedAtStep || null
     }))
 
     Logger.trace(LogCategories.UKB, `SSE update: ${progress.workflowName} [${completedSteps}/${totalSteps}]`)
