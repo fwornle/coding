@@ -283,26 +283,48 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const dispatch = useDispatch()
 
   // Workflow config from Redux (populated from API with fallback to constants)
-  const { stepToAgent, agentSubSteps } = useWorkflowDefinitions()
+  const { stepToAgent, stepToSubStep, agentSubSteps } = useWorkflowDefinitions()
 
-  // Compute which steps have sub-steps dynamically from workflow config
-  // A step has substeps if: 1) it's an agent with substeps, or 2) it maps to an agent with substeps
+  // Compute which steps have RUNTIME sub-steps (can be "stepped into")
+  // A step has runtime substeps if there are other steps that:
+  // 1. Map to the same agent, AND
+  // 2. Are themselves in stepToSubStep (i.e., are runtime substeps)
+  // NOTE: This is different from VISUAL substeps (agentSubSteps) which are for display only
   const stepsWithSubsteps = useMemo(() => {
     const steps = new Set<string>()
-    // Add all agents that have substeps defined
-    for (const agentId of Object.keys(agentSubSteps)) {
-      if (agentSubSteps[agentId]?.length > 0) {
-        steps.add(agentId)
+
+    // Build a map: agentId -> list of runtime substep names for that agent
+    const agentToRuntimeSubsteps = new Map<string, string[]>()
+    for (const [stepName, agentId] of Object.entries(stepToAgent)) {
+      // A step is a runtime substep if it has an entry in stepToSubStep
+      if (stepToSubStep[stepName]) {
+        if (!agentToRuntimeSubsteps.has(agentId)) {
+          agentToRuntimeSubsteps.set(agentId, [])
+        }
+        agentToRuntimeSubsteps.get(agentId)!.push(stepName)
       }
     }
-    // Add step names that map to agents with substeps
+
+    // A parent step has substeps if its agent has runtime substeps
     for (const [stepName, agentId] of Object.entries(stepToAgent)) {
-      if (agentSubSteps[agentId]?.length > 0) {
+      const runtimeSubsteps = agentToRuntimeSubsteps.get(agentId) || []
+      // The step has substeps if:
+      // 1. It's NOT itself a runtime substep (i.e., not in stepToSubStep), AND
+      // 2. Its agent has runtime substeps
+      if (!stepToSubStep[stepName] && runtimeSubsteps.length > 0) {
         steps.add(stepName)
       }
     }
+
+    // Also add agent IDs themselves if they have runtime substeps
+    for (const [agentId, substeps] of agentToRuntimeSubsteps) {
+      if (substeps.length > 0) {
+        steps.add(agentId)
+      }
+    }
+
     return steps
-  }, [agentSubSteps, stepToAgent])
+  }, [stepToAgent, stepToSubStep])
 
   // Redux state
   const selectedProcessIndex = useSelector((state: RootState) => state.ukb.selectedProcessIndex)
@@ -810,6 +832,27 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         })
         dispatch(setSelectedNode(agentId))
 
+        // Auto-select substep if the current step maps to one
+        // This ensures sidebar shows substep details when a substep is running
+        const substepId = stepToSubStep[effectiveStep]
+        if (substepId && agentSubSteps[agentId]?.length > 0) {
+          Logger.info(LogCategories.UI, 'Auto-selecting substep for running step', {
+            step: effectiveStep,
+            substepId,
+            agentId,
+          })
+          dispatch(setSelectedSubStep({ agentId, substepId }))
+          // Also expand the substeps arc to show the running substep
+          dispatch(setExpandedSubStepsAgent(agentId))
+        } else if (agentSubSteps[agentId]?.length > 0) {
+          // Parent step with substeps - clear substep selection but expand arc
+          dispatch(setSelectedSubStep(null))
+          dispatch(setExpandedSubStepsAgent(agentId))
+        } else {
+          // No substeps - clear selection
+          dispatch(setSelectedSubStep(null))
+        }
+
         // Auto-close sub-steps if we moved to a different agent
         const previousAgentId = previousStep ? (stepToAgent[previousStep] || previousStep) : null
         if (previousAgentId && previousAgentId !== agentId && expandedSubStepsAgent === previousAgentId) {
@@ -822,7 +865,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         previousAgentRef.current = agentId
       }
     }
-  }, [open, activeTab, activeCurrentProcess?.currentStep, singleStepMode, pausedAtStep, expandedSubStepsAgent, dispatch])
+  }, [open, activeTab, activeCurrentProcess?.currentStep, singleStepMode, pausedAtStep, expandedSubStepsAgent, dispatch, stepToAgent, stepToSubStep, agentSubSteps])
 
   // Reset step tracking ref when modal closes
   useEffect(() => {
