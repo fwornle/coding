@@ -311,3 +311,93 @@ The Claude Code status line displays health status emojis (✅/⚠️/❌) for q
 - 🔴 Red - Critical (<10% remaining)
 
 For detailed violation information, one-click restart capabilities, and comprehensive API quota monitoring, visit the System Health Dashboard at http://localhost:3032
+
+## UKB Workflow Monitor
+
+The dashboard includes an interactive workflow visualization for debugging UKB (Universal Knowledge Base) analysis workflows.
+
+![UKB Workflow Monitor](docs/images/ukb-workflow-monitor.png)
+
+### Accessing the Monitor
+
+1. Open the System Health Dashboard at `http://localhost:3032`
+2. Click the **UKB Workflow Monitor** button in the top navigation
+3. The modal displays active and historical workflow executions
+
+### Dashboard Controls
+
+| Control | Description |
+|---------|-------------|
+| **Active** | Shows currently running workflows (count badge) |
+| **History** | View completed/cancelled workflow executions |
+| **Mock LLM** | When checked, uses mock responses instead of actual LLM calls (faster, no API costs) |
+| **Single-step** | Enables step-by-step execution - workflow pauses after each step |
+| **Step** | Advance to the next macro step (agent-level) |
+| **Into** | Step into sub-steps within an agent (e.g., individual KG operators) |
+| **Cancel Workflow** | Stop execution immediately |
+
+### Visualization Components
+
+**Graph View (Left Panel):**
+- Interactive node graph showing workflow agents
+- **Orchestrator** (center): Coordinates all agents
+- **Agent nodes**: Color-coded by status (active=pulsing, completed=green, pending=gray)
+- **Edge types**: Control (dotted), Feedback (dashed), Dataflow (solid)
+- Numbered badges show execution order
+- Sub-step indicators appear on agents with runtime sub-steps
+
+**Details Sidebar (Right Panel):**
+- Current step name and description
+- **Execution stats**: Status, Duration, Tokens, Provider, LLM Calls
+- **Inputs**: Data fed into the current step
+- **Outputs**: Results produced (Live badge for streaming)
+
+**Progress Bar:**
+- Shows batch advancement (e.g., "Batch 5 / 27")
+- Percentage completion indicator
+- Workflow health status badge
+
+### Starting a Debug Session
+
+Via MCP tool:
+```
+mcp__semantic-analysis__execute_workflow
+  workflow_name: "batch-analysis"
+  async_mode: true
+  debug: true
+  parameters: {
+    team: "coding",
+    singleStepMode: true,
+    mockLLM: true,
+    stepIntoSubsteps: true
+  }
+```
+
+### Interactive Debugging Flow
+
+1. Start a workflow with debug parameters (see above)
+2. Open the UKB Workflow Monitor modal
+3. Verify checkboxes match your desired mode (Mock LLM, Single-step)
+4. Click **Step** to advance to next agent, or **Into** to step through sub-steps
+5. Watch the graph animate as nodes become active
+6. Review step details in the sidebar
+7. Console shows batch traces with entity/relation counts
+
+### Sub-step Sequences
+
+When using **Into** stepping, you can debug individual sub-steps within agents:
+
+| Agent | Sub-steps |
+|-------|-----------|
+| **Semantic Analysis** | Content Parsing → Entity Transform |
+| **KG Operators** | CONV → AGGR → EMBED → DEDUP → PRED → MERGE |
+| **Observation** | Pattern Extraction → Insight Discovery → Accumulate |
+
+### Debugging Tips
+
+- Use **Mock LLM** during development to avoid API costs and speed up iteration
+- Use **Into** to debug individual KG operators when investigating graph construction issues
+- Watch the **Tokens** count to track LLM usage per step
+- The graph highlights the active node with a pulsing animation
+- Click on any node to see its details in the sidebar
+- Progress bar shows overall batch advancement through the workflow

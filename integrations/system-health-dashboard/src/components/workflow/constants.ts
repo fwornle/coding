@@ -435,22 +435,21 @@ export const STEP_TO_AGENT: Record<string, string> = {
  * the primary source of truth for substep statuses during workflow execution.
  */
 export const STEP_TO_SUBSTEP: Record<string, string> = {
-  // code_graph agent sub-steps
+  // code_graph agent sub-steps (runtime substeps)
+  // NOTE: Parent step 'code_graph' intentionally NOT mapped
   'index_codebase': 'index',
   'correlate_with_codebase': 'query',
   'synthesize_code_insights': 'analyze',
   'transform_code_entities': 'analyze',
-  'code_graph': 'analyze',  // Generic step maps to analyze
-  // semantic_analysis agent sub-steps (main step + runtime substeps from batch YAML)
-  'semantic_analysis': 'extract',
-  'batch_semantic_analysis': 'extract',
+  // semantic_analysis agent sub-steps (runtime substeps from batch YAML)
+  // NOTE: Parent steps (semantic_analysis, batch_semantic_analysis) intentionally NOT mapped
+  // to avoid incorrectly highlighting a substep when the parent is running but no substep has started
   'sem_data_prep': 'parse',
   'sem_llm_analysis': 'extract',
   'sem_observation_gen': 'relate',
   'sem_entity_transform': 'enrich',
-  // observation_generation agent sub-steps (main step + runtime substeps)
-  'generate_observations': 'generate',
-  'generate_batch_observations': 'generate',
+  // observation_generation agent sub-steps (runtime substeps)
+  // NOTE: Parent steps intentionally NOT mapped (same reason as semantic_analysis)
   'obs_llm_generate': 'generate',
   'obs_accumulate': 'accumulate',
   // kg_operators agent sub-steps
@@ -460,16 +459,12 @@ export const STEP_TO_SUBSTEP: Record<string, string> = {
   'operator_dedup': 'dedup',
   'operator_pred': 'pred',
   'operator_merge': 'merge',
-  // ontology_classification agent sub-steps (main step + runtime substeps)
-  'classify_with_ontology': 'match',
-  'ontology_classification': 'match',
+  // ontology_classification agent sub-steps (runtime substeps)
+  // NOTE: Parent steps intentionally NOT mapped (same reason as semantic_analysis)
   'onto_data_prep': 'match',
   'onto_llm_classify': 'validate',
   'onto_apply_results': 'extend',
-  // persistence agent sub-steps
-  'persist_knowledge': 'persist',
-  'final_persist': 'persist',
-  'persistence': 'persist',
+  // persistence agent - no substeps to map (single-step agent)
 }
 
 // Multi-agent system edges
