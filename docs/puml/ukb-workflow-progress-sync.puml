@@ -1,0 +1,86 @@
+@startuml ukb-workflow-progress-sync
+!include _standard-style.puml
+
+title UKB Workflow - Progress File Synchronization
+skinparam responseMessageBelowArrow true
+
+participant "Dashboard UI" as ui
+participant "Redux\nukbSlice" as redux
+participant "SSE Middleware" as sse
+participant "API Server\n(port 3033)" as api
+participant "Progress File\n(.data/)" as file
+participant "Coordinator\nAgent" as coord
+
+== Initial State Sync ==
+ui -> api : GET /api/ukb/processes
+api -> file : Read workflow-progress.json
+file --> api : Full progress state
+api --> ui : { processes: [...], summary: {...} }
+ui -> redux : fetchUKBStatusSuccess(data)
+
+== SSE Real-Time Updates ==
+ui -> api : Connect to /api/ukb/stream
+api -> api : Start 100ms file polling
+
+loop Every 100ms
+  api -> file : Read progress
+  file --> api : Current state
+  api -> api : Detect changes
+  alt State changed
+    api --> sse : SSE message
+    sse -> redux : dispatch update
+    redux -> redux : syncStepPauseFromServer()
+    redux -> ui : Re-render
+  end
+end
+
+api --> sse : Heartbeat (15s)
+
+== Debug State Preservation ==
+note over file
+  **Preserved fields:**
+  - singleStepMode
+  - stepPaused
+  - pausedAtStep
+  - stepIntoSubsteps
+  - mockLLM
+  - mockLLMDelay
+end note
+
+coord -> file : Update progress
+note right of coord
+  Before write:
+  1. Read existing file
+  2. Extract debug fields
+  3. Merge with new state
+  4. Write merged state
+end note
+
+== Toggle Single-Step Mode ==
+ui -> api : POST /api/ukb/single-step-mode\n{ enabled: true }
+api -> file : Read current state
+api -> file : Write { ...existing, singleStepMode: true }
+note right
+  Dashboard API owns
+  debug state writes
+end note
+api --> ui : { status: "success" }
+
+== Coordinator Respects Debug State ==
+coord -> file : Read before step execution
+file --> coord : { singleStepMode: true, stepPaused: false }
+coord -> coord : Check pause condition
+alt Should pause
+  coord -> file : Write { stepPaused: true, pausedAtStep: "step_name" }
+  coord -> coord : Pause execution loop
+end
+
+== Race Condition Handling ==
+note over api
+  **Caching Strategy:**
+  If totalSteps == 0 during init,
+  use cached last-valid progress
+  to prevent UI flicker
+end note
+
+@enduml

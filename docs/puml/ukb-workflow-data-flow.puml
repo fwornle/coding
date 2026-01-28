@@ -1,0 +1,76 @@
+@startuml ukb-workflow-data-flow
+!include _standard-style.puml
+
+title UKB Workflow System - Data Flow
+left to right direction
+
+package "User Interface" {
+  actor "Developer" as dev
+  component "Dashboard\nBrowser" as browser <<cli>>
+}
+
+package "Frontend Layer" {
+  component "React App\n(port 3032)" as react <<core>>
+  component "Redux Store" as redux <<core>>
+  component "API Server\n(port 3033)" as dashapi <<api>>
+}
+
+package "Backend Layer" {
+  component "MCP Server\n(Semantic Analysis)" as mcp <<api>>
+  component "Workflow Runner\n(Standalone)" as runner <<core>>
+  component "Coordinator" as coord <<agent>>
+}
+
+package "Data Layer" {
+  database "Progress File\n(.data/)" as progress <<storage>>
+  database "Knowledge Graph\n(LevelDB)" as kg <<storage>>
+  database "Qdrant\n(Vectors)" as qdrant <<storage>>
+  database "Memgraph\n(Code Graph)" as memgraph <<storage>>
+}
+
+package "External" {
+  cloud "LLM APIs\n(Groq/OpenAI)" as llm <<external>>
+}
+
+' User interactions
+dev --> browser : interact
+browser --> react : HTTP
+
+' Frontend data flow
+react DATA_LINE redux : "state updates"
+react SYNC_LINE dashapi : "REST API calls"
+dashapi ASYNC_LINE react : "SSE stream"
+
+' API to Progress
+dashapi DATA_LINE progress : "read/write\nprogress"
+
+' Backend execution
+mcp CONTROL_LINE runner : "spawn"
+runner CONTROL_LINE coord : "execute"
+coord DATA_LINE progress : "write progress"
+
+' Coordinator to storage
+coord DATA_LINE kg : "persist entities"
+coord DATA_LINE qdrant : "store embeddings"
+coord DATA_LINE memgraph : "update code graph"
+
+' LLM calls
+coord ASYNC_LINE llm : "semantic analysis"
+
+' Legend
+legend right
+  |= Arrow |= Meaning |
+  | SYNC (Red) | Synchronous call |
+  | ASYNC (Green) | Async/Event-based |
+  | DATA (Orange) | Data flow |
+  | CONTROL (Purple) | Control flow |
+endlegend
+
+note bottom of progress
+  Central coordination point
+  - workflow-progress.json
+  - workflow-abort.json
+  - batch-checkpoints.json
+end note
+
+@enduml

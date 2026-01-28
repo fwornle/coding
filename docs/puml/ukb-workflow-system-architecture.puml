@@ -1,0 +1,120 @@
+@startuml ukb-workflow-system-architecture
+!include _standard-style.puml
+
+title UKB Workflow System - Architecture Overview
+top to bottom direction
+
+package "Frontend (System Health Dashboard)" <<infra>> {
+  component "UKB Workflow Modal" as modal <<core>> {
+    component "Multi-Agent Graph" as graph
+    component "Sidebar Details" as sidebar
+    component "Control Panel" as controls
+  }
+
+  component "Redux Store" as redux <<core>> {
+    component "ukbSlice" as slice
+    component "healthRefreshMiddleware" as middleware
+  }
+
+  component "Dashboard API Server" as dashapi <<api>> {
+    component "UKB Endpoints" as ukbapi
+    component "SSE Stream" as sse
+  }
+}
+
+package "Backend (MCP Semantic Analysis)" <<infra>> {
+  component "Workflow Runner" as runner <<core>> {
+    component "Signal Handlers" as signals
+    component "Watchdog Timer" as watchdog
+    component "Heartbeat" as heartbeat
+  }
+
+  component "Coordinator Agent" as coord <<agent>> {
+    component "Step Executor" as executor
+    component "Pause Controller" as pause
+    component "Progress Writer" as writer
+  }
+
+  component "Smart Orchestrator" as orch <<agent>> {
+    component "LLM Router" as router
+    component "Confidence Scorer" as scorer
+    component "Retry Manager" as retry
+  }
+
+  component "Batch Scheduler" as batch <<agent>> {
+    component "Checkpoint Manager" as checkpoint
+    component "Batch Planner" as planner
+  }
+
+  component "14+ Specialized Agents" as agents <<agent>> {
+    component "Git History" as git
+    component "Semantic Analysis" as semantic
+    component "Ontology Classifier" as ontology
+    component "Persistence" as persist
+  }
+}
+
+database "Progress File" as progress <<storage>> {
+  file "workflow-progress.json" as progressfile
+  file "workflow-abort.json" as abortfile
+  file "batch-checkpoints.json" as checkpointfile
+}
+
+database "Knowledge Graph" as kg <<storage>> {
+  storage "LevelDB" as level
+  storage "Graphology" as graphology
+  file "knowledge-export/*.json" as export
+}
+
+' Frontend internal connections
+graph --> sidebar : "selected node"
+controls --> ukbapi : "step advance\nsingle-step\nmock LLM"
+middleware --> sse : "subscribe"
+sse --> slice : "dispatch updates"
+slice --> modal : "state"
+
+' Frontend to Progress File
+ukbapi --> progressfile : "read/write\ndebug state"
+ukbapi --> abortfile : "write abort"
+
+' Backend internal connections
+runner --> coord : "execute"
+coord --> executor : "run steps"
+coord --> pause : "check pause"
+coord --> writer : "update progress"
+writer --> progressfile : "write"
+
+coord --> orch : "route decision"
+orch --> router : "LLM guidance"
+orch --> scorer : "evaluate result"
+orch --> retry : "handle failure"
+
+coord --> batch : "batch iteration"
+batch --> planner : "plan batches"
+batch --> checkpoint : "save/resume"
+checkpoint --> checkpointfile : "persist"
+
+executor --> agents : "invoke"
+agents --> kg : "persist entities"
+
+' SSE connection
+runner --> progressfile : "heartbeat"
+sse ..|> progressfile : "poll 100ms"
+
+note right of progressfile
+  Central coordination point
+  - Workflow state
+  - Debug flags (preserved)
+  - Batch iterations
+  - Step details
+end note
+
+note right of coord
+  Orchestrates 14+ agents
+  across 3 phases:
+  - Initialization
+  - Batch (iterates)
+  - Finalization
+end note
+
+@enduml
