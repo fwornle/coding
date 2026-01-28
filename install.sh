@@ -1003,6 +1003,44 @@ install_mcp_servers() {
     fi
 }
 
+# Install Playwright MCP server (FREE browser automation for E2E testing)
+# This enables Claude Code to see and interact with browsers without Browserbase costs
+install_playwright_mcp() {
+    echo -e "\n${CYAN}🎭 Installing Playwright MCP server (free browser automation)...${NC}"
+
+    cd "$CODING_REPO"
+
+    # Check if npx is available
+    if ! command -v npx >/dev/null 2>&1; then
+        warning "npx not found, skipping Playwright MCP installation"
+        warning "Playwright will be auto-downloaded on first use via npx"
+        return
+    fi
+
+    # Pre-cache the @playwright/mcp package to avoid delays on first use
+    info "Pre-caching @playwright/mcp package..."
+    if npm cache add @playwright/mcp@latest 2>/dev/null; then
+        success "Playwright MCP package cached"
+    else
+        warning "Could not pre-cache Playwright MCP, will download on first use"
+    fi
+
+    # Install Playwright browsers (optional - can be large ~400MB)
+    # Users can skip this and browsers will auto-download on first use
+    if [[ "${INSTALL_PLAYWRIGHT_BROWSERS:-false}" == "true" ]]; then
+        info "Installing Playwright browsers (this may take a few minutes)..."
+        npx playwright install chromium 2>/dev/null && success "Chromium browser installed" || warning "Could not install Chromium"
+    else
+        info "Skipping Playwright browser installation (will auto-download on first use)"
+        info "To pre-install browsers, run: npx playwright install chromium"
+    fi
+
+    success "Playwright MCP configured"
+    info "  - Launch with: npx @playwright/mcp@latest"
+    info "  - Tools: browser_navigate, browser_screenshot, browser_click, browser_type"
+    info "  - Use for FREE E2E testing (no API costs like Browserbase)"
+}
+
 # Install code-graph-rag MCP server (AST-based code knowledge graph)
 install_code_graph_rag() {
     echo -e "\n${CYAN}🔗 Installing code-graph-rag MCP server...${NC}"
@@ -2496,6 +2534,7 @@ main() {
     install_system_health_dashboard
     install_shadcn_mcp
     install_mcp_servers
+    install_playwright_mcp
     install_code_graph_rag
     configure_docker_mode
     create_command_wrappers
