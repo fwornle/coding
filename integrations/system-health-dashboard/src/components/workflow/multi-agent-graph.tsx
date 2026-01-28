@@ -278,16 +278,39 @@ export function MultiAgentGraph({
   const executionCurrentStep = useSelector(selectExecutionCurrentStep)
   const executionCurrentSubstep = useSelector(selectExecutionCurrentSubstep)
 
-  // Merge YAML-provided substeps with hardcoded fallback (AGENT_SUBSTEPS)
-  // NOTE: AGENT_SUBSTEPS is a DEPRECATED fallback - prefer YAML-provided definitions
-  const effectiveAgentSubSteps = Object.keys(agentSubSteps).length > 0
-    ? agentSubSteps as Record<string, SubStep[]>
-    : AGENT_SUBSTEPS
   // Merge YAML-provided substep ID mappings with hardcoded fallback
   // NOTE: STEP_TO_SUBSTEP is a DEPRECATED fallback - prefer YAML-provided definitions
   const effectiveStepToSubStep = Object.keys(stepToSubStep).length > 0
     ? stepToSubStep
     : STEP_TO_SUBSTEP
+
+  // Compute which agents have RUNTIME substeps (based on stepToSubStep mappings)
+  // An agent has runtime substeps if any step maps to that agent AND is in stepToSubStep
+  const agentsWithRuntimeSubsteps = useMemo(() => {
+    const agents = new Set<string>()
+    for (const [stepName, agentId] of Object.entries(stepToAgent)) {
+      // If the step has a substep mapping, the agent has runtime substeps
+      if (effectiveStepToSubStep[stepName]) {
+        agents.add(agentId)
+      }
+    }
+    return agents
+  }, [stepToAgent, effectiveStepToSubStep])
+
+  // Filter visual substeps to only include agents with RUNTIME substeps
+  // This prevents showing substep badges/pips for agents that don't support step-into
+  const allAgentSubSteps = Object.keys(agentSubSteps).length > 0
+    ? agentSubSteps as Record<string, SubStep[]>
+    : AGENT_SUBSTEPS
+  const effectiveAgentSubSteps = useMemo(() => {
+    const filtered: Record<string, SubStep[]> = {}
+    for (const [agentId, substeps] of Object.entries(allAgentSubSteps)) {
+      if (agentsWithRuntimeSubsteps.has(agentId)) {
+        filtered[agentId] = substeps
+      }
+    }
+    return filtered
+  }, [allAgentSubSteps, agentsWithRuntimeSubsteps])
 
   // Compute effective process steps: prefer event-driven state when available
   const effectiveSteps = useMemo((): StepInfo[] => {
@@ -1091,6 +1114,9 @@ export function MultiAgentGraph({
                   substepStatuses.set(substepId, step.status)
                 }
               }
+              // DEBUG: Log substep status computation
+              console.log('[SUBSTEP-DEBUG] agentSteps:', agentSteps.map(s => ({ name: s.name, status: s.status })))
+              console.log('[SUBSTEP-DEBUG] substepStatuses:', Object.fromEntries(substepStatuses))
               const isAgentRunning = agentSteps.some(s => s.status === 'running')
               // Agent is fully completed only if ALL its substeps are done (no running ones left)
               const isAgentCompleted = !isAgentRunning && agentSteps.length > 0 &&

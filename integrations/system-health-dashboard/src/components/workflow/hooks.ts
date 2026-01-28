@@ -16,6 +16,7 @@ import {
   setWorkflowEdges,
 } from '@/store/slices/workflowConfigSlice'
 import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, STEP_TO_SUBSTEP, MULTI_AGENT_EDGES } from './constants'
+import { AGENT_SUBSTEPS } from './multi-agent-graph'
 
 // Hook to get workflow definitions from Redux (populated by API with fallback to constants)
 export function useWorkflowDefinitions(workflowName?: string) {
@@ -47,7 +48,7 @@ export function useWorkflowDefinitions(workflowName?: string) {
       edges: MULTI_AGENT_EDGES,
       stepToAgent: STEP_TO_AGENT,
       stepToSubStep: STEP_TO_SUBSTEP,
-      agentSubSteps: {} as Record<string, Array<{ id: string; name: string; shortName: string; description: string; llmUsage?: string }>>,
+      agentSubSteps: AGENT_SUBSTEPS,
       isLoading: true,
       error: null
     }
@@ -59,7 +60,7 @@ export function useWorkflowDefinitions(workflowName?: string) {
     edges: edges.length > 0 ? edges : MULTI_AGENT_EDGES,
     stepToAgent: Object.keys(stepToAgent).length > 0 ? stepToAgent : STEP_TO_AGENT,
     stepToSubStep: Object.keys(stepToSubStep).length > 0 ? stepToSubStep : STEP_TO_SUBSTEP,
-    agentSubSteps,
+    agentSubSteps: Object.keys(agentSubSteps).length > 0 ? agentSubSteps : AGENT_SUBSTEPS,
     isLoading,
     error
   }

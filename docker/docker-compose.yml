@@ -57,8 +57,11 @@ services:
       - ${CODING_REPO:-.}/.git:/coding/.git:ro
       # Workspace access (host repos)
       - ${HOME}/Agentic:/workspace:ro
-      # Config file
+      # Config files (live-mounted to avoid staleness)
       - ${CODING_REPO:-.}/.env:/coding/.env:ro
+      - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:ro
+      # Dashboard build (live-mounted for development)
+      - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
     networks:
       - coding-network
     deploy:
