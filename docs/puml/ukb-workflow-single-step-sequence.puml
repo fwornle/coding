@@ -1,0 +1,70 @@
+@startuml ukb-workflow-single-step-sequence
+!include _standard-style.puml
+
+title UKB Workflow - Single-Step Debugging Sequence
+skinparam responseMessageBelowArrow true
+
+actor User
+participant "Dashboard UI" as ui
+participant "Redux Store" as redux
+participant "Dashboard API\n(server.js)" as api
+participant "Progress File" as file
+participant "Coordinator\nAgent" as coord
+
+== Enable Single-Step Mode ==
+User -> ui : Toggle "Single-step" checkbox
+ui -> redux : setSingleStepMode({ enabled: true, explicit: true })
+redux -> api : POST /api/ukb/single-step-mode\n{ enabled: true }
+api -> file : Read existing progress
+api -> file : Write { singleStepMode: true, stepPaused: false }
+api --> redux : { status: "success" }
+
+== Workflow Reaches Step Boundary ==
+coord -> file : Check singleStepMode
+file --> coord : singleStepMode: true, stepPaused: false
+coord -> coord : Pause execution
+coord -> file : Write { stepPaused: true, pausedAtStep: "step_name" }
+
+== Frontend Detects Pause ==
+api -> file : Poll progress (500ms)
+file --> api : { stepPaused: true, pausedAtStep: "step_name" }
+api -> redux : SSE update
+redux -> ui : Show "Paused at: step_name"
+ui -> ui : Enable "Step" button
+
+== User Advances to Next Step ==
+User -> ui : Click "Step" button
+ui -> redux : dispatch step advance
+redux -> api : POST /api/ukb/step-advance\n{ stepInto: false }
+api -> file : Read progress
+api -> file : Write { stepPaused: false, resumeRequestedAt: now() }
+api --> redux : { status: "success" }
+
+ui -> ui : Start rapid polling (500ms x 8)
+
+== Coordinator Resumes ==
+coord -> file : Check stepPaused
+file --> coord : stepPaused: false
+coord -> coord : Execute next step
+coord -> file : Write { currentStep: "next_step" }
+
+== Frontend Catches New Pause ==
+api -> file : Rapid poll
+file --> api : { stepPaused: true, pausedAtStep: "next_step" }
+api -> redux : SSE update
+redux -> ui : Show "Paused at: next_step"
+ui -> ui : Auto-select paused step in graph
+
+note over file
+  Progress file acts as
+  coordination point between
+  frontend and backend
+end note
+
+note over coord
+  Coordinator checks
+  progress file at each
+  step boundary
+end note
+
+@enduml

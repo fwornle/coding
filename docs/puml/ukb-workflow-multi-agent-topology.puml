@@ -1,0 +1,101 @@
+@startuml ukb-workflow-multi-agent-topology
+!include _standard-style.puml
+
+title UKB Workflow - Multi-Agent Hub-and-Spoke Topology
+top to bottom direction
+
+' Central orchestrator
+component "Coordinator\n(Orchestrator)" as coord <<agent>> #LightBlue
+
+' Ring of specialized agents
+package "Batch Phase Agents" {
+  component "Git History\n(extract commits)" as git <<agent>>
+  component "Vibe History\n(LSL sessions)" as vibe <<agent>>
+  component "Semantic\n(LLM analysis)" as semantic <<agent>>
+  component "Observations\n(generate obs)" as obs <<agent>>
+  component "Ontology\n(classify)" as onto <<agent>>
+}
+
+package "KG Operations Agents" {
+  component "KG-Ops\n(Tree-KG)" as kgops <<agent>>
+  component "QA\n(quality)" as qa <<agent>>
+  component "Checkpoint\n(save state)" as ckpt <<agent>>
+}
+
+package "Finalization Agents" {
+  component "Code\n(CGR index)" as code <<agent>>
+  component "Docs\n(link docs)" as docs <<agent>>
+  component "Insights\n(synthesize)" as insights <<agent>>
+  component "Persist\n(final save)" as persist <<agent>>
+  component "Dedup\n(remove dups)" as dedup <<agent>>
+  component "Validate\n(content QA)" as validate <<agent>>
+}
+
+' Hub connections (control flow)
+coord -[#9C27B0,thickness=2]-> git : "1"
+coord -[#9C27B0,thickness=2]-> vibe : "2"
+coord -[#9C27B0,thickness=2]-> semantic : "3"
+coord -[#9C27B0,thickness=2]-> obs : "4"
+coord -[#9C27B0,thickness=2]-> onto : "5"
+coord -[#9C27B0,thickness=2]-> kgops : "6"
+coord -[#9C27B0,thickness=2]-> qa : "7"
+coord -[#9C27B0,thickness=2]-> ckpt : "8"
+coord -[#9C27B0,thickness=2]-> code : "9"
+coord -[#9C27B0,thickness=2]-> docs : "10"
+coord -[#9C27B0,thickness=2]-> insights : "11"
+coord -[#9C27B0,thickness=2]-> persist : "12"
+coord -[#9C27B0,thickness=2]-> dedup : "13"
+coord -[#9C27B0,thickness=2]-> validate : "14"
+
+' Feedback arrows (results back to coordinator)
+git -[#43A047,dashed]-> coord
+semantic -[#43A047,dashed]-> coord
+onto -[#43A047,dashed]-> coord
+qa -[#43A047,dashed]-> coord
+
+' Self-loop for QA retry
+qa -[#E53935,thickness=2]-> qa : "retry\n(max 3)"
+
+' Data flow between agents
+git -[#FF9800]-> semantic : "commits"
+vibe -[#FF9800]-> semantic : "sessions"
+semantic -[#FF9800]-> obs : "patterns"
+obs -[#FF9800]-> onto : "observations"
+onto -[#FF9800]-> kgops : "classified"
+kgops -[#FF9800]-> qa : "entities"
+qa -[#FF9800]-> ckpt : "validated"
+
+note right of semantic
+  Substeps:
+  - Content Parsing
+  - LLM Analysis
+  - Observation Gen
+  - Entity Transform
+end note
+
+note right of onto
+  Substeps:
+  - Class Matching
+  - Validation
+  - Auto-Extension
+end note
+
+note right of kgops
+  6 Tree-KG Operators:
+  - Convert
+  - Aggregate
+  - Embed
+  - Dedup
+  - Predict
+  - Merge
+end note
+
+legend right
+  |= Arrow Color |= Type |
+  | Purple | Control (orchestrator dispatch) |
+  | Green dashed | Feedback (results) |
+  | Orange | Data flow |
+  | Red | Retry loop |
+endlegend
+
+@enduml

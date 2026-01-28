@@ -1,0 +1,108 @@
+@startuml ukb-workflow-batch-processing
+!include _standard-style.puml
+
+title UKB Batch Analysis Workflow - Processing Phases
+
+start
+
+partition "**Phase 0: Initialization**" {
+  :plan_batches;
+  note right
+    Segments git history into
+    chronological batches
+    (50 commits per batch)
+  end note
+  :Calculate total batches;
+}
+
+partition "**Phase 1: Batch Processing** (repeats per batch)" #E8F5E8 {
+  repeat
+    :extract_batch_commits;
+    note right: Git commits for this batch
+
+    :extract_batch_sessions;
+    note right: LSL session logs (vibes)
+
+    fork
+      :batch_semantic_analysis;
+      note right
+        LLM-powered analysis
+        Substeps:
+        - Content Parsing
+        - LLM Analysis
+        - Observation Gen
+        - Entity Transform
+      end note
+    fork again
+      :generate_batch_observations;
+      note right
+        Generate observations
+        Substeps:
+        - LLM Generate
+        - Accumulate
+      end note
+    end fork
+
+    :classify_with_ontology;
+    note right
+      Ontology classification
+      Substeps:
+      - Class Matching
+      - Validation
+      - Auto-Extension
+    end note
+
+    :Tree-KG Operators;
+    note right
+      6 KG Operations:
+      Convert, Aggregate, Embed,
+      Dedup, Predict, Merge
+    end note
+
+    :quality_assurance;
+    note right
+      QA with retry loop
+      (max 3 retries)
+    end note
+
+    :save_batch_checkpoint;
+    note right: Enables resume
+  repeat while (more batches?) is (yes)
+  -> no;
+}
+
+partition "**Phase 2: Finalization** (runs once)" #FFF9E6 {
+  :index_current_codebase;
+  note right
+    Code Graph RAG indexing
+    (correlates with current
+    codebase state)
+  end note
+
+  :link_documentation;
+
+  :synthesize_code_insights;
+
+  :transform_to_entities;
+
+  :final_persistence;
+
+  :generate_insight_docs;
+
+  :web_search_patterns;
+
+  :final_deduplication;
+
+  :content_validation;
+}
+
+stop
+
+legend right
+  |= Phase |= Description |
+  | Initialization | Plans batches from git history |
+  | Batch | Repeats for each batch (50 commits) |
+  | Finalization | Runs once after all batches |
+endlegend
+
+@enduml
