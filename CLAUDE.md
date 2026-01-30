@@ -35,6 +35,24 @@ Use Skill tool with command: "documentation-style"
 - **Services**: VKB Server (port 8080), Semantic Analysis, Graph Database
 - **Never use**: Just `claude` - always start via 'coding' infrastructure
 
+### 🚨 CRITICAL: Rebuilding Docker After Code Changes
+
+**When modifying code in these directories, you MUST rebuild the Docker container:**
+- `integrations/system-health-dashboard/` (dashboard UI)
+- `integrations/mcp-server-semantic-analysis/` (workflow coordinator)
+- `integrations/mcp-constraint-monitor/`
+- `integrations/browser-access/`
+- `lib/vkb-server/`
+
+**Rebuild Command:**
+```bash
+cd /Users/Q284340/Agentic/coding/docker && docker-compose build coding-services && docker-compose up -d coding-services
+```
+
+**Why:** The dashboard and services run inside the `coding-services` Docker container. Running `npm run build` locally only builds files on the host - the container serves from its own copy. Browser hard-refresh alone is NOT sufficient.
+
+**Common mistake:** Forgetting to rebuild Docker after UI changes, then wondering why changes aren't visible despite hard-refresh.
+
 ### Knowledge Management
 - **Graph Database**: Graphology + Level persistent storage
 - **Commands**: `vkb` (visualize)
