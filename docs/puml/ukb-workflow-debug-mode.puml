@@ -1,0 +1,69 @@
+@startuml ukb-workflow-debug-mode
+!include _standard-style.puml
+
+title UKB Workflow Debug Mode Architecture
+top to bottom direction
+
+rectangle "Debug Mode Controls" as controls #E8F4FD {
+  component "singleStepMode" as ssm <<core>>
+  component "stepIntoSubsteps" as sis <<core>>
+  component "mockLLM" as mock <<core>>
+}
+
+rectangle "Dashboard UI" as dashboard #E8F5E8 {
+  component "Workflow Modal" as modal <<api>>
+  component "Trace View" as trace <<api>>
+  component "Debug Checkboxes" as checkboxes <<api>>
+}
+
+rectangle "Progress File" as progress #FFF9E6 {
+  component "workflow-progress.json" as pfile <<storage>>
+}
+
+rectangle "Workflow Runner" as runner #FFE8F4 {
+  component "Coordinator" as coord <<agent>>
+  component "Semantic Agent" as sem <<agent>>
+  component "KG-Ops Agent" as kgops <<agent>>
+}
+
+rectangle "LLM Layer" as llm #F0F0F0 {
+  component "Real LLM\n(Anthropic/OpenAI)" as realllm <<external>>
+  component "Mock LLM Service" as mockllm <<util>>
+}
+
+' Dashboard to Progress
+checkboxes -[#4A90E2]-> pfile : "POST /api/ukb/single-step-mode\nPOST /api/ukb/mock-llm"
+modal -[#4A90E2]-> pfile : "POST /api/ukb/step-advance"
+
+' Progress to Runner
+pfile -[#43A047,dashed]-> coord : "Read debug flags\non each step"
+
+' Runner preserves flags
+coord -[#9C27B0]-> pfile : "Preserve:\nsingleStepMode\nmockLLM\nstepIntoSubsteps"
+
+' LLM selection
+coord --> sem
+sem -[#E53935]-> realllm : "mockLLM=false"
+sem -[#43A047]-> mockllm : "mockLLM=true"
+
+note bottom of mockllm
+  Mock LLM returns canned responses
+  but still tracks token metrics
+  for debugging visibility.
+
+  Tokens are estimated as:
+  (prompt.length + response.length) / 4
+end note
+
+note right of pfile
+  Debug state preserved across
+  workflow progress updates:
+  - singleStepMode
+  - stepPaused
+  - pausedAtStep
+  - stepIntoSubsteps
+  - mockLLM
+  - mockLLMDelay
+end note
+
+@enduml

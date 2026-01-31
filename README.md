@@ -42,6 +42,11 @@ The transition system ensures safe mode switching with:
 
 **Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers.
 
+**MCP Configuration**: Automatically selects the correct MCP config based on deployment mode:
+- Docker mode: Uses stdio-proxy → SSE bridge to communicate with containerized servers
+- Native mode: Runs MCP servers directly as Node.js processes
+- Configuration selection is centralized in `claude-mcp-launcher.sh`
+
 **Health System Adaptation**: The health verifier automatically detects Docker mode and adapts:
 - CGR cache staleness uses `cache-metadata.json` fallback (no `.git` access)
 - Service restarts use Docker-appropriate commands
@@ -207,6 +212,8 @@ Capture, organize, and visualize development insights with git-based team collab
 9. **ContentValidationAgent** - Stale entity detection and knowledge refresh
 10. **PersistenceAgent** - Knowledge base persistence
 11. **DeduplicationAgent** - Semantic duplicate detection
+
+**Debug Mode**: Full debugging support with single-step execution, substep inspection, and mock LLM mode for cost-free testing. See [UKB Workflow System](docs/health-system/ukb-workflow-system.md).
 
 **Status**: ✅ Production Ready
 

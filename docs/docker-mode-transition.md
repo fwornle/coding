@@ -43,6 +43,13 @@ The transition system ensures:
    - Presence indicates Docker mode
    - Absence indicates Native mode
 
+5. **MCP Config Selection** (`bin/claude-mcp-launcher.sh`)
+   - Centralized MCP configuration selection based on `CODING_DOCKER_MODE`
+   - Docker mode: Uses `claude-code-mcp-docker.json` (stdio-proxy to SSE)
+   - Native mode: Uses `claude-code-mcp-processed.json` (direct Node.js)
+
+![MCP Config Selection](./images/mcp-config-selection.png)
+
 ## State Machine
 
 ![Docker Mode State Machine](./images/docker-mode-state-machine.png)
@@ -263,8 +270,38 @@ if (result.success) {
 }
 ```
 
+## MCP Communication in Docker Mode
+
+When running in Docker mode, MCP servers use a **stdio-proxy to SSE bridge** architecture:
+
+```
+Claude Code ←→ stdio-proxy.js ←→ SSE Server (Docker container)
+    │               │                    │
+    └── stdio ──────┘                    │
+                    └── HTTP/SSE ────────┘
+```
+
+### Key Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `stdio-proxy.js` | Host (Node.js) | Bridges stdio to HTTP/SSE |
+| `sse-server.js` | Docker container | Handles SSE connections |
+| Port 3847 | Browser Access | Playwright MCP server |
+| Port 3848 | Semantic Analysis | Knowledge extraction |
+| Port 3849 | Constraint Monitor | Code quality enforcement |
+| Port 3850 | Code Graph RAG | AST-based code search |
+
+### Configuration Files
+
+- **Docker config**: `claude-code-mcp-docker.json` - Uses stdio-proxy with SSE URLs
+- **Native config**: `claude-code-mcp-processed.json` - Direct Node.js execution
+
+The `CODING_DOCKER_MODE` environment variable is set by `launch-claude.sh` and read by `claude-mcp-launcher.sh` to select the appropriate configuration.
+
 ## Related Documentation
 
 - [Health Verification System](./health-monitoring.md)
 - [Process State Manager](./process-state-manager.md)
 - [Docker Deployment](./docker-deployment.md)
+- [Architecture Report](./architecture-report.md)

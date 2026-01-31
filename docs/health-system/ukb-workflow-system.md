@@ -111,6 +111,43 @@ The system supports step-by-step workflow debugging:
 | Step into | `POST /api/ukb/step-advance { stepInto: true }` | Enter substeps |
 | Mock LLM | `POST /api/ukb/mock-llm` | Use mock LLM responses |
 
+### Full Debug Mode
+
+For comprehensive debugging, start workflows with all debug flags enabled:
+
+```bash
+# Via MCP tool
+mcp__semantic-analysis__execute_workflow
+  workflow_name: "batch-analysis"
+  async_mode: true
+  debug: true
+  parameters: {
+    team: "coding",
+    singleStepMode: true,
+    mockLLM: true,
+    stepIntoSubsteps: true
+  }
+```
+
+![Debug Mode Architecture](../images/ukb-workflow-debug-mode.png)
+
+### Mock LLM Mode
+
+When `mockLLM: true` is enabled:
+
+1. **No real API calls** - All LLM calls use canned responses from `llm-mock-service.ts`
+2. **Token metrics still tracked** - Tokens are estimated as `(prompt.length + response.length) / 4`
+3. **Fast execution** - Mock responses return immediately (configurable delay)
+4. **Dashboard visibility** - LLM calls and tokens appear in trace view for debugging
+
+The mock service generates realistic but synthetic responses for:
+- Semantic analysis (entity/relation extraction)
+- Observation generation
+- Ontology classification
+- Quality assurance checks
+
+**Note**: Mock LLM is recommended for debugging to avoid API costs and latency.
+
 ### Substep Support
 
 Some agents have substeps (e.g., Semantic Analysis):
