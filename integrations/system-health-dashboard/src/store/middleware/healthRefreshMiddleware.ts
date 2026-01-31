@@ -62,8 +62,7 @@ class HealthRefreshManager {
           this.lastSSEUpdate = Date.now()
 
           if (workflowProgress) {
-            // Debug: Log every SSE update to track frequency
-            console.log(`[SSE] ${new Date().toISOString().slice(11,23)} step=${workflowProgress.currentStep} details=${workflowProgress.stepsDetail?.length || 0}`)
+            Logger.trace(LogCategories.REFRESH, `SSE update: step=${workflowProgress.currentStep} details=${workflowProgress.stepsDetail?.length || 0}`)
             // Transform SSE data to match the expected format and dispatch update
             this.handleSSEWorkflowUpdate(workflowProgress)
           }

@@ -13,6 +13,7 @@ import {
 } from '@/store/slices/ukbSlice'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
 import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
+import { Logger, LogCategories } from '@/utils/logging'
 
 interface MultiAgentGraphProps {
   process: ProcessInfo
@@ -23,6 +24,10 @@ interface MultiAgentGraphProps {
   selectedNode?: string | null
   selectedSubStepId?: string | null  // Controlled substep selection from parent
   hideLegend?: boolean  // Hide internal legend (use external WorkflowLegend component instead)
+  // Controlled expanded substeps agent from parent (modal tracks this in Redux)
+  // When provided, disables internal auto-expand logic and uses this value directly
+  expandedSubStepsAgent?: string | null
+  onExpandedSubStepsAgentChange?: (agentId: string | null) => void
 }
 
 // Status colors for nodes
@@ -259,6 +264,8 @@ export function MultiAgentGraph({
   selectedNode,
   selectedSubStepId,
   hideLegend = false,
+  expandedSubStepsAgent: expandedSubStepsAgentProp,
+  onExpandedSubStepsAgentChange,
 }: MultiAgentGraphProps) {
   // Support both callback names for backward compatibility
   // onNodeClick takes string, onNodeSelect takes string | null
@@ -288,12 +295,29 @@ export function MultiAgentGraph({
   // An agent has runtime substeps if any step maps to that agent AND is in stepToSubStep
   const agentsWithRuntimeSubsteps = useMemo(() => {
     const agents = new Set<string>()
+    // DEBUG: Check if operator_* steps are in stepToAgent and effectiveStepToSubStep
+    const operatorSteps = ['operator_conv', 'operator_aggr', 'operator_embed', 'operator_dedup', 'operator_pred', 'operator_merge']
+    const kgOpsDebug = {
+      stepToAgentHasOperators: operatorSteps.map(s => ({ step: s, agentId: stepToAgent[s] })),
+      effectiveStepToSubStepHasOperators: operatorSteps.map(s => ({ step: s, substepId: effectiveStepToSubStep[s] })),
+    }
+
     for (const [stepName, agentId] of Object.entries(stepToAgent)) {
       // If the step has a substep mapping, the agent has runtime substeps
       if (effectiveStepToSubStep[stepName]) {
         agents.add(agentId)
       }
     }
+
+    // DEBUG: Log what we computed
+    Logger.info(LogCategories.UI, 'DEBUG: agentsWithRuntimeSubsteps computed', {
+      agentsList: Array.from(agents),
+      hasKgOperators: agents.has('kg_operators'),
+      kgOpsDebug,
+      stepToAgentCount: Object.keys(stepToAgent).length,
+      effectiveStepToSubStepCount: Object.keys(effectiveStepToSubStep).length,
+    })
+
     return agents
   }, [stepToAgent, effectiveStepToSubStep])
 
@@ -309,6 +333,15 @@ export function MultiAgentGraph({
         filtered[agentId] = substeps
       }
     }
+
+    // DEBUG: Log filtering result
+    Logger.info(LogCategories.UI, 'DEBUG: effectiveAgentSubSteps computed', {
+      allAgentSubStepsKeys: Object.keys(allAgentSubSteps),
+      filteredKeys: Object.keys(filtered),
+      hasKgOperators: !!filtered['kg_operators'],
+      kgOperatorsCount: filtered['kg_operators']?.length || 0,
+    })
+
     return filtered
   }, [allAgentSubSteps, agentsWithRuntimeSubsteps])
 
@@ -334,7 +367,24 @@ export function MultiAgentGraph({
   const { wigglingNode, handleNodeMouseEnter, handleNodeMouseLeave } = useNodeWiggle()
 
   // Track which agent has expanded sub-steps (click blue badge to toggle)
-  const [expandedSubStepsAgent, setExpandedSubStepsAgent] = useState<string | null>(null)
+  // Support both controlled (prop) and uncontrolled (local state) modes
+  const isControlled = expandedSubStepsAgentProp !== undefined
+  const [localExpandedAgent, setLocalExpandedAgent] = useState<string | null>(null)
+
+  // Use controlled value when prop is provided, otherwise use local state
+  const expandedSubStepsAgent = isControlled ? expandedSubStepsAgentProp : localExpandedAgent
+
+  // Unified setter that works for both controlled and uncontrolled modes
+  const setExpandedSubStepsAgent = useCallback((value: string | null) => {
+    if (isControlled) {
+      // In controlled mode, notify parent via callback
+      onExpandedSubStepsAgentChange?.(value)
+    } else {
+      // In uncontrolled mode, update local state
+      setLocalExpandedAgent(value)
+    }
+  }, [isControlled, onExpandedSubStepsAgentChange])
+
   // Track if expansion was triggered automatically (by running status)
   const [autoExpandedAgent, setAutoExpandedAgent] = useState<string | null>(null)
   // Track the last seen step statuses to detect transitions
@@ -342,7 +392,12 @@ export function MultiAgentGraph({
 
   // Auto-expand substeps when a multi-step agent is active (running or recently started)
   // Enhanced logic for free-flight mode: also detect agents where steps just completed
+  // IMPORTANT: Skip this logic entirely in controlled mode - let the parent (modal) handle expansion
   useEffect(() => {
+    // In controlled mode, the parent manages expandedSubStepsAgent via Redux
+    // Don't run our own auto-expand logic or we'll conflict with the parent
+    if (isControlled) return
+
     if (effectiveSteps.length === 0) return
 
     // Build current status map and detect active agent
@@ -398,7 +453,7 @@ export function MultiAgentGraph({
         setAutoExpandedAgent(null)
       }
     }
-  }, [effectiveSteps, expandedSubStepsAgent, autoExpandedAgent, stepToAgent])
+  }, [isControlled, effectiveSteps, expandedSubStepsAgent, autoExpandedAgent, stepToAgent, effectiveAgentSubSteps, setExpandedSubStepsAgent])
 
   // Attach scroll listener to save position on user scroll
   useEffect(() => {
@@ -1084,6 +1139,17 @@ export function MultiAgentGraph({
         </g>
 
         {/* Render expanded sub-steps arc overlay (above all nodes for z-order) */}
+        {/* DEBUG: Log arc rendering decision */}
+        {(() => {
+          Logger.info(LogCategories.UI, 'DEBUG: Arc rendering check', {
+            expandedSubStepsAgent,
+            hasSubstepsForAgent: !!effectiveAgentSubSteps[expandedSubStepsAgent || ''],
+            substepsCount: effectiveAgentSubSteps[expandedSubStepsAgent || '']?.length || 0,
+            effectiveAgentSubStepsKeys: Object.keys(effectiveAgentSubSteps),
+            willRender: !!(expandedSubStepsAgent && effectiveAgentSubSteps[expandedSubStepsAgent]),
+          })
+          return null
+        })()}
         {expandedSubStepsAgent && effectiveAgentSubSteps[expandedSubStepsAgent] && (
           <g className="substeps-arc-overlay">
             {(() => {
