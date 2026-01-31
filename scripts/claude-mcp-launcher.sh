@@ -21,7 +21,16 @@ export CODING_KNOWLEDGE_EXPORT="$CODING_REPO_DIR/.data/knowledge-export"
 export CODING_TOOLS_PATH="$CODING_REPO_DIR"
 
 # Path to the MCP config file
-MCP_CONFIG="$CODING_REPO_DIR/claude-code-mcp-processed.json"
+# Priority: 1) Docker mode if detected, 2) Environment variable, 3) Default local config
+if [[ "$CODING_DOCKER_MODE" == "true" ]] && [[ -f "$CODING_REPO_DIR/claude-code-mcp-docker.json" ]]; then
+    MCP_CONFIG="$CODING_REPO_DIR/claude-code-mcp-docker.json"
+    echo -e "${BLUE}🐳 Using Docker MCP config${NC}"
+elif [[ -n "$MCP_CONFIG" ]] && [[ -f "$MCP_CONFIG" ]]; then
+    # MCP_CONFIG already set from environment (e.g., by launch-claude.sh)
+    echo -e "${BLUE}Using MCP config from environment: $MCP_CONFIG${NC}"
+else
+    MCP_CONFIG="$CODING_REPO_DIR/claude-code-mcp-processed.json"
+fi
 
 # Check if the MCP config file exists
 if [[ ! -f "$MCP_CONFIG" ]]; then
