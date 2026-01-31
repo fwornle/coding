@@ -140,41 +140,6 @@ mcp__playwright__browser_take_screenshot filename="feature-screenshot.png"
 - Include descriptive `element` parameter for click actions
 - Close browser with `browser_close` when done
 
-### 🚨 MANDATORY: Autonomous Browser Debugging
-
-**When asked to debug, trace, or investigate browser UI issues, you MUST use Playwright tools autonomously. NEVER ask the user to:**
-- Check the browser console for you
-- Inspect variables in DevTools
-- Click through debugger breakpoints
-- Report what they see on screen
-- Take screenshots manually
-
-**Instead, YOU must:**
-1. **Navigate and screenshot**: Use `browser_navigate` + `browser_take_screenshot` to see the UI state
-2. **Check console**: Use `browser_console_messages` to read browser logs
-3. **Inspect state**: Use `browser_evaluate` to run JS and check Redux state, variables, etc.
-4. **Iterate autonomously**: Take screenshots after each action to verify changes
-
-**Debugging Pattern:**
-```
-# 1. Navigate and capture initial state
-mcp__playwright__browser_navigate url="http://localhost:3032"
-mcp__playwright__browser_take_screenshot filename="debug-initial.png"
-
-# 2. Check console for errors/logs
-mcp__playwright__browser_console_messages
-
-# 3. Inspect Redux state or JS variables
-mcp__playwright__browser_evaluate script="JSON.stringify(window.__REDUX_DEVTOOLS_EXTENSION__ ? store.getState() : 'no redux')"
-
-# 4. After making code changes and rebuilding, screenshot again to verify
-mcp__playwright__browser_take_screenshot filename="debug-after-fix.png"
-```
-
-**Why:** The user should not be your "remote debugger interface." You have the tools - use them. This is faster, more efficient, and less frustrating for everyone.
-
-**Instead of `debugger` statements:** Prefer adding Logger statements and checking them via `browser_console_messages`, or use `browser_evaluate` to inspect state directly.
-
 ### UKB Workflow Control (MANDATORY)
 
 **ALWAYS use the `mcp__semantic-analysis__` MCP tools for workflow operations:**
