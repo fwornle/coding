@@ -1,0 +1,66 @@
+@startuml mcp-config-selection
+!include _standard-style.puml
+
+title MCP Configuration Selection Flow
+
+actor "User" as user
+participant "bin/coding" as coding
+participant "launch-claude.sh" as launcher
+participant "claude-mcp-launcher.sh" as mcplauncher
+participant "Claude Code" as claude
+
+box "MCP Servers" #F5F5F5
+  participant "stdio-proxy.js" as proxy
+  participant "SSE Server\n(Docker)" as sse
+end box
+
+== Mode Detection ==
+
+user -> coding : coding --claude
+coding -> launcher : Execute
+
+launcher -> launcher : Check .docker-mode file
+launcher -> launcher : Check docker ps\nfor coding-services
+
+alt Docker Mode Detected
+  launcher -> launcher : DOCKER_MODE=true
+  launcher -> launcher : export CODING_DOCKER_MODE=true
+else Native Mode
+  launcher -> launcher : DOCKER_MODE=false
+end
+
+== MCP Config Selection ==
+
+launcher -> mcplauncher : exec claude-mcp
+
+mcplauncher -> mcplauncher : Check CODING_DOCKER_MODE
+
+alt CODING_DOCKER_MODE=true
+  mcplauncher -> mcplauncher : Use claude-code-mcp-docker.json
+  note right
+    Docker config uses stdio-proxy
+    to connect to SSE servers in container
+  end note
+else CODING_DOCKER_MODE=false or unset
+  mcplauncher -> mcplauncher : Use claude-code-mcp-processed.json
+  note right
+    Native config runs MCP servers
+    directly as Node.js processes
+  end note
+end
+
+mcplauncher -> claude : Launch with MCP config
+
+== Docker Mode Communication ==
+
+claude -> proxy : stdio (JSON-RPC)
+proxy -> sse : HTTP/SSE (port 3848)
+sse --> proxy : SSE events
+proxy --> claude : stdio response
+
+note over proxy, sse
+  stdio-proxy.js bridges Claude Code's
+  stdio transport to Docker's SSE servers
+end note
+
+@enduml
