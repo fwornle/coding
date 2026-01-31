@@ -10,6 +10,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    sourcemap: true, // Enable source maps for production builds (debugging)
+  },
   server: {
     port: parseInt(process.env.SYSTEM_HEALTH_DASHBOARD_PORT || '3032'),
     strictPort: true, // Fail if port is occupied instead of auto-switching
