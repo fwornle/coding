@@ -530,8 +530,18 @@ class ProcessStateManager {
         output += data.toString();
       });
 
+      // Add timeout to prevent lsof from hanging indefinitely (5 second timeout)
+      const LSOF_TIMEOUT_MS = 5000;
       await new Promise((resolve) => {
-        lsof.on('close', () => resolve());
+        const timeout = setTimeout(() => {
+          lsof.kill('SIGKILL');
+          resolve();
+        }, LSOF_TIMEOUT_MS);
+
+        lsof.on('close', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
       });
 
       if (output.trim()) {
