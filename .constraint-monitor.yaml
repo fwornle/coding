@@ -34,7 +34,7 @@ constraints:
   group: code_quality
   pattern: console\.log
   message: Use Logger.log() instead of console.log for better log management
-  severity: warning
+  severity: error
   enabled: true
   suggestion: 'Replace with: Logger.log(''info'', ''category'', message)'
 - id: no-var-declarations
