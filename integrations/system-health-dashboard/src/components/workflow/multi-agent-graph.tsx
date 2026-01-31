@@ -12,6 +12,8 @@ import {
   selectExecutionCurrentSubstep,
 } from '@/store/slices/ukbSlice'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
+// WebSocket hook disabled - no server-side implementation exists yet
+// import useWorkflowWebSocket from '@/hooks/useWorkflowWebSocket'
 import { STEP_TO_SUBSTEP, ORCHESTRATOR_NODE, MULTI_AGENT_EDGES } from './constants'
 import { Logger, LogCategories } from '@/utils/logging'
 
@@ -285,6 +287,10 @@ export function MultiAgentGraph({
   const executionCurrentStep = useSelector(selectExecutionCurrentStep)
   const executionCurrentSubstep = useSelector(selectExecutionCurrentSubstep)
 
+  // WebSocket disabled - no server-side implementation exists yet
+  // TODO: Implement WebSocket server in mcp-server-semantic-analysis to enable real-time SSE events
+  // const { isConnected: wsConnected, error: wsError } = useWorkflowWebSocket()
+
   // Merge YAML-provided substep ID mappings with hardcoded fallback
   // NOTE: STEP_TO_SUBSTEP is a DEPRECATED fallback - prefer YAML-provided definitions
   const effectiveStepToSubStep = Object.keys(stepToSubStep).length > 0
@@ -345,11 +351,31 @@ export function MultiAgentGraph({
     return filtered
   }, [allAgentSubSteps, agentsWithRuntimeSubsteps])
 
-  // Compute effective process steps: prefer event-driven state when available
+  // Compute effective process steps: SSE-only when connected (Option B)
+  // When SSE is active, ignore polling data entirely - build steps from SSE events only
   const effectiveSteps = useMemo((): StepInfo[] => {
-    if (isEventDrivenMode && Object.keys(executionStepStatuses).length > 0) {
-      // Convert event-driven step statuses to StepInfo array
-      return Object.values(executionStepStatuses).map(s => ({
+    // DEBUG: Log SSE state
+    Logger.info(LogCategories.UI, 'DEBUG effectiveSteps computation', {
+      isEventDrivenMode,
+      stepStatusesCount: Object.keys(executionStepStatuses).length,
+      substepStatusesCount: Object.keys(executionSubstepStatuses).length,
+      substepStatusesKeys: Object.keys(executionSubstepStatuses),
+      pollingStepsCount: process.steps?.length || 0,
+    })
+
+    if (!isEventDrivenMode) {
+      // SSE not active - use polling data
+      Logger.info(LogCategories.UI, 'DEBUG: Using polling data (SSE not active)')
+      return process.steps || []
+    }
+
+    // SSE active: build steps list ONLY from SSE events
+    const steps: StepInfo[] = []
+    const addedStepNames = new Set<string>()
+
+    // 1. Add regular steps from executionStepStatuses
+    for (const s of Object.values(executionStepStatuses)) {
+      steps.push({
         name: s.name,
         status: s.status,
         duration: s.duration,
@@ -358,11 +384,34 @@ export function MultiAgentGraph({
         llmCalls: s.llmCalls,
         error: s.error,
         outputs: s.outputs as Record<string, any>,
-      }))
+      })
+      addedStepNames.add(s.name)
     }
-    // Fallback to process.steps (polling-based)
-    return process.steps || []
-  }, [isEventDrivenMode, executionStepStatuses, process.steps])
+
+    // 2. Add substeps: convert from executionSubstepStatuses
+    // Find the step name for each (agentId, substepId) pair using reverse lookup
+    for (const [agentId, substeps] of Object.entries(executionSubstepStatuses)) {
+      for (const [substepId, substepInfo] of Object.entries(substeps)) {
+        // Find the step name that maps to this (agentId, substepId)
+        const stepName = Object.entries(effectiveStepToSubStep).find(([name, id]) =>
+          id === substepId && stepToAgent[name] === agentId
+        )?.[0]
+
+        if (stepName && !addedStepNames.has(stepName)) {
+          steps.push({
+            name: stepName,
+            status: substepInfo.status as StepInfo['status'],
+            duration: substepInfo.duration,
+            tokensUsed: substepInfo.tokensUsed,
+            llmProvider: substepInfo.llmProvider,
+          })
+          addedStepNames.add(stepName)
+        }
+      }
+    }
+
+    return steps
+  }, [isEventDrivenMode, executionStepStatuses, executionSubstepStatuses, process.steps, stepToAgent, effectiveStepToSubStep])
   const { scrollRef, saveScrollPosition } = useScrollPreservation()
   const { wigglingNode, handleNodeMouseEnter, handleNodeMouseLeave } = useNodeWiggle()
 
@@ -1180,9 +1229,47 @@ export function MultiAgentGraph({
                   substepStatuses.set(substepId, step.status)
                 }
               }
+
+              // FALLBACK: Infer substep statuses from currentStep when polling data lacks substep detail
+              // This handles the case where effectiveSteps doesn't have individual substep statuses
+              const currentStepSubstepId = process.currentStep ? effectiveStepToSubStep[process.currentStep] : null
+              const currentStepAgentId = process.currentStep ? (stepToAgent[process.currentStep] || process.currentStep) : null
+              const substepOrder = substeps.map(s => s.id)  // e.g., ['conv', 'aggr', 'embed', 'dedup', 'pred', 'merge']
+
+              // Check if this agent's parent step is already completed
+              // e.g., if 'generate_batch_observations' has status 'completed', all observation_generation substeps are done
+              const agentParentStepCompleted = effectiveSteps.some(step => {
+                const stepAgent = stepToAgent[step.name] || step.name
+                // Check if this is a parent step (not a substep) for this agent AND it's completed
+                const isParentStep = stepAgent === expandedSubStepsAgent && !effectiveStepToSubStep[step.name]
+                return isParentStep && step.status === 'completed'
+              })
+
+              if (agentParentStepCompleted) {
+                // Agent's parent step completed - mark ALL substeps as completed
+                substepOrder.forEach(substepId => {
+                  substepStatuses.set(substepId, 'completed')
+                })
+              } else if (currentStepAgentId === expandedSubStepsAgent && currentStepSubstepId) {
+                // We're currently running a substep of this agent - infer completion from position
+                const currentIdx = substepOrder.indexOf(currentStepSubstepId)
+
+                if (currentIdx >= 0) {
+                  // Mark substeps before current as completed, current as running, after as pending
+                  substepOrder.forEach((substepId, idx) => {
+                    if (idx < currentIdx) {
+                      substepStatuses.set(substepId, 'completed')
+                    } else if (idx === currentIdx) {
+                      substepStatuses.set(substepId, 'running')
+                    } else {
+                      substepStatuses.set(substepId, 'pending')
+                    }
+                  })
+                }
+              }
               // DEBUG: Log substep status computation
-              console.log('[SUBSTEP-DEBUG] agentSteps:', agentSteps.map(s => ({ name: s.name, status: s.status })))
-              console.log('[SUBSTEP-DEBUG] substepStatuses:', Object.fromEntries(substepStatuses))
+              Logger.debug(LogCategories.UI, '[SUBSTEP-DEBUG] agentSteps:', agentSteps.map(s => ({ name: s.name, status: s.status })))
+              Logger.debug(LogCategories.UI, '[SUBSTEP-DEBUG] substepStatuses:', Object.fromEntries(substepStatuses))
               const isAgentRunning = agentSteps.some(s => s.status === 'running')
               // Agent is fully completed only if ALL its substeps are done (no running ones left)
               const isAgentCompleted = !isAgentRunning && agentSteps.length > 0 &&
@@ -1215,11 +1302,6 @@ export function MultiAgentGraph({
                 // Per-substep status from runtime data
                 const substepStatus = substepStatuses.get(substep.id)
 
-                // DEBUG: Stop on ANY kg_operators substep
-                if (expandedSubStepsAgent === 'kg_operators') {
-                  // eslint-disable-next-line no-debugger
-                  debugger  // Should stop here when kg_operators arc is rendered
-                }
                 const isSubstepCompleted = substepStatus === 'completed' || substepStatus === 'skipped'
                 const isActiveSubStep = substepStatus === 'running'
                 const isPending = !substepStatus || substepStatus === 'pending'
