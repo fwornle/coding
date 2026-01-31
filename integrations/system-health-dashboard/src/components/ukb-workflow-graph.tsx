@@ -663,7 +663,13 @@ interface ProcessInfo {
 interface UKBWorkflowGraphProps {
   process: ProcessInfo
   onNodeClick?: (agentId: string) => void
+  onSubStepSelect?: (agentId: string, substep: SubStep | null) => void
   selectedNode?: string | null
+  selectedSubStepId?: string | null
+  hideLegend?: boolean
+  // Controlled expanded substeps agent from parent (modal tracks this in Redux)
+  expandedSubStepsAgent?: string | null
+  onExpandedSubStepsAgentChange?: (agentId: string | null) => void
 }
 
 /**
@@ -1206,7 +1212,16 @@ function StepResultDetails({ outputs: rawOutputs }: { outputs: Record<string, an
   )
 }
 
-export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }: UKBWorkflowGraphProps) {
+export default function UKBWorkflowGraph({
+  process,
+  onNodeClick,
+  onSubStepSelect,
+  selectedNode,
+  selectedSubStepId,
+  hideLegend = false,
+  expandedSubStepsAgent: expandedSubStepsAgentProp,
+  onExpandedSubStepsAgentChange,
+}: UKBWorkflowGraphProps) {
   // Fetch workflow definitions from API (Single Source of Truth)
   // Pass workflow name to load correct edges for the current workflow
   const { agents: WORKFLOW_AGENTS, orchestrator: ORCHESTRATOR_NODE, edges: WORKFLOW_EDGES, stepToAgent: STEP_TO_AGENT, isLoading: definitionsLoading } = useWorkflowDefinitions(process.workflowName)
@@ -1216,7 +1231,21 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
   const wiggleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Track which agent has expanded sub-steps
-  const [expandedSubStepsAgent, setExpandedSubStepsAgent] = useState<string | null>(null)
+  // Support both controlled (prop) and uncontrolled (local state) modes
+  const isControlled = expandedSubStepsAgentProp !== undefined
+  const [localExpandedAgent, setLocalExpandedAgent] = useState<string | null>(null)
+
+  // Use controlled value when prop is provided, otherwise use local state
+  const expandedSubStepsAgent = isControlled ? expandedSubStepsAgentProp : localExpandedAgent
+
+  // Unified setter that works for both controlled and uncontrolled modes
+  const setExpandedSubStepsAgent = useCallback((value: string | null) => {
+    if (isControlled) {
+      onExpandedSubStepsAgentChange?.(value)
+    } else {
+      setLocalExpandedAgent(value)
+    }
+  }, [isControlled, onExpandedSubStepsAgentChange])
 
   const handleNodeMouseEnter = useCallback((agentId: string) => {
     // Clear any existing timeout
@@ -1256,20 +1285,14 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
     return `${batchId}:${stepStatuses}`
   }, [process.batchIterations])
 
-  // KG operator child agents that should aggregate to parent kg_operators
-  const KG_OPERATOR_CHILDREN = [
-    'context_convolution', 'entity_aggregation', 'node_embedding',
-    'deduplication_operator', 'edge_prediction', 'structure_merge'
-  ]
-
-  // Batch-phase step names that repeat each batch (should use current batch status, not aggregate)
+  // Batch-phase agent names that repeat each batch (should use current batch status, not aggregate)
   // ORDERED by execution sequence within each batch - used to determine which steps are pending
-  // IMPORTANT: This list must match the actual batch loop sequence in coordinator.ts
+  // IMPORTANT: These are AGENT names (after stepToAgent mapping), not individual step names
+  // The stepToAgent mapping (e.g., operator_conv → kg_operators) handles step-to-agent conversion
   const BATCH_PHASE_STEPS = [
     'git_history', 'vibe_history', 'semantic_analysis',
     'observation_generation', 'ontology_classification',
-    'kg_operators', 'context_convolution', 'entity_aggregation', 'node_embedding',
-    'deduplication_operator', 'edge_prediction', 'structure_merge',
+    'kg_operators',  // All operator_* steps map to this agent
     'quality_assurance', 'batch_checkpoint_manager'  // batch_qa and save_batch_checkpoint
   ]
 
@@ -1304,19 +1327,9 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
         const existingPriority = existingEntry ? (STATUS_PRIORITY[existingEntry.status] || 0) : 0
         const newPriority = STATUS_PRIORITY[step.status] || 0
         // Only overwrite if new status has higher priority (handles duplicate tracking bug)
+        // NOTE: stepToAgent mapping already aggregates operator_* → kg_operators
         if (!existingEntry || newPriority > existingPriority) {
           currentBatchStepMap[agentId] = { ...step }
-        }
-
-        // Aggregate KG operator child status to parent kg_operators
-        if (KG_OPERATOR_CHILDREN.includes(agentId)) {
-          const existingStatus = currentBatchStepMap['kg_operators']?.status
-          if (!existingStatus ||
-              step.status === 'running' ||
-              (step.status === 'failed' && existingStatus !== 'running') ||
-              (step.status === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
-            currentBatchStepMap['kg_operators'] = { ...step, name: 'kg_operators' }
-          }
         }
       }
     }
@@ -1350,27 +1363,13 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
           }
         }
 
-        // Aggregate KG operator child status to parent kg_operators (for non-batch workflows)
-        if (!isBatchWorkflow && KG_OPERATOR_CHILDREN.includes(agentId)) {
-          const existingStatus = map['kg_operators']?.status
-          if (!existingStatus ||
-              step.status === 'running' ||
-              (step.status === 'failed' && existingStatus !== 'running') ||
-              (step.status === 'completed' && existingStatus !== 'running' && existingStatus !== 'failed')) {
-            map['kg_operators'] = { ...step, name: 'kg_operators' }
-          }
-        }
+        // NOTE: stepToAgent mapping already aggregates operator_* → kg_operators (no special handling needed)
       }
     }
 
-    // For batch workflows: ensure kg_operators uses current batch status
+    // For batch workflows: ensure kg_operators uses current batch status (same as other multi-step agents)
     if (isBatchWorkflow && currentBatchStepMap['kg_operators']) {
       map['kg_operators'] = currentBatchStepMap['kg_operators']
-    } else if (isBatchWorkflow && !currentBatchStepMap['kg_operators'] && BATCH_PHASE_STEPS.some(s => s.startsWith('context_') || s.startsWith('entity_') || s.startsWith('node_') || s.startsWith('deduplication_') || s.startsWith('edge_') || s.startsWith('structure_'))) {
-      // KG operators haven't started in current batch - show as pending
-      if (map['kg_operators']) {
-        map['kg_operators'] = { ...map['kg_operators'], status: 'pending' }
-      }
     }
 
     // Infer current step from process.currentStep
@@ -2097,11 +2096,6 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
               const Icon = agent.icon
               const colors = getNodeColors(status, isSelected)
 
-              // Debug: log expanded state for this agent
-              if (AGENT_SUBSTEPS[agent.id]) {
-                console.log('[SubSteps] Agent:', agent.id, 'expandedSubStepsAgent:', expandedSubStepsAgent, 'match:', expandedSubStepsAgent === agent.id)
-              }
-
               return (
                 <React.Fragment key={agent.id}>
                 <Tooltip>
@@ -2212,7 +2206,6 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                             onClick={(e) => {
                               e.stopPropagation()
                               e.preventDefault()
-                              console.log('[SubSteps] Badge clicked:', agent.id, 'isExpanded:', isExpanded, '-> setting to:', isExpanded ? null : agent.id)
                               setExpandedSubStepsAgent(isExpanded ? null : agent.id)
                             }}
                           >
@@ -2427,7 +2420,6 @@ export default function UKBWorkflowGraph({ process, onNodeClick, selectedNode }:
                   <g className="substeps-arc">
                     {(() => {
                       const substeps = AGENT_SUBSTEPS[agent.id]
-                      console.log('[SubSteps] Rendering outer ring for:', agent.id, 'substeps:', substeps.length, 'pos:', pos)
                       const centerX = pos.x + nodeWidth / 2
                       const centerY = pos.y + nodeHeight / 2
                       const innerRadius = Math.max(nodeWidth, nodeHeight) / 2 + 12
@@ -3145,12 +3137,12 @@ export function UKBNodeDetailsSidebar({
   // FIXED: For batch-phase steps, use current batch's status instead of top-level aggregate
   // The top-level stepsDetail may show stale "skipped" status from initial batch,
   // while the current batch has the actual running/completed status
-  // IMPORTANT: This list must match BATCH_PHASE_STEPS in the main graph component
-  const SIDEBAR_BATCH_PHASE_STEPS = [
+  // IMPORTANT: This list should contain AGENT names (after stepToAgent mapping), not individual step names
+  // The stepToAgent mapping handles operator_* → kg_operators conversion
+  const SIDEBAR_BATCH_PHASE_AGENTS = [
     'git_history', 'vibe_history', 'semantic_analysis',
     'observation_generation', 'ontology_classification',
-    'kg_operators', 'context_convolution', 'entity_aggregation', 'node_embedding',
-    'deduplication_operator', 'edge_prediction', 'structure_merge',
+    'kg_operators',  // All operator_* steps map to this agent
     'quality_assurance', 'batch_checkpoint_manager'
   ]
 
@@ -3161,8 +3153,8 @@ export function UKBNodeDetailsSidebar({
 
   // Get step info from the correct source based on step type
   const stepInfo = useMemo((): StepInfo | undefined => {
-    // For batch-phase steps in a batch workflow, prefer current batch status
-    if (isBatchWorkflow && SIDEBAR_BATCH_PHASE_STEPS.includes(agentId)) {
+    // For batch-phase agents in a batch workflow, prefer current batch status
+    if (isBatchWorkflow && SIDEBAR_BATCH_PHASE_AGENTS.includes(agentId)) {
       const batchStep = currentBatch?.steps?.find(
         (s: any) => STEP_TO_AGENT[s.name] === agentId || s.name === agentId
       )

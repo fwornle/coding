@@ -541,11 +541,18 @@ const ukbSlice = createSlice({
       state.total = action.payload.summary?.total || action.payload.total || 0
 
       // Merge new processes with existing ones to preserve valid data during refreshes
-      // This prevents the "Initializing..." flash when API briefly returns incomplete data
+      // This prevents flickering when SSE and REST polling race with each other
       const newProcesses = action.payload.processes || []
       const existingProcessMap = new Map(state.processes.map(p => [p.pid, p]))
+      const newProcessPids = new Set(newProcesses.map((p: UKBProcess) => p.pid))
 
-      state.processes = newProcesses.map((newProcess: UKBProcess) => {
+      // CRITICAL FIX: If new data is empty but we have existing running processes,
+      // preserve them. This prevents "No Active Workflows" flicker during data races.
+      const existingRunningProcesses = state.processes.filter(p =>
+        p.status === 'running' && !newProcessPids.has(p.pid)
+      )
+
+      const mergedNewProcesses = newProcesses.map((newProcess: UKBProcess) => {
         const existing = existingProcessMap.get(newProcess.pid)
 
         // If new data has valid workflowName and totalSteps, use it entirely
@@ -567,6 +574,9 @@ const ukbSlice = createSlice({
         // Otherwise use new process as-is
         return newProcess
       })
+
+      // Combine: new/merged processes + preserved running processes not in new data
+      state.processes = [...mergedNewProcesses, ...existingRunningProcesses]
 
       if (action.payload.config) {
         state.config = action.payload.config

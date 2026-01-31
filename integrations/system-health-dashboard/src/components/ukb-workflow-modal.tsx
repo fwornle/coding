@@ -397,18 +397,6 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const pausedAtStep = useSelector(selectPausedAtStep)
   const [stepAdvanceLoading, setStepAdvanceLoading] = useState(false)  // Local UI state only
 
-  // DEBUG: Log pausedAtStep and whether "Step Into" button should appear
-  useEffect(() => {
-    const hasSubsteps = pausedAtStep ? stepsWithSubsteps.has(pausedAtStep) : false
-    console.log('[UKB-DEBUG] Step pause state:', {
-      stepPaused,
-      pausedAtStep,
-      hasSubsteps,
-      stepsWithSubsteps: Array.from(stepsWithSubsteps),
-      shouldShowStepIntoButton: stepPaused && pausedAtStep && hasSubsteps
-    })
-  }, [stepPaused, pausedAtStep, stepsWithSubsteps])
-
   // LLM Mock mode state (MVI: from Redux store)
   const mockLLM = useSelector(selectMockLLM)
   const mockLLMExplicit = useSelector(selectMockLLMExplicit)
@@ -859,6 +847,15 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         // Auto-select substep if the current step maps to one
         // This ensures sidebar shows substep details when a substep is running
         const substepId = stepToSubStep[effectiveStep]
+        // DEBUG: Log what we're computing for substep expansion
+        Logger.info(LogCategories.UI, 'DEBUG: Checking substep expansion', {
+          effectiveStep,
+          agentId,
+          substepId,
+          hasSubsteps: !!agentSubSteps[agentId],
+          substepCount: agentSubSteps[agentId]?.length || 0,
+          currentExpandedAgent: expandedSubStepsAgent,
+        })
         if (substepId && agentSubSteps[agentId]?.length > 0) {
           Logger.info(LogCategories.UI, 'Auto-selecting substep for running step', {
             step: effectiveStep,
@@ -867,24 +864,26 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
           })
           dispatch(setSelectedSubStep({ agentId, substepId }))
           // Also expand the substeps arc to show the running substep
+          Logger.info(LogCategories.UI, 'DEBUG: Dispatching setExpandedSubStepsAgent', { agentId })
           dispatch(setExpandedSubStepsAgent(agentId))
         } else if (agentSubSteps[agentId]?.length > 0) {
           // Parent step with substeps - clear substep selection but expand arc
           dispatch(setSelectedSubStep(null))
           dispatch(setExpandedSubStepsAgent(agentId))
         } else {
-          // No substeps - clear selection
+          // No substeps - clear selection and close any expanded substeps arc
           dispatch(setSelectedSubStep(null))
-        }
 
-        // Auto-close sub-steps if we moved to a different agent
-        const previousAgentId = previousStep ? (stepToAgent[previousStep] || previousStep) : null
-        if (previousAgentId && previousAgentId !== agentId && expandedSubStepsAgent === previousAgentId) {
-          Logger.info(LogCategories.UI, 'Auto-closing sub-steps from previous agent', {
-            previousAgent: previousAgentId,
-            newAgent: agentId,
-          })
-          dispatch(setExpandedSubStepsAgent(null))
+          // Auto-close sub-steps from previous agent when moving to an agent WITHOUT substeps
+          // When moving to an agent WITH substeps, the new expansion replaces the old one automatically
+          const previousAgentId = previousStep ? (stepToAgent[previousStep] || previousStep) : null
+          if (previousAgentId && previousAgentId !== agentId && expandedSubStepsAgent === previousAgentId) {
+            Logger.info(LogCategories.UI, 'Auto-closing sub-steps from previous agent (new agent has no substeps)', {
+              previousAgent: previousAgentId,
+              newAgent: agentId,
+            })
+            dispatch(setExpandedSubStepsAgent(null))
+          }
         }
         previousAgentRef.current = agentId
       }
@@ -976,6 +975,12 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       dispatch(setSelectedNode(agentId))
     }
   }, [dispatch, dispatchSetSelectedSubStep])
+
+  // Handler for expanded substeps agent change (MVI: dispatches to Redux)
+  // This keeps the graph in sync with the modal's Redux state
+  const handleExpandedSubStepsAgentChange = useCallback((agentId: string | null) => {
+    dispatch(setExpandedSubStepsAgent(agentId))
+  }, [dispatch])
 
   const handleCloseSidebar = () => {
     Logger.debug(LogCategories.UI, 'Closing agent details sidebar', {
@@ -1431,6 +1436,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   selectedNode={selectedNode}
                   selectedSubStepId={selectedSubStep?.id || null}
                   hideLegend
+                  expandedSubStepsAgent={expandedSubStepsAgent}
+                  onExpandedSubStepsAgentChange={handleExpandedSubStepsAgentChange}
                 />
               </div>
 
@@ -2204,12 +2211,12 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                   const preBatchStepNames = new Set(['batch_scheduler', 'plan_batches'])
 
                   // Batch-phase agent names (these repeat per batch)
+                  // NOTE: These are AGENT names after stepToAgent mapping, not individual step names
                   const batchPhaseAgentNames = new Set([
                     'git_history', 'vibe_history', 'semantic_analysis',
                     'observation_generation', 'ontology_classification',
-                    'kg_operators', 'context_convolution', 'entity_aggregation',
-                    'node_embedding', 'deduplication_operator', 'edge_prediction',
-                    'structure_merge', 'quality_assurance', 'batch_checkpoint_manager'
+                    'kg_operators',  // All operator_* steps map to this agent
+                    'quality_assurance', 'batch_checkpoint_manager'
                   ])
 
                   // Post-batch step names (finalization)

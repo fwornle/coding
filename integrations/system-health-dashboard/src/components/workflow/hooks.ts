@@ -15,8 +15,7 @@ import {
   selectWorkflowConfigInitialized,
   setWorkflowEdges,
 } from '@/store/slices/workflowConfigSlice'
-import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, STEP_TO_SUBSTEP, MULTI_AGENT_EDGES } from './constants'
-import { AGENT_SUBSTEPS } from './multi-agent-graph'
+import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, STEP_TO_SUBSTEP, MULTI_AGENT_EDGES, AGENT_SUBSTEPS } from './constants'
 
 // Hook to get workflow definitions from Redux (populated by API with fallback to constants)
 export function useWorkflowDefinitions(workflowName?: string) {
@@ -54,13 +53,16 @@ export function useWorkflowDefinitions(workflowName?: string) {
     }
   }
 
+  // IMPORTANT: Merge API data with constants to ensure all mappings exist
+  // The API may return partial data, so we need constants as a safety net
+  // Constants take precedence for critical mappings (like operator_* → kg_operators)
   return {
     agents: agents.length > 0 ? agents : WORKFLOW_AGENTS,
     orchestrator: orchestrator || ORCHESTRATOR_NODE,
     edges: edges.length > 0 ? edges : MULTI_AGENT_EDGES,
-    stepToAgent: Object.keys(stepToAgent).length > 0 ? stepToAgent : STEP_TO_AGENT,
-    stepToSubStep: Object.keys(stepToSubStep).length > 0 ? stepToSubStep : STEP_TO_SUBSTEP,
-    agentSubSteps: Object.keys(agentSubSteps).length > 0 ? agentSubSteps : AGENT_SUBSTEPS,
+    stepToAgent: { ...STEP_TO_AGENT, ...stepToAgent },  // Merge: constants first, API overrides
+    stepToSubStep: { ...STEP_TO_SUBSTEP, ...stepToSubStep },  // Merge: constants first, API overrides
+    agentSubSteps: { ...AGENT_SUBSTEPS, ...agentSubSteps },  // Merge: constants first, API overrides
     isLoading,
     error
   }
