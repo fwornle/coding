@@ -386,32 +386,12 @@ fi
 # Run agent-common initialization (LSL, monitoring, gitignore, etc.)
 agent_common_init "$TARGET_PROJECT_DIR" "$CODING_REPO"
 
-# Find MCP config (always from coding repo)
-MCP_CONFIG=""
+# MCP config is now selected by claude-mcp-launcher.sh based on CODING_DOCKER_MODE
+# Log which mode will be used
 if [ "$DOCKER_MODE" = true ]; then
-  # Docker mode: Use Docker-specific MCP config with stdio proxies
-  if [ -f "$CODING_REPO/claude-code-mcp-docker.json" ]; then
-    MCP_CONFIG="$CODING_REPO/claude-code-mcp-docker.json"
-    log "Using Docker MCP config: $MCP_CONFIG"
-  else
-    log "Warning: Docker MCP config not found, using default"
-  fi
-fi
-
-# Fall back to standard configs
-if [ -z "$MCP_CONFIG" ]; then
-  if [ -f "$CODING_REPO/claude-code-mcp-processed.json" ]; then
-    MCP_CONFIG="$CODING_REPO/claude-code-mcp-processed.json"
-  elif [ -f "$HOME/.config/claude/claude_desktop_config.json" ]; then
-    MCP_CONFIG="$HOME/.config/claude/claude_desktop_config.json"
-  elif [ -f "$HOME/Library/Application Support/Claude/claude_desktop_config.json" ]; then
-    MCP_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-  fi
-fi
-
-if [ -z "$MCP_CONFIG" ]; then
-  log "Warning: No MCP configuration found. Some features may not work."
-  log "Run './install.sh' to configure MCP servers."
+  log "Docker mode: MCP servers will use stdio-proxy → SSE connections to Docker"
+else
+  log "Native mode: MCP servers will run as local processes"
 fi
 
 # Set environment variables
@@ -423,11 +403,6 @@ export TRANSCRIPT_SOURCE_PROJECT="$TARGET_PROJECT_DIR"
 cd "$TARGET_PROJECT_DIR"
 log "Changed working directory to: $(pwd)"
 
-# Launch Claude with MCP config
-if [ -n "$MCP_CONFIG" ]; then
-  log "Using MCP config: $MCP_CONFIG"
-  exec "$CODING_REPO/bin/claude-mcp" "$@"
-else
-  log "Launching Claude without MCP config"
-  exec claude "$@"
-fi
+# Launch Claude with MCP (config selected by claude-mcp-launcher.sh based on CODING_DOCKER_MODE)
+log "Launching Claude Code with MCP integration..."
+exec "$CODING_REPO/bin/claude-mcp" "$@"
