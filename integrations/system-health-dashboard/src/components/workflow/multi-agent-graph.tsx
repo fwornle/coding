@@ -1214,6 +1214,12 @@ export function MultiAgentGraph({
                 const isSelected = selectedSubStepId === substep.id
                 // Per-substep status from runtime data
                 const substepStatus = substepStatuses.get(substep.id)
+
+                // DEBUG: Stop on ANY kg_operators substep
+                if (expandedSubStepsAgent === 'kg_operators') {
+                  // eslint-disable-next-line no-debugger
+                  debugger  // Should stop here when kg_operators arc is rendered
+                }
                 const isSubstepCompleted = substepStatus === 'completed' || substepStatus === 'skipped'
                 const isActiveSubStep = substepStatus === 'running'
                 const isPending = !substepStatus || substepStatus === 'pending'

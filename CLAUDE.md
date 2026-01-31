@@ -35,23 +35,30 @@ Use Skill tool with command: "documentation-style"
 - **Services**: VKB Server (port 8080), Semantic Analysis, Graph Database
 - **Never use**: Just `claude` - always start via 'coding' infrastructure
 
-### 🚨 CRITICAL: Rebuilding Docker After Code Changes
+### 🚨 CRITICAL: Rebuilding After Code Changes
 
-**When modifying code in these directories, you MUST rebuild the Docker container:**
-- `integrations/system-health-dashboard/` (dashboard UI)
+**Dashboard UI (`integrations/system-health-dashboard/`):**
+The `dist` folder is **bind-mounted from host** into the container. Docker rebuilds are NOT needed - just rebuild locally:
+```bash
+cd /Users/Q284340/Agentic/coding/integrations/system-health-dashboard && npm run build
+```
+Then hard-refresh the browser (Cmd+Shift+R). The container serves the host's `dist` directly.
+
+**Backend services (require Docker rebuild):**
 - `integrations/mcp-server-semantic-analysis/` (workflow coordinator)
 - `integrations/mcp-constraint-monitor/`
 - `integrations/browser-access/`
 - `lib/vkb-server/`
 
-**Rebuild Command:**
+**Docker Rebuild Command (for backend changes only):**
 ```bash
 cd /Users/Q284340/Agentic/coding/docker && docker-compose build coding-services && docker-compose up -d coding-services
 ```
 
-**Why:** The dashboard and services run inside the `coding-services` Docker container. Running `npm run build` locally only builds files on the host - the container serves from its own copy. Browser hard-refresh alone is NOT sufficient.
-
-**Common mistake:** Forgetting to rebuild Docker after UI changes, then wondering why changes aren't visible despite hard-refresh.
+**Common mistakes:**
+- Running Docker rebuild for dashboard changes (unnecessary - use local `npm run build`)
+- Forgetting to hard-refresh browser after local rebuild
+- Not rebuilding Docker for backend service changes
 
 ### Knowledge Management
 - **Graph Database**: Graphology + Level persistent storage
