@@ -52,15 +52,22 @@ class PostSessionLogger {
   }
 
   async captureConversation() {
-    console.log('📋 Post-session logging started...');
-    
-    // First, stop semantic-analysis system
+    // LSL (Live Session Logging) now handles all session capture during the session
+    // This post-session logger is a legacy fallback that's no longer needed
+    // Service cleanup is handled by PSM via launch-claude.sh
     await this.stopSemanticAnalysisSystem();
-    
+
     try {
-      // Check if session needs logging
+      // Check if LSL already captured this session
+      const liveSessionCheck = await this.checkLiveSessionPlausibility();
+      if (liveSessionCheck.exists) {
+        // LSL handled it - nothing to do
+        return;
+      }
+
+      // Legacy session file check - this file is no longer created
       if (!fs.existsSync(this.sessionFile)) {
-        console.log('❌ No session file found - skipping logging');
+        // Expected: LSL is the primary logging system now
         return;
       }
 
@@ -429,51 +436,9 @@ ${isRerouted ? '- ⚠️  This session was RE-ROUTED from its original project d
   }
 
   async stopSemanticAnalysisSystem() {
-    console.log('🛑 Stopping all coding services...');
-    try {
-      // Use the new service lifecycle manager to stop all services
-      const { spawnSync } = await import('child_process');
-      const stopScript = path.join(this.codingRepo, 'lib', 'services', 'stop-services.js');
-      
-      if (fs.existsSync(stopScript)) {
-        const result = spawnSync('node', [stopScript, '--agent', 'claude', '--verbose'], { 
-          stdio: 'inherit',
-          cwd: this.codingRepo,
-          encoding: 'utf8'
-        });
-        
-        if (result.error) {
-          throw result.error;
-        }
-        
-        console.log('✅ All coding services stopped successfully');
-      } else {
-        console.warn('⚠️  Service stop script not found, attempting legacy cleanup...');
-        
-        // Fallback to legacy stop script
-        const legacyScript = path.join(this.codingRepo, 'scripts', 'stop-semantic-agents.sh');
-        if (fs.existsSync(legacyScript)) {
-          spawnSync('/bin/bash', [legacyScript], { 
-            stdio: 'inherit',
-            cwd: this.codingRepo 
-          });
-        }
-      }
-    } catch (error) {
-      console.error('⚠️  Failed to stop services:', error.message);
-      console.log('🔄 Attempting emergency cleanup...');
-      
-      // Emergency cleanup - kill all semantic-analysis processes
-      try {
-        const { spawnSync } = await import('child_process');
-        spawnSync('pkill', ['-f', 'semantic-analysis'], { stdio: 'pipe' });
-        spawnSync('pkill', ['-f', 'vkb-server'], { stdio: 'pipe' });
-        spawnSync('pkill', ['-f', 'copilot-http-server'], { stdio: 'pipe' });
-        console.log('✅ Emergency cleanup completed');
-      } catch (cleanupError) {
-        console.error('⚠️  Emergency cleanup failed:', cleanupError.message);
-      }
-    }
+    // No-op: In Docker mode, services run in containers managed by docker-compose
+    // In native mode, PSM (Process State Manager) handles cleanup via launch-claude.sh
+    // Service lifecycle is now handled by the proper infrastructure, not this fallback logger
   }
 }
 

@@ -115,106 +115,28 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
             return 0
         fi
         export CLEANUP_RUNNING=true
-        
-        echo -e "${BLUE}🔄 Gracefully shutting down MCP services...${NC}"
-        
-        # Store PIDs of MCP processes before cleanup
-        echo -e "${YELLOW}🔍 Locating MCP processes...${NC}"
-        local mcp_pids=$(ps aux | grep -E "(browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}' || true)
-        
-        # Only kill processes if they exist and are still running
-        if [[ -n "$mcp_pids" ]]; then
-            echo -e "${YELLOW}📋 Found MCP processes: $mcp_pids${NC}"
-            
-            # Send SIGTERM first for graceful shutdown
-            echo -e "${YELLOW}⏳ Sending graceful shutdown signal...${NC}"
-            echo "$mcp_pids" | xargs -r kill -TERM 2>/dev/null || true
-            
-            # Wait for graceful shutdown
-            echo -e "${YELLOW}⌛ Waiting for graceful shutdown (2s)...${NC}"
-            sleep 2
-            
-            # Check if processes are still running
-            local remaining_pids=$(ps aux | grep -E "(browser-access/dist/index.js|semantic-analysis-system/mcp-server)" | grep -v grep | awk '{print $2}' || true)
-            
-            if [[ -n "$remaining_pids" ]]; then
-                echo -e "${YELLOW}⚠️  Some processes need force termination: $remaining_pids${NC}"
-                echo "$remaining_pids" | xargs -r kill -KILL 2>/dev/null || true
-                sleep 1
-            fi
-        fi
-        
-        echo -e "${GREEN}✅ MCP services shutdown complete${NC}"
-        
-        # Check if live session logging already handled this session
-        if [[ -f "$FALLBACK_LOGGER" ]]; then
-            echo ""  # Add spacing before post-session messages
-            echo -e "${BLUE}📝 Checking session status...${NC}"
-            
-            # Check if LSL created recent session files (within last 10 minutes)
-            local current_time=$(date +%s)
-            local session_found=false
-            
-            # Check both project locations for recent LSL files
-            for project_dir in "$(pwd)" "$CODING_REPO_DIR"; do
-                if [[ -d "$project_dir/.specstory/history" ]]; then
-                    # Look for recent session files (modified within last 10 minutes)
-                    local recent_files=$(find "$project_dir/.specstory/history" -name "*session*.md" -newermt '10 minutes ago' 2>/dev/null)
-                    if [[ -n "$recent_files" ]]; then
-                        echo -e "${GREEN}✅ Live session logging already handled this session${NC}"
-                        session_found=true
-                        break
-                    fi
-                fi
-            done
-            
-            if [[ "$session_found" == "true" ]]; then
-                echo -e "${GREEN}📄 Session logging complete - skipping fallback${NC}"
-            else
-                echo -e "${YELLOW}⚠️  No recent LSL files found - running fallback logger${NC}"
-                echo -e "${YELLOW}⏳ Analyzing Claude Code conversation history (this may take 5-10 seconds)...${NC}"
-                
-                # Capture logger output to extract the actual file path
-                # Note: Using background job with wait instead of 'timeout' (not available on macOS)
-                node "$FALLBACK_LOGGER" "$(pwd)" "$CODING_REPO_DIR" 2>&1 &
-                local node_pid=$!
 
-                # Wait up to 15 seconds for the logger to complete
-                local wait_count=0
-                while kill -0 "$node_pid" 2>/dev/null && [[ $wait_count -lt 15 ]]; do
-                    sleep 1
-                    ((wait_count++))
-                done
+        echo -e "${GREEN}✅ Session complete${NC}"
 
-                # If still running, kill it
-                if kill -0 "$node_pid" 2>/dev/null; then
-                    kill "$node_pid" 2>/dev/null
-                    wait "$node_pid" 2>/dev/null
-                    local logger_exit_code=124  # Timeout exit code
-                    local logger_output="Logger timed out after 15 seconds"
-                else
-                    wait "$node_pid"
-                    local logger_exit_code=$?
-                    local logger_output=""  # Output already displayed directly
-                fi
-                
-                # Display the logger output (which includes progress messages)
-                echo "$logger_output"
-                
-                # Check if logger completed successfully
-                if [[ $logger_exit_code -eq 0 ]]; then
-                    # Extract and display the actual log file path from logger output
-                    local log_path=$(echo "$logger_output" | grep "✅ Session logged to:" | sed 's/.*✅ Session logged to: //')
-                    if [[ -n "$log_path" ]]; then
-                        echo -e "${GREEN}✅ Session logging complete${NC}"
-                    else
-                        # Fallback message if path extraction fails
-                        echo -e "${GREEN}✅ Session logged with timestamp: $(date '+%Y-%m-%d_%H%M')${NC}"
-                    fi
-                else
-                    echo -e "${YELLOW}⚠️  Post-session logger timed out or failed${NC}"
+        # In Docker mode, containers persist across sessions - no cleanup needed
+        # In native mode, PSM (Process State Manager) handles service cleanup via launch-claude.sh trap
+        # LSL (Live Session Logging) handles transcript capture during the session
+
+        # Check if LSL captured the session (look for recent .md files with correct naming pattern)
+        local session_found=false
+        for project_dir in "$(pwd)" "$CODING_REPO_DIR"; do
+            if [[ -d "$project_dir/.specstory/history" ]]; then
+                # LSL files are named: YYYY-MM-DD_HHMM-HHMM_<hash>.md
+                local recent_files=$(find "$project_dir/.specstory/history" -name "*.md" -newermt '10 minutes ago' 2>/dev/null | head -1)
+                if [[ -n "$recent_files" ]]; then
+                    session_found=true
+                    break
                 fi
             fi
+        done
+
+        if [[ "$session_found" == "true" ]]; then
+            echo -e "${GREEN}📄 Session logged by LSL${NC}"
         fi
     }
     # Register trap for multiple signals to ensure it runs

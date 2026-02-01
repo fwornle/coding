@@ -305,8 +305,8 @@
     },
     "groq": {
       "billingType": "monthly",
-      "monthlySpend": 2,
-      "billingMonth": "JAN",
+      "monthlySpend": 0,
+      "billingMonth": "FEB",
       "spendLimit": null,
       "description": "Groq monthly billing. Update monthlySpend from console.groq.com. billingMonth is 3-letter month abbrev. Set billingType to 'free' for free tier."
     },
