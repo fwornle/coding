@@ -53,9 +53,47 @@ System automatically selects providers in this order:
 2. **Anthropic** (high quality)
 3. **OpenAI** (GPT-4)
 4. **Gemini** (Google)
-5. **Local** (Ollama/vLLM)
+5. **Local** (DMR → Ollama fallback)
 
 If a provider fails, automatic fallback to the next available provider.
+
+## Per-Agent LLM Mode Control
+
+The UKB workflow system supports three LLM modes that can be set globally or per-agent:
+
+| Mode | Icon | Description | Use Case |
+|------|------|-------------|----------|
+| **Mock** | 🧪 Orange | Fake responses | Testing, development |
+| **Local** | 🖥️ Purple | DMR/Ollama | Privacy, offline, cost savings |
+| **Public** | ☁️ Green | Cloud APIs | Production quality |
+
+### Dashboard Controls
+
+1. **Global Dropdown** - Set default mode for all agents in the modal toolbar
+2. **Per-Agent Button** - Override specific agents in the node sidebar
+3. **Node Badge** - Shows current mode (M/L/P) on each graph node
+
+![LLM Mode Control](images/llm-mode-control.png)
+
+### API Endpoints
+
+```bash
+# Get current LLM state
+curl http://localhost:3033/api/ukb/llm-state
+
+# Set global mode
+curl -X POST http://localhost:3033/api/ukb/llm-mode/global \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "local"}'
+
+# Set per-agent override
+curl -X POST http://localhost:3033/api/ukb/llm-mode/agent \
+  -H "Content-Type: application/json" \
+  -d '{"agentId": "semantic_analysis", "mode": "mock"}'
+
+# Clear per-agent override
+curl -X DELETE http://localhost:3033/api/ukb/llm-mode/agent/semantic_analysis
+```
 
 ## Using with Different Agents
 
@@ -85,15 +123,82 @@ npm install groq-sdk
 
 ### Local Models (Privacy-First)
 
+#### Docker Model Runner (Recommended)
+
+DMR uses llama.cpp via Docker Desktop - no separate installation needed.
+
+```bash
+# Enable DMR (requires Docker Desktop 4.40+)
+docker desktop enable model-runner --tcp 12434
+
+# Pull a model
+docker model pull ai/llama3.2
+
+# Verify it's running
+curl http://localhost:12434/engines/v1/models
+```
+
+**CLI Usage** - Query DMR directly from terminal:
+
+```bash
+# Use the built-in llm command (installed with coding)
+llm "What is a closure in JavaScript?"
+
+# With options
+llm -m ai/qwen2.5-coder "Review this code: $(cat file.js)"
+llm -s "You are a code reviewer" "Check this function for bugs"
+llm -t 500 "Summarize this in 100 words"
+
+# Pipe input
+cat README.md | llm "Summarize this document"
+echo "Fix this SQL: SELCT * FORM users" | llm
+
+# Raw JSON output
+llm -r "Hello" | jq .usage
+```
+
+**Options**:
+- `-m, --model MODEL` - Model to use (default: ai/llama3.2)
+- `-t, --tokens N` - Max tokens (default: 1000)
+- `-s, --system PROMPT` - System prompt
+- `-r, --raw` - Output raw JSON
+
+**Direct curl** (for scripts/automation):
+
+```bash
+curl -X POST http://localhost:12434/engines/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ai/llama3.2",
+    "messages": [{"role": "user", "content": "Explain async/await"}],
+    "max_tokens": 500
+  }'
+```
+
+**Available Models**:
+- `ai/llama3.2` - General purpose (default)
+- `ai/qwen2.5-coder` - Code-focused
+- `ai/llama3.2:3B-Q4_K_M` - Faster, smaller variant
+
+Port is configured in `.env.ports` as `DMR_PORT` (default: 12434).
+
+![Local LLM Fallback](images/local-llm-fallback.png)
+
+#### Ollama (Legacy Fallback)
+
+If DMR is unavailable, the system falls back to Ollama:
+
 ```bash
 # Start Ollama
 ollama serve
-ollama pull llama3.3:70b
+ollama pull llama3.2:latest
 
 # Configure
 echo "LOCAL_MODEL_ENDPOINT=http://localhost:11434" >> .env
 npm install openai  # Ollama uses OpenAI-compatible API
 ```
+
+**Note**: DMR is preferred over Ollama as it's built into Docker Desktop and requires no separate installation.
 
 ## Troubleshooting
 

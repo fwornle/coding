@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+#
+# llm - Query local LLM (Docker Model Runner) from command line
+#
+# Usage:
+#   llm "What is a closure in JavaScript?"
+#   echo "Explain async/await" | llm
+#   llm -m ai/qwen2.5-coder "Review this code: $(cat file.js)"
+#
+# Options:
+#   -m, --model MODEL    Model to use (default: ai/llama3.2)
+#   -t, --tokens N       Max tokens (default: 1000)
+#   -s, --system PROMPT  System prompt
+#   -r, --raw            Output raw JSON instead of just content
+#   -h, --help           Show this help
+#
+# Environment:
+#   DMR_PORT    Port for Docker Model Runner (default: 12434)
+#
+
+set -euo pipefail
+
+# Load port from .env.ports if available
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODING_ROOT="$(dirname "$SCRIPT_DIR")"
+
+if [[ -f "$CODING_ROOT/.env.ports" ]]; then
+    source "$CODING_ROOT/.env.ports" 2>/dev/null || true
+fi
+
+DMR_PORT="${DMR_PORT:-12434}"
+DMR_HOST="${DMR_HOST:-localhost}"
+DMR_URL="http://${DMR_HOST}:${DMR_PORT}/engines/v1/chat/completions"
+
+# Defaults
+MODEL="ai/llama3.2"
+MAX_TOKENS=1000
+SYSTEM_PROMPT=""
+RAW_OUTPUT=false
+PROMPT=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -m|--model)
+            MODEL="$2"
+            shift 2
+            ;;
+        -t|--tokens)
+            MAX_TOKENS="$2"
+            shift 2
+            ;;
+        -s|--system)
+            SYSTEM_PROMPT="$2"
+            shift 2
+            ;;
+        -r|--raw)
+            RAW_OUTPUT=true
+            shift
+            ;;
+        -h|--help)
+            head -25 "$0" | tail -23 | sed 's/^# //' | sed 's/^#//'
+            exit 0
+            ;;
+        *)
+            PROMPT="$1"
+            shift
+            ;;
+    esac
+done
+
+# Read from stdin if no prompt provided
+if [[ -z "$PROMPT" ]]; then
+    if [[ -t 0 ]]; then
+        echo "Error: No prompt provided. Use: llm \"your question\"" >&2
+        exit 1
+    fi
+    PROMPT=$(cat)
+fi
+
+# Check if DMR is available
+if ! curl -s "http://${DMR_HOST}:${DMR_PORT}/engines/v1/models" >/dev/null 2>&1; then
+    echo "Error: Docker Model Runner not available at ${DMR_HOST}:${DMR_PORT}" >&2
+    echo "Enable it with: docker desktop enable model-runner --tcp ${DMR_PORT}" >&2
+    exit 1
+fi
+
+# Build messages array
+if [[ -n "$SYSTEM_PROMPT" ]]; then
+    MESSAGES="[{\"role\":\"system\",\"content\":$(echo "$SYSTEM_PROMPT" | jq -Rs .)},{\"role\":\"user\",\"content\":$(echo "$PROMPT" | jq -Rs .)}]"
+else
+    MESSAGES="[{\"role\":\"user\",\"content\":$(echo "$PROMPT" | jq -Rs .)}]"
+fi
+
+# Make request
+RESPONSE=$(curl -s -X POST "$DMR_URL" \
+    -H "Content-Type: application/json" \
+    -d "{\"model\":\"$MODEL\",\"messages\":$MESSAGES,\"max_tokens\":$MAX_TOKENS}")
+
+# Output
+if [[ "$RAW_OUTPUT" == "true" ]]; then
+    echo "$RESPONSE" | jq .
+else
+    echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message // "Error: No response"'
+fi

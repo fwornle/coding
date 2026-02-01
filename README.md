@@ -16,6 +16,10 @@ coding
 # Or use specific agent
 coding --claude
 coding --copilot
+
+# Query local LLM from command line (Docker Model Runner)
+llm "Explain this error message"
+cat file.js | llm "Review this code"
 ```
 
 ### 🐳 Docker Deployment (Optional)

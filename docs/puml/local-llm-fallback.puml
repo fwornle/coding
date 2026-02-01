@@ -1,0 +1,58 @@
+@startuml local-llm-fallback
+!include _standard-style.puml
+
+title Local LLM Fallback Chain
+
+start
+
+:LLM Mode = Local;
+
+partition "Try Docker Model Runner (DMR)" {
+  :Check DMR availability;
+  if (DMR available?) then (yes)
+    :Call DMR API\n(localhost:12434);
+    if (DMR success?) then (yes)
+      :Return DMR response;
+      stop
+    else (no)
+      :Log DMR failure;
+    endif
+  else (no)
+    :Log DMR unavailable;
+  endif
+}
+
+partition "Fallback to Ollama" {
+  if (Ollama client exists?) then (yes)
+    :Call Ollama API\n(localhost:11434);
+    if (Ollama success?) then (yes)
+      :Return Ollama response;
+      stop
+    else (no)
+      :Log Ollama failure;
+    endif
+  else (no)
+    :Ollama not configured;
+  endif
+}
+
+partition "Final Fallback to Public" {
+  :Log "No local LLM available";
+  :Use tier-based cloud provider;
+  :Return cloud API response;
+}
+
+stop
+
+note right
+  **Port Configuration**
+  DMR: 12434 (from .env.ports)
+  Ollama: 11434 (legacy)
+
+  **Provider Priority**
+  1. DMR (Docker Desktop 4.40+)
+  2. Ollama (deprecated fallback)
+  3. Cloud APIs (Groq > Anthropic > OpenAI)
+end note
+
+@enduml

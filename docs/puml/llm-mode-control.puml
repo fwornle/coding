@@ -1,0 +1,65 @@
+@startuml llm-mode-control
+!include _standard-style.puml
+
+title Per-Agent LLM Mode Control
+top to bottom direction
+
+' LLM Mode Types
+package "LLM Modes" {
+  rectangle "**Mock**\n(fake responses)" as mock #FFE0B2
+  rectangle "**Local**\n(DMR/Ollama)" as local #E1BEE7
+  rectangle "**Public**\n(Cloud APIs)" as public #C8E6C9
+}
+
+' UI Controls
+package "Dashboard UI" {
+  component "Global LLM Dropdown" as globalDropdown <<cli>>
+  component "Per-Agent Cycle Button" as agentButton <<cli>>
+  component "Graph Node Badge" as nodeBadge <<cli>>
+}
+
+' State Management
+package "State Management" {
+  component "Redux ukbSlice" as redux <<core>>
+  database "workflow-progress.json" as progress
+}
+
+note right of redux
+  globalMode: mock|local|public
+  perAgentOverrides: {agentId: mode}
+end note
+
+' Backend
+package "Backend Services" {
+  component "Dashboard Server" as dashServer <<api>>
+  component "SemanticAnalyzer" as analyzer <<core>>
+}
+
+' LLM Providers
+package "Local LLM Providers" {
+  component "Docker Model Runner\n(port 12434)" as dmr <<infra>>
+  component "Ollama\n(deprecated)" as ollama <<infra>>
+}
+
+cloud "Cloud APIs" {
+  component "Groq" as groq <<external>>
+  component "Anthropic" as anthropic <<external>>
+  component "OpenAI" as openai <<external>>
+}
+
+' Flows
+globalDropdown --> redux : set globalMode
+agentButton --> redux : set perAgentOverride
+redux --> progress : persist
+progress --> analyzer : read llmState
+
+analyzer --> mock : if mode=mock
+analyzer --> dmr : if mode=local
+analyzer ..> ollama : fallback
+analyzer --> groq : if mode=public
+analyzer ..> anthropic : fallback
+analyzer ..> openai : fallback
+
+nodeBadge --> redux : read mode
+
+@enduml

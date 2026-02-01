@@ -113,6 +113,12 @@ class SystemHealthAPIServer {
         this.app.post('/api/ukb/step-advance', this.handleStepAdvance.bind(this));
         this.app.post('/api/ukb/mock-llm', this.handleMockLLM.bind(this));
         this.app.post('/api/ukb/start', this.handleStartUKBWorkflow.bind(this));
+
+        // LLM Mode Control (per-agent/global)
+        this.app.get('/api/ukb/llm-state', this.handleGetLLMState.bind(this));
+        this.app.post('/api/ukb/llm-mode/global', this.handleSetGlobalLLMMode.bind(this));
+        this.app.post('/api/ukb/llm-mode/agent', this.handleSetAgentLLMMode.bind(this));
+        this.app.delete('/api/ukb/llm-mode/agent/:agentId', this.handleClearAgentLLMOverride.bind(this));
         this.app.get('/api/ukb/history', this.handleGetUKBHistory.bind(this));
         this.app.get('/api/ukb/history/:reportId', this.handleGetUKBHistoryDetail.bind(this));
 
@@ -1308,8 +1314,7 @@ class SystemHealthAPIServer {
 
             writeFileSync(progressPath, JSON.stringify(progress, null, 2));
 
-            console.log(`🔧 LLM Mock mode ${enabled ? 'enabled' : 'disabled'}${delay ? ` (delay: ${delay}ms)` : ''}`);
-
+            // Logging handled via existing pattern
             res.json({
                 status: 'success',
                 data: {
@@ -1323,6 +1328,231 @@ class SystemHealthAPIServer {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to set LLM mock mode',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get current LLM state (global mode and per-agent overrides)
+     */
+    async handleGetLLMState(req, res) {
+        try {
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            let llmState = {
+                globalMode: 'public',
+                perAgentOverrides: {},
+                updatedAt: null
+            };
+
+            if (existsSync(progressPath)) {
+                try {
+                    const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                    if (progress.llmState) {
+                        llmState = {
+                            globalMode: progress.llmState.globalMode || 'public',
+                            perAgentOverrides: progress.llmState.perAgentOverrides || {},
+                            updatedAt: progress.llmState.updatedAt || null
+                        };
+                    } else if (progress.mockLLM) {
+                        // Legacy: convert mockLLM flag to llmState
+                        llmState.globalMode = 'mock';
+                    }
+                } catch (e) {
+                    // Use defaults
+                }
+            }
+
+            res.json({
+                status: 'success',
+                data: llmState
+            });
+        } catch (error) {
+            console.error('Failed to get LLM state:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to get LLM state',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Set global LLM mode for all agents
+     * @body mode: 'mock' | 'local' | 'public'
+     */
+    async handleSetGlobalLLMMode(req, res) {
+        try {
+            const { mode } = req.body;
+
+            if (!['mock', 'local', 'public'].includes(mode)) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Invalid mode. Must be one of: mock, local, public'
+                });
+            }
+
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            // Read current progress (or create empty state)
+            let progress = {};
+            if (existsSync(progressPath)) {
+                try {
+                    progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                } catch (e) {
+                    // Start fresh
+                }
+            }
+
+            // Initialize or update llmState
+            if (!progress.llmState) {
+                progress.llmState = { globalMode: 'public', perAgentOverrides: {} };
+            }
+
+            progress.llmState.globalMode = mode;
+            progress.llmState.updatedAt = new Date().toISOString();
+
+            // Also update legacy mockLLM flag for backward compatibility
+            progress.mockLLM = mode === 'mock';
+            progress.mockLLMUpdatedAt = progress.llmState.updatedAt;
+
+            writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+
+            res.json({
+                status: 'success',
+                data: {
+                    globalMode: mode,
+                    updatedAt: progress.llmState.updatedAt
+                }
+            });
+        } catch (error) {
+            console.error('Failed to set global LLM mode:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to set global LLM mode',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Set LLM mode for a specific agent
+     * @body agentId: string - The agent ID
+     * @body mode: 'mock' | 'local' | 'public'
+     */
+    async handleSetAgentLLMMode(req, res) {
+        try {
+            const { agentId, mode } = req.body;
+
+            if (!agentId || typeof agentId !== 'string') {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'agentId is required'
+                });
+            }
+
+            if (!['mock', 'local', 'public'].includes(mode)) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Invalid mode. Must be one of: mock, local, public'
+                });
+            }
+
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            // Read current progress (or create empty state)
+            let progress = {};
+            if (existsSync(progressPath)) {
+                try {
+                    progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+                } catch (e) {
+                    // Start fresh
+                }
+            }
+
+            // Initialize llmState if not present
+            if (!progress.llmState) {
+                progress.llmState = { globalMode: 'public', perAgentOverrides: {} };
+            }
+            if (!progress.llmState.perAgentOverrides) {
+                progress.llmState.perAgentOverrides = {};
+            }
+
+            progress.llmState.perAgentOverrides[agentId] = mode;
+            progress.llmState.updatedAt = new Date().toISOString();
+
+            writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+
+            res.json({
+                status: 'success',
+                data: {
+                    agentId,
+                    mode,
+                    updatedAt: progress.llmState.updatedAt
+                }
+            });
+        } catch (error) {
+            console.error('Failed to set agent LLM mode:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to set agent LLM mode',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Clear LLM mode override for a specific agent (revert to global)
+     * @param agentId: string - The agent ID (from URL path)
+     */
+    async handleClearAgentLLMOverride(req, res) {
+        try {
+            const { agentId } = req.params;
+
+            if (!agentId) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'agentId is required'
+                });
+            }
+
+            const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            if (!existsSync(progressPath)) {
+                return res.json({
+                    status: 'success',
+                    data: { agentId, cleared: false, reason: 'No progress file' }
+                });
+            }
+
+            let progress = JSON.parse(readFileSync(progressPath, 'utf8'));
+
+            if (!progress.llmState?.perAgentOverrides?.[agentId]) {
+                return res.json({
+                    status: 'success',
+                    data: { agentId, cleared: false, reason: 'No override for this agent' }
+                });
+            }
+
+            delete progress.llmState.perAgentOverrides[agentId];
+            progress.llmState.updatedAt = new Date().toISOString();
+
+            writeFileSync(progressPath, JSON.stringify(progress, null, 2));
+
+            res.json({
+                status: 'success',
+                data: {
+                    agentId,
+                    cleared: true,
+                    updatedAt: progress.llmState.updatedAt
+                }
+            });
+        } catch (error) {
+            console.error('Failed to clear agent LLM override:', error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to clear agent LLM override',
                 error: error.message
             });
         }

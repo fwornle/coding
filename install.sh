@@ -2154,9 +2154,209 @@ EOF
     fi
 }
 
-# Install Ollama for local LLM inference (fallback when cloud APIs fail)
+# Update DMR_HOST in .env.ports for cross-platform container access
+# Windows containers need host.docker.internal to reach host services
+update_dmr_host_config() {
+    local dmr_host="$1"
+    local env_ports_file="${CODING_REPO:-.}/.env.ports"
+
+    if [[ ! -f "$env_ports_file" ]]; then
+        warning ".env.ports not found - skipping DMR_HOST update"
+        return 0
+    fi
+
+    # Check current DMR_HOST value
+    local current_host=$(grep "^DMR_HOST=" "$env_ports_file" 2>/dev/null | cut -d'=' -f2)
+
+    if [[ "$current_host" != "$dmr_host" ]]; then
+        info "Updating DMR_HOST=$dmr_host in .env.ports"
+        if grep -q "^DMR_HOST=" "$env_ports_file"; then
+            # Update existing line
+            sed -i.bak "s/^DMR_HOST=.*/DMR_HOST=$dmr_host/" "$env_ports_file"
+            rm -f "${env_ports_file}.bak"
+        else
+            # Add after DMR_PORT line
+            sed -i.bak "/^DMR_PORT=/a\\
+DMR_HOST=$dmr_host" "$env_ports_file"
+            rm -f "${env_ports_file}.bak"
+        fi
+        success "✓ DMR_HOST configured for $(uname -s)"
+    fi
+}
+
+# Detect and report available GPU acceleration for local LLM inference
+# This is informational - DMR/llama.cpp handles the actual backend selection
+detect_gpu_acceleration() {
+    local gpu_info=""
+
+    case "$(uname -s)" in
+        Darwin)
+            # macOS - check for Apple Silicon (Metal) or Intel
+            if [[ "$(uname -m)" == "arm64" ]]; then
+                gpu_info="Apple Silicon (Metal acceleration)"
+            else
+                gpu_info="Intel Mac (CPU only)"
+            fi
+            ;;
+        Linux)
+            # Check for NVIDIA GPU
+            if command -v nvidia-smi >/dev/null 2>&1; then
+                local nvidia_gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+                if [[ -n "$nvidia_gpu" ]]; then
+                    gpu_info="NVIDIA: $nvidia_gpu (CUDA)"
+                fi
+            fi
+            # Check for AMD GPU
+            if [[ -z "$gpu_info" ]] && command -v rocm-smi >/dev/null 2>&1; then
+                gpu_info="AMD GPU (ROCm)"
+            fi
+            # Fallback to CPU
+            if [[ -z "$gpu_info" ]]; then
+                gpu_info="CPU (AVX2/AVX512 if available)"
+            fi
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            # Windows - check for NVIDIA
+            if command -v nvidia-smi >/dev/null 2>&1; then
+                local nvidia_gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+                if [[ -n "$nvidia_gpu" ]]; then
+                    gpu_info="NVIDIA: $nvidia_gpu (CUDA)"
+                fi
+            fi
+            if [[ -z "$gpu_info" ]]; then
+                gpu_info="CPU (DirectML fallback available)"
+            fi
+            ;;
+        *)
+            gpu_info="Unknown platform"
+            ;;
+    esac
+
+    info "Hardware acceleration: $gpu_info"
+}
+
+# Setup local LLM inference via Docker Model Runner (DMR)
+# DMR uses llama.cpp backend via Docker Desktop's Model Runner feature
+# Port configured in .env.ports as DMR_PORT (default: 12434)
+#
+# GPU/Hardware Support (automatic via llama.cpp):
+# - Apple Silicon: Metal acceleration (built-in, no setup needed)
+# - NVIDIA GPU: CUDA acceleration (requires CUDA toolkit)
+# - AMD GPU: Vulkan/ROCm acceleration
+# - CPU: Always available fallback (AVX2/AVX512 optimized)
+setup_local_llm() {
+    local dmr_port="${DMR_PORT:-12434}"
+    local dmr_host="localhost"
+
+    info "Setting up local LLM inference (optional)..."
+
+    # Detect platform for DMR_HOST configuration
+    # Windows containers need host.docker.internal to reach host services
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*)
+            dmr_host="host.docker.internal"
+            info "Windows detected - using DMR_HOST=host.docker.internal"
+            ;;
+        *)
+            dmr_host="localhost"
+            ;;
+    esac
+
+    # Check if Docker is available
+    if ! command -v docker >/dev/null 2>&1; then
+        warning "Docker not installed - skipping local LLM setup"
+        info "Install Docker Desktop to enable local LLM inference"
+        SKIPPED_SYSTEM_DEPS+=("local-llm")
+        return 0
+    fi
+
+    # Check if Docker Desktop Model Runner is available
+    if docker model --help >/dev/null 2>&1; then
+        info "Docker Model Runner (DMR) is available"
+
+        # Report detected hardware acceleration
+        detect_gpu_acceleration
+
+        # Check if DMR is enabled on the correct port
+        if curl -s "http://localhost:${dmr_port}/engines/v1/models" >/dev/null 2>&1; then
+            success "✓ DMR already running on port ${dmr_port}"
+            update_dmr_host_config "$dmr_host"
+            ensure_dmr_model
+            return 0
+        fi
+
+        # DMR is available but not enabled - ask user
+        echo ""
+        echo -e "${CYAN}Docker Model Runner (DMR) is available but not enabled.${NC}"
+        echo -e "  DMR provides local LLM inference via llama.cpp"
+        echo -e "  ${GREEN}y${NC} = Enable DMR on port ${dmr_port}"
+        echo -e "  ${GREEN}n${NC} = Skip (coding tools will use cloud APIs only)"
+        echo ""
+        read -p "$(echo -e ${CYAN}Enable Docker Model Runner? [y/N]: ${NC})" enable_dmr_choice
+
+        case "$enable_dmr_choice" in
+            [yY]|[yY][eE][sS])
+                info "Enabling Docker Model Runner on port ${dmr_port}..."
+                if docker desktop enable model-runner --tcp "${dmr_port}" 2>/dev/null; then
+                    success "✓ DMR enabled on port ${dmr_port}"
+                    sleep 2  # Give it time to start
+                    update_dmr_host_config "$dmr_host"
+                    ensure_dmr_model
+                else
+                    warning "Failed to enable DMR (may require Docker Desktop restart)"
+                    INSTALLATION_WARNINGS+=("DMR: Failed to enable - try: docker desktop enable model-runner --tcp ${dmr_port}")
+                    return 1
+                fi
+                ;;
+            *)
+                info "Skipping DMR setup (optional component)"
+                SKIPPED_SYSTEM_DEPS+=("dmr")
+                return 0
+                ;;
+        esac
+    else
+        info "Docker Model Runner not available (requires Docker Desktop 4.40+)"
+        info "To enable DMR, upgrade Docker Desktop and run: docker desktop enable model-runner --tcp ${dmr_port}"
+        SKIPPED_SYSTEM_DEPS+=("dmr")
+        return 0
+    fi
+}
+
+# Ensure DMR has the required model downloaded
+ensure_dmr_model() {
+    local model="ai/llama3.2"
+    local dmr_port="${DMR_PORT:-12434}"
+    info "Ensuring DMR model '$model' is available..."
+
+    # Check if DMR is accessible
+    if ! curl -s "http://localhost:${dmr_port}/engines/v1/models" >/dev/null 2>&1; then
+        warning "DMR not accessible on port ${dmr_port}"
+        return 1
+    fi
+
+    # Check if model exists
+    if curl -s "http://localhost:${dmr_port}/engines/v1/models" | grep -q "llama3.2"; then
+        success "✓ Model '$model' already available"
+        return 0
+    fi
+
+    # Pull the model
+    info "Pulling model '$model' (this may take a few minutes)..."
+    if docker model pull "$model" 2>/dev/null; then
+        success "✓ Model '$model' downloaded"
+    else
+        warning "Failed to pull model '$model'"
+        info "Try manually: docker model pull $model"
+        INSTALLATION_WARNINGS+=("DMR: Failed to pull model $model")
+        return 1
+    fi
+}
+
+# Legacy: Install Ollama for local LLM inference (DEPRECATED - use DMR instead)
+# Kept for backward compatibility on systems without Docker Desktop
 install_ollama() {
-    info "Checking Ollama for local LLM inference (optional)..."
+    warning "Ollama is deprecated - prefer Docker Model Runner (DMR)"
+    info "Checking Ollama for local LLM inference (fallback)..."
 
     # Check if already installed
     if command -v ollama >/dev/null 2>&1; then
@@ -2168,9 +2368,9 @@ install_ollama() {
 
     # Ollama is optional - ask if user wants to install
     echo ""
-    echo -e "${CYAN}Ollama is not installed (optional - for local LLM fallback).${NC}"
+    echo -e "${CYAN}Ollama is not installed (legacy fallback - prefer DMR).${NC}"
     echo -e "  ${GREEN}y${NC} = Install Ollama"
-    echo -e "  ${GREEN}n${NC} = Skip (coding tools will work without it)"
+    echo -e "  ${GREEN}n${NC} = Skip"
     echo ""
     read -p "$(echo -e ${CYAN}Install Ollama? [y/N]: ${NC})" install_ollama_choice
 
@@ -2179,7 +2379,7 @@ install_ollama() {
             # Proceed with installation
             ;;
         *)
-            info "Skipping Ollama installation (optional component)"
+            info "Skipping Ollama installation"
             SKIPPED_SYSTEM_DEPS+=("ollama")
             return 0
             ;;
@@ -2523,7 +2723,7 @@ main() {
     install_node_dependencies
     initialize_knowledge_databases
     install_plantuml
-    install_ollama
+    setup_local_llm  # DMR preferred, Ollama as fallback
     detect_network_and_set_repos
     test_proxy_connectivity
     install_memory_visualizer
