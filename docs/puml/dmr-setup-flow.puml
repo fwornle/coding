@@ -1,0 +1,99 @@
+@startuml dmr-setup-flow
+!include _standard-style.puml
+
+title Docker Model Runner Setup Flow (install.sh)
+
+start
+
+partition "Platform Detection" {
+  :Detect Platform;
+  switch (uname -s)
+    case (Darwin)
+      if (uname -m = arm64?) then (yes)
+        :Apple Silicon;
+        #C8E6C9:GPU = Metal;
+      else (no)
+        :Intel Mac;
+        #E0E0E0:GPU = CPU;
+      endif
+    case (Linux)
+      if (nvidia-smi available?) then (yes)
+        #C8E6C9:GPU = CUDA;
+      elseif (rocm-smi available?) then (yes)
+        #C8E6C9:GPU = ROCm;
+      else (no)
+        #E0E0E0:GPU = AVX2/AVX512;
+      endif
+    case (MINGW/MSYS/CYGWIN)
+      :Windows detected;
+      #BBDEFB:DMR_HOST = host.docker.internal;
+      if (nvidia-smi available?) then (yes)
+        #C8E6C9:GPU = CUDA;
+      else (no)
+        #E0E0E0:GPU = DirectML;
+      endif
+    case (default)
+      :macOS/Linux default;
+      #E0E0E0:DMR_HOST = localhost;
+  endswitch
+  :Report detected hardware;
+}
+
+partition "Docker Check" {
+  if (docker command exists?) then (yes)
+    :Docker available;
+  else (no)
+    #FFF9C4:Skip local LLM setup;
+    note right: Install Docker Desktop to enable
+    stop
+  endif
+}
+
+partition "DMR Availability" {
+  if (docker model --help works?) then (yes)
+    :DMR feature available;
+    note right: Requires Docker Desktop 4.40+
+  else (no)
+    #FFF9C4:DMR not available;
+    note right: Upgrade Docker Desktop
+    stop
+  endif
+}
+
+partition "DMR Status Check" {
+  if (DMR running on port?) then (yes)
+    #C8E6C9:DMR already enabled;
+    :Update DMR_HOST in .env.ports;
+    :Ensure model downloaded;
+  else (no)
+    :Prompt user to enable DMR;
+    if (User approves?) then (yes)
+      :docker desktop enable model-runner;
+      if (Enable successful?) then (yes)
+        #C8E6C9:DMR enabled;
+        :Update DMR_HOST in .env.ports;
+        :Pull default model (ai/llama3.2);
+      else (no)
+        #FFCDD2:Enable failed;
+        note right: May need Docker restart
+      endif
+    else (no)
+      #E0E0E0:User skipped;
+    endif
+  endif
+}
+
+stop
+
+note right
+  **Environment Variables**
+  DMR_PORT: 12434 (default)
+  DMR_HOST: localhost (macOS/Linux)
+           host.docker.internal (Windows)
+
+  **GPU Auto-Detection**
+  llama.cpp selects best backend:
+  Metal > CUDA > ROCm > CPU
+end note
+
+@enduml

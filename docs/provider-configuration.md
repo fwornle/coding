@@ -127,6 +127,28 @@ npm install groq-sdk
 
 DMR uses llama.cpp via Docker Desktop - no separate installation needed.
 
+**Cross-Platform Support:**
+
+| Platform | GPU Acceleration | Notes |
+|----------|------------------|-------|
+| **macOS (Apple Silicon)** | Metal | Automatic, fastest option |
+| **macOS (Intel)** | CPU | AVX2 optimized |
+| **Linux + NVIDIA** | CUDA | Requires CUDA toolkit |
+| **Linux + AMD** | ROCm/Vulkan | Requires ROCm drivers |
+| **Linux (CPU)** | AVX2/AVX512 | Automatic fallback |
+| **Windows + NVIDIA** | CUDA | Requires CUDA toolkit |
+| **Windows (CPU)** | DirectML | Automatic fallback |
+
+The `install.sh` script automatically:
+1. Detects your platform and available GPU acceleration
+2. Enables DMR on the correct port
+3. Configures `DMR_HOST` for container access (Windows uses `host.docker.internal`)
+4. Downloads the default model (`ai/llama3.2`)
+
+![DMR Setup Flow](images/dmr-setup-flow.png)
+
+**Manual Setup** (if not using install.sh):
+
 ```bash
 # Enable DMR (requires Docker Desktop 4.40+)
 docker desktop enable model-runner --tcp 12434
@@ -180,7 +202,19 @@ curl -X POST http://localhost:12434/engines/v1/chat/completions \
 - `ai/qwen2.5-coder` - Code-focused
 - `ai/llama3.2:3B-Q4_K_M` - Faster, smaller variant
 
-Port is configured in `.env.ports` as `DMR_PORT` (default: 12434).
+**Configuration** (in `.env.ports`):
+```bash
+DMR_PORT=12434        # API port (default)
+DMR_HOST=localhost    # Host for API access
+```
+
+**Windows Container Access:**
+Windows containers need `host.docker.internal` to reach the host's DMR:
+```bash
+# In .env.ports on Windows:
+DMR_HOST=host.docker.internal
+```
+The installer handles this automatically.
 
 ![Local LLM Fallback](images/local-llm-fallback.png)
 
