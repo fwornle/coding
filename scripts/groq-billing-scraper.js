@@ -3,7 +3,7 @@
 /**
  * Groq Billing Scraper
  *
- * Uses Playwright to scrape current month's spend from console.groq.com/settings/billing
+ * Uses Playwright to scrape current month's spend from console.groq.com/settings/billing/manage
  * Called by the health monitoring system during active coding sessions.
  *
  * Requirements:
@@ -121,9 +121,9 @@ async function scrapeGroqBilling() {
 
     const page = await context.newPage();
 
-    // Navigate to Groq billing page
-    log('Navigating to console.groq.com/settings/billing...');
-    await page.goto('https://console.groq.com/settings/billing', {
+    // Navigate to Groq billing manage page (where Current Monthly Usage is shown)
+    log('Navigating to console.groq.com/settings/billing/manage...');
+    await page.goto('https://console.groq.com/settings/billing/manage', {
       waitUntil: 'networkidle',
       timeout: 30000
     });
@@ -142,36 +142,48 @@ async function scrapeGroqBilling() {
     // Wait for billing content to load
     await page.waitForTimeout(2000);
 
-    // Try to find the current month's spend
-    // Groq's billing page structure may vary, try multiple selectors
-    const spendSelectors = [
-      '[data-testid="current-spend"]',
-      '.billing-spend',
-      '.current-usage',
-      'text=/\\$[0-9]+\\.?[0-9]*/i'
-    ];
-
+    // Look for "Current Monthly Usage" section with "Total Amount" value
+    // Page structure: "Current Monthly Usage" header, then "Total Amount" label, then "$X.XX"
     let spendText = null;
-    for (const selector of spendSelectors) {
+
+    // Try to find by looking for text near "Total Amount" in the Current Monthly Usage section
+    try {
+      // Find the Current Monthly Usage section and get the dollar amount
+      const usageSection = await page.locator('text=Current Monthly Usage').locator('..').first();
+      if (usageSection) {
+        const amountElement = await usageSection.locator('text=/^\\$[0-9]+\\.?[0-9]*/').first();
+        if (amountElement) {
+          spendText = await amountElement.textContent();
+        }
+      }
+    } catch {
+      // Try alternative approach
+    }
+
+    // Fallback: look for Total Amount pattern
+    if (!spendText) {
       try {
-        const element = await page.$(selector);
-        if (element) {
-          spendText = await element.textContent();
-          if (spendText && spendText.includes('$')) {
-            break;
+        const totalAmountLabel = await page.locator('text=Total Amount').first();
+        if (totalAmountLabel) {
+          // Get the parent container and find the dollar amount nearby
+          const container = await totalAmountLabel.locator('..').first();
+          const allText = await container.textContent();
+          const match = allText?.match(/\$([0-9]+\.?[0-9]*)/);
+          if (match) {
+            spendText = '$' + match[1];
           }
         }
       } catch {
-        // Try next selector
+        // Try next fallback
       }
     }
 
-    // Fallback: search page content for spend pattern
+    // Fallback: search full page content for spend pattern
     if (!spendText) {
       const content = await page.content();
-      const spendMatch = content.match(/Current.*?\$([0-9]+\.?[0-9]*)/i) ||
-                         content.match(/Usage.*?\$([0-9]+\.?[0-9]*)/i) ||
-                         content.match(/Spend.*?\$([0-9]+\.?[0-9]*)/i);
+      // Look for Total Amount followed by dollar value
+      const spendMatch = content.match(/Total\s*Amount[^$]*\$([0-9]+\.?[0-9]*)/i) ||
+                         content.match(/Current Monthly Usage[^$]*\$([0-9]+\.?[0-9]*)/i);
       if (spendMatch) {
         spendText = '$' + spendMatch[1];
       }
