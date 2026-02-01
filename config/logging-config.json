@@ -1,0 +1,70 @@
+{
+  "$schema": "./schemas/logging-config.schema.json",
+  "_description": "Logging configuration for coding infrastructure backend services",
+
+  "level": "info",
+  "console": true,
+  "file": false,
+  "filePath": "logs/app.log",
+  "colors": true,
+  "timestamp": true,
+
+  "categories": {
+    "health": {
+      "level": "info",
+      "description": "Health monitoring and status line"
+    },
+    "billing": {
+      "level": "info",
+      "description": "API quota and billing tracking"
+    },
+    "transcript": {
+      "level": "info",
+      "description": "Live session logging and transcript monitoring"
+    },
+    "knowledge": {
+      "level": "info",
+      "description": "Knowledge management and UKB operations"
+    },
+    "workflow": {
+      "level": "info",
+      "description": "Workflow execution and agent coordination"
+    },
+    "database": {
+      "level": "warn",
+      "description": "Database operations (GraphDB, LevelDB, Qdrant)"
+    },
+    "api": {
+      "level": "info",
+      "description": "API endpoints and HTTP servers"
+    },
+    "mcp": {
+      "level": "info",
+      "description": "MCP server operations"
+    }
+  },
+
+  "environments": {
+    "development": {
+      "level": "debug",
+      "file": true
+    },
+    "production": {
+      "level": "info",
+      "file": true,
+      "colors": false
+    },
+    "test": {
+      "level": "warn",
+      "console": false
+    }
+  },
+
+  "_notes": {
+    "documentation": "See docs/logging/README.md for full usage guide and migration instructions",
+    "backend": "For Node.js code, use: import { createLogger } from '../lib/logging/Logger.js'",
+    "frontend": "For React code, use: import { Logger } from '../utils/logging/Logger'",
+    "constraints": "Enforced by no-console-log, no-console-error, no-console-warn in integrations/mcp-constraint-monitor/constraints.yaml",
+    "categories": "Add new categories here with level overrides. Categories: health, billing, transcript, knowledge, workflow, database, api, mcp"
+  }
+}
