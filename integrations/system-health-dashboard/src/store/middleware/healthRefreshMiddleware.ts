@@ -19,6 +19,7 @@ import {
   fetchUKBStatusSuccess,
   fetchUKBStatusFailure,
   syncStepPauseFromServer,
+  syncLLMStateFromServer,
 } from '../slices/ukbSlice'
 import { Logger, LogCategories } from '../../utils/logging'
 
@@ -160,6 +161,12 @@ class HealthRefreshManager {
       paused: progress.stepPaused === true,
       pausedAt: progress.pausedAtStep || null
     }))
+
+    // CRITICAL: Sync llmState for Mock/Local/Public mode selection in dashboard
+    // When "ukb full debug" sets llmState.globalMode='mock', dashboard needs to reflect this
+    if (progress.llmState) {
+      this.store.dispatch(syncLLMStateFromServer(progress.llmState))
+    }
 
     Logger.trace(LogCategories.UKB, `SSE update: ${progress.workflowName} [${completedSteps}/${totalSteps}]`)
   }

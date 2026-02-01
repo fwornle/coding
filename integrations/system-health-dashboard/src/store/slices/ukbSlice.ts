@@ -24,6 +24,10 @@ export interface EventStepStatusInfo {
   tokensUsed?: number
   llmProvider?: string
   llmCalls?: number
+  // LLM mode tracking for visibility
+  llmIntendedMode?: 'mock' | 'local' | 'public'
+  llmActualMode?: 'mock' | 'local' | 'public'
+  llmModeFallback?: boolean  // True if actual differs from intended
   error?: string
   outputs?: Record<string, unknown>
 }
@@ -1291,6 +1295,10 @@ export const selectHistoricalProcessInfo = createSelector(
         // Pass through LLM metrics from backend
         tokensUsed: (step as any).tokensUsed,
         llmCalls: (step as any).llmCalls,
+        // Pass through LLM mode tracking from backend
+        llmIntendedMode: (step as any).llmIntendedMode,
+        llmActualMode: (step as any).llmActualMode,
+        llmModeFallback: (step as any).llmModeFallback,
         error: step.errors?.join('\n'),
         outputs: step.outputs,
       }))
@@ -1317,6 +1325,10 @@ export const selectNodeStatus = createSelector(
             llmProvider: (s as any).llmProvider,
             tokensUsed: (s as any).tokensUsed,
             llmCalls: (s as any).llmCalls,
+            // Pass through LLM mode tracking
+            llmIntendedMode: (s as any).llmIntendedMode,
+            llmActualMode: (s as any).llmActualMode,
+            llmModeFallback: (s as any).llmModeFallback,
             error: s.errors?.join('\n'),
             outputs: s.outputs,
           }))
@@ -1375,6 +1387,10 @@ export const selectStepStatusMap = createSelector(
             llmProvider: (s as any).llmProvider,
             tokensUsed: (s as any).tokensUsed,
             llmCalls: (s as any).llmCalls,
+            // Pass through LLM mode tracking
+            llmIntendedMode: (s as any).llmIntendedMode,
+            llmActualMode: (s as any).llmActualMode,
+            llmModeFallback: (s as any).llmModeFallback,
             error: s.errors?.join('\n'),
             outputs: s.outputs,
           }))
