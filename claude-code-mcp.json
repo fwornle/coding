@@ -44,15 +44,6 @@
       "command": "npx",
       "args": ["-y", "@pimzino/spec-workflow-mcp@latest", "{{CODING_TOOLS_PATH}}"]
     },
-    "serena": {
-      "command": "uvx",
-      "args": ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server", "--context", "ide-assistant", "--project", "{{CODING_TOOLS_PATH}}"]
-    },
-    "shadcn": {
-      "command": "npx",
-      "args": ["shadcn@latest", "mcp"],
-      "cwd": "{{CODING_TOOLS_PATH}}/integrations/mcp-constraint-monitor"
-    },
     "code-graph-rag": {
       "command": "uv",
       "args": ["run", "--directory", "{{CODING_TOOLS_PATH}}/integrations/code-graph-rag", "graph-code", "mcp-server"],
