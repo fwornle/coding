@@ -47,6 +47,8 @@ services:
       # DMR uses llama.cpp under the hood for local inference
       - DMR_HOST=host.docker.internal
       - DMR_PORT=12434
+      # Ollama fallback (if DMR unavailable) - also on host
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     ports:
       - "8080:8080"     # VKB Server
       - "3847:3847"     # Browser Access SSE
