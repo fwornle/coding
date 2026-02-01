@@ -33,8 +33,8 @@ services:
       - MEMGRAPH_HOST=memgraph
       - MEMGRAPH_PORT=7687
       # Bypass corporate proxy for internal Docker networking
-      - no_proxy=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph
-      - NO_PROXY=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph
+      - no_proxy=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph,host.docker.internal
+      - NO_PROXY=qdrant,redis,memgraph,localhost,127.0.0.1,coding-qdrant,coding-redis,coding-memgraph,host.docker.internal
       # Project paths (mapped via volumes)
       - TARGET_REPO_PATH=/workspace
       - CODING_ROOT=/coding
@@ -42,6 +42,11 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      # Local LLM - Docker Model Runner (DMR) on host
+      # DMR uses llama.cpp under the hood for local inference
+      - DMR_HOST=host.docker.internal
+      - DMR_PORT=12434
     ports:
       - "8080:8080"     # VKB Server
       - "3847:3847"     # Browser Access SSE
@@ -64,6 +69,9 @@ services:
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
     networks:
       - coding-network
+    # Allow container to reach host services (DMR/llama.cpp)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     deploy:
       resources:
         limits:
