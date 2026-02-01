@@ -554,15 +554,15 @@ function useWorkflowDefinitions(workflowName?: string) {
           // Store all workflows for later selection
           setAllWorkflows(data.data.workflows.map(w => ({ name: w.name, edges: w.edges })))
 
-          console.log('✅ Loaded workflow definitions from API (Single Source of Truth)')
+          Logger.info(LogCategories.UKB, 'Loaded workflow definitions from API (Single Source of Truth)')
         } else {
           throw new Error(`API returned invalid data structure - check YAML configuration`)
         }
       } catch (err) {
         // NO FALLBACK - Log explicit error and keep empty state
         const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-        console.error(`❌ CRITICAL: Failed to fetch workflow definitions from YAML: ${errorMsg}`)
-        console.error('   Graph will be empty. Fix the YAML configuration or API endpoint.')
+        Logger.error(LogCategories.UKB, `CRITICAL: Failed to fetch workflow definitions from YAML: ${errorMsg}`)
+        Logger.error(LogCategories.UKB, 'Graph will be empty. Fix the YAML configuration or API endpoint.')
         setError(errorMsg)
       } finally {
         setIsLoading(false)
@@ -591,13 +591,13 @@ function useWorkflowDefinitions(workflowName?: string) {
 
       if (workflow?.edges) {
         setEdges(workflow.edges)
-        console.log(`✅ Loaded edges for workflow: ${workflowName} (matched: ${workflow.name})`)
+        Logger.debug(LogCategories.UKB, `Loaded edges for workflow: ${workflowName} (matched: ${workflow.name})`)
       } else {
         // Fallback to incremental-analysis if workflow not found
         const fallback = allWorkflows.find(w => w.name === 'incremental-analysis')
         if (fallback?.edges) {
           setEdges(fallback.edges)
-          console.warn(`⚠️ Workflow '${workflowName}' not found, using incremental-analysis edges`)
+          Logger.warn(LogCategories.UKB, `Workflow '${workflowName}' not found, using incremental-analysis edges`)
         }
       }
     }

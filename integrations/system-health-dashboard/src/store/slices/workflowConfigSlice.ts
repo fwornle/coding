@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '../index'
 import type { AgentDefinition, EdgeDefinition, AgentDefinitionAPI, WorkflowDefinitionsAPI } from '@/components/workflow/types'
 import { ICON_MAP, WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, STEP_TO_SUBSTEP, MULTI_AGENT_EDGES } from '@/components/workflow/constants'
+import { Logger, LogCategories } from '@/utils/logging'
 
 // Sub-step definition for agents with multiple operations
 export interface SubStep {
@@ -142,7 +143,7 @@ export const initializeWorkflowConfig = createAsyncThunk(
         allWorkflows,
       }
     } catch (error) {
-      console.warn('Failed to fetch workflow definitions, using fallback:', error)
+      Logger.warn(LogCategories.UKB, 'Failed to fetch workflow definitions, using fallback:', error)
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error')
     }
   }

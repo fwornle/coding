@@ -437,9 +437,9 @@ process.on('SIGINT', async () => {
       await transports[sessionId].close();
       delete transports[sessionId];
     } catch (error) {
-      console.error(`Error closing transport for session ${sessionId}:`, error);
+      log(`Error closing transport for session ${sessionId}: ${error}`, 'error');
     }
   }
-  console.log('Server shutdown complete');
+  log('Server shutdown complete', 'info');
   process.exit(0);
 });

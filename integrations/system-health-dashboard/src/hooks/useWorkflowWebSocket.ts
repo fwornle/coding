@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useDispatch } from 'react-redux'
+import { Logger, LogCategories } from '@/utils/logging'
 import {
   handleWorkflowStarted,
   handleStepStarted,
@@ -182,7 +183,7 @@ export function useWorkflowWebSocket(
         // They just keep the connection alive
         break
       default:
-        console.warn('[WorkflowWebSocket] Unknown event type:', type)
+        Logger.warn(LogCategories.UKB, 'Unknown WebSocket event type:', type)
     }
   }, [dispatch])
 
@@ -193,13 +194,13 @@ export function useWorkflowWebSocket(
     }
 
     const url = serverUrl || getWebSocketUrl()
-    console.log('[WorkflowWebSocket] Connecting to:', url)
+    Logger.info(LogCategories.UKB, 'WebSocket connecting to:', url)
 
     try {
       const ws = new WebSocket(url)
 
       ws.onopen = () => {
-        console.log('[WorkflowWebSocket] Connected')
+        Logger.info(LogCategories.UKB, 'WebSocket connected')
         setIsConnected(true)
         setError(null)
         setReconnectAttempts(0)
@@ -212,17 +213,17 @@ export function useWorkflowWebSocket(
             handleEvent(data as WorkflowEvent)
           }
         } catch (parseError) {
-          console.warn('[WorkflowWebSocket] Failed to parse message:', event.data)
+          Logger.warn(LogCategories.UKB, 'Failed to parse WebSocket message:', event.data)
         }
       }
 
       ws.onerror = (event) => {
-        console.error('[WorkflowWebSocket] Error:', event)
+        Logger.error(LogCategories.UKB, 'WebSocket error:', event)
         setError('WebSocket connection error')
       }
 
       ws.onclose = (event) => {
-        console.log('[WorkflowWebSocket] Disconnected:', event.code, event.reason)
+        Logger.info(LogCategories.UKB, 'WebSocket disconnected:', event.code, event.reason)
         setIsConnected(false)
         wsRef.current = null
 
@@ -230,7 +231,7 @@ export function useWorkflowWebSocket(
         if (autoReconnect && event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
           setReconnectAttempts((prev) => prev + 1)
           reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('[WorkflowWebSocket] Attempting reconnect...')
+            Logger.info(LogCategories.UKB, 'Attempting WebSocket reconnect...')
             connect()
           }, reconnectDelay)
         }
@@ -238,7 +239,7 @@ export function useWorkflowWebSocket(
 
       wsRef.current = ws
     } catch (connectError) {
-      console.error('[WorkflowWebSocket] Failed to create WebSocket:', connectError)
+      Logger.error(LogCategories.UKB, 'Failed to create WebSocket:', connectError)
       setError('Failed to create WebSocket connection')
     }
   }, [serverUrl, autoReconnect, reconnectDelay, maxReconnectAttempts, reconnectAttempts, handleEvent])
@@ -262,16 +263,16 @@ export function useWorkflowWebSocket(
   // Send a command to the coordinator
   const sendCommand = useCallback((command: WorkflowCommand): boolean => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('[WorkflowWebSocket] Cannot send command: not connected')
+      Logger.warn(LogCategories.UKB, 'Cannot send command: WebSocket not connected')
       return false
     }
 
     try {
       wsRef.current.send(JSON.stringify(command))
-      console.log('[WorkflowWebSocket] Sent command:', command.type)
+      Logger.debug(LogCategories.UKB, 'Sent WebSocket command:', command.type)
       return true
     } catch (sendError) {
-      console.error('[WorkflowWebSocket] Failed to send command:', sendError)
+      Logger.error(LogCategories.UKB, 'Failed to send WebSocket command:', sendError)
       return false
     }
   }, [])
