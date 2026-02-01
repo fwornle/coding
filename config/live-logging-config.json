@@ -308,7 +308,10 @@
       "monthlySpend": 0,
       "billingMonth": "FEB",
       "spendLimit": null,
-      "description": "Groq monthly billing. Update monthlySpend from console.groq.com. billingMonth is 3-letter month abbrev. Set billingType to 'free' for free tier."
+      "autoScrape": true,
+      "scrapeIntervalMinutes": 15,
+      "lastScraped": null,
+      "description": "Groq monthly billing. autoScrape uses Playwright to fetch spend from console.groq.com every scrapeIntervalMinutes during active sessions."
     },
     "google": {
       "prepaidCredits": null,
