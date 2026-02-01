@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, XCircle, Info, RefreshCw } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { Logger, LogCategories } from '@/utils/logging'
 
 interface Violation {
   category: string
@@ -73,7 +74,7 @@ export default function ViolationsTable({ violations }: ViolationsTableProps) {
         }))
       }
     } catch (error) {
-      console.error('Failed to restart service:', error)
+      Logger.error(LogCategories.HEALTH, 'Failed to restart service:', error)
       setRestartResults(prev => new Map(prev).set(serviceName, {
         success: false,
         message: error instanceof Error ? error.message : 'Network error'

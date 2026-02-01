@@ -2,7 +2,7 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
-import { ensureLogDirectory, registerExitHandlers, scheduleLogRotation, setupLogRotation } from "./logging.js";
+import { ensureLogDirectory, registerExitHandlers, scheduleLogRotation, setupLogRotation, log } from "./logging.js";
 
 // Run setup for logging
 ensureLogDirectory();
@@ -23,5 +23,5 @@ async function runServer() {
 
 runServer().catch((error) => {
   const errorMsg = error instanceof Error ? error.message : String(error);
-  console.error(errorMsg);
+  log(`Server startup failed: ${errorMsg}`, 'error');
 });

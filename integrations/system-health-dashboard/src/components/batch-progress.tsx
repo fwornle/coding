@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { Logger, LogCategories } from '@/utils/logging'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -149,7 +150,7 @@ export default function BatchProgress({ onStatusChange }: BatchProgressProps) {
         setHistory(data.data.checkpoints || [])
       }
     } catch (err) {
-      console.warn('Failed to fetch batch history:', err)
+      Logger.warn(LogCategories.BATCH, 'Failed to fetch batch history:', err)
     }
   }, [])
 
@@ -180,7 +181,7 @@ export default function BatchProgress({ onStatusChange }: BatchProgressProps) {
         fetchProgress()
       }
     } catch (err) {
-      console.error('Failed to pause:', err)
+      Logger.error(LogCategories.BATCH, 'Failed to pause:', err)
     } finally {
       setIsPausing(false)
     }
@@ -199,7 +200,7 @@ export default function BatchProgress({ onStatusChange }: BatchProgressProps) {
         fetchProgress()
       }
     } catch (err) {
-      console.error('Failed to resume:', err)
+      Logger.error(LogCategories.BATCH, 'Failed to resume:', err)
     } finally {
       setIsResuming(false)
     }

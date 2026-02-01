@@ -4,6 +4,7 @@ import React, { useEffect } from 'react'
 import { Provider } from 'react-redux'
 import { store } from './index'
 import { healthRefreshManager } from './middleware/healthRefreshMiddleware'
+import { Logger, LogCategories } from '@/utils/logging'
 
 interface ReduxProviderProps {
   children: React.ReactNode
@@ -12,11 +13,11 @@ interface ReduxProviderProps {
 export function ReduxProvider({ children }: ReduxProviderProps) {
   useEffect(() => {
     // Initialize health refresh manager when provider mounts
-    console.log('🚀 Redux Provider mounted, initializing health refresh manager')
+    Logger.info(LogCategories.STORE, 'Redux Provider mounted, initializing health refresh manager')
 
     // Set up error boundary for Redux errors
     const handleReduxError = (error: ErrorEvent) => {
-      console.error('Redux Error:', error)
+      Logger.error(LogCategories.STORE, 'Redux Error:', error)
       // Could dispatch error action here if needed
     }
 
@@ -24,7 +25,7 @@ export function ReduxProvider({ children }: ReduxProviderProps) {
 
     // Cleanup on unmount
     return () => {
-      console.log('🛑 Redux Provider unmounting, cleaning up')
+      Logger.info(LogCategories.STORE, 'Redux Provider unmounting, cleaning up')
       healthRefreshManager.stopAutoRefresh()
       window.removeEventListener('error', handleReduxError)
     }

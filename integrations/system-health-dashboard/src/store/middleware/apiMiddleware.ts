@@ -5,6 +5,7 @@ import {
   triggerVerificationFailure,
 } from '../slices/autoHealingSlice'
 import { healthRefreshManager } from './healthRefreshMiddleware'
+import { Logger, LogCategories } from '@/utils/logging'
 
 const API_PORT = process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}/api/health-verifier`
@@ -31,17 +32,17 @@ export const apiMiddleware: Middleware = (store) => (next) => (action: any) => {
 
         const responseData = await response.json()
         if (responseData.status === 'success') {
-          console.log('✅ Health verification triggered successfully')
+          Logger.info(LogCategories.HEALTH, 'Health verification triggered successfully')
 
           // Wait for verification to complete before fetching updated data
           // Health verification typically takes 2-5 seconds to run all checks
-          console.log('⏳ Waiting for verification to complete (3 seconds)...')
+          Logger.debug(LogCategories.HEALTH, 'Waiting for verification to complete (3 seconds)...')
           await new Promise(resolve => setTimeout(resolve, 3000))
 
           // Now fetch updated health data
-          console.log('🔄 Fetching updated health data...')
+          Logger.debug(LogCategories.HEALTH, 'Fetching updated health data...')
           await healthRefreshManager.fetchAllData()
-          console.log('✅ Health data refreshed')
+          Logger.info(LogCategories.HEALTH, 'Health data refreshed')
 
           store.dispatch(triggerVerificationSuccess())
         } else {
@@ -49,7 +50,7 @@ export const apiMiddleware: Middleware = (store) => (next) => (action: any) => {
         }
       } catch (error: any) {
         store.dispatch(triggerVerificationFailure(error.message))
-        console.error('❌ Failed to trigger verification:', error)
+        Logger.error(LogCategories.HEALTH, 'Failed to trigger verification:', error)
       }
     })()
   }

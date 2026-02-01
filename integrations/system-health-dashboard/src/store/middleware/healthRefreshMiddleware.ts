@@ -232,7 +232,7 @@ class HealthRefreshManager {
       }
     } catch (error: any) {
       this.store.dispatch(fetchHealthStatusFailure(error.message))
-      console.error('Failed to fetch health status:', error)
+      Logger.error(LogCategories.HEALTH, 'Failed to fetch health status:', error)
     }
   }
 
@@ -255,7 +255,7 @@ class HealthRefreshManager {
       }
     } catch (error: any) {
       this.store.dispatch(fetchHealthReportFailure(error.message))
-      console.error('Failed to fetch health report:', error)
+      Logger.error(LogCategories.HEALTH, 'Failed to fetch health report:', error)
     }
   }
 
@@ -276,7 +276,7 @@ class HealthRefreshManager {
       }
     } catch (error: any) {
       this.store.dispatch(fetchAPIQuotaFailure(error.message))
-      console.error('Failed to fetch API quota:', error)
+      Logger.error(LogCategories.API, 'Failed to fetch API quota:', error)
     }
   }
 
