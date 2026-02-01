@@ -77,23 +77,9 @@ class PostSessionLogger {
         return;
       }
 
-      console.log(`🔍 Capturing conversation for session: ${sessionData.sessionId}`);
-
-      // Check if live session logs exist and are plausible
-      const liveSessionCheck = await this.checkLiveSessionPlausibility();
-      
-      if (liveSessionCheck.exists && liveSessionCheck.plausible) {
-        console.log('✅ Live session complete and plausible - skipping post-session logging');
-        sessionData.needsLogging = false;
-        sessionData.loggedAt = new Date().toISOString();
-        sessionData.logFile = `Live session: ${liveSessionCheck.filePath}`;
-        fs.writeFileSync(this.sessionFile, JSON.stringify(sessionData, null, 2));
-        return;
-      } else if (liveSessionCheck.exists && !liveSessionCheck.plausible) {
-        console.log('⚠️  Live session exists but incomplete - creating post-session backup');
-      } else {
-        console.log('📝 Live session missing - creating post-session backup');
-      }
+      process.stderr.write(`🔍 Capturing conversation for session: ${sessionData.sessionId}\n`);
+      // Note: LSL check already happened above - if we got here, LSL doesn't exist
+      process.stderr.write('📝 Live session missing - creating post-session backup\n');
 
       // Get conversation history using Claude's internal history
       // This is a workaround since we can't directly access Claude's conversation buffer
