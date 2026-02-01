@@ -1,7 +1,17 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import type { AggregatedSteps } from '@/store/slices/ukbSlice'
+import {
+  selectAgentLLMMode,
+  selectAgentHasOverride,
+  selectGlobalLLMMode,
+  setAgentLLMMode,
+  clearAgentLLMOverride,
+  type LLMMode,
+} from '@/store/slices/ukbSlice'
+import type { RootState } from '@/store'
 import { Logger, LogCategories } from '@/utils/logging'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,6 +48,9 @@ import {
   Network,
   Save,
   RotateCcw,
+  FlaskConical,
+  Server,
+  Cloud,
 } from 'lucide-react'
 
 // Utility: Format duration in milliseconds to human readable format
@@ -3122,7 +3135,8 @@ export function UKBNodeDetailsSidebar({
   onClose,
   aggregatedSteps,
   edges = [],
-  agents = WORKFLOW_AGENTS
+  agents = WORKFLOW_AGENTS,
+  apiBaseUrl,
 }: {
   agentId: string
   process: ProcessInfo
@@ -3130,9 +3144,17 @@ export function UKBNodeDetailsSidebar({
   aggregatedSteps?: AggregatedSteps | null
   edges?: Array<{ from: string; to: string; type?: string; label?: string }>
   agents?: typeof WORKFLOW_AGENTS
+  apiBaseUrl?: string
 }) {
+  const dispatch = useDispatch()
+
   // Compute all values unconditionally to ensure hooks are called consistently
   const agent = agents.find(a => a.id === agentId)
+
+  // LLM Mode state for this agent
+  const agentLLMMode = useSelector((state: RootState) => selectAgentLLMMode(state, agentId))
+  const hasOverride = useSelector((state: RootState) => selectAgentHasOverride(state, agentId))
+  const globalLLMMode = useSelector(selectGlobalLLMMode)
 
   // FIXED: For batch-phase steps, use current batch's status instead of top-level aggregate
   // The top-level stepsDetail may show stale "skipped" status from initial batch,
@@ -3299,6 +3321,115 @@ export function UKBNodeDetailsSidebar({
             )}
           </div>
         </div>
+
+        {/* LLM Mode Control - Only show for agents that use LLM */}
+        {agent.usesLLM && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm flex items-center gap-2">
+                LLM Mode
+                {hasOverride && (
+                  <span className="text-xs text-yellow-600 font-normal">(override)</span>
+                )}
+              </h4>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-md overflow-hidden border border-gray-200 flex-1" title="Set LLM mode for this agent">
+                  <button
+                    onClick={async () => {
+                      dispatch(setAgentLLMMode({ agentId, mode: 'mock' }))
+                      if (apiBaseUrl) {
+                        try {
+                          await fetch(`${apiBaseUrl}/api/ukb/llm-mode/agent`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ agentId, mode: 'mock' })
+                          })
+                        } catch (e) { /* ignore */ }
+                      }
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors flex-1 justify-center ${
+                      agentLLMMode === 'mock'
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-white text-gray-600 hover:bg-orange-50'
+                    }`}
+                    title="Mock: Use fake LLM responses"
+                  >
+                    <FlaskConical className="h-3 w-3" />
+                    M
+                  </button>
+                  <button
+                    onClick={async () => {
+                      dispatch(setAgentLLMMode({ agentId, mode: 'local' }))
+                      if (apiBaseUrl) {
+                        try {
+                          await fetch(`${apiBaseUrl}/api/ukb/llm-mode/agent`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ agentId, mode: 'local' })
+                          })
+                        } catch (e) { /* ignore */ }
+                      }
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs border-l border-r border-gray-200 transition-colors flex-1 justify-center ${
+                      agentLLMMode === 'local'
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-white text-gray-600 hover:bg-purple-50'
+                    }`}
+                    title="Local: Use Docker Model Runner"
+                  >
+                    <Server className="h-3 w-3" />
+                    L
+                  </button>
+                  <button
+                    onClick={async () => {
+                      dispatch(setAgentLLMMode({ agentId, mode: 'public' }))
+                      if (apiBaseUrl) {
+                        try {
+                          await fetch(`${apiBaseUrl}/api/ukb/llm-mode/agent`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ agentId, mode: 'public' })
+                          })
+                        } catch (e) { /* ignore */ }
+                      }
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors flex-1 justify-center ${
+                      agentLLMMode === 'public'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-white text-gray-600 hover:bg-green-50'
+                    }`}
+                    title="Public: Use Groq/Anthropic/OpenAI"
+                  >
+                    <Cloud className="h-3 w-3" />
+                    P
+                  </button>
+                </div>
+                {hasOverride && (
+                  <button
+                    onClick={async () => {
+                      dispatch(clearAgentLLMOverride(agentId))
+                      if (apiBaseUrl) {
+                        try {
+                          await fetch(`${apiBaseUrl}/api/ukb/llm-mode/agent/${agentId}`, {
+                            method: 'DELETE'
+                          })
+                        } catch (e) { /* ignore */ }
+                      }
+                    }}
+                    className="p-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                    title={`Reset to global (${globalLLMMode})`}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Global: {globalLLMMode.charAt(0).toUpperCase() + globalLLMMode.slice(1)}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Step Execution Details - Always show with available data */}
         <Separator />

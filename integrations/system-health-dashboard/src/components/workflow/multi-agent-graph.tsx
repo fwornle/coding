@@ -10,6 +10,8 @@ import {
   selectExecutionSubstepStatuses,
   selectExecutionCurrentStep,
   selectExecutionCurrentSubstep,
+  selectLLMState,
+  type LLMMode,
 } from '@/store/slices/ukbSlice'
 import { useScrollPreservation, useNodeWiggle, useWorkflowDefinitions } from './hooks'
 // WebSocket hook disabled - no server-side implementation exists yet
@@ -286,6 +288,9 @@ export function MultiAgentGraph({
   const executionSubstepStatuses = useSelector(selectExecutionSubstepStatuses)
   const executionCurrentStep = useSelector(selectExecutionCurrentStep)
   const executionCurrentSubstep = useSelector(selectExecutionCurrentSubstep)
+
+  // LLM Mode state for per-agent badges
+  const llmState = useSelector(selectLLMState)
 
   // WebSocket disabled - no server-side implementation exists yet
   // TODO: Implement WebSocket server in mcp-server-semantic-analysis to enable real-time SSE events
@@ -1024,6 +1029,33 @@ export function MultiAgentGraph({
                 className="fill-red-500"
               />
             )}
+
+            {/* LLM Mode badge - only for LLM-using agents */}
+            {agent.usesLLM && (() => {
+              const agentMode = llmState.perAgentOverrides[agent.id] || llmState.globalMode
+              const hasOverride = agent.id in llmState.perAgentOverrides
+              const badgeColors = {
+                mock: { bg: 'fill-orange-500', letter: 'M' },
+                local: { bg: 'fill-purple-500', letter: 'L' },
+                public: { bg: 'fill-green-500', letter: 'P' },
+              }
+              const badge = badgeColors[agentMode] || badgeColors.public
+              return (
+                <g transform={`translate(${nodeWidth - 14}, ${nodeHeight - 14})`}>
+                  <circle r={7} className={badge.bg} />
+                  {hasOverride && (
+                    <circle r={7} className="fill-none stroke-yellow-400" strokeWidth={2} />
+                  )}
+                  <text
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    className="text-[7px] fill-white font-bold"
+                  >
+                    {badge.letter}
+                  </text>
+                </g>
+              )
+            })()}
 
             {/* Sub-steps badge - blue circle showing count, click to expand AND select agent */}
             {effectiveAgentSubSteps[agent.id] && (

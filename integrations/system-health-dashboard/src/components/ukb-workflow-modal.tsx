@@ -39,6 +39,8 @@ import {
   Network,
   StopCircle,
   Activity,
+  FlaskConical,
+  Cloud,
 } from 'lucide-react'
 import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, useWorkflowDefinitions } from './workflow'
 import type { SubStep } from './workflow'
@@ -85,6 +87,12 @@ import {
   // LLM Mock mode selectors (MVI)
   selectMockLLM,
   selectMockLLMExplicit,
+  // LLM Mode state (per-agent control)
+  setGlobalLLMMode,
+  syncLLMStateFromServer,
+  selectLLMState,
+  selectGlobalLLMMode,
+  type LLMMode,
   type HistoricalWorkflow,
   type UKBProcess,
   type StepTimingStatistics,
@@ -401,6 +409,9 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
   const mockLLM = useSelector(selectMockLLM)
   const mockLLMExplicit = useSelector(selectMockLLMExplicit)
 
+  // LLM Mode state (per-agent control)
+  const globalLLMMode = useSelector(selectGlobalLLMMode)
+
   // Trace modal state
   const [traceModalOpen, setTraceModalOpen] = useState(false)
 
@@ -643,6 +654,46 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       // Revert on error
       dispatch(setMockLLM({ enabled: !enabled, explicit: false }))
       Logger.error(LogCategories.UKB, 'Error toggling LLM mock mode', error)
+    }
+  }
+
+  // Handle global LLM mode change
+  const handleGlobalLLMModeChange = async (mode: LLMMode) => {
+    const previousMode = globalLLMMode
+    try {
+      Logger.info(LogCategories.UKB, `Setting global LLM mode: ${mode}`)
+
+      // Update Redux immediately for responsive UI
+      dispatch(setGlobalLLMMode({ mode, explicit: true }))
+
+      // Also sync mockLLM state for backward compatibility
+      if (mode === 'mock') {
+        dispatch(setMockLLM({ enabled: true, explicit: true }))
+      } else {
+        dispatch(setMockLLM({ enabled: false, explicit: true }))
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/ukb/llm-mode/global`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      })
+      const data = await response.json()
+      if (data.status === 'success') {
+        Logger.info(LogCategories.UKB, `Global LLM mode set to: ${mode}`)
+        // Sync state from server
+        if (data.llmState) {
+          dispatch(syncLLMStateFromServer(data.llmState))
+        }
+      } else {
+        // Revert on failure
+        dispatch(setGlobalLLMMode({ mode: previousMode, explicit: false }))
+        Logger.error(LogCategories.UKB, 'Failed to set global LLM mode', data)
+      }
+    } catch (error) {
+      // Revert on error
+      dispatch(setGlobalLLMMode({ mode: previousMode, explicit: false }))
+      Logger.error(LogCategories.UKB, 'Error setting global LLM mode', error)
     }
   }
 
@@ -1520,6 +1571,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                       agentId={selectedNode}
                       process={activeCurrentProcess}
                       onClose={handleCloseSidebar}
+                      apiBaseUrl={apiBaseUrl}
                     />
                   )}
                 </div>
@@ -1810,6 +1862,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
                         process={historicalProcessInfo}
                         onClose={handleCloseHistoricalSidebar}
                         aggregatedSteps={batchSummary?.aggregatedSteps}
+                        apiBaseUrl={apiBaseUrl}
                       />
                     )}
                   </div>
@@ -1974,20 +2027,47 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
               )}
               {activeProcesses.length > 0 && (
                 <>
-                  {/* LLM Mock mode control */}
+                  {/* Global LLM Mode Control */}
                   <div className="flex items-center gap-2 border-r pr-3 mr-1">
-                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer" title="Use mock LLM responses for testing without API calls">
-                      <input
-                        type="checkbox"
-                        checked={mockLLM}
-                        onChange={(e) => handleToggleMockLLM(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500 focus:ring-orange-400 cursor-pointer"
-                      />
-                      Mock LLM
-                    </label>
-                    {mockLLM && (
-                      <span className="text-xs text-orange-500 font-medium">(active)</span>
-                    )}
+                    <span className="text-xs text-muted-foreground">LLM:</span>
+                    <div className="flex rounded-md overflow-hidden border border-gray-200" title="Set LLM mode for all agents">
+                      <button
+                        onClick={() => handleGlobalLLMModeChange('mock')}
+                        className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${
+                          globalLLMMode === 'mock'
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-white text-gray-600 hover:bg-orange-50'
+                        }`}
+                        title="Mock: Use fake LLM responses for testing"
+                      >
+                        <FlaskConical className="h-3 w-3" />
+                        Mock
+                      </button>
+                      <button
+                        onClick={() => handleGlobalLLMModeChange('local')}
+                        className={`flex items-center gap-1 px-2 py-1 text-xs border-l border-r border-gray-200 transition-colors ${
+                          globalLLMMode === 'local'
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-white text-gray-600 hover:bg-purple-50'
+                        }`}
+                        title="Local: Use Docker Model Runner (localhost:12434)"
+                      >
+                        <Server className="h-3 w-3" />
+                        Local
+                      </button>
+                      <button
+                        onClick={() => handleGlobalLLMModeChange('public')}
+                        className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${
+                          globalLLMMode === 'public'
+                            ? 'bg-green-500 text-white'
+                            : 'bg-white text-gray-600 hover:bg-green-50'
+                        }`}
+                        title="Public: Use Groq/Anthropic/OpenAI APIs"
+                      >
+                        <Cloud className="h-3 w-3" />
+                        Public
+                      </button>
+                    </div>
                   </div>
                   {/* Single-step debugging controls */}
                   <div className="flex items-center gap-2 border-r pr-3 mr-1">

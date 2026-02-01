@@ -1,6 +1,15 @@
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit'
 import { STEP_TO_AGENT as FALLBACK_STEP_TO_AGENT } from '@/components/workflow/constants'
 
+// LLM Mode types for per-agent control
+export type LLMMode = 'mock' | 'local' | 'public'
+
+export interface LLMState {
+  globalMode: LLMMode
+  perAgentOverrides: Record<string, LLMMode>
+  updatedAt?: string
+}
+
 // Event-driven workflow types
 // Note: These types are copied from workflow-events.ts to avoid cross-package imports
 // Keep in sync with the coordinator's event types
@@ -457,6 +466,16 @@ interface UKBState {
 
   // Workflow tracing
   trace: TraceState
+
+  // LLM Mode state (per-agent control)
+  llmState: LLMState
+}
+
+// Default LLM state
+const initialLLMState: LLMState = {
+  globalMode: 'public',
+  perAgentOverrides: {},
+  updatedAt: undefined,
 }
 
 const initialState: UKBState = {
@@ -521,6 +540,9 @@ const initialState: UKBState = {
     events: [],
     selectedEventId: undefined,
   },
+
+  // LLM Mode state
+  llmState: { ...initialLLMState },
 }
 
 const ukbSlice = createSlice({
@@ -1073,6 +1095,33 @@ const ukbSlice = createSlice({
         state.mockLLMDelay = mockLLMDelay
       }
     },
+
+    // ========================================
+    // LLM Mode State Actions
+    // ========================================
+
+    // Set global LLM mode for all agents
+    setGlobalLLMMode(state, action: PayloadAction<{ mode: LLMMode; explicit?: boolean }>) {
+      state.llmState.globalMode = action.payload.mode
+      state.llmState.updatedAt = new Date().toISOString()
+    },
+
+    // Set LLM mode for a specific agent (override)
+    setAgentLLMMode(state, action: PayloadAction<{ agentId: string; mode: LLMMode }>) {
+      state.llmState.perAgentOverrides[action.payload.agentId] = action.payload.mode
+      state.llmState.updatedAt = new Date().toISOString()
+    },
+
+    // Clear per-agent override (revert to global mode)
+    clearAgentLLMOverride(state, action: PayloadAction<string>) {
+      delete state.llmState.perAgentOverrides[action.payload]
+      state.llmState.updatedAt = new Date().toISOString()
+    },
+
+    // Sync LLM state from server
+    syncLLMStateFromServer(state, action: PayloadAction<LLMState>) {
+      state.llmState = action.payload
+    },
   },
 })
 
@@ -1129,6 +1178,11 @@ export const {
   handlePreferencesUpdated,
   resetExecutionState,
   setWorkflowPreferences,
+  // LLM Mode actions
+  setGlobalLLMMode,
+  setAgentLLMMode,
+  clearAgentLLMOverride,
+  syncLLMStateFromServer,
 } = ukbSlice.actions
 
 // Selectors
@@ -1602,6 +1656,42 @@ export const selectExecutionAsProcess = createSelector(
       } : undefined,
     }
   }
+)
+
+// ========================================
+// LLM Mode Selectors
+// ========================================
+
+export const selectLLMState = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.llmState
+)
+
+export const selectGlobalLLMMode = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.llmState.globalMode
+)
+
+// Get effective LLM mode for a specific agent (override or global)
+export const selectAgentLLMMode = createSelector(
+  [selectUkbState, (_: any, agentId: string) => agentId],
+  (ukb, agentId): LLMMode => {
+    return ukb.llmState.perAgentOverrides[agentId] || ukb.llmState.globalMode
+  }
+)
+
+// Check if agent has a per-agent override
+export const selectAgentHasOverride = createSelector(
+  [selectUkbState, (_: any, agentId: string) => agentId],
+  (ukb, agentId): boolean => {
+    return agentId in ukb.llmState.perAgentOverrides
+  }
+)
+
+// Get all per-agent overrides
+export const selectPerAgentOverrides = createSelector(
+  [selectUkbState],
+  (ukb) => ukb.llmState.perAgentOverrides
 )
 
 export default ukbSlice.reducer
