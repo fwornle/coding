@@ -368,6 +368,7 @@ Copyright © 2025 Frank Wornle
 
 - **Documentation Hub**: [docs/README.md](docs/README.md)
 - **Installation Guide**: [docs/getting-started.md](docs/getting-started.md)
+- **LLM Providers & Local Models**: [docs/provider-configuration.md](docs/provider-configuration.md)
 - **Docker Architecture**: [docs/architecture-report.md](docs/architecture-report.md)
 - **Docker Mode Transition**: [docs/docker-mode-transition.md](docs/docker-mode-transition.md)
 - **Docker Deployment**: [docker/README.md](docker/README.md)

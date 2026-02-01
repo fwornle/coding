@@ -110,6 +110,13 @@ This ensures you can always restore your original shell configuration if needed.
    - Constraint enforcement hooks
    - 4-layer health monitoring
 
+5. **Local LLM Support (Optional)**
+   - Docker Model Runner (DMR) - llama.cpp via Docker Desktop
+   - Automatic GPU detection (Metal/CUDA/ROCm/CPU)
+   - Cross-platform configuration (DMR_HOST for Windows containers)
+   - Default model download (`ai/llama3.2`)
+   - CLI tool (`llm`) for command-line inference
+
 ### Managing Git Submodules
 
 The repository uses git submodules for integration components. Here's how to manage them:
@@ -247,7 +254,12 @@ OPENAI_API_KEY=sk-your-openai-key-here
 # Google Gemini
 GOOGLE_API_KEY=your-google-key-here
 
-# Local models (Ollama/vLLM - privacy-first, free)
+# Local models via Docker Model Runner (recommended - auto-configured by installer)
+# DMR uses llama.cpp with automatic GPU detection (Metal/CUDA/CPU)
+DMR_PORT=12434
+DMR_HOST=localhost  # Use host.docker.internal on Windows
+
+# Legacy: Ollama fallback (if DMR unavailable)
 LOCAL_MODEL_ENDPOINT=http://localhost:11434
 
 # Browser automation (if using browser-access)
@@ -271,6 +283,7 @@ SYSTEM_HEALTH_DASHBOARD_PORT=3032  # Health dashboard UI
 SYSTEM_HEALTH_API_PORT=3033      # Health dashboard API
 MEMGRAPH_BOLT_PORT=7687          # Memgraph database (Bolt protocol)
 MEMGRAPH_LAB_PORT=3100           # Memgraph Lab UI
+DMR_PORT=12434                   # Docker Model Runner (local LLM)
 ```
 
 The startup scripts (`bin/coding`, `scripts/start-services-robust.js`) automatically read these ports. To customize:
