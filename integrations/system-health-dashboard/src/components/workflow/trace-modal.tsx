@@ -325,10 +325,21 @@ export function TraceModal({
                           {formatDuration(event.duration)}
                         </div>
 
-                        {/* LLM indicator - show specific model name */}
+                        {/* LLM indicator - show specific model name with fallback warning */}
                         <div className="w-24 text-right">
                           {event.llmProvider && (
-                            <Badge variant="outline" className="text-[10px] h-5 truncate max-w-[90px]" title={event.llmProvider}>
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] h-5 truncate max-w-[90px] ${
+                                (event as any).llmModeFallback ? 'border-orange-400 text-orange-600' : ''
+                              }`}
+                              title={
+                                (event as any).llmModeFallback
+                                  ? `Fallback: intended ${(event as any).llmIntendedMode}, actual ${(event as any).llmActualMode} (${event.llmProvider})`
+                                  : event.llmProvider
+                              }
+                            >
+                              {(event as any).llmModeFallback && '⚠️ '}
                               {formatModelName(event.llmProvider)}
                             </Badge>
                           )}
