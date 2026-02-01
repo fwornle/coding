@@ -7,7 +7,7 @@ Real-time code quality enforcement through PreToolUse hooks that block violation
 The Constraint Monitoring System provides **real-time enforcement** of coding standards through hook interception:
 
 - **PreToolUse Hook Enforcement** - Blocks violations BEFORE tool execution
-- **18 Active Constraints** - Security, architecture, code quality, PlantUML, documentation
+- **20 Active Constraints** - Security, architecture, code quality, logging, PlantUML, documentation
 - **Severity-Based Enforcement** - CRITICAL/ERROR blocks, WARNING/INFO allows with feedback
 - **Compliance Scoring** - Real-time scoring (0-10) with violation impact tracking
 - **Dashboard Monitoring** - Live violation feed, trends, and compliance metrics at `http://localhost:3030`
@@ -73,7 +73,7 @@ integrations/mcp-constraint-monitor/
 }
 ```
 
-## 18 Active Constraints
+## 20 Active Constraints
 
 ### Security (2 constraints) - 100% Detection ✅
 
@@ -90,15 +90,17 @@ integrations/mcp-constraint-monitor/
 | `debug-not-speculate` | ERROR | Requires concrete debugging over speculation |
 | `no-evolutionary-names` | ERROR | Prevents evolutionary naming (fixed, patched, modified) |
 
-### Code Quality (5 constraints) - 20% Detection ⚠️
+### Code Quality (7 constraints)
 
-| Constraint ID | Severity | Status |
-|---------------|----------|--------|
-| `proper-error-handling` | ERROR | ✅ Detected |
-| `no-console-log` | WARNING | ❌ Pattern needs refinement |
-| `no-var-declarations` | WARNING | ❌ Pattern needs refinement |
-| `proper-function-naming` | INFO | ❌ Pattern needs refinement |
-| `no-magic-numbers` | INFO | ❌ Pattern needs refinement |
+| Constraint ID | Severity | Description |
+|---------------|----------|-------------|
+| `proper-error-handling` | ERROR | ✅ Detects empty catch blocks |
+| `no-console-log` | WARNING | ✅ Enforces Logger.info() usage - see [Logging](../logging/) |
+| `no-console-error` | WARNING | ✅ Enforces Logger.error() usage - see [Logging](../logging/) |
+| `no-console-warn` | WARNING | ✅ Enforces Logger.warn() usage - see [Logging](../logging/) |
+| `no-var-declarations` | WARNING | Detects var declarations |
+| `proper-function-naming` | INFO | Function naming conventions |
+| `no-magic-numbers` | INFO | Detects magic numbers |
 
 ### PlantUML (5 constraints) - 40% Detection ⚠️
 
@@ -117,8 +119,9 @@ All documentation constraints need pattern refinement:
 - `documentation-filename-format` (INFO)
 - `update-main-readme` (INFO)
 
-**Overall Detection Rate: 8/18 (44%)**
+**Overall Detection Rate: 11/20 (55%)**
 **Critical/Error Blocking: 100% effective** ✅
+**Logging Constraints: 100% effective** ✅
 
 ## How It Works
 
@@ -258,13 +261,13 @@ node test-all-constraints-comprehensive.js
 ```
 
 **Output Summary**:
-- Constraints tested: 18/18
-- Violations detected: 8
-- Violations blocked: 8
-- Pattern fixes needed: 10
+- Constraints tested: 20/20
+- Violations detected: 11
+- Violations blocked: 11
+- Pattern fixes needed: 9
 
 **Test Results**:
-- **Detection Rate**: 8/18 (44%)
+- **Detection Rate**: 11/20 (55%)
 - **Blocking Accuracy**: 100% (all detected violations blocked correctly)
 - **False Positives**: 0
 - **Response Time**: <50ms per check
@@ -363,5 +366,6 @@ Example: `[🛡️ 94% ⚙️ IMP]` shows 94% constraint compliance and "impleme
 
 ## See Also
 
+- [Unified Logging System](../logging/) - Backend and frontend Logger usage, migration guide
 - [MCP Constraint Monitor Integration](../../integrations/mcp-constraint-monitor/README.md) - Integration details
 - [Testing Guide](../../integrations/mcp-constraint-monitor/TESTING.md) - Complete testing documentation
