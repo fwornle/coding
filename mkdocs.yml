@@ -96,6 +96,7 @@ nav:
     - Overview: guides/index.md
     - Status Line: guides/status-line.md
     - Health Dashboard: guides/health-dashboard.md
+    - LLM Providers: guides/llm-providers.md
     - Constraint Testing: guides/constraint-testing.md
     - VKB Visualization: guides/vkb-visualization.md
     - Knowledge Workflows: guides/knowledge-workflows.md

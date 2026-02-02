@@ -65,7 +65,7 @@ The system relies on the following operational services:
 - **SQLite** (analytics database): Analytics, budget tracking, and temporal metadata
 - **Groq**: Primary LLM provider for fast, cost-effective inference
 - **OpenRouter**: Multi-model access for fallback and specialized tasks
-- **Ollama**: Local models for sensitive data processing
+- **DMR/llama.cpp**: Local models for sensitive data processing
 
 ---
 
@@ -356,8 +356,8 @@ const system = new KnowledgeLearningSystem({
       enabled: true
     },
     local: {
-      url: 'http://localhost:11434',  // Ollama
-      model: 'llama3.2:3b',
+      url: 'http://localhost:12434',  // DMR/llama.cpp
+      model: 'ai/llama3.2',
       enabled: true
     }
   },

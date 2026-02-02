@@ -28,7 +28,7 @@ cloud "External LLM Providers" as llm #F0F0F0 {
 }
 
 cloud "Local LLM" as local #F0F0F0 {
-  [Ollama]
+  [DMR/llama.cpp]
 }
 
 file ".data/knowledge-export/\n<team>.json" as json

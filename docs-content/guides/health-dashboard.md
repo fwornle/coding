@@ -200,6 +200,148 @@ The "View Trace" button opens the execution trace modal showing the complete tim
 
 ---
 
+## Workflow Debug Controls
+
+The UKB Workflow Modal provides powerful debugging capabilities for development and troubleshooting:
+
+![Workflow Debug Mode](../images/ukb-workflow-debug-mode.png)
+
+### Single-Step Mode
+
+Enable single-step mode to pause the workflow after each agent completes, allowing you to inspect intermediate results:
+
+![Single-Step Sequence](../images/ukb-workflow-single-step-sequence.png)
+
+**How to Enable:**
+
+1. Open the UKB Workflow Monitor
+2. Toggle "Single-Step Mode" checkbox before starting a workflow
+3. Or start with: `ukb debug` in Claude chat
+
+**Controls:**
+
+| Button | Action |
+|--------|--------|
+| **Continue** | Execute next agent and pause |
+| **Skip** | Skip current agent, move to next |
+| **Run All** | Disable single-step, run to completion |
+| **Abort** | Stop workflow immediately |
+
+### LLM Mode Control
+
+![LLM Mode Control](../images/llm-mode-control.png)
+
+The workflow supports three LLM execution modes, configurable per-workflow or globally:
+
+| Mode | Description | Cost | Use Case |
+|------|-------------|------|----------|
+| **Public** | Use configured cloud providers (Groq, Anthropic, OpenAI) | $$ | Production, high-quality analysis |
+| **Local** | Use DMR/llama.cpp local models | Free | Development, privacy, offline |
+| **Mock** | Return simulated responses | Free | Testing, UI development |
+
+**Switching Modes:**
+
+- **Per-workflow**: Toggle in the workflow modal before starting
+- **Via Claude**: `ukb debug` (enables mock mode by default)
+- **Environment**: Set `SEMANTIC_LLM_MODE=local|public|mock`
+
+### Mock LLM Mode
+
+Mock mode returns pre-defined responses without making actual LLM calls. Useful for:
+
+- Testing workflow UI without API costs
+- Debugging agent sequencing
+- CI/CD pipeline testing
+- Developing new agents
+
+**Enable Mock Mode:**
+
+```bash
+# Via Claude chat
+ukb debug  # Automatically enables mock mode
+
+# Via environment
+export SEMANTIC_LLM_MODE=mock
+```
+
+### Local LLM Mode (DMR/llama.cpp)
+
+Run workflows using locally-hosted models via Docker Model Runner or llama.cpp:
+
+**Prerequisites:**
+
+1. DMR running on configured port (default: 12434)
+2. Model downloaded and available
+
+**Configuration:**
+
+```env
+# .env.ports
+DMR_PORT=12434
+DMR_HOST=localhost
+
+# .env
+LOCAL_MODEL=llama-3.2-3b  # Or your preferred model
+```
+
+**Benefits:**
+
+- Zero API costs
+- Data privacy (no external calls)
+- Offline operation
+- Faster iteration during development
+
+See [LLM Providers Guide](llm-providers.md) for complete local model setup.
+
+### Tracer View
+
+The tracer provides detailed execution logs for every LLM call:
+
+![Workflow Trace Modal](../images/health-monitor-multi-agent-wf-5.png)
+
+**Tracer Information:**
+
+| Field | Description |
+|-------|-------------|
+| **Agent** | Which agent made the call |
+| **Provider** | LLM provider used (groq, local, mock) |
+| **Model** | Specific model (llama-3.3-70b, etc.) |
+| **Input Tokens** | Prompt token count |
+| **Output Tokens** | Response token count |
+| **Duration** | Call latency in milliseconds |
+| **Cost** | Estimated cost (if applicable) |
+| **Input** | Full prompt sent |
+| **Output** | Full response received |
+
+**Access Tracer:**
+
+1. Click "View Trace" button in workflow modal
+2. Or expand any agent node and click the trace icon
+3. Filter by agent, status, or time range
+
+### Step-Into Sub-Steps
+
+For agents with multiple internal steps, you can step into sub-step execution:
+
+![Sub-Step Details](../images/health-monitor-multi-agent-wf-4.png)
+
+**Enable Sub-Step Debugging:**
+
+1. Enable "Step Into Sub-Steps" checkbox
+2. Workflow will pause at each sub-step boundary
+3. Inspect inputs/outputs for each sub-step
+4. Continue to next sub-step or skip to next agent
+
+**Sub-Step Information:**
+
+- Step name and sequence number
+- Input data from previous step
+- Output data produced
+- LLM usage indicator (none/fast/standard/premium)
+- Execution duration
+
+---
+
 ## Daemon Robustness Mechanism
 
 The HealthVerifier daemon implements a defense-in-depth approach to ensure continuous health monitoring.

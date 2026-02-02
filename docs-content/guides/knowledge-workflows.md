@@ -251,7 +251,7 @@ const system = new KnowledgeLearningSystem({
 |----------|----------------------|------------------------|
 | Groq | $0.0004 | $0.0006 |
 | OpenRouter | $0.001 | $0.001 |
-| Local (Ollama) | $0 | $0 |
+| Local (DMR/llama.cpp) | $0 | $0 |
 
 ### Fallback Chain
 

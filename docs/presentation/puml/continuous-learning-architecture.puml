@@ -65,7 +65,7 @@ package "LLM Providers" <<external>> {
       component "OpenAI" as OPENAI <<provider>>
     }
     cloud "Local" as LOCAL {
-      component "Ollama" as OLLAMA <<provider>>
+      component "DMR/llama.cpp" as LOCALLLM <<provider>>
       component "vLLM" as VLLM <<provider>>
     }
   }
@@ -88,8 +88,8 @@ HBACK -[hidden]right-> MBACK
 MBACK -[hidden]right-> GROQ
 GROQ -[hidden]right-> ANTHRO
 ANTHRO -[hidden]right-> OPENAI
-OPENAI -[hidden]right-> OLLAMA
-OLLAMA -[hidden]right-> VLLM
+OPENAI -[hidden]right-> LOCALLLM
+LOCALLLM -[hidden]right-> VLLM
 
 ' Align other components at same horizontal level
 COPILOT -[hidden]down-> ADAPTER_API
@@ -126,7 +126,7 @@ ENGINE --> SENS
 ENGINE --> GROQ
 ENGINE --> ANTHRO
 ENGINE --> OPENAI
-ENGINE --> OLLAMA
+ENGINE --> LOCALLLM
 ENGINE --> VLLM
 
 ' Knowledge → Databases

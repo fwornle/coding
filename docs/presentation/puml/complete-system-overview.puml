@@ -37,11 +37,11 @@ realtime -right-> km : feeds content
 cloud "LLM Providers" as llm_providers #F8F8F8 {
   [Groq] as groq
   [OpenAI] as openai
-  [Ollama] as ollama
+  [DMR/llama.cpp] as localllm
 }
 
 lsl -down-> llm_providers : Layer 4\nclassification
-learning -down-> ollama : sensitive\ndata
+learning -down-> localllm : sensitive\ndata
 
 ' MCP Integration Layer
 package "MCP Integration Servers" as mcp #E0E7FF {
