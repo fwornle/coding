@@ -259,7 +259,7 @@ GOOGLE_API_KEY=your-google-key-here
 DMR_PORT=12434
 DMR_HOST=localhost  # Use host.docker.internal on Windows
 
-# Legacy: Ollama fallback (if DMR unavailable)
+# Legacy: llama.cpp fallback (if DMR unavailable)
 LOCAL_MODEL_ENDPOINT=http://localhost:11434
 
 # Browser automation (if using browser-access)

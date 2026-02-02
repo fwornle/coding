@@ -22,17 +22,17 @@ partition "Try Docker Model Runner (DMR)" {
   endif
 }
 
-partition "Fallback to Ollama" {
-  if (Ollama client exists?) then (yes)
-    :Call Ollama API\n(localhost:11434);
-    if (Ollama success?) then (yes)
-      :Return Ollama response;
+partition "Fallback to llama.cpp Direct" {
+  if (llama.cpp server running?) then (yes)
+    :Call llama.cpp API\n(configurable port);
+    if (llama.cpp success?) then (yes)
+      :Return llama.cpp response;
       stop
     else (no)
-      :Log Ollama failure;
+      :Log llama.cpp failure;
     endif
   else (no)
-    :Ollama not configured;
+    :llama.cpp not configured;
   endif
 }
 
@@ -47,11 +47,11 @@ stop
 note right
   **Port Configuration**
   DMR: 12434 (from .env.ports)
-  Ollama: 11434 (legacy)
+  llama.cpp: custom (if configured)
 
   **Provider Priority**
   1. DMR (Docker Desktop 4.40+)
-  2. Ollama (deprecated fallback)
+  2. llama.cpp direct (manual setup)
   3. Cloud APIs (Groq > Anthropic > OpenAI)
 end note
 

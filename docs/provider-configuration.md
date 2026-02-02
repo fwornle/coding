@@ -24,7 +24,7 @@ GROK_API_KEY=your-groq-key           # For Groq
 ANTHROPIC_API_KEY=your-anthropic-key # For Anthropic
 OPENAI_API_KEY=your-openai-key       # For OpenAI
 GOOGLE_API_KEY=your-google-key       # For Gemini
-LOCAL_MODEL_ENDPOINT=http://localhost:11434  # For Ollama/vLLM
+LOCAL_MODEL_ENDPOINT=http://localhost:11434  # For llama.cpp/vLLM (legacy fallback)
 ```
 
 ### 3. Verify
@@ -53,7 +53,7 @@ System automatically selects providers in this order:
 2. **Anthropic** (high quality)
 3. **OpenAI** (GPT-4)
 4. **Gemini** (Google)
-5. **Local** (DMR → Ollama fallback)
+5. **Local** (DMR → llama.cpp fallback)
 
 If a provider fails, automatic fallback to the next available provider.
 
@@ -64,7 +64,7 @@ The UKB workflow system supports three LLM modes that can be set globally or per
 | Mode | Icon | Description | Use Case |
 |------|------|-------------|----------|
 | **Mock** | 🧪 Orange | Fake responses | Testing, development |
-| **Local** | 🖥️ Purple | DMR/Ollama | Privacy, offline, cost savings |
+| **Local** | 🖥️ Purple | DMR/llama.cpp | Privacy, offline, cost savings |
 | **Public** | ☁️ Green | Cloud APIs | Production quality |
 
 ### Dashboard Controls
@@ -218,21 +218,22 @@ The installer handles this automatically.
 
 ![Local LLM Fallback](images/local-llm-fallback.png)
 
-#### Ollama (Legacy Fallback)
+#### llama.cpp Direct (Legacy Fallback)
 
-If DMR is unavailable, the system falls back to Ollama:
+If DMR is unavailable, the system falls back to llama.cpp server:
 
 ```bash
-# Start Ollama
-ollama serve
-ollama pull llama3.2:latest
+# Build and run llama.cpp server
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp && make -j
+./llama-server --model /path/to/model.gguf --host 0.0.0.0 --port 11434
 
 # Configure
 echo "LOCAL_MODEL_ENDPOINT=http://localhost:11434" >> .env
-npm install openai  # Ollama uses OpenAI-compatible API
+npm install openai  # llama.cpp uses OpenAI-compatible API
 ```
 
-**Note**: DMR is preferred over Ollama as it's built into Docker Desktop and requires no separate installation.
+**Note**: DMR is preferred over direct llama.cpp as it's built into Docker Desktop and requires no separate installation.
 
 ## Troubleshooting
 
