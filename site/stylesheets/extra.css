@@ -154,3 +154,37 @@
 .deep-dive-link:hover {
   background: var(--md-primary-fg-color);
 }
+
+/* Status indicator colors for feature tables */
+.green {
+  color: #00c853;
+}
+
+.yellow {
+  color: #ffc107;
+}
+
+.red {
+  color: #ff1744;
+}
+
+/* Grid cards for documentation sections */
+.grid.cards > ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.grid.cards > ul > li {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.grid.cards > ul > li:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-color: var(--md-primary-fg-color--light);
+}
