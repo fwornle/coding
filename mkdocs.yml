@@ -43,6 +43,9 @@ plugins:
 markdown_extensions:
   - admonition
   - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -64,24 +67,25 @@ extra_css:
   - stylesheets/extra.css
 
 nav:
-  - Home:
-    - index.md
+  - Home: index.md
   - Getting Started:
-    - getting-started/index.md
+    - Overview: getting-started/index.md
+    - Installation: getting-started/installation.md
+    - Verify & Repair: getting-started/verify-repair.md
     - Configuration: getting-started/configuration.md
     - Docker Mode: getting-started/docker-mode.md
   - Core Systems:
-    - core-systems/index.md
-    - LSL: core-systems/lsl.md
-    - UKB/VKB: core-systems/ukb-vkb.md
+    - Overview: core-systems/index.md
+    - Live Session Logging: core-systems/lsl.md
+    - Knowledge Management: core-systems/ukb-vkb.md
     - Constraints: core-systems/constraints.md
     - Trajectories: core-systems/trajectories.md
   - Architecture:
-    - architecture/index.md
+    - Overview: architecture/index.md
     - Health Monitoring: architecture/health-monitoring.md
     - Data Flow: architecture/data-flow.md
   - Integrations:
-    - integrations/index.md
+    - Overview: integrations/index.md
     - Semantic Analysis: integrations/semantic-analysis.md
     - Constraint Monitor: integrations/constraint-monitor.md
     - Browser Access: integrations/browser-access.md
@@ -89,7 +93,7 @@ nav:
     - Serena: integrations/serena.md
     - Dashboard: integrations/dashboard.md
   - Guides:
-    - guides/index.md
+    - Overview: guides/index.md
     - Status Line: guides/status-line.md
     - Health Dashboard: guides/health-dashboard.md
     - Constraint Testing: guides/constraint-testing.md
@@ -97,7 +101,7 @@ nav:
     - Knowledge Workflows: guides/knowledge-workflows.md
     - Docker Mode Setup: guides/docker-mode-setup.md
   - Reference:
-    - reference/index.md
+    - Overview: reference/index.md
     - Commands: reference/commands.md
     - API: reference/api.md
     - Troubleshooting: reference/troubleshooting.md
