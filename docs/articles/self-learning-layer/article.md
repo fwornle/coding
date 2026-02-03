@@ -45,10 +45,10 @@ That's the bigger vision here. Not just memory for one assistant, but **shared i
 
 The system has four main layers:
 
-1. **Live Session Logging** - 5-layer intelligent classification
-2. **Knowledge Extraction** - 14-agent AI system building a collective brain
+1. **Live Session Logging** - Multi-layer intelligent classification
+2. **Knowledge Extraction** - Multi-agent AI system building a collective brain
 3. **Constraint Enforcement** - Blocks mistakes before execution
-4. **Health Monitoring** - 4-layer watchdog architecture
+4. **Health Monitoring** - Multi-layer watchdog architecture
 
 Let me walk you through each.
 
@@ -61,7 +61,7 @@ The foundation is a real-time monitoring system called LSL (Live Session Logging
 It captures every prompt, every tool call, every response - but here's where it gets interesting: it uses a **5-layer classification system** to intelligently route content.
 
 ![LSL Session Logs](images/lsl.png)
-*Session logs organized by time slots, with intelligent routing - notice how "from-curriculum-alignment" files are automatically routed based on semantic classification.*
+*Session logs organized by time slots, with intelligent routing - notice how "from-curriculum-alignment" files are automatically routed (to project Coding) based on semantic classification.*
 
 | Layer | What It Does | Speed |
 |-------|--------------|-------|
@@ -69,13 +69,13 @@ It captures every prompt, every tool call, every response - but here's where it 
 | Path Analyzer | Pattern-matches file operations | Less than 1ms |
 | Keyword Matcher | Fast keyword classification | Less than 10ms |
 | Embedding Classifier | Semantic vector similarity | Around 50ms |
-| Semantic Analyzer | LLM-powered understanding | Less than 10ms (cached) |
+| Semantic Analyzer | LLM-powered understanding | From 10ms (cached) up to 500-800ms |
 
 Why layers? Because not everything needs deep analysis. A simple file read can be classified in under a millisecond. Complex discussions about architecture might need the semantic analyzer. The system short-circuits at the first confident decision.
 
 The classification determines routing. Content about the Coding infrastructure itself goes to one log. Content about your actual project goes to another. Multiple projects, multiple developers - the system keeps everything organized automatically.
 
-**Privacy is baked in.** Before anything gets stored, a configurable redactor strips sensitive data - API keys, tokens, passwords, email addresses, corporate identifiers. 13 pattern types, under 5ms overhead per exchange.
+**Privacy is baked in.** Before anything gets stored, a configurable redactor strips sensitive data - API keys, tokens, passwords, email addresses, corporate identifiers. At present: 13 pattern types, low millisecond overhead per exchange.
 
 ---
 
@@ -83,11 +83,23 @@ The classification determines routing. Content about the Coding infrastructure i
 
 Capturing conversations is just the start. The real value comes from extracting **actionable knowledge** that any team member or AI agent can access.
 
-The system aims to learn a programmer's ways by quietly observing - watching how we approach specific problems and what solutions we arrive at. Think of Antonio Banderas in the 1999 film [*The 13th Warrior*](https://www.youtube.com/watch?v=9Y7zq1gGEAU), where he plays a captured Arab poet who learns to speak "viking" simply by listening to his captors' conversations around the campfire. Given a certain cultural overlap - both parties are human, they eat, they drink, they make jokes about each other's mothers - a shared ontology, if you like - he manages to extract enough meaning to finally begin communicating. In his case, flawlessly. It's Hollywood, after all.
+The system aims to learn a programmer's ways by quietly observing - watching how we approach specific problems and what solutions we arrive at. Think of Antonio Banderas in the 1999 film [*The 13th Warrior*](https://www.youtube.com/watch?v=9Y7zq1gGEAU), where he plays a captured Arab poet who learns to speak "Viking" (Old Norse) simply by listening to his captors' conversations around the campfire. Given a certain cultural overlap - both parties are human, they eat, they drink, they make jokes about each other's mothers - a shared ontology, if you like - he manages to extract enough meaning to finally begin communicating. In his case, flawlessly. It's Hollywood, after all.
 
 That's the idea here. The system observes conversations, git commits, debugging sessions. It looks for patterns in how problems are framed and solved. Over time, it builds understanding - not through explicit teaching, but through quiet observation of the shared "ontology" between developer and codebase.
 
-A 14-agent AI system analyzes git history and conversation logs, extracting patterns and insights into a searchable knowledge graph.
+A multi-agent (currently 14 agents) AI system analyzes git history and conversation logs, extracting patterns and insights into a searchable knowledge graph.
+
+![Semantic Analysis MCP Server](images/health-monitor-multi-agent-wf-7.png)
+*The WF modal in the health monitor dashboard can be used to visualize the flow of information through the multi-agent system which is called when demanding an update of the knowledge base (ukb).*
+
+A visualization of the (configurable) multi-agent system has been added to the health board to better understand what is going on inside the multi-agent system used for semantic analysis of repositories.
+
+Exposed as MCP server, the updating of the knowledge base can be done from within the coding agent: ask for an update of the knowledge-base (ukb) for an incremental update - since the last time we ran 'ukb'. Use 'ukb full' and 'ukb full debug' to run a full analysis of the entire repo - from the very first commit until today. In "debug" mode you can single-step through the agentic workflow, switch from publicly hosted LLMs to locally run LLMs (Docker Model Runner with llama.cpp) or use mocked LLM calls.
+
+![Tracing the multi-agent system](images/health-monitor-multi-agent-wf-8.png)
+*Use the tracing tool to inspect what goes into each agent, what comes back from the LLM, number of tokens, latencies, etc.*
+
+The integrated tracing tool can be used to inspect each step of the workflow, allowing the spotting of bottlenecks and misbehaving agents. The result of an updated knowledge-base can be viewed using the 'vkb' viewer:
 
 ![Knowledge Graph Visualization](images/vkb.png)
 *The VKB (Visualize Knowledge Base) interface: filter by team/scope, explore entity relationships, view observations and detailed insights with auto-generated diagrams.*
@@ -107,7 +119,7 @@ Each insight gets classified into one of five entity types:
 
 The more you use it, the smarter it gets. Patterns compound.
 
-*Note: The knowledge extraction system is functional but still being refined. The 14-agent workflow works, but some edge cases need attention. This is one of the areas where contributions would be particularly valuable.*
+*Note: The knowledge extraction system is functional but still being refined. The multi-agent workflow for semantic analysis works, but some edge cases need attention. This is one of the areas where contributions would be particularly valuable.*
 
 ---
 
@@ -124,10 +136,10 @@ Coding takes a different approach: it uses **PreToolUse hooks** to intercept AI 
 
 When the AI wants to write code, the PreToolUse hook fires first. It evaluates 20+ constraints against the proposed action. If the constraint severity is CRITICAL or ERROR, the tool call is blocked entirely. WARNING and INFO severity allows the action but provides feedback.
 
-![Constraint Monitor Dashboard](images/constraings-mon.png)
+![Constraint Monitor Dashboard](images/constraints-mon.png)
 *The constraint monitoring dashboard: violation timeline, severity breakdown, and real-time feed of recent violations.*
 
-The system currently enforces 20 constraints across several categories:
+The system currently enforces around 20 constraints (configurable, per-project) across several categories:
 
 **Security (blocks 100% of violations)**
 - No hardcoded secrets
@@ -165,9 +177,9 @@ If a process crashes, the watchdog detects it and restarts automatically. Servic
 
 ## Provider Agnostic, Agent Agnostic
 
-One design principle I insisted on: **no lock-in**.
+One design principle I aimed for: **no lock-in**.
 
-The system is designed to work with any AI coding assistant. Currently it's optimized for Claude Code, but the architecture supports GitHub Copilot, Codex, Gemini CLI, and others.
+The system is designed to work with any AI coding assistant. Currently it's optimized for Claude Code (installation process, status line integration and hook functions), but the architecture supports GitHub Copilot, Codex, Gemini CLI, and others. Should be straight-forward to extend this to other environments, as they become increasingly similar and, by and large, support similar mechanisms (eg. hook functions).
 
 Similarly, it's not locked to any LLM provider. You can use:
 
@@ -189,7 +201,7 @@ One of the more sophisticated aspects is the ontology system for knowledge class
 ![Ontology Integration](images/ontology.png)
 *The full pipeline: from transcript capture through classification to storage, with ontology-based entity typing and a spec workflow for requirements management.*
 
-This enables structured knowledge that can be queried semantically, not just by keyword matching.
+This enables structured knowledge that can be queried semantically, not just by keyword matching. More work is needed to improve this aspect - a lot of publications talk about ontologies and GraphRAG these days... should be easy to incorporate some of the shared ideas in the provided ontology classes.
 
 ---
 
@@ -205,7 +217,7 @@ That's it. The infrastructure spins up in containers, your AI assistant connects
 
 The dashboard is at `localhost:3030`. The knowledge graph viewer is at `localhost:8080`. Health monitoring shows you exactly what's running and catches problems automatically.
 
-If a process crashes, a 4-layer watchdog architecture detects it and restarts. Sessions can run for days without intervention.
+If a process crashes or a status has gone stale, the multi-layer watchdog and process monitoring architecture detects it and restarts or refreshes the status. Sessions can run for days without intervention. Unused open coding sessions are detected as such and treated as dormant.
 
 ---
 
@@ -223,7 +235,7 @@ Let me be honest about where things stand:
 **Working but needs refinement:**
 - Continuous learning (automatic knowledge extraction)
 - Trajectory detection (recognizing exploring vs. implementing vs. debugging)
-- Some edge cases in the 14-agent workflow
+- Some edge cases in the multi-agent workflow, which has grown from a much simpler set-up to what might have become a slightly too complicated configuration
 
 **The code itself reflects its vibe-coded origins.** There are inconsistencies. Some abstractions could be cleaner. But it works, and more importantly, the patterns are sound.
 
@@ -277,13 +289,15 @@ If you're working on similar problems - AI memory, team knowledge sharing, const
 ---
 
 **Images for Medium upload:**
-1. `head.png` - Artistic header image
+1. `head-2.png` - Artistic header image
 2. `brain.png` - Collective brain / team ontology vision
 3. `lsl.png` - Session log browser with classification
-4. `vkb.png` - Knowledge graph visualization
-5. `routing.png` - Cross-project knowledge flow
-6. `constraints.png` - Constraint violation detection in VS Code
-7. `constraings-mon.png` - Constraint monitoring dashboard
-8. `health-mon.png` - System health dashboard
-9. `health.png` - Process monitoring architecture diagram
-10. `ontology.png` - Ontology integration pipeline
+4. `health-monitor-multi-agent-wf-7.png` - Semantic Analysis MCP Server
+5. `health-monitor-multi-agent-wf-8.png` - Tracing the multi-agent system
+6. `vkb.png` - Knowledge graph visualization
+7. `routing.png` - Cross-project knowledge flow
+8. `constraints.png` - Constraint violation detection in VS Code
+9. `constraints-mon.png` - Constraint monitoring dashboard
+10. `health-mon.png` - System health dashboard
+11. `health.png` - Process monitoring architecture diagram
+12. `ontology.png` - Ontology integration pipeline
