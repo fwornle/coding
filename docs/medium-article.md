@@ -277,13 +277,15 @@ If you're working on similar problems - AI memory, team knowledge sharing, const
 ---
 
 **Images for Medium upload:**
-1. `head.png` - Artistic header image
+1. `head-2.png` - Artistic header image
 2. `brain.png` - Collective brain / team ontology vision
 3. `lsl.png` - Session log browser with classification
-4. `vkb.png` - Knowledge graph visualization
-5. `routing.png` - Cross-project knowledge flow
-6. `constraints.png` - Constraint violation detection in VS Code
-7. `constraings-mon.png` - Constraint monitoring dashboard
-8. `health-mon.png` - System health dashboard
-9. `health.png` - Process monitoring architecture diagram
-10. `ontology.png` - Ontology integration pipeline
+4. `health-monitor-multi-agent-wf-7.png` - Semantic Analysis MCP Server
+5. `health-monitor-multi-agent-wf-8.png` - Tracing the multi-agent system
+6. `vkb.png` - Knowledge graph visualization
+7. `routing.png` - Cross-project knowledge flow
+8. `constraints.png` - Constraint violation detection in VS Code
+9. `constraints-mon.png` - Constraint monitoring dashboard
+10. `health-mon.png` - System health dashboard
+11. `health.png` - Process monitoring architecture diagram
+12. `ontology.png` - Ontology integration pipeline
