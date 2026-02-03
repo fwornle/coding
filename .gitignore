@@ -209,3 +209,6 @@ nul
 
 # Runtime-generated Docker configs
 docker/config/
+
+# MkDocs build output
+site/
