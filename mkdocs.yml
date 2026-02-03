@@ -106,6 +106,8 @@ nav:
     - Commands: reference/commands.md
     - API: reference/api.md
     - Troubleshooting: reference/troubleshooting.md
+  - Articles:
+    - Self-Learning Layer: reference/articles/self-learning-layer.md
 
 extra:
   social:
