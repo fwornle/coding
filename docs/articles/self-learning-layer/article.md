@@ -89,14 +89,14 @@ That's the idea here. The system observes conversations, git commits, debugging 
 
 A multi-agent (currently 14 agents) AI system analyzes git history and conversation logs, extracting patterns and insights into a searchable knowledge graph.
 
-![Semantic Analysis MCP Server](images/health-monitor-multi-agent-wf-7.png)
+![Semantic Analysis MCP Server](images/health-monitor-multi-agent-wf-8.png)
 *The WF modal in the health monitor dashboard can be used to visualize the flow of information through the multi-agent system which is called when demanding an update of the knowledge base (ukb).*
 
 A visualization of the (configurable) multi-agent system has been added to the health board to better understand what is going on inside the multi-agent system used for semantic analysis of repositories.
 
 Exposed as MCP server, the updating of the knowledge base can be done from within the coding agent: ask for an update of the knowledge-base (ukb) for an incremental update - since the last time we ran 'ukb'. Use 'ukb full' and 'ukb full debug' to run a full analysis of the entire repo - from the very first commit until today. In "debug" mode you can single-step through the agentic workflow, switch from publicly hosted LLMs to locally run LLMs (Docker Model Runner with llama.cpp) or use mocked LLM calls.
 
-![Tracing the multi-agent system](images/health-monitor-multi-agent-wf-8.png)
+![Tracing the multi-agent system](images/health-monitor-multi-agent-wf-7.png)
 *Use the tracing tool to inspect what goes into each agent, what comes back from the LLM, number of tokens, latencies, etc.*
 
 The integrated tracing tool can be used to inspect each step of the workflow, allowing the spotting of bottlenecks and misbehaving agents. The result of an updated knowledge-base can be viewed using the 'vkb' viewer:
