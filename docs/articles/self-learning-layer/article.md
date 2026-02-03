@@ -2,7 +2,7 @@
 
 **An experiment in 100% vibe coding: creating infrastructure that captures conversations, prevents mistakes, and builds collective intelligence for development teams.**
 
-![Header](images/head.png)
+![Header](images/head-2.png)
 
 ---
 
