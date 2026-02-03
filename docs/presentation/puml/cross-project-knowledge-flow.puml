@@ -1,7 +1,8 @@
 @startuml cross-project-knowledge-flow
 !include _standard-style.puml
 
-' Presentation overrides - larger fonts and bolder lines
+' Presentation overrides - larger fonts, bolder lines, white background
+skinparam backgroundColor white
 skinparam defaultFontSize 18
 skinparam defaultFontStyle bold
 skinparam component {
