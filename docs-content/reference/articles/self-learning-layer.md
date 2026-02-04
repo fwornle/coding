@@ -217,6 +217,14 @@ coding
 
 That's it. The infrastructure spins up in containers, your AI assistant connects, and you're working with full session logging, knowledge extraction, and constraint enforcement.
 
+![Coding startup](images/coding-startup-dockerized.png)
+*Coding startup - all launched services are checked for proper operations to ensure a fully working system.*
+
+Coding has the option to run in dockerized mode to keep the machine footprint low and allow for fast startup-/shutdown times.
+
+![Coding dockerzied](images/docker-architecture.png)
+*Coding running in dockerized mode - only the coding agent is installed natively, plus a set of thin layer of proxies.*
+
 The dashboard is at `localhost:3030`. The knowledge graph viewer is at `localhost:8080`. Health monitoring shows you exactly what's running and catches problems automatically.
 
 If a process crashes or a status has gone stale, the multi-layer watchdog and process monitoring architecture detects it and restarts or refreshes the status. Sessions can run for days without intervention. Unused open coding sessions are detected as such and treated as dormant.
