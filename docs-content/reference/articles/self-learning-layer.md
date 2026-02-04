@@ -144,15 +144,18 @@ When the AI wants to write code, the PreToolUse hook fires first. It evaluates 2
 The system currently enforces around 20 constraints (configurable, per-project) across several categories:
 
 **Security (blocks 100% of violations)**  
+
 - No hardcoded secrets  
 - No dangerous function usage  
 
 **Architecture (blocks 100% of violations)**  
+
 - No parallel/duplicate files (prevents `-v2.js` proliferation)  
 - Debug before speculating  
 - No evolutionary naming (`-new`, `-fixed` suffixes)  
 
 **Code Quality**  
+
 - Proper error handling  
 - No debug statements in production code  
 - Modern variable declarations only  
