@@ -113,6 +113,7 @@ Each insight gets classified into one of five entity types:
 - **WorkflowPattern** - Development process patterns  
 - **ConfigurationPattern** - Setup and configuration knowledge  
 
+
 ![Cross-Project Knowledge Flow](images/routing.png)
 *Knowledge flows from multiple projects into a central graph database, with git-tracked JSON exports enabling team collaboration.*
 
