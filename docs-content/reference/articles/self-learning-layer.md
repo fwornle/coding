@@ -1,8 +1,8 @@
 # Building a Self-Learning Layer for AI Coding Assistants
 
-**An experiment in 100% vibe coding: creating infrastructure that captures conversations, prevents mistakes, and builds collective intelligence for development teams.**
+**An experiment in declarative coding: creating infrastructure that captures conversations, prevents mistakes, and builds collective intelligence for development teams.**
 
-![Header](images/head-2.png)
+![Header](images/head-3.jpg)
 
 ---
 
@@ -43,12 +43,12 @@ That's the bigger vision here. Not just memory for one assistant, but **shared i
 
 ## What Coding Does
 
-The system has four main layers:
+The system has four main layers:  
 
-1. **Live Session Logging** - Multi-layer intelligent classification
-2. **Knowledge Extraction** - Multi-agent AI system building a collective brain
-3. **Constraint Enforcement** - Blocks mistakes before execution
-4. **Health Monitoring** - Multi-layer watchdog architecture
+1. **Live Session Logging** - Multi-layer intelligent classificationv  
+2. **Knowledge Extraction** - Multi-agent AI system building a collective brain  
+3. **Constraint Enforcement** - Blocks mistakes before execution  
+4. **Health Monitoring** - Multi-layer watchdog architecture  
 
 Let me walk you through each.
 
@@ -84,7 +84,7 @@ The classification determines routing. Content about the Coding infrastructure i
 
 Capturing conversations is just the start. The real value comes from extracting **actionable knowledge** that any team member or AI agent can access.
 
-The system aims to learn a programmer's ways by quietly observing - watching how we approach specific problems and what solutions we arrive at. Think of Antonio Banderas in the 1999 film [*The 13th Warrior*](https://www.youtube.com/watch?v=9Y7zq1gGEAU), where he plays a captured Arab poet who learns to speak "Viking" (Old Norse) simply by listening to his captors' conversations around the campfire. Given a certain cultural overlap - both parties are human, they eat, they drink, they make jokes about each other's mothers - a shared ontology, if you like - he manages to extract enough meaning to finally begin communicating. In his case, flawlessly. It's Hollywood, after all.
+The system aims to learn a programmer's ways by quietly observing - watching how we approach specific problems and what solutions we arrive at. Think of Antonio Banderas in the 1999 film [*The 13th Warrior*](https://www.youtube.com/watch?v=9Y7zq1gGEAU), where he plays a captured Arab poet who learns to speak "Viking" (Old Norse) simply by listening to his captors' conversations around the campfire. Given a certain cultural overlap - both parties are human, they eat, they drink, they make jokes - a shared ontology, if you like - he manages to extract enough meaning to finally begin communicating. In his case, flawlessly. It's Hollywood, after all.
 
 That's the idea here. The system observes conversations, git commits, debugging sessions. It looks for patterns in how problems are framed and solved. Over time, it builds understanding - not through explicit teaching, but through quiet observation of the shared "ontology" between developer and codebase.
 
@@ -105,13 +105,13 @@ The integrated tracing tool can be used to inspect each step of the workflow, al
 ![Knowledge Graph Visualization](images/vkb.png)
 *The VKB (Visualize Knowledge Base) interface: filter by team/scope, explore entity relationships, view observations and detailed insights with auto-generated diagrams.*
 
-Each insight gets classified into one of five entity types:
+Each insight gets classified into one of five entity types:  
 
-- **ImplementationPattern** - Code patterns and best practices
-- **ArchitecturalDecision** - System design choices with rationale
-- **TechnicalSolution** - Problem-solving approaches
-- **WorkflowPattern** - Development process patterns
-- **ConfigurationPattern** - Setup and configuration knowledge
+- **ImplementationPattern** - Code patterns and best practices  
+- **ArchitecturalDecision** - System design choices with rationale  
+- **TechnicalSolution** - Problem-solving approaches  
+- **WorkflowPattern** - Development process patterns  
+- **ConfigurationPattern** - Setup and configuration knowledge  
 
 ![Cross-Project Knowledge Flow](images/routing.png)
 *Knowledge flows from multiple projects into a central graph database, with git-tracked JSON exports enabling team collaboration.*
@@ -142,19 +142,19 @@ When the AI wants to write code, the PreToolUse hook fires first. It evaluates 2
 
 The system currently enforces around 20 constraints (configurable, per-project) across several categories:
 
-**Security (blocks 100% of violations)**
-- No hardcoded secrets
-- No dangerous function usage
+**Security (blocks 100% of violations)**  
+- No hardcoded secrets  
+- No dangerous function usage  
 
-**Architecture (blocks 100% of violations)**
-- No parallel/duplicate files (prevents `-v2.js` proliferation)
-- Debug before speculating
-- No evolutionary naming (`-new`, `-fixed` suffixes)
+**Architecture (blocks 100% of violations)**  
+- No parallel/duplicate files (prevents `-v2.js` proliferation)  
+- Debug before speculating  
+- No evolutionary naming (`-new`, `-fixed` suffixes)  
 
-**Code Quality**
-- Proper error handling
-- No debug statements in production code
-- Modern variable declarations only
+**Code Quality**  
+- Proper error handling  
+- No debug statements in production code  
+- Modern variable declarations only  
 
 When a critical constraint is violated, the tool call simply doesn't execute. The AI gets feedback about why, and can adjust its approach. It's like having a code reviewer that never sleeps and catches issues at the moment of creation.
 
@@ -182,12 +182,12 @@ One design principle I aimed for: **no lock-in**.
 
 The system is designed to work with any AI coding assistant. Currently it's optimized for Claude Code (installation process, status line integration and hook functions), but the architecture supports GitHub Copilot, Codex, Gemini CLI, and others. Should be straight-forward to extend this to other environments, as they become increasingly similar and, by and large, support similar mechanisms (eg. hook functions).
 
-Similarly, it's not locked to any LLM provider. You can use:
+Similarly, it's not locked to any LLM provider. You can use:  
 
-- **Groq** (fast, cheap - my default)
-- **Anthropic** (high quality)
-- **OpenAI** (GPT-4 when needed)
-- **Local models** via Docker Model Runner or llama.cpp (free, private)
+- **Groq** (fast, cheap - my default)  
+- **Anthropic** (high quality)  
+- **OpenAI** (GPT-4 when needed)  
+- **Local models** via Docker Model Runner or llama.cpp (free, private)  
 
 The system automatically routes based on content sensitivity. Discussing API architecture? Send it to the cloud for fast, accurate analysis. Processing something with potential credentials? Route it locally - the data never leaves your machine.
 
@@ -226,17 +226,17 @@ If a process crashes or a status has gone stale, the multi-layer watchdog and pr
 
 Let me be honest about where things stand:
 
-**Production-ready:**
-- Live Session Logging with 5-layer classification
-- Constraint enforcement with PreToolUse hooks
-- Health monitoring and automatic recovery
-- Knowledge graph storage and visualization
-- Multi-project support
+**Production-ready:**  
+- Live Session Logging with 5-layer classification  
+- Constraint enforcement with PreToolUse hooks  
+- Health monitoring and automatic recovery  
+- Knowledge graph storage and visualization  
+- Multi-project support  
 
-**Working but needs refinement:**
-- Continuous learning (automatic knowledge extraction)
-- Trajectory detection (recognizing exploring vs. implementing vs. debugging)
-- Some edge cases in the multi-agent workflow, which has grown from a much simpler set-up to what might have become a slightly too complicated configuration
+**Working but needs refinement:**  
+- Continuous learning (automatic knowledge extraction)  
+- Trajectory detection (recognizing exploring vs. implementing vs. debugging)  
+- Some edge cases in the multi-agent workflow, which has grown from a much simpler set-up to what might have become a slightly too complicated configuration  
 
 **The code itself reflects its vibe-coded origins.** There are inconsistencies. Some abstractions could be cleaner. But it works, and more importantly, the patterns are sound.
 
