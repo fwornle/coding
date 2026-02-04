@@ -63,6 +63,9 @@ It captures every prompt, every tool call, every response - but here's where it 
 ![LSL Session Logs](images/lsl.png)
 *Session logs organized by time slots, with intelligent routing - notice how "from-curriculum-alignment" files are automatically routed (to project Coding) based on semantic classification.*
 
+
+Why layers? Because not everything needs deep analysis. A simple file read can be classified in under a millisecond. Complex discussions about architecture might need the semantic analyzer. The system short-circuits at the first confident decision.
+
 | Layer | What It Does | Speed |
 |-------|--------------|-------|
 | Session Filter | Tracks conversation context | Instant |
@@ -70,8 +73,6 @@ It captures every prompt, every tool call, every response - but here's where it 
 | Keyword Matcher | Fast keyword classification | Less than 10ms |
 | Embedding Classifier | Semantic vector similarity | Around 50ms |
 | Semantic Analyzer | LLM-powered understanding | From 10ms (cached) up to 500-800ms |
-
-Why layers? Because not everything needs deep analysis. A simple file read can be classified in under a millisecond. Complex discussions about architecture might need the semantic analyzer. The system short-circuits at the first confident decision.
 
 The classification determines routing. Content about the Coding infrastructure itself goes to one log. Content about your actual project goes to another. Multiple projects, multiple developers - the system keeps everything organized automatically.
 
