@@ -286,4 +286,4 @@ If you're working on similar problems - AI memory, team knowledge sharing, const
 
 *MIT licensed. Contributions welcome. This is an experiment - treat it accordingly.*
 
-*This article was produced over breakfast - in a fully vibed manner, of course.*
+*This article was produced over breakfast - in a fully declarative manner, of course. Look for Prompt Set "ps_1770097340854" in LSL file coding/.specstory/history/2026–02–03_0600–0700_c197ef.md, if you want to see how I asked Claude to write this… including the style guide it suggested.*
