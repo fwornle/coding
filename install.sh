@@ -2631,66 +2631,12 @@ setup_unified_launcher() {
     fi
 }
 
-# Setup VSCode extension for knowledge management
+# [DEPRECATED] VSCode extension removed in favor of native agent integration
+# The vscode-km-copilot extension has been removed as part of the agent-agnostic
+# architecture update. Integration is now handled through the unified agent API.
+# See: lib/agent-api/ for the new adapter-based architecture
 setup_vscode_extension() {
-    info "Setting up VSCode extension for knowledge management..."
-    
-    local vscode_ext_dir="$CODING_REPO/integrations/vscode-km-copilot"
-    
-    if [ ! -d "$vscode_ext_dir" ]; then
-        warning "VSCode extension directory not found at $vscode_ext_dir - skipping VSCode extension setup"
-        INSTALLATION_WARNINGS+=("VSCode extension directory not found - skipped VSCode extension setup")
-        return 0
-    fi
-    
-    # Install extension dependencies
-    cd "$vscode_ext_dir"
-    
-    info "Installing VSCode extension dependencies..."
-    if npm install; then
-        success "✓ VSCode extension dependencies installed"
-    else
-        warning "Failed to install VSCode extension dependencies"
-        INSTALLATION_WARNINGS+=("VSCode extension dependencies failed")
-        return 1
-    fi
-    
-    # Build the extension
-    info "Building VSCode extension..."
-    if npm run package; then
-        local vsix_file=$(find . -name "*.vsix" | head -1)
-        if [ -n "$vsix_file" ]; then
-            success "✓ VSCode extension built: $vsix_file"
-            
-            # Check if VSCode is available
-            if command -v code >/dev/null 2>&1; then
-                info "Installing VSCode extension..."
-                if code --install-extension "$vsix_file" --force; then
-                    success "✓ VSCode extension installed successfully"
-                else
-                    warning "Failed to install VSCode extension automatically"
-                    info "  Manual installation: Open VSCode → Extensions → '...' → Install from VSIX → Select: $vsix_file"
-                fi
-            else
-                info "VSCode CLI not available. Manual installation required:"
-                info "  1. Open VSCode"
-                info "  2. Go to Extensions view (Ctrl+Shift+X)"
-                info "  3. Click '...' menu → 'Install from VSIX...'"
-                info "  4. Select: $vscode_ext_dir/$vsix_file"
-            fi
-        else
-            error_exit "VSIX file not found after build"
-            return 1
-        fi
-    else
-        warning "Failed to build VSCode extension"
-        INSTALLATION_WARNINGS+=("VSCode extension build failed")
-        return 1
-    fi
-    
-    # Return to original directory
-    cd "$CODING_REPO"
-    
+    info "[DEPRECATED] VSCode extension has been removed - using native agent integration"
     return 0
 }
 

@@ -498,6 +498,37 @@ EOF
 }
 
 # ==============================================================================
+# UNIFIED HOOKS INITIALIZATION
+# ==============================================================================
+# Initialize the unified hook system for the current agent
+initialize_unified_hooks() {
+  local target_project_dir="$1"
+  local coding_repo="$2"
+  local agent_type="${CODING_AGENT:-claude}"
+
+  # Set environment variables for the hook system
+  export CODING_HOOKS_CONFIG="$coding_repo/config/hooks-config.json"
+  export CODING_AGENT_ADAPTER_PATH="$coding_repo/lib/agent-api/adapters"
+  export CODING_TRANSCRIPT_FORMAT="$agent_type"
+
+  # Create user-level hooks directory if it doesn't exist
+  local user_hooks_dir="$HOME/.coding-tools"
+  if [ ! -d "$user_hooks_dir" ]; then
+    mkdir -p "$user_hooks_dir"
+    log "Created user hooks directory: $user_hooks_dir"
+  fi
+
+  # Create project-level hooks directory if it doesn't exist
+  local project_hooks_dir="$target_project_dir/.coding"
+  if [ ! -d "$project_hooks_dir" ]; then
+    mkdir -p "$project_hooks_dir"
+    log "Created project hooks directory: $project_hooks_dir"
+  fi
+
+  log "Unified hooks system initialized for agent: $agent_type"
+}
+
+# ==============================================================================
 # MAIN INITIALIZATION
 # ==============================================================================
 # Main initialization function called by agent-specific launchers
@@ -508,6 +539,9 @@ agent_common_init() {
   log "Initializing agent-common setup..."
   log "Target project: $target_project_dir"
   log "Coding services from: $coding_repo"
+
+  # Initialize the unified hooks system
+  initialize_unified_hooks "$target_project_dir" "$coding_repo"
 
   # Ensure .data/ directory is ignored (MCP Memory LevelDB runtime data)
   ensure_data_directory_ignored "$target_project_dir"
@@ -551,4 +585,5 @@ export -f start_global_lsl_monitoring
 export -f start_browser_access_server
 export -f ensure_claude_md_with_skill_instruction
 export -f ensure_statusline_config
+export -f initialize_unified_hooks
 export -f agent_common_init

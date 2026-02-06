@@ -168,10 +168,13 @@ start_http_adapter "$CODING_REPO"
 # Run agent-common initialization (LSL, monitoring, gitignore, etc.)
 agent_common_init "$TARGET_PROJECT_DIR" "$CODING_REPO"
 
-# Set environment variables for CoPilot adapter
+# Set environment variables for agent adapter system
 export CODING_AGENT="copilot"
 export CODING_TOOLS_PATH="$CODING_REPO"
 export TRANSCRIPT_SOURCE_PROJECT="$TARGET_PROJECT_DIR"
+export CODING_AGENT_ADAPTER_PATH="$CODING_REPO/lib/agent-api/adapters"
+export CODING_HOOKS_CONFIG="$CODING_REPO/config/hooks-config.json"
+export CODING_TRANSCRIPT_FORMAT="copilot"
 
 # Change to target project directory before launching CoPilot
 cd "$TARGET_PROJECT_DIR"

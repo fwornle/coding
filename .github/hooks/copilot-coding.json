@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "$CODING_REPO/scripts/copilot-hooks/session-start.sh",
+        "cwd": "$CODING_REPO",
+        "timeoutSec": 10
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "$CODING_REPO/scripts/copilot-hooks/user-prompt.sh",
+        "cwd": "$CODING_REPO",
+        "timeoutSec": 5
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "$CODING_REPO/scripts/copilot-hooks/pre-tool.sh",
+        "cwd": "$CODING_REPO",
+        "timeoutSec": 15
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "$CODING_REPO/scripts/copilot-hooks/post-tool.sh",
+        "cwd": "$CODING_REPO",
+        "timeoutSec": 5
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "$CODING_REPO/scripts/copilot-hooks/session-end.sh",
+        "cwd": "$CODING_REPO",
+        "timeoutSec": 10
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "$CODING_REPO/scripts/copilot-hooks/error-occurred.sh",
+        "cwd": "$CODING_REPO",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

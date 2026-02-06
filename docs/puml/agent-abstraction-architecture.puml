@@ -1,0 +1,78 @@
+@startuml agent-abstraction-architecture
+!include _standard-style.puml
+
+title Agent Abstraction Architecture
+
+top to bottom direction
+
+package "Unified Launcher" <<cli>> {
+  component "coding" as launcher
+  component "agent-detector" as detector
+}
+
+package "Agent Abstraction API" <<core>> {
+  interface "BaseAdapter" as baseAdapter
+  interface "StatuslineProvider" as statusline
+  interface "HooksManager" as hooks
+  interface "TranscriptAdapter" as transcript
+  
+  component "index.js" as apiIndex <<api>>
+}
+
+package "Agent Adapters" <<agent>> {
+  component "ClaudeAdapter" as claudeAdapter
+  component "CopilotAdapter" as copilotAdapter
+  note right of copilotAdapter
+    Extensible for
+    future agents
+  end note
+}
+
+package "Unified Hook System" <<infra>> {
+  component "HookManager" as hookManager
+  component "HookConfig" as hookConfig
+  component "claude-bridge.js" as claudeBridge
+  component "copilot-bridge.sh" as copilotBridge
+}
+
+package "Unified Transcript System" <<storage>> {
+  component "LSLConverter" as lslConverter
+  component "ClaudeParser" as claudeParser
+  component "CopilotParser" as copilotParser
+}
+
+package "Native Agent Systems" <<external>> {
+  component "Claude Code" as claude
+  component "GitHub Copilot CLI" as copilot
+}
+
+launcher --> detector : detect agent
+launcher --> apiIndex : get adapter
+apiIndex --> baseAdapter
+baseAdapter <|.. claudeAdapter
+baseAdapter <|.. copilotAdapter
+
+claudeAdapter --> statusline
+claudeAdapter --> hooks
+claudeAdapter --> transcript
+
+copilotAdapter --> statusline
+copilotAdapter --> hooks
+copilotAdapter --> transcript
+
+hooks --> hookManager
+hookManager --> hookConfig
+hookManager --> claudeBridge : claude events
+hookManager --> copilotBridge : copilot events
+
+claudeBridge --> claude
+copilotBridge --> copilot
+
+transcript --> lslConverter
+claudeParser --> lslConverter
+copilotParser --> lslConverter
+
+claudeParser --> claude : reads
+copilotParser --> copilot : reads
+
+@enduml

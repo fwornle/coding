@@ -1,0 +1,55 @@
+@startuml agent-transcript-processing
+!include _standard-style.puml
+
+title Agent Transcript Processing Flow
+
+top to bottom direction
+
+package "Claude Code" <<external>> {
+  storage "~/.claude/projects/\n*/conversation.jsonl" as claudeTranscripts
+}
+
+package "GitHub Copilot CLI" <<external>> {
+  storage "integrations/copi/logs/\n*.jsonl" as copilotLogs
+}
+
+package "Transcript Adapters" <<core>> {
+  component "ClaudeParser" as claudeParser
+  component "CopilotParser" as copilotParser
+}
+
+package "LSL Converter" <<core>> {
+  component "LSLConverter" as converter
+  
+  note right of converter
+    Unified LSL Format:
+    - USER
+    - ASSISTANT  
+    - TOOL_USE
+    - TOOL_RESULT
+    - SYSTEM
+    - ERROR
+  end note
+}
+
+package "Commands & Output" <<cli>> {
+  component "/sl Handler" as slHandler
+  
+  storage "Markdown Output" as mdOutput
+  storage "JSON Output" as jsonOutput
+  storage "Stats Output" as statsOutput
+}
+
+claudeTranscripts --> claudeParser
+copilotLogs --> copilotParser
+
+claudeParser --> converter : claude entries
+copilotParser --> converter : copi entries
+
+converter --> slHandler : LSLSession[]
+
+slHandler --> mdOutput : --format md
+slHandler --> jsonOutput : --format json
+slHandler --> statsOutput : --stats
+
+@enduml

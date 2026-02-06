@@ -141,7 +141,8 @@ integrations/
 ├── browser-access/                   # Web browser automation
 ├── claude-logger-mcp/               # Claude Code MCP integration
 ├── mcp-constraint-monitor/          # Constraint monitoring MCP server
-└── vscode-km-copilot/               # VSCode extension integration
+├── system-health-dashboard/         # VKB dashboard interface
+└── mcp-server-semantic-analysis/    # Semantic analysis MCP server
 ```
 
 **Integration Standards**:
@@ -156,19 +157,13 @@ integrations/
 
 ```
 lib/
-├── adapters/                        # Service adapters and bridges
-│   ├── claude-mcp.js
-│   ├── semantic-analysis-bridge.js
-│   └── copilot-http-server.js
-├── fallbacks/                       # Fallback implementations
-│   ├── memory-fallback.js
-│   └── browser-fallback.js
-├── integrations/                    # Integration utilities
-│   └── specstory-adapter.js
-├── knowledge-api/                   # Knowledge management API
-├── utils/                           # General utilities
-│   └── system.js
-└── vkb-server/                      # Knowledge visualization server
+  adapters/                        - Service adapters and bridges
+  agent-api/                       - Agent abstraction API (multi-agent support)
+  fallbacks/                       - Fallback implementations
+  integrations/                    - Integration utilities
+  knowledge-api/                   - Knowledge management API
+  utils/                           - General utilities
+  vkb-server/                      - Knowledge visualization server
 ```
 
 **Library Standards**:
