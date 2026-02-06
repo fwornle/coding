@@ -96,9 +96,22 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 ### Integration Support
 
 - **Claude Code** - Full MCP server integration
-- **GitHub CoPilot** - Enhanced VSCode integration with fallback services
-- **Agent-Agnostic** - Same features regardless of AI assistant
+- **GitHub CoPilot CLI** - Native hooks integration with session logging
+- **Agent Abstraction API** - Unified adapter system for any coding agent
 - **Docker Support** - Containerized deployment with HTTP/SSE transport for MCP servers
+
+### Agent Abstraction Architecture
+
+The system uses a unified Agent Abstraction API (`lib/agent-api/`) that enables consistent features across different coding agents:
+
+- **BaseAdapter** - Common interface for all agent adapters
+- **StatuslineProvider** - Unified status display
+- **HooksManager** - Bridge between native hook systems and unified hooks
+- **TranscriptAdapter** - Unified session log format (LSL)
+
+![Agent Abstraction Architecture](docs/images/agent-abstraction-architecture.png)
+
+See [Agent Abstraction API](docs/architecture/agent-abstraction-api.md) for details.
 
 ---
 
@@ -369,6 +382,8 @@ Copyright © 2025 Frank Wornle
 - **Documentation Hub**: [docs/README.md](docs/README.md)
 - **Installation Guide**: [docs/getting-started.md](docs/getting-started.md)
 - **LLM Providers & Local Models**: [docs/provider-configuration.md](docs/provider-configuration.md)
+- **Agent Abstraction API**: [docs/architecture/agent-abstraction-api.md](docs/architecture/agent-abstraction-api.md)
+- **Adding Agents**: [docs/architecture/adding-new-agent.md](docs/architecture/adding-new-agent.md)
 - **Docker Architecture**: [docs/architecture-report.md](docs/architecture-report.md)
 - **Docker Mode Transition**: [docs/docker-mode-transition.md](docs/docker-mode-transition.md)
 - **Docker Deployment**: [docker/README.md](docker/README.md)

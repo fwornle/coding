@@ -1,18 +1,23 @@
 @startuml dockerized-system-architecture
 !include _standard-style.puml
 
-title Coding System - Docker Container Architecture
+title Coding System - Docker Container Architecture (Agent-Agnostic)
 
 top to bottom direction
 
 ' External actors
 actor "Developer" as dev
-actor "Claude Code\n(CLI Agent)" as claude
 
 ' Host machine context
 rectangle "Host Machine (macOS)" as host {
   component "Docker Desktop" <<infra>> as docker
-  component "Claude Code CLI" <<cli>> as cli
+
+  rectangle "Agent Abstraction Layer" as agent_layer {
+    component "coding\n(unified launcher)" <<cli>> as launcher
+    component "Claude Code" <<agent>> as claude
+    component "GitHub Copilot CLI" <<agent>> as copilot
+    component "Agent API\n(lib/agent-api/)" <<core>> as agentapi
+  }
 
   rectangle "Bind Mounts" as mounts {
     folder ".data/" as data_mount
@@ -61,12 +66,16 @@ rectangle "Docker Volumes" as volumes {
 }
 
 ' Connections
-dev --> cli : uses
-cli --> claude : powers
+dev --> launcher : uses
+launcher --> agentapi : adapters
+agentapi --> claude
+agentapi --> copilot
 claude ASYNC_LINE sem : "SSE/HTTP"
 claude ASYNC_LINE browser : "SSE/HTTP"
 claude ASYNC_LINE constraint : "SSE/HTTP"
 claude ASYNC_LINE cgr : "SSE/HTTP"
+copilot ASYNC_LINE sem : "HTTP fallback"
+copilot ASYNC_LINE browser : "HTTP fallback"
 
 dev --> health_ui : "http://localhost:3032"
 dev --> vkb : "http://localhost:8080"
