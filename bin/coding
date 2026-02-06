@@ -186,11 +186,14 @@ else
   fi
 fi
 
-# Set environment variables
+# Set environment variables for agent adapter system
 export CODING_AGENT="$AGENT"
 export CODING_TOOLS_PATH="$SCRIPT_DIR/.."
 export CODING_REPO="$SCRIPT_DIR/.."
 export CODING_PROJECT_DIR="$PROJECT_DIR"
+export CODING_AGENT_ADAPTER_PATH="$SCRIPT_DIR/../lib/agent-api/adapters"
+export CODING_HOOKS_CONFIG="$SCRIPT_DIR/../config/hooks-config.json"
+export CODING_TRANSCRIPT_FORMAT="$AGENT"
 
 # Launch appropriate agent
 case "$AGENT" in

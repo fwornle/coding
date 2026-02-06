@@ -1,0 +1,48 @@
+@startuml agent-hook-flow
+!include _standard-style.puml
+
+title Agent Hook Event Flow
+
+participant "Agent\n(Claude/Copilot)" as agent
+participant "Native Hook\nBridge" as bridge
+participant "Unified\nHookManager" as hookMgr
+participant "Hook Config" as config
+participant "Hook Handlers" as handlers
+participant "Logging/\nMonitoring" as logging
+
+== Hook Event Triggered ==
+
+agent -> bridge : native hook event\n(PreToolUse, preToolUse)
+activate bridge
+
+bridge -> bridge : map to unified event\n(pre-tool)
+bridge -> hookMgr : executeHooks(event, context)
+activate hookMgr
+
+hookMgr -> config : loadConfig()
+config --> hookMgr : handlers[]
+
+loop for each handler
+    hookMgr -> handlers : execute(context)
+    activate handlers
+    handlers -> logging : log event
+    handlers --> hookMgr : {allow, message}
+    deactivate handlers
+end
+
+hookMgr --> bridge : aggregated result
+deactivate hookMgr
+
+bridge -> bridge : convert to native format
+bridge --> agent : native response\n({decision: allow/block})
+deactivate bridge
+
+== Configuration Levels ==
+
+note over config
+  User Level: ~/.coding-tools/hooks.json
+  Project Level: .coding/hooks.json
+  Project config overrides user config
+end note
+
+@enduml

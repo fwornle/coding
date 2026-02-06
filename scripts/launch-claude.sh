@@ -394,10 +394,13 @@ else
   log "Native mode: MCP servers will run as local processes"
 fi
 
-# Set environment variables
+# Set environment variables for agent adapter system
 export CODING_AGENT="claude"
 export CODING_TOOLS_PATH="$CODING_REPO"
 export TRANSCRIPT_SOURCE_PROJECT="$TARGET_PROJECT_DIR"
+export CODING_AGENT_ADAPTER_PATH="$CODING_REPO/lib/agent-api/adapters"
+export CODING_HOOKS_CONFIG="$CODING_REPO/config/hooks-config.json"
+export CODING_TRANSCRIPT_FORMAT="claude"
 
 # Change to target project directory before launching Claude
 cd "$TARGET_PROJECT_DIR"

@@ -1,0 +1,54 @@
+{
+  "$schema": "./hooks-config-schema.json",
+  "_comment": "Default unified hook configuration for coding infrastructure",
+  "settings": {
+    "enableLogging": true,
+    "stopOnError": false,
+    "timeout": 30000
+  },
+  "hooks": {
+    "startup": [
+      {
+        "id": "default-startup-log",
+        "type": "module",
+        "path": "./lib/agent-api/hooks/default-handlers/startup-log.js",
+        "priority": 1,
+        "enabled": true,
+        "description": "Log session startup"
+      }
+    ],
+    "shutdown": [
+      {
+        "id": "default-shutdown-log",
+        "type": "module",
+        "path": "./lib/agent-api/hooks/default-handlers/shutdown-log.js",
+        "priority": 1,
+        "enabled": true,
+        "description": "Log session shutdown"
+      }
+    ],
+    "pre-tool": [
+      {
+        "id": "tool-interaction-capture",
+        "type": "module",
+        "path": "./lib/agent-api/hooks/default-handlers/tool-capture.js",
+        "priority": 10,
+        "enabled": true,
+        "description": "Capture tool interactions for monitoring"
+      }
+    ],
+    "post-tool": [],
+    "pre-prompt": [],
+    "post-prompt": [],
+    "error": [
+      {
+        "id": "error-logger",
+        "type": "module",
+        "path": "./lib/agent-api/hooks/default-handlers/error-log.js",
+        "priority": 1,
+        "enabled": true,
+        "description": "Log errors to monitoring system"
+      }
+    ]
+  }
+}
