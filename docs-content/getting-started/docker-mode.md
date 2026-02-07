@@ -27,16 +27,17 @@ curl -fsSL https://get.docker.com | sh
 # Create marker file
 touch .docker-mode
 
-# Launch (services start automatically)
+# Launch with any agent (services start automatically)
 coding --claude
+coding --copilot
 ```
 
-The `coding --claude` command:
+Both `coding --claude` and `coding --copilot` share identical Docker mode logic:
 
-1. Detects Docker mode via `.docker-mode` marker
-2. Starts containers via Docker Compose
+1. Detects Docker mode via 3-tier priority (`.docker-mode` marker, running `coding-services` container, `CODING_DOCKER_MODE` env var)
+2. Reuses existing containers if already healthy, or starts new ones via Docker Compose
 3. Waits for health checks to pass
-4. Launches Claude with Docker MCP config
+4. Launches the agent with Docker MCP config
 
 !!! tip "Alternative"
     Set environment variable instead of marker file:
@@ -88,7 +89,8 @@ See [Architecture > Data Flow](../architecture/data-flow.md) for detailed diagra
 
 ```bash
 touch .docker-mode
-coding --claude  # Services start automatically
+coding --claude   # Services start automatically
+coding --copilot  # Same Docker support
 ```
 
 ### Disable Docker Mode
@@ -96,7 +98,8 @@ coding --claude  # Services start automatically
 ```bash
 rm .docker-mode
 docker compose -f docker/docker-compose.yml down
-coding --claude  # Now runs in native mode
+coding --claude   # Now runs in native mode
+coding --copilot  # Also runs in native mode
 ```
 
 ## Common Operations
