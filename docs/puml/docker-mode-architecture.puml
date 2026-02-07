@@ -7,6 +7,7 @@ top to bottom direction
 
 actor "Developer" as dev
 actor "Claude Code" as claude
+actor "GitHub CoPilot" as copilot
 
 package "Native Mode" as native_pkg {
   component "VKB Server\n(localhost:8080)" <<core>> as vkb_native
@@ -38,7 +39,9 @@ package "Transition Orchestrator" as transition_pkg {
 }
 
 dev --> claude : starts session
+dev --> copilot : starts session
 claude --> orchestrator : coding --switch-to-docker
+copilot --> orchestrator : detects Docker mode
 
 orchestrator --> lock_file : creates lock
 orchestrator ASYNC_LINE statusline : SIGUSR2 (pause)
@@ -62,6 +65,14 @@ end note
 note bottom of mode_marker
   Presence indicates Docker mode
   Absence indicates Native mode
+end note
+
+note right of copilot
+  Both launchers share identical
+  Docker mode detection:
+  1. .docker-mode marker file
+  2. coding-services container check
+  3. CODING_DOCKER_MODE env var
 end note
 
 @enduml
