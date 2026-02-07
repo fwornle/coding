@@ -67,6 +67,16 @@ The Docker stack runs 4 containers (coding-services, Qdrant, Memgraph, Redis) wi
 
 See [Architecture Report](docs/architecture-report.md) for full system overview, [Docker Mode Transition](docs/docker-mode-transition.md) for switching details, and [Docker Deployment Guide](docker/README.md) for container configuration.
 
+### Environment Resilience
+
+The launcher automatically adapts to your network environment:
+- **Corporate network detection** — 3-layer detection (environment variable, SSH probe, HTTPS fallback) with 5-second timeouts
+- **Proxy auto-configuration** — Detects local proxy services (proxydetox) and configures environment variables automatically
+- **Docker auto-start** — Launches Docker Desktop on demand with hung-process recovery and 45-second timeout
+- **Tested in all combinations** — CN/public network, with/without proxy, Claude/CoPilot — validated by 17 end-to-end tests
+
+No manual network configuration needed for most environments. See [Getting Started - Network Setup](docs/getting-started.md#network-setup-corporateproxy) for details.
+
 ### Installation Safety
 
 The installer follows a **non-intrusive policy** - it will NEVER modify system tools without explicit consent:

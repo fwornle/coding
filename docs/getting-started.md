@@ -440,18 +440,49 @@ execute_workflow {
 
 ## Network Setup (Corporate/Proxy)
 
-### Behind Corporate Firewall
+### Automatic Network Detection
 
-The installer automatically detects network restrictions and configures appropriate repository mirrors.
+The launcher automatically detects your network environment at startup and configures proxy settings — no manual intervention needed. This ensures `coding` works reliably in all environments:
 
-**Test Network Access:**
-```bash
-# Test external connectivity
-curl -I https://github.com
-curl -I https://npmjs.org
+| Environment | CN Detection | Proxy Config | External Access |
+|-------------|-------------|--------------|-----------------|
+| Corporate network + proxy | Auto-detected | Auto-configured | Via proxy |
+| Corporate network, no proxy | Auto-detected | Warning shown | Limited |
+| Public network + proxy set | Skipped | Uses existing | Direct |
+| Public network, no proxy | Skipped | None needed | Direct |
+
+### How CN Detection Works
+
+The launcher uses a **3-layer detection strategy** with graceful fallbacks:
+
+1. **Environment override** (instant) — `CODING_FORCE_CN=true|false` skips auto-detection entirely. Useful for testing or when behind VPN.
+
+2. **SSH probe** (5s timeout) — Tests SSH access to the corporate GitHub instance. Case-insensitive response matching handles different server response formats.
+
+3. **HTTPS fallback** (5s timeout) — If SSH fails (e.g. port blocked), tries HTTPS access to the same host. Both methods use strict timeouts to prevent hangs on unreliable networks.
+
+If all methods fail, the system assumes **public network** and proceeds normally.
+
+### Automatic Proxy Configuration
+
+When inside a corporate network, the launcher:
+
+1. **Checks existing proxy** — If `HTTP_PROXY` is already set and working, does nothing
+2. **Tests external access** — Tries reaching `https://google.de` to verify connectivity
+3. **Auto-detects local proxy** (proxydetox) — Probes `127.0.0.1:3128` for a running proxy service
+4. **Configures environment** — Sets `HTTP_PROXY`, `HTTPS_PROXY`, `http_proxy`, `https_proxy`, and `NO_PROXY` (excluding `localhost`, `127.0.0.1`, and internal domains)
+5. **Verifies** — Re-tests external access after configuration to confirm the proxy works
+
+If no proxy can be found, the launcher continues with a warning:
+```
+WARNING: Inside CN but no proxy available
+  Docker pulls, npm installs, and external API calls may fail
 ```
 
-**Configure Proxy:**
+### Manual Proxy Configuration
+
+If auto-detection doesn't suit your environment, configure manually:
+
 ```bash
 # Set git proxy
 git config --global http.proxy http://proxy:8080
@@ -466,9 +497,21 @@ export HTTP_PROXY=http://proxy:8080
 export HTTPS_PROXY=http://proxy:8080
 ```
 
-**Use Internal Mirrors:**
+### Override CN Detection
 
-If inside corporate network, installer automatically uses internal mirrors for:
+For testing or non-standard setups:
+
+```bash
+# Force CN mode (skip auto-detection)
+CODING_FORCE_CN=true coding --claude
+
+# Force public mode (skip auto-detection)
+CODING_FORCE_CN=false coding --claude
+```
+
+### Internal Mirrors
+
+When inside a corporate network, the installer automatically uses internal mirrors for:
 - memory-visualizer (CN mirror with team modifications)
 - Other components (graceful fallback to public repos)
 

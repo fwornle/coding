@@ -112,6 +112,37 @@ See `.env.ports` in the main repository for all port configurations:
 | `${HOME}/Agentic` | Bind (ro) | Workspace (all repos) |
 | `${CODING_REPO}/.env` | Bind (ro) | Configuration |
 
+## Docker Auto-Start
+
+The launcher automatically starts Docker Desktop if it isn't running — no need to launch Docker manually before running `coding`.
+
+### What Happens at Launch
+
+1. **Daemon check** — `docker ps` with 5-second timeout
+2. **Auto-start** — If Docker is not running, launches Docker Desktop and waits up to 45 seconds
+3. **Hung recovery** — If Docker Desktop is running but the daemon is unresponsive (common after failed updates), the launcher performs a graceful quit → force kill → relaunch cycle with an additional 30 seconds of wait time
+4. **Non-blocking** — If Docker still isn't ready after all timeouts, the launcher continues with a warning (degraded mode)
+
+### Timeout Configuration
+
+The default timeout is 45 seconds, configurable via the `DOCKER_TIMEOUT` environment variable:
+
+```bash
+# Extend timeout for slow machines
+DOCKER_TIMEOUT=90 coding --claude
+```
+
+Smart elapsed tracking ensures the total wait is predictable: if 20 seconds have already passed during early startup, only 25 seconds remain in the wait loop.
+
+### Platform Support
+
+| Platform | Auto-Start Method |
+|----------|------------------|
+| macOS | `open -F -a "Docker"` + daemon polling |
+| Linux | `systemctl start docker` (if systemd available) |
+
+---
+
 ## How It Works
 
 ### Stdio Proxy Pattern
