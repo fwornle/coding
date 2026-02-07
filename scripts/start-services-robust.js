@@ -42,6 +42,9 @@ const CODING_DIR = path.resolve(SCRIPT_DIR, '..');
 const execAsync = promisify(exec);
 const psm = new ProcessStateManager();
 
+// Docker mode: when true, skip launching containers already provided by coding-services
+const DOCKER_MODE = process.env.CODING_DOCKER_MODE === 'true';
+
 /**
  * Check if any process matching the script pattern is running at OS level
  * This catches orphaned processes that PSM doesn't know about
@@ -417,6 +420,16 @@ const SERVICE_CONFIGS = {
     maxRetries: 2,
     timeout: 30000,
     startFn: async () => {
+      // In Docker mode, Redis + Qdrant are already provided by coding-services container
+      if (DOCKER_MODE) {
+        console.log('[ConstraintMonitor] Docker mode: Redis + Qdrant provided by coding-services - skipping standalone containers');
+        return {
+          service: 'constraint-monitor-docker',
+          mode: 'docker-mode-builtin',
+          containers: ['coding-redis', 'coding-qdrant']
+        };
+      }
+
       console.log('[ConstraintMonitor] Starting Docker containers...');
 
       // Check if Docker is running
@@ -451,8 +464,24 @@ const SERVICE_CONFIGS = {
         containers: ['redis', 'qdrant']
       };
     },
-    healthCheckFn: async () => {
-      // Check Docker containers only - web services checked by coordinator
+    healthCheckFn: async (result) => {
+      // In Docker mode, check coding-services health endpoint instead
+      if (result && result.mode === 'docker-mode-builtin') {
+        try {
+          const healthy = await isPortListening(PORTS.VKB);
+          if (healthy) {
+            console.log('[ConstraintMonitor] Docker mode: coding-services healthy (Redis + Qdrant builtin)');
+            return true;
+          }
+          console.log('[ConstraintMonitor] Docker mode: coding-services health check failed');
+          return false;
+        } catch (error) {
+          console.log('[ConstraintMonitor] Docker mode health check error:', error.message);
+          return false;
+        }
+      }
+
+      // Native mode: Check Docker containers only - web services checked by coordinator
       try {
         const { stdout } = await execAsync(
           'docker ps --filter "name=constraint-monitor" --format "{{.Names}}" | wc -l',
@@ -692,6 +721,16 @@ const SERVICE_CONFIGS = {
     maxRetries: 2,
     timeout: 45000, // Memgraph can take time to start
     startFn: async () => {
+      // In Docker mode, Memgraph is already provided by coding-services container
+      if (DOCKER_MODE) {
+        console.log('[Memgraph] Docker mode: Memgraph provided by coding-services - skipping standalone container');
+        return {
+          service: 'memgraph-docker',
+          mode: 'docker-mode-builtin',
+          ports: { bolt: PORTS.MEMGRAPH_BOLT, https: PORTS.MEMGRAPH_HTTPS, lab: PORTS.MEMGRAPH_LAB }
+        };
+      }
+
       console.log('[Memgraph] Starting Memgraph Docker container for code-graph-rag...');
 
       // Check if Docker is running
@@ -741,8 +780,24 @@ const SERVICE_CONFIGS = {
         ports: { bolt: PORTS.MEMGRAPH_BOLT, https: PORTS.MEMGRAPH_HTTPS, lab: PORTS.MEMGRAPH_LAB }
       };
     },
-    healthCheckFn: async () => {
-      // Check if Memgraph is listening on Bolt port using TCP (not HTTP)
+    healthCheckFn: async (result) => {
+      // In Docker mode, check TCP port directly (Memgraph provided by coding-services)
+      if (result && result.mode === 'docker-mode-builtin') {
+        try {
+          const isListening = await isTcpPortListening(PORTS.MEMGRAPH_BOLT);
+          if (isListening) {
+            console.log(`[Memgraph] Docker mode: Bolt port ${PORTS.MEMGRAPH_BOLT} listening (coding-services builtin)`);
+            return true;
+          }
+          console.log(`[Memgraph] Docker mode: Bolt port ${PORTS.MEMGRAPH_BOLT} not yet listening`);
+          return false;
+        } catch (error) {
+          console.log('[Memgraph] Docker mode health check error:', error.message);
+          return false;
+        }
+      }
+
+      // Native mode: Check if Memgraph is listening on Bolt port using TCP (not HTTP)
       // Memgraph uses Bolt protocol, not HTTP, so we need raw TCP socket check
       try {
         const isListening = await isTcpPortListening(PORTS.MEMGRAPH_BOLT);
