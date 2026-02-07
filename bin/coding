@@ -10,6 +10,7 @@ AGENT=""
 FORCE_AGENT=""
 ARGS=()
 VERBOSE=false
+DRY_RUN=false
 CONFIG_FILE=""
 PROJECT_DIR=""
 
@@ -35,11 +36,12 @@ USAGE:
 OPTIONS:
   --agent AGENT      Force specific agent (claude|copilot)
   --claude           Force Claude Code (same as --agent claude)
-  --copilot          Force CoPilot (same as --agent copilot)
+  --copilot, --copi  Force CoPilot (same as --agent copilot)
   --copilot-stop     Stop all CoPilot fallback services
   --config FILE      Use specific config file
   --project DIR      Set target project directory (default: current dir)
   --verbose          Enable verbose logging
+  --dry-run          Run startup logic but stop before launching agent
   --help             Show this help
 
 MODE SWITCHING:
@@ -81,7 +83,7 @@ while [[ $# -gt 0 ]]; do
       FORCE_AGENT="$2"
       shift 2
       ;;
-    --copilot)
+    --copilot|--copi)
       FORCE_AGENT="copilot"
       shift
       ;;
@@ -102,6 +104,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --verbose)
       VERBOSE=true
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=true
       shift
       ;;
     --lsl-status)
@@ -185,6 +191,9 @@ else
     log "Working in project: $(basename "$PROJECT_DIR") (from: $PROJECT_DIR)"
   fi
 fi
+
+# Export dry-run flag for launch scripts
+export CODING_DRY_RUN="$DRY_RUN"
 
 # Set environment variables for agent adapter system
 export CODING_AGENT="$AGENT"
