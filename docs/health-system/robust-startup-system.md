@@ -499,6 +499,137 @@ docker-compose logs
 3. **Check health endpoint**: Verify `/health` returns 200 OK
 4. **Check dependencies**: Ensure Docker, Node.js, Python are available
 
+## Docker Auto-Start and Recovery
+
+The launcher automatically manages Docker Desktop availability via `scripts/ensure-docker.sh`, eliminating the need for users to manually start Docker before running `coding`.
+
+### Auto-Start Flow (macOS)
+
+When the launcher detects that Docker is not running:
+
+1. **Check Docker client** — Verifies the `docker` CLI is installed
+2. **Check daemon responsiveness** — Runs `docker ps` with a 5-second timeout
+3. **Start Docker Desktop** — Launches via `open -F -a "Docker"` and waits for the process to appear
+4. **Wait for daemon** — Polls every second for up to 45 seconds with progress updates every 10 seconds
+
+### Hung Docker Recovery
+
+Docker Desktop can enter a "process running but daemon unresponsive" state (common after failed updates). The launcher detects and auto-recovers:
+
+1. **Graceful quit** — `osascript -e 'quit app "Docker"'` (2s wait)
+2. **Force kill** — `killall` for Docker Desktop, com.docker.backend, com.docker.vmnetd (3s wait)
+3. **Verify gone** — Loop up to 5s checking processes
+4. **Final force kill** — `pkill -9` for stubborn processes (2s wait)
+5. **Relaunch** — `open -F -a "Docker"` and wait for daemon readiness
+
+### Timeout Strategy
+
+| Phase | Timeout | Purpose |
+|-------|---------|---------|
+| Daemon check | 5s | Quick responsiveness test |
+| Initial wait | 45s (configurable via `DOCKER_TIMEOUT`) | Fresh launch startup |
+| Smart elapsed | Remaining from 45s | Accounts for time already spent |
+| Restart recovery | +30s | Additional time after auto-restart |
+| Minimum fallback | 10s | Always gives at least 10s more |
+
+If Docker still isn't ready after all timeouts, the launcher continues with a warning — it does not block startup.
+
+### Linux Support
+
+On Linux, the launcher uses `systemctl start docker` if systemd is available. If not, it displays the appropriate manual command.
+
+---
+
+## Network Environment Resilience
+
+The launcher ensures reliable operation across all network environments via `scripts/detect-network.sh`, which is sourced during `agent-common-setup.sh` initialization.
+
+### 4-Environment Matrix
+
+The system is tested and works in all combinations:
+
+| Environment | CN Detection | Proxy Handling | Behavior |
+|-------------|-------------|----------------|----------|
+| Corporate + proxy | SSH/HTTPS probe | Auto-configured | Full access via proxy |
+| Corporate, no proxy | SSH/HTTPS probe | Warning issued | Degraded (no external access) |
+| Public + proxy set | Skipped | Uses existing `HTTP_PROXY` | Full access |
+| Public, no proxy | Skipped | None needed | Direct access |
+
+### Detection Strategy
+
+**Corporate Network Detection** (3 layers with fallback):
+
+1. **Environment override**: `CODING_FORCE_CN=true|false` — Instant, bypasses probing
+2. **SSH probe**: Tests SSH access to corporate GitHub (5s timeout, case-insensitive response matching)
+3. **HTTPS fallback**: Tests HTTPS access to corporate GitHub (5s timeout)
+
+**Proxy Auto-Configuration** (conditional on CN detection):
+
+1. Check if `HTTP_PROXY` already set and working → skip
+2. Test external access (google.de) → if works, no proxy needed
+3. Probe `127.0.0.1:3128` for proxydetox service → auto-configure if found
+4. Verify proxy works after configuration → warn if still failing
+
+### Timeout Design
+
+All network probes use **strict 5-second timeouts** to prevent hangs on unreliable networks. The launcher never blocks indefinitely on network operations.
+
+### Non-Blocking Failures
+
+Network detection issues never block startup:
+- CN detection failure → assumes public network, proceeds
+- Proxy configuration failure → warns and proceeds in degraded mode
+- External access unavailable → warns that Docker pulls/npm installs may fail
+
+---
+
+## E2E Test Coverage
+
+Comprehensive end-to-end tests validate all environment combinations via `tests/integration/launcher-e2e.sh`.
+
+### Test Matrix (8 Core Scenarios)
+
+| # | CN | Proxy | Agent | Verified |
+|---|-----|-------|-------|----------|
+| 1 | Yes | Yes | Claude | Output assertions |
+| 2 | Yes | Yes | CoPilot | Output assertions |
+| 3 | Yes | No | Claude | Warning assertions |
+| 4 | Yes | No | CoPilot | Warning assertions |
+| 5 | No | Yes | Claude | Output assertions |
+| 6 | No | Yes | CoPilot | Output assertions |
+| 7 | No | No | Claude | Output assertions |
+| 8 | No | No | CoPilot | Output assertions |
+
+### Additional Tests (9 more)
+
+- Agent flag equivalence (`--copi` = `--copilot`)
+- `--claude` flag behavior
+- Invalid agent rejection
+- `--help` output
+- `--verbose` logging
+- Docker auto-start logic
+- Dry-run markers
+- `CODING_FORCE_CN` override (true and false)
+
+### Test Approach
+
+- Uses `--dry-run` flag to skip blocking operations (Docker wait, service start, agent launch)
+- Uses `CODING_FORCE_CN` environment variable to mock CN detection without network access
+- Output assertion functions: `assert_output_contains`, `assert_output_not_contains`, `assert_exit_code`
+- Color-coded results with pass/fail/skip counters
+
+### Running Tests
+
+```bash
+# Run full test suite
+./tests/integration/launcher-e2e.sh
+
+# Verbose mode (shows output from passing tests too)
+./tests/integration/launcher-e2e.sh --verbose
+```
+
+---
+
 ## Future Enhancements
 
 - [ ] Add parallel service startup (currently sequential)
@@ -513,4 +644,8 @@ docker-compose logs
 - `lib/service-starter.js` - Core retry logic module
 - `scripts/start-services-robust.js` - Service orchestrator
 - `start-services.sh` - Entry point script
+- `scripts/ensure-docker.sh` - Docker auto-start and recovery
+- `scripts/detect-network.sh` - Corporate network and proxy detection
+- `scripts/agent-common-setup.sh` - Shared agent initialization
+- `tests/integration/launcher-e2e.sh` - E2E test suite
 - `memory-visualizer/api-server.py` - VKB health endpoint implementation
