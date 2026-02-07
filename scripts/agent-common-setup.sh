@@ -13,6 +13,12 @@ log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
+# Resolve this script's directory for sourcing sibling scripts
+_AGENT_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source CN/proxy detection
+source "$_AGENT_COMMON_DIR/detect-network.sh"
+
 # ==============================================================================
 # GITIGNORE VALIDATION
 # ==============================================================================
@@ -540,6 +546,9 @@ agent_common_init() {
   log "Target project: $target_project_dir"
   log "Coding services from: $coding_repo"
 
+  # Detect corporate network and configure proxy if needed
+  detect_network_and_configure_proxy
+
   # Initialize the unified hooks system
   initialize_unified_hooks "$target_project_dir" "$coding_repo"
 
@@ -586,4 +595,8 @@ export -f start_browser_access_server
 export -f ensure_claude_md_with_skill_instruction
 export -f ensure_statusline_config
 export -f initialize_unified_hooks
+export -f detect_corporate_network
+export -f test_proxy_connectivity
+export -f configure_proxy_if_needed
+export -f detect_network_and_configure_proxy
 export -f agent_common_init

@@ -137,6 +137,28 @@ if [ -f "$CODING_REPO/.env.ports" ]; then
   set +a
 fi
 
+# ============================================
+# Docker Auto-Start (shared logic)
+# ============================================
+source "$SCRIPT_DIR/ensure-docker.sh"
+detect_platform
+
+# Dry-run mode: skip Docker, services, and monitoring - exit early
+if [ "$CODING_DRY_RUN" = "true" ]; then
+  log "DRY-RUN: All startup logic completed successfully"
+  log "DRY-RUN: Would launch: gh copilot"
+  log "DRY-RUN: Agent=copilot, Platform=$PLATFORM"
+  log "DRY-RUN: Project=$TARGET_PROJECT_DIR"
+  exit 0
+fi
+
+# Ensure Docker is running before starting services
+early_docker_launch
+if ! ensure_docker_running; then
+  log "WARNING: Continuing in DEGRADED mode without Docker"
+  log "  Knowledge base will work but without semantic search capabilities"
+fi
+
 # Start all services using simple startup script BEFORE monitoring verification
 # Services need to be running for the monitoring verifier to check them
 log "Starting coding services for CoPilot..."
