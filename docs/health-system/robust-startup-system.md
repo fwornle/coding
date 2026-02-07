@@ -84,10 +84,24 @@ If these fail after all retries → **Claude startup blocked with clear error**
 #### Optional Services (Degrade gracefully if failed)
 
 1. **VKB Server** - Knowledge visualization (port 8080)
-2. **Constraint Monitor** - Live guardrails system
+2. **Constraint Monitor** - Live guardrails system (Docker mode aware)
 3. **Semantic Analysis** - MCP semantic analysis server
+4. **Memgraph** - Code Graph RAG AST analysis (Docker mode aware)
 
 If these fail after all retries → **Continue in DEGRADED mode with warning**
+
+#### Docker Mode Awareness
+
+When `CODING_DOCKER_MODE=true` (set by both `launch-claude.sh` and `launch-copilot.sh`), `start-services-robust.js` automatically skips launching standalone containers that are already provided by the `coding-services` Docker container:
+
+- **Constraint Monitor**: Skips `docker-compose up -d` for standalone Redis + Qdrant containers (they run inside `coding-services` as `coding-redis` and `coding-qdrant`)
+- **Memgraph**: Skips `docker-compose up -d` for standalone Memgraph container (runs inside `coding-services`)
+
+This prevents duplicate containers, port conflicts (both bind 6379, 6333), and ~540MB wasted RAM. Health checks in Docker mode verify the `coding-services` health endpoint or TCP port instead of counting standalone containers.
+
+![Launcher Docker Mode Flow](../images/launcher-docker-mode-flow.png)
+
+*Figure: Unified Docker mode flow shared by both Claude and CoPilot launchers*
 
 ## Pre-Startup Cleanup
 
@@ -430,6 +444,7 @@ const SERVICE_CONFIGS = {
 - `ROBUST_MODE=true` - Enable robust startup (default)
 - `ROBUST_MODE=false` - Use legacy startup mode
 - `VKB_DATA_SOURCE=combined` - Data source for VKB server
+- `CODING_DOCKER_MODE=true` - Skip standalone containers already in coding-services
 
 ## Benefits
 
@@ -484,12 +499,18 @@ lsof -i :8080
 # Check Docker status
 docker info
 
-# Check constraint monitor containers
+# Docker mode: containers are inside coding-services
+docker ps --filter "name=coding"
+
+# Native mode: check standalone constraint-monitor containers
 docker ps --filter "name=constraint-monitor"
 
-# Check docker-compose logs
+# Check docker-compose logs (native mode only)
 cd integrations/mcp-constraint-monitor
 docker-compose logs
+
+# Verify Docker mode detection
+echo $CODING_DOCKER_MODE
 ```
 
 ### Services Keep Failing
@@ -642,10 +663,12 @@ Comprehensive end-to-end tests validate all environment combinations via `tests/
 ## References
 
 - `lib/service-starter.js` - Core retry logic module
-- `scripts/start-services-robust.js` - Service orchestrator
+- `scripts/start-services-robust.js` - Service orchestrator (Docker mode aware)
 - `start-services.sh` - Entry point script
 - `scripts/ensure-docker.sh` - Docker auto-start and recovery
 - `scripts/detect-network.sh` - Corporate network and proxy detection
 - `scripts/agent-common-setup.sh` - Shared agent initialization
+- `scripts/launch-claude.sh` - Claude launcher (Docker mode detection & startup)
+- `scripts/launch-copilot.sh` - CoPilot launcher (Docker mode detection & startup)
 - `tests/integration/launcher-e2e.sh` - E2E test suite
 - `memory-visualizer/api-server.py` - VKB health endpoint implementation

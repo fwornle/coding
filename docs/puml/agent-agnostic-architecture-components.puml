@@ -30,11 +30,14 @@ package "Common Setup Layer" {
 }
 
 package "Shared Services Layer" {
-    component "start-services.sh" as services <<service>> {
+    component "start-services.sh\n(Native Mode)" as services_native <<service>> {
         [VKB Server]
         [Semantic Analysis]
-        [Constraint Monitor]
+        [Constraint Monitor\n(standalone containers)]
         [Live Logging System]
+    }
+    component "docker compose\n(Docker Mode)" as services_docker <<infra>> {
+        [coding-services\n(all-in-one container)]
     }
 }
 
@@ -56,10 +59,12 @@ launch_claude ..> common : sources
 launch_copilot ..> common : sources
 launch_future ..> common : sources
 
-' Launchers use services
-launch_claude --> services : starts
-launch_copilot --> services : starts
-launch_future --> services : starts
+' Launchers use services (Docker or Native mode)
+launch_claude --> services_native : native mode
+launch_claude --> services_docker : docker mode
+launch_copilot --> services_native : native mode
+launch_copilot --> services_docker : docker mode
+launch_future --> services_native : starts
 
 ' Launchers launch agents
 launch_claude --> claude : exec
@@ -80,7 +85,8 @@ claude_adapter ..|> adapter_interface : implements
 copilot_adapter ..|> adapter_interface : implements
 
 ' Common setup provides to all
-common --> services : initializes
+common --> services_native : initializes
+common --> services_docker : initializes
 
 note right of common
   **Agent-Agnostic Functions:**
@@ -101,10 +107,18 @@ note right of adapter_interface
   • logConversation()
 end note
 
-note bottom of services
-  **Shared by All Agents:**
-  VKB Server, Semantic Analysis,
-  Constraint Monitor, LSL System
+note bottom of services_native
+  **Native Mode:**
+  Services run as Node.js processes
+  Constraint Monitor uses standalone
+  Redis + Qdrant containers
+end note
+
+note bottom of services_docker
+  **Docker Mode:**
+  All services in coding-services
+  container (Redis, Qdrant, Memgraph
+  included - no duplicate containers)
 end note
 
 @enduml

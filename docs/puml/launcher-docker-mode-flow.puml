@@ -1,0 +1,96 @@
+@startuml launcher-docker-mode-flow
+!include _standard-style.puml
+
+title Unified Launcher Docker Mode Flow\nShared by launch-claude.sh & launch-copilot.sh
+
+participant "bin/coding" as entry
+participant "launch-{agent}.sh" as launcher
+participant "ensure-docker.sh" as docker_helper
+participant "docker compose" as compose
+participant "start-services.sh" as native_svc
+participant "start-services-robust.js" as robust
+
+== Docker Mode Detection ==
+
+entry -> launcher: exec (--claude or --copi)
+activate launcher
+
+launcher -> launcher: check_transition_lock()
+note right
+  Wait up to 60s if
+  .transition-in-progress
+  lock file exists
+end note
+
+launcher -> launcher: Detect Docker mode
+note right
+  3-tier priority:
+  1. .docker-mode marker file
+  2. coding-services container running
+  3. CODING_DOCKER_MODE env var
+end note
+
+launcher -> launcher: export CODING_DOCKER_MODE
+
+== Dry-Run Exit ==
+
+alt CODING_DRY_RUN = true
+  launcher --> entry: exit 0\nDRY-RUN: Agent={agent}, Docker={mode}, Platform={platform}
+end
+
+== Service Startup ==
+
+alt Docker Mode = true
+  launcher -> docker_helper: early_docker_launch()
+  launcher -> docker_helper: ensure_docker_running()
+
+  alt Docker not running
+    launcher --> entry: exit 1 (Docker required)
+  end
+
+  alt coding-services already healthy
+    launcher -> launcher: curl localhost:8080/health
+    note right: Reuse existing containers\n(no Docker destabilization)
+  else Not running
+    launcher -> compose: docker compose -f docker/docker-compose.yml up -d
+    activate compose
+    compose --> launcher: containers started
+    deactivate compose
+    launcher -> launcher: Wait for health (up to 60s)
+  end
+
+  launcher -> launcher: Generate Docker MCP config\n(if needed)
+
+else Native Mode
+  launcher -> native_svc: start-services.sh
+  activate native_svc
+  native_svc -> robust: startAllServices()
+  activate robust
+
+  note over robust
+    Docker mode awareness:
+    CODING_DOCKER_MODE=false
+    - Constraint Monitor: launches standalone Redis + Qdrant
+    - Memgraph: launches standalone container
+  end note
+
+  robust --> native_svc: services started
+  deactivate robust
+  native_svc --> launcher: OK
+  deactivate native_svc
+end
+
+== Common Initialization ==
+
+launcher -> launcher: verify_monitoring_systems()
+launcher -> launcher: agent_common_init()
+launcher -> launcher: exec {agent binary}
+deactivate launcher
+
+legend right
+  |= Agent |= Binary |= Docker Support |
+  | Claude | claude-mcp | Full (since v1) |
+  | CoPilot | gh copilot | Full (unified) |
+endlegend
+
+@enduml

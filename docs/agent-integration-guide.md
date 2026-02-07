@@ -53,8 +53,20 @@ When integrating a new agent:
 1. Agent detection checks availability
 2. Registry provides adapter instance
 3. Launcher sources common setup
-4. Services start (shared infrastructure)
-5. Agent launches with full integration
+4. Docker mode detection (3-tier: marker file, container check, env var)
+5. Services start (Docker compose or native, based on mode)
+6. Agent launches with full integration
+
+### Launcher Docker Mode Flow
+
+![Launcher Docker Mode Flow](../images/launcher-docker-mode-flow.png)
+
+Both `launch-claude.sh` and `launch-copilot.sh` share identical Docker mode logic:
+- Transition lock checking (waits for mode transitions)
+- 3-tier Docker mode detection
+- Conditional Docker/native service startup
+- Container reuse (health check before starting new containers)
+- Docker MCP config generation
 
 ---
 
@@ -90,7 +102,9 @@ You must implement the `AgentAdapter` interface (see [API Contract](#api-contrac
 #### 4. **Launcher Script**
 Create `scripts/launch-{agent}.sh` that:
 - Sources `agent-common-setup.sh`
-- Starts shared services
+- Checks transition lock (Docker mode transitions)
+- Detects Docker mode (`.docker-mode` marker, running containers, env var)
+- Starts shared services (Docker compose or native, based on mode)
 - Calls `agent_common_init()`
 - Launches your agent
 
@@ -187,11 +201,13 @@ Create `scripts/launch-myagent.sh`:
 #!/bin/bash
 
 # Launch My Agent with integrated services
+# Supports both native and Docker modes
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODING_REPO="$(dirname "$SCRIPT_DIR")"
+export CODING_REPO
 
 # Source agent-common setup functions
 source "$SCRIPT_DIR/agent-common-setup.sh"
@@ -199,6 +215,38 @@ source "$SCRIPT_DIR/agent-common-setup.sh"
 log() {
   echo "[MyAgent] $1"
 }
+
+# ============================================
+# Docker Mode Transition Check
+# ============================================
+check_transition_lock() {
+  local lock_file="$CODING_REPO/.transition-in-progress"
+  local wait_count=0
+  local max_wait=60
+  while [ -f "$lock_file" ] && [ $wait_count -lt $max_wait ]; do
+    if [ $wait_count -eq 0 ]; then
+      log "⏳ Docker mode transition in progress, waiting..."
+    fi
+    sleep 1
+    ((wait_count++))
+  done
+}
+check_transition_lock
+
+# ============================================
+# Docker Mode Detection
+# ============================================
+DOCKER_MODE=false
+if [ -f "$CODING_REPO/.docker-mode" ]; then
+  DOCKER_MODE=true
+fi
+if timeout 5 docker ps --format '{{.Names}}' 2>/dev/null | grep -q "coding-services"; then
+  DOCKER_MODE=true
+fi
+if [ "$CODING_DOCKER_MODE" = "true" ]; then
+  DOCKER_MODE=true
+fi
+export CODING_DOCKER_MODE="$DOCKER_MODE"
 
 # Generate unique session ID
 SESSION_ID="myagent-$$-$(date +%s)"
@@ -222,48 +270,25 @@ cleanup_session() {
 
 trap cleanup_session EXIT INT TERM
 
-# Verify monitoring systems
-verify_monitoring_systems() {
-  local target_project="$1"
-  log "🔐 MANDATORY: Verifying monitoring systems..."
+# ... (monitoring verification, target project setup, env loading) ...
 
-  if node "$SCRIPT_DIR/monitoring-verifier.js" --project "$target_project" --strict; then
-    log "✅ MONITORING VERIFIED: Systems operational"
-    return 0
+# Docker Auto-Start (shared logic)
+source "$SCRIPT_DIR/ensure-docker.sh"
+detect_platform
+
+# Start Services (Docker or Native mode)
+if [ "$DOCKER_MODE" = true ]; then
+  # Docker mode: reuse coding-services container
+  if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+    log "✅ coding-services already running - reusing"
   else
-    log "❌ MONITORING FAILED: Critical systems not operational"
-    exit 1
+    docker compose -f "$CODING_REPO/docker/docker-compose.yml" up -d
+    # ... health check loop ...
   fi
-}
-
-# Determine target project directory
-if [ -n "$CODING_PROJECT_DIR" ]; then
-  TARGET_PROJECT_DIR="$CODING_PROJECT_DIR"
 else
-  TARGET_PROJECT_DIR="$CODING_REPO"
+  # Native mode: start-services.sh
+  "$CODING_REPO/start-services.sh"
 fi
-
-# Register session
-register_session
-
-# Load environment
-if [ -f "$CODING_REPO/.env" ]; then
-  set -a
-  source "$CODING_REPO/.env"
-  set +a
-fi
-
-# Start shared services
-log "Starting coding services..."
-if ! "$CODING_REPO/start-services.sh"; then
-  log "Error: Failed to start services"
-  exit 1
-fi
-
-sleep 2
-
-# Verify monitoring
-verify_monitoring_systems "$TARGET_PROJECT_DIR"
 
 # Run agent-common initialization (LSL, monitoring, gitignore, etc.)
 agent_common_init "$TARGET_PROJECT_DIR" "$CODING_REPO"
@@ -606,6 +631,10 @@ See `lib/adapters/claude-mcp.js` and `scripts/launch-claude.sh` for reference im
 See `lib/adapters/copilot.js` and `scripts/launch-copilot.sh` for reference implementation.
 
 **Key features:**
+- Full Docker mode support (identical to Claude launcher)
+- Transition lock checking and Docker mode detection
+- Docker/Native conditional service startup
+- Container reuse (detects already-running coding-services)
 - Fallback services (Graphology, Playwright)
 - HTTP adapter server for tool integration
 - GitHub CLI verification

@@ -82,7 +82,7 @@ deactivate CGR
 
 legend right
   |= Detection Method |= Priority |= Where Used |
-  | CODING_DOCKER_MODE env | 1st | Set by launch-claude.sh |
+  | CODING_DOCKER_MODE env | 1st | Set by launch-claude.sh & launch-copilot.sh |
   | .docker-mode marker | 2nd | Created when switching modes |
   | /.dockerenv | 3rd | Exists inside Docker containers |
 endlegend
