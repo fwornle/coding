@@ -8,24 +8,24 @@ System design principles and patterns for the coding infrastructure.
 
 ## Key Principles
 
-### 1. Agent-Agnostic Design (Goal)
+### 1. Agent-Agnostic Design
 
-!!! warning "Current State: Claude-Centric"
-    The system is **currently optimized for Claude Code**. The agent-agnostic architecture is a design goal, not yet fully implemented. Core services (VKB, Semantic Analysis, LSL) work independently, but MCP integration and hooks are Claude-specific.
+!!! success "Multi-Agent Support"
+    Both **Claude Code** and **GitHub CoPilot** are fully supported with identical Docker mode logic, shared services, and unified launcher infrastructure. Adding new agents follows a documented adapter pattern.
 
-The architecture is designed to eventually support multiple AI coding assistants through a unified adapter pattern:
+The architecture supports multiple AI coding assistants through a unified adapter pattern:
 
 ![Agent-Agnostic Architecture](../images/agent-agnostic-architecture-components.png)
 
 ![Agent-Agnostic Architecture Sequence](../images/agent-agnostic-architecture-sequence.png)
 
-**Planned Layers**:
+**Layers**:
 
-1. **Agent Layer** - AI assistants (Claude now, CoPilot/Cursor planned)
-2. **Launcher Layer** - Agent-specific startup scripts
+1. **Agent Layer** - AI assistants (Claude Code, GitHub CoPilot)
+2. **Launcher Layer** - Agent-specific startup scripts with shared Docker mode logic
 3. **Common Setup Layer** - Shared initialization (`agent-common-setup.sh`)
 4. **Shared Services** - VKB, Semantic Analysis, Constraint Monitor, LSL
-5. **Adapter Layer** - Abstract interface + agent implementations (partial)
+5. **Adapter Layer** - Abstract interface + agent implementations
 
 ### 2. Knowledge Persistence
 
@@ -105,7 +105,7 @@ constraints:
 ```javascript
 const detector = new AgentDetector();
 const available = await detector.detectAll();
-// { claude: true, copilot: false }
+// { claude: true, copilot: true }
 
 const best = await detector.getBest();
 // 'claude'

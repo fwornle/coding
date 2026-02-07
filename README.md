@@ -30,8 +30,9 @@ For containerized deployment with persistent services:
 # Switch to Docker mode (safe transition with health monitoring)
 coding --switch-to-docker
 
-# Start Claude - Docker services are already running
+# Start Claude or CoPilot - Docker services are already running
 coding --claude
+coding --copilot
 
 # Check current mode
 coding --mode-status
@@ -44,12 +45,14 @@ The transition system ensures safe mode switching with:
 - Multi-session support
 - Docker-aware health verification (CGR cache, service restarts)
 
-**Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers.
+**Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers, no duplicate containers when switching agents.
 
 **MCP Configuration**: Automatically selects the correct MCP config based on deployment mode:
 - Docker mode: Uses stdio-proxy → SSE bridge to communicate with containerized servers
 - Native mode: Runs MCP servers directly as Node.js processes
 - Configuration selection is centralized in `claude-mcp-launcher.sh`
+
+**Unified Docker Support**: Both `launch-claude.sh` and `launch-copilot.sh` share identical Docker mode logic (transition lock checking, 3-tier mode detection, conditional startup, container reuse). The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
 
 **Health System Adaptation**: The health verifier automatically detects Docker mode and adapts:
 - CGR cache staleness uses `cache-metadata.json` fallback (no `.git` access)
