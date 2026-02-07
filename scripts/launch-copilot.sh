@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Launch GitHub CoPilot with fallback services
+# Launch CoPilot via copi tmux wrapper with fallback services
 # Supports both native and Docker modes
 
 set -e
@@ -116,25 +116,33 @@ verify_monitoring_systems() {
   fi
 }
 
-# Check for GitHub CLI and CoPilot extension
+# Check for copilot CLI, tmux, and copi wrapper
 check_copilot_requirements() {
   log "Checking CoPilot requirements..."
 
-  # Check for GitHub CLI
-  if ! command -v gh &> /dev/null; then
-    log "Error: GitHub CLI (gh) is not installed"
-    log "Install: https://cli.github.com/"
+  # Check for copilot binary
+  if ! command -v copilot &> /dev/null; then
+    log "Error: copilot CLI is not installed or not in PATH"
+    log "Ensure the 'copilot' command is available"
     exit 1
   fi
 
-  # Check for CoPilot extension
-  if ! gh extension list | grep -q copilot; then
-    log "Error: GitHub CoPilot extension is not installed"
-    log "Install: gh extension install github/gh-copilot"
+  # Check for tmux (required by copi wrapper)
+  if ! command -v tmux &> /dev/null; then
+    log "Error: tmux is not installed (required for copi wrapper)"
+    log "Install: brew install tmux"
     exit 1
   fi
 
-  log "✅ GitHub CLI and CoPilot extension detected"
+  # Check for copi wrapper
+  local copi_path="$CODING_REPO/integrations/copi/copi"
+  if [ ! -x "$copi_path" ]; then
+    log "Error: copi wrapper not found at $copi_path"
+    log "Run: git submodule update --init integrations/copi"
+    exit 1
+  fi
+
+  log "✅ copilot CLI, tmux, and copi wrapper detected"
 }
 
 # Start CoPilot HTTP adapter server for tool integration
@@ -200,7 +208,7 @@ detect_platform
 # Dry-run mode: skip all blocking operations (Docker, services, monitoring)
 if [ "$CODING_DRY_RUN" = "true" ]; then
   log "DRY-RUN: All startup logic completed successfully"
-  log "DRY-RUN: Would launch: gh copilot"
+  log "DRY-RUN: Would launch: copi (via $CODING_REPO/integrations/copi/copi)"
   log "DRY-RUN: Agent=copilot, Docker=$DOCKER_MODE, Platform=$PLATFORM"
   log "DRY-RUN: Project=$TARGET_PROJECT_DIR"
   exit 0
@@ -318,20 +326,21 @@ export CODING_AGENT_ADAPTER_PATH="$CODING_REPO/lib/agent-api/adapters"
 export CODING_HOOKS_CONFIG="$CODING_REPO/config/hooks-config.json"
 export CODING_TRANSCRIPT_FORMAT="copilot"
 
+# Set copi log directory
+export COPI_LOG_DIR="$CODING_REPO/.logs/copi"
+
 # Change to target project directory before launching CoPilot
 cd "$TARGET_PROJECT_DIR"
 log "Changed working directory to: $(pwd)"
 
-# Launch GitHub CoPilot
-log "Launching GitHub CoPilot..."
+# Launch CoPilot via copi tmux wrapper
+log "Launching CoPilot via copi wrapper..."
 log "📚 CoPilot features available:"
-log "   • Code suggestions and completion"
-log "   • Chat interface"
+log "   • Copilot CLI in tmux session with I/O capture"
+log "   • Session logging (JSON Lines format)"
 log "   • Memory/Knowledge management (fallback services)"
 log "   • Browser automation (Playwright fallback)"
-log "   • Session logging (LSL system)"
-log ""
-log "💡 Tip: Use 'gh copilot suggest' or 'gh copilot explain'"
+log "   • LSL system integration"
 log ""
 
-exec gh copilot "$@"
+exec "$CODING_REPO/integrations/copi/copi" "$@"
