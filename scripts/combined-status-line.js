@@ -695,12 +695,19 @@ class CombinedStatusLine {
         const runningMonitors = this.getRunningTranscriptMonitorsSync();
 
         if (runningMonitors.size > 0) {
+          // Build dynamic reverse mapping: abbreviation → project name
+          // This handles ALL projects, not just hardcoded ones
+          const abbrevToProject = new Map();
+          for (const projectName of runningMonitors) {
+            const abbrev = this.getProjectAbbreviation(projectName);
+            abbrevToProject.set(abbrev, projectName);
+          }
+
           // Filter sessions to only include those with running monitors
           const validatedSessions = {};
           for (const [abbrev, sessionData] of Object.entries(result.sessions)) {
-            // Map abbreviation back to project name for validation
-            const projectNameForAbbrev = this.getProjectNameFromAbbrev(abbrev);
-            if (runningMonitors.has(projectNameForAbbrev) || runningMonitors.has(abbrev)) {
+            const projectName = abbrevToProject.get(abbrev) || this.getProjectNameFromAbbrev(abbrev);
+            if (runningMonitors.has(projectName) || runningMonitors.has(abbrev)) {
               validatedSessions[abbrev] = sessionData;
             }
           }
@@ -1660,7 +1667,7 @@ class CombinedStatusLine {
           .map(([project, health]) => {
             const abbrev = this.getProjectAbbreviation(project);
             const isCurrentProject = abbrev === currentAbbrev;
-            const displayAbbrev = isCurrentProject ? `\u001b[4m${abbrev}\u001b[24m` : abbrev;
+            const displayAbbrev = isCurrentProject ? `#[underscore]${abbrev}#[nounderscore]` : abbrev;
             if ((health.icon === '🟡' || health.icon === '🔴') && health.reason) {
               return `${displayAbbrev}${health.icon}(${health.reason})`;
             }
