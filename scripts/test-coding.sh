@@ -318,6 +318,21 @@ else
     print_fail "Git not found - please install Git manually"
 fi
 
+# Check tmux (required for status bar rendering in all agents)
+print_check "tmux installation"
+if command_exists tmux; then
+    TMUX_VERSION=$(tmux -V)
+    print_pass "tmux found: $TMUX_VERSION"
+else
+    if command_exists brew; then
+        suggest_system_install "tmux" "brew install tmux"
+    elif command_exists apt-get; then
+        suggest_system_install "tmux" "sudo apt-get install -y tmux"
+    else
+        suggest_system_install "tmux" "Install tmux from your package manager"
+    fi
+fi
+
 # =============================================================================
 # PHASE 2: CODING TOOLS CORE INSTALLATION
 # =============================================================================
