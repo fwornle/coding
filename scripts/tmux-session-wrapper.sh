@@ -25,7 +25,9 @@ tmux_session_wrapper() {
   local coding_repo="${CODING_REPO:?CODING_REPO must be set}"
   local agent="${CODING_AGENT:-agent}"
   local session_name="coding-${agent}-$$"
-  local status_cmd="CODING_REPO=${coding_repo} node ${coding_repo}/scripts/combined-status-line.js"
+  # Pass project identity into status command so each session underlines its OWN project
+  local transcript_project="${TRANSCRIPT_SOURCE_PROJECT:-${CODING_PROJECT_DIR:-$(pwd)}}"
+  local status_cmd="CODING_REPO=${coding_repo} TRANSCRIPT_SOURCE_PROJECT=${transcript_project} node ${coding_repo}/scripts/combined-status-line.js"
 
   # Export so tmux environment inherits it (needed for the status-right #() command)
   export CODING_REPO
