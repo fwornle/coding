@@ -333,9 +333,6 @@ export COPI_LOG_DIR="$CODING_REPO/.logs/copi"
 cd "$TARGET_PROJECT_DIR"
 log "Changed working directory to: $(pwd)"
 
-# Disable terminal focus reporting to prevent ^[[I escape sequences from leaking into output
-printf '\e[?1004l' 2>/dev/null
-
 # Launch CoPilot via copi tmux wrapper
 log "Launching CoPilot via copi wrapper..."
 log "📚 CoPilot features available:"

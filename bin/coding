@@ -5,6 +5,10 @@
 
 set -e
 
+# Disable terminal focus reporting immediately to prevent ^[[I / ^[[O escape sequences
+# leaking into output during the startup phase
+printf '\e[?1004l' 2>/dev/null || true
+
 # Default values
 AGENT=""
 FORCE_AGENT=""
