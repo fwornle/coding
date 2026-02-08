@@ -350,7 +350,7 @@ coding --lsl-status
 - `agent_check_requirements()` — checks MCP sync status
 - `agent_pre_launch()` — logs Docker/native mode info
 
-### GitHub CoPilot (`config/agents/copilot.sh`)
+### GitHub Copilot CLI (`config/agents/copilot.sh`)
 
 - `AGENT_COMMAND="copilot"` — launches copilot CLI directly
 - `AGENT_ENABLE_PIPE_CAPTURE=true` — captures I/O via tmux pipe-pane
@@ -358,10 +358,14 @@ coding --lsl-status
 - `agent_pre_launch()` — starts HTTP adapter server
 - `agent_cleanup()` — stops HTTP adapter on exit
 
-### OpenCode (`config/agents/opencode.sh`) — Proof of concept
+![GitHub Copilot CLI running in coding](../images/coding-copilot-cli.png)
+
+### OpenCode (`config/agents/opencode.sh`)
 
 - 25-line config file, zero shared code changes
 - Demonstrates the minimum integration: `AGENT_NAME` + `AGENT_COMMAND` + `agent_check_requirements()`
+
+![OpenCode running in coding](../images/coding-opencode.png)
 
 ---
 

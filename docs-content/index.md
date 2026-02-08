@@ -77,7 +77,7 @@ vkb           # Opens http://localhost:8080
 
 ### Health Monitoring
 
-4-layer watchdog architecture ensures system reliability with automatic recovery.
+3-layer supervision architecture ensures system reliability with automatic recovery.
 
 ![Health Dashboard](images/health-dashboard-hero.png)
 
@@ -92,7 +92,7 @@ vkb           # Opens http://localhost:8080
 
 ### Status Line
 
-Real-time feedback via the unified tmux status bar showing system health, costs, and development state. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions with a shared status line rendered by `combined-status-line.js`.
+Real-time feedback via the unified tmux status bar showing system health, costs, and development state. All coding agents (Claude, Copilot, OpenCode) are wrapped in tmux sessions with a shared status line rendered by `combined-status-line.js`.
 
 ![Coding Environment — Tmux Status Bar](images/status-line.png)
 
@@ -104,6 +104,26 @@ Real-time feedback via the unified tmux status bar showing system health, costs,
 | LSL status | Logging window and routing |
 
 [Learn more about Status Line](guides/status-line.md){ .md-button }
+
+---
+
+### Multi-Agent Support
+
+While Claude Code is the primary and default agent, **coding** is fully agent-agnostic. Any coding assistant can be integrated with a single config file — no changes to shared code needed.
+
+| Agent | Launch | Status |
+|-------|--------|--------|
+| **Claude Code** (default) | `coding` or `coding --claude` | Full MCP integration |
+| **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
+| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
+
+All agents share the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, and constraint enforcement.
+
+![GitHub Copilot CLI running in coding](images/coding-copilot-cli.png)
+
+![OpenCode running in coding](images/coding-opencode.png)
+
+[Agent Integration Guide](guides/agent-integration.md){ .md-button }
 
 ---
 
@@ -139,7 +159,7 @@ vkb
 | **Provider Flexible** | Works with Anthropic, OpenAI, Groq, and local LLMs (DMR/llama.cpp) |
 | **Multi-Project** | Handle multiple projects with automatic context routing |
 | **Multi-Developer** | Session logs tagged per user for collaboration |
-| **Self-Healing** | 4-layer monitoring with automatic recovery |
+| **Self-Healing** | 3-layer supervision with automatic recovery |
 
 ---
 
@@ -151,7 +171,7 @@ vkb
 | Knowledge Base (UKB) | :material-check-circle:{ .green } Production | 14-agent knowledge extraction system |
 | Knowledge Viewer (VKB) | :material-check-circle:{ .green } Production | Graph visualization and exploration |
 | Constraint System | :material-check-circle:{ .green } Production | 20+ constraints with web dashboard |
-| Health Monitoring | :material-check-circle:{ .green } Production | 4-layer watchdog architecture |
+| Health Monitoring | :material-check-circle:{ .green } Production | 3-layer supervision architecture |
 | Status Line | :material-check-circle:{ .green } Production | Real-time terminal feedback |
 | Online Learning | :material-progress-clock:{ .yellow } Beta | Continuous learning without manual UKB |
 | Trajectory Detection | :material-progress-clock:{ .yellow } Beta | Real-time goal and deviation tracking |

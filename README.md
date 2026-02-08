@@ -1,6 +1,6 @@
 # Coding - AI Development Toolkit
 
-A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting both Claude Code and GitHub CoPilot.
+A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting Claude Code, GitHub Copilot CLI, and OpenCode.
 
 ---
 
@@ -16,6 +16,7 @@ coding
 # Or use specific agent
 coding --claude
 coding --copilot
+coding --opencode
 
 # Query local LLM from command line (Docker Model Runner)
 llm "Explain this error message"
@@ -55,6 +56,22 @@ The transition system ensures safe mode switching with:
 **Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, and future agents. The shared orchestrator (`scripts/launch-agent-common.sh`) handles Docker mode detection, service startup, monitoring, and session management — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
 
 ![Coding Environment — Tmux Status Bar](docs/images/status-line.png)
+
+**Multi-Agent Support**: While Claude Code is the primary and default agent (`coding` or `coding --claude`), the system is fully agent-agnostic. Any coding agent can be integrated with a single config file in `config/agents/`. Currently supported:
+
+| Agent | Launch Command | Detection |
+|-------|---------------|-----------|
+| **Claude Code** (default) | `coding` or `coding --claude` | Native transcript support |
+| **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
+| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
+
+All agents get the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, and constraint enforcement.
+
+![GitHub Copilot CLI running in coding](docs/images/coding-copilot-cli.png)
+
+![OpenCode running in coding](docs/images/coding-opencode.png)
+
+See [Agent Integration Guide](docs/agent-integration-guide.md) for adding new agents.
 
 **Health System Adaptation**: The health verifier automatically detects Docker mode and adapts:
 - CGR cache staleness uses `cache-metadata.json` fallback (no `.git` access)
@@ -110,8 +127,9 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 
 ### Integration Support
 
-- **Claude Code** - Full MCP server integration
-- **GitHub CoPilot CLI** - Native hooks integration with session logging
+- **Claude Code** - Full MCP server integration (default agent)
+- **GitHub Copilot CLI** - Pipe-pane capture with session logging
+- **OpenCode** - Pipe-pane capture with session logging
 - **Agent Abstraction API** - Unified adapter system for any coding agent
 - **Docker Support** - Containerized deployment with HTTP/SSE transport for MCP servers
 

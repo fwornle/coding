@@ -48,7 +48,7 @@ Real-time visual indicators of system health and development activity rendered v
 
 ### Session Activity Indicators
 
-Sessions use a **graduated color scheme** based on time since last activity. Only sessions active within 24 hours are displayed.
+Sessions use a **graduated color scheme** based on time since last activity. **All sessions are always displayed** — sleeping sessions show as 💤, never hidden. Sessions are only removed when the agent process exits.
 
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
@@ -56,15 +56,18 @@ Sessions use a **graduated color scheme** based on time since last activity. Onl
 | 🌲 | Cooling | 5 - 15 minutes | Session cooling down |
 | 🫒 | Fading | 15 min - 1 hour | Session fading, still tracked |
 | 🪨 | Dormant | 1 - 6 hours | Session dormant but alive |
-| ⚫ | Inactive | 6 - 24 hours | Session inactive (last shown before filtering) |
-| 💤 | Sleeping | > 24 hours | **Hidden from display** |
+| ⚫ | Inactive | 6 - 24 hours | Session inactive but tracked |
+| 💤 | Sleeping | > 24 hours | Long-term dormant session |
 | ❌ | Error | Any | Health check failed or service crash |
 
 **Visual progression:**
 ```
-🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → [hidden]
+🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → 💤 Sleeping
    <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
 ```
+
+!!! info "Agent Age Cap"
+    When an agent process (Claude, Copilot, OpenCode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant — the session starts green and naturally progresses through the cooling scheme based on how long the current session has been idle.
 
 ### Trajectory States
 
@@ -275,8 +278,8 @@ This replaces the previous approach of using agent-specific status bar APIs (e.g
 - Critical failures → Critical (❌)
 
 **Session States** (graduated cooling scheme):
-- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → [hidden]
-- Sessions >24 hours are filtered from display
+- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤
+- Sessions only removed when agent exits, never hidden while running
 
 ---
 
@@ -285,16 +288,27 @@ This replaces the previous approach of using agent-specific status bar APIs (e.g
 ### Discovery Methods
 
 1. **Running Monitor Detection**: Checks `ps aux` for running `enhanced-transcript-monitor.js` processes
-2. **Registry-based Discovery**: Uses Global LSL Registry for registered sessions
-3. **Dynamic Discovery**: Scans Claude transcript directories for unregistered sessions
-4. **Health File Validation**: Uses centralized health files from `.health/` directory
+2. **Agent Process Detection**: Scans for `claude`, `copilot`, and `opencode` processes via `ps -eo pid,comm` and resolves project from working directory via `lsof`
+3. **Registry-based Discovery**: Uses Global LSL Registry for registered sessions
+4. **Dynamic Discovery**: Scans Claude transcript directories for unregistered sessions
+5. **Health File Validation**: Uses centralized health files from `.health/` directory
 
 ### Key Behavior
 
-- Sessions WITH running transcript monitors are shown with full activity status
-- Sessions WITHOUT running monitors BUT with recent transcripts (within 48h) are shown as 💤
-- Sessions older than 48 hours without a monitor are hidden
+- Sessions with a **running agent process** use age capped at monitor uptime (graduated cooling from session start)
+- Sessions with running transcript monitors but no active agent use transcript-based activity icons
+- Sessions are **only removed** when the agent process has exited — never hidden
 - The Global Process Supervisor automatically restarts dead monitors within 30 seconds
+
+### Multi-Agent Support
+
+| Agent | Binary | Detection Method |
+|-------|--------|-----------------|
+| Claude | `claude` | Exact match on `ps -eo comm` |
+| Copilot | `copilot` | Path-ending match `/copilot$` |
+| OpenCode | `opencode` | Path-ending match `/opencode$` |
+
+New agents can be added to the detection loop in `statusline-health-monitor.js` → `getRunningAgentSessions()`.
 
 ### Smart Abbreviation Engine
 
@@ -359,7 +373,7 @@ Every 15 seconds, the statusline-health-monitor broadcasts status to all Claude 
 Terminal Tab: "C🟢 | UT🫒 CA🌲"
               ↑          ↑
         Current     Other active sessions
-        project     (sleeping sessions hidden)
+        project     (all sessions shown)
 ```
 
 ### Terminal Compatibility
@@ -402,10 +416,16 @@ cat .lsl/global-registry.json | jq '.sessions[] | {project, last_activity}'
 ### Session not showing that should be?
 
 ```bash
+# Check if agent process is detected (claude, copilot, opencode)
+ps -eo pid,comm | awk '/claude$|copilot$|opencode$/ {print}'
+
+# Check if the agent's cwd resolves to the right project
+lsof -p <PID> 2>/dev/null | grep cwd
+
 # Check if transcript monitor is running for that project
 ps aux | grep enhanced-transcript-monitor | grep PROJECT_NAME
 
-# Only sessions with running monitors are shown
+# Sessions show if: agent process running OR transcript monitor running
 ```
 
 ### Docker MCP services showing unhealthy?
@@ -433,7 +453,8 @@ docker compose -f docker/docker-compose.yml logs coding-services
 |------|---------|
 | `scripts/tmux-session-wrapper.sh` | Tmux session wrapper — wraps all agents with unified status bar |
 | `scripts/combined-status-line.js` | Main status line script (invoked by tmux `status-right`) |
-| `scripts/statusline-health-monitor.js` | Session health monitor daemon |
+| `scripts/statusline-health-monitor.js` | Session health monitor daemon (multi-agent detection) |
+| `scripts/auto-restart-watcher.js` | File-change detection for daemon code reloading |
 | `scripts/health-verifier.js` | Health status provider |
 | `lib/api-quota-checker.js` | API quota provider |
 | `.lsl/global-registry.json` | LSL session registry |
