@@ -88,6 +88,9 @@ class EnhancedTranscriptMonitor {
   constructor(config = {}) {
     // Initialize debug early so it can be used in getProjectPath
     this.debug_enabled = config.debug || process.env.TRANSCRIPT_DEBUG === 'true';
+
+    // Detect agent type: 'claude' (default) or 'copilot'
+    this.agentType = config.agent || process.env.CODING_AGENT || 'claude';
     
     this.config = {
       checkInterval: config.checkInterval || 2000, // More frequent for prompt detection
@@ -460,43 +463,60 @@ class EnhancedTranscriptMonitor {
    * Find current session's transcript file
    */
   findCurrentTranscript() {
+    // Auto-detect: check BOTH copilot and Claude sources, use most recent
+    const candidates = [];
+
+    // Check copilot session-state
+    const copilotTranscript = this.findCopilotTranscript();
+    if (copilotTranscript) {
+      try {
+        const stats = fs.statSync(copilotTranscript);
+        const timeDiff = Date.now() - stats.mtime.getTime();
+        if (timeDiff < this.config.sessionDuration * 2) {
+          candidates.push({ path: copilotTranscript, mtime: stats.mtime, source: 'copilot' });
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    // Check Claude JSONL
     const baseDir = path.join(os.homedir(), '.claude', 'projects');
     const projectName = this.getProjectDirName();
     const projectDir = path.join(baseDir, projectName);
     
-    if (!fs.existsSync(projectDir)) {
-      this.debug(`Project directory not found: ${projectDir}`);
-      return null;
-    }
+    if (fs.existsSync(projectDir)) {
+      try {
+        const files = fs.readdirSync(projectDir)
+          .filter(file => file.endsWith('.jsonl'))
+          .map(file => {
+            const filePath = path.join(projectDir, file);
+            const stats = fs.statSync(filePath);
+            return { path: filePath, mtime: stats.mtime, size: stats.size, source: 'claude' };
+          })
+          .sort((a, b) => b.mtime - a.mtime);
 
-    this.debug(`Looking for transcripts in: ${projectDir}`);
-
-    try {
-      const files = fs.readdirSync(projectDir)
-        .filter(file => file.endsWith('.jsonl'))
-        .map(file => {
-          const filePath = path.join(projectDir, file);
-          const stats = fs.statSync(filePath);
-          return { path: filePath, mtime: stats.mtime, size: stats.size };
-        })
-        .sort((a, b) => b.mtime - a.mtime);
-
-      if (files.length === 0) return null;
-
-      const mostRecent = files[0];
-      const timeDiff = Date.now() - mostRecent.mtime.getTime();
-      
-      if (timeDiff < this.config.sessionDuration * 2) {
-        this.debug(`Using transcript: ${mostRecent.path}`);
-        return mostRecent.path;
+        if (files.length > 0) {
+          const mostRecent = files[0];
+          const timeDiff = Date.now() - mostRecent.mtime.getTime();
+          if (timeDiff < this.config.sessionDuration * 2) {
+            candidates.push(mostRecent);
+          }
+        }
+      } catch (error) {
+        this.debug(`Error scanning Claude transcripts: ${error.message}`);
       }
+    }
 
-      this.debug(`Transcript too old: ${timeDiff}ms > ${this.config.sessionDuration * 2}ms`);
-      return null;
-    } catch (error) {
-      this.debug(`Error finding transcript: ${error.message}`);
+    if (candidates.length === 0) {
+      this.debug('No active transcripts found (copilot or Claude)');
       return null;
     }
+
+    // Use most recently modified source
+    candidates.sort((a, b) => b.mtime - a.mtime);
+    const winner = candidates[0];
+    this.agentType = winner.source;
+    this.debug(`Using ${winner.source} transcript: ${winner.path}`);
+    return winner.path;
   }
 
   /**
@@ -900,6 +920,132 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
+   * Find current Copilot CLI transcript (events.jsonl) by scanning session-state directories
+   * Matches sessions whose cwd matches this monitor's project path
+   */
+  findCopilotTranscript() {
+    const baseDir = path.join(os.homedir(), '.copilot', 'session-state');
+    if (!fs.existsSync(baseDir)) {
+      this.debug('Copilot session-state directory not found');
+      return null;
+    }
+
+    try {
+      const sessions = fs.readdirSync(baseDir)
+        .map(dir => {
+          const eventsPath = path.join(baseDir, dir, 'events.jsonl');
+          if (!fs.existsSync(eventsPath)) return null;
+          const stats = fs.statSync(eventsPath);
+          return { dir, path: eventsPath, mtime: stats.mtime, size: stats.size };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.mtime - a.mtime);
+
+      // Find sessions matching this project path
+      for (const session of sessions) {
+        const timeDiff = Date.now() - session.mtime.getTime();
+        if (timeDiff > this.config.sessionDuration * 2) continue;
+
+        // Read first line to check session.start for cwd match
+        try {
+          const fd = fs.openSync(session.path, 'r');
+          const buf = Buffer.alloc(2048);
+          const bytesRead = fs.readSync(fd, buf, 0, 2048, 0);
+          fs.closeSync(fd);
+          const firstLine = buf.toString('utf-8', 0, bytesRead).split('\n')[0];
+          const startEvent = JSON.parse(firstLine);
+          if (startEvent.type === 'session.start' &&
+              startEvent.data?.context?.cwd === this.config.projectPath) {
+            this.debug(`Found copilot transcript: ${session.path}`);
+            return session.path;
+          }
+        } catch { continue; }
+      }
+
+      this.debug('No matching copilot transcript found for project');
+      return null;
+    } catch (error) {
+      this.debug(`Error finding copilot transcript: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Normalize Copilot events.jsonl entries to Claude-compatible message format
+   * so the existing extractExchanges pipeline can process them unchanged
+   */
+  normalizeCopilotMessages(messages) {
+    const normalized = [];
+    for (const event of messages) {
+      if (!event.type) continue;
+      switch (event.type) {
+        case 'user.message':
+          normalized.push({
+            type: 'user',
+            uuid: event.id,
+            timestamp: event.timestamp,
+            message: {
+              role: 'user',
+              content: [{ type: 'text', text: event.data?.content || '' }]
+            }
+          });
+          break;
+        case 'assistant.message': {
+          const content = [];
+          if (event.data?.content) {
+            content.push({ type: 'text', text: event.data.content });
+          }
+          if (event.data?.toolRequests) {
+            for (const tr of event.data.toolRequests) {
+              content.push({
+                type: 'tool_use',
+                id: tr.toolCallId,
+                name: tr.name,
+                input: tr.arguments || {}
+              });
+            }
+          }
+          normalized.push({
+            type: 'assistant',
+            uuid: event.id || event.data?.messageId,
+            timestamp: event.timestamp,
+            message: {
+              role: 'assistant',
+              content,
+              stop_reason: 'end_turn'
+            }
+          });
+          break;
+        }
+        case 'tool.execution_complete': {
+          if (event.data?.result) {
+            const resultContent = typeof event.data.result === 'string'
+              ? event.data.result
+              : event.data.result.content || JSON.stringify(event.data.result);
+            normalized.push({
+              type: 'user',
+              uuid: event.id,
+              timestamp: event.timestamp,
+              message: {
+                role: 'user',
+                content: [{
+                  type: 'tool_result',
+                  tool_use_id: event.data.toolCallId,
+                  content: resultContent,
+                  is_error: event.data.success === false
+                }]
+              }
+            });
+          }
+          break;
+        }
+        // session.start, assistant.turn_start/end, tool.execution_start, abort, etc. are skipped
+      }
+    }
+    return normalized;
+  }
+
+  /**
    * Read and parse transcript messages
    */
   readTranscriptMessages(transcriptPath) {
@@ -917,6 +1063,16 @@ class EnhancedTranscriptMonitor {
           continue;
         }
       }
+
+      // If this is a copilot events.jsonl, normalize to Claude-compatible format
+      const isCopilotTranscript = messages.length > 0 &&
+        messages[0].type === 'session.start' &&
+        messages[0].data?.producer === 'copilot-agent';
+      if (isCopilotTranscript) {
+        this.debug('Detected copilot events.jsonl — normalizing to Claude format');
+        return this.normalizeCopilotMessages(messages);
+      }
+
       return messages;
     } catch (error) {
       this.debug(`Error reading transcript: ${error.message}`);

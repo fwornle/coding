@@ -180,7 +180,8 @@ class GlobalLSLCoordinator {
             TRANSCRIPT_DEBUG: this.debug ? 'true' : 'false',
             PROJECT_PATH: projectPath,
             TRANSCRIPT_SOURCE_PROJECT: projectPath,  // Critical: Tell monitor which project to monitor
-            CODING_TOOLS_PATH: this.codingRepoPath
+            CODING_TOOLS_PATH: this.codingRepoPath,
+            CODING_AGENT: process.env.CODING_AGENT || 'claude'  // Pass agent type to monitor
           }
         });
 

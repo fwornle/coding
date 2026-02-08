@@ -177,19 +177,30 @@ class StatusLineHealthMonitor {
 
       if (psOutput && psOutput.trim()) {
         for (const line of psOutput.trim().split('\n')) {
-          // Format: PID enhanced-transcript-monitor.js /path/to/Agentic/PROJECT
-          // Try multiple patterns for robustness - no hardcoded user paths
-          const patterns = [
-            /enhanced-transcript-monitor\.js\s+\S+\/Agentic\/([^\s/]+)/,  // Generic: any path with /Agentic/
-            /\/Agentic\/([^\s/]+)(?:\s|$)/,  // Fallback: just extract project after /Agentic/
-            /PROJECT_PATH=\S+\/Agentic\/([^\s/]+)/  // Handle env var format
+          // Format: PID node enhanced-transcript-monitor.js /path/to/project
+          // Extract the LAST path argument (basename) as the project name
+          // This handles nested projects like /Agentic/_work/pofo → pofo
+          const argMatch = line.match(/enhanced-transcript-monitor\.js\s+(\S+)/);
+          if (argMatch) {
+            const projectPath = argMatch[1];
+            const projectName = path.basename(projectPath);
+            if (projectName && projectName !== 'enhanced-transcript-monitor.js') {
+              runningProjects.add(projectName);
+              continue;
+            }
+          }
+
+          // Fallback patterns for edge cases (env vars, different command formats)
+          const fallbackPatterns = [
+            /\/Agentic\/(?:[^/\s]+\/)*([^\s/]+)\s*$/,  // Last segment of Agentic path
+            /PROJECT_PATH=\S*\/([^\s/]+)\s*$/            // Handle env var format
           ];
 
-          for (const pattern of patterns) {
+          for (const pattern of fallbackPatterns) {
             const match = line.match(pattern);
             if (match) {
               runningProjects.add(match[1]);
-              break;  // Found a match, no need to try other patterns
+              break;
             }
           }
         }
@@ -229,19 +240,33 @@ class StatusLineHealthMonitor {
   }
 
   /**
-   * Get running Claude sessions via process detection
-   * Detects Claude processes and their working directories using lsof
+   * Get running coding agent sessions via process detection
+   * Detects Claude and Copilot processes and their working directories using lsof
    * This catches sessions even if transcript monitors haven't started yet
    */
-  async getRunningClaudeSessions() {
-    const claudeSessions = new Set();
+  async getRunningAgentSessions() {
+    const agentSessions = new Set();
+
+    // Helper: extract project name from cwd via lsof
+    const extractProjectFromPid = (pid) => {
+      try {
+        const lsofOutput = execSync(`lsof -p ${pid} 2>/dev/null | grep cwd`, { encoding: 'utf8', timeout: 5000 });
+        if (lsofOutput && lsofOutput.trim()) {
+          const parts = lsofOutput.trim().split(/\s+/);
+          const cwdPath = parts[parts.length - 1];
+          const agenticMatch = cwdPath.match(/\/Agentic\/([^/\s]+)/);
+          if (agenticMatch) {
+            agentSessions.add(agenticMatch[1]);
+          }
+        }
+      } catch (e) { /* process may have exited */ }
+    };
 
     try {
       // Method 1: Find Claude process PIDs and get their working directories
       // Use ps instead of pgrep - pgrep has reliability issues on macOS (misses some processes)
       let claudePids = '';
       try {
-        // ps -eo pid,comm finds all processes; awk filters for exact 'claude' match
         claudePids = execSync('ps -eo pid,comm | awk \'$2 == "claude" {print $1}\'', { encoding: 'utf8', timeout: 5000 });
       } catch (psError) {
         this.log(`ps for claude failed: ${psError.message}`, 'WARN');
@@ -250,30 +275,26 @@ class StatusLineHealthMonitor {
       if (claudePids && claudePids.trim()) {
         for (const pidStr of claudePids.trim().split('\n')) {
           const pid = pidStr.trim();
-          if (!pid) continue;
-
-          try {
-            // Use lsof to get the current working directory of the Claude process
-            const lsofOutput = execSync(`lsof -p ${pid} 2>/dev/null | grep cwd`, { encoding: 'utf8', timeout: 5000 });
-
-            if (lsofOutput && lsofOutput.trim()) {
-              // Format: claude PID user cwd DIR ... /path/to/project
-              const parts = lsofOutput.trim().split(/\s+/);
-              const cwdPath = parts[parts.length - 1]; // Last column is the path
-
-              // Extract project name from path like ~/Agentic/nano-degree
-              const agenticMatch = cwdPath.match(/\/Agentic\/([^/\s]+)/);
-              if (agenticMatch) {
-                claudeSessions.add(agenticMatch[1]);
-              }
-            }
-          } catch (lsofError) {
-            // Process might have exited between pgrep and lsof
-          }
+          if (pid) extractProjectFromPid(pid);
         }
       }
 
-      // Method 2: Alternative - check parent launcher processes
+      // Method 2: Find Copilot agent processes (copilot binary with cwd in Agentic/)
+      let copilotPids = '';
+      try {
+        copilotPids = execSync('ps -eo pid,comm | awk \'$2 == "copilot" {print $1}\'', { encoding: 'utf8', timeout: 5000 });
+      } catch (psError) {
+        // copilot not running is normal
+      }
+
+      if (copilotPids && copilotPids.trim()) {
+        for (const pidStr of copilotPids.trim().split('\n')) {
+          const pid = pidStr.trim();
+          if (pid) extractProjectFromPid(pid);
+        }
+      }
+
+      // Method 3: Alternative - check parent launcher processes
       // The claude-mcp-launcher.sh processes know which project they're in
       let launcherOutput = '';
       try {
@@ -286,31 +307,16 @@ class StatusLineHealthMonitor {
 
       if (launcherOutput && launcherOutput.trim()) {
         for (const line of launcherOutput.trim().split('\n')) {
-          // Extract PID and get its cwd
           const pidMatch = line.match(/^(\d+)/);
-          if (pidMatch) {
-            try {
-              const lsofOutput = execSync(`lsof -p ${pidMatch[1]} 2>/dev/null | grep cwd`, { encoding: 'utf8', timeout: 5000 });
-              if (lsofOutput && lsofOutput.trim()) {
-                const parts = lsofOutput.trim().split(/\s+/);
-                const cwdPath = parts[parts.length - 1];
-                const agenticMatch = cwdPath.match(/\/Agentic\/([^/\s]+)/);
-                if (agenticMatch) {
-                  claudeSessions.add(agenticMatch[1]);
-                }
-              }
-            } catch (lsofError) {
-              // Process might have exited
-            }
-          }
+          if (pidMatch) extractProjectFromPid(pidMatch[1]);
         }
       }
 
     } catch (error) {
-      this.log(`getRunningClaudeSessions error: ${error.message}`, 'ERROR');
+      this.log(`getRunningAgentSessions error: ${error.message}`, 'ERROR');
     }
 
-    return claudeSessions;
+    return agentSessions;
   }
 
   /**
@@ -323,7 +329,7 @@ class StatusLineHealthMonitor {
     const runningMonitors = await this.getRunningTranscriptMonitors();
 
     // Get projects with running Claude sessions (even without monitors)
-    const claudeSessions = await this.getRunningClaudeSessions();
+    const agentSessions = await this.getRunningAgentSessions();
 
     // Dynamic path computation - no hardcoded user paths!
     const agenticDir = path.dirname(this.codingRepoPath);
@@ -360,13 +366,13 @@ class StatusLineHealthMonitor {
                   // 1. Claude session is running (virgin/idle session), OR
                   // 2. Very recent activity (< 5 min) suggesting session just closed
                   // Sessions with older transcripts but no Claude process are truly closed - omit them
-                  const hasClaudeSession = claudeSessions.has(projectName);
+                  const hasAgentSession = agentSessions.has(projectName);
                   const isVeryRecent = age < 300000; // 5 minutes
-                  if (hasClaudeSession || isVeryRecent) {
+                  if (hasAgentSession || isVeryRecent) {
                     sessions[projectName] = {
                       status: 'no-monitor',
                       icon: '💤',
-                      details: hasClaudeSession ? 'virgin' : 'closing'
+                      details: hasAgentSession ? 'virgin' : 'closing'
                     };
                   }
                 }
@@ -416,13 +422,13 @@ class StatusLineHealthMonitor {
                 // Only show no-monitor sessions if:
                 // 1. Claude session is running (virgin/idle session), OR
                 // 2. Very recent activity (< 5 min) suggesting session just closed
-                const hasClaudeSession = claudeSessions.has(projectName);
+                const hasAgentSession = agentSessions.has(projectName);
                 const isVeryRecent = age < 300000; // 5 minutes
-                if (hasClaudeSession || isVeryRecent) {
+                if (hasAgentSession || isVeryRecent) {
                   sessions[projectName] = {
                     status: 'no-monitor',
                     icon: '💤',
-                    details: hasClaudeSession ? 'virgin' : 'closing'
+                    details: hasAgentSession ? 'virgin' : 'closing'
                   };
                 }
               }
@@ -560,13 +566,13 @@ class StatusLineHealthMonitor {
                 // Only show no-monitor sessions if:
                 // 1. Claude session is running (virgin/idle session), OR
                 // 2. Very recent activity (< 5 min) suggesting session just closed
-                const hasClaudeSession = claudeSessions.has(projectName);
+                const hasAgentSession = agentSessions.has(projectName);
                 const isVeryRecent = age < 300000; // 5 minutes
-                if (hasClaudeSession || isVeryRecent) {
+                if (hasAgentSession || isVeryRecent) {
                   sessions[projectName] = {
                     status: 'no-monitor',
                     icon: '💤',
-                    details: hasClaudeSession ? 'virgin' : 'closing'
+                    details: hasAgentSession ? 'virgin' : 'closing'
                   };
                 }
               }
@@ -592,7 +598,7 @@ class StatusLineHealthMonitor {
     // Method 4: Add Claude sessions without monitors (detected via process)
     // These are sessions where Claude is running but no transcript monitor has started yet
     // (e.g., user opened session but hasn't typed anything, or monitor crashed)
-    for (const projectName of claudeSessions) {
+    for (const projectName of agentSessions) {
       // Skip if already found via other methods
       if (sessions[projectName]) continue;
 
@@ -717,11 +723,16 @@ class StatusLineHealthMonitor {
    */
   async getProjectSessionHealth(projectName, projectInfo) {
     try {
-      const healthFile = path.join(projectInfo.projectPath, '.transcript-monitor-health');
+      // Check CENTRALIZED health file first (preferred - used by all modern monitors)
+      const centralizedHealthFile = this.getCentralizedHealthFile(projectInfo.projectPath);
+      if (fs.existsSync(centralizedHealthFile)) {
+        return await this.getProjectSessionHealthFromFile(centralizedHealthFile, projectInfo.projectPath);
+      }
 
-      // If health file exists, use it
-      if (fs.existsSync(healthFile)) {
-        return await this.getProjectSessionHealthFromFile(healthFile, projectInfo.projectPath);
+      // Legacy fallback: check old project-local health file
+      const legacyHealthFile = path.join(projectInfo.projectPath, '.transcript-monitor-health');
+      if (fs.existsSync(legacyHealthFile)) {
+        return await this.getProjectSessionHealthFromFile(legacyHealthFile, projectInfo.projectPath);
       }
 
       // Otherwise, check transcript activity as fallback
@@ -847,7 +858,8 @@ class StatusLineHealthMonitor {
         age = Math.max(age, healthFileAge);
       }
 
-      // If no active transcript/session, show as inactive (black) regardless of health file age
+      // If no active transcript/session, show as inactive regardless of monitor state
+      // (streamingActive only means the transcript monitor is running, not that a coding agent is active)
       if (healthData.transcriptInfo?.status === 'not_found' ||
           (healthData.transcriptPath === null && !healthData.streamingActive)) {
         return {
@@ -2194,7 +2206,7 @@ class StatusLineHealthMonitor {
       if ((now - this.lastBillingCheck) < intervalMs) return;
 
       // Check if there are active sessions (don't scrape if idle)
-      const activeSessions = await this.getRunningClaudeSessions();
+      const activeSessions = await this.getRunningAgentSessions();
       if (activeSessions.size === 0) {
         this.log('Skipping billing scrape - no active sessions');
         return;
