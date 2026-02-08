@@ -386,7 +386,11 @@ check_dependencies() {
     if ! command -v plantuml >/dev/null 2>&1; then
         missing_deps+=("plantuml")
     fi
-    
+
+    if ! command -v tmux >/dev/null 2>&1; then
+        missing_deps+=("tmux")
+    fi
+
     # Install uv if missing (required for Serena MCP server)
     if ! command -v uv >/dev/null 2>&1; then
         if confirm_system_change \
@@ -548,12 +552,12 @@ handle_non_mirrored_repo_cn() {
         case "$PLATFORM" in
             macos)
                 echo "  - Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-                echo "  - Then run: brew install git node python3 jq plantuml"
+                echo "  - Then run: brew install git node python3 jq plantuml tmux"
                 ;;
             linux)
-                echo "  - Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y git nodejs npm python3 python3-pip jq plantuml"
-                echo "  - RHEL/CentOS: sudo yum install -y git nodejs npm python3 python3-pip jq plantuml"
-                echo "  - Arch: sudo pacman -S git nodejs npm python python-pip jq plantuml"
+                echo "  - Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y git nodejs npm python3 python3-pip jq plantuml tmux"
+                echo "  - RHEL/CentOS: sudo yum install -y git nodejs npm python3 python3-pip jq plantuml tmux"
+                echo "  - Arch: sudo pacman -S git nodejs npm python python-pip jq plantuml tmux"
                 ;;
             windows)
                 echo "  - Install Git Bash: https://git-scm.com/downloads"

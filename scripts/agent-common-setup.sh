@@ -451,6 +451,11 @@ ensure_statusline_config() {
   local claude_dir="$target_project/.claude"
   local settings_file="$claude_dir/settings.local.json"
 
+  # Skip native statusLine when tmux handles the status bar
+  if [ -n "$TMUX" ] || [ "$CODING_TMUX_MODE" = "true" ]; then
+    return 0
+  fi
+
   # Skip if we're in the coding repo itself (already has config)
   if [ "$target_project" = "$coding_repo" ]; then
     return 0

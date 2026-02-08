@@ -77,7 +77,7 @@ detect_platform
 # Dry-run mode: skip all blocking operations (Docker, services, monitoring)
 if [ "$CODING_DRY_RUN" = "true" ]; then
   log "DRY-RUN: All startup logic completed successfully"
-  log "DRY-RUN: Would launch: $CODING_REPO/bin/claude-mcp"
+  log "DRY-RUN: Would launch in tmux: $CODING_REPO/bin/claude-mcp"
   log "DRY-RUN: Agent=claude, Docker=$DOCKER_MODE, Platform=$PLATFORM"
   log "DRY-RUN: Project=${CODING_PROJECT_DIR:-$CODING_REPO}"
   exit 0
@@ -273,4 +273,6 @@ log "Changed working directory to: $(pwd)"
 # Launch Claude with MCP (config selected by claude-mcp-launcher.sh based on CODING_DOCKER_MODE)
 log "Launching Claude Code with MCP integration..."
 
-exec "$CODING_REPO/bin/claude-mcp" "$@"
+# Wrap Claude in tmux for proper status line rendering
+source "$SCRIPT_DIR/tmux-session-wrapper.sh"
+tmux_session_wrapper "$CODING_REPO/bin/claude-mcp" "$@"
