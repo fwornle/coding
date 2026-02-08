@@ -12,7 +12,7 @@ Before installing, ensure you have these tools:
 
     ```bash
     # Install prerequisites
-    brew install git node jq
+    brew install git node jq tmux
 
     # Install Docker Desktop (for recommended Docker mode)
     brew install --cask docker
@@ -22,7 +22,7 @@ Before installing, ensure you have these tools:
 
     ```bash
     # Install prerequisites
-    sudo apt update && sudo apt install -y git nodejs npm jq
+    sudo apt update && sudo apt install -y git nodejs npm jq tmux
 
     # Install Docker
     curl -fsSL https://get.docker.com | sh
@@ -35,7 +35,7 @@ Before installing, ensure you have these tools:
     2. Install [Docker Desktop](https://www.docker.com/products/docker-desktop)
     3. In WSL2:
        ```bash
-       sudo apt update && sudo apt install -y git nodejs npm jq
+       sudo apt update && sudo apt install -y git nodejs npm jq tmux
        ```
 
 ### Version Requirements
@@ -44,6 +44,7 @@ Before installing, ensure you have these tools:
 |------|----------------|---------------|
 | Node.js | 18+ | `node --version` |
 | Git | 2.0+ | `git --version` |
+| tmux | 3.0+ | `tmux -V` |
 | Docker | 20+ | `docker --version` |
 | jq | 1.6+ | `jq --version` |
 

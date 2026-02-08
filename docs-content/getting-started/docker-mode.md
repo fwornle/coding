@@ -37,7 +37,8 @@ Both `coding --claude` and `coding --copilot` share identical Docker mode logic:
 1. Detects Docker mode via 3-tier priority (`.docker-mode` marker, running `coding-services` container, `CODING_DOCKER_MODE` env var)
 2. Reuses existing containers if already healthy, or starts new ones via Docker Compose
 3. Waits for health checks to pass
-4. Launches the agent with Docker MCP config
+4. Wraps the agent in a tmux session (via `tmux-session-wrapper.sh`) with a unified status bar
+5. Launches the agent inside tmux with Docker MCP config
 
 !!! tip "Alternative"
     Set environment variable instead of marker file:

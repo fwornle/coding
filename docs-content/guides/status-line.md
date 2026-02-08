@@ -1,6 +1,6 @@
 # Status Line Complete Guide
 
-Real-time visual indicators of system health and development activity in the Claude Code status bar.
+Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions by `tmux-session-wrapper.sh`, which configures `status-right` to invoke `combined-status-line.js` every 5 seconds.
 
 ![Status Line Display](../images/status-line-display.png)
 
@@ -221,13 +221,25 @@ The StatusLineHealthMonitor (Layer 4) aggregates health from all other layers an
 
 ![StatusLine Architecture](../images/statusline-architecture.png)
 
+### Tmux-Based Rendering
+
+All coding agents are wrapped in tmux sessions via `scripts/tmux-session-wrapper.sh`. The wrapper:
+
+- Creates a tmux session named `coding-{agent}-{PID}`
+- Configures `status-right` to invoke `combined-status-line.js` every 5 seconds
+- Handles nesting guard (reuses existing tmux if already inside one)
+- Propagates environment variables (`CODING_REPO`, `SESSION_ID`, etc.)
+- Enables mouse forwarding for terminal interaction
+
+This replaces the previous approach of using agent-specific status bar APIs (e.g., Claude's `statusLine` config), providing a unified rendering target that works identically for all agents.
+
 ### Status Line Update Flow
 
 ![Status Line Hook Timing](../images/status-line-hook-timing.png)
 
 **Update Sequence:**
 
-1. **Health Check Trigger**: Pre-prompt hook fires
+1. **Tmux Timer**: `status-right` fires every 5 seconds
 2. **Status Collection**:
    - Read health verification status
    - Query constraint monitor API
@@ -235,7 +247,7 @@ The StatusLineHealthMonitor (Layer 4) aggregates health from all other layers an
    - Check API quota for all providers
    - Scan LSL registry
 3. **Status Aggregation**: Combine all indicators
-4. **Display Update**: Update Claude Code status bar
+4. **Display Update**: Render to tmux status bar (supports tmux formatting codes: `#[underscore]`, `#[bold]`, colors)
 5. **Cache**: Store for next check
 
 ### Caching
@@ -357,7 +369,7 @@ Terminal Tab: "C🟢 | UT🫒 CA🌲"
 | iTerm2 | ✅ Works | Full OSC 0 support |
 | Terminal.app | ✅ Works | Native macOS terminal |
 | VS Code Terminal | ❌ Limited | Does not process OSC 0 from external TTY writes |
-| tmux | ⚠️ Partial | Requires `set -g set-titles on` |
+| tmux | ✅ Works | Primary rendering target — all agents run inside tmux |
 
 ---
 
@@ -419,7 +431,8 @@ docker compose -f docker/docker-compose.yml logs coding-services
 
 | File | Purpose |
 |------|---------|
-| `scripts/combined-status-line.js` | Main status line script |
+| `scripts/tmux-session-wrapper.sh` | Tmux session wrapper — wraps all agents with unified status bar |
+| `scripts/combined-status-line.js` | Main status line script (invoked by tmux `status-right`) |
 | `scripts/statusline-health-monitor.js` | Session health monitor daemon |
 | `scripts/health-verifier.js` | Health status provider |
 | `lib/api-quota-checker.js` | API quota provider |
