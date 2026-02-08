@@ -33,7 +33,7 @@ The health system is built on interconnected components with active supervision:
 | **EnhancedTranscriptMonitor** | `enhanced-transcript-monitor.js` | Real-time per-project transcript monitoring |
 | **LiveLoggingCoordinator** | `live-logging-coordinator.js` | Logging orchestration with multi-user support |
 | **ProcessStateManager** | `process-state-manager.js` | Unified registry with atomic file locking (used by all) |
-| **AutoRestartWatcher** | `auto-restart-watcher.js` | File-change detection for automatic daemon code reloading |
+| **AutoRestartWatcher** | `auto-restart-watcher.js` | File-change detection — daemons exit cleanly on code change, supervision restarts with new code |
 
 ### Supervision Architecture
 
@@ -53,7 +53,10 @@ The health system is built on interconnected components with active supervision:
 - **Cooldown Protection** - 5-minute cooldown per service prevents restart storms
 - **Rate Limiting** - Max 10 restarts per hour per service
 - **Fallback Supervision** - CombinedStatusLine provides backup restart capability
-- **Active Session Gating** - Transcript monitors only spawned for sessions with activity in the last 2 minutes
+- **Active Session Gating** - Transcript monitors only spawned for sessions with transcript activity in the last 2 minutes
+- **Multi-Agent Detection** - Detects Claude, Copilot, and OpenCode sessions via process scanning
+- **Agent Age Cap** - Running agent's display age capped at monitor uptime, so fresh sessions start green and cool naturally
+- **Intentional Stop Markers** - Graceful shutdown marks project as stopped, preventing restart loops
 
 ## Component Details
 
@@ -63,6 +66,8 @@ The health system is built on interconnected components with active supervision:
 - Discovers projects from: PSM registry, health files, Claude transcript directories
 - 5-minute cooldown per service prevents restart storms
 - Max 10 restarts per hour per service (safety limit)
+- Respects intentional stop markers (skips projects that were gracefully shut down)
+- Auto-restarts on code change via AutoRestartWatcher
 - Heartbeat file: `.health/supervisor-heartbeat.json`
 - Started via: `start-services-robust.js` or manually
 
@@ -82,7 +87,9 @@ The health system is built on interconnected components with active supervision:
 ### StatusLineHealthMonitor (`scripts/statusline-health-monitor.js`) - Status Aggregation
 - Health aggregation for Claude Code status bar
 - 15-second update interval with auto-healing
-- **Only shows sessions with running transcript monitors**
+- Detects all agent types: Claude, Copilot, OpenCode (via process scanning)
+- **Agent age cap**: running agent's age capped at monitor uptime — fresh sessions start green and cool naturally
+- Sessions removed only when agent process exits, never hidden
 - Outputs to: `.logs/statusline-health-status.txt`
 
 ### CombinedStatusLine (`scripts/combined-status-line.js`) - Master Supervisor + Status Display
@@ -90,6 +97,8 @@ The health system is built on interconnected components with active supervision:
 - **`ensureGlobalProcessSupervisorRunning()`** - Ensures GPS is running
 - **`ensureStatuslineHealthMonitorRunning()`** - Ensures SHM is running
 - **`ensureAllTranscriptMonitorsRunning()`** - Fallback supervisor for all projects
+- **2-minute active session gating** - only spawns monitors for projects with transcript activity in last 2 min
+- Respects intentional stop markers (prevents restart loops after graceful shutdown)
 - Displays health status in Claude Code status bar
 - Guarantees service recovery even if GPS dies
 
@@ -98,6 +107,8 @@ The health system is built on interconnected components with active supervision:
 - 2-second check interval for prompt detection
 - Writes health files to centralized `.health/` directory
 - Generates LSL files in `.specstory/history/`
+- Auto-restarts on code change via AutoRestartWatcher
+- Marks project as intentionally stopped on graceful shutdown (prevents restart loops)
 
 ### LiveLoggingCoordinator (`scripts/live-logging-coordinator.js`) - Logging
 - Orchestrates live logging components
@@ -288,7 +299,7 @@ The status line appears automatically in Claude Code:
 **Components:**
 - `[🐳]` - Docker mode indicator (only shown when running in Docker mode)
 - `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, CGR=Code Graph RAG
-- `[C🟢 UT🫒]` - Active sessions with activity icons (sleeping sessions hidden)
+- `[C🟢 UT🫒]` - Active sessions with activity icons (all sessions shown, 💤 for sleeping)
 - `[🛡️ 67% 🔍EX]` - Constraint compliance percentage + trajectory state
 - `[Gq$2JAN A$18 X$25]` - API quota status (Groq $2 spent in Jan, etc.)
 - `[📚✅]` - Knowledge system status (icons only, no counts)
@@ -328,6 +339,7 @@ See [Status Line System](./status-line.md) for complete documentation.
 - `scripts/live-logging-coordinator.js` - Logging orchestration
 
 **Supporting Scripts**:
+- `scripts/auto-restart-watcher.js` - File-change detection for daemon code reloading
 - `scripts/health-prompt-hook.js` - Pre-prompt integration
 - `scripts/health-remediation-actions.js` - Auto-healing actions
 - `scripts/start-services-robust.js` - Service startup with supervisor
