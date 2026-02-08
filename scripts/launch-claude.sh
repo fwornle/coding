@@ -272,4 +272,8 @@ log "Changed working directory to: $(pwd)"
 
 # Launch Claude with MCP (config selected by claude-mcp-launcher.sh based on CODING_DOCKER_MODE)
 log "Launching Claude Code with MCP integration..."
+
+# Disable terminal focus reporting to prevent ^[[I escape sequences from leaking into output
+printf '\e[?1004l' 2>/dev/null
+
 exec "$CODING_REPO/bin/claude-mcp" "$@"

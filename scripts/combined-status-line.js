@@ -1871,15 +1871,24 @@ class CombinedStatusLine {
 
       if (psOutput && psOutput.trim()) {
         for (const line of psOutput.trim().split('\n')) {
-          // Extract project name from command line
-          // Format: PID node enhanced-transcript-monitor.js /path/to/Agentic/PROJECT
-          const patterns = [
-            /enhanced-transcript-monitor\.js\s+\S+\/Agentic\/([^\s/]+)/,  // Generic: any path with /Agentic/
-            /\/Agentic\/([^\s/]+)(?:\s|$)/,  // Fallback: just extract project after /Agentic/
-            /PROJECT_PATH=\S+\/Agentic\/([^\s/]+)/  // Handle env var format
+          // Extract the LAST path argument (basename) as the project name
+          // This handles nested projects like /Agentic/_work/pofo → pofo
+          const argMatch = line.match(/enhanced-transcript-monitor\.js\s+(\S+)/);
+          if (argMatch) {
+            const projectName = basename(argMatch[1]);
+            if (projectName && projectName !== 'enhanced-transcript-monitor.js') {
+              runningProjects.add(projectName);
+              continue;
+            }
+          }
+
+          // Fallback patterns for edge cases
+          const fallbackPatterns = [
+            /\/Agentic\/(?:[^/\s]+\/)*([^\s/]+)\s*$/,
+            /PROJECT_PATH=\S*\/([^\s/]+)\s*$/
           ];
 
-          for (const pattern of patterns) {
+          for (const pattern of fallbackPatterns) {
             const match = line.match(pattern);
             if (match) {
               runningProjects.add(match[1]);
