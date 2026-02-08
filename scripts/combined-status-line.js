@@ -1264,7 +1264,9 @@ class CombinedStatusLine {
         // Ignore health file errors
       }
 
-      // Source 3: Claude transcript directories with recent activity
+      // Source 3: Claude transcript directories with ACTIVE sessions only
+      // Only spawn monitors for projects with actively-written transcripts (< 2 min)
+      // This prevents orphaned monitors for sessions that closed without explicit stop
       try {
         if (!homeDir) throw new Error('HOME not set');
         const claudeProjectsDir = join(homeDir, '.claude', 'projects');
@@ -1276,14 +1278,14 @@ class CombinedStatusLine {
             if (projectName) {
               const projectPath = join(agenticDir, projectName);
               if (existsSync(projectPath)) {
-                // Check for recent transcript activity (last 6 hours)
                 const transcriptDir = join(claudeProjectsDir, dir);
                 const jsonlFiles = fs.readdirSync(transcriptDir).filter(f => f.endsWith('.jsonl'));
                 if (jsonlFiles.length > 0) {
                   const latestMtime = Math.max(
                     ...jsonlFiles.map(f => fs.statSync(join(transcriptDir, f)).mtime.getTime())
                   );
-                  if (Date.now() - latestMtime < 6 * 60 * 60 * 1000) {
+                  // Active session: transcript written in last 2 minutes
+                  if (Date.now() - latestMtime < 120000) {
                     projects.add(projectPath);
                   }
                 }

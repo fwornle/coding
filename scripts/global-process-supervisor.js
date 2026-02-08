@@ -21,6 +21,7 @@ import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
 import ProcessStateManager from './process-state-manager.js';
 import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
+import { enableAutoRestart } from './auto-restart-watcher.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -764,6 +765,14 @@ Environment:
 
   // Default: daemon mode
   await supervisor.start();
+
+  // Watch for code changes and auto-restart (combined-status-line will restart us)
+  enableAutoRestart({
+    scriptUrl: import.meta.url,
+    dependencies: ['./process-state-manager.js', './docker-mode-transition.js'],
+    cleanupFn: () => supervisor.stop(),
+    logger: (msg) => supervisor.log(msg)
+  });
 }
 
 main().catch(error => {

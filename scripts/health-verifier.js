@@ -27,6 +27,7 @@ import { EventEmitter } from 'events';
 import ProcessStateManager from './process-state-manager.js';
 import HealthRemediationActions from './health-remediation-actions.js';
 import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
+import { enableAutoRestart } from './auto-restart-watcher.js';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1822,6 +1823,18 @@ runIfMain(import.meta.url, () => {
       verifier.start()
         .then(() => {
           console.log('✅ Health verifier started');
+          // Watch for code changes and auto-restart (supervisor will restart us)
+          enableAutoRestart({
+            scriptUrl: import.meta.url,
+            dependencies: [
+              './process-state-manager.js',
+              './health-remediation-actions.js',
+              './docker-mode-transition.js'
+            ],
+            cleanupFn: () => verifier.stop(),
+            logger: (msg) => verifier.log(msg)
+          });
+
           // Keep process alive
           process.on('SIGINT', async () => {
             await verifier.stop();

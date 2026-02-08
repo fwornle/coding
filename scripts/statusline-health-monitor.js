@@ -21,6 +21,7 @@ import { fileURLToPath } from 'url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import ProcessStateManager from './process-state-manager.js';
 import { isTransitionLocked, getTransitionLockData } from './docker-mode-transition.js';
+import { enableAutoRestart } from './auto-restart-watcher.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2788,6 +2789,18 @@ Auto-Healing:
     }
 
     await monitor.start();
+
+    // Watch for code changes and auto-restart (supervisor will restart us)
+    enableAutoRestart({
+      scriptUrl: import.meta.url,
+      dependencies: ['./process-state-manager.js', './docker-mode-transition.js'],
+      cleanupFn: async () => {
+        monitor.stop();
+        monitor.removePidFile();
+        await monitor.unregisterFromPSM();
+      },
+      logger: (msg) => monitor.log(msg)
+    });
   } else {
     // Single update mode - no singleton check needed
     await monitor.updateStatusLine();
