@@ -76,13 +76,28 @@ Update `lib/agent-api/index.js` to include your adapter in the ADAPTERS registry
 
 ## Step 6: Create Launch Script
 
-Create `scripts/launch-myagent.sh` using the common setup functions.
+Create `scripts/launch-myagent.sh` using the common setup functions. The final agent launch must be wrapped using the shared tmux wrapper for unified status bar rendering:
+
+```bash
+# At the end of launch-myagent.sh:
+source "$SCRIPT_DIR/tmux-session-wrapper.sh"
+tmux_session_wrapper myagent "$@"
+```
+
+The `tmux_session_wrapper` function (from `scripts/tmux-session-wrapper.sh`):
+- Creates a tmux session named `coding-{agent}-{PID}`
+- Configures the tmux status bar to run `combined-status-line.js`
+- Propagates all required environment variables into the tmux session
+- If already inside tmux, configures the current session's status bar instead of nesting
+
+**Requirement:** `tmux` must be installed (added to `install.sh` prerequisites).
 
 ## Best Practices
 
 1. Handle missing capabilities gracefully
 2. Use the Logger class instead of console methods
 3. Support both user-level and project-level config
+4. Always wrap the agent launch in `tmux_session_wrapper` for consistent status bar rendering
 
 ## See Also
 

@@ -59,13 +59,14 @@ Coding is an intelligent development infrastructure that:
 
 ### 4. Status Line System
 
-**Visual system health and activity indicators**
+**Visual system health and activity indicators via unified tmux status bar**
 
+- **Tmux-Based Rendering**: All agents (Claude, CoPilot) wrapped in tmux via shared `tmux-session-wrapper.sh`
 - **Real-Time Status**: Shows LSL activity, constraint compliance, trajectory state
 - **Health Monitoring**: 4-layer monitoring with automatic recovery
 - **Session Windows**: Time-based session boundaries with activity indicators
 - **Activity Detection**: Distinguishes coding infrastructure vs. project work
-- **Visual Feedback**: Icons show system state at a glance
+- **Visual Feedback**: Icons show system state at a glance, tmux formatting codes (underline, bold) render correctly
 
 **Learn more:** [Status Line Documentation](health-system/README.md)
 
@@ -358,6 +359,7 @@ See [Docker Deployment Guide](../docker/README.md) for detailed setup.
 
 - **Node.js 18+** - All components are Node.js based
 - **Git** - Version control and knowledge base storage
+- **tmux** - Terminal multiplexer for unified status bar rendering
 - **3GB RAM minimum** - For MCP servers and monitoring
 - **macOS, Linux, or Windows** (WSL/Git Bash)
 

@@ -1,10 +1,20 @@
 # Status Line System
 
-Real-time visual indicators of system health and development activity in the Claude Code status bar.
+Real-time visual indicators of system health and development activity, rendered in the **tmux status bar** for all coding agents (Claude Code, CoPilot, and future agents).
+
+## Tmux-Based Rendering
+
+All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`. The status line is rendered using tmux's `status-right` directive, which invokes `combined-status-line.js` every 5 seconds. This replaces the earlier approach of using Claude Code's native `statusLine` config, which could not render tmux-specific formatting codes (like `#[underscore]`).
+
+**Key benefits:**
+- Unified rendering across all agents (no agent-specific status line code)
+- Full support for tmux formatting codes (underline, bold, colors)
+- Consistent status bar positioning at the bottom of the terminal
+- Mouse support forwarded to the agent running inside tmux
 
 ## What It Shows
 
-The Status Line provides a **compact, real-time view** of all system activity across multiple Claude Code sessions.
+The Status Line provides a **compact, real-time view** of all system activity across multiple coding agent sessions.
 
 ![Status Line Display](../images/status-line-display.png)
 
@@ -309,7 +319,7 @@ Project names are automatically abbreviated using intelligent algorithms:
 
 ## Multi-Session Support
 
-The status line displays information for **multiple active Claude Code sessions** simultaneously. Only sessions active within the last 24 hours are shown.
+The status line displays information for **multiple active coding agent sessions** simultaneously. Only sessions active within the last 24 hours are shown.
 
 ### Session Display
 
@@ -446,14 +456,20 @@ Where:
 
 ### Starting the Status Line
 
-The status line is **automatically started** with the `coding` command:
+The status line is **automatically started** with the `coding` command. All agents are wrapped in tmux, and the tmux `status-right` is configured to run `combined-status-line.js`:
 
 ```bash
-# Start Claude Code with status line
-coding
-
-# Status line updates appear in Claude Code status bar
+# Start any agent - tmux wrapping is automatic
+coding              # Status line renders in tmux status bar
+coding --claude     # Same tmux wrapping
+coding --copilot    # Same tmux wrapping
 ```
+
+The tmux wrapper (`scripts/tmux-session-wrapper.sh`) handles:
+- Creating a tmux session named `coding-{agent}-{PID}`
+- Configuring `status-right` to invoke `combined-status-line.js`
+- Nesting guard: if already in tmux, configures the current session instead
+- Mouse forwarding for interactive agent use
 
 ### Manual Status Line Check
 
@@ -591,7 +607,7 @@ Works with terminals that support ANSI OSC (Operating System Command) escape seq
 | iTerm2 | ✅ Works | Full OSC 0 support |
 | Terminal.app | ✅ Works | Native macOS terminal |
 | VS Code Terminal | ❌ Limited | Does not process OSC 0 from external TTY writes |
-| tmux | ⚠️ Partial | Requires `set -g set-titles on` |
+| tmux | ✅ Works | All agents now run inside tmux (primary rendering target) |
 
 **VSCode Limitation**: VSCode's integrated terminal captures TTY output and does not interpret OSC escape sequences written directly to the TTY device from external processes. The status line within the terminal content still updates on activity.
 
@@ -613,7 +629,8 @@ ps -eo pid,tty,comm | grep claude
 
 **Core System**:
 
-- `scripts/combined-status-line.js` - Main status line script (reads from statusline-health-status.txt)
+- `scripts/tmux-session-wrapper.sh` - Shared tmux wrapper that configures status bar for all agents
+- `scripts/combined-status-line.js` - Main status line script (invoked by tmux `status-right`)
 - `scripts/statusline-health-monitor.js` - Session health monitor daemon (detects running monitors, writes status)
 - `scripts/health-verifier.js` - Health status provider
 - `src/live-logging/RealTimeTrajectoryAnalyzer.js` - Trajectory state provider

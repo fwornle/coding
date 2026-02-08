@@ -1,16 +1,16 @@
 @startuml
 !include _standard-style.puml
 
-title Claude Code Status Line System Architecture
+title Unified Status Line System Architecture\n(tmux-based, agent-agnostic)
 
 top to bottom direction
 
-' Main entry point from Claude Code
-component [Claude Code] as CC <<client>>
-component [~/.claude/settings.json] as Config <<config>>
+' Main entry point - any coding agent
+component [Coding Agent\n(Claude / CoPilot / Future)] as CC <<agent>>
+component [tmux-session-wrapper.sh] as TmuxWrapper <<infra>>
 
 ' Execution layer
-component [combined-status-line-wrapper.js] as Wrapper <<wrapper>>
+component [tmux status-right] as TmuxStatus <<infra>>
 component [combined-status-line.js] as MainScript <<orchestrator>>
 
 ' Service providers arranged horizontally
@@ -38,9 +38,9 @@ package "Status Output Format" {
 }
 
 ' Main flow
-CC --> Config : reads statusLine config
-Config --> Wrapper : executes every 5s
-Wrapper --> MainScript : sets CODING_REPO env
+CC --> TmuxWrapper : agent launched via\ntmux_session_wrapper
+TmuxWrapper --> TmuxStatus : configures status-right\nwith combined-status-line.js
+TmuxStatus --> MainScript : invokes every 5s
 
 ' Service orchestration
 MainScript --> GCM : getGlobalConfigStatus()
@@ -61,14 +61,16 @@ ConstraintSvc --> Constraint_Out : compliance % + trajectory
 SemanticSvc --> Semantic_Out : API status
 
 ' Final aggregation
-MainScript --> CC : [GCM✅] [C🟢] [🛡️ 85% 🔍EX] [🧠API✅]
+MainScript --> TmuxStatus : [GCM✅] [C🟢] [🛡️ 85% 🔍EX] [🧠API✅]
 
 note top of CC
-  **Current Status Line Format:**
-  [GCM✅] [C🟢] [🛡️ 85% 🔍EX] [🧠API✅]
+  **Rendering: tmux status-right**
+  All agents wrapped in tmux via
+  tmux-session-wrapper.sh
 
   **Update Frequency:** Every 5 seconds
-  **Color Coding:** Green/Yellow/Red based on overall health
+  **Supports:** tmux formatting codes
+  (#[underscore], #[bold], colors)
 end note
 
 note right of ConstraintAPI

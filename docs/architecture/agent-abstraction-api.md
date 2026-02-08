@@ -61,16 +61,18 @@ getTranscriptAdapter()
 
 The `StatuslineProvider` class handles status display for the agent.
 
+All agents are now wrapped in tmux sessions (via `scripts/tmux-session-wrapper.sh`), so the primary rendering target is tmux's `status-right`. The `formatForTmux()` method is the main rendering path, with `formatForCLI()` available as a fallback for non-tmux environments.
+
 ### Methods
 
 ```javascript
 // Returns StatusData object with text, indicators, health
 async getStatus()
 
-// Returns tmux-formatted status string
+// Returns tmux-formatted status string (primary - used by tmux status bar)
 async formatForTmux()
 
-// Returns CLI-formatted status string (with ANSI codes)
+// Returns CLI-formatted status string (with ANSI codes) - fallback only
 async formatForCLI()
 
 // Returns cached status with configurable TTL
@@ -231,6 +233,7 @@ const sessions = await transcripts.readTranscripts({ limit: 10 });
 | `CODING_AGENT_ADAPTER_PATH` | Path to adapter modules | `lib/agent-api/adapters` |
 | `CODING_HOOKS_CONFIG` | Path to hooks config | `config/hooks-config.json` |
 | `CODING_TRANSCRIPT_FORMAT` | Agent's native format | `claude`, `copilot` |
+| `CODING_TMUX_MODE` | Set when running inside tmux wrapper | `true` |
 
 ## Hook Configuration
 

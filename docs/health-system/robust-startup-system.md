@@ -668,7 +668,8 @@ Comprehensive end-to-end tests validate all environment combinations via `tests/
 - `scripts/ensure-docker.sh` - Docker auto-start and recovery
 - `scripts/detect-network.sh` - Corporate network and proxy detection
 - `scripts/agent-common-setup.sh` - Shared agent initialization
-- `scripts/launch-claude.sh` - Claude launcher (Docker mode detection & startup)
-- `scripts/launch-copilot.sh` - CoPilot launcher (Docker mode detection & startup)
+- `scripts/launch-claude.sh` - Claude launcher (Docker mode detection & startup, tmux wrapping)
+- `scripts/launch-copilot.sh` - CoPilot launcher (Docker mode detection & startup, tmux wrapping)
+- `scripts/tmux-session-wrapper.sh` - Shared tmux wrapper for unified status bar across all agents
 - `tests/integration/launcher-e2e.sh` - E2E test suite
 - `memory-visualizer/api-server.py` - VKB health endpoint implementation

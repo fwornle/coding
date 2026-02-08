@@ -4,7 +4,8 @@
 title Service Startup with PSM Integration
 
 actor User
-participant "launch-claude.sh" as LaunchScript
+participant "launch-{agent}.sh" as LaunchScript
+participant "tmux-session-wrapper.sh" as TmuxWrapper
 participant "start-services.sh" as StartScript
 participant "Global Service\nCoordinator" as Coordinator
 participant "Process State\nManager" as PSM
@@ -14,7 +15,7 @@ participant "StatusLine\nHealth Monitor" as SLM
 
 == Claude Session Startup ==
 
-User -> LaunchScript : coding / claude-mcp
+User -> LaunchScript : coding --claude / --copilot
 activate LaunchScript
 
 LaunchScript -> LaunchScript : generate SESSION_ID\nsetup trap handlers
@@ -82,7 +83,11 @@ deactivate StartScript
 LaunchScript -> Coordinator : verify running
 Coordinator --> LaunchScript : ✅ healthy
 
-LaunchScript --> User : Claude starts
+LaunchScript -> TmuxWrapper : source + tmux_session_wrapper
+activate TmuxWrapper
+TmuxWrapper -> TmuxWrapper : create tmux session\nconfigure status-right
+TmuxWrapper --> User : agent starts inside tmux\nwith unified status bar
+deactivate TmuxWrapper
 deactivate LaunchScript
 
 == Coordinator Manages Dashboard ==
