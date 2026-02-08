@@ -670,20 +670,42 @@ class StatusLineHealthMonitor {
       }
     }
 
-    // AGENT OVERRIDE: Running agent = active session, regardless of transcript age
-    // A freshly started agent in a project with old transcripts should show as 🟢
+    // AGENT AGE CAP: When agent is running, cap the displayed age at monitor uptime
+    // This prevents a fresh session in a project with old transcripts from showing as dormant
+    // The monitor uptime tracks how long this session has been active — use it as the age ceiling
     for (const [projectName, sessionData] of Object.entries(liveSessions)) {
       if (agentSessions.has(projectName) && sessionData.icon !== '🟢' && sessionData.icon !== '❌') {
-        liveSessions[projectName] = {
-          ...sessionData,
-          icon: '🟢',
-          status: 'active',
-          details: 'Agent running'
-        };
+        const projectPath = path.join(agenticDir, projectName);
+        const healthFile = this.getCentralizedHealthFile(projectPath);
+        try {
+          if (fs.existsSync(healthFile)) {
+            const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+            const uptimeMs = (healthData.metrics?.uptimeSeconds || 0) * 1000;
+            const transcriptAge = healthData.transcriptInfo?.ageMs || 0;
+            // Use min(transcriptAge, monitorUptime) — uptime caps the age for fresh sessions
+            const effectiveAge = Math.min(transcriptAge, uptimeMs);
+            // Recalculate icon from effective age
+            liveSessions[projectName] = this.iconFromAge(effectiveAge);
+          }
+        } catch {
+          // On error, keep existing session data
+        }
       }
     }
 
     return liveSessions;
+  }
+
+  /**
+   * Convert an age in ms to the graduated session icon/status
+   */
+  iconFromAge(age) {
+    if (age < 300000) return { status: 'active', icon: '🟢', details: 'Active session' };
+    if (age < 900000) return { status: 'cooling', icon: '🌲', details: 'Cooling down' };
+    if (age < 3600000) return { status: 'fading', icon: '🫒', details: 'Session fading' };
+    if (age < 21600000) return { status: 'dormant', icon: '🪨', details: 'Session dormant' };
+    if (age < 86400000) return { status: 'inactive', icon: '⚫', details: 'Session inactive' };
+    return { status: 'sleeping', icon: '💤', details: 'Session sleeping' };
   }
 
   /**

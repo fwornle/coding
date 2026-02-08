@@ -241,13 +241,13 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 
 **No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings like missing trajectory files or stale health data. Normal session inactivity is shown through the graduated cooling sequence.
 
-**Agent Override**: If an agent process (claude, copilot, opencode) is actively running in a project, the session is always shown as 🟢 Active. This ensures freshly started sessions in projects with old transcripts display correctly.
+**Agent Age Cap**: When an agent process (claude, copilot, opencode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant. The session starts as 🟢 and naturally progresses through the cooling scheme based on how long the current session has been idle.
 
 **Activity Age Calculation**:
 - Uses `transcriptInfo.ageMs` from health file (actual transcript inactivity)
 - Falls back to health file timestamp if transcript age unavailable
 - For stale health files (>5 min old), uses health file age as minimum to ensure closed sessions aren't falsely shown as active
-- Overridden to 🟢 when agent process is detected as running
+- Capped at monitor uptime when agent is running (prevents stale transcript age from showing dormant on fresh sessions)
 
 **Design Rationale**: Projects that aren't actively being worked on should show gradual "cooling" colors rather than alarming red/orange/yellow. These colors are reserved for actual errors and warnings, not normal session lifecycle states.
 
@@ -282,19 +282,27 @@ The StatusLineHealthMonitor (Layer 4) aggregates health from all other layers an
 
 ### Session Discovery
 
-The system uses multiple discovery methods to ensure **only active sessions** (with running transcript monitors) are displayed:
+The system uses multiple discovery methods to find all active sessions:
 
 **Discovery Methods**:
 1. **Running Monitor Detection**: Checks `ps aux` for running `enhanced-transcript-monitor.js` processes
-2. **Registry-based Discovery**: Uses Global LSL Registry for registered sessions
-3. **Dynamic Discovery**: Scans Claude transcript directories for unregistered sessions
-4. **Health File Validation**: Uses centralized health files from `.health/` directory
+2. **Agent Process Detection**: Scans for `claude`, `copilot`, and `opencode` processes via `ps -eo pid,comm` and resolves project from working directory via `lsof`
+3. **Registry-based Discovery**: Uses Global LSL Registry for registered sessions
+4. **Dynamic Discovery**: Scans Claude transcript directories for unregistered sessions
+5. **Health File Validation**: Uses centralized health files from `.health/` directory
 
 **Key Behavior**:
-- Sessions WITH running transcript monitors are shown with full activity status (🟢, 🌲, 🫒, 🪨, ⚫)
+- Sessions with a **running agent process** use age capped at monitor uptime (graduated cooling from session start)
+- Sessions with running transcript monitors but no active agent use graduated activity icons
 - Sessions WITHOUT running monitors BUT with a running agent are shown as 💤 (no monitor yet)
-- Sessions are only removed when the agent process has exited
+- Sessions are **only removed** when the agent process has exited — never hidden
 - The Global Process Supervisor automatically restarts dead monitors within 30 seconds
+
+**Multi-Agent Support**:
+- **Claude**: Detected via `ps -eo pid,comm` with exact match on `claude`
+- **Copilot**: Detected via path-ending match `/copilot$` (comm shows full binary path)
+- **OpenCode**: Detected via path-ending match `/opencode$` (comm shows full binary path)
+- New agents can be added to the detection loop in `getRunningAgentSessions()`
 
 **Example**:
 - `[C🟢 UT🟢]` - coding and ui-template both active
@@ -509,11 +517,16 @@ cat .lsl/global-registry.json | jq '.sessions[] | {project, last_activity}'
 
 **Session not showing that should be?**
 ```bash
+# Check if agent process is detected (claude, copilot, opencode)
+ps -eo pid,comm | awk '/claude$|copilot$|opencode$/ {print}'
+
+# Check if the agent's cwd resolves to the right project
+lsof -p <PID> 2>/dev/null | grep cwd
+
 # Check if transcript monitor is running for that project
 ps aux | grep enhanced-transcript-monitor | grep PROJECT_NAME
 
-# Only sessions with running monitors are shown
-# If no monitor is running, the session won't appear in the status line
+# Sessions show if: agent process running OR transcript monitor running
 ```
 
 **Closed session still showing?**
