@@ -4,24 +4,14 @@
 
 This guide provides step-by-step instructions for integrating new AI coding assistants into the agent-agnostic Coding system.
 
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Architecture](#architecture)
-3. [Quick Start (1 File)](#quick-start-1-file)
-4. [Agent Config Reference](#agent-config-reference)
-5. [Optional Enhancements](#optional-enhancements)
-6. [API Contract](#api-contract)
-7. [Testing](#testing)
-8. [Examples](#examples)
+!!! success "1-File Integration"
+    Adding a new agent requires **only a single config file** (`config/agents/<name>.sh`). No changes to shared code needed.
 
 ---
 
 ## Overview
 
-The Coding system is designed to support multiple AI coding assistants through a config-driven architecture. All agents share common infrastructure:
+The Coding system supports multiple AI coding assistants through a config-driven architecture. All agents share common infrastructure:
 
 - **Tmux Session Wrapping** - Unified status bar rendering via `tmux-session-wrapper.sh`
 - **Live Session Logging (LSL)** - Automatic transcript monitoring
@@ -31,8 +21,6 @@ The Coding system is designed to support multiple AI coding assistants through a
 - **Browser Automation** - Playwright integration
 - **Session Continuity** - Cross-session context
 - **Pipe-Pane Capture** - Optional I/O capture for non-native agents (prompt detection, hook firing)
-
-**Adding a new agent requires only a single config file.** No changes to shared code.
 
 ---
 
@@ -57,6 +45,7 @@ The system follows a layered architecture:
 ![Agent Integration Flow](../images/agent-integration-flow.png)
 
 When a new agent is launched:
+
 1. `bin/coding` validates config exists in `config/agents/<name>.sh`
 2. Agent detection checks CLI availability via `AGENT_REQUIRES_COMMANDS`
 3. Shared orchestrator (`launch-agent-common.sh`) sources the config
@@ -71,6 +60,7 @@ When a new agent is launched:
 ![Launcher Docker Mode Flow](../images/launcher-docker-mode-flow.png)
 
 All agents share identical Docker mode logic via `launch-agent-common.sh`:
+
 - Transition lock checking (waits for mode transitions)
 - 3-tier Docker mode detection
 - Conditional Docker/native service startup
@@ -118,14 +108,14 @@ coding --agent myagent --dry-run
 coding --agent myagent
 ```
 
-The agent will automatically get:
-- Docker mode detection and service startup
-- Monitoring verification
-- LSL transcript monitoring
-- Tmux session with status bar
-- Pipe-pane I/O capture (since `AGENT_ENABLE_PIPE_CAPTURE=true`)
-- Session registration and cleanup
-- All shared infrastructure
+!!! info "What You Get Automatically"
+    - Docker mode detection and service startup
+    - Monitoring verification
+    - LSL transcript monitoring
+    - Tmux session with status bar
+    - Pipe-pane I/O capture (since `AGENT_ENABLE_PIPE_CAPTURE=true`)
+    - Session registration and cleanup
+    - All shared infrastructure
 
 ---
 
@@ -174,7 +164,8 @@ agent_cleanup() {
 }
 ```
 
-All hooks have access to `_agent_log` for logging, `$CODING_REPO`, `$TARGET_PROJECT_DIR`, `$DOCKER_MODE`, `$SESSION_ID`, and all other env vars set by the orchestrator.
+!!! tip "Hook Environment"
+    All hooks have access to `_agent_log` for logging, `$CODING_REPO`, `$TARGET_PROJECT_DIR`, `$DOCKER_MODE`, `$SESSION_ID`, and all other env vars set by the orchestrator.
 
 ---
 
@@ -278,39 +269,40 @@ isInitialized(): boolean
 
 ### Type Definitions
 
-```typescript
-interface Entity {
-  name: string;
-  entityType: string;
-  observations: string[];
-  significance?: number;
-  created?: string;
-  lastUpdated?: string;
-  metadata?: Record<string, any>;
-}
+??? note "Full Type Definitions (click to expand)"
+    ```typescript
+    interface Entity {
+      name: string;
+      entityType: string;
+      observations: string[];
+      significance?: number;
+      created?: string;
+      lastUpdated?: string;
+      metadata?: Record<string, any>;
+    }
 
-interface Relation {
-  from: string;
-  to: string;
-  relationType: string;
-  created?: string;
-  metadata?: Record<string, any>;
-}
+    interface Relation {
+      from: string;
+      to: string;
+      relationType: string;
+      created?: string;
+      metadata?: Record<string, any>;
+    }
 
-interface GraphData {
-  nodes: Entity[];
-  edges: Relation[];
-  metadata?: { nodeCount: number; edgeCount: number; lastAccessed: string; };
-}
+    interface GraphData {
+      nodes: Entity[];
+      edges: Relation[];
+      metadata?: { nodeCount: number; edgeCount: number; lastAccessed: string; };
+    }
 
-interface CreateResult { success: boolean; created?: number; updated?: number; errors?: string[]; }
-interface DeleteResult { success: boolean; deleted: number; notFound: number; }
-interface NavigationResult { success: boolean; url?: string; error?: string; }
-interface ActionResult { success: boolean; result?: any; error?: string; }
-interface ConversationEntry { timestamp: string; type: string; content: any; metadata?: Record<string, any>; }
-interface LogResult { success: boolean; logFile?: string; error?: string; }
-interface HistoryOptions { limit?: number; startDate?: Date; endDate?: Date; type?: string; }
-```
+    interface CreateResult { success: boolean; created?: number; updated?: number; errors?: string[]; }
+    interface DeleteResult { success: boolean; deleted: number; notFound: number; }
+    interface NavigationResult { success: boolean; url?: string; error?: string; }
+    interface ActionResult { success: boolean; result?: any; error?: string; }
+    interface ConversationEntry { timestamp: string; type: string; content: any; metadata?: Record<string, any>; }
+    interface LogResult { success: boolean; logFile?: string; error?: string; }
+    interface HistoryOptions { limit?: number; startDate?: Date; endDate?: Date; type?: string; }
+    ```
 
 ---
 
@@ -401,9 +393,9 @@ coding --lsl-status
 
 ---
 
-## References
+## Related Documentation
 
-- [Architecture Overview](architecture/README.md)
-- [Live Session Logging](lsl/README.md)
-- [Constraint Monitoring](constraints/README.md)
-- [Status Line System](health-system/README.md)
+- [Architecture Overview](../architecture/index.md)
+- [Core Systems](../core-systems/index.md)
+- [Status Line Guide](status-line.md)
+- [Health Dashboard](health-dashboard.md)

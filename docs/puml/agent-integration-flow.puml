@@ -4,87 +4,88 @@
 title Agent Integration Flow\nAdding a New Coding Agent
 
 actor "Developer" as dev
+participant "config/agents/{name}.sh" as config
 participant "bin/coding" as main
 participant "AgentDetector" as detector
-participant "AgentRegistry" as registry
-participant "launch-{agent}.sh" as launcher
-participant "agent-common-setup.sh" as common
-participant "start-services.sh" as services
+participant "launch-agent-common.sh" as common
+participant "agent-common-setup.sh" as setup
 participant "tmux-session-wrapper.sh" as tmux
 participant "New Agent" as agent
-participant "AgentAdapter" as adapter
 
-== Detection Phase ==
+== Step 1: Create Config File ==
+
+dev -> config: Create config/agents/newagent.sh
+note right
+  **Only file needed:**
+  AGENT_NAME="newagent"
+  AGENT_COMMAND="newagent"
+  AGENT_REQUIRES_COMMANDS="newagent"
+  agent_check_requirements() { ... }
+end note
+
+== Detection Phase (Automatic) ==
+
 dev -> main : coding --agent newagent
+main -> main : Check config/agents/newagent.sh exists
 main -> detector : detectAll()
-detector -> agent : check if available
+detector -> detector : Scan config/agents/*.sh\nparse AGENT_REQUIRES_COMMANDS
+detector -> agent : commandExists("newagent")
 agent --> detector : available = true
 detector --> main : newagent detected
 
-== Registry Phase ==
-main -> registry : getAdapter("newagent")
-registry -> adapter : new NewAgentAdapter()
-adapter -> adapter : initialize()
-adapter --> registry : adapter instance
-registry --> main : ready
-
 == Launch Phase ==
-main -> launcher : exec launch-newagent.sh
-launcher -> services : start shared services
-services --> launcher : VKB, LSL, Constraints ready
 
-launcher -> common : source agent-common-setup.sh
-launcher -> common : agent_common_init()
-common -> common : ensure_specstory_logs_tracked()
-common -> common : start_transcript_monitoring()
-common -> common : start_statusline_health_monitor()
-common -> common : start_global_lsl_monitoring()
-common -> common : show_session_reminder()
-common --> launcher : common setup complete
+alt launch-newagent.sh exists
+  main -> common : exec launch-newagent.sh\n(thin wrapper)
+else No agent-specific launcher
+  main -> common : exec launch-generic.sh\n(config path passed)
+end
+
+common -> config : source config/agents/newagent.sh
+common -> common : Docker mode detection
+common -> common : Service startup
+common -> common : Monitoring verification
+
+common -> config : agent_check_requirements()
+common -> config : agent_pre_launch()
+
+common -> setup : agent_common_init()
+setup -> setup : ensure_specstory_logs_tracked()
+setup -> setup : start_transcript_monitoring()
+setup -> setup : start_statusline_health_monitor()
+setup -> setup : start_global_lsl_monitoring()
+setup -> setup : show_session_reminder()
+setup --> common : common setup complete
 
 == Tmux Wrapping ==
-launcher -> tmux : source tmux-session-wrapper.sh
-launcher -> tmux : tmux_session_wrapper {agent}
+
+common -> tmux : tmux_session_wrapper AGENT_COMMAND
 tmux -> tmux : create tmux session\ncoding-{agent}-{PID}
 tmux -> tmux : configure status-right\n(combined-status-line.js)
+
+alt AGENT_ENABLE_PIPE_CAPTURE = true
+  tmux -> tmux : tmux pipe-pane + capture-monitor.js
+end
+
 tmux -> agent : exec inside tmux
 agent --> tmux : agent running in tmux
 
-note right of tmux
-  **Tmux wrapper provides:**
-  • Unified status bar for all agents
-  • Nesting guard (reuses existing tmux)
-  • Environment propagation
-  • Mouse forwarding
+note right of config
+  **Adding a new agent requires ONLY:**
+  1. config/agents/<name>.sh
+  Zero changes to shared code.
+
+  **Optionally add:**
+  2. lib/agent-api/adapters/<name>-adapter.js
+  3. scripts/launch-<name>.sh (thin wrapper)
 end note
 
-== Runtime Phase ==
-agent -> adapter : tool call (memory/browser/log)
-adapter -> adapter : process request
-adapter --> agent : response
-
-note right of adapter
-  **Agent Adapter provides:**
-  • Memory operations
-  • Browser automation
-  • Session logging
-  • Transcript monitoring
-end note
-
-note right of common
+note right of setup
   **Common setup ensures:**
-  • LSL system running
-  • Gitignore configured
-  • Monitoring active
-  • Session continuity
-end note
-
-note right of services
-  **Shared services:**
-  • VKB Server (8080)
-  • Semantic Analysis
-  • Constraint Monitor
-  • Live Logging System
+  - LSL system running
+  - Gitignore configured
+  - Monitoring active
+  - Session continuity
 end note
 
 @enduml
