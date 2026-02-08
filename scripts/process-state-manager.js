@@ -41,8 +41,9 @@ class ProcessStateManager {
    */
   async initialize() {
     const defaultRegistry = {
-      version: '3.0.0',
+      version: '3.1.0',
       lastChange: Date.now(),
+      stoppedProjects: {},
       sessions: {},
       services: {
         global: {},
@@ -130,6 +131,11 @@ class ProcessStateManager {
           registry.services.projects[serviceInfo.projectPath] = {};
         }
         registry.services.projects[serviceInfo.projectPath][serviceInfo.name] = serviceRecord;
+
+        // Auto-clear stop marker when a new monitor registers (new session resuming)
+        if (registry.stoppedProjects?.[serviceInfo.projectPath]) {
+          delete registry.stoppedProjects[serviceInfo.projectPath];
+        }
       } else if (serviceInfo.type === 'per-session') {
         if (!serviceInfo.sessionId) {
           throw new Error('sessionId required for per-session services');
@@ -421,7 +427,19 @@ class ProcessStateManager {
         }
       }
 
-      const total = globalCleaned + projectsCleaned + sessionsCleaned;
+      // Clean up expired stop markers
+      let stoppedCleaned = 0;
+      const now = Date.now();
+      if (registry.stoppedProjects) {
+        for (const [projectPath, marker] of Object.entries(registry.stoppedProjects)) {
+          if (marker.expiresAt && now > marker.expiresAt) {
+            delete registry.stoppedProjects[projectPath];
+            stoppedCleaned++;
+          }
+        }
+      }
+
+      const total = globalCleaned + projectsCleaned + sessionsCleaned + stoppedCleaned;
       if (total > 0) {
         await this.writeRegistry(registry);
       }
@@ -430,6 +448,7 @@ class ProcessStateManager {
         globalCleaned,
         projectsCleaned,
         sessionsCleaned,
+        stoppedCleaned,
         total
       };
     });
@@ -497,6 +516,106 @@ class ProcessStateManager {
    */
   async cleanupStaleServices() {
     return this.cleanupDeadProcesses();
+  }
+
+  /**
+   * Mark a project as intentionally stopped (prevents restart loops)
+   *
+   * @param {string} projectPath - Absolute project path
+   * @param {Object} [options]
+   * @param {string} [options.reason] - Why it was stopped (default: 'graceful_shutdown')
+   * @param {string} [options.stoppedBy] - Which service stopped it
+   * @param {number} [options.pid] - PID of the stopped process
+   * @param {number} [options.ttlMs] - Time-to-live in ms (default: 24h)
+   */
+  async stopProject(projectPath, options = {}) {
+    return this.withLock(async () => {
+      const registry = await this.readRegistry();
+      if (!registry.stoppedProjects) {
+        registry.stoppedProjects = {};
+      }
+
+      const ttlMs = options.ttlMs || 24 * 60 * 60 * 1000; // 24h default
+      registry.stoppedProjects[projectPath] = {
+        stoppedAt: Date.now(),
+        expiresAt: Date.now() + ttlMs,
+        reason: options.reason || 'graceful_shutdown',
+        stoppedBy: options.stoppedBy || 'unknown',
+        lastPid: options.pid || null
+      };
+
+      await this.writeRegistry(registry);
+      return true;
+    });
+  }
+
+  /**
+   * Check if a project is intentionally stopped
+   * Returns false if marker is expired or missing (fail-open)
+   *
+   * @param {string} projectPath - Absolute project path
+   * @returns {Promise<boolean>}
+   */
+  async isProjectStopped(projectPath) {
+    try {
+      return await this.withLock(async () => {
+        const registry = await this.readRegistry();
+        const marker = registry.stoppedProjects?.[projectPath];
+
+        if (!marker) return false;
+
+        // Auto-clean expired markers
+        if (marker.expiresAt && Date.now() > marker.expiresAt) {
+          delete registry.stoppedProjects[projectPath];
+          await this.writeRegistry(registry);
+          return false;
+        }
+
+        return true;
+      });
+    } catch {
+      // Fail-open: if check fails, allow restart
+      return false;
+    }
+  }
+
+  /**
+   * Manually clear a project's stop marker
+   *
+   * @param {string} projectPath - Absolute project path
+   * @returns {Promise<boolean>} true if marker was cleared
+   */
+  async clearProjectStop(projectPath) {
+    return this.withLock(async () => {
+      const registry = await this.readRegistry();
+      if (registry.stoppedProjects?.[projectPath]) {
+        delete registry.stoppedProjects[projectPath];
+        await this.writeRegistry(registry);
+        return true;
+      }
+      return false;
+    });
+  }
+
+  /**
+   * Get all stopped projects (for CLI/debugging)
+   *
+   * @returns {Promise<Object>} Map of projectPath -> stop marker
+   */
+  async getStoppedProjects() {
+    return this.withLock(async () => {
+      const registry = await this.readRegistry();
+      const stopped = {};
+      const now = Date.now();
+
+      for (const [projectPath, marker] of Object.entries(registry.stoppedProjects || {})) {
+        if (!marker.expiresAt || now <= marker.expiresAt) {
+          stopped[projectPath] = marker;
+        }
+      }
+
+      return stopped;
+    });
   }
 
   /**
@@ -776,6 +895,40 @@ if (isMainModule) {
           console.log(JSON.stringify(registry, null, 2));
           break;
 
+        case 'stopped': {
+          const stoppedProjects = await manager.getStoppedProjects();
+          const entries = Object.entries(stoppedProjects);
+          if (entries.length === 0) {
+            process.stdout.write('\n\u2705 No stopped projects\n\n');
+          } else {
+            process.stdout.write(`\n\ud83d\uded1 Stopped Projects (${entries.length}):\n\n`);
+            for (const [projectPath, marker] of entries) {
+              const ago = Math.round((Date.now() - marker.stoppedAt) / 1000 / 60);
+              const expiresIn = Math.round((marker.expiresAt - Date.now()) / 1000 / 60);
+              process.stdout.write(`   ${projectPath}\n`);
+              process.stdout.write(`     Stopped ${ago}m ago by ${marker.stoppedBy} (${marker.reason})\n`);
+              process.stdout.write(`     Expires in ${expiresIn}m | Last PID: ${marker.lastPid || 'unknown'}\n\n`);
+            }
+          }
+          break;
+        }
+
+        case 'unstop': {
+          const targetPath = process.argv[3];
+          if (!targetPath) {
+            process.stderr.write('Usage: node process-state-manager.js unstop <project-path>\n');
+            process.exit(1);
+          }
+          const cleared = await manager.clearProjectStop(targetPath);
+          if (cleared) {
+            process.stdout.write(`\u2705 Cleared stop marker for ${targetPath}\n`);
+          } else {
+            process.stdout.write(`\u2139\ufe0f  No stop marker found for ${targetPath}\n`);
+          }
+          break;
+        }
+
+
         default:
           console.log('Process State Manager CLI\n');
           console.log('Usage: node process-state-manager.js <command>\n');
@@ -783,7 +936,9 @@ if (isMainModule) {
           console.log('  init     - Initialize registry file');
           console.log('  status   - Show health status of all services');
           console.log('  cleanup  - Remove dead processes from registry');
-          console.log('  dump     - Dump entire registry as JSON');
+          console.log('  dump          - Dump entire registry as JSON');
+          console.log('  stopped       - List intentionally stopped projects');
+          console.log('  unstop <path> - Clear stop marker for a project');
       }
     } catch (error) {
       console.error('❌ Error:', error.message);
