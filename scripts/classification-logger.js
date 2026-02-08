@@ -314,9 +314,10 @@ class ClassificationLogger {
     const summaryFiles = [];
 
     // Group decisions by time window
+    // Use disk-based decisions to also regenerate missing markdown files for older windows
+    const allDecisions = this.readAllDecisionsFromDisk();
     const decisionsByWindow = new Map();
-    for (const decision of this.decisions) {
-      if (decision.type !== 'classification_decision') continue;
+    for (const decision of allDecisions) {
 
       const promptTimestamp = decision.timeRange?.start || new Date().toISOString();
       const localDate = utcToLocalTime(promptTimestamp);
@@ -343,14 +344,19 @@ class ClassificationLogger {
       const previousCount = this.decisionCountByWindow.get(fullWindow) || 0;
       const currentCount = windowDecisions.length;
 
-      // Skip if no new decisions in this window
-      if (currentCount === previousCount && this.finalizedWindows.has(fullWindow)) {
-        continue;
-      }
-
       // Split decisions by target
       const localDecisions = windowDecisions.filter(d => !d.classification.isCoding);
       const codingDecisions = windowDecisions.filter(d => d.classification.isCoding);
+
+      // Skip if no new decisions AND all required markdown files exist
+      if (currentCount === previousCount && this.finalizedWindows.has(fullWindow)) {
+        const localFileExists = localDecisions.length === 0 || fs.existsSync(path.join(this.logDir, `${fullWindow}.md`));
+        const codingLogDir = path.join(this.codingRepo, '.specstory', 'logs', 'classification');
+        const codingFileExists = codingDecisions.length === 0 || fs.existsSync(path.join(codingLogDir, `${fullWindow}_from-${this.projectName}.md`));
+        if (localFileExists && codingFileExists) {
+          continue;
+        }
+      }
 
       // CRITICAL FIX: Parse window timestamp from fullWindow string
       // Format: YYYY-MM-DD_HHMM-HHMM_userhash

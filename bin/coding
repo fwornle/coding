@@ -38,7 +38,7 @@ USAGE:
   coding-agent [OPTIONS] [COMMAND_ARGS...]
 
 OPTIONS:
-  --agent AGENT      Force specific agent (claude|copilot)
+  --agent AGENT      Force specific agent (any name with config/agents/<name>.sh)
   --claude           Force Claude Code (same as --agent claude)
   --copilot, --copi  Force CoPilot (same as --agent copilot)
   --copilot-stop     Stop all CoPilot fallback services
@@ -65,6 +65,7 @@ EXAMPLES:
 AGENTS:
   claude     Claude Code with MCP servers (memory, browser, logging)
   copilot    GitHub CoPilot with fallback services
+  <name>     Any agent with a config at config/agents/<name>.sh
 
 For more information, see docs/agent-agnostic-implementation-plan.md
 EOF
@@ -163,18 +164,19 @@ else
   log "Detected agent: $AGENT"
 fi
 
-# Validate agent
-case "$AGENT" in
-  claude|copilot)
-    ;;
-  *)
-    error "Unsupported agent: $AGENT. Must be 'claude' or 'copilot'"
-    ;;
-esac
+# Resolve the repo path early (needed for config lookup)
+CODING_REPO_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Validate agent: check for config file in config/agents/
+AGENT_CONFIG="$CODING_REPO_PATH/config/agents/${AGENT}.sh"
+if [ ! -f "$AGENT_CONFIG" ]; then
+  # List available agents from config/agents/*.sh
+  AVAILABLE=$(ls "$CODING_REPO_PATH/config/agents/"*.sh 2>/dev/null | xargs -I{} basename {} .sh | tr '\n' ', ' | sed 's/,$//')
+  error "Unsupported agent: $AGENT. No config at config/agents/${AGENT}.sh. Available: ${AVAILABLE:-none}"
+fi
 
 # Capture the directory where coding was invoked from (before any cd operations)
 INVOKED_FROM_DIR="$(pwd)"
-CODING_REPO_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Validate and set project directory
 if [ -n "$PROJECT_DIR" ]; then
@@ -209,13 +211,12 @@ export CODING_HOOKS_CONFIG="$SCRIPT_DIR/../config/hooks-config.json"
 export CODING_TRANSCRIPT_FORMAT="$AGENT"
 
 # Launch appropriate agent
-case "$AGENT" in
-  claude)
-    log "Launching Claude Code with MCP..."
-    exec "$SCRIPT_DIR/../scripts/launch-claude.sh" "${ARGS[@]}"
-    ;;
-  copilot)
-    log "Launching CoPilot with fallback services..."
-    exec "$SCRIPT_DIR/../scripts/launch-copilot.sh" "${ARGS[@]}"
-    ;;
-esac
+# Prefer agent-specific launcher if it exists, otherwise use generic launcher
+AGENT_LAUNCHER="$SCRIPT_DIR/../scripts/launch-${AGENT}.sh"
+if [ -x "$AGENT_LAUNCHER" ]; then
+  log "Launching $AGENT via agent-specific launcher..."
+  exec "$AGENT_LAUNCHER" "${ARGS[@]}"
+else
+  log "Launching $AGENT via generic launcher..."
+  exec "$SCRIPT_DIR/../scripts/launch-generic.sh" "$AGENT_CONFIG" "${ARGS[@]}"
+fi
