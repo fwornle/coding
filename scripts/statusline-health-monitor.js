@@ -280,34 +280,21 @@ class StatusLineHealthMonitor {
         }
       }
 
-      // Method 2: Find Copilot agent processes (copilot binary with cwd in Agentic/)
-      let copilotPids = '';
-      try {
-        copilotPids = execSync('ps -eo pid,comm | awk \'$2 == "copilot" {print $1}\'', { encoding: 'utf8', timeout: 5000 });
-      } catch (psError) {
-        // copilot not running is normal
-      }
-
-      if (copilotPids && copilotPids.trim()) {
-        for (const pidStr of copilotPids.trim().split('\n')) {
-          const pid = pidStr.trim();
-          if (pid) extractProjectFromPid(pid);
+      // Method 2: Find non-Claude agent processes (copilot, opencode, etc.)
+      // These binaries show full path in ps comm field, so match on basename
+      for (const agentName of ['copilot', 'opencode']) {
+        let agentPids = '';
+        try {
+          agentPids = execSync(`ps -eo pid,comm | awk '/${agentName}$/ {print $1}'`, { encoding: 'utf8', timeout: 5000 });
+        } catch (psError) {
+          // agent not running is normal
         }
-      }
 
-      // Method 2b: Find OpenCode agent processes
-      // OpenCode's comm field shows full path, so match on basename ending with /opencode
-      let opencodePids = '';
-      try {
-        opencodePids = execSync('ps -eo pid,comm | awk \'/\\/opencode$/ {print $1}\'', { encoding: 'utf8', timeout: 5000 });
-      } catch (psError) {
-        // opencode not running is normal
-      }
-
-      if (opencodePids && opencodePids.trim()) {
-        for (const pidStr of opencodePids.trim().split('\n')) {
-          const pid = pidStr.trim();
-          if (pid) extractProjectFromPid(pid);
+        if (agentPids && agentPids.trim()) {
+          for (const pidStr of agentPids.trim().split('\n')) {
+            const pid = pidStr.trim();
+            if (pid) extractProjectFromPid(pid);
+          }
         }
       }
 
@@ -631,13 +618,21 @@ class StatusLineHealthMonitor {
       this.log(`Detected Claude session without monitor: ${projectName}`, 'DEBUG');
     }
 
-    // ORPHAN CLEANUP: Remove sessions with extremely stale transcripts (>6 hours)
-    // These indicate orphaned monitors running without an active Claude session
-    // A running monitor process does NOT mean there's an active conversation
+    // ORPHAN CLEANUP: Remove sessions with stale transcripts ONLY if no agent is running
+    // A stale transcript + no agent = truly orphaned monitor → remove
+    // A stale transcript + agent running = freshly started session → keep as active
     const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
     const cleanedSessions = {};
 
     for (const [projectName, sessionData] of Object.entries(sessions)) {
+      const hasRunningAgent = agentSessions.has(projectName);
+
+      // Never remove sessions with a running agent
+      if (hasRunningAgent) {
+        cleanedSessions[projectName] = sessionData;
+        continue;
+      }
+
       // Check health file for transcript age
       const projectPath = path.join(agenticDir, projectName);
       const healthFile = this.getCentralizedHealthFile(projectPath);
@@ -647,9 +642,9 @@ class StatusLineHealthMonitor {
           const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
           const transcriptAge = healthData.transcriptInfo?.ageMs || 0;
 
-          // Skip sessions with transcripts older than 6 hours (orphaned monitors)
+          // Remove orphaned sessions (stale transcript + no agent)
           if (transcriptAge > SIX_HOURS_MS) {
-            this.log(`Filtering out orphaned session ${projectName} (transcript age: ${Math.round(transcriptAge / 3600000)}h)`, 'DEBUG');
+            this.log(`Filtering out orphaned session ${projectName} (transcript age: ${Math.round(transcriptAge / 3600000)}h, no agent)`, 'DEBUG');
             continue;
           }
         } catch (readError) {
@@ -672,6 +667,19 @@ class StatusLineHealthMonitor {
         liveSessions[projectName] = sessionData;
       } else {
         this.log(`Removed closed session ${projectName} from statusline (agent not running, was: ${sessionData.status})`, 'DEBUG');
+      }
+    }
+
+    // AGENT OVERRIDE: Running agent = active session, regardless of transcript age
+    // A freshly started agent in a project with old transcripts should show as 🟢
+    for (const [projectName, sessionData] of Object.entries(liveSessions)) {
+      if (agentSessions.has(projectName) && sessionData.icon !== '🟢' && sessionData.icon !== '❌') {
+        liveSessions[projectName] = {
+          ...sessionData,
+          icon: '🟢',
+          status: 'active',
+          details: 'Agent running'
+        };
       }
     }
 
@@ -2136,10 +2144,8 @@ class StatusLineHealthMonitor {
       statusLine += `[GCM:${gcmHealth.icon}]`;
     }
 
-    // Project Sessions - only show ACTIVE sessions (exclude sleeping/inactive >24h)
-    // Filter out stale sessions that haven't been used in over 24 hours
-    const activeSessionEntries = Object.entries(sessionHealth)
-      .filter(([_, health]) => !['sleeping', 'inactive'].includes(health.status) && health.icon !== '💤' && health.icon !== '⚫');
+    // Project Sessions - show ALL sessions (sleeping shown as 💤, never hidden)
+    const activeSessionEntries = Object.entries(sessionHealth);
 
     if (activeSessionEntries.length > 0) {
       const sessionStatuses = activeSessionEntries
