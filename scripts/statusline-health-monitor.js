@@ -643,7 +643,22 @@ class StatusLineHealthMonitor {
       cleanedSessions[projectName] = sessionData;
     }
 
-    return cleanedSessions;
+    // SHUTDOWN CLEANUP: Remove sessions where agent process has exited
+    // When a user shuts down a coding session, it should disappear from the
+    // statusline immediately — not linger as "cooling down" based on transcript age
+    const liveSessions = {};
+    for (const [projectName, sessionData] of Object.entries(cleanedSessions)) {
+      const hasRunningAgent = agentSessions.has(projectName);
+
+      if (hasRunningAgent || sessionData.status === 'no-monitor') {
+        // Agent is running, or already handled as no-monitor — keep
+        liveSessions[projectName] = sessionData;
+      } else {
+        this.log(`Removed closed session ${projectName} from statusline (agent not running, was: ${sessionData.status})`, 'DEBUG');
+      }
+    }
+
+    return liveSessions;
   }
 
   /**

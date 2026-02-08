@@ -315,7 +315,6 @@ test_verbose_agent_selection() {
 
 # Test: Docker auto-start logic exists in shared helper
 test_docker_autostart_exists() {
-  # Verify the shared Docker helper is sourced by both launchers
   local coding_root
   coding_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
@@ -330,16 +329,64 @@ test_docker_autostart_exists() {
     return 1
   fi
 
-  # Verify both launchers source it
-  if ! grep -q "ensure-docker.sh" "$coding_root/scripts/launch-claude.sh"; then
-    echo "launch-claude.sh does not source ensure-docker.sh"
+  # Verify launch-agent-common.sh sources ensure-docker.sh (shared orchestrator)
+  if ! grep -q "ensure-docker.sh" "$coding_root/scripts/launch-agent-common.sh"; then
+    echo "launch-agent-common.sh does not source ensure-docker.sh"
     return 1
   fi
 
-  if ! grep -q "ensure-docker.sh" "$coding_root/scripts/launch-copilot.sh"; then
-    echo "launch-copilot.sh does not source ensure-docker.sh"
+  # Verify both thin-wrapper launchers delegate to launch-agent-common.sh
+  if ! grep -q "launch-agent-common.sh" "$coding_root/scripts/launch-claude.sh"; then
+    echo "launch-claude.sh does not source launch-agent-common.sh"
     return 1
   fi
+
+  if ! grep -q "launch-agent-common.sh" "$coding_root/scripts/launch-copilot.sh"; then
+    echo "launch-copilot.sh does not source launch-agent-common.sh"
+    return 1
+  fi
+}
+
+# Test: Agent config files exist for known agents
+test_agent_configs_exist() {
+  local coding_root
+  coding_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+  if [ ! -f "$coding_root/config/agents/claude.sh" ]; then
+    echo "config/agents/claude.sh not found"
+    return 1
+  fi
+
+  if [ ! -f "$coding_root/config/agents/copilot.sh" ]; then
+    echo "config/agents/copilot.sh not found"
+    return 1
+  fi
+
+  # Verify configs define AGENT_NAME
+  if ! grep -q 'AGENT_NAME="claude"' "$coding_root/config/agents/claude.sh"; then
+    echo "claude.sh missing AGENT_NAME"
+    return 1
+  fi
+
+  if ! grep -q 'AGENT_NAME="copilot"' "$coding_root/config/agents/copilot.sh"; then
+    echo "copilot.sh missing AGENT_NAME"
+    return 1
+  fi
+}
+
+# Test: Generic launcher fallback works for config-only agents
+test_generic_launcher_fallback() {
+  local output
+  local exit_code
+
+  # opencode has a config but no launch-opencode.sh — should use generic launcher
+  output=$(
+    export CODING_FORCE_CN=false
+    run_coding_dry --verbose --agent opencode
+  ) && exit_code=0 || exit_code=$?
+
+  assert_output_contains "$output" "DRY-RUN" "should reach dry-run exit" || return 1
+  assert_output_contains "$output" "Agent=opencode" "should select opencode agent" || return 1
 }
 
 # Test: dry-run produces DRY-RUN markers
@@ -429,6 +476,8 @@ run_test "Invalid agent name produces error"   test_invalid_agent
 run_test "--help shows help text"              test_help_flag
 run_test "--verbose shows agent selection"     test_verbose_agent_selection
 run_test "Docker auto-start logic exists"       test_docker_autostart_exists
+run_test "Agent config files exist"             test_agent_configs_exist
+run_test "Generic launcher fallback works"      test_generic_launcher_fallback
 run_test "dry-run produces DRY-RUN markers"    test_dry_run_markers
 run_test "CODING_FORCE_CN=true detected"       test_force_cn_true
 run_test "CODING_FORCE_CN=false detected"      test_force_cn_false

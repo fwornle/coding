@@ -11,6 +11,11 @@
 #   1. Already inside tmux ($TMUX set) → configure current session's status bar, then exec
 #   2. Otherwise → create detached session, configure status bar, attach
 #
+# Optional pipe-pane capture (for non-native agents like CoPilot):
+#   Set AGENT_ENABLE_PIPE_CAPTURE=true before calling tmux_session_wrapper
+#   Set AGENT_PROMPT_REGEX to the prompt detection pattern
+#   Capture file and monitor process are cleaned up automatically
+#
 # Prerequisite: tmux must be installed (handled by install.sh)
 
 tmux_session_wrapper() {
@@ -68,6 +73,7 @@ tmux_session_wrapper() {
     CODING_AGENT_ADAPTER_PATH CODING_HOOKS_CONFIG CODING_TRANSCRIPT_FORMAT
     TRANSCRIPT_SOURCE_PROJECT CLAUDE_SESSION_ID COPILOT_SESSION_ID
     ANTHROPIC_API_KEY COPILOT_HTTP_ADAPTER_PID COPI_LOG_DIR
+    AGENT_ENABLE_PIPE_CAPTURE AGENT_PROMPT_REGEX SESSION_ID
     PATH HOME USER SHELL TERM
   )
 
@@ -93,8 +99,37 @@ tmux_session_wrapper() {
   # Configure status bar on the new session
   _configure_tmux_status "$session_name"
 
+  # --- Optional: pipe-pane capture for non-native agents ---
+  local capture_monitor_pid=""
+  if [ "${AGENT_ENABLE_PIPE_CAPTURE}" = "true" ]; then
+    local capture_dir="${COPI_LOG_DIR:-${coding_repo}/.logs/capture}"
+    mkdir -p "$capture_dir"
+    local capture_file="${capture_dir}/capture-${session_name}-$(date +%s).txt"
+    export TMUX_CAPTURE_FILE="$capture_file"
+
+    echo "[tmux-wrapper] Enabling pipe-pane capture: $capture_file"
+    tmux pipe-pane -t "$session_name" -o "cat >> '${capture_file}'"
+
+    # Start capture monitor in background (prompt detection + hook firing)
+    if [ -f "${coding_repo}/scripts/capture-monitor.js" ]; then
+      CAPTURE_FILE="$capture_file" \
+        AGENT_PROMPT_REGEX="${AGENT_PROMPT_REGEX:-}" \
+        CODING_REPO="$coding_repo" \
+        SESSION_ID="${SESSION_ID:-}" \
+        COPI_LOG_DIR="${capture_dir}" \
+        node "${coding_repo}/scripts/capture-monitor.js" &
+      capture_monitor_pid=$!
+      echo "[tmux-wrapper] Capture monitor started (PID: $capture_monitor_pid)"
+    fi
+  fi
+
   # Attach — blocks until the agent exits or user detaches
   tmux attach-session -t "$session_name"
+
+  # Cleanup: stop capture monitor if running
+  if [ -n "$capture_monitor_pid" ] && kill -0 "$capture_monitor_pid" 2>/dev/null; then
+    kill "$capture_monitor_pid" 2>/dev/null || true
+  fi
 
   # After attach returns, clean up the session if it still exists
   tmux kill-session -t "$session_name" 2>/dev/null || true
