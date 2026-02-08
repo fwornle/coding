@@ -1061,6 +1061,18 @@ class CombinedStatusLine {
         const psm = new ProcessStateManager();
         await psm.initialize();
 
+        // Check if project was intentionally stopped (prevents restart loops)
+        try {
+          if (await psm.isProjectStopped(projectPath)) {
+            if (process.env.DEBUG_STATUS) {
+              console.error('DEBUG: Project intentionally stopped, not restarting monitor');
+            }
+            return;
+          }
+        } catch {
+          // Fail-open: if check fails, continue with normal flow
+        }
+
         const existingMonitor = await psm.getService('enhanced-transcript-monitor', 'per-project', { projectPath });
 
         if (existingMonitor) {
@@ -1285,6 +1297,18 @@ class CombinedStatusLine {
 
       // Check each project's monitor health
       for (const projectPath of projects) {
+        // Skip projects that were intentionally stopped (prevents restart loops)
+        try {
+          if (await psm.isProjectStopped(projectPath)) {
+            if (process.env.DEBUG_STATUS) {
+              console.error(`DEBUG: Skipping ${basename(projectPath)}: intentionally stopped`);
+            }
+            continue;
+          }
+        } catch {
+          // Fail-open: if check fails, continue with normal flow
+        }
+
         const projectName = basename(projectPath);
         const healthFile = join(codingPath, '.health', `${projectName}-transcript-monitor-health.json`);
 

@@ -300,6 +300,16 @@ class GlobalProcessSupervisor {
   async restartTranscriptMonitor(projectPath) {
     const serviceName = `transcript-monitor:${path.basename(projectPath)}`;
 
+    // Defense-in-depth: check if project was intentionally stopped
+    try {
+      if (await this.psm.isProjectStopped(projectPath)) {
+        this.log(`${serviceName} restart blocked: project intentionally stopped`, 'DEBUG');
+        return false;
+      }
+    } catch {
+      // Fail-open: if check fails, allow restart
+    }
+
     // Check cooldown and rate limits
     if (this.isInCooldown(serviceName)) {
       this.log(`${serviceName} is in cooldown, skipping restart`, 'DEBUG');
@@ -435,6 +445,16 @@ class GlobalProcessSupervisor {
     let restartCount = 0;
 
     for (const projectPath of projects) {
+      // Skip projects that were intentionally stopped (prevents restart loops)
+      try {
+        if (await this.psm.isProjectStopped(projectPath)) {
+          this.log(`Skipping ${path.basename(projectPath)}: intentionally stopped`, 'DEBUG');
+          continue;
+        }
+      } catch {
+        // Fail-open: if check fails, allow restart
+      }
+
       const health = this.isMonitorHealthy(projectPath);
 
       if (!health.healthy) {

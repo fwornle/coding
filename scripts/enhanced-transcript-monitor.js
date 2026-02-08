@@ -2661,10 +2661,24 @@ class EnhancedTranscriptMonitor {
       this.debug('📁 LSL File Manager shut down gracefully');
     }
 
+    // Mark project as intentionally stopped BEFORE unregistering (closes race window)
+    if (this.serviceRegistered) {
+      try {
+        await this.processStateManager.stopProject(this.config.projectPath, {
+          reason: 'graceful_shutdown',
+          stoppedBy: 'enhanced-transcript-monitor',
+          pid: process.pid
+        });
+        this.debug('🛑 Project marked as intentionally stopped in PSM');
+      } catch (error) {
+        this.debug(`Failed to set stop marker: ${error.message}`);
+      }
+    }
+
     // Unregister service from Process State Manager
     if (this.serviceRegistered) {
       try {
-        await this.processStateManager.unregisterService('enhanced-transcript-monitor', 'per-project', this.config.projectPath);
+        await this.processStateManager.unregisterService('enhanced-transcript-monitor', 'per-project', { projectPath: this.config.projectPath });
         this.serviceRegistered = false;
         this.debug('✅ Service unregistered from Process State Manager');
       } catch (error) {

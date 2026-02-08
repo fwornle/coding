@@ -86,9 +86,22 @@ class GlobalLSLCoordinator {
   async ensure(projectPath, parentPid = null) {
     const projectName = path.basename(projectPath);
     const absoluteProjectPath = path.resolve(projectPath);
-    
+
     this.log(`Ensuring LSL for project: ${projectName} (${absoluteProjectPath})`);
-    
+
+    // Check if project was intentionally stopped (prevents restart loops)
+    try {
+      const ProcessStateManager = (await import('./process-state-manager.js')).default;
+      const psm = new ProcessStateManager();
+      await psm.initialize();
+      if (await psm.isProjectStopped(absoluteProjectPath)) {
+        this.log(`Project ${projectName} is intentionally stopped, skipping`);
+        return false;
+      }
+    } catch {
+      // Fail-open: if check fails, continue with normal flow
+    }
+
     // Create .specstory directory if needed
     const specstoryPath = path.join(absoluteProjectPath, '.specstory', 'history');
     if (!fs.existsSync(specstoryPath)) {

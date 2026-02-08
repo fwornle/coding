@@ -681,6 +681,18 @@ export class HealthRemediationActions {
       const projectPath = details.project_path || this.codingRoot;
       const projectName = projectPath.split('/').pop();
 
+      // Check if project was intentionally stopped (prevents restart loops)
+      try {
+        if (await this.psm.isProjectStopped(projectPath)) {
+          return {
+            success: false,
+            message: `Project ${projectName} is intentionally stopped. Use 'node scripts/process-state-manager.js unstop ${projectPath}' to resume.`
+          };
+        }
+      } catch {
+        // Fail-open: if check fails, continue with restart
+      }
+
       // Kill existing monitor if registered in PSM
       try {
         const service = await this.psm.getService('enhanced-transcript-monitor', 'per-project', projectPath);
