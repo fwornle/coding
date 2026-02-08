@@ -29,6 +29,7 @@ import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import LSLFileManager from '../src/live-logging/LSLFileManager.js';
 import ClassificationLogger from './classification-logger.js';
 import ProcessStateManager from './process-state-manager.js';
+import { enableAutoRestart } from './auto-restart-watcher.js';
 
 // Knowledge management dependencies
 import { DatabaseManager } from '../src/databases/DatabaseManager.js';
@@ -3015,6 +3016,18 @@ async function main() {
     }
     const monitor = new EnhancedTranscriptMonitor(config);
     await monitor.start();
+
+    // Watch for code changes and auto-restart (supervisor will restart us)
+    enableAutoRestart({
+      scriptUrl: import.meta.url,
+      dependencies: [
+        './process-state-manager.js',
+        './timezone-utils.js',
+        './classification-logger.js'
+      ],
+      cleanupFn: () => monitor.stop(),
+      logger: (msg) => monitor.debug(msg)
+    });
   } catch (error) {
     console.error('❌ Failed to start transcript monitor:', error.message);
     process.exit(1);
