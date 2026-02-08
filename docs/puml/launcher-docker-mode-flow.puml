@@ -9,6 +9,7 @@ participant "ensure-docker.sh" as docker_helper
 participant "docker compose" as compose
 participant "start-services.sh" as native_svc
 participant "start-services-robust.js" as robust
+participant "tmux-session-wrapper.sh" as tmux
 
 == Docker Mode Detection ==
 
@@ -84,7 +85,23 @@ end
 
 launcher -> launcher: verify_monitoring_systems()
 launcher -> launcher: agent_common_init()
-launcher -> launcher: exec {agent binary}
+
+== Tmux Wrapping ==
+
+launcher -> tmux: source tmux-session-wrapper.sh
+launcher -> tmux: tmux_session_wrapper {agent binary}
+activate tmux
+
+tmux -> tmux: create tmux session\ncoding-{agent}-$$
+tmux -> tmux: configure status-right\n(combined-status-line.js)
+tmux -> tmux: exec {agent} inside tmux
+note right
+  Status bar renders at bottom
+  with unified health indicators
+end note
+
+tmux --> launcher: tmux session ended
+deactivate tmux
 deactivate launcher
 
 legend right

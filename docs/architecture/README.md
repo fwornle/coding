@@ -53,10 +53,11 @@ The system supports multiple AI coding assistants through a unified adapter patt
 **Architecture Layers:**
 
 1. **Agent Layer** - AI coding assistants (Claude, CoPilot, future agents)
-2. **Launcher Layer** - Agent-specific startup scripts
-3. **Common Setup Layer** - Shared initialization (`agent-common-setup.sh`)
-4. **Shared Services** - VKB, Semantic Analysis, Constraint Monitor, LSL
-5. **Adapter Layer** - Abstract interface + agent implementations
+2. **Tmux Wrapper Layer** - All agents wrapped in tmux sessions via shared `tmux-session-wrapper.sh` for unified status bar
+3. **Launcher Layer** - Agent-specific startup scripts (`launch-claude.sh`, `launch-copilot.sh`)
+4. **Common Setup Layer** - Shared initialization (`agent-common-setup.sh`)
+5. **Shared Services** - VKB, Semantic Analysis, Constraint Monitor, LSL
+6. **Adapter Layer** - Abstract interface + agent implementations
 
 **Benefits**:
 - No vendor lock-in
@@ -156,9 +157,9 @@ The system makes it easy to add new AI coding assistants. See the [Agent Integra
 1. Implement `AgentAdapter` interface
 2. Register adapter in `agent-registry.js`
 3. Add detection in `agent-detector.js`
-4. Create launcher script `launch-{agent}.sh`
+4. Create launcher script `launch-{agent}.sh` (using `tmux_session_wrapper` for the final launch)
 5. Update `bin/coding` routing
-6. Test with validation commands
+6. Test with validation commands (verify tmux status bar renders)
 
 **Required APIs:**
 - Transcript generation (JSONL format)

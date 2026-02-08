@@ -18,6 +18,10 @@ package "Launcher Layer" {
     component "launch-future.sh\n(Future Agent)" as launch_future <<launcher>>
 }
 
+package "Tmux Wrapper Layer" {
+    component "tmux-session-wrapper.sh\n(Unified Status Bar)" as tmux_wrapper <<infra>>
+}
+
 package "Common Setup Layer" {
     component "agent-common-setup.sh" as common <<common>> {
         [ensure_specstory_logs_tracked()]
@@ -66,10 +70,13 @@ launch_copilot --> services_native : native mode
 launch_copilot --> services_docker : docker mode
 launch_future --> services_native : starts
 
-' Launchers launch agents
-launch_claude --> claude : exec
-launch_copilot --> copilot : exec
-launch_future --> future : exec
+' Launchers use tmux wrapper to launch agents
+launch_claude --> tmux_wrapper : wraps
+launch_copilot --> tmux_wrapper : wraps
+launch_future --> tmux_wrapper : wraps
+tmux_wrapper --> claude : tmux exec
+tmux_wrapper --> copilot : tmux exec
+tmux_wrapper --> future : tmux exec
 
 ' Agent detection
 main --> detector : detects\navailable\nagents
@@ -87,6 +94,15 @@ copilot_adapter ..|> adapter_interface : implements
 ' Common setup provides to all
 common --> services_native : initializes
 common --> services_docker : initializes
+
+note right of tmux_wrapper
+  **Tmux Wrapper provides:**
+  • Unified status bar (combined-status-line.js)
+  • Per-session config (not global)
+  • Nesting guard (no double tmux)
+  • Environment propagation
+  • Mouse forwarding
+end note
 
 note right of common
   **Agent-Agnostic Functions:**

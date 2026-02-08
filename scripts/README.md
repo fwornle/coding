@@ -6,6 +6,13 @@ This directory contains utility scripts for the Coding Knowledge Management Syst
 
 ### Core System Scripts
 
+- **`tmux-session-wrapper.sh`** - Shared tmux wrapper for all coding agents
+  - Wraps any agent command in a tmux session with the coding status bar
+  - Handles tmux nesting (configures current session if already inside tmux)
+  - Propagates all required environment variables into the tmux session
+  - Called by `launch-claude.sh` and `launch-copilot.sh` at the final agent launch step
+  - Usage: `source tmux-session-wrapper.sh && tmux_session_wrapper <command> [args...]`
+
 - **`sync-knowledge-base.sh`** - Prepares MCP memory sync operations
   - Called automatically by `claude-mcp` at startup
   - Creates sync trigger files for automatic knowledge base loading

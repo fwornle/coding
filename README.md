@@ -52,7 +52,7 @@ The transition system ensures safe mode switching with:
 - Native mode: Runs MCP servers directly as Node.js processes
 - Configuration selection is centralized in `claude-mcp-launcher.sh`
 
-**Unified Docker Support**: Both `launch-claude.sh` and `launch-copilot.sh` share identical Docker mode logic (transition lock checking, 3-tier mode detection, conditional startup, container reuse). The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
+**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, and future agents. Both `launch-claude.sh` and `launch-copilot.sh` share identical Docker mode logic (transition lock checking, 3-tier mode detection, conditional startup, container reuse). The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
 
 **Health System Adaptation**: The health verifier automatically detects Docker mode and adapts:
 - CGR cache staleness uses `cache-metadata.json` fallback (no `.git` access)
@@ -118,7 +118,7 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 The system uses a unified Agent Abstraction API (`lib/agent-api/`) that enables consistent features across different coding agents:
 
 - **BaseAdapter** - Common interface for all agent adapters
-- **StatuslineProvider** - Unified status display
+- **StatuslineProvider** - Unified status display (rendered via tmux status bar)
 - **HooksManager** - Bridge between native hook systems and unified hooks
 - **TranscriptAdapter** - Unified session log format (LSL)
 
@@ -138,7 +138,7 @@ Automatic health monitoring and self-healing with real-time dashboard
 - Auto-healing failed services (Docker-aware)
 - Dashboard at `http://localhost:3032`
 - Service supervision hierarchy ensures services stay running
-- **[📊 Status Line System](docs/health-system/status-line.md)** - Real-time indicators in Claude Code status bar
+- **[📊 Status Line System](docs/health-system/status-line.md)** - Real-time indicators via unified tmux status bar (all agents)
 
 ![Health Supervision Hierarchy](docs/images/supervisor-restart-hierarchy.png)
 
@@ -367,7 +367,7 @@ cd integrations/mcp-constraint-monitor && npm test
 ✅ **Constraint Monitoring** - 18 active constraints with PreToolUse hooks
 ✅ **Knowledge Management** - UKB/VKB with MCP integration
 ✅ **Multi-Agent Analysis** - 11 agents with workflow orchestration
-✅ **Status Line System** - Real-time indicators in Claude Code status bar
+✅ **Status Line System** - Real-time indicators via unified tmux status bar
 ✅ **Cross-Platform** - macOS, Linux, Windows support
 
 ---

@@ -10,6 +10,7 @@ Complete guide to installing, configuring, and using the unified semantic analys
 - **Node.js 18+** - JavaScript runtime
 - **npm** - Package manager
 - **jq** - JSON processor
+- **tmux** - Terminal multiplexer (required for status bar rendering)
 - **macOS, Linux, or Windows** (via WSL/Git Bash)
 - **Docker** (optional) - For containerized deployment
 
@@ -18,19 +19,20 @@ Complete guide to installing, configuring, and using the unified semantic analys
 **macOS:**
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install git node jq
+brew install git node jq tmux
 ```
 
 **Linux (Ubuntu/Debian):**
 ```bash
 sudo apt update
-sudo apt install git nodejs npm jq
+sudo apt install git nodejs npm jq tmux
 ```
 
 **Windows:**
 - Install Node.js from [nodejs.org](https://nodejs.org)
 - Install Git Bash from [git-scm.com](https://git-scm.com)
 - Install jq from [stedolan.github.io/jq](https://stedolan.github.io/jq/)
+- Install tmux (available via WSL or MSYS2)
 
 ---
 

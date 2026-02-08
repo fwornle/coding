@@ -10,6 +10,7 @@ participant "AgentRegistry" as registry
 participant "launch-{agent}.sh" as launcher
 participant "agent-common-setup.sh" as common
 participant "start-services.sh" as services
+participant "tmux-session-wrapper.sh" as tmux
 participant "New Agent" as agent
 participant "AgentAdapter" as adapter
 
@@ -41,8 +42,21 @@ common -> common : start_global_lsl_monitoring()
 common -> common : show_session_reminder()
 common --> launcher : common setup complete
 
-launcher -> agent : exec {agent command}
-agent --> launcher : agent running
+== Tmux Wrapping ==
+launcher -> tmux : source tmux-session-wrapper.sh
+launcher -> tmux : tmux_session_wrapper {agent}
+tmux -> tmux : create tmux session\ncoding-{agent}-{PID}
+tmux -> tmux : configure status-right\n(combined-status-line.js)
+tmux -> agent : exec inside tmux
+agent --> tmux : agent running in tmux
+
+note right of tmux
+  **Tmux wrapper provides:**
+  • Unified status bar for all agents
+  • Nesting guard (reuses existing tmux)
+  • Environment propagation
+  • Mouse forwarding
+end note
 
 == Runtime Phase ==
 agent -> adapter : tool call (memory/browser/log)

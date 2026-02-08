@@ -22,6 +22,7 @@ This guide provides step-by-step instructions for integrating new AI coding assi
 
 The Coding system is designed to support multiple AI coding assistants through a unified adapter pattern. All agents share common infrastructure:
 
+- **Tmux Session Wrapping** - Unified status bar rendering via `tmux-session-wrapper.sh`
 - **Live Session Logging (LSL)** - Automatic transcript monitoring
 - **Knowledge Management** - VKB server and semantic analysis
 - **Constraint Monitoring** - Real-time code quality enforcement
@@ -40,10 +41,11 @@ The Coding system is designed to support multiple AI coding assistants through a
 The system follows a layered architecture:
 
 1. **Agent Layer** - Your AI coding assistant (Claude, CoPilot, etc.)
-2. **Launcher Layer** - Agent-specific startup scripts
-3. **Common Setup Layer** - Shared initialization (LSL, monitoring, gitignore)
-4. **Shared Services Layer** - VKB, Semantic Analysis, Constraints, LSL
-5. **Adapter Layer** - Abstract interface + agent implementations
+2. **Tmux Wrapper Layer** - Shared `tmux-session-wrapper.sh` wraps all agents in tmux with unified status bar
+3. **Launcher Layer** - Agent-specific startup scripts
+4. **Common Setup Layer** - Shared initialization (LSL, monitoring, gitignore)
+5. **Shared Services Layer** - VKB, Semantic Analysis, Constraints, LSL
+6. **Adapter Layer** - Abstract interface + agent implementations
 
 ### Integration Flow
 
@@ -55,7 +57,7 @@ When integrating a new agent:
 3. Launcher sources common setup
 4. Docker mode detection (3-tier: marker file, container check, env var)
 5. Services start (Docker compose or native, based on mode)
-6. Agent launches with full integration
+6. Agent launches wrapped in tmux session (via `tmux-session-wrapper.sh`) with unified status bar
 
 ### Launcher Docker Mode Flow
 
@@ -106,7 +108,7 @@ Create `scripts/launch-{agent}.sh` that:
 - Detects Docker mode (`.docker-mode` marker, running containers, env var)
 - Starts shared services (Docker compose or native, based on mode)
 - Calls `agent_common_init()`
-- Launches your agent
+- Sources `tmux-session-wrapper.sh` and wraps the agent launch in `tmux_session_wrapper` for unified status bar rendering
 
 ---
 
@@ -302,9 +304,10 @@ export TRANSCRIPT_SOURCE_PROJECT="$TARGET_PROJECT_DIR"
 cd "$TARGET_PROJECT_DIR"
 log "Changed working directory to: $(pwd)"
 
-# Launch your agent
+# Launch your agent wrapped in tmux for unified status bar
 log "Launching My Agent..."
-exec myagent "$@"
+source "$SCRIPT_DIR/tmux-session-wrapper.sh"
+tmux_session_wrapper myagent "$@"
 ```
 
 Make it executable:
@@ -581,6 +584,7 @@ interface HistoryOptions {
 - [ ] **Launch**: Agent starts via `./bin/coding --agent myagent`
 - [ ] **LSL**: Transcripts monitored and classified
 - [ ] **Gitignore**: `.specstory/logs/` tracked in git
+- [ ] **Tmux**: Agent launches inside tmux session with status bar
 - [ ] **Monitoring**: StatusLine health monitoring active
 - [ ] **Memory**: Knowledge operations work
 - [ ] **Browser**: Browser automation functional
@@ -631,6 +635,7 @@ See `lib/adapters/claude-mcp.js` and `scripts/launch-claude.sh` for reference im
 See `lib/adapters/copilot.js` and `scripts/launch-copilot.sh` for reference implementation.
 
 **Key features:**
+- Tmux session wrapping with shared status bar (via `tmux-session-wrapper.sh`)
 - Full Docker mode support (identical to Claude launcher)
 - Transition lock checking and Docker mode detection
 - Docker/Native conditional service startup
