@@ -219,7 +219,7 @@ The health verifier runs every 60 seconds with auto-healing enabled.
 
 ### Session Activity Indicators
 
-Session activity uses a **unified graduated color scheme** that transitions smoothly from active to dormant. **Only active sessions (< 24 hours) are displayed** - sleeping/inactive sessions are automatically filtered out to reduce clutter.
+Session activity uses a **unified graduated color scheme** that transitions smoothly from active to dormant. **All sessions are always displayed** - sleeping sessions show as 💤, never hidden.
 
 | Icon | Status | Time Since Activity | Description |
 |------|--------|---------------------|-------------|
@@ -227,25 +227,27 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 | 🌲 | Cooling | 5 - 15 minutes | Session cooling down |
 | 🫒 | Fading | 15 min - 1 hour | Session fading, still tracked |
 | 🪨 | Dormant | 1 - 6 hours | Session dormant but alive |
-| ⚫ | Inactive | 6 - 24 hours | Session inactive (last shown before filtering) |
-| 💤 | Sleeping | > 24 hours | **Hidden from display** |
+| ⚫ | Inactive | 6 - 24 hours | Session inactive but tracked |
+| 💤 | Sleeping | > 24 hours | Long-term dormant session |
 | ❌ | Error | Any | Health check failed or service crash |
 
-**Displayed Sessions** (Active within 24 hours):
+**Session Lifecycle**:
 ```
-🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → [hidden]
+🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → 💤 Sleeping
    <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
 ```
 
-**Hidden Sessions**: Sessions inactive for more than 24 hours (💤 sleeping) are automatically filtered from the status line display. This keeps the status line focused on actively used projects.
+**Sessions are only removed** when the agent process has exited (session closed). A session with a running agent always shows as 🟢 Active, regardless of transcript age.
 
 **No Yellow Status**: The system intentionally avoids yellow (🟡) for session inactivity. Yellow is reserved for actual warnings like missing trajectory files or stale health data. Normal session inactivity is shown through the graduated cooling sequence.
+
+**Agent Override**: If an agent process (claude, copilot, opencode) is actively running in a project, the session is always shown as 🟢 Active. This ensures freshly started sessions in projects with old transcripts display correctly.
 
 **Activity Age Calculation**:
 - Uses `transcriptInfo.ageMs` from health file (actual transcript inactivity)
 - Falls back to health file timestamp if transcript age unavailable
 - For stale health files (>5 min old), uses health file age as minimum to ensure closed sessions aren't falsely shown as active
-- Virgin sessions (no transcript exchanges) are detected by `exchangeCount === 0`
+- Overridden to 🟢 when agent process is detected as running
 
 **Design Rationale**: Projects that aren't actively being worked on should show gradual "cooling" colors rather than alarming red/orange/yellow. These colors are reserved for actual errors and warnings, not normal session lifecycle states.
 
@@ -290,15 +292,15 @@ The system uses multiple discovery methods to ensure **only active sessions** (w
 
 **Key Behavior**:
 - Sessions WITH running transcript monitors are shown with full activity status (🟢, 🌲, 🫒, 🪨, ⚫)
-- Sessions WITHOUT running monitors BUT with recent transcripts (within 48h) are shown as 💤 (dormant/no monitor)
-- Sessions older than 48 hours without a monitor are hidden
+- Sessions WITHOUT running monitors BUT with a running agent are shown as 💤 (no monitor yet)
+- Sessions are only removed when the agent process has exited
 - The Global Process Supervisor automatically restarts dead monitors within 30 seconds
 
 **Example**:
 - `[C🟢 UT🟢]` - coding and ui-template both active
 - `[C🟢 CA🌲]` - coding active, curriculum-alignment cooling
 - `[C🟢 UT🫒 CA🪨]` - coding active, ui-template fading, curriculum-alignment dormant
-- Sessions inactive >24 hours (💤 sleeping) are automatically hidden from display
+- Sessions only removed when agent process exits (never hidden while running)
 
 ### Smart Abbreviation Engine
 
@@ -407,14 +409,14 @@ Where:
 - **Fading** (🫒) - Activity fading (15 min - 1 hr)
 - **Dormant** (🪨) - Dormant but trackable (1-6 hr)
 - **Inactive** (⚫) - Session idle (6-24 hr) - last visible state
-- **Sleeping** (💤) - Long-term dormant (> 24 hr) - **hidden from display**
+- **Sleeping** (💤) - Long-term dormant (> 24 hr) - still shown
 
 **Transitions**:
 - Health check success → Healthy (✅)
 - GCM or Health Verifier issues → Warning (⚠️)
 - Critical failures → Critical (❌)
-- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → [hidden]
-- Sessions >24 hours are filtered from display
+- Time passage → 🟢 → 🌲 → 🫒 → 🪨 → ⚫ → 💤
+- Sessions only removed when agent exits, never hidden while running
 
 ### Status Display States
 
