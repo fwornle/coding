@@ -192,7 +192,7 @@ Currently integrated:
 |-------|--------|-------------|
 | **Claude Code** (default) | `coding` | Native MCP + transcript support |
 | **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture + HTTP adapter |
-| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
+| **OpenCode** | `coding --agent opencode` | Pipe-pane I/O capture |
 
 All agents share the same infrastructure: tmux session wrapping with unified status bar, health monitoring with multi-agent detection, LSL session logging, knowledge management, and constraint enforcement. The health system detects all running agents via process scanning and tracks their sessions with graduated activity indicators.
 
@@ -233,7 +233,7 @@ All of this runs in Docker. One command starts everything:
 ```bash
 coding              # Claude Code (default)
 coding --copilot    # GitHub Copilot CLI
-coding --opencode   # OpenCode
+coding --agent opencode   # OpenCode
 ```
 
 That's it. The infrastructure spins up in containers, your AI assistant connects, and you're working with full session logging, knowledge extraction, and constraint enforcement. All agents get the same infrastructure — the only difference is which coding assistant you interact with.

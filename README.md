@@ -16,7 +16,7 @@ coding
 # Or use specific agent
 coding --claude
 coding --copilot
-coding --opencode
+coding --agent opencode
 
 # Query local LLM from command line (Docker Model Runner)
 llm "Explain this error message"
@@ -63,7 +63,7 @@ The transition system ensures safe mode switching with:
 |-------|---------------|-----------|
 | **Claude Code** (default) | `coding` or `coding --claude` | Native transcript support |
 | **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
-| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
+| **OpenCode** | `coding --agent opencode` | Pipe-pane I/O capture |
 
 All agents get the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, and constraint enforcement.
 
