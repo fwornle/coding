@@ -94,6 +94,7 @@ nav:
     - Dashboard: integrations/dashboard.md
   - Guides:
     - Overview: guides/index.md
+    - Agent Integration: guides/agent-integration.md
     - Status Line: guides/status-line.md
     - Health Dashboard: guides/health-dashboard.md
     - LLM Providers: guides/llm-providers.md

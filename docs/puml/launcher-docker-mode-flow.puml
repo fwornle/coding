@@ -1,29 +1,41 @@
 @startuml launcher-docker-mode-flow
 !include _standard-style.puml
 
-title Unified Launcher Docker Mode Flow\nShared by launch-claude.sh & launch-copilot.sh
+title Agent-Agnostic Launcher Flow\nShared orchestration via launch-agent-common.sh
 
 participant "bin/coding" as entry
-participant "launch-{agent}.sh" as launcher
+participant "config/agents/{name}.sh" as config
+participant "launch-agent-common.sh" as common
 participant "ensure-docker.sh" as docker_helper
 participant "docker compose" as compose
 participant "start-services.sh" as native_svc
 participant "start-services-robust.js" as robust
 participant "tmux-session-wrapper.sh" as tmux
 
+== Agent Resolution ==
+
+entry -> entry: Validate agent config\nexists in config/agents/
+entry -> common: launch_agent(config, args)
+activate common
+common -> config: source agent config
+note right
+  Agent config defines:
+  AGENT_NAME, AGENT_COMMAND,
+  AGENT_DISPLAY_NAME,
+  AGENT_ENABLE_PIPE_CAPTURE,
+  hook functions
+end note
+
 == Docker Mode Detection ==
 
-entry -> launcher: exec (--claude or --copi)
-activate launcher
-
-launcher -> launcher: check_transition_lock()
+common -> common: _check_transition_lock()
 note right
   Wait up to 60s if
   .transition-in-progress
   lock file exists
 end note
 
-launcher -> launcher: Detect Docker mode
+common -> common: _detect_docker_mode()
 note right
   3-tier priority:
   1. .docker-mode marker file
@@ -31,83 +43,80 @@ note right
   3. CODING_DOCKER_MODE env var
 end note
 
-launcher -> launcher: export CODING_DOCKER_MODE
+common -> common: export CODING_DOCKER_MODE
 
 == Dry-Run Exit ==
 
 alt CODING_DRY_RUN = true
-  launcher --> entry: exit 0\nDRY-RUN: Agent={agent}, Docker={mode}, Platform={platform}
+  common --> entry: exit 0\nDRY-RUN: Agent={name}, Docker={mode}
 end
 
 == Service Startup ==
 
 alt Docker Mode = true
-  launcher -> docker_helper: early_docker_launch()
-  launcher -> docker_helper: ensure_docker_running()
+  common -> docker_helper: early_docker_launch()
+  common -> docker_helper: ensure_docker_running()
 
   alt Docker not running
-    launcher --> entry: exit 1 (Docker required)
+    common --> entry: exit 1 (Docker required)
   end
 
   alt coding-services already healthy
-    launcher -> launcher: curl localhost:8080/health
+    common -> common: curl localhost:8080/health
     note right: Reuse existing containers\n(no Docker destabilization)
   else Not running
-    launcher -> compose: docker compose -f docker/docker-compose.yml up -d
+    common -> compose: docker compose up -d
     activate compose
-    compose --> launcher: containers started
+    compose --> common: containers started
     deactivate compose
-    launcher -> launcher: Wait for health (up to 60s)
+    common -> common: Wait for health (up to 60s)
   end
 
-  launcher -> launcher: Generate Docker MCP config\n(if needed)
+  common -> common: Generate Docker MCP config\n(if needed)
 
 else Native Mode
-  launcher -> native_svc: start-services.sh
+  common -> native_svc: start-services.sh
   activate native_svc
   native_svc -> robust: startAllServices()
   activate robust
-
-  note over robust
-    Docker mode awareness:
-    CODING_DOCKER_MODE=false
-    - Constraint Monitor: launches standalone Redis + Qdrant
-    - Memgraph: launches standalone container
-  end note
-
   robust --> native_svc: services started
   deactivate robust
-  native_svc --> launcher: OK
+  native_svc --> common: OK
   deactivate native_svc
 end
 
 == Common Initialization ==
 
-launcher -> launcher: verify_monitoring_systems()
-launcher -> launcher: agent_common_init()
+common -> common: _verify_monitoring()
+common -> config: agent_check_requirements()
+common -> config: agent_pre_launch()
+common -> common: agent_common_init()
 
 == Tmux Wrapping ==
 
-launcher -> tmux: source tmux-session-wrapper.sh
-launcher -> tmux: tmux_session_wrapper {agent binary}
+common -> tmux: tmux_session_wrapper AGENT_COMMAND
 activate tmux
 
 tmux -> tmux: create tmux session\ncoding-{agent}-$$
 tmux -> tmux: configure status-right\n(combined-status-line.js)
-tmux -> tmux: exec {agent} inside tmux
-note right
-  Status bar renders at bottom
-  with unified health indicators
-end note
 
-tmux --> launcher: tmux session ended
+alt AGENT_ENABLE_PIPE_CAPTURE = true
+  tmux -> tmux: tmux pipe-pane\n(capture I/O to file)
+  tmux -> tmux: start capture-monitor.js\n(prompt detection + hooks)
+end
+
+tmux -> tmux: exec {agent} inside tmux
+
+tmux --> common: tmux session ended
 deactivate tmux
-deactivate launcher
+deactivate common
 
 legend right
-  |= Agent |= Binary |= Docker Support |
-  | Claude | claude-mcp | Full (since v1) |
-  | CoPilot | gh copilot | Full (unified) |
+  |= Agent |= Config File |= Binary |= Pipe Capture |
+  | Claude | config/agents/claude.sh | claude-mcp | No |
+  | CoPilot | config/agents/copilot.sh | copilot | Yes |
+  | OpenCode | config/agents/opencode.sh | opencode | Yes |
+  | (new) | config/agents/{name}.sh | {binary} | Configurable |
 endlegend
 
 @enduml

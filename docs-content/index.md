@@ -94,7 +94,7 @@ vkb           # Opens http://localhost:8080
 
 Real-time feedback via the unified tmux status bar showing system health, costs, and development state. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions with a shared status line rendered by `combined-status-line.js`.
 
-![Status Line](images/status-line-display.png)
+![Coding Environment — Tmux Status Bar](images/status-line.png)
 
 | Indicator | Meaning |
 |-----------|---------|
@@ -134,7 +134,7 @@ vkb
 
 | Principle | Description |
 |-----------|-------------|
-| **Agent-Agnostic** | Designed for any AI assistant — Claude and CoPilot fully supported, others follow the same pattern |
+| **Agent-Agnostic** | Designed for any AI assistant — add a new agent with [a single config file](guides/agent-integration.md). Claude, CoPilot, and OpenCode integrated |
 | **Non-Intrusive** | Docker deployment keeps your system clean |
 | **Provider Flexible** | Works with Anthropic, OpenAI, Groq, and local LLMs (DMR/llama.cpp) |
 | **Multi-Project** | Handle multiple projects with automatic context routing |

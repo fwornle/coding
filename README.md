@@ -52,7 +52,9 @@ The transition system ensures safe mode switching with:
 - Native mode: Runs MCP servers directly as Node.js processes
 - Configuration selection is centralized in `claude-mcp-launcher.sh`
 
-**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, and future agents. Both `launch-claude.sh` and `launch-copilot.sh` share identical Docker mode logic (transition lock checking, 3-tier mode detection, conditional startup, container reuse). The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
+**Unified Agent Launching**: All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`, providing a consistent status bar across Claude, CoPilot, and future agents. The shared orchestrator (`scripts/launch-agent-common.sh`) handles Docker mode detection, service startup, monitoring, and session management — adding a new agent requires only a single config file in `config/agents/`. The service orchestrator (`start-services-robust.js`) automatically skips standalone containers (Redis, Qdrant, Memgraph) when Docker mode is active, preventing duplicate containers and port conflicts.
+
+![Coding Environment — Tmux Status Bar](docs/images/status-line.png)
 
 **Health System Adaptation**: The health verifier automatically detects Docker mode and adapts:
 - CGR cache staleness uses `cache-metadata.json` fallback (no `.git` access)
@@ -396,7 +398,7 @@ Copyright © 2025 Frank Wornle
 - **Installation Guide**: [docs/getting-started.md](docs/getting-started.md)
 - **LLM Providers & Local Models**: [docs/provider-configuration.md](docs/provider-configuration.md)
 - **Agent Abstraction API**: [docs/architecture/agent-abstraction-api.md](docs/architecture/agent-abstraction-api.md)
-- **Adding Agents**: [docs/architecture/adding-new-agent.md](docs/architecture/adding-new-agent.md)
+- **Adding Agents**: [docs/agent-integration-guide.md](docs/agent-integration-guide.md)
 - **Docker Architecture**: [docs/architecture-report.md](docs/architecture-report.md)
 - **Docker Mode Transition**: [docs/docker-mode-transition.md](docs/docker-mode-transition.md)
 - **Docker Deployment**: [docker/README.md](docker/README.md)

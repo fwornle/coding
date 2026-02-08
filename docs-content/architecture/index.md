@@ -21,12 +21,13 @@ The architecture supports multiple AI coding assistants through a unified adapte
 
 **Layers**:
 
-1. **Agent Layer** - AI assistants (Claude Code, GitHub CoPilot)
-2. **Tmux Wrapper Layer** - Unified session wrapping via `tmux-session-wrapper.sh` — provides status bar, nesting guard, environment propagation
-3. **Launcher Layer** - Agent-specific startup scripts with shared Docker mode logic
-4. **Common Setup Layer** - Shared initialization (`agent-common-setup.sh`)
-5. **Shared Services** - VKB, Semantic Analysis, Constraint Monitor, LSL
-6. **Adapter Layer** - Abstract interface + agent implementations
+1. **Agent Layer** - AI assistants (Claude Code, GitHub CoPilot, OpenCode, future agents)
+2. **Tmux Wrapper Layer** - Unified session wrapping via `tmux-session-wrapper.sh` — status bar, nesting guard, env propagation, optional pipe-pane I/O capture
+3. **Config Layer** - Agent definitions in `config/agents/<name>.sh` (10-30 lines each)
+4. **Orchestration Layer** - `launch-agent-common.sh` handles all shared startup (Docker detection, service startup, monitoring, session management)
+5. **Common Setup Layer** - Shared initialization (`agent-common-setup.sh`)
+6. **Shared Services** - VKB, Semantic Analysis, Constraint Monitor, LSL
+7. **Adapter Layer** - Abstract interface + agent implementations (dynamic import by convention)
 
 ### 2. Knowledge Persistence
 
@@ -127,15 +128,15 @@ vkb
 
 ## Adding New Agents
 
-See [Agent Integration Guide](../reference/api.md#agent-integration) for:
+Adding a new agent requires **only a single config file** — zero changes to shared code.
 
-1. Implement `AgentAdapter` interface
-2. Register adapter in `agent-registry.js`
-3. Add detection in `agent-detector.js`
-4. Create launcher script
-5. Update `bin/coding` routing
-6. Integrate with tmux wrapper (`tmux_session_wrapper`)
-7. Test with validation commands
+![Agent Integration Flow](../images/agent-integration-flow.png)
+
+Create `config/agents/<name>.sh` defining `AGENT_NAME`, `AGENT_COMMAND`, and optional hook functions. Agent detection, launcher routing, and tmux wrapping all happen automatically.
+
+**Proof:** The OpenCode agent (`config/agents/opencode.sh`) is a 25-line file providing full integration.
+
+See the [Agent Integration Guide](../guides/agent-integration.md) for the complete walkthrough, config reference, and API contract.
 
 ## Related Documentation
 

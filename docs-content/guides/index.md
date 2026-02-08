@@ -4,6 +4,14 @@ Comprehensive reference guides with detailed explanations, complete configuratio
 
 <div class="thumbnail-grid" markdown>
 
+<a href="agent-integration/" class="thumbnail-card">
+  <img src="../images/agent-integration-flow.png" alt="Agent Integration">
+  <div class="card-content">
+    <h3>Agent Integration</h3>
+    <p>Add a new coding agent with a single config file — config reference, hooks, API contract</p>
+  </div>
+</a>
+
 <a href="status-line/" class="thumbnail-card">
   <img src="../images/status-line-display.png" alt="Status Line">
   <div class="card-content">
@@ -58,6 +66,7 @@ Comprehensive reference guides with detailed explanations, complete configuratio
 
 | Guide | Use When... |
 |-------|-------------|
+| **Agent Integration** | Adding a new AI coding assistant to the system |
 | **Status Line** | You need to understand status bar indicators or configure API quota display |
 | **Health Dashboard** | Investigating health issues or understanding the monitoring architecture |
 | **Constraint Testing** | Adding new constraints, debugging detection, or testing enforcement |

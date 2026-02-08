@@ -225,7 +225,7 @@ Claude Code communicates via stdio with stdio-proxy.js (on the host), which then
 - **Docker config**: `claude-code-mcp-docker.json` - Uses stdio-proxy with SSE URLs
 - **Native config**: `claude-code-mcp-processed.json` - Direct Node.js execution
 
-The `CODING_DOCKER_MODE` environment variable is set by both `launch-claude.sh` and `launch-copilot.sh`, and read by `claude-mcp-launcher.sh` to select the appropriate configuration. In Docker mode, `start-services-robust.js` also reads this variable to skip launching standalone containers (Constraint Monitor Redis/Qdrant, Memgraph) that are already provided by the `coding-services` container.
+The `CODING_DOCKER_MODE` environment variable is set by `launch-agent-common.sh` (shared across all agents), and read by `claude-mcp-launcher.sh` to select the appropriate configuration. In Docker mode, `start-services-robust.js` also reads this variable to skip launching standalone containers (Constraint Monitor Redis/Qdrant, Memgraph) that are already provided by the `coding-services` container.
 
 ---
 
@@ -354,8 +354,9 @@ docker compose -f docker/docker-compose.yml restart
 | `scripts/health-verifier.js` | Modified to respect transition lock |
 | `scripts/global-process-supervisor.js` | Modified to respect transition lock |
 | `scripts/statusline-health-monitor.js` | Shows transition status, skips healing |
-| `scripts/launch-claude.sh` | Docker mode detection, transition lock, conditional startup |
-| `scripts/launch-copilot.sh` | Docker mode detection, transition lock, conditional startup |
+| `scripts/launch-agent-common.sh` | Shared orchestration: Docker mode detection, transition lock, conditional startup |
+| `scripts/launch-claude.sh` | Thin wrapper sourcing `launch-agent-common.sh` with Claude config |
+| `scripts/launch-copilot.sh` | Thin wrapper sourcing `launch-agent-common.sh` with CoPilot config |
 | `scripts/start-services-robust.js` | Docker mode awareness (skips duplicate containers) |
 | `bin/coding` | CLI commands for mode switching |
 | `bin/claude-mcp-launcher.sh` | MCP config selection based on mode |
