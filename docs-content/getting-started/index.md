@@ -48,6 +48,7 @@ Choose your deployment mode:
 | **Node.js 18+** | Yes | Runtime for all services |
 | **Git** | Yes | Clone repository, submodules |
 | **jq** | Yes | JSON processing in scripts |
+| **tmux** | Yes | Unified agent session wrapping and status bar |
 | **Docker** | For Docker mode | Container runtime |
 
 ### Quick Install
@@ -55,14 +56,14 @@ Choose your deployment mode:
 === "macOS"
 
     ```bash
-    brew install git node jq
+    brew install git node jq tmux
     brew install --cask docker  # For Docker mode
     ```
 
 === "Linux (Ubuntu/Debian)"
 
     ```bash
-    sudo apt update && sudo apt install -y git nodejs npm jq
+    sudo apt update && sudo apt install -y git nodejs npm jq tmux
     curl -fsSL https://get.docker.com | sh  # For Docker mode
     ```
 
@@ -70,7 +71,7 @@ Choose your deployment mode:
 
     Install [Docker Desktop](https://www.docker.com/products/docker-desktop), then in WSL2:
     ```bash
-    sudo apt update && sudo apt install -y git nodejs npm jq
+    sudo apt update && sudo apt install -y git nodejs npm jq tmux
     ```
 
 ---
