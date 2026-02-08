@@ -33,6 +33,7 @@ The health system is built on interconnected components with active supervision:
 | **EnhancedTranscriptMonitor** | `enhanced-transcript-monitor.js` | Real-time per-project transcript monitoring |
 | **LiveLoggingCoordinator** | `live-logging-coordinator.js` | Logging orchestration with multi-user support |
 | **ProcessStateManager** | `process-state-manager.js` | Unified registry with atomic file locking (used by all) |
+| **AutoRestartWatcher** | `auto-restart-watcher.js` | File-change detection for automatic daemon code reloading |
 
 ### Supervision Architecture
 
@@ -48,9 +49,11 @@ The health system is built on interconnected components with active supervision:
 
 - **Dynamic Discovery** - Discovers ALL projects from PSM, health files, and Claude transcript directories
 - **Active Supervision** - GlobalProcessSupervisor actively restarts dead monitors within 30 seconds
+- **Auto-Restart on Code Change** - Daemons watch their own source files and exit cleanly when code changes, relying on supervision to restart with updated code
 - **Cooldown Protection** - 5-minute cooldown per service prevents restart storms
 - **Rate Limiting** - Max 10 restarts per hour per service
 - **Fallback Supervision** - CombinedStatusLine provides backup restart capability
+- **Active Session Gating** - Transcript monitors only spawned for sessions with activity in the last 2 minutes
 
 ## Component Details
 

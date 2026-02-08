@@ -295,6 +295,22 @@ class StatusLineHealthMonitor {
         }
       }
 
+      // Method 2b: Find OpenCode agent processes
+      // OpenCode's comm field shows full path, so match on basename ending with /opencode
+      let opencodePids = '';
+      try {
+        opencodePids = execSync('ps -eo pid,comm | awk \'/\\/opencode$/ {print $1}\'', { encoding: 'utf8', timeout: 5000 });
+      } catch (psError) {
+        // opencode not running is normal
+      }
+
+      if (opencodePids && opencodePids.trim()) {
+        for (const pidStr of opencodePids.trim().split('\n')) {
+          const pid = pidStr.trim();
+          if (pid) extractProjectFromPid(pid);
+        }
+      }
+
       // Method 3: Alternative - check parent launcher processes
       // The claude-mcp-launcher.sh processes know which project they're in
       let launcherOutput = '';
