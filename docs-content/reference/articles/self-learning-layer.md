@@ -24,7 +24,7 @@ The age of custom-made software is approaching.
 
 ## The Problems We're Solving
 
-AI coding assistants are everywhere now. Claude Code, GitHub Copilot, Codex, Gemini CLI - pick your favorite.
+AI coding assistants are everywhere now. Claude Code, GitHub Copilot, OpenCode, Codex, Gemini CLI - pick your favorite.
 
 But two things keep bothering me:
 
@@ -48,7 +48,7 @@ The system has four main layers:
 1. **Live Session Logging** - Multi-layer intelligent classificationv  
 2. **Knowledge Extraction** - Multi-agent AI system building a collective brain  
 3. **Constraint Enforcement** - Blocks mistakes before execution  
-4. **Health Monitoring** - Multi-layer watchdog architecture  
+4. **Health Monitoring** - 3-layer supervision architecture
 
 Let me walk you through each.
 
@@ -171,7 +171,7 @@ Running multiple services, databases, and monitoring processes requires robust h
 ![System Health Dashboard](images/health-mon.png)
 *The health dashboard: real-time status of databases (Qdrant, CGR Cache), services (VKB Server, Constraint Monitor), processes, API quotas, and UKB workflows - all with auto-healing active.*
 
-The system uses a 4-layer watchdog architecture:
+The system uses a 3-layer supervision architecture:
 
 ![Process Monitoring Architecture](images/health.png)
 *The process monitoring architecture: session management, service coordination, process state management with atomic operations, and a monitoring layer with watchdog and verifier.*
@@ -184,7 +184,23 @@ If a process crashes, the watchdog detects it and restarts automatically. Servic
 
 One design principle I aimed for: **no lock-in**.
 
-The system is designed to work with any AI coding assistant. Currently it's optimized for Claude Code (installation process, status line integration and hook functions), but the architecture supports GitHub Copilot, Codex, Gemini CLI, and others. Should be straight-forward to extend this to other environments, as they become increasingly similar and, by and large, support similar mechanisms (eg. hook functions).
+The system is designed to work with any AI coding assistant. Claude Code is the primary and default agent — it gets the deepest integration with native MCP servers, transcript support, and hook functions. But the infrastructure is fully agent-agnostic. Adding a new agent requires only a single config file (`config/agents/<name>.sh`) — no changes to shared code.
+
+Currently integrated:
+
+| Agent | Launch | Integration |
+|-------|--------|-------------|
+| **Claude Code** (default) | `coding` | Native MCP + transcript support |
+| **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture + HTTP adapter |
+| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
+
+All agents share the same infrastructure: tmux session wrapping with unified status bar, health monitoring with multi-agent detection, LSL session logging, knowledge management, and constraint enforcement. The health system detects all running agents via process scanning and tracks their sessions with graduated activity indicators.
+
+![GitHub Copilot CLI running in coding](images/coding-copilot-cli.png)
+*GitHub Copilot CLI running in the coding infrastructure — same tmux wrapper, status bar, and monitoring as Claude Code.*
+
+![OpenCode running in coding](images/coding-opencode.png)
+*OpenCode integrated with a 25-line config file — zero changes to shared code.*
 
 Similarly, it's not locked to any LLM provider. You can use:  
 
@@ -215,10 +231,12 @@ This enables structured knowledge that can be queried semantically, not just by 
 All of this runs in Docker. One command starts everything:
 
 ```bash
-coding
+coding              # Claude Code (default)
+coding --copilot    # GitHub Copilot CLI
+coding --opencode   # OpenCode
 ```
 
-That's it. The infrastructure spins up in containers, your AI assistant connects, and you're working with full session logging, knowledge extraction, and constraint enforcement.
+That's it. The infrastructure spins up in containers, your AI assistant connects, and you're working with full session logging, knowledge extraction, and constraint enforcement. All agents get the same infrastructure — the only difference is which coding assistant you interact with.
 
 ![Coding startup](images/coding-startup-dockerized.png)
 *Coding startup - all launched services are checked for proper operations to ensure a fully working system.*
@@ -230,7 +248,7 @@ Coding has the option to run in dockerized mode to keep the machine footprint lo
 
 The dashboard is at `localhost:3030`. The knowledge graph viewer is at `localhost:8080`. Health monitoring shows you exactly what's running and catches problems automatically.
 
-If a process crashes or a status has gone stale, the multi-layer watchdog and process monitoring architecture detects it and restarts or refreshes the status. Sessions can run for days without intervention. Unused open coding sessions are detected as such and treated as dormant.
+If a process crashes or a status has gone stale, the 3-layer supervision architecture detects it and restarts or refreshes the status. Sessions can run for days without intervention. The health monitor detects all running agents (Claude, Copilot, OpenCode) and tracks their sessions with a graduated cooling scheme — active sessions glow green, idle ones fade through cooling stages, and sleeping sessions show as dormant. Sessions are only removed when the agent process exits, never hidden.
 
 ---
 

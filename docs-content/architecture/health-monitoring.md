@@ -1,90 +1,122 @@
 # Health Monitoring
 
-4-layer monitoring architecture for system reliability.
+3-layer supervision architecture for system reliability with multi-agent support.
 
-![4-Layer Monitoring Architecture](../images/4-layer-monitoring-architecture.png)
+![Health System Architecture](../images/enhanced-health-monitoring-overview.png)
 
 ## Architecture Overview
 
-The health monitoring system uses progressive escalation across four layers, each with distinct responsibilities.
+The health monitoring system uses a **3-layer resilience architecture** to ensure services stay running, with automatic recovery at each level.
 
-## Layer 1: System Watchdog
+| Layer | Component | Trigger | What It Supervises |
+|-------|-----------|---------|-------------------|
+| 1 | CombinedStatusLine | Every Claude prompt | GlobalProcessSupervisor, StatusLineHealthMonitor |
+| 2 | GlobalProcessSupervisor | 30s loop | HealthVerifier, StatusLineHealthMonitor, TranscriptMonitors |
+| 3 | HealthVerifier | 60s loop | Databases, Services, Processes |
 
-**Component**: `monitoring/global-monitor-watchdog.js`
+**Key Guarantee**: If any service dies, it will be restarted within:
 
-**Function**: Top-level supervisor monitoring all monitors
+- 30 seconds (by GlobalProcessSupervisor)
+- Or the next Claude prompt (by CombinedStatusLine as master supervisor)
 
-- Restarts failed monitoring processes
-- Logs health status every 60 seconds
-- Acts as last line of defense
+## Layer 1: Master Supervisor
 
-**Health Check**:
+**Component**: `scripts/combined-status-line.js`
 
-```bash
-ps aux | grep global-monitor-watchdog
+**Function**: Runs on every agent prompt — ultimate safety net
+
+- Ensures GlobalProcessSupervisor is running
+- Ensures StatusLineHealthMonitor is running
+- Fallback supervisor for all transcript monitors
+- 2-minute active session gating (only spawns monitors for actively-written transcripts)
+- Respects intentional stop markers (prevents restart loops)
+- Renders status to tmux status bar
+
+## Layer 2: Active Supervision
+
+**Component**: `scripts/global-process-supervisor.js`
+
+**Function**: Continuous supervision of all services
+
+- 30-second supervision loop with dynamic project discovery
+- Discovers projects from: PSM registry, health files, Claude transcript directories
+- 5-minute cooldown per service prevents restart storms
+- Max 10 restarts per hour per service (safety limit)
+- Respects intentional stop markers
+- Auto-restarts on own code change via AutoRestartWatcher
+- Heartbeat file: `.health/supervisor-heartbeat.json`
+
+## Layer 3: Verification & Auto-Healing
+
+**Component**: `scripts/health-verifier.js`
+
+**Function**: Periodic health verification with auto-healing
+
+- 60-second periodic checks
+- Dynamic discovery of ALL projects
+- Checks databases (LevelDB, Qdrant, SQLite, Memgraph), services, processes
+- Generates health scores (0-100) per service
+- Triggers auto-healing via HealthRemediationActions
+
+## Status Aggregation
+
+**Component**: `scripts/statusline-health-monitor.js`
+
+**Function**: Aggregates health from all layers for display
+
+- 15-second update interval with auto-healing
+- Multi-agent detection: Claude, Copilot, OpenCode (via process scanning)
+- Agent age cap: running agent's display age capped at monitor uptime
+- Sessions only removed when agent process exits, never hidden
+- Outputs to: `.logs/statusline-health-status.txt`
+
+### Multi-Agent Detection
+
+The health monitor detects all coding agent types by scanning process tables:
+
+| Agent | Binary | Detection |
+|-------|--------|-----------|
+| Claude | `claude` | `ps -eo pid,comm` exact match |
+| Copilot | `copilot` | Path-ending match `/copilot$` |
+| OpenCode | `opencode` | Path-ending match `/opencode$` |
+
+Agent project association is resolved via `lsof -p <PID> | grep cwd` → extracts project name from `/Agentic/<project>` path.
+
+### Session Lifecycle
+
+Sessions use a graduated cooling scheme based on idle time:
+
+```
+🟢 Active → 🌲 Cooling → 🫒 Fading → 🪨 Dormant → ⚫ Inactive → 💤 Sleeping
+   <5min      5-15min     15m-1hr     1-6hr        6-24hr       >24hr
 ```
 
-## Layer 2: System Coordinator
+- **Agent running**: Age capped at monitor uptime (fresh sessions start green, cool naturally)
+- **No agent**: Removed from display (session closed)
+- **Never hidden**: All states are visible, including 💤 sleeping
 
-**Component**: `monitoring/global-transcript-monitor-coordinator.js`
+## Per-Project Monitoring
 
-**Function**: Manages monitoring across all projects
+**Component**: `scripts/enhanced-transcript-monitor.js`
 
-- Ensures exactly one monitor per project
-- Coordinates monitor lifecycle
-- Aggregates health metrics
+**Function**: Real-time transcript monitoring per project
 
-**Health Check**:
+- 2-second check interval for prompt detection
+- Writes health files to centralized `.health/` directory
+- Generates LSL files in `.specstory/history/`
+- Auto-restarts on code change via AutoRestartWatcher
+- Marks project as intentionally stopped on graceful shutdown
 
-```bash
-cat .health/coordinator-status.json | jq '{status, activeProjects}'
-```
+## Auto-Restart on Code Change
 
-## Layer 3: System Verifier
+**Component**: `scripts/auto-restart-watcher.js`
 
-**Component**: `monitoring/transcript-monitor-verifier.js`
+**Function**: Watches script files on disk for changes
 
-**Function**: Verifies monitor health for all active projects
-
-- Health checks every 30 seconds
-- Detects suspicious activity (stuck processes)
-- Reports anomalies to coordinator
-
-**Suspicious Activity Detection**:
-
-- Stale monitors (no activity for extended period)
-- Stuck processes (exchange count not increasing)
-- High memory usage
-- Processing issues
-
-## Layer 4: Service-Level Self-Monitoring
-
-**Component**: Enhanced Transcript Monitor
-
-**Function**: Per-service health reporting
-
-- Generates `.transcript-monitor-health` file
-- Real-time process metrics
-- Exchange count and activity tracking
-
-**Health File Format**:
-
-```json
-{
-  "status": "healthy",
-  "metrics": {
-    "memoryMB": 9,
-    "cpuUser": 7481974,
-    "uptimeSeconds": 925,
-    "processId": 78406
-  },
-  "activity": {
-    "lastExchange": "82da8b2a-6a30-45eb-b0c7-5e1e2b2d54ee",
-    "exchangeCount": 10,
-    "isSuspicious": false
-  }
-}
-```
+- Uses `fs.watchFile` with 5-second poll interval
+- 2-second debounce for rapid saves
+- Triggers graceful exit on change — supervision restarts with new code
+- Used by: GlobalProcessSupervisor, StatusLineHealthMonitor, EnhancedTranscriptMonitor
 
 ## Health Dashboard
 
@@ -92,10 +124,10 @@ cat .health/coordinator-status.json | jq '{status, activeProjects}'
 
 **Features**:
 
-- Real-time service status
-- Health metrics visualization
-- Alert history
+- Real-time service status (4-card system: Databases, Services, Processes, API Quota)
+- UKB Workflow Monitor with visual workflow graph
 - Service restart controls
+- Auto-healing history
 
 ### API Endpoints (Port 3033)
 
@@ -110,35 +142,11 @@ cat .health/coordinator-status.json | jq '{status, activeProjects}'
 
 | File | Purpose |
 |------|---------|
-| `.health/coding-transcript-monitor-health.json` | LSL monitor health |
-| `.health/coordinator-status.json` | Coordinator status |
-| `.health/service-health.json` | Aggregated service health |
-
-## Monitoring Commands
-
-```bash
-# Check overall health
-cat .health/coding-transcript-monitor-health.json | jq '{status, activity}'
-
-# Verify all monitors
-node monitoring/transcript-monitor-verifier.js --check
-
-# Restart coordinator
-pkill -f global-transcript-monitor-coordinator
-node monitoring/global-transcript-monitor-coordinator.js &
-
-# Full system restart
-./bin/restart-monitoring.sh
-```
-
-## Alert Thresholds
-
-| Metric | Warning | Critical |
-|--------|---------|----------|
-| Memory Usage | >500MB | >1GB |
-| CPU Usage | >50% | >80% |
-| Stale Monitor | >5 min | >15 min |
-| Processing Delay | >30s | >60s |
+| `.health/verification-status.json` | HealthVerifier output |
+| `.health/supervisor-heartbeat.json` | GlobalProcessSupervisor heartbeat |
+| `.health/*-transcript-monitor-health.json` | Per-project health files (centralized) |
+| `.logs/statusline-health-status.txt` | StatusLineHealthMonitor rendered output |
+| `.live-process-registry.json` | ProcessStateManager registry |
 
 ## Troubleshooting
 
@@ -151,22 +159,21 @@ ps aux | grep enhanced-transcript-monitor
 # Check health file timestamp
 ls -la .health/coding-transcript-monitor-health.json
 
-# Restart monitor
-pkill -f enhanced-transcript-monitor
-TRANSCRIPT_SOURCE_PROJECT="/path/to/project" node scripts/enhanced-transcript-monitor.js &
+# Force restart (supervisor will restart automatically)
+kill $(pgrep -f "enhanced-transcript-monitor.*coding")
 ```
 
-### Coordinator issues
+### Session not showing
 
 ```bash
-# Check coordinator status
-cat .health/coordinator-status.json
+# Check if agent process is detected
+ps -eo pid,comm | awk '/claude$|copilot$|opencode$/ {print}'
 
-# View coordinator logs
-tail -100 .logs/coordinator.log
+# Check agent's working directory
+lsof -p <PID> 2>/dev/null | grep cwd
 
-# Restart coordinator
-node monitoring/global-transcript-monitor-coordinator.js &
+# Check health monitor status
+cat .logs/statusline-health-status.txt
 ```
 
 ### Health dashboard not loading
@@ -175,6 +182,16 @@ node monitoring/global-transcript-monitor-coordinator.js &
 # Check if server is running
 lsof -i :3032
 
-# Start health dashboard
-node integrations/system-health-dashboard/server.js &
+# Check health API
+curl http://localhost:3033/api/health
+```
+
+### Services stuck unhealthy
+
+```bash
+# Manual health check with auto-heal
+node scripts/health-verifier.js --auto-heal
+
+# View health status
+cat .health/verification-status.json | jq '.'
 ```
