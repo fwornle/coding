@@ -26,10 +26,12 @@ The health system is built on interconnected components with active supervision:
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| **GlobalProcessSupervisor** | `global-process-supervisor.js` | Active supervision - 30s checks, restarts dead services |
+| **GlobalProcessSupervisor** | `global-process-supervisor.js` | Active supervision - 30s checks, restarts dead services, OS-level re-registration |
+| **GlobalServiceCoordinator** | `global-service-coordinator.js` | Constraint service management with spawn guards and rate limiting |
 | **HealthVerifier** | `health-verifier.js` | Core verification engine with dynamic discovery & auto-healing |
-| **StatusLineHealthMonitor** | `statusline-health-monitor.js` | Health aggregation for Claude Code status bar |
-| **CombinedStatusLine** | `combined-status-line.js` | Status display + fallback supervisor (60s rate limit) |
+| **StatusLineHealthMonitor** | `statusline-health-monitor.js` | Health aggregation for tmux status bar |
+| **CombinedStatusLine** | `combined-status-line.js` | Status display + fallback supervisor (GPS heartbeat-gated) |
+| **StatusLineFastPath** | `status-line-fast.cjs` | Ultra-fast CJS cache reader (~60ms) for tmux `status-right` |
 | **EnhancedTranscriptMonitor** | `enhanced-transcript-monitor.js` | Real-time per-project transcript monitoring |
 | **LiveLoggingCoordinator** | `live-logging-coordinator.js` | Logging orchestration with multi-user support |
 | **ProcessStateManager** | `process-state-manager.js` | Unified registry with atomic file locking (used by all) |
@@ -39,23 +41,43 @@ The health system is built on interconnected components with active supervision:
 
 ![Health Monitoring Architecture](../images/enhanced-health-monitoring-overview.png)
 
-**Active Supervision Layer** - GlobalProcessSupervisor actively monitors and restarts dead services
+**Cache Layer** - `status-line-fast.cjs` serves pre-rendered cache in ~60ms (CJS, no ESM overhead)
+**Display + Fallback Layer** - CombinedStatusLine renders full status, writes cache; ensure* functions gated by GPS heartbeat
+**Active Supervision Layer** - GlobalProcessSupervisor actively monitors and restarts dead services with OS-level fallback discovery
+**Service Coordination Layer** - GlobalServiceCoordinator manages constraint services with spawn guards
 **Verification Layer** - HealthVerifier runs periodic checks with dynamic project discovery
 **Status Aggregation Layer** - StatusLineHealthMonitor + CombinedStatusLine display health
 **Per-Project Layer** - EnhancedTranscriptMonitor + LiveLoggingCoordinator per session
 **Core Infrastructure** - ProcessStateManager provides unified process registry
 
+### Spawn Storm Prevention
+
+The supervision architecture includes multiple guards to prevent runaway process spawning:
+
+| Guard | Component | Mechanism |
+|-------|-----------|-----------|
+| **GPS heartbeat gate** | CombinedStatusLine | ensure* functions skip when GPS heartbeat <60s old |
+| **OS-level dup check** | GlobalServiceCoordinator | `findRunningProcessesByScript()` before every spawn |
+| **Orphan kill** | GlobalServiceCoordinator | Kills spawned process if post-spawn health check fails |
+| **Cooldown** | GPS (5min), Coordinator (2min) | Per-service cooldown between restart attempts |
+| **Rate limiting** | GPS (10/hr), Coordinator (6/hr) | Maximum restarts per service per hour |
+| **OS-level re-registration** | GlobalProcessSupervisor | Re-registers running-but-unregistered services instead of respawning |
+| **Health file staleness** | GlobalProcessSupervisor | 120s threshold (2× write interval) prevents false-positive "dead" detection |
+
 ### Key Features
 
+- **CJS Fast-Path Cache** - `status-line-fast.cjs` serves status in ~60ms via pre-rendered cache file, eliminating ESM module loading overhead (was 2-18s under load)
 - **Dynamic Discovery** - Discovers ALL projects from PSM, health files, and Claude transcript directories
 - **Active Supervision** - GlobalProcessSupervisor actively restarts dead monitors within 30 seconds
+- **OS-Level Fallback** - GPS re-registers running-but-unregistered services (prevents blind respawn cycles)
 - **Auto-Restart on Code Change** - Daemons watch their own source files and exit cleanly when code changes, relying on supervision to restart with updated code
-- **Cooldown Protection** - 5-minute cooldown per service prevents restart storms
-- **Rate Limiting** - Max 10 restarts per hour per service
-- **Fallback Supervision** - CombinedStatusLine provides backup restart capability
+- **Spawn Storm Prevention** - Multi-layered guards: GPS heartbeat gating, OS-level duplicate checks, orphan kill, cooldowns, and rate limiting
+- **Cooldown Protection** - GPS: 5-minute cooldown per service; Coordinator: 2-minute cooldown
+- **Rate Limiting** - GPS: Max 10 restarts/hour; Coordinator: Max 6 restarts/hour per service
+- **Fallback Supervision** - CombinedStatusLine provides backup restart only when GPS heartbeat is stale
 - **Active Session Gating** - Transcript monitors only spawned for sessions with transcript activity in the last 2 minutes
 - **Multi-Agent Detection** - Detects Claude, Copilot, and OpenCode sessions via process scanning
-- **Agent Age Cap** - Running agent's display age capped at monitor uptime, so fresh sessions start green and cool naturally
+- **Agent Age Cap** - Running agent's display age capped at monitor uptime; transcripts with `status: 'not_found'` (e.g., OpenCode) correctly show as inactive instead of falsely green
 - **Intentional Stop Markers** - Graceful shutdown marks project as stopped, preventing restart loops
 
 ## Component Details
@@ -64,6 +86,8 @@ The health system is built on interconnected components with active supervision:
 - **Active supervision of ALL transcript monitors and global services**
 - 30-second supervision loop with dynamic project discovery
 - Discovers projects from: PSM registry, health files, Claude transcript directories
+- **OS-level fallback**: When PSM says "not registered", checks OS process table via `findRunningProcessesByScript()` — re-registers alive services instead of blind respawn
+- Health file staleness threshold: **120 seconds** (2× write interval, prevents false-positive "dead" detection at boundary)
 - 5-minute cooldown per service prevents restart storms
 - Max 10 restarts per hour per service (safety limit)
 - Respects intentional stop markers (skips projects that were gracefully shut down)
@@ -85,22 +109,30 @@ The health system is built on interconnected components with active supervision:
 - Triggers auto-healing via HealthRemediationActions
 
 ### StatusLineHealthMonitor (`scripts/statusline-health-monitor.js`) - Status Aggregation
-- Health aggregation for Claude Code status bar
+- Health aggregation for tmux status bar
 - 15-second update interval with auto-healing
 - Detects all agent types: Claude, Copilot, OpenCode (via process scanning)
 - **Agent age cap**: running agent's age capped at monitor uptime — fresh sessions start green and cool naturally
+- **not_found transcript guard**: agents without Claude-compatible transcripts (e.g., OpenCode) correctly show as inactive (⚫) instead of falsely active (🟢)
 - Sessions removed only when agent process exits, never hidden
 - Outputs to: `.logs/statusline-health-status.txt`
 
-### CombinedStatusLine (`scripts/combined-status-line.js`) - Master Supervisor + Status Display
-- **Master supervisor** - runs on every Claude prompt
-- **`ensureGlobalProcessSupervisorRunning()`** - Ensures GPS is running
-- **`ensureStatuslineHealthMonitorRunning()`** - Ensures SHM is running
-- **`ensureAllTranscriptMonitorsRunning()`** - Fallback supervisor for all projects
-- **2-minute active session gating** - only spawns monitors for projects with transcript activity in last 2 min
+### CombinedStatusLine (`scripts/combined-status-line.js`) - Display + Fallback Supervisor
+- **Display-first**: renders full status bar with all segments
+- **GPS heartbeat gate**: ensure* functions only run when GPS heartbeat is stale (>60s) — eliminates overlapping supervision
+- When GPS is running (normal case): CSL is display-only, writes cache to `.logs/combined-status-line-cache.txt`
+- When GPS is dead: CSL acts as fallback supervisor for GPS, SHM, and transcript monitors
+- 2-minute active session gating — only spawns monitors for projects with transcript activity in last 2 min
 - Respects intentional stop markers (prevents restart loops after graceful shutdown)
-- Displays health status in Claude Code status bar
-- Guarantees service recovery even if GPS dies
+
+### StatusLineFastPath (`scripts/status-line-fast.cjs`) - Cache Reader
+- **Ultra-fast CJS cache reader** (~60ms) — invoked by tmux `status-right` every 5 seconds
+- CommonJS module (no ESM overhead) — eliminates the 2-18 second ESM module resolution penalty under system load
+- Reads pre-rendered status from `.logs/combined-status-line-cache.txt`
+- If cache <60s old: serves immediately
+- If cache >20s old: triggers background CSL refresh (detached, non-blocking)
+- If cache missing/stale: falls back to synchronous full CSL execution
+- Configured in `tmux-session-wrapper.sh` for all new sessions
 
 ### EnhancedTranscriptMonitor (`scripts/enhanced-transcript-monitor.js`) - Per-Project
 - Real-time transcript monitoring per project
@@ -247,17 +279,19 @@ The dashboard displays:
 
 ![Supervisor Restart Hierarchy](../images/supervisor-restart-hierarchy.png)
 
-The health system uses a **3-layer resilience architecture** to ensure services stay running:
+The health system uses a **multi-layer resilience architecture** with spawn storm prevention:
 
-| Layer | Component | Trigger | What It Supervises |
-|-------|-----------|---------|-------------------|
-| 1 | CombinedStatusLine | Every Claude prompt | GlobalProcessSupervisor, StatusLineHealthMonitor |
-| 2 | GlobalProcessSupervisor | 30s loop | HealthVerifier, StatusLineHealthMonitor, TranscriptMonitors |
-| 3 | HealthVerifier | 60s loop | Databases, Services, Processes |
+| Layer | Component | Trigger | What It Supervises | Spawn Guards |
+|-------|-----------|---------|-------------------|--------------|
+| Cache | StatusLineFastPath | Every 5s (tmux) | N/A (read-only) | N/A |
+| 1 | CombinedStatusLine | Cache miss | GPS, SHM (fallback only) | GPS heartbeat gate |
+| 2 | GlobalProcessSupervisor | 30s loop | HealthVerifier, SHM, TranscriptMonitors | OS dup check, re-registration, 120s staleness |
+| 2 | GlobalServiceCoordinator | 15s loop | Constraint services (api, dashboard) | OS dup check, orphan kill, 2m cooldown, 6/hr limit |
+| 3 | HealthVerifier | 60s loop | Databases, Services, Processes | N/A |
 
 **Key Guarantee**: If any service dies, it will be restarted within:
 - 30 seconds (by GlobalProcessSupervisor)
-- Or the next Claude prompt (by CombinedStatusLine as master supervisor)
+- Or the next cache miss (by CombinedStatusLine as fallback supervisor, only if GPS is also dead)
 
 ## Quick Start
 
@@ -330,11 +364,13 @@ See [Status Line System](./status-line.md) for complete documentation.
 ## Key Files
 
 **Core Health Components**:
-- `scripts/global-process-supervisor.js` - Active supervision of all services
+- `scripts/global-process-supervisor.js` - Active supervision of all services (with OS-level re-registration)
+- `scripts/global-service-coordinator.js` - Constraint service management (with spawn guards)
 - `scripts/process-state-manager.js` - Unified process registry with atomic locking
 - `scripts/health-verifier.js` - Core verification with dynamic discovery & auto-healing
 - `scripts/statusline-health-monitor.js` - Health aggregation daemon
 - `scripts/combined-status-line.js` - Status display + fallback supervisor
+- `scripts/status-line-fast.cjs` - Ultra-fast CJS cache reader (~60ms) for tmux
 - `scripts/enhanced-transcript-monitor.js` - Per-project monitoring
 - `scripts/live-logging-coordinator.js` - Logging orchestration
 
@@ -343,6 +379,7 @@ See [Status Line System](./status-line.md) for complete documentation.
 - `scripts/health-prompt-hook.js` - Pre-prompt integration
 - `scripts/health-remediation-actions.js` - Auto-healing actions
 - `scripts/start-services-robust.js` - Service startup with supervisor
+- `scripts/tmux-session-wrapper.sh` - Tmux session wrapper (configures status-line-fast.cjs)
 - `lib/api-quota-checker.js` - API quota checking (shared library)
 
 **Data Files**:
@@ -351,6 +388,7 @@ See [Status Line System](./status-line.md) for complete documentation.
 - `.health/verification-status.json` - HealthVerifier output
 - `.health/*-transcript-monitor-health.json` - Per-project health files
 - `.logs/statusline-health-status.txt` - StatusLineHealthMonitor output
+- `.logs/combined-status-line-cache.txt` - Pre-rendered status cache (served by fast-path)
 
 **Configuration**:
 - `config/health-verification-rules.json` - Health check rules with `dynamic_discovery` flag

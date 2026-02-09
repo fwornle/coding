@@ -95,6 +95,12 @@ class GlobalServiceCoordinator extends EventEmitter {
     this.healthTimer = null;
     this.recoveryQueue = new Map(); // Track services being recovered
 
+    // Cooldown and rate limiting (prevents spawn storms)
+    this.cooldowns = new Map();       // serviceKey -> lastRestartTime
+    this.restartCounts = new Map();   // serviceKey -> { count, resetTime }
+    this.cooldownMs = 120000;         // 2 minute cooldown per service
+    this.maxRestartsPerHour = 6;      // max 6 restarts per service per hour
+
     this.ensureLogDirectory();
     this.setupSignalHandlers();
   }
@@ -217,6 +223,34 @@ class GlobalServiceCoordinator extends EventEmitter {
     return true;
   }
 
+  // ============================================
+  // COOLDOWN AND RATE LIMITING
+  // ============================================
+
+  isInCooldown(serviceKey) {
+    const lastRestart = this.cooldowns.get(serviceKey);
+    if (!lastRestart) return false;
+    return Date.now() - lastRestart < this.cooldownMs;
+  }
+
+  canRestart(serviceKey) {
+    const counts = this.restartCounts.get(serviceKey);
+    if (!counts) return true;
+    const now = Date.now();
+    if (now - counts.resetTime > 60 * 60 * 1000) {
+      this.restartCounts.set(serviceKey, { count: 0, resetTime: now });
+      return true;
+    }
+    return counts.count < this.maxRestartsPerHour;
+  }
+
+  recordRestart(serviceKey) {
+    this.cooldowns.set(serviceKey, Date.now());
+    const counts = this.restartCounts.get(serviceKey) || { count: 0, resetTime: Date.now() };
+    counts.count++;
+    this.restartCounts.set(serviceKey, counts);
+  }
+
   /**
    * Ensure a specific service is running
    */
@@ -227,6 +261,16 @@ class GlobalServiceCoordinator extends EventEmitter {
     if (existingService && await this.isServiceHealthy(serviceKey, serviceDef, projectPath)) {
       this.debug(`Service already healthy: ${serviceKey}`);
       return true;
+    }
+
+    // Check cooldown and rate limits before attempting restart
+    if (this.isInCooldown(serviceKey)) {
+      this.debug(`Service in cooldown: ${serviceKey}`);
+      return false;
+    }
+    if (!this.canRestart(serviceKey)) {
+      this.warn(`Service exceeded hourly restart limit: ${serviceKey}`);
+      return false;
     }
 
     // Clean up stale service
@@ -249,6 +293,30 @@ class GlobalServiceCoordinator extends EventEmitter {
    */
   async startService(serviceKey, serviceDef, projectPath = null) {
     try {
+      const scriptBasename = path.basename(serviceDef.script);
+
+      // OS-level duplicate check — don't spawn if same script is already running
+      try {
+        const existing = await this.psm.findRunningProcessesByScript(scriptBasename);
+        if (existing.length > 0) {
+          this.debug(`Skipping spawn of ${serviceKey}: ${existing.length} instance(s) already running (PIDs: ${existing.map(p => p.pid).join(',')})`);
+          // Register the existing process so we track it
+          this.registry.services[serviceKey] = {
+            pid: existing[0].pid,
+            serviceType: serviceDef.type,
+            script: serviceDef.script,
+            projectPath: projectPath,
+            startTime: Date.now(),
+            lastHealthCheck: Date.now(),
+            status: 'running',
+            restartCount: 0
+          };
+          return true;
+        }
+      } catch (e) {
+        this.debug(`OS process check failed for ${serviceKey}: ${e.message}`);
+      }
+
       this.log(`🚀 Starting service: ${serviceKey}`);
       
       const scriptPath = path.join(this.codingRepoPath, serviceDef.script);
@@ -267,7 +335,6 @@ class GlobalServiceCoordinator extends EventEmitter {
       // Prepare arguments
       const args = [scriptPath];
       if (projectPath) {
-        // Add project-specific arguments
         args.push('--project', projectPath);
       }
 
@@ -318,10 +385,14 @@ class GlobalServiceCoordinator extends EventEmitter {
           restartCount: 0
         };
 
+        this.recordRestart(serviceKey);
         this.log(`✅ Service started: ${serviceKey} (PID: ${child.pid})`);
         return true;
       } else {
-        this.error(`❌ Service failed to start: ${serviceKey}`);
+        // Health check failed — kill the orphan to prevent accumulation
+        this.warn(`Service failed health check after spawn: ${serviceKey} (PID: ${child.pid}) — killing orphan`);
+        try { process.kill(child.pid, 'SIGTERM'); } catch { /* already dead */ }
+        this.recordRestart(serviceKey);
         return false;
       }
 

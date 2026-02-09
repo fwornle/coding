@@ -682,10 +682,14 @@ class StatusLineHealthMonitor {
             const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
             const uptimeMs = (healthData.metrics?.uptimeSeconds || 0) * 1000;
             const transcriptAge = healthData.transcriptInfo?.ageMs || 0;
-            // Use min(transcriptAge, monitorUptime) — uptime caps the age for fresh sessions
-            const effectiveAge = Math.min(transcriptAge, uptimeMs);
-            // Recalculate icon from effective age
-            liveSessions[projectName] = this.iconFromAge(effectiveAge);
+            // Skip age cap when transcript is "not_found" — ageMs=0 means "no transcript",
+            // not "active 0ms ago" (e.g., opencode without Claude-compatible transcripts)
+            if (healthData.transcriptInfo?.status !== 'not_found') {
+              // Use min(transcriptAge, monitorUptime) — uptime caps the age for fresh sessions
+              const effectiveAge = Math.min(transcriptAge, uptimeMs);
+              // Recalculate icon from effective age
+              liveSessions[projectName] = this.iconFromAge(effectiveAge);
+            }
           }
         } catch {
           // On error, keep existing session data

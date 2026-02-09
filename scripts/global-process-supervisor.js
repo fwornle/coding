@@ -41,7 +41,7 @@ class GlobalProcessSupervisor {
     this.checkInterval = options.checkInterval || 30000;  // 30 seconds
     this.cooldownMs = options.cooldownMs || 300000;       // 5 minutes
     this.maxRestartsPerHour = options.maxRestartsPerHour || 10;
-    this.healthFileMaxAge = options.healthFileMaxAge || 60000;  // 60 seconds stale
+    this.healthFileMaxAge = options.healthFileMaxAge || 120000;  // 120 seconds (2× write interval)
 
     // Internal state
     this.running = false;
@@ -233,15 +233,38 @@ class GlobalProcessSupervisor {
   async isGlobalServiceHealthy(serviceName) {
     try {
       const service = await this.psm.getService(serviceName, 'global');
-      if (!service) {
-        return { healthy: false, reason: 'not registered' };
-      }
-
-      if (!this.psm.isProcessAlive(service.pid)) {
+      if (service) {
+        if (this.psm.isProcessAlive(service.pid)) {
+          return { healthy: true, reason: 'ok', pid: service.pid };
+        }
         return { healthy: false, reason: `PID ${service.pid} is dead`, pid: service.pid };
       }
 
-      return { healthy: true, reason: 'ok', pid: service.pid };
+      // Not in PSM — fall back to OS-level discovery before declaring unhealthy.
+      // This prevents the unregister→spawn→exit→still-unregistered cycle.
+      const serviceConfig = this.globalServices.find(s => s.name === serviceName);
+      if (serviceConfig) {
+        try {
+          const existing = await this.psm.findRunningProcessesByScript(serviceConfig.script);
+          if (existing.length > 0) {
+            // Process is running but unregistered — re-register it
+            const pid = existing[0].pid;
+            this.log(`${serviceName} running (PID ${pid}) but not in PSM — re-registering`);
+            await this.psm.registerService({
+              name: serviceName,
+              pid,
+              type: 'global',
+              script: serviceConfig.script,
+              metadata: { reRegisteredBy: 'global-process-supervisor', at: new Date().toISOString() }
+            });
+            return { healthy: true, reason: 're-registered', pid };
+          }
+        } catch (e) {
+          this.log(`OS-level check for ${serviceName} failed: ${e.message}`, 'DEBUG');
+        }
+      }
+
+      return { healthy: false, reason: 'not registered' };
     } catch (error) {
       return { healthy: false, reason: error.message };
     }
@@ -402,6 +425,23 @@ class GlobalProcessSupervisor {
 
     try {
       this.log(`Restarting global service: ${name}`);
+
+      // Safety: verify the process is truly dead before spawning.
+      // If it's alive but just unregistered, re-register instead of respawning.
+      try {
+        const existing = await this.psm.findRunningProcessesByScript(script);
+        if (existing.length > 0) {
+          const pid = existing[0].pid;
+          this.log(`${name} already running (PID ${pid}) — re-registering instead of respawning`);
+          await this.psm.registerService({
+            name, pid, type: 'global', script,
+            metadata: { reRegisteredBy: 'global-process-supervisor', at: new Date().toISOString() }
+          });
+          return true;
+        }
+      } catch (e) {
+        this.log(`OS check before restart failed for ${name}: ${e.message}`, 'DEBUG');
+      }
 
       // Clean up dead PSM entry first
       await this.psm.unregisterService(name, 'global');

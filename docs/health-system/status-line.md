@@ -4,13 +4,14 @@ Real-time visual indicators of system health and development activity, rendered 
 
 ## Tmux-Based Rendering
 
-All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`. The status line is rendered using tmux's `status-right` directive, which invokes `combined-status-line.js` every 5 seconds. This replaces the earlier approach of using Claude Code's native `statusLine` config, which could not render tmux-specific formatting codes (like `#[underscore]`).
+All agents are wrapped in tmux sessions via the shared `scripts/tmux-session-wrapper.sh`. The status line is rendered using tmux's `status-right` directive, which invokes `scripts/status-line-fast.cjs` every 5 seconds. This CJS (CommonJS) fast-path reads a pre-rendered cache file in ~60ms, eliminating the 2-18 second ESM module loading penalty that occurs under system load. When the cache is stale, it triggers a background refresh via `combined-status-line.js`.
 
 **Key benefits:**
 - Unified rendering across all agents (no agent-specific status line code)
 - Full support for tmux formatting codes (underline, bold, colors)
 - Consistent status bar positioning at the bottom of the terminal
 - Mouse support forwarded to the agent running inside tmux
+- Ultra-fast cache-based rendering (~60ms) — never blanks under load
 
 ## What It Shows
 
@@ -243,6 +244,8 @@ Session activity uses a **unified graduated color scheme** that transitions smoo
 
 **Agent Age Cap**: When an agent process (claude, copilot, opencode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant. The session starts as 🟢 and naturally progresses through the cooling scheme based on how long the current session has been idle.
 
+**Not-Found Transcript Guard**: Agents that don't produce Claude-compatible transcripts (e.g., OpenCode) have `transcriptInfo.status: 'not_found'` with `ageMs: 0`. The age cap logic skips these sessions — they correctly display as ⚫ inactive instead of falsely showing as 🟢 active.
+
 **Activity Age Calculation**:
 - Uses `transcriptInfo.ageMs` from health file (actual transcript inactivity)
 - Falls back to health file timestamp if transcript age unavailable
@@ -263,13 +266,23 @@ The StatusLineHealthMonitor (Layer 4) aggregates health from all other layers an
 
 ### Core Components
 
-**1. Combined Status Line** (`scripts/combined-status-line.js`)
-- Unified status display across all Claude Code sessions
-- Integration with health monitoring, constraint monitoring, and trajectory analysis
-- Real-time updates via health check integration
+**1. Status Line Fast-Path** (`scripts/status-line-fast.cjs`)
+- Ultra-fast CommonJS cache reader (~60ms) — invoked by tmux `status-right` every 5 seconds
+- Reads pre-rendered status from `.logs/combined-status-line-cache.txt`
+- If cache <60s old: serves immediately (no Node.js ESM overhead)
+- If cache >20s old: triggers background refresh via `combined-status-line.js` (detached)
+- Falls back to synchronous full CSL only if cache missing or >60s stale
+- Solves the 2-18 second ESM module resolution penalty under high system load
+
+**2. Combined Status Line** (`scripts/combined-status-line.js`)
+- Full status display with all segments (health, quota, sessions, compliance, knowledge, LSL)
+- Writes cache to `.logs/combined-status-line-cache.txt` after successful generation
+- **GPS heartbeat gate**: ensure* supervision functions only run when GPS heartbeat is stale (>60s)
+- When GPS is running (normal): display-only, no process spawning
+- When GPS is dead: fallback supervisor for GPS, SHM, and transcript monitors
 - Smart abbreviations for compact display
 
-**2. Status Line Integration**
+**3. Status Line Integration**
 
 ![Status Line Integration](../images/status-line-trajectory-integration.png)
 
@@ -362,27 +375,34 @@ Where:
 
 ![Status Line Hook Timing](../images/status-line-hook-timing.png)
 
-**Update Sequence**:
-1. **Health Check Trigger**: Pre-prompt hook fires
-2. **Status Collection**:
+**Cache Fast-Path (normal operation)**:
+1. **Tmux fires** `status-line-fast.cjs` every 5 seconds
+2. **Cache check**: Read `.logs/combined-status-line-cache.txt`
+3. If cache <60s old → **serve immediately** (~60ms, no further processing)
+4. If cache >20s old → trigger **background refresh** (detached `combined-status-line.js`)
+5. If cache missing/stale → synchronous fallback to full CSL
+
+**Full Refresh (background or fallback)**:
+1. **Status Collection**:
    - Read health verification status
    - Query constraint monitor API
    - Read trajectory state file
    - Check API quota for all providers
    - Scan LSL registry
-3. **Status Aggregation**: Combine all indicators
-4. **Display Update**: Update Claude Code status bar
-5. **Cache**: Store for next check
+2. **Status Aggregation**: Combine all indicators
+3. **Display**: Output full status bar
+4. **Cache Write**: Save to `.logs/combined-status-line-cache.txt`
+5. **GPS Heartbeat Check**: If GPS heartbeat >60s stale, run ensure* functions as fallback supervisor
 
 ### Update Frequency
 
 **Triggered By**:
-- User prompts (via pre-prompt hook)
-- Health verification completion
-- Trajectory state changes
-- LSL activity events
+- Tmux `status-right` every 5 seconds (via fast-path cache)
+- Background refresh when cache >20s old
+- Full CSL fallback when cache missing
 
 **Caching**:
+- Pre-rendered status cache (fast-path): 60s TTL, 20s background refresh trigger
 - Health status cached for 5 minutes
 - Constraint compliance cached for 1 minute
 - API quota cached for 30 seconds (real-time) or 5 minutes (estimated)
@@ -477,14 +497,17 @@ coding --copilot    # Same tmux wrapping
 
 The tmux wrapper (`scripts/tmux-session-wrapper.sh`) handles:
 - Creating a tmux session named `coding-{agent}-{PID}`
-- Configuring `status-right` to invoke `combined-status-line.js`
+- Configuring `status-right` to invoke `status-line-fast.cjs` (CJS fast-path cache reader)
 - Nesting guard: if already in tmux, configures the current session instead
 - Mouse forwarding for interactive agent use
 
 ### Manual Status Line Check
 
 ```bash
-# Get current status line output
+# Get current status line output (fast-path from cache)
+node scripts/status-line-fast.cjs
+
+# Force full refresh (bypasses cache)
 node scripts/combined-status-line.js
 
 # Example output:
@@ -492,6 +515,24 @@ node scripts/combined-status-line.js
 ```
 
 ### Troubleshooting
+
+**Status bar completely blank?**
+```bash
+# Check if the cache file exists and is recent
+ls -la .logs/combined-status-line-cache.txt
+
+# Test the fast-path directly
+time node scripts/status-line-fast.cjs
+
+# If cache is stale/missing, force a full refresh
+node scripts/combined-status-line.js
+
+# Check for process spawn storm (should be <80 Node processes)
+ps aux | grep node | wc -l
+
+# If >100 processes, kill the coordinator and let GPS restart cleanly
+ps aux | grep global-service-coordinator | grep -v grep
+```
 
 **Status line not updating?**
 ```bash
@@ -645,7 +686,9 @@ ps -eo pid,tty,comm | grep claude
 **Core System**:
 
 - `scripts/tmux-session-wrapper.sh` - Shared tmux wrapper that configures status bar for all agents
-- `scripts/combined-status-line.js` - Main status line script (invoked by tmux `status-right`)
+- `scripts/status-line-fast.cjs` - Ultra-fast CJS cache reader (~60ms) — invoked by tmux `status-right`
+- `scripts/combined-status-line.js` - Full status line renderer + fallback supervisor (writes cache)
+- `scripts/combined-status-line-wrapper.js` - ESM wrapper (backup; primary is fast-path CJS)
 - `scripts/statusline-health-monitor.js` - Session health monitor daemon (detects running monitors, writes status)
 - `scripts/health-verifier.js` - Health status provider
 - `src/live-logging/RealTimeTrajectoryAnalyzer.js` - Trajectory state provider
@@ -654,6 +697,7 @@ ps -eo pid,tty,comm | grep claude
 - `.health/verification-status.json` - Health status cache
 - `.health/*-transcript-monitor-health.json` - Per-project health files (centralized in coding project)
 - `.logs/statusline-health-status.txt` - Rendered status line output
+- `.logs/combined-status-line-cache.txt` - Pre-rendered status cache (served by fast-path)
 - `.specstory/trajectory/live-state.json` - Trajectory state
 
 **Configuration**:

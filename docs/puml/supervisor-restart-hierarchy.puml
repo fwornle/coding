@@ -1,30 +1,53 @@
 @startuml supervisor-restart-hierarchy
 !include _standard-style.puml
 
-title Service Supervision Hierarchy\n3-Layer Resilience Architecture
+title Service Supervision Hierarchy\n3-Layer Resilience Architecture with Spawn Prevention
 
 top to bottom direction
 
-package "Layer 1: Master Supervisor (Per-Prompt)" #E8F5E8 {
-  component [CombinedStatusLine] as CSL <<core>>
-  note right of CSL
-    **Runs on EVERY Claude prompt**
-    - ensureGlobalProcessSupervisorRunning()
-    - ensureStatuslineHealthMonitorRunning()
-    - ensureAllTranscriptMonitorsRunning()
-    - Checks PSM + heartbeat freshness
+package "Tmux Status Bar (Every 5s)" #F3E5F5 {
+  component [status-line-fast.cjs\n(CJS cache reader)] as FastPath <<cli>>
+  component [combined-status-line-cache.txt] as Cache <<storage>>
+  note right of FastPath
+    **Ultra-fast CJS reader (~60ms)**
+    - Reads pre-rendered cache file
+    - If cache <60s old → serve immediately
+    - If cache >20s old → trigger background refresh
+    - Falls back to full CSL only if cache missing
   end note
 }
 
-package "Layer 2: Active Supervisor (30s Loop)" #E6F3FF {
+package "Layer 1: Display + Fallback Supervisor" #E8F5E8 {
+  component [CombinedStatusLine] as CSL <<core>>
+  note right of CSL
+    **Runs only when cache is stale**
+    - ensure* functions GUARDED by GPS heartbeat
+    - If GPS heartbeat <60s old → display-only
+    - If GPS dead → acts as fallback supervisor
+    - Writes cache after successful generation
+  end note
+}
+
+package "Layer 2: Active Supervision" #E6F3FF {
   component [GlobalProcessSupervisor] as GPS <<infra>>
+  component [GlobalServiceCoordinator] as GSC <<infra>>
+
   note right of GPS
     **30-second supervision loop**
-    - Monitors health-verifier
-    - Monitors statusline-health-monitor
-    - Dynamic project discovery
-    - 5-min cooldown per service
-    - Max 10 restarts/hour
+    - Monitors health-verifier + statusline-health-monitor
+    - OS-level fallback: re-registers running but
+      unregistered services (prevents blind respawn)
+    - Health file staleness: **120s** (2× write interval)
+    - 5-min cooldown, max 10 restarts/hour
+  end note
+
+  note right of GSC
+    **15-second health check loop**
+    - Manages constraint-api (port 3031)
+    - Manages constraint-dashboard (port 3030)
+    - **Spawn guards**: OS-level dup check before every spawn
+    - **Orphan kill**: kills spawned process if health check fails
+    - **Rate limiting**: 2-min cooldown, max 6/hour
   end note
 }
 
@@ -41,7 +64,7 @@ package "Layer 3: Health Services" #FFF9E6 {
   note bottom of SHM
     15s status updates
     Health file aggregation
-    Claude status bar output
+    Agent age cap (with not_found guard)
   end note
 }
 
@@ -49,32 +72,38 @@ package "Layer 4: Per-Project Monitors" #FFE8F4 {
   component [EnhancedTranscriptMonitor\n(per project)] as ETM <<per_project>>
 }
 
+' Fast path
+FastPath -[#9C27B0,thickness=2]-> Cache : reads (<60s)
+CSL -[#9C27B0,thickness=1,dashed]-> Cache : writes on success
+
 ' Supervision relationships
-CSL -[#2E7D32,thickness=3]-> GPS : **ensures running**
-CSL -[#2E7D32,thickness=2]-> SHM : ensures running
-CSL -[#2E7D32,thickness=1,dashed]-> ETM : fallback restart
+CSL -[#2E7D32,thickness=2,dashed]-> GPS : fallback only\n(if GPS heartbeat stale)
+CSL -[#2E7D32,thickness=1,dashed]-> SHM : fallback only
 
 GPS -[#1565C0,thickness=2]-> HV : supervises & restarts
-GPS -[#1565C0,thickness=2]-> SHM : supervises & restarts
+GPS -[#1565C0,thickness=2]-> SHM : supervises & re-registers
 GPS -[#1565C0,thickness=2]-> ETM : supervises & restarts
+GSC -[#F57C00,thickness=2]-> GSC : constraint services\n(api + dashboard)
 
 legend right
-  |= Layer |= Component |= Trigger |= Recovery Time |
-  | 1 | CombinedStatusLine | Every prompt | Immediate |
-  | 2 | GlobalProcessSupervisor | 30s loop | < 30s |
-  | 3 | HealthVerifier | Supervised | < 30s |
-  | 3 | StatusLineHealthMonitor | Supervised | < 30s |
-  | 4 | EnhancedTranscriptMonitor | Supervised | < 30s |
+  |= Layer |= Component |= Trigger |= Spawn Guards |
+  | Cache | status-line-fast.cjs | Every 5s (tmux) | N/A (read-only) |
+  | 1 | CombinedStatusLine | Cache miss | GPS heartbeat gate |
+  | 2 | GlobalProcessSupervisor | 30s loop | OS dup check + re-register |
+  | 2 | GlobalServiceCoordinator | 15s loop | OS dup check + cooldown + orphan kill |
+  | 3 | HealthVerifier | Supervised | N/A |
+  | 3 | StatusLineHealthMonitor | Supervised | N/A |
+  | 4 | EnhancedTranscriptMonitor | Supervised | N/A |
 endlegend
 
 note as N1
-  **Resilience Guarantee**:
-  If ANY service dies, it will be restarted within:
-  - 30 seconds (by GlobalProcessSupervisor)
-  - Or next Claude prompt (by CombinedStatusLine)
-
-  If GlobalProcessSupervisor itself dies:
-  - Next Claude prompt restarts it immediately
+  **Spawn Storm Prevention** (Feb 2026):
+  ─ CJS fast-path eliminates ESM startup overhead (60ms vs 2-18s)
+  ─ CSL ensure* guarded by GPS heartbeat (eliminates 3rd spawner)
+  ─ Coordinator: OS dup check + orphan kill + cooldown + rate limit
+  ─ GPS: OS-level fallback re-registers unregistered-but-alive services
+  ─ GPS: health file staleness threshold 60s → 120s (no false positives)
+  ─ Agent age cap: transcripts with status=not_found skip override
 end note
 
 @enduml

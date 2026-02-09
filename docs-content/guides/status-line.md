@@ -1,6 +1,6 @@
 # Status Line Complete Guide
 
-Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions by `tmux-session-wrapper.sh`, which configures `status-right` to invoke `combined-status-line.js` every 5 seconds.
+Real-time visual indicators of system health and development activity rendered via the unified tmux status bar. All coding agents (Claude, CoPilot, etc.) are wrapped in tmux sessions by `tmux-session-wrapper.sh`, which configures `status-right` to invoke `status-line-fast.cjs` — an ultra-fast CJS cache reader (~60ms) that serves pre-rendered status from a file-based cache, eliminating the 2-18s ESM module loading penalty under system load.
 
 ![Status Line Display](../images/status-line-display.png)
 
@@ -68,6 +68,9 @@ Sessions use a **graduated color scheme** based on time since last activity. **A
 
 !!! info "Agent Age Cap"
     When an agent process (Claude, Copilot, OpenCode) is running, the displayed age is capped at the transcript monitor's uptime. This prevents a freshly started session in a project with old transcripts from immediately showing as dormant — the session starts green and naturally progresses through the cooling scheme based on how long the current session has been idle.
+
+!!! warning "Not-Found Transcript Guard"
+    Agents that don't produce Claude-compatible transcripts (e.g., OpenCode) have `transcriptInfo.status: 'not_found'`. The age cap logic skips these sessions — they correctly display as ⚫ inactive instead of falsely showing as 🟢 active.
 
 ### Trajectory States
 
@@ -229,40 +232,72 @@ The StatusLineHealthMonitor (Layer 4) aggregates health from all other layers an
 All coding agents are wrapped in tmux sessions via `scripts/tmux-session-wrapper.sh`. The wrapper:
 
 - Creates a tmux session named `coding-{agent}-{PID}`
-- Configures `status-right` to invoke `combined-status-line.js` every 5 seconds
+- Configures `status-right` to invoke `status-line-fast.cjs` (CJS fast-path cache reader, ~60ms)
 - Handles nesting guard (reuses existing tmux if already inside one)
 - Propagates environment variables (`CODING_REPO`, `SESSION_ID`, etc.)
 - Enables mouse forwarding for terminal interaction
 
 This replaces the previous approach of using agent-specific status bar APIs (e.g., Claude's `statusLine` config), providing a unified rendering target that works identically for all agents.
 
+### Cache Fast-Path
+
+The `status-line-fast.cjs` is a CommonJS module that eliminates ESM module loading overhead:
+
+- Reads pre-rendered status from `.logs/combined-status-line-cache.txt`
+- If cache <60s old → **serves immediately** (~60ms)
+- If cache >20s old → triggers **background refresh** via `combined-status-line.js` (detached)
+- If cache missing/stale → synchronous fallback to full CSL
+
+This ensures the status bar **never goes blank** under system load (ESM imports took 2-18s under high process count).
+
 ### Status Line Update Flow
 
 ![Status Line Hook Timing](../images/status-line-hook-timing.png)
 
-**Update Sequence:**
+**Cache Fast-Path (normal operation):**
 
-1. **Tmux Timer**: `status-right` fires every 5 seconds
-2. **Status Collection**:
+1. **Tmux Timer**: `status-right` fires every 5 seconds → `status-line-fast.cjs`
+2. **Cache Check**: Read `.logs/combined-status-line-cache.txt`
+3. If cache fresh → serve immediately (~60ms), done
+4. If cache >20s → trigger background refresh (detached `combined-status-line.js`)
+
+**Full Refresh (background or fallback):**
+
+1. **Status Collection**:
    - Read health verification status
    - Query constraint monitor API
    - Read trajectory state file
    - Check API quota for all providers
    - Scan LSL registry
-3. **Status Aggregation**: Combine all indicators
-4. **Display Update**: Render to tmux status bar (supports tmux formatting codes: `#[underscore]`, `#[bold]`, colors)
-5. **Cache**: Store for next check
+2. **Status Aggregation**: Combine all indicators
+3. **Display**: Render to tmux status bar (supports tmux formatting codes: `#[underscore]`, `#[bold]`, colors)
+4. **Cache Write**: Save to `.logs/combined-status-line-cache.txt`
+5. **GPS Check**: If GPS heartbeat >60s stale, run ensure* functions as fallback supervisor
 
 ### Caching
 
 | Data | Cache Duration |
 |------|----------------|
+| Pre-rendered status (fast-path) | 60s TTL, 20s background refresh |
 | Health status | 5 minutes |
 | Constraint compliance | 1 minute |
 | API quota (real-time) | 30 seconds |
 | API quota (estimated) | 5 minutes |
 | Trajectory state | Read on every update |
 | LSL status | Read on every update |
+
+### Spawn Storm Prevention
+
+The supervision architecture includes guards to prevent runaway process spawning:
+
+| Guard | Component | Mechanism |
+|-------|-----------|-----------|
+| GPS heartbeat gate | CombinedStatusLine | ensure* functions skip when GPS heartbeat <60s old |
+| OS-level dup check | GlobalServiceCoordinator | `findRunningProcessesByScript()` before every spawn |
+| Orphan kill | GlobalServiceCoordinator | Kills spawned process if post-spawn health check fails |
+| Cooldown | GPS (5min), Coordinator (2min) | Per-service cooldown between restart attempts |
+| Rate limiting | GPS (10/hr), Coordinator (6/hr) | Maximum restarts per service per hour |
+| OS-level re-registration | GlobalProcessSupervisor | Re-registers alive services instead of respawning |
 
 ---
 
@@ -389,6 +424,25 @@ Terminal Tab: "C🟢 | UT🫒 CA🌲"
 
 ## Troubleshooting
 
+### Status bar completely blank?
+
+```bash
+# Check cache file freshness
+ls -la .logs/combined-status-line-cache.txt
+
+# Test fast-path directly (should complete in <100ms)
+time node scripts/status-line-fast.cjs
+
+# Force full refresh
+node scripts/combined-status-line.js
+
+# Check for process spawn storm (should be <80 Node processes)
+ps aux | grep node | wc -l
+
+# If >100 processes, kill the coordinator and let GPS restart cleanly
+ps aux | grep global-service-coordinator | grep -v grep
+```
+
 ### Status line not updating?
 
 ```bash
@@ -452,14 +506,18 @@ docker compose -f docker/docker-compose.yml logs coding-services
 | File | Purpose |
 |------|---------|
 | `scripts/tmux-session-wrapper.sh` | Tmux session wrapper — wraps all agents with unified status bar |
-| `scripts/combined-status-line.js` | Main status line script (invoked by tmux `status-right`) |
+| `scripts/status-line-fast.cjs` | Ultra-fast CJS cache reader (~60ms) — invoked by tmux `status-right` |
+| `scripts/combined-status-line.js` | Full status line renderer + fallback supervisor (writes cache) |
+| `scripts/combined-status-line-wrapper.js` | ESM wrapper (backup; primary is fast-path CJS) |
 | `scripts/statusline-health-monitor.js` | Session health monitor daemon (multi-agent detection) |
+| `scripts/global-service-coordinator.js` | Constraint service management with spawn guards |
 | `scripts/auto-restart-watcher.js` | File-change detection for daemon code reloading |
 | `scripts/health-verifier.js` | Health status provider |
 | `lib/api-quota-checker.js` | API quota provider |
 | `.lsl/global-registry.json` | LSL session registry |
 | `.health/verification-status.json` | Health status cache |
 | `.logs/statusline-health-status.txt` | Rendered status line output |
+| `.logs/combined-status-line-cache.txt` | Pre-rendered status cache (served by fast-path) |
 
 **Configuration:**
 
