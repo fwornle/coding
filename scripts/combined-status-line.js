@@ -74,17 +74,16 @@ class CombinedStatusLine {
       const healthVerifierStatus = await this.getHealthVerifierStatus();
       const ukbStatus = this.getUKBStatus();
 
-      // Robust transcript monitor health check and auto-restart
-      await this.ensureTranscriptMonitorRunning();
-
-      // Ensure ALL transcript monitors are running (safety net)
-      await this.ensureAllTranscriptMonitorsRunning();
-
-      // Ensure statusline health monitor daemon is running (global singleton)
-      await this.ensureStatuslineHealthMonitorRunning();
-
-      // Ensure global process supervisor is running (watches health-verifier & statusline-health-monitor)
-      await this.ensureGlobalProcessSupervisorRunning();
+      // Only run ensure* supervision when GPS is NOT running.
+      // GPS + Coordinator are the authoritative supervisors; CSL should be display-only
+      // when they're active. This prevents triple-spawning from 3 overlapping supervisors.
+      const gpsRunning = await this.isGlobalProcessSupervisorRunning();
+      if (!gpsRunning) {
+        await this.ensureTranscriptMonitorRunning();
+        await this.ensureAllTranscriptMonitorsRunning();
+        await this.ensureStatuslineHealthMonitorRunning();
+        await this.ensureGlobalProcessSupervisorRunning();
+      }
 
       const status = await this.buildCombinedStatus(constraintStatus, semanticStatus, knowledgeStatus, liveLogTarget, redirectStatus, globalHealthStatus, healthVerifierStatus, ukbStatus);
 
@@ -1501,6 +1500,22 @@ class CombinedStatusLine {
    * This supervisor watches health-verifier and statusline-health-monitor
    * and restarts them if they die
    */
+  /**
+   * Quick check if GPS is running (heartbeat file-based, no PSM overhead)
+   */
+  async isGlobalProcessSupervisorRunning() {
+    try {
+      const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
+      const heartbeatFile = join(codingPath, '.health', 'supervisor-heartbeat.json');
+      if (!existsSync(heartbeatFile)) return false;
+      const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf8'));
+      const age = Date.now() - new Date(heartbeat.timestamp).getTime();
+      return age < 60000; // Fresh heartbeat = GPS is running
+    } catch {
+      return false;
+    }
+  }
+
   async ensureGlobalProcessSupervisorRunning() {
     try {
       const codingPath = process.env.CODING_TOOLS_PATH || process.env.CODING_REPO || rootDir;
@@ -2048,6 +2063,28 @@ class CombinedStatusLine {
 // Main execution
 async function main() {
   try {
+    // FAST PATH: If a recent cached render exists, output it immediately.
+    // The full generateStatus() does heavy imports, PSM init, ensure* checks, and
+    // API calls which can take >4s under load (especially with many Node processes).
+    // The statusline-health-monitor daemon keeps the underlying data fresh every 15s,
+    // so a 30s cache is safe. This ensures tmux always gets output within milliseconds.
+    const cacheFile = join(rootDir, '.logs', 'combined-status-line-cache.txt');
+    try {
+      if (existsSync(cacheFile)) {
+        const stat = fs.statSync(cacheFile);
+        const ageMs = Date.now() - stat.mtimeMs;
+        if (ageMs < 30000) {
+          const cached = readFileSync(cacheFile, 'utf8').trim();
+          if (cached) {
+            process.stdout.write(cached + '\n', () => process.exit(0));
+            return;
+          }
+        }
+      }
+    } catch {
+      // Cache read failed — fall through to full generation
+    }
+
     const timeout = setTimeout(() => {
       console.error('⚠️ SYS:TIMEOUT - Status line generation took >4s');
       process.stdout.write('⚠️ SYS:TIMEOUT\n', () => process.exit(1));
@@ -2057,6 +2094,9 @@ async function main() {
     const status = await statusLine.generateStatus();
 
     clearTimeout(timeout);
+
+    // Write cache for fast-path on subsequent invocations
+    try { writeFileSync(cacheFile, status.text, 'utf8'); } catch { /* best effort */ }
 
     // Claude Code status line expects plain text output
     // Rich features like tooltips may need different configuration
