@@ -330,6 +330,18 @@ constraints:
   enabled: true
   suggestion: Use useReducer for complex state or separate into multiple useState
     calls
+- id: no-java-jar-plantuml
+  group: plantuml
+  pattern: java\s+.*-jar\s+.*plantuml
+  message: 'CRITICAL: Never use java -jar plantuml.jar! Always use the plantuml CLI
+    command directly: plantuml <file.puml>'
+  severity: critical
+  enabled: true
+  applies_to: content
+  tool_filter:
+  - Bash
+  suggestion: 'Use the plantuml CLI: plantuml docs/puml/my-diagram.puml (NOT java
+    -jar plantuml.jar)'
 - id: no-ukb-bash-command
   group: architecture
   pattern: ^ukb\s|^ukb$|\s+ukb\s|\s+ukb$|[;&|]\s*ukb\s|[;&|]\s*ukb$

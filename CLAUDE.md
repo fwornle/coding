@@ -101,6 +101,7 @@ node scripts/purge-knowledge-entities.js 2025-12-23 --team=ui --verbose
 - **Working Directory**: Always start in top-level project directory
 - **File Interference**: Avoid `.mcp-sync/` for importable modules
 - **API Design**: Never modify working APIs for TypeScript; fix types instead
+- **PlantUML**: ALWAYS use the `plantuml` CLI command. NEVER use `java -jar plantuml.jar`
 
 ### MCP & Tools
 - **Serena MCP**: ONLY for reading/searching/analyzing code
