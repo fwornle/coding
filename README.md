@@ -1,6 +1,6 @@
 # Coding - AI Development Toolkit
 
-A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting Claude Code, GitHub Copilot CLI, and OpenCode.
+A comprehensive AI-powered development toolkit featuring live session logging, real-time constraint monitoring, semantic knowledge management, and multi-agent analysis — supporting Claude Code, GitHub Copilot CLI, and OpenCode. **Zero-cost LLM routing** via existing Claude Code and GitHub Copilot subscriptions.
 
 ---
 
@@ -124,6 +124,25 @@ The installer follows a **non-intrusive policy** - it will NEVER modify system t
 - **🧠 Knowledge Management** - Capture, visualize, and share development insights
 - **📈 Trajectory Generation** - Automated project analysis and documentation
 - **🤖 Multi-Agent Analysis** - 11 specialized AI agents for comprehensive code analysis
+
+### LLM Providers (Zero-Cost Routing)
+
+The unified LLM layer (`lib/llm/`) intelligently routes requests to maximize cost savings:
+
+- **Subscription-First**: Claude Code → GitHub Copilot → Groq → Anthropic → OpenAI
+- **10 Providers**: 2 subscription (CLI), 5 cloud API, 2 local, 1 mock
+- **Automatic Fallback**: Quota exhausted? Seamlessly fall back to paid APIs
+- **Quota Tracking**: Persistent usage tracking with exponential backoff
+- **Cost Savings**: ~$50-100/month for active development (all UKB/LSL analysis is $0)
+
+**Provider Status**:
+- ✅ Claude Code (sonnet/opus) - **Zero cost** via subscription
+- ✅ GitHub Copilot (gpt-4o-mini/gpt-4o) - **Zero cost** via subscription
+- ✅ Groq (llama-3.1/3.3) - Fast, low-cost API fallback
+- ✅ Anthropic, OpenAI, Gemini, GitHub Models - Cloud API fallback
+- ✅ DMR, Ollama - Local fallback (no API costs)
+
+See [LLM Architecture](docs-content/architecture/llm-architecture.md) for details.
 
 ### Integration Support
 
