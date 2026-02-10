@@ -15,19 +15,90 @@ The coding infrastructure uses LLMs for:
 - **Continuous learning** (real-time session analysis)
 - **Code analysis** (pattern recognition)
 
-You can use cloud providers, local models, or a combination:
+You can use subscription providers, cloud APIs, local models, or a combination:
 
 | Mode | Providers | Cost | Privacy | Speed |
 |------|-----------|------|---------|-------|
+| **Subscription** | Claude Code, Copilot | **$0** | Uses existing subscription | Fast (CLI) |
 | **Cloud** | Groq, Anthropic, OpenAI | $$$ | Data sent externally | Fast (API) |
 | **Local** | DMR/llama.cpp | Free | Data stays local | Varies |
 | **Mock** | Simulated | Free | N/A | Instant |
 
 ---
 
-## Cloud Providers
+## Subscription Providers (Zero Cost)
 
-### Groq (Recommended)
+### Claude Code (Recommended - Zero Cost)
+
+Route requests through your existing Claude max subscription.
+
+**Setup:**
+
+```bash
+# 1. Install Claude Code
+# Download from: https://claude.ai/downloads
+
+# 2. Verify installation
+claude --version
+
+# 3. Authenticate
+claude login
+
+# 4. Test
+claude --print --silent "Say hello"
+```
+
+**No environment variables needed** - uses CLI directly.
+
+**Supported Models:**
+
+- `sonnet` (Claude Sonnet 4.5) - fast and standard tiers
+- `opus` (Claude Opus 4.6) - premium tier
+
+**Features:**
+- ✅ Zero per-token cost
+- ✅ Automatic quota tracking
+- ✅ Exponential backoff on exhaustion
+- ✅ Seamless fallback to API providers
+
+### GitHub Copilot (Zero Cost)
+
+Route requests through your GitHub Copilot subscription.
+
+**Setup:**
+
+```bash
+# 1. Install Copilot CLI
+npm install -g @githubnext/github-copilot-cli
+
+# 2. Verify installation
+copilot-cli --version
+
+# 3. Authenticate via GitHub
+# (Handled automatically if you have Copilot access)
+
+# 4. Test
+copilot-cli --prompt "Say hello" --silent
+```
+
+**No environment variables needed** - uses CLI directly.
+
+**Supported Models:**
+
+- `gpt-4o-mini` (fast tier)
+- `gpt-4o` (standard and premium tiers)
+
+**Features:**
+- ✅ Zero per-token cost
+- ✅ Shared quota tracking
+- ✅ Automatic rotation on exhaustion
+- ✅ Work and personal subscriptions supported
+
+---
+
+## Cloud API Providers
+
+### Groq (Recommended Fallback)
 
 Fastest inference for open models. Recommended for UKB workflows.
 
@@ -200,11 +271,15 @@ curl -X POST http://localhost:12434/v1/models/pull \
 
 All LLM requests route through the `lib/llm/` unified layer, which provides:
 
-- **8 providers**: Groq, Anthropic, OpenAI, Gemini, GitHub Models, DMR, Ollama, Mock
+- **10 providers**: 2 subscription (Claude Code, Copilot), 5 cloud API, 2 local, 1 mock
+- **Subscription-first routing**: Always tries zero-cost subscriptions before paid APIs
 - **Tier-based routing**: Automatic provider selection based on task complexity
+- **Quota tracking**: Persistent usage tracking with exponential backoff
 - **Circuit breaker**: Prevents cascading failures (threshold: 5 failures, reset: 60s)
 - **LRU cache**: Deduplicates requests (1000 entries, 1-hour TTL)
 - **Metrics tracking**: Cost, performance, and usage stats per provider
+
+**Cost Savings**: ~$50-100/month for active development (all UKB/LSL analysis routes through subscriptions first)
 
 See [LLM Architecture](../architecture/llm-architecture.md) for complete details.
 
@@ -216,33 +291,38 @@ Requests are automatically routed based on task complexity and cost optimization
 
 | Tier | Use Cases | Provider Priority | Cost |
 |------|-----------|-------------------|------|
-| **Fast** | Simple extraction, parsing, basic classification | Groq only | Lowest |
-| **Standard** | Semantic analysis, ontology classification, documentation | Groq → Anthropic → OpenAI | Medium |
-| **Premium** | Insight generation, pattern recognition, QA review | Anthropic → OpenAI → Groq | Highest |
+| **Fast** | Simple extraction, parsing, basic classification | Claude Code → Copilot → Groq | **$0** → Lowest |
+| **Standard** | Semantic analysis, ontology classification, documentation | Claude Code → Copilot → Groq → Anthropic → OpenAI | **$0** → Medium |
+| **Premium** | Insight generation, pattern recognition, QA review | Claude Code → Copilot → Anthropic → OpenAI → Groq | **$0** → Highest |
 
 ### Routing Flow
 
 ```mermaid
 flowchart TB
     A[LLM Request] --> B{Determine Tier}
-    B -->|Fast| C[Try Groq]
-    B -->|Standard| D[Try Groq → Anthropic → OpenAI]
-    B -->|Premium| E[Try Anthropic → OpenAI → Groq]
-    C --> F{Circuit Breaker OK?}
+    B -->|Fast| C[Claude Code → Copilot → Groq]
+    B -->|Standard| D[Claude Code → Copilot → Groq → Anthropic → OpenAI]
+    B -->|Premium| E[Claude Code → Copilot → Anthropic → OpenAI → Groq]
+    C --> F{Quota Available?}
     D --> F
     E --> F
-    F -->|No| G[Skip Failed Provider]
-    F -->|Yes| H{Check Cache}
-    H -->|Hit| I[Return Cached]
-    H -->|Miss| J[Make API Call]
-    J --> K{Success?}
-    K -->|Yes| L[Cache & Return]
-    K -->|No| M{More Providers?}
-    M -->|Yes| F
-    M -->|No| N[Try Local: DMR → Ollama]
-    N --> O{Success?}
-    O -->|Yes| L
-    O -->|No| P[Fail with Error]
+    F -->|No| G[Skip to Next Provider]
+    F -->|Yes| H{Circuit Breaker OK?}
+    H -->|No| G
+    H -->|Yes| I{Check Cache}
+    I -->|Hit| J[Return Cached]
+    I -->|Miss| K[Make Request]
+    K --> L{Success?}
+    L -->|Yes| M[Record Usage & Cache]
+    M --> N[Return Result]
+    L -->|No - Quota| O[Mark Exhausted]
+    O --> G
+    L -->|No - Other| P{More Providers?}
+    P -->|Yes| F
+    P -->|No| Q[Try Local: DMR → Ollama]
+    Q --> R{Success?}
+    R -->|Yes| N
+    R -->|No| S[Fail with Error]
 ```
 
 ### Configuration
@@ -251,9 +331,9 @@ Tier routing is configured in `config/llm-providers.yaml`:
 
 ```yaml
 provider_priority:
-  fast: ["groq"]
-  standard: ["groq", "anthropic", "openai"]
-  premium: ["anthropic", "openai", "groq"]
+  fast: ["claude-code", "copilot", "groq"]
+  standard: ["claude-code", "copilot", "groq", "anthropic", "openai"]
+  premium: ["claude-code", "copilot", "anthropic", "openai", "groq"]
 
 task_tiers:
   fast:
@@ -268,6 +348,19 @@ task_tiers:
     - insight_generation
     - observation_generation
     - pattern_recognition
+
+# Subscription quota tracking
+providers:
+  claude-code:
+    cliCommand: "claude"
+    quotaTracking:
+      enabled: true
+      softLimitPerHour: 100
+  copilot:
+    cliCommand: "copilot-cli"
+    quotaTracking:
+      enabled: true
+      softLimitPerHour: 100
 ```
 
 ---
@@ -399,15 +492,21 @@ Response:
 
 ### Provider Costs
 
-| Provider | Input (per 1M tokens) | Output (per 1M tokens) |
-|----------|----------------------|------------------------|
-| Groq | $0.40 | $0.60 |
-| Anthropic Claude Sonnet 4.5 | $3.00 | $15.00 |
-| Anthropic Claude Opus 4.6 | $5.00 | $25.00 |
-| OpenAI GPT-4.1 | $2.50 | $10.00 |
-| Google Gemini 2.5 Flash | $0.35 | $1.05 |
-| GitHub Models | Free (rate limited) | Free (rate limited) |
-| Local (DMR) | $0 | $0 |
+| Provider | Input (per 1M tokens) | Output (per 1M tokens) | Notes |
+|----------|----------------------|------------------------|-------|
+| **Claude Code** | **$0** | **$0** | Uses existing subscription |
+| **GitHub Copilot** | **$0** | **$0** | Uses existing subscription |
+| Groq | $0.40 | $0.60 | Fast fallback |
+| Anthropic Claude Sonnet 4.5 | $3.00 | $15.00 | Standard fallback |
+| Anthropic Claude Opus 4.6 | $5.00 | $25.00 | Premium fallback |
+| OpenAI GPT-4.1 | $2.50 | $10.00 | Fallback |
+| Google Gemini 2.5 Flash | $0.35 | $1.05 | Fallback |
+| GitHub Models | Free (rate limited) | Free (rate limited) | API access |
+| Local (DMR) | $0 | $0 | Final fallback |
+
+**Cost Savings Example**:
+- Before: 170 requests/day × $0.01 avg = **$51/month**
+- After: 170 requests/day × $0 (subscriptions) = **$0/month** ✅
 
 ### Budget Alerts
 

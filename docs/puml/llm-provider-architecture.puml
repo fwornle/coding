@@ -18,7 +18,13 @@ package "lib/llm/ - Unified LLM Layer" {
     component [ProviderRegistry\nTier-Based Routing] <<core>> as Registry
   }
 
-  package "Cloud Providers" {
+  package "Subscription Providers (Zero Cost)" {
+    component [Claude Code\nsonnet / opus (CLI)] <<cli>> as ClaudeCode
+    component [Copilot\ngpt-4o-mini / gpt-4o (CLI)] <<cli>> as Copilot
+    component [QuotaTracker\nExponential backoff] <<infra>> as QuotaTracker
+  }
+
+  package "Cloud API Providers (Per-Token Cost)" {
     component [Groq\nllama-3.1-8b / llama-3.3-70b] <<api>> as Groq
     component [Anthropic\nclaude-haiku-4-5 / claude-sonnet-4-5] <<api>> as Anthropic
     component [OpenAI\ngpt-4.1-mini / gpt-4.1] <<api>> as OpenAI
@@ -51,24 +57,40 @@ package "lib/llm/ - Unified LLM Layer" {
 LLMService -down-> Registry
 LLMService -down-> Cache
 LLMService -down-> Metrics
+LLMService -down-> QuotaTracker
 
 ' Registry to providers via circuit breaker
 Registry -down-> CB
+
+' Subscription providers
+CB -down-> ClaudeCode
+CB -down-> Copilot
+ClaudeCode .right.> QuotaTracker : reports usage
+Copilot .right.> QuotaTracker : reports usage
+
+' API providers
 CB -down-> Groq
 CB -down-> Anthropic
 CB -down-> OpenAI
 CB -down-> Gemini
 CB -down-> GitHub
+
+' Local providers
 CB -down-> DMR
 CB -down-> Ollama
+
+' Test provider
 CB -down-> Mock
 
 note right of Registry
-  **Tier-Based Routing**
-  Fast: Groq
-  Standard: Groq -> Anthropic -> OpenAI
-  Premium: Anthropic -> OpenAI -> Groq
-  Local fallback: DMR -> Ollama
+  **Subscription-First Routing**
+  Fast: Claude Code -> Copilot -> Groq
+  Standard: Claude Code -> Copilot -> Groq -> Anthropic -> OpenAI
+  Premium: Claude Code -> Copilot -> Anthropic -> OpenAI -> Groq
+
+  **Quota exhausted?** Automatic fallback to next provider
+  **All cloud failed?** Local fallback: DMR -> Ollama
+  **Cost**: $0 until subscriptions exhausted
 end note
 
 note bottom of LLMService
@@ -76,6 +98,15 @@ note bottom of LLMService
   BudgetTrackerInterface
   SensitivityClassifierInterface
   MockServiceInterface
+  SubscriptionQuotaTrackerInterface (new)
+end note
+
+note bottom of QuotaTracker
+  **Quota Management**
+  • Tracks completions/hour
+  • Exponential backoff: 5m -> 15m -> 1h
+  • Persistent storage: .data/llm-subscription-usage.json
+  • Auto-prune data older than 24h
 end note
 
 @enduml

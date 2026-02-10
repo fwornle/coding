@@ -202,16 +202,20 @@ All agents share the same infrastructure: tmux session wrapping with unified sta
 ![OpenCode running in coding](images/coding-opencode.png)
 *OpenCode integrated with a 25-line config file — zero changes to shared code.*
 
-Similarly, it's not locked to any LLM provider. You can use:  
+Similarly, it's not locked to any LLM provider. The system supports 10 providers with intelligent routing:
 
-- **Groq** (fast, cheap - my default)  
-- **Anthropic** (high quality)  
-- **OpenAI** (GPT-4 when needed)  
-- **Local models** via Docker Model Runner or llama.cpp (free, private)  
+- **Claude Code** (zero cost - uses existing subscription) ✨
+- **GitHub Copilot** (zero cost - uses existing subscription) ✨
+- **Groq** (fast, cheap API fallback)
+- **Anthropic** (high quality API fallback)
+- **OpenAI** (GPT-4 when needed)
+- **Local models** via Docker Model Runner or llama.cpp (free, private)
 
-The system automatically routes based on content sensitivity. Discussing API architecture? Send it to the cloud for fast, accurate analysis. Processing something with potential credentials? Route it locally - the data never leaves your machine.
+**Subscription-first routing**: All requests try your existing Claude Code or GitHub Copilot subscriptions first ($0 per token), then fall back to paid APIs only if quotas are exhausted. Automatic quota tracking with exponential backoff ensures seamless operation.
 
-Budget tracking is built in with configurable limits and automatic fallback to local models when thresholds are reached.
+**Content sensitivity routing**: Discussing API architecture? Send it to the cloud for fast, accurate analysis. Processing something with potential credentials? Route it locally - the data never leaves your machine.
+
+**Cost savings**: ~$50-100/month for active development by routing through subscriptions first. Budget tracking is built in with configurable limits and automatic fallback to local models when thresholds are reached.
 
 ---
 
