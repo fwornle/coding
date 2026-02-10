@@ -217,6 +217,93 @@ Similarly, it's not locked to any LLM provider. The system supports 10 providers
 
 **Cost savings**: ~$50-100/month for active development by routing through subscriptions first. Budget tracking is built in with configurable limits and automatic fallback to local models when thresholds are reached.
 
+### Unified LLM Layer Architecture
+
+Under the hood, all LLM requests flow through `lib/llm/` — a unified abstraction layer that consolidates what used to be three separate LLM implementations. This layer provides intelligent routing, resilience, and cost optimization across all 10 providers.
+
+![LLM Provider Architecture](../images/llm-provider-architecture.png)
+*The unified LLM layer with subscription-first routing, circuit breaker, cache, and quota tracking.*
+
+**Core Components:**
+
+| Component | Purpose |
+|-----------|---------|
+| **LLMService** | Single entry point - routes all requests |
+| **ProviderRegistry** | Manages 10 providers and tier-based selection |
+| **QuotaTracker** | Tracks subscription usage with exponential backoff |
+| **CircuitBreaker** | Prevents cascading failures (5 failures = 60s timeout) |
+| **LRU Cache** | Deduplicates requests (1000 entries, 1hr TTL) |
+| **MetricsTracker** | Records cost, latency, and token usage |
+
+**Tier-Based Routing:**
+
+The system automatically maps tasks to quality tiers:
+
+```
+Fast Tier (simple tasks)
+├─ git_file_extraction
+├─ commit_message_parsing
+└─ basic_classification
+    → Try: Claude Code → Copilot → Groq
+
+Standard Tier (semantic analysis)
+├─ git_history_analysis
+├─ semantic_code_analysis
+└─ ontology_classification
+    → Try: Claude Code → Copilot → Groq → Anthropic → OpenAI
+
+Premium Tier (deep understanding)
+├─ insight_generation
+├─ observation_generation
+└─ pattern_recognition
+    → Try: Claude Code → Copilot → Anthropic → OpenAI → Groq
+```
+
+When you run a UKB workflow or the LSL classifier makes a call, it specifies the task type (e.g., "semantic_code_analysis"). The system looks up which tier that task belongs to, then tries providers in order until one succeeds.
+
+**Fallback Chain:**
+
+```
+Request with task type
+  ↓
+Check subscription quota
+  ↓ (available)
+Try Claude Code CLI
+  ↓ (quota exhausted or CLI unavailable)
+Try Copilot CLI
+  ↓ (quota exhausted or CLI unavailable)
+Try Groq API
+  ↓ (circuit breaker open or failed)
+Try Anthropic API
+  ↓ (circuit breaker open or failed)
+Try OpenAI API
+  ↓ (all cloud providers failed)
+Try DMR (local)
+  ↓ (DMR unavailable)
+Try Ollama (local)
+  ↓ (all providers failed)
+Error
+```
+
+**Quota Management:**
+
+Subscription providers track usage in `.data/llm-subscription-usage.json`:
+- Records completions per hour (rolling window)
+- Estimates token usage (4 chars ≈ 1 token)
+- Marks exhaustion with exponential backoff: 5min → 15min → 1hr
+- Automatically retries when backoff expires
+- Prunes data older than 24 hours
+
+On every request, the quota tracker checks availability. If exhausted, the circuit breaker temporarily marks the provider as unavailable and tries the next one. When quota becomes available again (successful completion or backoff expires), the provider is automatically re-enabled.
+
+**Cost Tracking:**
+
+The system records $0 cost for subscription providers, normal per-token costs for APIs. The budget tracker (if configured) enforces monthly limits and triggers fallback to local models when thresholds are reached.
+
+This architecture means you can start a workflow, exhaust your Claude Code quota mid-way through, and the system seamlessly falls back to Copilot, then Groq — all without interruption or manual intervention.
+
+See [LLM Architecture](../architecture/llm-architecture.md) for complete technical details.
+
 ---
 
 ## Ontology-Based Classification
