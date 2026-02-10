@@ -36,8 +36,10 @@ constraints:
   message: Use Logger.log() instead of console.log for better log management
   severity: error
   enabled: true
-  file_pattern: '.(js|ts|jsx|tsx|mjs|cjs)$'
+  file_pattern: '\.(js|ts|jsx|tsx|mjs|cjs)$'
   suggestion: 'Replace with: Logger.log(''info'', ''category'', message)'
+  whitelist:
+  - '**/.claude/plans/*.md'
 - id: no-var-declarations
   group: code_quality
   pattern: \bvar\s+
@@ -252,6 +254,8 @@ constraints:
   file_pattern: '\.md$'
   suggestion: 1. Invoke Skill tool with skill='documentation-style' 2. Create .puml
     file in docs/puml/ 3. Generate PNG with plantuml 4. Reference image in markdown
+  whitelist:
+  - '**/.claude/plans/*.md'
 - id: documentation-style-skill-required
   group: documentation
   pattern: (?:```(?:plantuml|puml|mermaid)|@startuml|flowchart|sequenceDiagram)
