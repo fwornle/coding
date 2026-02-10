@@ -36,6 +36,7 @@ constraints:
   message: Use Logger.log() instead of console.log for better log management
   severity: error
   enabled: true
+  file_pattern: '.(js|ts|jsx|tsx|mjs|cjs)$'
   suggestion: 'Replace with: Logger.log(''info'', ''category'', message)'
 - id: no-var-declarations
   group: code_quality
