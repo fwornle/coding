@@ -372,6 +372,9 @@ Logger.log('info', `Cached: ${result.cached}`);            // Was it from cache?
 ## Related Documentation
 
 - [LLM Provider Guide](../guides/llm-providers.md) - User guide for working with providers
-- [Provider Configuration](../provider-configuration.md) - API key setup
 - [Semantic Analysis Integration](../integrations/semantic-analysis.md) - SA consumer usage
-- [Config Reference](../../config/llm-providers.yaml) - Full configuration schema
+- [Getting Started](../getting-started/index.md) - Installation and API key setup
+
+**Configuration Files:**
+- `config/llm-providers.yaml` - Full provider configuration schema
+- `docs/provider-configuration.md` - Detailed API key setup guide
