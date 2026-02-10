@@ -1,0 +1,81 @@
+@startuml llm-provider-architecture
+!include _standard-style.puml
+
+top to bottom direction
+
+title Unified LLM Provider Architecture (lib/llm/)
+
+package "Consumers" {
+  component [SemanticAnalyzer] <<agent>>
+  component [UnifiedInferenceEngine] <<agent>>
+  component [SemanticValidator] <<agent>>
+}
+
+package "lib/llm/ - Unified LLM Layer" {
+  component [LLMService\nFacade] <<core>> as LLMService
+
+  package "Provider Registry" {
+    component [ProviderRegistry\nTier-Based Routing] <<core>> as Registry
+  }
+
+  package "Cloud Providers" {
+    component [Groq\nllama-3.1-8b / llama-3.3-70b] <<api>> as Groq
+    component [Anthropic\nclaude-haiku-4-5 / claude-sonnet-4-5] <<api>> as Anthropic
+    component [OpenAI\ngpt-4.1-mini / gpt-4.1] <<api>> as OpenAI
+    component [Gemini\ngemini-2.5-flash / gemini-2.5-pro] <<api>> as Gemini
+    component [GitHub Models\ngpt-4.1-mini / o4-mini] <<api>> as GitHub
+  }
+
+  package "Local Providers" {
+    component [DMR\nai/llama3.2 via Docker] <<infra>> as DMR
+    component [Ollama\nLocal models] <<infra>> as Ollama
+  }
+
+  package "Test Provider" {
+    component [Mock\nSimulated responses] <<util>> as Mock
+  }
+
+  package "Infrastructure" {
+    component [CircuitBreaker\nPer-provider fault tolerance] <<infra>> as CB
+    component [LRU Cache\n1000 entries, 1hr TTL] <<infra>> as Cache
+    component [MetricsTracker\nPer-provider/operation stats] <<infra>> as Metrics
+  }
+}
+
+' Consumer connections
+[SemanticAnalyzer] -down-> LLMService
+[UnifiedInferenceEngine] -down-> LLMService
+[SemanticValidator] -down-> LLMService
+
+' LLMService to infrastructure
+LLMService -down-> Registry
+LLMService -down-> Cache
+LLMService -down-> Metrics
+
+' Registry to providers via circuit breaker
+Registry -down-> CB
+CB -down-> Groq
+CB -down-> Anthropic
+CB -down-> OpenAI
+CB -down-> Gemini
+CB -down-> GitHub
+CB -down-> DMR
+CB -down-> Ollama
+CB -down-> Mock
+
+note right of Registry
+  **Tier-Based Routing**
+  Fast: Groq
+  Standard: Groq -> Anthropic -> OpenAI
+  Premium: Anthropic -> OpenAI -> Groq
+  Local fallback: DMR -> Ollama
+end note
+
+note bottom of LLMService
+  **DI Hooks**
+  BudgetTrackerInterface
+  SensitivityClassifierInterface
+  MockServiceInterface
+end note
+
+@enduml

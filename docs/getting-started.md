@@ -245,16 +245,19 @@ Edit `.env`:
 ```env
 # LLM Provider (configure at least ONE - the system is provider-agnostic!)
 # Groq (recommended - fastest and cheapest)
-GROK_API_KEY=your-groq-key-here
+GROQ_API_KEY=your-groq-key-here
 
-# Anthropic (high quality)
+# Anthropic (high quality - Claude Opus 4.6, Sonnet 4.5, Haiku 4.5)
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 
-# OpenAI (GPT-4, GPT-3.5)
+# OpenAI (GPT-4.1, o4-mini)
 OPENAI_API_KEY=sk-your-openai-key-here
 
-# Google Gemini
+# Google Gemini (Gemini 2.5 Flash/Pro)
 GOOGLE_API_KEY=your-google-key-here
+
+# GitHub Models (free tier OpenAI models)
+GITHUB_TOKEN=ghp_your-token-here
 
 # Local models via Docker Model Runner (recommended - auto-configured by installer)
 # DMR uses llama.cpp with automatic GPU detection (Metal/CUDA/CPU)

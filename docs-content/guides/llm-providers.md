@@ -53,8 +53,9 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 **Supported Models:**
 
-- `claude-3-5-sonnet-20241022`
-- `claude-3-haiku-20240307`
+- `claude-sonnet-4-5` (standard tier)
+- `claude-haiku-4-5` (fast tier)
+- `claude-opus-4-6` (premium tier)
 
 ### OpenAI
 
@@ -67,8 +68,9 @@ OPENAI_API_KEY=sk-...
 
 **Supported Models:**
 
-- `gpt-4o` (analysis)
-- `gpt-4o-mini` (fast tasks)
+- `gpt-4.1` (standard tier)
+- `gpt-4.1-mini` (fast tier)
+- `o4-mini` (premium tier - reasoning)
 - `text-embedding-3-small` (embeddings)
 
 ### Google Gemini
@@ -79,6 +81,28 @@ Alternative provider.
 # .env
 GOOGLE_API_KEY=...
 ```
+
+**Supported Models:**
+
+- `gemini-2.5-flash` (fast and standard tiers)
+- `gemini-2.5-pro` (premium tier)
+
+### GitHub Models
+
+Free tier access to OpenAI models via GitHub.
+
+```env
+# .env
+GITHUB_TOKEN=ghp_...
+```
+
+**Supported Models:**
+
+- `gpt-4.1` (standard tier)
+- `gpt-4.1-mini` (fast tier)
+- `o4-mini` (premium tier)
+
+**Base URL**: `https://models.github.ai/inference/v1`
 
 ---
 
@@ -172,38 +196,78 @@ curl -X POST http://localhost:12434/v1/models/pull \
 
 ---
 
-## Provider Fallback Chain
+## Unified LLM Layer
 
-The system uses a configurable fallback chain:
+All LLM requests route through the `lib/llm/` unified layer, which provides:
+
+- **8 providers**: Groq, Anthropic, OpenAI, Gemini, GitHub Models, DMR, Ollama, Mock
+- **Tier-based routing**: Automatic provider selection based on task complexity
+- **Circuit breaker**: Prevents cascading failures (threshold: 5 failures, reset: 60s)
+- **LRU cache**: Deduplicates requests (1000 entries, 1-hour TTL)
+- **Metrics tracking**: Cost, performance, and usage stats per provider
+
+See [LLM Architecture](../architecture/llm-architecture.md) for complete details.
+
+## Tier-Based Routing
+
+Requests are automatically routed based on task complexity and cost optimization:
+
+### Tier Definitions
+
+| Tier | Use Cases | Provider Priority | Cost |
+|------|-----------|-------------------|------|
+| **Fast** | Simple extraction, parsing, basic classification | Groq only | Lowest |
+| **Standard** | Semantic analysis, ontology classification, documentation | Groq → Anthropic → OpenAI | Medium |
+| **Premium** | Insight generation, pattern recognition, QA review | Anthropic → OpenAI → Groq | Highest |
+
+### Routing Flow
 
 ```mermaid
 flowchart TB
-    A[LLM Request] --> B{Provider Available?}
-    B -->|Yes| C[Use Primary]
-    B -->|No| D{Fallback Available?}
-    D -->|Yes| E[Use Fallback]
-    D -->|No| F{Local Available?}
-    F -->|Yes| G[Use Local]
-    F -->|No| H[Fail with Error]
+    A[LLM Request] --> B{Determine Tier}
+    B -->|Fast| C[Try Groq]
+    B -->|Standard| D[Try Groq → Anthropic → OpenAI]
+    B -->|Premium| E[Try Anthropic → OpenAI → Groq]
+    C --> F{Circuit Breaker OK?}
+    D --> F
+    E --> F
+    F -->|No| G[Skip Failed Provider]
+    F -->|Yes| H{Check Cache}
+    H -->|Hit| I[Return Cached]
+    H -->|Miss| J[Make API Call]
+    J --> K{Success?}
+    K -->|Yes| L[Cache & Return]
+    K -->|No| M{More Providers?}
+    M -->|Yes| F
+    M -->|No| N[Try Local: DMR → Ollama]
+    N --> O{Success?}
+    O -->|Yes| L
+    O -->|No| P[Fail with Error]
 ```
-
-### Default Chain
-
-1. **Groq** - Fast, cost-effective
-2. **Anthropic** - High quality fallback
-3. **OpenAI** - Alternative fallback
-4. **Local (DMR)** - Zero-cost final fallback
 
 ### Configuration
 
-```javascript
-// Fallback chain configuration
-const providers = [
-  { name: 'groq', priority: 1 },
-  { name: 'anthropic', priority: 2 },
-  { name: 'openai', priority: 3 },
-  { name: 'local', priority: 4 }
-];
+Tier routing is configured in `config/llm-providers.yaml`:
+
+```yaml
+provider_priority:
+  fast: ["groq"]
+  standard: ["groq", "anthropic", "openai"]
+  premium: ["anthropic", "openai", "groq"]
+
+task_tiers:
+  fast:
+    - git_file_extraction
+    - commit_message_parsing
+    - basic_classification
+  standard:
+    - git_history_analysis
+    - semantic_code_analysis
+    - ontology_classification
+  premium:
+    - insight_generation
+    - observation_generation
+    - pattern_recognition
 ```
 
 ---
@@ -338,8 +402,11 @@ Response:
 | Provider | Input (per 1M tokens) | Output (per 1M tokens) |
 |----------|----------------------|------------------------|
 | Groq | $0.40 | $0.60 |
-| Anthropic Claude 3.5 | $3.00 | $15.00 |
-| OpenAI GPT-4o | $2.50 | $10.00 |
+| Anthropic Claude Sonnet 4.5 | $3.00 | $15.00 |
+| Anthropic Claude Opus 4.6 | $5.00 | $25.00 |
+| OpenAI GPT-4.1 | $2.50 | $10.00 |
+| Google Gemini 2.5 Flash | $0.35 | $1.05 |
+| GitHub Models | Free (rate limited) | Free (rate limited) |
 | Local (DMR) | $0 | $0 |
 
 ### Budget Alerts

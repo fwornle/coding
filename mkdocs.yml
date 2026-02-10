@@ -82,6 +82,7 @@ nav:
     - Trajectories: core-systems/trajectories.md
   - Architecture:
     - Overview: architecture/index.md
+    - LLM Architecture: architecture/llm-architecture.md
     - Health Monitoring: architecture/health-monitoring.md
     - Data Flow: architecture/data-flow.md
   - Integrations:

@@ -20,7 +20,7 @@ npm install @google/generative-ai # Google Gemini
 Add to `.env`:
 
 ```bash
-GROK_API_KEY=your-groq-key           # For Groq
+GROQ_API_KEY=your-groq-key           # For Groq
 ANTHROPIC_API_KEY=your-anthropic-key # For Anthropic
 OPENAI_API_KEY=your-openai-key       # For OpenAI
 GOOGLE_API_KEY=your-google-key       # For Gemini
@@ -45,17 +45,18 @@ node scripts/enhanced-transcript-monitor.js
 | **Gemini** | Google | 💰💰 Mid | ☁️ Cloud | ⚡⚡ Fast |
 | **Local** | Privacy | 🆓 Free | 🔒 Local | ⚡⚡⚡ Variable |
 
-## Provider Priority
+## Tier-Based Routing
 
-System automatically selects providers in this order:
+The system uses tier-based provider routing via the `lib/llm/` unified layer:
 
-1. **Groq** (cheapest, fastest)
-2. **Anthropic** (high quality)
-3. **OpenAI** (GPT-4)
-4. **Gemini** (Google)
-5. **Local** (DMR → llama.cpp fallback)
+| Tier | Provider Priority | Use Cases |
+|------|-------------------|-----------|
+| **Fast** | Groq | Simple extraction, parsing, basic classification |
+| **Standard** | Groq → Anthropic → OpenAI | Semantic analysis, ontology classification |
+| **Premium** | Anthropic → OpenAI → Groq | Insight generation, pattern recognition, QA review |
+| **Local Fallback** | DMR → Ollama | Always available when cloud providers fail |
 
-If a provider fails, automatic fallback to the next available provider.
+See [LLM Architecture](../docs-content/architecture/llm-architecture.md) for complete tier configuration.
 
 ## Per-Agent LLM Mode Control
 
@@ -116,7 +117,7 @@ npm install openai
 ### Any Agent + Groq
 
 ```bash
-echo "GROK_API_KEY=your-key" >> .env
+echo "GROQ_API_KEY=your-key" >> .env
 npm install groq-sdk
 # Works with ANY coding agent!
 ```
