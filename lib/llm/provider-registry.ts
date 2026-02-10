@@ -18,6 +18,8 @@ import { GitHubModelsProvider } from './providers/github-models-provider.js';
 import { DMRProvider } from './providers/dmr-provider.js';
 import { OllamaProvider } from './providers/ollama-provider.js';
 import { MockProvider } from './providers/mock-provider.js';
+import { ClaudeCodeProvider } from './providers/claude-code-provider.js';
+import { CopilotProvider } from './providers/copilot-provider.js';
 
 export interface ProviderSelection {
   provider: LLMProvider;
@@ -37,6 +39,8 @@ export class ProviderRegistry {
    */
   async initializeAll(): Promise<void> {
     const providerInstances: Array<{ name: ProviderName; instance: LLMProvider }> = [
+      { name: 'claude-code', instance: new ClaudeCodeProvider(this.config.providers?.['claude-code']) },
+      { name: 'copilot', instance: new CopilotProvider(this.config.providers?.copilot) },
       { name: 'groq', instance: new GroqProvider(this.config.providers?.groq) },
       { name: 'openai', instance: new OpenAIProvider(this.config.providers?.openai) },
       { name: 'anthropic', instance: new AnthropicProvider(this.config.providers?.anthropic) },

@@ -11,6 +11,7 @@ import type {
   LLMCompletionRequest, LLMCompletionResult, LLMServiceConfig, LLMMetrics,
   LLMMode, ProviderName, ModelTier,
   BudgetTrackerInterface, SensitivityClassifierInterface, MockServiceInterface,
+  SubscriptionQuotaTrackerInterface,
 } from './types.js';
 import { loadConfig, getDefaultConfig } from './config.js';
 import { ProviderRegistry } from './provider-registry.js';
@@ -32,6 +33,7 @@ export class LLMService extends EventEmitter {
   private modeResolver: ((agentId?: string) => LLMMode) | null = null;
   private budgetTracker: BudgetTrackerInterface | null = null;
   private sensitivityClassifier: SensitivityClassifierInterface | null = null;
+  private quotaTracker: SubscriptionQuotaTrackerInterface | null = null;
 
   constructor(config?: LLMServiceConfig) {
     super();
@@ -106,6 +108,13 @@ export class LLMService extends EventEmitter {
    */
   setSensitivityClassifier(classifier: SensitivityClassifierInterface): void {
     this.sensitivityClassifier = classifier;
+  }
+
+  /**
+   * Set subscription quota tracker for subscription-based providers
+   */
+  setQuotaTracker(tracker: SubscriptionQuotaTrackerInterface): void {
+    this.quotaTracker = tracker;
   }
 
   // --- Core Completion Methods ---
@@ -274,6 +283,18 @@ export class LLMService extends EventEmitter {
       }
     }
 
+    // Check subscription quota availability
+    if (this.quotaTracker) {
+      for (const providerName of ['claude-code', 'copilot']) {
+        const isAvailable = await this.quotaTracker.isAvailable(providerName);
+        if (!isAvailable) {
+          // Mark as temporarily unavailable via circuit breaker
+          this.circuitBreaker.recordFailure(providerName);
+          console.info(`[llm] Subscription provider ${providerName} quota exhausted, temporarily disabled`);
+        }
+      }
+    }
+
     // Resolve provider chain and try each
     const chain = this.registry.resolveProviderChain(request);
 
@@ -290,12 +311,25 @@ export class LLMService extends EventEmitter {
         this.circuitBreaker.recordSuccess(provider.name);
         this.metrics.recordCall(provider.name, result.model, result.tokens, latencyMs, request.operationType);
 
-        // Record cost
+        // Record subscription usage for subscription providers
+        const isSubscriptionProvider = provider.name === 'claude-code' || provider.name === 'copilot';
+        if (isSubscriptionProvider && this.quotaTracker) {
+          try {
+            await this.quotaTracker.recordUsage(provider.name, result.tokens.total);
+          } catch (error: any) {
+            console.warn(`[llm] Failed to record quota usage for ${provider.name}:`, error.message);
+          }
+        }
+
+        // Record cost ($0 for subscription providers)
         if (this.budgetTracker) {
           try {
+            // Calculate cost (zero for subscription providers)
+            const cost = isSubscriptionProvider ? 0 : undefined; // undefined = use standard calculation
             await this.budgetTracker.recordCost(result.tokens.total, provider.name, {
               operationType: request.operationType || 'default',
               model: result.model,
+              cost, // Pass zero cost for subscriptions
             });
           } catch {
             // Non-fatal
@@ -313,6 +347,12 @@ export class LLMService extends EventEmitter {
         return result;
 
       } catch (error: any) {
+        // Check if quota exhausted
+        if (error.message?.includes('QUOTA_EXHAUSTED') && this.quotaTracker) {
+          this.quotaTracker.markQuotaExhausted(provider.name);
+          console.info(`[llm] Provider ${provider.name} quota exhausted, marked for backoff`);
+        }
+
         this.circuitBreaker.recordFailure(provider.name);
         console.warn(`[llm] Provider ${provider.name} failed:`, error.message);
         continue;
