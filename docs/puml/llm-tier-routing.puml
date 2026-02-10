@@ -1,0 +1,89 @@
+@startuml llm-tier-routing
+!include _standard-style.puml
+
+title LLM Tier-Based Routing Flow
+
+start
+
+:LLM Request arrives\n(messages, tier hint, privacy);
+
+if (Mode = mock?) then (yes)
+  :Return MockProvider\nsimulated response;
+  stop
+endif
+
+if (Privacy = local?) then (yes)
+  :Route to local providers only;
+  :Try DMR (Docker Model Runner);
+  if (DMR available?) then (yes)
+    :Execute on DMR;
+    stop
+  else (no)
+    :Try Ollama;
+    if (Ollama available?) then (yes)
+      :Execute on Ollama;
+      stop
+    else (no)
+      :Error: No local\nprovider available;
+      stop
+    endif
+  endif
+endif
+
+:Determine tier from request;
+
+note right
+  **Tier Resolution**
+  1. Explicit tier hint
+  2. Agent override (config)
+  3. Task type mapping
+  4. Default: standard
+end note
+
+switch (Tier?)
+case (fast)
+  :Priority: **Groq**;
+case (standard)
+  :Priority: **Groq** -> Anthropic -> OpenAI;
+case (premium)
+  :Priority: **Anthropic** -> OpenAI -> Groq;
+endswitch
+
+:Check LRU Cache;
+
+if (Cache hit?) then (yes)
+  :Return cached result;
+  stop
+endif
+
+repeat
+  :Select next provider\nin priority chain;
+
+  if (CircuitBreaker open?) then (yes)
+    :Skip provider;
+  else (no)
+    :Call provider API;
+
+    if (Success?) then (yes)
+      :Cache result;
+      :Record metrics;
+      :Return result;
+      stop
+    else (no)
+      :Record failure\nin CircuitBreaker;
+    endif
+  endif
+
+repeat while (More providers?) is (yes)
+
+:Try local fallback\n(DMR -> Ollama);
+
+if (Local available?) then (yes)
+  :Execute locally;
+  stop
+else (no)
+  :Error: All providers failed;
+  stop
+endif
+
+@enduml
