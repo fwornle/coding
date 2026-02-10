@@ -14,7 +14,9 @@ export type ProviderName =
   | 'github-models'
   | 'dmr'
   | 'ollama'
-  | 'mock';
+  | 'mock'
+  | 'claude-code'
+  | 'copilot';
 
 export type ModelTier = 'fast' | 'standard' | 'premium';
 
@@ -77,12 +79,19 @@ export interface LLMProvider {
 
 export interface ProviderConfig {
   name: ProviderName;
-  apiKeyEnvVar: string;
+  apiKeyEnvVar?: string;
   baseUrl?: string;
   models: Partial<Record<ModelTier, string>>;
   defaultModel: string;
   timeout?: number;
   isLocal?: boolean;
+  // CLI-specific fields
+  cliCommand?: string;
+  cliSubcommand?: string;
+  quotaTracking?: {
+    enabled: boolean;
+    softLimitPerHour?: number;
+  };
 }
 
 export interface DMRConfig {
@@ -142,6 +151,14 @@ export interface MockServiceInterface {
     prompt: string,
     repositoryPath: string
   ): Promise<LLMCompletionResult>;
+}
+
+export interface SubscriptionQuotaTrackerInterface {
+  recordUsage(provider: string, tokens: number): Promise<void>;
+  isAvailable(provider: string): Promise<boolean>;
+  getHourlyUsage(provider: string): { completions: number; tokens: number };
+  markQuotaExhausted(provider: string): void;
+  canRetry(provider: string): boolean;
 }
 
 // --- Metrics ---

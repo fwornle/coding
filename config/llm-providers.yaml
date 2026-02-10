@@ -4,6 +4,30 @@
 
 # Available providers and their models per tier
 providers:
+  # Subscription providers (zero cost)
+  claude-code:
+    cliCommand: "claude"
+    timeout: 60000
+    models:
+      fast: "sonnet"
+      standard: "sonnet"
+      premium: "opus"
+    quotaTracking:
+      enabled: true
+      softLimitPerHour: 100  # Conservative estimate
+
+  copilot:
+    cliCommand: "copilot-cli"
+    timeout: 60000
+    models:
+      fast: "gpt-4o-mini"
+      standard: "gpt-4o"
+      premium: "gpt-4o"
+    quotaTracking:
+      enabled: true
+      softLimitPerHour: 100
+
+  # API providers (per-token cost)
   groq:
     apiKeyEnvVar: GROQ_API_KEY
     fast: "llama-3.1-8b-instant"        # ~$0.05/M tokens, 750 tok/s
@@ -35,11 +59,11 @@ providers:
     standard: "gpt-4.1"
     premium: "o4-mini"
 
-# Default provider priority per tier (falls back in order)
+# Default provider priority per tier (subscriptions first for cost savings)
 provider_priority:
-  fast: ["groq"]
-  standard: ["groq", "anthropic", "openai"]
-  premium: ["anthropic", "openai", "groq"]
+  fast: ["claude-code", "copilot", "groq"]
+  standard: ["claude-code", "copilot", "groq", "anthropic", "openai"]
+  premium: ["claude-code", "copilot", "anthropic", "openai", "groq"]
 
 # Task-to-tier mapping
 task_tiers:
