@@ -221,7 +221,7 @@ Similarly, it's not locked to any LLM provider. The system supports 10 providers
 
 Under the hood, all LLM requests flow through `lib/llm/` — a unified abstraction layer that consolidates what used to be three separate LLM implementations. This layer provides intelligent routing, resilience, and cost optimization across all 10 providers.
 
-![LLM Provider Architecture](../images/llm-provider-architecture.png)
+![LLM Provider Architecture](../../images/llm-provider-architecture.png)
 *The unified LLM layer with subscription-first routing, circuit breaker, cache, and quota tracking.*
 
 **Core Components:**
@@ -302,7 +302,7 @@ The system records $0 cost for subscription providers, normal per-token costs fo
 
 This architecture means you can start a workflow, exhaust your Claude Code quota mid-way through, and the system seamlessly falls back to Copilot, then Groq — all without interruption or manual intervention.
 
-See [LLM Architecture](../architecture/llm-architecture.md) for complete technical details.
+See [LLM Architecture](../../architecture/llm-architecture.md) for complete technical details.
 
 ---
 
