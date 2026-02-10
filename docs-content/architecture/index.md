@@ -4,8 +4,6 @@ System design principles and patterns for the coding infrastructure.
 
 ![Complete System Overview](../images/complete-system-overview.png)
 
-![System Architecture](../images/coding-system-architecture.png)
-
 ## Key Principles
 
 ### 1. Agent-Agnostic Design
