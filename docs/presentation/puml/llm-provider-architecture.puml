@@ -1,77 +1,35 @@
 @startuml llm-provider-architecture
 !include _standard-style.puml
 
-' Presentation mode: larger fonts, thicker lines, simplified
-skinparam DefaultFontSize 18
-skinparam ArrowThickness 3
-skinparam PackageBorderThickness 2
-skinparam ComponentBorderThickness 2
+' Presentation mode: horizontal pipeline
+skinparam DefaultFontSize 14
+skinparam ArrowThickness 2
+skinparam RectangleBorderThickness 2
+skinparam NoteFontSize 12
+skinparam DefaultTextAlignment center
 
 left to right direction
 
 title Unified LLM Provider Architecture
 
-package "Subscription\n(Zero Cost)" #LightGreen {
-  component [Claude Code\nCLI] <<cli>> as ClaudeCode
-  component [Copilot\nCLI] <<cli>> as Copilot
-}
+rectangle "LLM Service" <<core>> as SVC
+rectangle "Cache +\nCircuit Breaker" <<infra>> as INFRA
 
-component [LLM Service\nFacade] <<core>> as LLMService
+rectangle "**Subscription** (Zero Cost)\n\nClaude Code  |  Copilot\n<size:11>Quota tracked, exponential backoff</size>" <<cli>> as SUB
+rectangle "**Cloud API** (Per-Token)\n\nGroq  |  Anthropic  |  OpenAI\n<size:11>Circuit breaker per provider</size>" <<api>> as API
+rectangle "**Local** (Free)\n\nDMR  |  Ollama\n<size:11>Always available fallback</size>" <<infra>> as LOCAL
 
-package "Cloud API\n(Per-Token Cost)" #LightBlue {
-  component [Groq] <<api>>
-  component [Anthropic] <<api>>
-  component [OpenAI] <<api>>
-}
+SVC --> INFRA
+INFRA --> SUB : try first
+INFRA --> API : fallback
+INFRA --> LOCAL : last resort
 
-package "Local\n(Free)" #LightYellow {
-  component [DMR] <<infra>>
-  component [Ollama] <<infra>>
-}
-
-package "Infrastructure" #LightGray {
-  component [Quota\nTracker] <<infra>> as QuotaTracker
-  component [Circuit\nBreaker] <<infra>> as CircuitBreaker
-  component [Cache] <<infra>>
-}
-
-' Main flow
-LLMService -down-> CircuitBreaker : route request
-
-' Subscription providers (priority 1)
-CircuitBreaker -down-> ClaudeCode : 1. try
-CircuitBreaker -down-> Copilot : 2. try
-
-' Cloud API providers (priority 2)
-CircuitBreaker -down-> Groq : 3. try
-CircuitBreaker -down-> Anthropic : 4. try
-CircuitBreaker -down-> OpenAI : 5. try
-
-' Local fallback (priority 3)
-CircuitBreaker -down-> DMR : 6. fallback
-CircuitBreaker -down-> Ollama : 7. fallback
-
-' Infrastructure connections
-LLMService -up-> Cache : check
-LLMService -up-> QuotaTracker : check
-ClaudeCode .up.> QuotaTracker : report usage
-Copilot .up.> QuotaTracker : report usage
-
-note top of LLMService
+note bottom of SVC
   **Tier-Based Routing**
-  Fast: Claude Code → Copilot → Groq
-  Standard: + Anthropic → OpenAI
-  Premium: Anthropic prioritized
-
-  **Cost**: $0 until subscriptions exhausted
-end note
-
-note bottom of QuotaTracker
-  **Exponential Backoff**
-  5min → 15min → 1hr
-
-  Persistent tracking
-  Auto-retry on recovery
+  Fast: Claude Code, Copilot, Groq
+  Standard: + Anthropic, OpenAI
+  Premium: Anthropic first
+  **$0 until quota exhausted**
 end note
 
 @enduml
