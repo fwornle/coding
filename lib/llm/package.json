@@ -1,0 +1,26 @@
+{
+  "name": "@coding/llm",
+  "version": "1.0.0",
+  "description": "Unified LLM support layer with multi-provider routing, circuit breaking, and caching",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "check": "tsc --noEmit"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.57.0",
+    "@google/generative-ai": "^0.24.1",
+    "groq-sdk": "^0.36.0",
+    "openai": "^4.52.0"
+  },
+  "dependencies": {
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.8.3"
+  }
+}
