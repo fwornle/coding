@@ -107,7 +107,7 @@ PNG files should match their source PUML file:
 
 PNGs should be generated to:
 - `docs/images/` - For markdown documentation references
-- `docs/presentation/png/` - For presentation diagrams
+- `docs/presentation/images/` - For presentation diagrams
 
 ---
 
