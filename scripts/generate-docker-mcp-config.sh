@@ -36,21 +36,24 @@ cat > "$OUTPUT_FILE" << EOF
       "command": "node",
       "args": ["$CODING_REPO/integrations/mcp-server-semantic-analysis/dist/stdio-proxy.js"],
       "env": {
-        "SEMANTIC_ANALYSIS_SSE_URL": "http://localhost:$SEMANTIC_ANALYSIS_PORT"
+        "SEMANTIC_ANALYSIS_SSE_URL": "http://localhost:$SEMANTIC_ANALYSIS_PORT",
+        "CODING_REPO": "$CODING_REPO"
       }
     },
     "browser-access": {
       "command": "node",
       "args": ["$CODING_REPO/integrations/browser-access/dist/stdio-proxy.js"],
       "env": {
-        "BROWSER_ACCESS_SSE_URL": "http://localhost:$BROWSER_ACCESS_PORT"
+        "BROWSER_ACCESS_SSE_URL": "http://localhost:$BROWSER_ACCESS_PORT",
+        "CODING_REPO": "$CODING_REPO"
       }
     },
     "constraint-monitor": {
       "command": "node",
       "args": ["$CODING_REPO/integrations/mcp-constraint-monitor/src/stdio-proxy.js"],
       "env": {
-        "CONSTRAINT_MONITOR_SSE_URL": "http://localhost:$CONSTRAINT_MONITOR_PORT"
+        "CONSTRAINT_MONITOR_SSE_URL": "http://localhost:$CONSTRAINT_MONITOR_PORT",
+        "CODING_REPO": "$CODING_REPO"
       }
     },
     "code-graph-rag": {
