@@ -20,13 +20,35 @@ import {
   GetPromptRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import * as fs from "fs";
+import * as path from "path";
 
 const SSE_SERVER_URL = process.env.BROWSER_ACCESS_SSE_URL || 'http://localhost:3847';
+const PROXY_NAME = 'browser-access';
+
+// Persistent file logging for diagnostics
+const LOG_DIR = process.env.CODING_REPO
+  ? path.join(process.env.CODING_REPO, '.data', 'logs')
+  : path.join(process.cwd(), '.data', 'logs');
+
+try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch {}
+
+const LOG_FILE = path.join(LOG_DIR, `mcp-proxy-${PROXY_NAME}.log`);
+
+function log(level: string, msg: string) {
+  const ts = new Date().toISOString();
+  const line = `[${ts}] ${level.toUpperCase()} [${PROXY_NAME}-proxy] ${msg}\n`;
+  console.error(line.trimEnd());
+  try { fs.appendFileSync(LOG_FILE, line); } catch {}
+}
 
 // Keep process alive with a heartbeat interval
 let heartbeatInterval: NodeJS.Timeout | null = null;
 
 async function startProxy() {
+  log('info', `Starting proxy -> ${SSE_SERVER_URL}`);
+  log('info', `Log file: ${LOG_FILE}`);
+
   // Connect to the SSE server as a client
   const sseTransport = new SSEClientTransport(new URL(`${SSE_SERVER_URL}/sse`));
   const client = new Client({
@@ -36,22 +58,22 @@ async function startProxy() {
 
   // Handle SSE transport errors
   sseTransport.onerror = (error) => {
-    console.error(`SSE transport error: ${error}`);
+    log('error', `SSE transport error: ${error}`);
     // Don't exit immediately - let the stdio transport handle cleanup
   };
 
   // Handle SSE transport close
   sseTransport.onclose = () => {
-    console.error('SSE transport closed unexpectedly');
+    log('warn', 'SSE transport closed unexpectedly');
     // The process will exit when Claude Code closes the stdio connection
   };
 
   try {
     await client.connect(sseTransport);
-    console.error(`Connected to SSE server at ${SSE_SERVER_URL}`);
+    log('info', `Connected to SSE server at ${SSE_SERVER_URL}`);
   } catch (error) {
-    console.error(`Failed to connect to SSE server at ${SSE_SERVER_URL}: ${error}`);
-    console.error('Make sure the browser-access SSE server is running: npm run start:sse');
+    log('error', `Failed to connect to SSE server at ${SSE_SERVER_URL}: ${error}`);
+    log('error', 'Make sure the Docker container is running and port is mapped: docker port coding-services 3847');
     process.exit(1);
   }
 
@@ -130,7 +152,7 @@ async function startProxy() {
 
   // Handle stdio transport close (Claude Code disconnected)
   transport.onclose = () => {
-    console.error('Stdio transport closed - Claude Code disconnected');
+    log('info', 'Stdio transport closed - Claude Code disconnected');
     cleanup();
   };
 
@@ -150,7 +172,7 @@ async function startProxy() {
 
   // Handle stdin close (Claude Code process ended)
   process.stdin.on('close', () => {
-    console.error('stdin closed - exiting');
+    log('info', 'stdin closed - exiting');
     cleanup();
   });
 
@@ -159,6 +181,6 @@ async function startProxy() {
 }
 
 startProxy().catch((error) => {
-  console.error(`Proxy error: ${error}`);
+  log('error', `Proxy startup failed: ${error}`);
   process.exit(1);
 });
