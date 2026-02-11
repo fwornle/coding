@@ -91,17 +91,16 @@ export default function SystemHealthDashboard() {
     }
   }
 
-  // Refresh happens every 5 seconds - show countdown
-  const REFRESH_INTERVAL_MS = 5000
+  // Visual refresh countdown (independent of data polling which happens every 500ms)
+  const DISPLAY_REFRESH_SECONDS = 5
+  const [refreshCountdown, setRefreshCountdown] = useState(DISPLAY_REFRESH_SECONDS)
 
-  // Calculate countdown to next refresh (5, 4, 3, 2, 1, 0)
-  const calculateCountdown = (): number => {
-    if (!healthStatus.lastFetch) return 5
-    const lastFetchTime = new Date(healthStatus.lastFetch).getTime()
-    const elapsed = currentTime - lastFetchTime
-    const remaining = REFRESH_INTERVAL_MS - (elapsed % REFRESH_INTERVAL_MS)
-    return Math.ceil(remaining / 1000)
-  }
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshCountdown(prev => prev <= 1 ? DISPLAY_REFRESH_SECONDS : prev - 1)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Map check status to UI status
   const mapCheckStatus = (check: any): 'operational' | 'warning' | 'error' | 'offline' => {
@@ -439,7 +438,7 @@ export default function SystemHealthDashboard() {
                 </CardTitle>
                 <CardDescription>
                   {healthStatus.lastFetch ? (
-                    <>Refreshing in {calculateCountdown()}s</>
+                    <>Refreshing in {refreshCountdown}s</>
                   ) : (
                     'Connecting...'
                   )}
