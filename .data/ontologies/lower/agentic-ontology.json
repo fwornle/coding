@@ -3,22 +3,34 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "agentic",
-  "extendsOntology": "development-knowledge",
+  "extendsOntology": "software-system-structure",
   "description": "Lower ontology for the Agentic AI Nanodegree project, covering agent frameworks, RAG systems, communication protocols, and distributed agent architectures",
   "entities": {
     "AgentFramework": {
       "description": "An AI agent framework or library for building agentic applications",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "frameworkName": {
           "type": "string",
           "description": "Framework identifier",
-          "enum": ["LangChain", "LangGraph", "CrewAI", "PydanticAI", "AtomicAgents", "ADK", "Agno"]
+          "enum": [
+            "LangChain",
+            "LangGraph",
+            "CrewAI",
+            "PydanticAI",
+            "AtomicAgents",
+            "ADK",
+            "Agno"
+          ]
         },
         "language": {
           "type": "string",
           "description": "Programming language",
-          "enum": ["Python", "TypeScript", "JavaScript"]
+          "enum": [
+            "Python",
+            "TypeScript",
+            "JavaScript"
+          ]
         },
         "capabilities": {
           "type": "array",
@@ -31,10 +43,20 @@
         "architecture": {
           "type": "string",
           "description": "Framework architecture pattern",
-          "enum": ["chain", "graph", "crew", "agent", "atomic"]
+          "enum": [
+            "chain",
+            "graph",
+            "crew",
+            "agent",
+            "atomic"
+          ]
         }
       },
-      "requiredProperties": ["frameworkName", "language", "capabilities"],
+      "requiredProperties": [
+        "frameworkName",
+        "language",
+        "capabilities"
+      ],
       "examples": [
         "LangChain (Python/TS, chain-based, LCEL)",
         "CrewAI (Python, multi-agent crews, role-based)"
@@ -42,17 +64,28 @@
     },
     "RAGSystem": {
       "description": "Retrieval Augmented Generation system architecture",
-      "extendsEntity": "ModelComponent",
+      "extendsEntity": "Service",
       "properties": {
         "ragType": {
           "type": "string",
           "description": "RAG system type",
-          "enum": ["basic_rag", "graph_rag", "agentic_rag", "multimodal_rag"]
+          "enum": [
+            "basic_rag",
+            "graph_rag",
+            "agentic_rag",
+            "multimodal_rag"
+          ]
         },
         "retrieverType": {
           "type": "string",
           "description": "Retriever implementation",
-          "enum": ["vector_similarity", "keyword", "hybrid", "graph_traversal", "agentic_query"]
+          "enum": [
+            "vector_similarity",
+            "keyword",
+            "hybrid",
+            "graph_traversal",
+            "agentic_query"
+          ]
         },
         "embeddingModel": {
           "type": "string",
@@ -61,19 +94,34 @@
         "vectorStore": {
           "type": "string",
           "description": "Vector database backend",
-          "enum": ["Qdrant", "Pinecone", "Weaviate", "ChromaDB", "FAISS"]
+          "enum": [
+            "Qdrant",
+            "Pinecone",
+            "Weaviate",
+            "ChromaDB",
+            "FAISS"
+          ]
         },
         "chunkingStrategy": {
           "type": "string",
           "description": "Text chunking strategy",
-          "enum": ["fixed_size", "semantic", "recursive", "markdown_based"]
+          "enum": [
+            "fixed_size",
+            "semantic",
+            "recursive",
+            "markdown_based"
+          ]
         },
         "llmIntegration": {
           "type": "string",
           "description": "LLM used for generation"
         }
       },
-      "requiredProperties": ["ragType", "retrieverType", "vectorStore"],
+      "requiredProperties": [
+        "ragType",
+        "retrieverType",
+        "vectorStore"
+      ],
       "examples": [
         "Basic RAG (vector similarity, Qdrant, fixed-size chunks)",
         "Graph RAG (graph traversal, knowledge graph, entity-based chunks)"
@@ -81,12 +129,16 @@
     },
     "CommunicationProtocol": {
       "description": "Agent-to-agent or agent-to-system communication protocol",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "protocolName": {
           "type": "string",
           "description": "Protocol identifier",
-          "enum": ["MCP", "ACP", "A2A"]
+          "enum": [
+            "MCP",
+            "ACP",
+            "A2A"
+          ]
         },
         "protocolVersion": {
           "type": "string",
@@ -95,19 +147,32 @@
         "transportLayer": {
           "type": "string",
           "description": "Transport mechanism",
-          "enum": ["stdio", "http", "websocket", "grpc"]
+          "enum": [
+            "stdio",
+            "http",
+            "websocket",
+            "grpc"
+          ]
         },
         "messageFormat": {
           "type": "string",
           "description": "Message serialization format",
-          "enum": ["json", "protobuf", "msgpack"]
+          "enum": [
+            "json",
+            "protobuf",
+            "msgpack"
+          ]
         },
         "capabilities": {
           "type": "array",
           "description": "Protocol capabilities (tools, resources, prompts, etc.)"
         }
       },
-      "requiredProperties": ["protocolName", "transportLayer", "messageFormat"],
+      "requiredProperties": [
+        "protocolName",
+        "transportLayer",
+        "messageFormat"
+      ],
       "examples": [
         "MCP (Model Context Protocol, stdio/http, JSON, tools/resources/prompts)",
         "A2A (Agent-to-Agent, websocket, JSON, event-driven)"
@@ -115,7 +180,7 @@
     },
     "ModuleContent": {
       "description": "Learning module content for nanodegree curriculum",
-      "extendsEntity": "DocumentationAsset",
+      "extendsEntity": "File",
       "properties": {
         "moduleNumber": {
           "type": "number",
@@ -136,14 +201,24 @@
         "contentFormat": {
           "type": "string",
           "description": "Content delivery format",
-          "enum": ["video", "interactive_notebook", "reading", "lab", "quiz"]
+          "enum": [
+            "video",
+            "interactive_notebook",
+            "reading",
+            "lab",
+            "quiz"
+          ]
         },
         "duration": {
           "type": "string",
           "description": "Estimated completion time"
         }
       },
-      "requiredProperties": ["moduleNumber", "moduleName", "topics"],
+      "requiredProperties": [
+        "moduleNumber",
+        "moduleName",
+        "topics"
+      ],
       "examples": [
         "Module 1: Agent Frameworks (LangChain, CrewAI, PydanticAI)",
         "Module 2: RAG Architecture (basic, graph, agentic, multimodal)"
@@ -151,7 +226,7 @@
     },
     "Exercise": {
       "description": "Coding exercise or lab assignment",
-      "extendsEntity": "DocumentationAsset",
+      "extendsEntity": "File",
       "properties": {
         "exerciseId": {
           "type": "string",
@@ -164,7 +239,12 @@
         "difficulty": {
           "type": "string",
           "description": "Exercise difficulty level",
-          "enum": ["beginner", "intermediate", "advanced", "expert"]
+          "enum": [
+            "beginner",
+            "intermediate",
+            "advanced",
+            "expert"
+          ]
         },
         "moduleReference": {
           "type": "reference",
@@ -184,7 +264,11 @@
           "description": "Solution code file path"
         }
       },
-      "requiredProperties": ["exerciseId", "exerciseTitle", "difficulty"],
+      "requiredProperties": [
+        "exerciseId",
+        "exerciseTitle",
+        "difficulty"
+      ],
       "examples": [
         "Build a LangChain agent with tool use (intermediate)",
         "Implement graph RAG with Neo4j (advanced)"
@@ -192,7 +276,7 @@
     },
     "LabEnvironment": {
       "description": "Cloud development workspace for hands-on labs",
-      "extendsEntity": "ExecutionContext",
+      "extendsEntity": "Process",
       "properties": {
         "environmentId": {
           "type": "string",
@@ -201,7 +285,12 @@
         "provider": {
           "type": "string",
           "description": "Cloud provider",
-          "enum": ["AWS", "Google Cloud", "Azure", "custom"]
+          "enum": [
+            "AWS",
+            "Google Cloud",
+            "Azure",
+            "custom"
+          ]
         },
         "preinstalledTools": {
           "type": "array",
@@ -220,7 +309,11 @@
           "description": "Pre-configured API access (OpenAI, Anthropic, etc.)"
         }
       },
-      "requiredProperties": ["environmentId", "provider", "preinstalledTools"],
+      "requiredProperties": [
+        "environmentId",
+        "provider",
+        "preinstalledTools"
+      ],
       "examples": [
         "LangChain Lab (AWS, Python 3.11, LangChain, OpenAI API)",
         "RAG Workshop (Google Cloud, Python, Qdrant, Llama Index)"
@@ -228,7 +321,7 @@
     },
     "CourseModule": {
       "description": "Week-long course module in 6-week nanodegree structure",
-      "extendsEntity": "DocumentationAsset",
+      "extendsEntity": "File",
       "properties": {
         "weekNumber": {
           "type": "number",
@@ -251,7 +344,10 @@
           "description": "Required prior knowledge"
         }
       },
-      "requiredProperties": ["weekNumber", "theme"],
+      "requiredProperties": [
+        "weekNumber",
+        "theme"
+      ],
       "examples": [
         "Week 1: Agent Frameworks and Tool Use",
         "Week 3: Communication Protocols (MCP, ACP, A2A)"
@@ -259,12 +355,19 @@
     },
     "LLMProvider": {
       "description": "LLM service provider integration",
-      "extendsEntity": "ModelComponent",
+      "extendsEntity": "Service",
       "properties": {
         "providerName": {
           "type": "string",
           "description": "Provider identifier",
-          "enum": ["OpenAI", "Anthropic", "Groq", "Google", "AWS Bedrock", "Azure OpenAI"]
+          "enum": [
+            "OpenAI",
+            "Anthropic",
+            "Groq",
+            "Google",
+            "AWS Bedrock",
+            "Azure OpenAI"
+          ]
         },
         "models": {
           "type": "array",
@@ -277,14 +380,22 @@
         "authentication": {
           "type": "string",
           "description": "Authentication method",
-          "enum": ["api_key", "oauth", "aws_iam"]
+          "enum": [
+            "api_key",
+            "oauth",
+            "aws_iam"
+          ]
         },
         "rateLimit": {
           "type": "object",
           "description": "Rate limiting configuration"
         }
       },
-      "requiredProperties": ["providerName", "models", "apiEndpoint"],
+      "requiredProperties": [
+        "providerName",
+        "models",
+        "apiEndpoint"
+      ],
       "examples": [
         "OpenAI (gpt-4o, gpt-4o-mini, API key auth)",
         "Anthropic (claude-3.5-sonnet, claude-3-opus, API key auth)"
@@ -292,7 +403,7 @@
     },
     "VectorStore": {
       "description": "Vector database for RAG embeddings",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "storeName": {
           "type": "string",
@@ -301,7 +412,14 @@
         "backend": {
           "type": "string",
           "description": "Vector database backend",
-          "enum": ["Qdrant", "Pinecone", "Weaviate", "ChromaDB", "FAISS", "Milvus"]
+          "enum": [
+            "Qdrant",
+            "Pinecone",
+            "Weaviate",
+            "ChromaDB",
+            "FAISS",
+            "Milvus"
+          ]
         },
         "dimensions": {
           "type": "number",
@@ -310,15 +428,28 @@
         "distanceMetric": {
           "type": "string",
           "description": "Distance metric",
-          "enum": ["cosine", "euclidean", "dot_product"]
+          "enum": [
+            "cosine",
+            "euclidean",
+            "dot_product"
+          ]
         },
         "indexingMethod": {
           "type": "string",
           "description": "Indexing algorithm",
-          "enum": ["HNSW", "IVF", "flat", "PQ"]
+          "enum": [
+            "HNSW",
+            "IVF",
+            "flat",
+            "PQ"
+          ]
         }
       },
-      "requiredProperties": ["storeName", "backend", "dimensions"],
+      "requiredProperties": [
+        "storeName",
+        "backend",
+        "dimensions"
+      ],
       "examples": [
         "Course RAG Store (Qdrant, 1536-dim, cosine, HNSW)",
         "Multimodal Store (Weaviate, 768-dim, cosine, hybrid search)"
@@ -326,7 +457,7 @@
     },
     "ToolDefinition": {
       "description": "Agent tool definition for function calling",
-      "extendsEntity": "ModelComponent",
+      "extendsEntity": "Service",
       "properties": {
         "toolName": {
           "type": "string",
@@ -347,10 +478,19 @@
         "implementation": {
           "type": "string",
           "description": "Implementation type",
-          "enum": ["function", "api_call", "subprocess", "mcp_tool"]
+          "enum": [
+            "function",
+            "api_call",
+            "subprocess",
+            "mcp_tool"
+          ]
         }
       },
-      "requiredProperties": ["toolName", "description", "parameters"],
+      "requiredProperties": [
+        "toolName",
+        "description",
+        "parameters"
+      ],
       "examples": [
         "web_search (DuckDuckGo, query parameter, returns search results)",
         "calculator (arithmetic operations, expression parameter, returns number)"
@@ -358,7 +498,7 @@
     },
     "PromptTemplate": {
       "description": "Reusable prompt template for agent interactions",
-      "extendsEntity": "ModelComponent",
+      "extendsEntity": "Service",
       "properties": {
         "templateName": {
           "type": "string",
@@ -375,14 +515,24 @@
         "purpose": {
           "type": "string",
           "description": "Template use case",
-          "enum": ["system", "user", "few_shot", "chain_of_thought", "react"]
+          "enum": [
+            "system",
+            "user",
+            "few_shot",
+            "chain_of_thought",
+            "react"
+          ]
         },
         "framework": {
           "type": "string",
           "description": "Compatible framework"
         }
       },
-      "requiredProperties": ["templateName", "templateText", "variables"],
+      "requiredProperties": [
+        "templateName",
+        "templateText",
+        "variables"
+      ],
       "examples": [
         "RAG Query Template (query, context, answer_format variables)",
         "Agent System Prompt (role, tools, capabilities variables)"
@@ -390,7 +540,7 @@
     },
     "AgentWorkflow": {
       "description": "Multi-agent coordination workflow",
-      "extendsEntity": "ExecutionContext",
+      "extendsEntity": "Process",
       "properties": {
         "workflowName": {
           "type": "string",
@@ -403,28 +553,47 @@
         "communicationPattern": {
           "type": "string",
           "description": "Inter-agent communication pattern",
-          "enum": ["sequential", "parallel", "hierarchical", "graph", "swarm"]
+          "enum": [
+            "sequential",
+            "parallel",
+            "hierarchical",
+            "graph",
+            "swarm"
+          ]
         },
         "coordination": {
           "type": "string",
           "description": "Coordination mechanism",
-          "enum": ["centralized", "decentralized", "peer_to_peer"]
+          "enum": [
+            "centralized",
+            "decentralized",
+            "peer_to_peer"
+          ]
         },
         "framework": {
           "type": "string",
           "description": "Workflow framework",
-          "enum": ["LangGraph", "CrewAI", "AutoGen", "custom"]
+          "enum": [
+            "LangGraph",
+            "CrewAI",
+            "AutoGen",
+            "custom"
+          ]
         }
       },
-      "requiredProperties": ["workflowName", "agents", "communicationPattern"],
+      "requiredProperties": [
+        "workflowName",
+        "agents",
+        "communicationPattern"
+      ],
       "examples": [
-        "Research Workflow (sequential: search → analyze → summarize)",
-        "Crew Workflow (hierarchical: manager → workers, CrewAI)"
+        "Research Workflow (sequential: search \u2192 analyze \u2192 summarize)",
+        "Crew Workflow (hierarchical: manager \u2192 workers, CrewAI)"
       ]
     },
     "KnowledgeGraph": {
       "description": "Knowledge graph structure for graph RAG",
-      "extendsEntity": "DataRepresentation",
+      "extendsEntity": "File",
       "properties": {
         "graphName": {
           "type": "string",
@@ -433,7 +602,13 @@
         "backend": {
           "type": "string",
           "description": "Graph database backend",
-          "enum": ["Neo4j", "Amazon Neptune", "ArangoDB", "MemGraph", "Networkx"]
+          "enum": [
+            "Neo4j",
+            "Amazon Neptune",
+            "ArangoDB",
+            "MemGraph",
+            "Networkx"
+          ]
         },
         "schema": {
           "type": "object",
@@ -450,10 +625,19 @@
         "queryLanguage": {
           "type": "string",
           "description": "Graph query language",
-          "enum": ["Cypher", "Gremlin", "SPARQL", "custom"]
+          "enum": [
+            "Cypher",
+            "Gremlin",
+            "SPARQL",
+            "custom"
+          ]
         }
       },
-      "requiredProperties": ["graphName", "backend", "schema"],
+      "requiredProperties": [
+        "graphName",
+        "backend",
+        "schema"
+      ],
       "examples": [
         "Course Knowledge Graph (Neo4j, Cypher, concept nodes + prerequisite edges)",
         "Document Graph (NetworkX, entity + relation nodes)"
@@ -461,7 +645,7 @@
     },
     "EvaluationMetric": {
       "description": "Agent or RAG system evaluation metric",
-      "extendsEntity": "QualityMetric",
+      "extendsEntity": "Contract",
       "properties": {
         "metricName": {
           "type": "string",
@@ -470,7 +654,14 @@
         "metricType": {
           "type": "string",
           "description": "Metric category",
-          "enum": ["accuracy", "latency", "cost", "relevance", "faithfulness", "hallucination"]
+          "enum": [
+            "accuracy",
+            "latency",
+            "cost",
+            "relevance",
+            "faithfulness",
+            "hallucination"
+          ]
         },
         "calculationMethod": {
           "type": "string",
@@ -483,10 +674,19 @@
         "framework": {
           "type": "string",
           "description": "Evaluation framework",
-          "enum": ["RAGAS", "TruLens", "LangSmith", "custom"]
+          "enum": [
+            "RAGAS",
+            "TruLens",
+            "LangSmith",
+            "custom"
+          ]
         }
       },
-      "requiredProperties": ["metricName", "metricType", "calculationMethod"],
+      "requiredProperties": [
+        "metricName",
+        "metricType",
+        "calculationMethod"
+      ],
       "examples": [
         "Answer Relevance (RAGAS, cosine similarity, threshold 0.7)",
         "Hallucination Rate (custom, fact verification, threshold <5%)"
@@ -494,7 +694,7 @@
     },
     "DevelopmentSetup": {
       "description": "Pre-configured development environment",
-      "extendsEntity": "ExecutionContext",
+      "extendsEntity": "Process",
       "properties": {
         "setupName": {
           "type": "string",
@@ -517,7 +717,10 @@
           "description": "Quick start command or script"
         }
       },
-      "requiredProperties": ["setupName", "dependencies"],
+      "requiredProperties": [
+        "setupName",
+        "dependencies"
+      ],
       "examples": [
         "LangChain Setup (Python 3.11, langchain, openai, python-dotenv)",
         "CrewAI Setup (Python 3.11, crewai, crewai-tools, Docker image)"

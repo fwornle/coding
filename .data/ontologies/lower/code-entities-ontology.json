@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "coding",
-  "extendsOntology": "development-knowledge",
+  "extendsOntology": "software-system-structure",
   "description": "Lower ontology for AST-based code entities extracted from code-graph-rag, including functions, classes, modules, and documentation links",
   "entities": {
     "CodeFunction": {
       "description": "A function or method extracted from source code via AST analysis",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "functionName": {
           "type": "string",
@@ -25,7 +25,16 @@
         "language": {
           "type": "string",
           "description": "Programming language",
-          "enum": ["typescript", "javascript", "python", "java", "go", "rust", "c", "cpp"]
+          "enum": [
+            "typescript",
+            "javascript",
+            "python",
+            "java",
+            "go",
+            "rust",
+            "c",
+            "cpp"
+          ]
         },
         "signature": {
           "type": "string",
@@ -48,7 +57,11 @@
           "description": "Whether the function is exported from its module"
         }
       },
-      "requiredProperties": ["functionName", "filePath", "language"],
+      "requiredProperties": [
+        "functionName",
+        "filePath",
+        "language"
+      ],
       "examples": [
         "handleToolCall (src/tools.ts:460, async, exported)",
         "parseMarkdown (lib/parser.js:25, sync)"
@@ -56,7 +69,7 @@
     },
     "CodeClass": {
       "description": "A class definition extracted from source code via AST analysis",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "className": {
           "type": "string",
@@ -73,7 +86,16 @@
         "language": {
           "type": "string",
           "description": "Programming language",
-          "enum": ["typescript", "javascript", "python", "java", "go", "rust", "c", "cpp"]
+          "enum": [
+            "typescript",
+            "javascript",
+            "python",
+            "java",
+            "go",
+            "rust",
+            "c",
+            "cpp"
+          ]
         },
         "extendsClass": {
           "type": "string",
@@ -104,7 +126,11 @@
           "description": "Whether the class is exported"
         }
       },
-      "requiredProperties": ["className", "filePath", "language"],
+      "requiredProperties": [
+        "className",
+        "filePath",
+        "language"
+      ],
       "examples": [
         "CodeGraphAgent (src/agents/code-graph-agent.ts, 8 methods, exported)",
         "GraphDatabaseService (lib/storage/graph-db.ts, extends BaseService)"
@@ -112,7 +138,7 @@
     },
     "CodeModule": {
       "description": "A code module or file containing multiple code entities",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "modulePath": {
           "type": "string",
@@ -125,7 +151,16 @@
         "language": {
           "type": "string",
           "description": "Programming language",
-          "enum": ["typescript", "javascript", "python", "java", "go", "rust", "c", "cpp"]
+          "enum": [
+            "typescript",
+            "javascript",
+            "python",
+            "java",
+            "go",
+            "rust",
+            "c",
+            "cpp"
+          ]
         },
         "exportedSymbols": {
           "type": "array",
@@ -144,7 +179,10 @@
           "description": "Average complexity of functions in module"
         }
       },
-      "requiredProperties": ["modulePath", "language"],
+      "requiredProperties": [
+        "modulePath",
+        "language"
+      ],
       "examples": [
         "tools.ts (src/tools.ts, 2400 lines, 25 exports)",
         "coordinator.ts (src/agents/coordinator.ts, 900 lines)"
@@ -152,7 +190,7 @@
     },
     "DocumentationLink": {
       "description": "A link between documentation (markdown, PlantUML) and code entities",
-      "extendsEntity": "Workflow",
+      "extendsEntity": "Feature",
       "properties": {
         "documentPath": {
           "type": "string",
@@ -161,7 +199,13 @@
         "documentType": {
           "type": "string",
           "description": "Type of documentation",
-          "enum": ["markdown", "plantuml", "mermaid", "jsdoc", "readme"]
+          "enum": [
+            "markdown",
+            "plantuml",
+            "mermaid",
+            "jsdoc",
+            "readme"
+          ]
         },
         "codeReference": {
           "type": "string",
@@ -170,7 +214,14 @@
         "referenceType": {
           "type": "string",
           "description": "Type of reference",
-          "enum": ["inline_code", "code_block", "class_diagram", "component_diagram", "sequence_diagram", "api_reference"]
+          "enum": [
+            "inline_code",
+            "code_block",
+            "class_diagram",
+            "component_diagram",
+            "sequence_diagram",
+            "api_reference"
+          ]
         },
         "context": {
           "type": "string",
@@ -185,7 +236,11 @@
           "description": "Confidence score for the link (0-1)"
         }
       },
-      "requiredProperties": ["documentPath", "codeReference", "referenceType"],
+      "requiredProperties": [
+        "documentPath",
+        "codeReference",
+        "referenceType"
+      ],
       "examples": [
         "CLAUDE.md mentions CodeGraphAgent (inline_code, line 45)",
         "architecture.puml defines CoordinatorAgent (class_diagram)"
@@ -193,12 +248,20 @@
     },
     "CodeRelationship": {
       "description": "A relationship between code entities (calls, imports, extends)",
-      "extendsEntity": "Workflow",
+      "extendsEntity": "Feature",
       "properties": {
         "relationshipType": {
           "type": "string",
           "description": "Type of relationship",
-          "enum": ["calls", "imports", "extends", "implements", "uses", "defines", "references"]
+          "enum": [
+            "calls",
+            "imports",
+            "extends",
+            "implements",
+            "uses",
+            "defines",
+            "references"
+          ]
         },
         "sourceEntity": {
           "type": "string",
@@ -225,7 +288,11 @@
           "description": "Whether this is a direct call or indirect reference"
         }
       },
-      "requiredProperties": ["relationshipType", "sourceEntity", "targetEntity"],
+      "requiredProperties": [
+        "relationshipType",
+        "sourceEntity",
+        "targetEntity"
+      ],
       "examples": [
         "CodeGraphAgent calls runCodeGraphCommand (direct, 5 times)",
         "tools.ts imports CodeGraphAgent (import)"
@@ -235,8 +302,13 @@
   "relationships": {
     "calls": {
       "description": "A function calls another function",
-      "sourceTypes": ["CodeFunction", "CodeClass"],
-      "targetTypes": ["CodeFunction"],
+      "sourceTypes": [
+        "CodeFunction",
+        "CodeClass"
+      ],
+      "targetTypes": [
+        "CodeFunction"
+      ],
       "properties": {
         "callCount": {
           "type": "number",
@@ -250,31 +322,55 @@
     },
     "imports": {
       "description": "A module imports from another module",
-      "sourceTypes": ["CodeModule"],
-      "targetTypes": ["CodeModule", "CodeClass", "CodeFunction"],
+      "sourceTypes": [
+        "CodeModule"
+      ],
+      "targetTypes": [
+        "CodeModule",
+        "CodeClass",
+        "CodeFunction"
+      ],
       "properties": {
         "importType": {
           "type": "string",
-          "enum": ["default", "named", "namespace"]
+          "enum": [
+            "default",
+            "named",
+            "namespace"
+          ]
         }
       }
     },
     "extends": {
       "description": "A class extends another class",
-      "sourceTypes": ["CodeClass"],
-      "targetTypes": ["CodeClass"],
+      "sourceTypes": [
+        "CodeClass"
+      ],
+      "targetTypes": [
+        "CodeClass"
+      ],
       "properties": {}
     },
     "implements": {
       "description": "A class implements an interface",
-      "sourceTypes": ["CodeClass"],
-      "targetTypes": ["CodeClass"],
+      "sourceTypes": [
+        "CodeClass"
+      ],
+      "targetTypes": [
+        "CodeClass"
+      ],
       "properties": {}
     },
     "documents": {
       "description": "Documentation describes a code entity",
-      "sourceTypes": ["DocumentationLink"],
-      "targetTypes": ["CodeFunction", "CodeClass", "CodeModule"],
+      "sourceTypes": [
+        "DocumentationLink"
+      ],
+      "targetTypes": [
+        "CodeFunction",
+        "CodeClass",
+        "CodeModule"
+      ],
       "properties": {
         "confidence": {
           "type": "number",
@@ -285,23 +381,56 @@
   },
   "extractionRules": {
     "CodeFunction": {
-      "namePatterns": ["[a-z][a-zA-Z0-9]*(?:Function|Handler|Callback)?", "handle[A-Z][a-zA-Z]*", "on[A-Z][a-zA-Z]*"],
-      "contextKeywords": ["function", "async function", "const.*=.*=>", "method", "def ", "fn "],
+      "namePatterns": [
+        "[a-z][a-zA-Z0-9]*(?:Function|Handler|Callback)?",
+        "handle[A-Z][a-zA-Z]*",
+        "on[A-Z][a-zA-Z]*"
+      ],
+      "contextKeywords": [
+        "function",
+        "async function",
+        "const.*=.*=>",
+        "method",
+        "def ",
+        "fn "
+      ],
       "priority": 3
     },
     "CodeClass": {
-      "namePatterns": ["[A-Z][a-zA-Z0-9]*(?:Agent|Service|Manager|Factory|Builder|Handler)?"],
-      "contextKeywords": ["class ", "interface ", "type ", "struct "],
+      "namePatterns": [
+        "[A-Z][a-zA-Z0-9]*(?:Agent|Service|Manager|Factory|Builder|Handler)?"
+      ],
+      "contextKeywords": [
+        "class ",
+        "interface ",
+        "type ",
+        "struct "
+      ],
       "priority": 3
     },
     "CodeModule": {
-      "namePatterns": ["[a-z][a-z0-9-]*\\.(ts|js|py|java|go|rs)$"],
-      "contextKeywords": ["import", "export", "module", "package"],
+      "namePatterns": [
+        "[a-z][a-z0-9-]*\\.(ts|js|py|java|go|rs)$"
+      ],
+      "contextKeywords": [
+        "import",
+        "export",
+        "module",
+        "package"
+      ],
       "priority": 2
     },
     "DocumentationLink": {
-      "namePatterns": ["[A-Z][a-zA-Z0-9]*", "`[^`]+`"],
-      "contextKeywords": ["class ", "function ", "component ", "participant "],
+      "namePatterns": [
+        "[A-Z][a-zA-Z0-9]*",
+        "`[^`]+`"
+      ],
+      "contextKeywords": [
+        "class ",
+        "function ",
+        "component ",
+        "participant "
+      ],
       "priority": 2
     }
   },

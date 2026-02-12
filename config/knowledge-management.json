@@ -35,7 +35,7 @@
   },
   "ontology": {
     "enabled": true,
-    "upperOntologyPath": "src/ontology/upper-ontology.json",
+    "upperOntologyPath": ".data/ontologies/upper/development-knowledge-ontology.json",
     "team": "mixed",
     "confidenceThreshold": 0.7,
     "validation": {

@@ -1,690 +1,624 @@
 {
-  "name": "Development Knowledge Ontology",
+  "name": "Software System Structure Ontology",
   "version": "1.0.0",
   "type": "upper",
-  "description": "Generic upper ontology for development knowledge management, providing abstract base classes for patterns, insights, decisions, workflows, and system components that all team-specific ontologies extend",
+  "description": "Upper ontology for software systems organized in six facets: Structure (what it is), Behavior (what it does), Operations (how it runs), Resilience (what goes wrong), Quality (how good it is), Evolution (how it changed). Complements the Development Knowledge Ontology which covers patterns, insights, and decisions.",
+
+  "facets": [
+    "structure",
+    "behavior",
+    "operations",
+    "resilience",
+    "quality",
+    "evolution"
+  ],
+
   "entities": {
-    "Pattern": {
-      "description": "A reusable solution to a commonly occurring problem in software development",
+
+    "_comment_structure": "=== FACET 1: STRUCTURE — What it IS ===",
+
+    "File": {
+      "facet": "structure",
+      "description": "A single source file — the atomic unit of the code hierarchy",
       "properties": {
-        "patternName": {
+        "path": {
           "type": "string",
-          "description": "Unique identifier for the pattern"
+          "description": "Relative path from project root",
+          "required": true
         },
-        "category": {
+        "language": {
           "type": "string",
-          "description": "Pattern category",
-          "enum": ["coding", "architectural", "integration", "testing", "deployment", "refactoring", "optimization"]
-        },
-        "problemContext": {
-          "type": "string",
-          "description": "The problem or situation this pattern addresses"
-        },
-        "solution": {
-          "type": "string",
-          "description": "The pattern's solution approach"
-        },
-        "consequences": {
-          "type": "array",
-          "description": "Trade-offs and consequences of applying the pattern",
-          "items": {
-            "type": "string",
-            "description": "Consequence description"
-          }
-        },
-        "applicability": {
-          "type": "array",
-          "description": "Conditions under which this pattern applies",
-          "items": {
-            "type": "string",
-            "description": "Applicability condition"
-          }
-        }
-      },
-      "requiredProperties": ["patternName", "category", "problemContext", "solution"],
-      "examples": [
-        "Repository Pattern for data access abstraction",
-        "Event Sourcing Pattern for audit trail"
-      ]
-    },
-    "Insight": {
-      "description": "An observation, learning, or understanding derived from analysis or experience",
-      "properties": {
-        "insightType": {
-          "type": "string",
-          "description": "Type of insight",
-          "enum": ["observation", "learning", "discovery", "hypothesis", "conclusion"]
-        },
-        "context": {
-          "type": "string",
-          "description": "Context in which the insight was derived"
-        },
-        "evidence": {
-          "type": "array",
-          "description": "Evidence supporting this insight",
-          "items": {
-            "type": "string",
-            "description": "Evidence item"
-          }
-        },
-        "confidence": {
-          "type": "number",
-          "description": "Confidence level in the insight (0-1)",
-          "min": 0,
-          "max": 1
-        },
-        "actionable": {
-          "type": "boolean",
-          "description": "Whether this insight leads to actionable recommendations"
-        }
-      },
-      "requiredProperties": ["insightType", "context"],
-      "examples": [
-        "Performance bottleneck identified in database queries",
-        "Security vulnerability pattern discovered"
-      ]
-    },
-    "Decision": {
-      "description": "An architectural or design decision with rationale and alternatives considered",
-      "properties": {
-        "decisionId": {
-          "type": "string",
-          "description": "Unique decision identifier"
-        },
-        "status": {
-          "type": "string",
-          "description": "Decision status",
-          "enum": ["proposed", "accepted", "deprecated", "superseded"]
-        },
-        "context": {
-          "type": "string",
-          "description": "Context and forces driving the decision"
-        },
-        "decisionMade": {
-          "type": "string",
-          "description": "The decision that was made"
-        },
-        "rationale": {
-          "type": "string",
-          "description": "Reasoning behind the decision"
-        },
-        "alternatives": {
-          "type": "array",
-          "description": "Alternatives considered",
-          "items": {
-            "type": "object",
-            "description": "Alternative option with pros/cons",
-            "properties": {
-              "option": {
-                "type": "string",
-                "description": "Alternative option"
-              },
-              "pros": {
-                "type": "string",
-                "description": "Pros of this option"
-              },
-              "cons": {
-                "type": "string",
-                "description": "Cons of this option"
-              }
-            }
-          }
-        },
-        "consequences": {
-          "type": "array",
-          "description": "Known consequences of the decision",
-          "items": {
-            "type": "string",
-            "description": "Consequence"
-          }
-        }
-      },
-      "requiredProperties": ["decisionId", "status", "context", "decisionMade", "rationale"],
-      "examples": [
-        "ADR-001: Use GraphDB for knowledge storage",
-        "ADR-002: Adopt event-driven architecture"
-      ]
-    },
-    "Workflow": {
-      "description": "A defined sequence of steps or process for accomplishing a task",
-      "properties": {
-        "workflowName": {
-          "type": "string",
-          "description": "Workflow identifier"
+          "description": "Programming language",
+          "enum": ["typescript", "javascript", "python", "shell", "json", "yaml", "markdown", "other"]
         },
         "purpose": {
           "type": "string",
-          "description": "What this workflow accomplishes"
+          "description": "Brief description of what this file does"
         },
-        "steps": {
-          "type": "array",
-          "description": "Ordered list of workflow steps",
-          "items": {
-            "type": "object",
-            "description": "Workflow step",
-            "properties": {
-              "stepId": {
-                "type": "string",
-                "description": "Step identifier"
-              },
-              "action": {
-                "type": "string",
-                "description": "Action to perform"
-              },
-              "dependencies": {
-                "type": "array",
-                "description": "Dependencies on other steps",
-                "items": {
-                  "type": "string",
-                  "description": "Step ID"
-                }
-              }
-            }
-          }
+        "complexity": {
+          "type": "string",
+          "description": "Coarse complexity assessment",
+          "enum": ["low", "medium", "high"],
+          "facet": "quality"
         },
-        "triggers": {
-          "type": "array",
-          "description": "Events or conditions that trigger this workflow",
-          "items": {
-            "type": "string",
-            "description": "Trigger condition"
-          }
-        },
-        "outputs": {
-          "type": "array",
-          "description": "Expected outputs of the workflow",
-          "items": {
-            "type": "string",
-            "description": "Output description"
-          }
+        "testCoverage": {
+          "type": "string",
+          "description": "Degree of test coverage",
+          "enum": ["none", "partial", "full"],
+          "facet": "quality"
         }
       },
-      "requiredProperties": ["workflowName", "purpose", "steps"],
+      "requiredProperties": ["path"],
       "examples": [
-        "Incremental Analysis Workflow",
-        "Entity Refresh Workflow"
+        "integrations/mcp-server-semantic-analysis/src/stdio-proxy.ts",
+        "scripts/generate-docker-mcp-config.sh"
       ]
     },
-    "SystemComponent": {
-      "description": "A software component or service within a system",
+
+    "Service": {
+      "facet": "structure",
+      "description": "A deployable or runnable unit composed of files",
       "properties": {
-        "componentName": {
+        "serviceName": {
           "type": "string",
-          "description": "Component identifier"
+          "description": "Human-readable service name",
+          "required": true
         },
-        "componentType": {
+        "serviceType": {
           "type": "string",
-          "description": "Type of component",
-          "enum": ["service", "library", "agent", "database", "api", "ui", "infrastructure"]
+          "description": "Kind of service",
+          "enum": ["server", "proxy", "ui", "cli", "library", "agent", "worker"]
         },
-        "responsibilities": {
-          "type": "array",
-          "description": "What this component is responsible for",
-          "items": {
-            "type": "string",
-            "description": "Responsibility"
-          }
+        "entryPoint": {
+          "type": "string",
+          "description": "Main file that starts the service"
         },
-        "interfaces": {
-          "type": "array",
-          "description": "Interfaces exposed by this component",
-          "items": {
-            "type": "string",
-            "description": "Interface description"
-          }
+        "maturity": {
+          "type": "string",
+          "description": "Lifecycle stage of the service",
+          "enum": ["prototype", "active", "stable", "deprecated", "sunset"],
+          "facet": "quality"
         },
-        "dependencies": {
+        "architectureStyle": {
+          "type": "string",
+          "description": "Primary architectural style",
+          "enum": ["event-driven", "request-response", "pipeline", "pub-sub", "batch"],
+          "facet": "quality"
+        },
+        "patterns": {
           "type": "array",
-          "description": "Other components this depends on",
-          "items": {
-            "type": "string",
-            "description": "Dependency name"
-          }
+          "description": "Coding/design patterns employed in this service",
+          "items": { "type": "string" },
+          "facet": "quality",
+          "examples": ["proxy", "circuit-breaker", "observer", "factory", "middleware-chain"]
         }
       },
-      "requiredProperties": ["componentName", "componentType"],
+      "requiredProperties": ["serviceName", "serviceType"],
       "examples": [
-        "GraphDatabaseService (database, knowledge storage)",
-        "CoordinatorAgent (agent, workflow orchestration)"
+        "semantic-analysis-proxy (proxy, active)",
+        "system-health-dashboard (ui, stable)",
+        "vkb-server (server, active)"
       ]
     },
-    "ModelComponent": {
-      "description": "A component that represents a domain model or processing unit",
+
+    "Feature": {
+      "facet": "structure",
+      "description": "A user-facing capability composed of one or more services",
       "properties": {
-        "modelName": {
+        "featureName": {
           "type": "string",
-          "description": "Model identifier"
+          "description": "Human-readable feature name",
+          "required": true
         },
-        "modelType": {
+        "description": {
           "type": "string",
-          "description": "Type of model",
-          "enum": ["domain", "processing", "classification", "embedding", "validation"]
+          "description": "What this feature provides to the user"
+        },
+        "maturity": {
+          "type": "string",
+          "description": "Lifecycle stage of the feature",
+          "enum": ["prototype", "active", "stable", "deprecated", "sunset"],
+          "facet": "quality"
+        }
+      },
+      "requiredProperties": ["featureName"],
+      "examples": [
+        "MCP Tool Integration (stable)",
+        "Knowledge Graph Visualization (active)",
+        "Continuous Learning Pipeline (prototype)"
+      ]
+    },
+
+    "_comment_behavior": "=== FACET 2: BEHAVIOR — What it DOES ===",
+
+    "Contract": {
+      "facet": "behavior",
+      "description": "A specification of what a component promises to do — the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",
+      "properties": {
+        "contractName": {
+          "type": "string",
+          "description": "Human-readable name for this contract",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "description": "What this contract specifies"
         },
         "inputs": {
           "type": "array",
-          "description": "Input requirements",
-          "items": {
-            "type": "string",
-            "description": "Input description"
-          }
+          "description": "What the contract accepts",
+          "items": { "type": "string" }
         },
         "outputs": {
           "type": "array",
-          "description": "Output specifications",
-          "items": {
-            "type": "string",
-            "description": "Output description"
-          }
+          "description": "What the contract produces",
+          "items": { "type": "string" }
         },
-        "accuracy": {
-          "type": "number",
-          "description": "Model accuracy or performance metric (0-1)",
-          "min": 0,
-          "max": 1
+        "protocol": {
+          "type": "string",
+          "description": "Interaction protocol",
+          "enum": ["rest", "sse", "stdio", "ws", "function-call", "cli", "event"]
+        },
+        "invariants": {
+          "type": "array",
+          "description": "Conditions that must always hold",
+          "items": { "type": "string" }
         }
       },
-      "requiredProperties": ["modelName", "modelType"],
+      "requiredProperties": ["contractName"],
       "examples": [
-        "EmbeddingClassifier (classification model)",
-        "OntologyClassifier (classification model)"
+        "MCP stdio-to-SSE bridge: accepts MCP requests on stdin, forwards to SSE server, returns responses on stdout",
+        "Health endpoint: GET /health returns JSON with service status, always responds within 5s",
+        "Knowledge graph query: accepts Cypher-like query string, returns array of matching entities"
       ]
     },
-    "ConfigurationData": {
-      "description": "Configuration settings or parameters for system components",
+
+    "_comment_operations": "=== FACET 3: OPERATIONS — How it RUNS ===",
+
+    "RuntimeDiagnostics": {
+      "facet": "operations",
+      "description": "Observable diagnostic output available while the system runs",
       "properties": {
-        "configName": {
+        "channel": {
           "type": "string",
-          "description": "Configuration identifier"
-        },
-        "configPath": {
-          "type": "string",
-          "description": "File path or key path"
-        },
-        "format": {
-          "type": "string",
-          "description": "Configuration format",
-          "enum": ["json", "yaml", "env", "toml"]
-        },
-        "schema": {
-          "type": "string",
-          "description": "Schema or validation specification"
-        },
-        "reloadable": {
-          "type": "boolean",
-          "description": "Whether config can be reloaded at runtime"
-        },
-        "sensitive": {
-          "type": "boolean",
-          "description": "Whether config contains sensitive data"
-        }
-      },
-      "requiredProperties": ["configName", "format"],
-      "examples": [
-        "ontology-config.json (ontology settings)",
-        "constraints.yaml (constraint definitions)"
-      ]
-    },
-    "DataRepresentation": {
-      "description": "A data structure, format, or encoding",
-      "properties": {
-        "dataName": {
-          "type": "string",
-          "description": "Data representation identifier"
-        },
-        "format": {
-          "type": "string",
-          "description": "Data format",
-          "enum": ["json", "binary", "vector", "graph", "table", "tree"]
-        },
-        "schema": {
-          "type": "string",
-          "description": "Schema definition"
-        },
-        "storage": {
-          "type": "string",
-          "description": "Where data is stored"
-        },
-        "serialization": {
-          "type": "string",
-          "description": "Serialization method"
-        }
-      },
-      "requiredProperties": ["dataName", "format"],
-      "examples": [
-        "EmbeddingVector (384-dim float array)",
-        "KnowledgeGraph (Graphology structure)"
-      ]
-    },
-    "AnalysisArtifact": {
-      "description": "An artifact produced by analysis or processing",
-      "properties": {
-        "artifactName": {
-          "type": "string",
-          "description": "Artifact identifier"
-        },
-        "artifactType": {
-          "type": "string",
-          "description": "Type of artifact",
-          "enum": ["report", "log", "metric", "snapshot", "export", "checkpoint"]
-        },
-        "source": {
-          "type": "string",
-          "description": "What produced this artifact"
-        },
-        "timestamp": {
-          "type": "string",
-          "description": "When artifact was created"
-        },
-        "retention": {
-          "type": "string",
-          "description": "How long to keep this artifact"
-        }
-      },
-      "requiredProperties": ["artifactName", "artifactType", "source"],
-      "examples": [
-        "Session Log (LSL markdown file)",
-        "Analysis Checkpoint (incremental analysis state)"
-      ]
-    },
-    "DocumentationAsset": {
-      "description": "Documentation, diagrams, or explanatory content",
-      "properties": {
-        "assetName": {
-          "type": "string",
-          "description": "Asset identifier"
-        },
-        "assetType": {
-          "type": "string",
-          "description": "Type of documentation",
-          "enum": ["markdown", "diagram", "api_doc", "tutorial", "reference", "readme"]
+          "description": "How the diagnostics are delivered",
+          "enum": ["file", "stderr", "stdout", "endpoint", "docker-logs", "browser-console"],
+          "required": true
         },
         "path": {
           "type": "string",
-          "description": "File path"
+          "description": "File path, URL, or command to access the diagnostics"
         },
         "format": {
           "type": "string",
-          "description": "File format",
-          "enum": ["md", "puml", "mermaid", "openapi", "html"]
+          "description": "Output format",
+          "enum": ["text", "json", "structured"]
         },
-        "audience": {
+        "rotation": {
           "type": "string",
-          "description": "Target audience",
-          "enum": ["developer", "user", "admin", "all"]
+          "description": "Log rotation policy, if any"
         }
       },
-      "requiredProperties": ["assetName", "assetType", "path"],
+      "requiredProperties": ["channel"],
       "examples": [
-        "Architecture Diagram (PlantUML)",
-        "API Reference (OpenAPI spec)"
+        ".data/logs/mcp-proxy-semantic-analysis.log (file, text)",
+        "docker logs coding-services (docker-logs, text)",
+        "http://localhost:3033/health (endpoint, json)"
       ]
     },
-    "ExecutionContext": {
-      "description": "Runtime environment or execution context",
+
+    "StaticDiagnostics": {
+      "facet": "operations",
+      "description": "Checks that verify correctness without running the system",
       "properties": {
-        "contextName": {
+        "checkType": {
           "type": "string",
-          "description": "Context identifier"
+          "description": "Kind of static check",
+          "enum": ["config-validation", "type-check", "lint", "schema", "dependency-audit"],
+          "required": true
         },
-        "contextType": {
+        "command": {
           "type": "string",
-          "description": "Type of execution context",
-          "enum": ["process", "container", "session", "transaction", "workflow"]
+          "description": "Shell command to run the check"
         },
-        "state": {
+        "path": {
           "type": "string",
-          "description": "Current state",
-          "enum": ["idle", "running", "paused", "completed", "failed"]
-        },
-        "resources": {
-          "type": "object",
-          "description": "Resource allocation",
-          "properties": {
-            "memory": {
-              "type": "string",
-              "description": "Memory allocation"
-            },
-            "cpu": {
-              "type": "string",
-              "description": "CPU allocation"
-            }
-          }
-        },
-        "timeout": {
+          "description": "File or directory the check applies to"
+        }
+      },
+      "requiredProperties": ["checkType"],
+      "examples": [
+        "npx tsc --noEmit (type-check)",
+        "docker-compose config --quiet (config-validation)"
+      ]
+    },
+
+    "Port": {
+      "facet": "operations",
+      "description": "A network port used for inter-component communication",
+      "properties": {
+        "portNumber": {
           "type": "number",
-          "description": "Execution timeout in milliseconds"
-        }
-      },
-      "requiredProperties": ["contextName", "contextType"],
-      "examples": [
-        "Workflow Execution Context",
-        "MCP Tool Execution Context"
-      ]
-    },
-    "QualityMetric": {
-      "description": "A measurable quality or performance indicator",
-      "properties": {
-        "metricName": {
-          "type": "string",
-          "description": "Metric identifier"
-        },
-        "metricType": {
-          "type": "string",
-          "description": "Type of metric",
-          "enum": ["performance", "quality", "accuracy", "coverage", "compliance", "health"]
-        },
-        "value": {
-          "type": "number",
-          "description": "Current metric value"
-        },
-        "unit": {
-          "type": "string",
-          "description": "Unit of measurement"
-        },
-        "threshold": {
-          "type": "object",
-          "description": "Threshold definitions",
-          "properties": {
-            "warning": {
-              "type": "number",
-              "description": "Warning threshold"
-            },
-            "critical": {
-              "type": "number",
-              "description": "Critical threshold"
-            }
-          }
-        },
-        "trend": {
-          "type": "string",
-          "description": "Trend direction",
-          "enum": ["improving", "stable", "degrading"]
-        }
-      },
-      "requiredProperties": ["metricName", "metricType"],
-      "examples": [
-        "Classification Accuracy (0.95)",
-        "Response Time (< 100ms)"
-      ]
-    },
-    "Constraint": {
-      "description": "A rule or constraint that must be satisfied",
-      "properties": {
-        "constraintName": {
-          "type": "string",
-          "description": "Constraint identifier"
-        },
-        "constraintType": {
-          "type": "string",
-          "description": "Type of constraint",
-          "enum": ["validation", "security", "architecture", "style", "semantic"]
-        },
-        "severity": {
-          "type": "string",
-          "description": "Violation severity",
-          "enum": ["info", "warning", "error", "critical"]
-        },
-        "rule": {
-          "type": "string",
-          "description": "The constraint rule definition"
-        },
-        "enforcement": {
-          "type": "string",
-          "description": "How the constraint is enforced",
-          "enum": ["blocking", "warning", "logging"]
-        }
-      },
-      "requiredProperties": ["constraintName", "constraintType", "severity", "rule"],
-      "examples": [
-        "No hardcoded secrets (critical, blocking)",
-        "Max function length (warning)"
-      ]
-    },
-    "Integration": {
-      "description": "An integration point between systems or components",
-      "properties": {
-        "integrationName": {
-          "type": "string",
-          "description": "Integration identifier"
-        },
-        "integrationType": {
-          "type": "string",
-          "description": "Type of integration",
-          "enum": ["api", "event", "file", "database", "message_queue"]
+          "description": "Port number",
+          "required": true
         },
         "protocol": {
           "type": "string",
           "description": "Communication protocol",
-          "enum": ["rest", "grpc", "websocket", "sse", "file_watch"]
+          "enum": ["http", "sse", "ws", "tcp"]
         },
-        "source": {
+        "host": {
           "type": "string",
-          "description": "Source system"
-        },
-        "target": {
-          "type": "string",
-          "description": "Target system"
-        },
-        "dataFormat": {
-          "type": "string",
-          "description": "Data format exchanged"
+          "description": "Host the port is bound to",
+          "enum": ["localhost", "container", "0.0.0.0"]
         }
       },
-      "requiredProperties": ["integrationName", "integrationType", "source", "target"],
+      "requiredProperties": ["portNumber"],
       "examples": [
-        "MCP Tool Integration (rest API)",
-        "Graph Database Sync (event-driven)"
+        "3848 (sse, localhost) — semantic-analysis",
+        "8080 (http, localhost) — VKB server"
+      ]
+    },
+
+    "Config": {
+      "facet": "operations",
+      "description": "A configuration source that controls system behavior",
+      "properties": {
+        "configPath": {
+          "type": "string",
+          "description": "File path relative to project root",
+          "required": true
+        },
+        "format": {
+          "type": "string",
+          "description": "Configuration format",
+          "enum": ["json", "yaml", "env", "sh", "toml"]
+        },
+        "scope": {
+          "type": "string",
+          "description": "Where this config applies",
+          "enum": ["global", "project", "runtime"]
+        }
+      },
+      "requiredProperties": ["configPath", "format"],
+      "examples": [
+        "claude-code-mcp-docker.json (json, project)",
+        "docker/docker-compose.yml (yaml, project)"
+      ]
+    },
+
+    "Container": {
+      "facet": "operations",
+      "description": "A Docker container or compose service",
+      "properties": {
+        "containerName": {
+          "type": "string",
+          "description": "Container or compose service name",
+          "required": true
+        },
+        "image": {
+          "type": "string",
+          "description": "Docker image used"
+        },
+        "composeService": {
+          "type": "string",
+          "description": "Name in docker-compose.yml"
+        }
+      },
+      "requiredProperties": ["containerName"],
+      "examples": [
+        "coding-services (custom image, compose)"
+      ]
+    },
+
+    "Process": {
+      "facet": "operations",
+      "description": "A running OS-level process",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Command line used to start the process",
+          "required": true
+        },
+        "transport": {
+          "type": "string",
+          "description": "How the process communicates",
+          "enum": ["stdio", "http", "tcp", "ipc"]
+        }
+      },
+      "requiredProperties": ["command"],
+      "examples": [
+        "node dist/stdio-proxy.js (stdio)",
+        "python -m codebase_rag.mcp.stdio_proxy (stdio)"
+      ]
+    },
+
+    "_comment_resilience": "=== FACET 4: RESILIENCE — What goes WRONG ===",
+
+    "Fault": {
+      "facet": "resilience",
+      "description": "A known failure mode with symptoms and resolution",
+      "properties": {
+        "faultName": {
+          "type": "string",
+          "description": "Short identifier for the fault",
+          "required": true
+        },
+        "symptoms": {
+          "type": "string",
+          "description": "What the user or agent observes when this fault occurs"
+        },
+        "rootCause": {
+          "type": "string",
+          "description": "Underlying cause of the fault"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Steps to fix the fault"
+        },
+        "severity": {
+          "type": "string",
+          "description": "Impact level",
+          "enum": ["critical", "warning", "info"]
+        }
+      },
+      "requiredProperties": ["faultName", "severity"],
+      "examples": [
+        "port-not-mapped: Docker port not exposed to host (critical)",
+        "stale-process-on-port: Old process blocking a port after restart (warning)"
+      ]
+    },
+
+    "Limitation": {
+      "facet": "resilience",
+      "description": "A known boundary, constraint, or area of technical debt. Not a failure, but an inherent limit on what the system can do. Covers: scalability limits, missing features, technical debt, and planned future work.",
+      "properties": {
+        "limitationName": {
+          "type": "string",
+          "description": "Short identifier for the limitation",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "description": "What the limitation is and why it exists"
+        },
+        "category": {
+          "type": "string",
+          "description": "Kind of limitation",
+          "enum": ["technical-debt", "scalability", "missing-feature", "design-constraint", "dependency"]
+        },
+        "impact": {
+          "type": "string",
+          "description": "How this limitation affects users or the system"
+        },
+        "severity": {
+          "type": "string",
+          "description": "How important it is to address",
+          "enum": ["critical", "moderate", "low", "accepted"]
+        }
+      },
+      "requiredProperties": ["limitationName", "category"],
+      "examples": [
+        "no-proxy-retry: MCP proxies do not retry on transient SSE failures (technical-debt, moderate)",
+        "single-container: All backend services run in one container, cannot scale independently (design-constraint, accepted)",
+        "no-auth-on-health: Health endpoint has no authentication (missing-feature, low)"
+      ]
+    },
+
+    "_comment_quality": "=== FACET 5: QUALITY — How GOOD it is (no new nodes, properties on File/Service/Feature) ===",
+
+    "_comment_evolution": "=== FACET 6: EVOLUTION — How it CHANGED ===",
+
+    "Revision": {
+      "facet": "evolution",
+      "description": "A significant change milestone in the codebase. Not every git commit, but a meaningful event that altered structure or behavior. The lower ontology may link to specific commit ranges.",
+      "properties": {
+        "revisionName": {
+          "type": "string",
+          "description": "Short descriptive name for the revision",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "description": "What changed and why"
+        },
+        "scope": {
+          "type": "string",
+          "description": "Breadth of the change",
+          "enum": ["file", "service", "feature", "system"]
+        },
+        "changeType": {
+          "type": "string",
+          "description": "Nature of the change",
+          "enum": ["introduction", "rewrite", "refactor", "extension", "deprecation", "removal"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Whether this revision is completed or planned",
+          "enum": ["completed", "in-progress", "planned"]
+        }
+      },
+      "requiredProperties": ["revisionName"],
+      "examples": [
+        "sse-proxy-rewrite: Rewrote proxy layer from REST to SSE (service, rewrite, completed)",
+        "subscription-llm-providers: Subscription-based LLM provider tier (feature, extension, completed)",
+        "proxy-retry-logic: Add retry with exponential backoff to all MCP proxies (service, extension, planned)"
       ]
     }
   },
+
   "relationships": {
-    "extends": {
-      "description": "One entity extends or inherits from another",
-      "sourceEntityClass": "Pattern",
-      "targetEntityClass": "Pattern",
-      "cardinality": "many-to-one",
-      "properties": {
-        "inheritedProperties": "array"
-      }
+
+    "_comment_structure_rels": "=== STRUCTURE RELATIONS ===",
+
+    "part_of": {
+      "facet": "structure",
+      "description": "Composition hierarchy: File → Service → Feature",
+      "sourceEntityClass": ["File", "Service"],
+      "targetEntityClass": ["Service", "Feature"],
+      "cardinality": "many-to-one"
     },
-    "implements": {
-      "description": "A component implements a pattern or interface",
-      "sourceEntityClass": "SystemComponent",
-      "targetEntityClass": "Pattern",
-      "cardinality": "many-to-many",
-      "properties": {
-        "conformance": "string"
-      }
+
+    "_comment_behavior_rels": "=== BEHAVIOR RELATIONS ===",
+
+    "fulfills": {
+      "facet": "behavior",
+      "description": "A service or file fulfills (implements) a contract",
+      "sourceEntityClass": ["Service", "File"],
+      "targetEntityClass": "Contract",
+      "cardinality": "many-to-many"
     },
+
+    "depends_on_contract": {
+      "facet": "behavior",
+      "description": "A service depends on a contract being available, regardless of which service fulfills it",
+      "sourceEntityClass": "Service",
+      "targetEntityClass": "Contract",
+      "cardinality": "many-to-many"
+    },
+
+    "_comment_operations_rels": "=== OPERATIONS RELATIONS ===",
+
+    "diagnosed_by": {
+      "facet": "operations",
+      "description": "Links a component to its diagnostic outputs (runtime or static)",
+      "sourceEntityClass": ["File", "Service"],
+      "targetEntityClass": ["RuntimeDiagnostics", "StaticDiagnostics"],
+      "cardinality": "many-to-many"
+    },
+
+    "logs_to": {
+      "facet": "operations",
+      "description": "A process writes output to a diagnostic channel",
+      "sourceEntityClass": "Process",
+      "targetEntityClass": "RuntimeDiagnostics",
+      "cardinality": "one-to-many"
+    },
+
+    "connects_to": {
+      "facet": "operations",
+      "description": "A service connects to a port as a client",
+      "sourceEntityClass": "Service",
+      "targetEntityClass": "Port",
+      "cardinality": "many-to-many"
+    },
+
+    "listens_on": {
+      "facet": "operations",
+      "description": "A service listens on a port",
+      "sourceEntityClass": "Service",
+      "targetEntityClass": "Port",
+      "cardinality": "many-to-one"
+    },
+
+    "configured_by": {
+      "facet": "operations",
+      "description": "A service reads its configuration from a config source",
+      "sourceEntityClass": "Service",
+      "targetEntityClass": "Config",
+      "cardinality": "many-to-many"
+    },
+
+    "runs_in": {
+      "facet": "operations",
+      "description": "A service runs inside a container",
+      "sourceEntityClass": "Service",
+      "targetEntityClass": "Container",
+      "cardinality": "many-to-one"
+    },
+
+    "spawns": {
+      "facet": "operations",
+      "description": "A service launches a process",
+      "sourceEntityClass": "Service",
+      "targetEntityClass": "Process",
+      "cardinality": "one-to-many"
+    },
+
+    "_comment_dependency_rels": "=== DEPENDENCY RELATIONS ===",
+
     "depends_on": {
-      "description": "One entity depends on another",
-      "sourceEntityClass": "SystemComponent",
-      "targetEntityClass": "SystemComponent",
-      "cardinality": "many-to-many",
-      "properties": {
-        "dependencyType": "string"
-      }
+      "facet": "structure",
+      "description": "A service requires another service to function",
+      "sourceEntityClass": "Service",
+      "targetEntityClass": "Service",
+      "cardinality": "many-to-many"
     },
-    "produces": {
-      "description": "A component or workflow produces an artifact",
-      "sourceEntityClass": "Workflow",
-      "targetEntityClass": "AnalysisArtifact",
-      "cardinality": "one-to-many",
-      "properties": {
-        "frequency": "string"
-      }
+
+    "proxies_for": {
+      "facet": "structure",
+      "description": "A service acts as a proxy or bridge for another service",
+      "sourceEntityClass": "Service",
+      "targetEntityClass": "Service",
+      "cardinality": "one-to-one"
     },
-    "consumes": {
-      "description": "A component consumes data from another",
-      "sourceEntityClass": "SystemComponent",
-      "targetEntityClass": "DataRepresentation",
-      "cardinality": "many-to-many",
-      "properties": {
-        "format": "string"
-      }
+
+    "_comment_resilience_rels": "=== RESILIENCE RELATIONS ===",
+
+    "affects": {
+      "facet": "resilience",
+      "description": "A fault manifests in a service",
+      "sourceEntityClass": "Fault",
+      "targetEntityClass": "Service",
+      "cardinality": "many-to-many"
     },
-    "validates_against": {
-      "description": "An entity is validated against a constraint or schema",
-      "sourceEntityClass": "DataRepresentation",
-      "targetEntityClass": "Constraint",
-      "cardinality": "many-to-many",
-      "properties": {
-        "validationMode": "string"
-      }
+
+    "revealed_by": {
+      "facet": "resilience",
+      "description": "A fault is visible in runtime diagnostics",
+      "sourceEntityClass": "Fault",
+      "targetEntityClass": "RuntimeDiagnostics",
+      "cardinality": "many-to-many"
     },
-    "documents": {
-      "description": "Documentation describes a component or pattern",
-      "sourceEntityClass": "DocumentationAsset",
-      "targetEntityClass": "SystemComponent",
-      "cardinality": "many-to-many",
-      "properties": {
-        "coverage": "string"
-      }
+
+    "prevented_by": {
+      "facet": "resilience",
+      "description": "A static check can catch this fault before runtime",
+      "sourceEntityClass": "Fault",
+      "targetEntityClass": "StaticDiagnostics",
+      "cardinality": "many-to-many"
     },
-    "measures": {
-      "description": "A metric measures an aspect of a component",
-      "sourceEntityClass": "QualityMetric",
-      "targetEntityClass": "SystemComponent",
-      "cardinality": "many-to-one",
-      "properties": {
-        "sampleRate": "string"
-      }
+
+    "caused_by": {
+      "facet": "resilience",
+      "description": "A fault is a downstream consequence of another fault",
+      "sourceEntityClass": "Fault",
+      "targetEntityClass": "Fault",
+      "cardinality": "many-to-one"
     },
-    "informs": {
-      "description": "An insight informs a decision",
-      "sourceEntityClass": "Insight",
-      "targetEntityClass": "Decision",
-      "cardinality": "many-to-many",
-      "properties": {
-        "weight": "number"
-      }
+
+    "limited_by": {
+      "facet": "resilience",
+      "description": "A service or feature has a known limitation",
+      "sourceEntityClass": ["Service", "Feature"],
+      "targetEntityClass": "Limitation",
+      "cardinality": "many-to-many"
     },
-    "supersedes": {
-      "description": "One decision supersedes another",
-      "sourceEntityClass": "Decision",
-      "targetEntityClass": "Decision",
-      "cardinality": "one-to-one",
-      "properties": {
-        "reason": "string"
-      }
+
+    "_comment_evolution_rels": "=== EVOLUTION RELATIONS ===",
+
+    "changed_in": {
+      "facet": "evolution",
+      "description": "A file or service was introduced or modified in a revision",
+      "sourceEntityClass": ["File", "Service"],
+      "targetEntityClass": "Revision",
+      "cardinality": "many-to-many"
     },
-    "integrates_with": {
-      "description": "A component integrates with another via an integration point",
-      "sourceEntityClass": "SystemComponent",
-      "targetEntityClass": "Integration",
-      "cardinality": "many-to-many",
-      "properties": {
-        "direction": "string"
-      }
+
+    "precedes": {
+      "facet": "evolution",
+      "description": "Chronological ordering: this revision came before that one",
+      "sourceEntityClass": "Revision",
+      "targetEntityClass": "Revision",
+      "cardinality": "one-to-one"
     },
-    "orchestrates": {
-      "description": "A workflow orchestrates components",
-      "sourceEntityClass": "Workflow",
-      "targetEntityClass": "SystemComponent",
-      "cardinality": "one-to-many",
-      "properties": {
-        "order": "number"
-      }
+
+    "addressed_in": {
+      "facet": "evolution",
+      "description": "A limitation is being resolved in a revision (completed or planned)",
+      "sourceEntityClass": "Limitation",
+      "targetEntityClass": "Revision",
+      "cardinality": "many-to-one"
     }
   }
 }

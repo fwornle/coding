@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "cluster-reprocessing",
-  "extendsOntology": "development-knowledge",
+  "extendsOntology": "software-system-structure",
   "description": "Lower ontology for the Cluster Reprocessing (RPR) ecosystem, covering vehicle data recording, reprocessing, validation, and ADAS function evaluation. Extends the Development Knowledge upper ontology.",
   "entities": {
     "RecordedData": {
@@ -20,12 +20,18 @@
         "containerFormat": {
           "type": "string",
           "description": "Container format for recorded data",
-          "enum": ["MF4", "MCAP"]
+          "enum": [
+            "MF4",
+            "MCAP"
+          ]
         },
         "payloadFormat": {
           "type": "string",
           "description": "Payload serialization format",
-          "enum": ["Protobuf/SPP", "Kaitai-Binary"]
+          "enum": [
+            "Protobuf/SPP",
+            "Kaitai-Binary"
+          ]
         },
         "metadata": {
           "type": "object",
@@ -41,7 +47,11 @@
           "description": "Whether data is fragmented"
         }
       },
-      "requiredProperties": ["sources", "containerFormat", "payloadFormat"],
+      "requiredProperties": [
+        "sources",
+        "containerFormat",
+        "payloadFormat"
+      ],
       "examples": [
         "Camera + radar data in MF4 format with Protobuf/SPP payload",
         "MIPI camera stream in MCAP format with Kaitai binary blobs"
@@ -65,10 +75,17 @@
         "executionMode": {
           "type": "string",
           "description": "Execution mode",
-          "enum": ["local", "cloud", "hybrid"]
+          "enum": [
+            "local",
+            "cloud",
+            "hybrid"
+          ]
         }
       },
-      "requiredProperties": ["targetName", "ecuType"],
+      "requiredProperties": [
+        "targetName",
+        "ecuType"
+      ],
       "examples": [
         "AEB ECU virtual target v2.5 (cloud execution)",
         "Lane keeping ECU virtual target v1.8 (local dev)"
@@ -99,7 +116,11 @@
           "description": "Resource requirements (CPU, memory)"
         }
       },
-      "requiredProperties": ["imageId", "imageTag", "virtualTarget"],
+      "requiredProperties": [
+        "imageId",
+        "imageTag",
+        "virtualTarget"
+      ],
       "examples": [
         "AEB RPU docker image v2.5.0 from artifactory",
         "Lane keeping RPU with 4 CPU, 8GB memory requirements"
@@ -124,10 +145,17 @@
         "executionMode": {
           "type": "string",
           "description": "Execution coordination mode",
-          "enum": ["sequential", "parallel", "hybrid"]
+          "enum": [
+            "sequential",
+            "parallel",
+            "hybrid"
+          ]
         }
       },
-      "requiredProperties": ["rpuComponents", "dagDefinition"],
+      "requiredProperties": [
+        "rpuComponents",
+        "dagDefinition"
+      ],
       "examples": [
         "Sensor fusion workflow with 3 RPUs (camera, radar, lidar)",
         "Full ADAS stack with 5 RPUs in parallel DAG"
@@ -161,7 +189,10 @@
           }
         }
       },
-      "requiredProperties": ["kpiDockerImage", "evaluationScript"],
+      "requiredProperties": [
+        "kpiDockerImage",
+        "evaluationScript"
+      ],
       "examples": [
         "AEB braking distance KPI with threshold < 5m",
         "Lane keeping deviation KPI with threshold < 0.3m"
@@ -177,7 +208,12 @@
         "kpiType": {
           "type": "string",
           "description": "KPI category",
-          "enum": ["performance", "safety", "quality", "accuracy"]
+          "enum": [
+            "performance",
+            "safety",
+            "quality",
+            "accuracy"
+          ]
         },
         "threshold": {
           "type": "number",
@@ -188,7 +224,11 @@
           "description": "Measurement unit"
         }
       },
-      "requiredProperties": ["kpiName", "kpiType", "threshold"],
+      "requiredProperties": [
+        "kpiName",
+        "kpiType",
+        "threshold"
+      ],
       "examples": [
         "Braking distance < 5m (safety KPI)",
         "Detection accuracy > 95% (accuracy KPI)"
@@ -218,7 +258,11 @@
           "description": "Evaluation timestamp"
         }
       },
-      "requiredProperties": ["kpiName", "measuredValue", "passed"],
+      "requiredProperties": [
+        "kpiName",
+        "measuredValue",
+        "passed"
+      ],
       "examples": [
         "Braking distance: 4.2m (passed, threshold 5m)",
         "Detection accuracy: 96.5% (passed, threshold 95%)"
@@ -234,7 +278,12 @@
         "scenarioType": {
           "type": "string",
           "description": "Scenario category",
-          "enum": ["edge_case", "known_unsafe", "unknown_unsafe", "safe"]
+          "enum": [
+            "edge_case",
+            "known_unsafe",
+            "unknown_unsafe",
+            "safe"
+          ]
         },
         "safetyAssessment": {
           "type": "string",
@@ -249,7 +298,10 @@
           "description": "False negative rate"
         }
       },
-      "requiredProperties": ["scenarioId", "scenarioType"],
+      "requiredProperties": [
+        "scenarioId",
+        "scenarioType"
+      ],
       "examples": [
         "Edge case: pedestrian crossing at night (false neg rate 2%)",
         "Known unsafe: no detection in heavy rain (requires improvement)"
@@ -283,7 +335,10 @@
           "description": "Real-time timing constraints"
         }
       },
-      "requiredProperties": ["orchestratorName", "orchestratedFunctions"],
+      "requiredProperties": [
+        "orchestratorName",
+        "orchestratedFunctions"
+      ],
       "examples": [
         "ADAS stack orchestrator (AEB, lane keeping, ACC)",
         "Perception fusion orchestrator (camera, radar, lidar)"
@@ -299,7 +354,12 @@
         "functionType": {
           "type": "string",
           "description": "Function category",
-          "enum": ["perception", "planning", "control", "fusion"]
+          "enum": [
+            "perception",
+            "planning",
+            "control",
+            "fusion"
+          ]
         },
         "inputSignals": {
           "type": "array",
@@ -318,9 +378,12 @@
           }
         }
       },
-      "requiredProperties": ["functionName", "functionType"],
+      "requiredProperties": [
+        "functionName",
+        "functionType"
+      ],
       "examples": [
-        "AEB function (perception → control)",
+        "AEB function (perception \u2192 control)",
         "Lane detection function (perception)"
       ]
     },
@@ -345,10 +408,14 @@
           "unit": "Hz"
         }
       },
-      "requiredProperties": ["sourceFunction", "targetFunction", "signalName"],
+      "requiredProperties": [
+        "sourceFunction",
+        "targetFunction",
+        "signalName"
+      ],
       "examples": [
-        "Camera → object detection (video stream @ 30Hz)",
-        "Radar → fusion (object list @ 20Hz)"
+        "Camera \u2192 object detection (video stream @ 30Hz)",
+        "Radar \u2192 fusion (object list @ 20Hz)"
       ]
     },
     "ResourceAllocation": {
@@ -370,10 +437,18 @@
         "priorityLevel": {
           "type": "string",
           "description": "Resource priority",
-          "enum": ["low", "normal", "high", "critical"]
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "critical"
+          ]
         }
       },
-      "requiredProperties": ["cpuCores", "memoryMB"],
+      "requiredProperties": [
+        "cpuCores",
+        "memoryMB"
+      ],
       "examples": [
         "Standard RPU: 4 cores, 8GB memory",
         "GPU-accelerated: 8 cores, 16GB, GPU enabled"
@@ -403,7 +478,9 @@
           "unit": "MB/s"
         }
       },
-      "requiredProperties": ["executionTime"],
+      "requiredProperties": [
+        "executionTime"
+      ],
       "examples": [
         "Fast run: 45s execution, 65% CPU, 6GB peak memory",
         "Large dataset: 180s execution, 85% CPU, 12GB peak"
@@ -415,7 +492,12 @@
         "backendType": {
           "type": "string",
           "description": "Storage backend type",
-          "enum": ["s3", "filesystem", "nfs", "ceph"]
+          "enum": [
+            "s3",
+            "filesystem",
+            "nfs",
+            "ceph"
+          ]
         },
         "bucketName": {
           "type": "string",
@@ -428,10 +510,15 @@
         "accessMode": {
           "type": "string",
           "description": "Access mode",
-          "enum": ["read-only", "read-write"]
+          "enum": [
+            "read-only",
+            "read-write"
+          ]
         }
       },
-      "requiredProperties": ["backendType"],
+      "requiredProperties": [
+        "backendType"
+      ],
       "examples": [
         "S3 backend: s3://rpr-recordings/2024/",
         "Local filesystem: /mnt/data/recordings/"
@@ -443,7 +530,12 @@
         "cacheType": {
           "type": "string",
           "description": "Cache type",
-          "enum": ["memory", "disk", "redis", "none"]
+          "enum": [
+            "memory",
+            "disk",
+            "redis",
+            "none"
+          ]
         },
         "cacheSize": {
           "type": "number",
@@ -458,10 +550,16 @@
         "evictionPolicy": {
           "type": "string",
           "description": "Cache eviction policy",
-          "enum": ["LRU", "LFU", "FIFO"]
+          "enum": [
+            "LRU",
+            "LFU",
+            "FIFO"
+          ]
         }
       },
-      "requiredProperties": ["cacheType"],
+      "requiredProperties": [
+        "cacheType"
+      ],
       "examples": [
         "Memory cache: 1GB, LRU eviction, 3600s TTL",
         "Redis distributed cache: 10GB, LFU eviction"
@@ -473,7 +571,12 @@
         "costType": {
           "type": "string",
           "description": "Cost category",
-          "enum": ["compute", "storage", "network", "total"]
+          "enum": [
+            "compute",
+            "storage",
+            "network",
+            "total"
+          ]
         },
         "amount": {
           "type": "number",
@@ -489,7 +592,10 @@
           "description": "Resource identifier"
         }
       },
-      "requiredProperties": ["costType", "amount"],
+      "requiredProperties": [
+        "costType",
+        "amount"
+      ],
       "examples": [
         "Compute cost: $450/month for cluster",
         "Storage cost: $120/month for S3 buckets"
@@ -505,7 +611,12 @@
         "ruleType": {
           "type": "string",
           "description": "Optimization type",
-          "enum": ["cost", "performance", "quality", "hybrid"]
+          "enum": [
+            "cost",
+            "performance",
+            "quality",
+            "hybrid"
+          ]
         },
         "condition": {
           "type": "string",
@@ -516,7 +627,12 @@
           "description": "Optimization action"
         }
       },
-      "requiredProperties": ["ruleName", "ruleType", "condition", "action"],
+      "requiredProperties": [
+        "ruleName",
+        "ruleType",
+        "condition",
+        "action"
+      ],
       "examples": [
         "Scale down idle clusters after 2 hours (cost optimization)",
         "Use cached data when available (performance optimization)"
@@ -543,7 +659,9 @@
           "unit": "seconds"
         }
       },
-      "requiredProperties": ["intervals"],
+      "requiredProperties": [
+        "intervals"
+      ],
       "examples": [
         "Critical scenarios: 10 intervals totaling 300s",
         "Full recording: single interval 3600s"
@@ -566,7 +684,10 @@
           "unit": "seconds"
         }
       },
-      "requiredProperties": ["start", "end"],
+      "requiredProperties": [
+        "start",
+        "end"
+      ],
       "examples": [
         "2024-01-15T10:30:00Z to 2024-01-15T10:35:00Z (300s)",
         "2024-01-15T14:00:00Z to 2024-01-15T15:00:00Z (3600s)"
@@ -600,7 +721,10 @@
           "description": "Test scenario type"
         }
       },
-      "requiredProperties": ["recordingId", "vehicleId"],
+      "requiredProperties": [
+        "recordingId",
+        "vehicleId"
+      ],
       "examples": [
         "Recording ABC123 from vehicle V-001 at Nurburgring",
         "Highway scenario in rainy conditions with driver D-042"
@@ -616,7 +740,12 @@
         "metricType": {
           "type": "string",
           "description": "Quality aspect",
-          "enum": ["completeness", "validity", "accuracy", "consistency"]
+          "enum": [
+            "completeness",
+            "validity",
+            "accuracy",
+            "consistency"
+          ]
         },
         "score": {
           "type": "number",
@@ -631,7 +760,12 @@
           "description": "Whether quality check passed"
         }
       },
-      "requiredProperties": ["metricName", "metricType", "score", "passed"],
+      "requiredProperties": [
+        "metricName",
+        "metricType",
+        "score",
+        "passed"
+      ],
       "examples": [
         "Completeness: 0.98 (passed, threshold 0.95)",
         "Signal validity: 0.92 (failed, threshold 0.95)"
@@ -661,10 +795,13 @@
           "description": "Whether data was unfragmented"
         }
       },
-      "requiredProperties": ["inputFormat", "outputFormat"],
+      "requiredProperties": [
+        "inputFormat",
+        "outputFormat"
+      ],
       "examples": [
-        "MF4 → MCAP conversion with defragmentation",
-        "Binary blob → Protobuf/SPP conversion"
+        "MF4 \u2192 MCAP conversion with defragmentation",
+        "Binary blob \u2192 Protobuf/SPP conversion"
       ]
     },
     "ReprocessingDAG": {
@@ -689,13 +826,20 @@
         "executionStrategy": {
           "type": "string",
           "description": "DAG execution strategy",
-          "enum": ["topological", "parallel", "optimized"]
+          "enum": [
+            "topological",
+            "parallel",
+            "optimized"
+          ]
         }
       },
-      "requiredProperties": ["nodes", "edges"],
+      "requiredProperties": [
+        "nodes",
+        "edges"
+      ],
       "examples": [
-        "Sensor fusion DAG: 3 parallel perception nodes → 1 fusion node",
-        "Sequential pipeline: preprocessing → RPU → postprocessing"
+        "Sensor fusion DAG: 3 parallel perception nodes \u2192 1 fusion node",
+        "Sequential pipeline: preprocessing \u2192 RPU \u2192 postprocessing"
       ]
     },
     "ConfigurationData": {
@@ -704,7 +848,11 @@
         "configFormat": {
           "type": "string",
           "description": "Configuration format",
-          "enum": ["yaml", "json", "xml"]
+          "enum": [
+            "yaml",
+            "json",
+            "xml"
+          ]
         },
         "configContent": {
           "type": "object",
@@ -715,7 +863,10 @@
           "description": "Schema for validation"
         }
       },
-      "requiredProperties": ["configFormat", "configContent"],
+      "requiredProperties": [
+        "configFormat",
+        "configContent"
+      ],
       "examples": [
         "RaaS YAML configuration with RPU versions and datasets",
         "KPI evaluation JSON configuration with thresholds"
@@ -727,12 +878,22 @@
         "documentType": {
           "type": "string",
           "description": "Document type",
-          "enum": ["spec", "manual", "guide", "reference"]
+          "enum": [
+            "spec",
+            "manual",
+            "guide",
+            "reference"
+          ]
         },
         "format": {
           "type": "string",
           "description": "Document format",
-          "enum": ["markdown", "pdf", "html", "docx"]
+          "enum": [
+            "markdown",
+            "pdf",
+            "html",
+            "docx"
+          ]
         },
         "version": {
           "type": "string",
@@ -743,7 +904,10 @@
           "description": "File path"
         }
       },
-      "requiredProperties": ["documentType", "format"],
+      "requiredProperties": [
+        "documentType",
+        "format"
+      ],
       "examples": [
         "RPU development guide (markdown v2.1)",
         "API reference documentation (HTML)"
@@ -767,10 +931,17 @@
         "status": {
           "type": "string",
           "description": "Component status",
-          "enum": ["active", "inactive", "deprecated"]
+          "enum": [
+            "active",
+            "inactive",
+            "deprecated"
+          ]
         }
       },
-      "requiredProperties": ["componentName", "componentType"],
+      "requiredProperties": [
+        "componentName",
+        "componentType"
+      ],
       "examples": [
         "RaaS orchestration engine v3.5 (active)",
         "Legacy data converter v1.2 (deprecated)"
@@ -786,7 +957,12 @@
         "modelType": {
           "type": "string",
           "description": "Model category",
-          "enum": ["detection", "classification", "regression", "fusion"]
+          "enum": [
+            "detection",
+            "classification",
+            "regression",
+            "fusion"
+          ]
         },
         "framework": {
           "type": "string",
@@ -801,7 +977,10 @@
           "description": "Model accuracy metric"
         }
       },
-      "requiredProperties": ["modelName", "modelType"],
+      "requiredProperties": [
+        "modelName",
+        "modelType"
+      ],
       "examples": [
         "Object detection CNN v2.3 (accuracy 96%)",
         "Lane segmentation model v1.8 (TensorFlow)"
@@ -813,7 +992,12 @@
         "contextType": {
           "type": "string",
           "description": "Context type",
-          "enum": ["local", "cloud", "hybrid", "ci"]
+          "enum": [
+            "local",
+            "cloud",
+            "hybrid",
+            "ci"
+          ]
         },
         "platform": {
           "type": "string",
@@ -824,7 +1008,9 @@
           "description": "Context-specific configuration"
         }
       },
-      "requiredProperties": ["contextType"],
+      "requiredProperties": [
+        "contextType"
+      ],
       "examples": [
         "Local development on Ubuntu 22.04",
         "Cloud execution on Kubernetes cluster"
@@ -846,7 +1032,9 @@
           "description": "Data schema"
         }
       },
-      "requiredProperties": ["representationType"],
+      "requiredProperties": [
+        "representationType"
+      ],
       "examples": [
         "Protobuf binary encoding with schema v2.0",
         "JSON representation with schema validation"
@@ -858,7 +1046,11 @@
         "metricCategory": {
           "type": "string",
           "description": "Metric category",
-          "enum": ["data_quality", "code_quality", "system_quality"]
+          "enum": [
+            "data_quality",
+            "code_quality",
+            "system_quality"
+          ]
         },
         "value": {
           "type": "number",
@@ -873,7 +1065,10 @@
           "description": "Threshold for acceptance"
         }
       },
-      "requiredProperties": ["metricCategory", "value"],
+      "requiredProperties": [
+        "metricCategory",
+        "value"
+      ],
       "examples": [
         "Code coverage: 85% (threshold 80%)",
         "Data completeness: 98% (threshold 95%)"
@@ -899,7 +1094,10 @@
           "description": "Artifact file path"
         }
       },
-      "requiredProperties": ["artifactType", "generatedBy"],
+      "requiredProperties": [
+        "artifactType",
+        "generatedBy"
+      ],
       "examples": [
         "KPI evaluation report generated by Python script",
         "Performance analysis dashboard generated by Grafana"

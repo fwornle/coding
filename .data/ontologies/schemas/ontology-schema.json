@@ -33,12 +33,23 @@
       "type": "string",
       "description": "Ontology description"
     },
+    "facets": {
+      "type": "array",
+      "description": "Facet names used to organize entities and relationships",
+      "items": {
+        "type": "string"
+      }
+    },
     "entities": {
       "type": "object",
       "description": "Entity class definitions",
       "patternProperties": {
         "^[A-Z][a-zA-Z0-9]*$": {
           "$ref": "#/definitions/EntityDefinition"
+        },
+        "^_comment_.*$": {
+          "type": "string",
+          "description": "Comment for organizing entity sections"
         }
       },
       "additionalProperties": false
@@ -49,6 +60,10 @@
       "patternProperties": {
         "^[a-z][a-zA-Z0-9_]*$": {
           "$ref": "#/definitions/RelationshipDefinition"
+        },
+        "^_comment_.*$": {
+          "type": "string",
+          "description": "Comment for organizing relationship sections"
         }
       },
       "additionalProperties": false
@@ -77,6 +92,10 @@
           "type": "string",
           "description": "Entity description",
           "minLength": 1
+        },
+        "facet": {
+          "type": "string",
+          "description": "Facet this entity belongs to"
         },
         "extendsEntity": {
           "type": "string",
@@ -122,6 +141,14 @@
           "description": "Property description",
           "minLength": 1
         },
+        "facet": {
+          "type": "string",
+          "description": "Facet this property is tagged with"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether this property is required"
+        },
         "enum": {
           "type": "array",
           "description": "Allowed values for enum types",
@@ -155,6 +182,13 @@
               "$ref": "#/definitions/PropertyDefinition"
             }
           ]
+        },
+        "examples": {
+          "type": "array",
+          "description": "Example values",
+          "items": {
+            "type": "string"
+          }
         },
         "properties": {
           "type": "object",
@@ -210,13 +244,23 @@
           "description": "Relationship description",
           "minLength": 1
         },
-        "sourceEntityClass": {
+        "facet": {
           "type": "string",
-          "description": "Source entity class"
+          "description": "Facet this relationship belongs to"
+        },
+        "sourceEntityClass": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "Source entity class or classes"
         },
         "targetEntityClass": {
-          "type": "string",
-          "description": "Target entity class"
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "Target entity class or classes"
         },
         "cardinality": {
           "type": "string",

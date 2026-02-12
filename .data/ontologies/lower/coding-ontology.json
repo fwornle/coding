@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "coding",
-  "extendsOntology": "development-knowledge",
+  "extendsOntology": "software-system-structure",
   "description": "Lower ontology for the coding infrastructure project, covering knowledge management, live session logging, constraint monitoring, trajectory generation, and MCP integrations",
   "entities": {
     "LSLSession": {
       "description": "A live session logging session with time-windowed conversation capture",
-      "extendsEntity": "AnalysisArtifact",
+      "extendsEntity": "File",
       "properties": {
         "sessionFile": {
           "type": "string",
@@ -51,7 +51,12 @@
           "description": "Number of conversation exchanges in session"
         }
       },
-      "requiredProperties": ["sessionFile", "timeWindow", "userHash", "sourceProject"],
+      "requiredProperties": [
+        "sessionFile",
+        "timeWindow",
+        "userHash",
+        "sourceProject"
+      ],
       "examples": [
         "2025-10-05_1400-1500_g9b30a.md",
         "2025-10-05_1400-1500_g9b30a_from-curriculum-alignment.md"
@@ -59,12 +64,18 @@
     },
     "ClassificationLayer": {
       "description": "A classification layer in the 5-layer LSL classification system",
-      "extendsEntity": "ModelComponent",
+      "extendsEntity": "Service",
       "properties": {
         "layerId": {
           "type": "string",
           "description": "Layer identifier",
-          "enum": ["session_filter", "path", "keyword", "embedding", "semantic"]
+          "enum": [
+            "session_filter",
+            "path",
+            "keyword",
+            "embedding",
+            "semantic"
+          ]
         },
         "layerNumber": {
           "type": "number",
@@ -87,7 +98,11 @@
           "description": "Implementation class name"
         }
       },
-      "requiredProperties": ["layerId", "layerNumber", "processingTime"],
+      "requiredProperties": [
+        "layerId",
+        "layerNumber",
+        "processingTime"
+      ],
       "examples": [
         "PathAnalyzer (Layer 1, <1ms, artifact checking)",
         "EmbeddingClassifier (Layer 3, <3ms, vector similarity)"
@@ -95,7 +110,7 @@
     },
     "ConstraintRule": {
       "description": "A coding constraint enforced via PreToolUse hooks",
-      "extendsEntity": "QualityMetric",
+      "extendsEntity": "Contract",
       "properties": {
         "constraintId": {
           "type": "string",
@@ -104,7 +119,12 @@
         "severity": {
           "type": "string",
           "description": "Enforcement severity level",
-          "enum": ["critical", "error", "warning", "info"]
+          "enum": [
+            "critical",
+            "error",
+            "warning",
+            "info"
+          ]
         },
         "pattern": {
           "type": "string",
@@ -113,7 +133,13 @@
         "category": {
           "type": "string",
           "description": "Constraint category",
-          "enum": ["security", "architecture", "code_quality", "plantuml", "documentation"]
+          "enum": [
+            "security",
+            "architecture",
+            "code_quality",
+            "plantuml",
+            "documentation"
+          ]
         },
         "blocking": {
           "type": "boolean",
@@ -128,7 +154,12 @@
           "description": "Test detection rate (0-1)"
         }
       },
-      "requiredProperties": ["constraintId", "severity", "pattern", "category"],
+      "requiredProperties": [
+        "constraintId",
+        "severity",
+        "pattern",
+        "category"
+      ],
       "examples": [
         "no-hardcoded-secrets (critical, security, -3.0 impact)",
         "no-parallel-files (critical, architecture, prevents v2/enhanced suffixes)"
@@ -136,12 +167,19 @@
     },
     "TrajectoryState": {
       "description": "Real-time development trajectory state during Claude Code session",
-      "extendsEntity": "AnalysisArtifact",
+      "extendsEntity": "File",
       "properties": {
         "state": {
           "type": "string",
           "description": "Current trajectory state",
-          "enum": ["exploring", "on_track", "off_track", "implementing", "verifying", "blocked"]
+          "enum": [
+            "exploring",
+            "on_track",
+            "off_track",
+            "implementing",
+            "verifying",
+            "blocked"
+          ]
         },
         "icon": {
           "type": "string",
@@ -164,15 +202,20 @@
           "description": "JSON file path for state persistence (.specstory/trajectory/live-state.json)"
         }
       },
-      "requiredProperties": ["state", "icon", "confidence", "timestamp"],
+      "requiredProperties": [
+        "state",
+        "icon",
+        "confidence",
+        "timestamp"
+      ],
       "examples": [
-        "🔍 EX (exploring, gathering information)",
-        "⚙️ IMP (implementing, active code modification)"
+        "\ud83d\udd0d EX (exploring, gathering information)",
+        "\u2699\ufe0f IMP (implementing, active code modification)"
       ]
     },
     "MCPAgent": {
       "description": "A specialized agent in the MCP Semantic Analysis Server",
-      "extendsEntity": "ModelComponent",
+      "extendsEntity": "Service",
       "properties": {
         "agentName": {
           "type": "string",
@@ -181,7 +224,12 @@
         "agentType": {
           "type": "string",
           "description": "Agent category",
-          "enum": ["orchestration", "analysis_no_llm", "llm_powered", "infrastructure"]
+          "enum": [
+            "orchestration",
+            "analysis_no_llm",
+            "llm_powered",
+            "infrastructure"
+          ]
         },
         "usesLLM": {
           "type": "boolean",
@@ -209,7 +257,11 @@
           }
         }
       },
-      "requiredProperties": ["agentName", "agentType", "usesLLM"],
+      "requiredProperties": [
+        "agentName",
+        "agentType",
+        "usesLLM"
+      ],
       "examples": [
         "CoordinatorAgent (orchestration, workflow coordination)",
         "SemanticAnalysisAgent (llm_powered, 3-tier LLM chain)"
@@ -217,7 +269,7 @@
     },
     "KnowledgeEntity": {
       "description": "A knowledge graph entity with observations in GraphDatabaseService",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "entityId": {
           "type": "string",
@@ -256,7 +308,11 @@
           "description": "Entity creation/update timestamp"
         }
       },
-      "requiredProperties": ["entityId", "entityType", "observations"],
+      "requiredProperties": [
+        "entityId",
+        "entityType",
+        "observations"
+      ],
       "examples": [
         "Entity: StreamingKnowledgeExtractor (entityType: system_component)",
         "Entity: LSL 5-layer Classification (entityType: analysis_system)"
@@ -264,12 +320,15 @@
     },
     "EmbeddingVector": {
       "description": "Vector embedding for semantic similarity search",
-      "extendsEntity": "DataRepresentation",
+      "extendsEntity": "File",
       "properties": {
         "dimensions": {
           "type": "number",
           "description": "Vector dimensionality",
-          "enum": ["384", "1536"]
+          "enum": [
+            "384",
+            "1536"
+          ]
         },
         "model": {
           "type": "string",
@@ -278,7 +337,10 @@
         "provider": {
           "type": "string",
           "description": "Embedding provider",
-          "enum": ["local_transformers", "openai"]
+          "enum": [
+            "local_transformers",
+            "openai"
+          ]
         },
         "contentHash": {
           "type": "string",
@@ -287,10 +349,18 @@
         "similarityMetric": {
           "type": "string",
           "description": "Similarity calculation method",
-          "enum": ["cosine", "euclidean", "dot_product"]
+          "enum": [
+            "cosine",
+            "euclidean",
+            "dot_product"
+          ]
         }
       },
-      "requiredProperties": ["dimensions", "model", "provider"],
+      "requiredProperties": [
+        "dimensions",
+        "model",
+        "provider"
+      ],
       "examples": [
         "384-dim local (Xenova/all-MiniLM-L6-v2, Transformers.js)",
         "1536-dim remote (text-embedding-3-small, OpenAI)"
@@ -298,12 +368,16 @@
     },
     "HookConfiguration": {
       "description": "Claude Code hook configuration for PreToolUse or PostToolUse",
-      "extendsEntity": "ConfigurationData",
+      "extendsEntity": "Config",
       "properties": {
         "hookType": {
           "type": "string",
           "description": "Hook execution timing",
-          "enum": ["PreToolUse", "PostToolUse", "PrePrompt"]
+          "enum": [
+            "PreToolUse",
+            "PostToolUse",
+            "PrePrompt"
+          ]
         },
         "matcher": {
           "type": "string",
@@ -320,10 +394,18 @@
         "purpose": {
           "type": "string",
           "description": "Hook purpose",
-          "enum": ["constraint_enforcement", "lsl_logging", "monitoring"]
+          "enum": [
+            "constraint_enforcement",
+            "lsl_logging",
+            "monitoring"
+          ]
         }
       },
-      "requiredProperties": ["hookType", "matcher", "command"],
+      "requiredProperties": [
+        "hookType",
+        "matcher",
+        "command"
+      ],
       "examples": [
         "PreToolUse: constraint enforcement (pre-tool-hook-wrapper.js)",
         "PostToolUse: LSL logging (tool-interaction-hook-wrapper.js)"
@@ -331,12 +413,17 @@
     },
     "MonitoringLayer": {
       "description": "A layer in the 4-layer LSL monitoring architecture",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "layerName": {
           "type": "string",
           "description": "Layer identifier",
-          "enum": ["system_watchdog", "global_coordinator", "monitoring_verifier", "service_health"]
+          "enum": [
+            "system_watchdog",
+            "global_coordinator",
+            "monitoring_verifier",
+            "service_health"
+          ]
         },
         "layerLevel": {
           "type": "number",
@@ -345,7 +432,12 @@
         "executionMode": {
           "type": "string",
           "description": "How layer runs",
-          "enum": ["launchd_service", "daemon", "session_startup", "self_monitoring"]
+          "enum": [
+            "launchd_service",
+            "daemon",
+            "session_startup",
+            "self_monitoring"
+          ]
         },
         "healthCheckInterval": {
           "type": "number",
@@ -356,7 +448,11 @@
           "description": "Whether layer can restart failed services"
         }
       },
-      "requiredProperties": ["layerName", "layerLevel", "executionMode"],
+      "requiredProperties": [
+        "layerName",
+        "layerLevel",
+        "executionMode"
+      ],
       "examples": [
         "System Watchdog (Layer 1, macOS launchd, ultimate failsafe)",
         "Global Service Coordinator (Layer 2, daemon, self-healing)"
@@ -364,7 +460,7 @@
     },
     "HealthFile": {
       "description": "Health monitoring file for service status tracking",
-      "extendsEntity": "ConfigurationData",
+      "extendsEntity": "Config",
       "properties": {
         "filePath": {
           "type": "string",
@@ -377,7 +473,12 @@
         "status": {
           "type": "string",
           "description": "Service status",
-          "enum": ["running", "stopped", "suspicious", "stale"]
+          "enum": [
+            "running",
+            "stopped",
+            "suspicious",
+            "stale"
+          ]
         },
         "metrics": {
           "type": "object",
@@ -392,7 +493,12 @@
           "description": "Suspicious activity detected"
         }
       },
-      "requiredProperties": ["filePath", "processId", "status", "lastUpdate"],
+      "requiredProperties": [
+        "filePath",
+        "processId",
+        "status",
+        "lastUpdate"
+      ],
       "examples": [
         ".transcript-monitor-health (enhanced-transcript-monitor)",
         "health check file for constraint monitor"
@@ -400,7 +506,7 @@
     },
     "ConfigurationFile": {
       "description": "JSON or YAML configuration file for system components",
-      "extendsEntity": "ConfigurationData",
+      "extendsEntity": "Config",
       "properties": {
         "configPath": {
           "type": "string",
@@ -409,7 +515,10 @@
         "format": {
           "type": "string",
           "description": "File format",
-          "enum": ["json", "yaml"]
+          "enum": [
+            "json",
+            "yaml"
+          ]
         },
         "component": {
           "type": "string",
@@ -424,7 +533,11 @@
           "description": "Whether config can be reloaded without restart"
         }
       },
-      "requiredProperties": ["configPath", "format", "component"],
+      "requiredProperties": [
+        "configPath",
+        "format",
+        "component"
+      ],
       "examples": [
         "config/live-logging-config.json (LSL system)",
         "constraints.yaml (constraint monitor, 18 rules)"
@@ -432,7 +545,7 @@
     },
     "RedactionPattern": {
       "description": "Security redaction pattern for sanitizing sensitive information",
-      "extendsEntity": "QualityMetric",
+      "extendsEntity": "Contract",
       "properties": {
         "patternId": {
           "type": "string",
@@ -449,7 +562,12 @@
         "severity": {
           "type": "string",
           "description": "Security severity",
-          "enum": ["low", "medium", "high", "critical"]
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
         },
         "enabled": {
           "type": "boolean",
@@ -458,10 +576,22 @@
         "redactionTarget": {
           "type": "string",
           "description": "What to redact",
-          "enum": ["api_keys", "passwords", "tokens", "connection_strings", "emails", "user_ids"]
+          "enum": [
+            "api_keys",
+            "passwords",
+            "tokens",
+            "connection_strings",
+            "emails",
+            "user_ids"
+          ]
         }
       },
-      "requiredProperties": ["patternId", "patternName", "regex", "severity"],
+      "requiredProperties": [
+        "patternId",
+        "patternName",
+        "regex",
+        "severity"
+      ],
       "examples": [
         "API keys (sk-, xai- prefixes, critical severity)",
         "Connection strings (MongoDB, PostgreSQL, MySQL, high severity)"
@@ -469,7 +599,7 @@
     },
     "ToolWrapper": {
       "description": "Bash command wrapper for tool execution",
-      "extendsEntity": "ExecutionContext",
+      "extendsEntity": "Process",
       "properties": {
         "wrapperPath": {
           "type": "string",
@@ -482,7 +612,12 @@
         "purpose": {
           "type": "string",
           "description": "Wrapper purpose",
-          "enum": ["security_check", "logging", "monitoring", "validation"]
+          "enum": [
+            "security_check",
+            "logging",
+            "monitoring",
+            "validation"
+          ]
         },
         "timeoutMs": {
           "type": "number",
@@ -493,7 +628,11 @@
           "description": "Exit code interpretation"
         }
       },
-      "requiredProperties": ["wrapperPath", "targetCommand", "purpose"],
+      "requiredProperties": [
+        "wrapperPath",
+        "targetCommand",
+        "purpose"
+      ],
       "examples": [
         "pre-tool-hook-wrapper.js (constraint checks, blocks on error)",
         "tool-interaction-hook-wrapper.js (LSL logging, non-blocking)"
@@ -501,7 +640,7 @@
     },
     "GraphDatabase": {
       "description": "Graphology + LevelDB persistent graph database",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "storagePath": {
           "type": "string",
@@ -528,14 +667,18 @@
           "description": "Auto-export interval in milliseconds (30s)"
         }
       },
-      "requiredProperties": ["storagePath", "graphEngine", "persistenceEngine"],
+      "requiredProperties": [
+        "storagePath",
+        "graphEngine",
+        "persistenceEngine"
+      ],
       "examples": [
         "GraphDatabaseService (.data/knowledge-graph/, Graphology + LevelDB)"
       ]
     },
     "VectorDatabase": {
       "description": "Qdrant vector database collection for semantic search",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "collectionName": {
           "type": "string",
@@ -548,7 +691,11 @@
         "distance": {
           "type": "string",
           "description": "Distance metric",
-          "enum": ["Cosine", "Euclidean", "Dot"]
+          "enum": [
+            "Cosine",
+            "Euclidean",
+            "Dot"
+          ]
         },
         "indexingAlgorithm": {
           "type": "string",
@@ -559,7 +706,11 @@
           "description": "Number of indexed vectors"
         }
       },
-      "requiredProperties": ["collectionName", "vectorDimension", "distance"],
+      "requiredProperties": [
+        "collectionName",
+        "vectorDimension",
+        "distance"
+      ],
       "examples": [
         "coding_repository (384-dim, Cosine, 183 files indexed)",
         "knowledge_embeddings (1536-dim, Cosine, semantic search)"
@@ -567,7 +718,7 @@
     },
     "WorkflowDefinition": {
       "description": "Multi-agent workflow coordination definition",
-      "extendsEntity": "ExecutionContext",
+      "extendsEntity": "Process",
       "properties": {
         "workflowName": {
           "type": "string",
@@ -590,14 +741,18 @@
           "description": "Coordinator that orchestrates agents"
         }
       },
-      "requiredProperties": ["workflowName", "steps", "agentOrchestration"],
+      "requiredProperties": [
+        "workflowName",
+        "steps",
+        "agentOrchestration"
+      ],
       "examples": [
-        "complete-analysis (GitHistory → VibeHistory → Semantic → WebSearch → Insights)"
+        "complete-analysis (GitHistory \u2192 VibeHistory \u2192 Semantic \u2192 WebSearch \u2192 Insights)"
       ]
     },
     "PlantUMLDiagram": {
       "description": "PlantUML architecture diagram with standardized styling",
-      "extendsEntity": "DocumentationAsset",
+      "extendsEntity": "File",
       "properties": {
         "pumlPath": {
           "type": "string",
@@ -610,7 +765,13 @@
         "diagramType": {
           "type": "string",
           "description": "Diagram type",
-          "enum": ["component", "sequence", "activity", "class", "deployment"]
+          "enum": [
+            "component",
+            "sequence",
+            "activity",
+            "class",
+            "deployment"
+          ]
         },
         "standardStyleIncluded": {
           "type": "boolean",
@@ -621,7 +782,11 @@
           "description": "Whether diagram is optimized for presentation (thicker lines, larger fonts)"
         }
       },
-      "requiredProperties": ["pumlPath", "pngPath", "diagramType"],
+      "requiredProperties": [
+        "pumlPath",
+        "pngPath",
+        "diagramType"
+      ],
       "examples": [
         "ontology-system-architecture.puml (component diagram)",
         "lsl-classification-flow.puml (sequence diagram)"
@@ -629,7 +794,7 @@
     },
     "ServiceRegistry": {
       "description": "Global service coordinator registry tracking",
-      "extendsEntity": "ConfigurationData",
+      "extendsEntity": "Config",
       "properties": {
         "registryPath": {
           "type": "string",
@@ -656,7 +821,11 @@
           "description": "Last health check timestamp"
         }
       },
-      "requiredProperties": ["registryPath", "coordinatorPid", "registeredProjects"],
+      "requiredProperties": [
+        "registryPath",
+        "coordinatorPid",
+        "registeredProjects"
+      ],
       "examples": [
         ".global-service-registry.json (coordinator PID, multi-project tracking)"
       ]
