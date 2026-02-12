@@ -1,0 +1,136 @@
+@startuml ontology-six-facet-structure
+!include _standard-style.puml
+
+top to bottom direction
+
+title Six-Facet Upper Ontology
+
+' === STRUCTURE FACET ===
+package "Structure" <<core>> {
+  entity "File" as file {
+    path : string
+    language : enum
+    purpose : string
+  }
+  entity "Service" as service {
+    serviceName : string
+    serviceType : enum
+    entryPoint : string
+  }
+  entity "Feature" as feature {
+    featureName : string
+    description : string
+  }
+
+  file -up-> service : part_of
+  service -up-> feature : part_of
+  service --> service : depends_on
+  service --> service : proxies_for
+}
+
+' === BEHAVIOR FACET ===
+package "Behavior" <<api>> {
+  entity "Contract" as contract {
+    contractName : string
+    inputs : array
+    outputs : array
+    protocol : enum
+    invariants : array
+  }
+}
+
+service --> contract : fulfills
+service ..> contract : depends_on_contract
+
+' === OPERATIONS FACET ===
+package "Operations" <<infra>> {
+  entity "RuntimeDiagnostics" as rtdiag {
+    channel : enum
+    path : string
+    format : enum
+  }
+  entity "StaticDiagnostics" as stdiag {
+    checkType : enum
+    command : string
+  }
+  entity "Port" as port {
+    portNumber : number
+    protocol : enum
+  }
+  entity "Config" as config {
+    configPath : string
+    format : enum
+    scope : enum
+  }
+  entity "Container" as container {
+    containerName : string
+    image : string
+  }
+  entity "Process" as process {
+    command : string
+    transport : enum
+  }
+}
+
+service --> rtdiag : diagnosed_by
+service --> stdiag : diagnosed_by
+service --> port : listens_on
+service ..> port : connects_to
+service --> config : configured_by
+service --> container : runs_in
+service --> process : spawns
+process --> rtdiag : logs_to
+
+' === RESILIENCE FACET ===
+package "Resilience" <<cli>> {
+  entity "Fault" as fault {
+    faultName : string
+    symptoms : string
+    rootCause : string
+    resolution : string
+    severity : enum
+  }
+  entity "Limitation" as limitation {
+    limitationName : string
+    category : enum
+    impact : string
+    severity : enum
+  }
+}
+
+fault --> service : affects
+fault --> rtdiag : revealed_by
+fault --> stdiag : prevented_by
+fault --> fault : caused_by
+service --> limitation : limited_by
+
+' === QUALITY FACET (properties only) ===
+note bottom of file
+  **Quality** (properties)
+  complexity: low/med/high
+  testCoverage: none/partial/full
+end note
+
+note bottom of service
+  **Quality** (properties)
+  maturity: prototype..sunset
+  architectureStyle: event-driven..batch
+  patterns: [proxy, circuit-breaker, ...]
+end note
+
+' === EVOLUTION FACET ===
+package "Evolution" <<agent>> {
+  entity "Revision" as revision {
+    revisionName : string
+    scope : enum
+    changeType : enum
+    status : enum
+  }
+}
+
+file --> revision : changed_in
+service --> revision : changed_in
+revision --> revision : precedes
+limitation --> revision : addressed_in
+
+@enduml

@@ -48,15 +48,18 @@ Two complementary approaches for capturing and visualizing development insights.
 
 ### Ontology Classification
 
-5 entity classes:
+13 entity types organized into a [six-facet upper ontology](ontology.md):
 
-| Class | Description |
-|-------|-------------|
-| ImplementationPattern | Code patterns and best practices |
-| ArchitecturalDecision | System design choices |
-| TechnicalSolution | Problem-solving approaches |
-| WorkflowPattern | Development process patterns |
-| ConfigurationPattern | Setup and configuration knowledge |
+| Facet | Entity Types | Question Answered |
+|-------|-------------|-------------------|
+| **Structure** | File, Service, Feature | What it IS |
+| **Behavior** | Contract | What it DOES |
+| **Operations** | RuntimeDiagnostics, StaticDiagnostics, Port, Config, Container, Process | How it RUNS |
+| **Resilience** | Fault, Limitation | What goes WRONG |
+| **Quality** | *(properties on Structure entities)* | How GOOD it is |
+| **Evolution** | Revision | How it CHANGED |
+
+Team-specific lower ontologies extend these with project-specific types (e.g., `LSLSession`, `MCPAgent`, `GraphDatabase`).
 
 ## Continuous Learning (Automatic)
 
