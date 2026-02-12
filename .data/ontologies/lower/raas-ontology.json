@@ -3,17 +3,22 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "RaaS",
-  "extendsOntology": "development-knowledge",
+  "extendsOntology": "software-system-structure",
   "description": "Lower ontology for RaaS (Reprocessing as a Service) team, covering cloud orchestration, Kubernetes, Argo Workflows, event-driven architecture, and monitoring",
   "entities": {
     "EventMeshNode": {
       "description": "Node in event-driven data mesh architecture",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "nodeType": {
           "type": "string",
           "description": "Node type in mesh",
-          "enum": ["producer", "consumer", "processor", "router"]
+          "enum": [
+            "producer",
+            "consumer",
+            "processor",
+            "router"
+          ]
         },
         "topics": {
           "type": "array",
@@ -28,7 +33,10 @@
           "description": "Auto-scaling configuration"
         }
       },
-      "requiredProperties": ["nodeType", "topics"],
+      "requiredProperties": [
+        "nodeType",
+        "topics"
+      ],
       "examples": [
         "Recording ingestion producer publishing to 'recordings-new' topic",
         "KPI evaluation consumer subscribing to 'reprocessing-complete' topic"
@@ -36,7 +44,7 @@
     },
     "DataContract": {
       "description": "Data contract between mesh nodes",
-      "extendsEntity": "ConfigurationData",
+      "extendsEntity": "Config",
       "properties": {
         "contractVersion": {
           "type": "string",
@@ -59,7 +67,12 @@
           "description": "SLA guarantees (latency, availability)"
         }
       },
-      "requiredProperties": ["contractVersion", "producer", "consumers", "schema"],
+      "requiredProperties": [
+        "contractVersion",
+        "producer",
+        "consumers",
+        "schema"
+      ],
       "examples": [
         "Reprocessing completion event contract v2.1",
         "Recording metadata update contract v1.5"
@@ -67,7 +80,7 @@
     },
     "SchemaRegistry": {
       "description": "Centralized schema registry for event definitions",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "registryUrl": {
           "type": "string",
@@ -80,10 +93,18 @@
         "compatibilityMode": {
           "type": "string",
           "description": "Schema evolution compatibility",
-          "enum": ["backward", "forward", "full", "none"]
+          "enum": [
+            "backward",
+            "forward",
+            "full",
+            "none"
+          ]
         }
       },
-      "requiredProperties": ["registryUrl", "compatibilityMode"],
+      "requiredProperties": [
+        "registryUrl",
+        "compatibilityMode"
+      ],
       "examples": [
         "Confluent Schema Registry at schema.raas.internal",
         "AWS Glue Schema Registry with backward compatibility"
@@ -115,7 +136,10 @@
           "unit": "seconds"
         }
       },
-      "requiredProperties": ["templateName", "dagSpec"],
+      "requiredProperties": [
+        "templateName",
+        "dagSpec"
+      ],
       "examples": [
         "Sensor fusion workflow template with 3-stage DAG",
         "Full ADAS validation template with 10 parallel RPUs"
@@ -123,7 +147,7 @@
     },
     "KubernetesCluster": {
       "description": "Kubernetes cluster for RPU execution",
-      "extendsEntity": "ExecutionContext",
+      "extendsEntity": "Process",
       "properties": {
         "clusterName": {
           "type": "string",
@@ -146,7 +170,11 @@
           "description": "Kubernetes version"
         }
       },
-      "requiredProperties": ["clusterName", "region", "nodeCount"],
+      "requiredProperties": [
+        "clusterName",
+        "region",
+        "nodeCount"
+      ],
       "examples": [
         "rpr-prod-eu-west-1 cluster with 50 c5.4xlarge nodes",
         "rpr-dev-us-east-1 cluster with 10 t3.large nodes"
@@ -181,7 +209,11 @@
           "description": "Pod tolerations"
         }
       },
-      "requiredProperties": ["podName", "namespace", "containers"],
+      "requiredProperties": [
+        "podName",
+        "namespace",
+        "containers"
+      ],
       "examples": [
         "aeb-rpu-v2.5 pod in namespace 'reprocessing' with 4 CPU, 8GB memory",
         "lane-keeping-rpu pod with GPU toleration"
@@ -189,7 +221,7 @@
     },
     "RDQFramework": {
       "description": "RaaS Data Quality validation framework",
-      "extendsEntity": "QualityMetric",
+      "extendsEntity": "Contract",
       "properties": {
         "qualityRules": {
           "type": "array",
@@ -198,7 +230,11 @@
         "validationMode": {
           "type": "string",
           "description": "Validation strictness",
-          "enum": ["strict", "warning", "permissive"]
+          "enum": [
+            "strict",
+            "warning",
+            "permissive"
+          ]
         },
         "qualityGates": {
           "type": "array",
@@ -209,7 +245,10 @@
           "description": "Auto-reject low quality data"
         }
       },
-      "requiredProperties": ["qualityRules", "validationMode"],
+      "requiredProperties": [
+        "qualityRules",
+        "validationMode"
+      ],
       "examples": [
         "Strict R-DQ with completeness > 95%, validity > 98%",
         "Permissive R-DQ with warning-only mode for exploratory data"
@@ -226,7 +265,11 @@
         "warmupStrategy": {
           "type": "string",
           "description": "Cache warmup approach",
-          "enum": ["eager", "lazy", "predictive"]
+          "enum": [
+            "eager",
+            "lazy",
+            "predictive"
+          ]
         },
         "invalidationRules": {
           "type": "array",
@@ -237,9 +280,11 @@
           "description": "Target cache hit rate"
         }
       },
-      "requiredProperties": ["cacheTiers"],
+      "requiredProperties": [
+        "cacheTiers"
+      ],
       "examples": [
-        "3-tier cache: memory (1GB) → Redis (10GB) → S3 (cold storage)",
+        "3-tier cache: memory (1GB) \u2192 Redis (10GB) \u2192 S3 (cold storage)",
         "Lazy warmup with 85% hit rate target"
       ]
     },
@@ -254,7 +299,12 @@
         "metricType": {
           "type": "string",
           "description": "Metric type",
-          "enum": ["counter", "gauge", "histogram", "summary"]
+          "enum": [
+            "counter",
+            "gauge",
+            "histogram",
+            "summary"
+          ]
         },
         "labels": {
           "type": "object",
@@ -266,7 +316,10 @@
           "unit": "seconds"
         }
       },
-      "requiredProperties": ["metricName", "metricType"],
+      "requiredProperties": [
+        "metricName",
+        "metricType"
+      ],
       "examples": [
         "rpu_execution_duration_seconds (histogram) with labels: rpu_type, cluster",
         "reprocessing_queue_length (gauge) scraped every 15s"
@@ -274,7 +327,7 @@
     },
     "GrafanaDashboard": {
       "description": "Grafana monitoring dashboard",
-      "extendsEntity": "AnalysisArtifact",
+      "extendsEntity": "File",
       "properties": {
         "dashboardName": {
           "type": "string",
@@ -294,7 +347,10 @@
           "unit": "seconds"
         }
       },
-      "requiredProperties": ["dashboardName", "dashboardUrl"],
+      "requiredProperties": [
+        "dashboardName",
+        "dashboardUrl"
+      ],
       "examples": [
         "RaaS Cluster Overview dashboard with 12 panels",
         "RPU Execution Metrics dashboard refreshing every 30s"
@@ -307,7 +363,12 @@
         "targetCostType": {
           "type": "string",
           "description": "Cost category to optimize",
-          "enum": ["compute", "storage", "network", "total"]
+          "enum": [
+            "compute",
+            "storage",
+            "network",
+            "total"
+          ]
         },
         "savingsTarget": {
           "type": "number",
@@ -318,7 +379,10 @@
           "description": "How rule is implemented"
         }
       },
-      "requiredProperties": ["targetCostType", "savingsTarget"],
+      "requiredProperties": [
+        "targetCostType",
+        "savingsTarget"
+      ],
       "examples": [
         "Scale down clusters during off-hours (30% compute savings)",
         "Use spot instances for non-critical RPUs (60% compute savings)"
@@ -326,7 +390,7 @@
     },
     "FinOpsReport": {
       "description": "Financial operations cost report",
-      "extendsEntity": "AnalysisArtifact",
+      "extendsEntity": "File",
       "properties": {
         "reportPeriod": {
           "type": "string",
@@ -350,7 +414,11 @@
           "description": "Cost optimization recommendations"
         }
       },
-      "requiredProperties": ["reportPeriod", "totalCost", "costByCategory"],
+      "requiredProperties": [
+        "reportPeriod",
+        "totalCost",
+        "costByCategory"
+      ],
       "examples": [
         "October 2024 FinOps report: $45,230 total (compute: $32k, storage: $10k, network: $3k)",
         "Q4 2024 forecast: $140k with 15% savings opportunity"
@@ -363,15 +431,27 @@
         "selectionAlgorithm": {
           "type": "string",
           "description": "How intervals were selected",
-          "enum": ["manual", "automated", "ml_based", "rule_based"]
+          "enum": [
+            "manual",
+            "automated",
+            "ml_based",
+            "rule_based"
+          ]
         },
         "priorityLevel": {
           "type": "string",
           "description": "Processing priority",
-          "enum": ["low", "normal", "high", "critical"]
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "critical"
+          ]
         }
       },
-      "requiredProperties": ["selectionAlgorithm"],
+      "requiredProperties": [
+        "selectionAlgorithm"
+      ],
       "examples": [
         "ML-based critical scenario selection (high priority)",
         "Manual interval selection for exploratory analysis (normal priority)"
@@ -379,12 +459,17 @@
     },
     "KPITrigger": {
       "description": "KPI evaluation trigger configuration",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "triggerType": {
           "type": "string",
           "description": "Trigger mechanism",
-          "enum": ["event_based", "scheduled", "manual", "conditional"]
+          "enum": [
+            "event_based",
+            "scheduled",
+            "manual",
+            "conditional"
+          ]
         },
         "eventSource": {
           "type": "string",
@@ -399,7 +484,9 @@
           "description": "Trigger condition expression"
         }
       },
-      "requiredProperties": ["triggerType"],
+      "requiredProperties": [
+        "triggerType"
+      ],
       "examples": [
         "Event-based trigger on 'reprocessing-complete' event",
         "Scheduled trigger: daily at 02:00 UTC (cron: 0 2 * * *)"
@@ -407,7 +494,7 @@
     },
     "AlertingRule": {
       "description": "Prometheus alerting rule",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "alertName": {
           "type": "string",
@@ -416,7 +503,12 @@
         "severity": {
           "type": "string",
           "description": "Alert severity",
-          "enum": ["info", "warning", "error", "critical"]
+          "enum": [
+            "info",
+            "warning",
+            "error",
+            "critical"
+          ]
         },
         "condition": {
           "type": "string",
@@ -432,7 +524,11 @@
           "description": "Notification channels (Slack, PagerDuty, email)"
         }
       },
-      "requiredProperties": ["alertName", "severity", "condition"],
+      "requiredProperties": [
+        "alertName",
+        "severity",
+        "condition"
+      ],
       "examples": [
         "HighRPUFailureRate (critical): failure_rate > 10% for 5 minutes",
         "ClusterCPUHigh (warning): cpu_utilization > 80% for 15 minutes"
@@ -456,7 +552,7 @@
     "monitors": {
       "description": "Prometheus metric monitors system component",
       "sourceEntityClass": "PrometheusMetric",
-      "targetEntityClass": "SystemComponent"
+      "targetEntityClass": "Service"
     },
     "visualizes": {
       "description": "Grafana dashboard visualizes metrics",

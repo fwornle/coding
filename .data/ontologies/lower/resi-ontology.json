@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "type": "lower",
   "team": "ReSi",
-  "extendsOntology": "development-knowledge",
+  "extendsOntology": "software-system-structure",
   "description": "Lower ontology for ReSi team, covering embedded C++ virtual target development, data format handling, function orchestration, and local development workflows",
   "entities": {
     "EmbeddedFunction": {
       "description": "C++ function implementation within virtual target",
-      "extendsEntity": "ModelComponent",
+      "extendsEntity": "Service",
       "properties": {
         "functionName": {
           "type": "string",
@@ -41,7 +41,11 @@
           "unit": "bytes"
         }
       },
-      "requiredProperties": ["functionName", "sourceFile", "signature"],
+      "requiredProperties": [
+        "functionName",
+        "sourceFile",
+        "signature"
+      ],
       "examples": [
         "AEB sensor fusion function in aeb_fusion.cpp",
         "Lane keeping control function in lka_controller.cpp"
@@ -49,7 +53,7 @@
     },
     "FunctionOrchestrator": {
       "description": "Orchestrates execution of embedded functions in virtual target",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "orchestratorId": {
           "type": "string",
@@ -62,20 +66,38 @@
         "schedulingPolicy": {
           "type": "string",
           "description": "Scheduling approach",
-          "enum": ["sequential", "parallel", "priority", "time_triggered"]
+          "enum": [
+            "sequential",
+            "parallel",
+            "priority",
+            "time_triggered"
+          ]
         },
         "clockSource": {
           "type": "string",
           "description": "Timing reference",
-          "enum": ["system_clock", "recorded_timestamps", "simulated_time"]
+          "enum": [
+            "system_clock",
+            "recorded_timestamps",
+            "simulated_time"
+          ]
         },
         "errorHandling": {
           "type": "string",
           "description": "Error handling strategy",
-          "enum": ["abort", "skip", "retry", "fallback"]
+          "enum": [
+            "abort",
+            "skip",
+            "retry",
+            "fallback"
+          ]
         }
       },
-      "requiredProperties": ["orchestratorId", "executionOrder", "schedulingPolicy"],
+      "requiredProperties": [
+        "orchestratorId",
+        "executionOrder",
+        "schedulingPolicy"
+      ],
       "examples": [
         "Sequential ADAS pipeline orchestrator with recorded timestamps",
         "Parallel sensor processing with priority scheduling"
@@ -83,7 +105,7 @@
     },
     "MF4Container": {
       "description": "MF4 file container for vehicle data",
-      "extendsEntity": "DataRepresentation",
+      "extendsEntity": "File",
       "properties": {
         "filePath": {
           "type": "string",
@@ -92,7 +114,11 @@
         "version": {
           "type": "string",
           "description": "MF4 format version",
-          "enum": ["4.0", "4.1", "4.2"]
+          "enum": [
+            "4.0",
+            "4.1",
+            "4.2"
+          ]
         },
         "channelCount": {
           "type": "number",
@@ -106,14 +132,22 @@
         "compression": {
           "type": "string",
           "description": "Compression algorithm",
-          "enum": ["none", "deflate", "zlib"]
+          "enum": [
+            "none",
+            "deflate",
+            "zlib"
+          ]
         },
         "attachments": {
           "type": "array",
           "description": "Embedded attachments"
         }
       },
-      "requiredProperties": ["filePath", "version", "channelCount"],
+      "requiredProperties": [
+        "filePath",
+        "version",
+        "channelCount"
+      ],
       "examples": [
         "MF4 4.2 file with 200 channels at 100Hz, deflate compression",
         "Uncompressed MF4 4.0 with 50 CAN channels"
@@ -121,7 +155,7 @@
     },
     "MCAPContainer": {
       "description": "MCAP file container for ROS bag data",
-      "extendsEntity": "DataRepresentation",
+      "extendsEntity": "File",
       "properties": {
         "filePath": {
           "type": "string",
@@ -142,15 +176,28 @@
         "compression": {
           "type": "string",
           "description": "Compression algorithm",
-          "enum": ["none", "lz4", "zstd"]
+          "enum": [
+            "none",
+            "lz4",
+            "zstd"
+          ]
         },
         "schemaFormat": {
           "type": "string",
           "description": "Message schema format",
-          "enum": ["protobuf", "json_schema", "ros1msg", "ros2msg"]
+          "enum": [
+            "protobuf",
+            "json_schema",
+            "ros1msg",
+            "ros2msg"
+          ]
         }
       },
-      "requiredProperties": ["filePath", "topicCount", "messageCount"],
+      "requiredProperties": [
+        "filePath",
+        "topicCount",
+        "messageCount"
+      ],
       "examples": [
         "MCAP with 15 Protobuf topics, LZ4 compression",
         "MCAP with ROS2 messages, Zstd compression"
@@ -158,7 +205,7 @@
     },
     "ProtobufSPP": {
       "description": "Protobuf/SPP payload format",
-      "extendsEntity": "DataRepresentation",
+      "extendsEntity": "File",
       "properties": {
         "schemaFile": {
           "type": "string",
@@ -175,14 +222,22 @@
         "serialization": {
           "type": "string",
           "description": "Serialization format",
-          "enum": ["binary", "json", "text"]
+          "enum": [
+            "binary",
+            "json",
+            "text"
+          ]
         },
         "sppVersion": {
           "type": "string",
           "description": "SPP envelope version"
         }
       },
-      "requiredProperties": ["schemaFile", "messageType", "serialization"],
+      "requiredProperties": [
+        "schemaFile",
+        "messageType",
+        "serialization"
+      ],
       "examples": [
         "SensorData.proto with binary serialization, SPP v2.0 envelope",
         "ADASOutput.proto with JSON serialization for debugging"
@@ -190,7 +245,7 @@
     },
     "KaitaiBinaryBlob": {
       "description": "Kaitai Struct binary blob definition",
-      "extendsEntity": "DataRepresentation",
+      "extendsEntity": "File",
       "properties": {
         "kaitaiSpec": {
           "type": "string",
@@ -207,7 +262,10 @@
         "endianness": {
           "type": "string",
           "description": "Byte order",
-          "enum": ["little", "big"]
+          "enum": [
+            "little",
+            "big"
+          ]
         },
         "fixedSize": {
           "type": "boolean",
@@ -219,7 +277,11 @@
           "unit": "bytes"
         }
       },
-      "requiredProperties": ["kaitaiSpec", "structName", "binaryFormat"],
+      "requiredProperties": [
+        "kaitaiSpec",
+        "structName",
+        "binaryFormat"
+      ],
       "examples": [
         "CAN frame Kaitai spec with 8-byte alignment, little-endian",
         "Ethernet packet Kaitai spec with variable size"
@@ -227,7 +289,7 @@
     },
     "MIPIStream": {
       "description": "MIPI camera stream data",
-      "extendsEntity": "DataRepresentation",
+      "extendsEntity": "File",
       "properties": {
         "cameraId": {
           "type": "string",
@@ -245,7 +307,12 @@
         "colorSpace": {
           "type": "string",
           "description": "Color encoding",
-          "enum": ["RGB", "YUV422", "YUV420", "RAW"]
+          "enum": [
+            "RGB",
+            "YUV422",
+            "YUV420",
+            "RAW"
+          ]
         },
         "bitDepth": {
           "type": "number",
@@ -256,7 +323,11 @@
           "description": "Number of MIPI lanes"
         }
       },
-      "requiredProperties": ["cameraId", "resolution", "frameRate"],
+      "requiredProperties": [
+        "cameraId",
+        "resolution",
+        "frameRate"
+      ],
       "examples": [
         "Front camera 1920x1080 @ 30fps, YUV422, 4 MIPI lanes",
         "Surround camera 1280x720 @ 60fps, RAW, 2 MIPI lanes"
@@ -264,7 +335,7 @@
     },
     "SOMEIPTrace": {
       "description": "SOME/IP communication trace",
-      "extendsEntity": "DataRepresentation",
+      "extendsEntity": "File",
       "properties": {
         "serviceId": {
           "type": "string",
@@ -277,12 +348,20 @@
         "messageType": {
           "type": "string",
           "description": "Message type",
-          "enum": ["REQUEST", "RESPONSE", "NOTIFICATION", "ERROR"]
+          "enum": [
+            "REQUEST",
+            "RESPONSE",
+            "NOTIFICATION",
+            "ERROR"
+          ]
         },
         "transportProtocol": {
           "type": "string",
           "description": "Transport layer",
-          "enum": ["UDP", "TCP"]
+          "enum": [
+            "UDP",
+            "TCP"
+          ]
         },
         "payload": {
           "type": "object",
@@ -294,7 +373,11 @@
           "unit": "microseconds"
         }
       },
-      "requiredProperties": ["serviceId", "methodId", "messageType"],
+      "requiredProperties": [
+        "serviceId",
+        "methodId",
+        "messageType"
+      ],
       "examples": [
         "ADAS service 0x1234 method 0x5678 REQUEST over TCP",
         "Sensor fusion NOTIFICATION event over UDP"
@@ -302,12 +385,17 @@
     },
     "FragmentationHandler": {
       "description": "Handles fragmented recorded data",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "fragmentStrategy": {
           "type": "string",
           "description": "Fragmentation approach",
-          "enum": ["time_based", "size_based", "event_based", "adaptive"]
+          "enum": [
+            "time_based",
+            "size_based",
+            "event_based",
+            "adaptive"
+          ]
         },
         "fragmentSize": {
           "type": "number",
@@ -317,23 +405,35 @@
         "reassemblyPolicy": {
           "type": "string",
           "description": "How fragments are reassembled",
-          "enum": ["on_demand", "eager", "lazy"]
+          "enum": [
+            "on_demand",
+            "eager",
+            "lazy"
+          ]
         },
         "overlapHandling": {
           "type": "string",
           "description": "Handling of overlapping fragments",
-          "enum": ["first_wins", "last_wins", "merge", "error"]
+          "enum": [
+            "first_wins",
+            "last_wins",
+            "merge",
+            "error"
+          ]
         }
       },
-      "requiredProperties": ["fragmentStrategy", "reassemblyPolicy"],
+      "requiredProperties": [
+        "fragmentStrategy",
+        "reassemblyPolicy"
+      ],
       "examples": [
         "Time-based fragmentation with 100MB fragments, on-demand reassembly",
         "Adaptive fragmentation with lazy reassembly, merge overlaps"
       ]
     },
     "FormatConverter": {
-      "description": "Converts between data formats (MF4 ↔ MCAP, Protobuf ↔ Binary)",
-      "extendsEntity": "SystemComponent",
+      "description": "Converts between data formats (MF4 \u2194 MCAP, Protobuf \u2194 Binary)",
+      "extendsEntity": "Service",
       "properties": {
         "sourceFormat": {
           "type": "string",
@@ -346,7 +446,11 @@
         "conversionMode": {
           "type": "string",
           "description": "Conversion approach",
-          "enum": ["lossless", "lossy_compression", "schema_translation"]
+          "enum": [
+            "lossless",
+            "lossy_compression",
+            "schema_translation"
+          ]
         },
         "mappingRules": {
           "type": "array",
@@ -357,7 +461,11 @@
           "description": "Validate after conversion"
         }
       },
-      "requiredProperties": ["sourceFormat", "targetFormat", "conversionMode"],
+      "requiredProperties": [
+        "sourceFormat",
+        "targetFormat",
+        "conversionMode"
+      ],
       "examples": [
         "MF4 to MCAP lossless converter with schema translation",
         "Protobuf to Kaitai binary converter with validation"
@@ -365,7 +473,7 @@
     },
     "TraceFileReader": {
       "description": "Reads trace files (MF4, MCAP) for virtual target",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "supportedFormats": {
           "type": "array",
@@ -374,7 +482,12 @@
         "readMode": {
           "type": "string",
           "description": "Reading strategy",
-          "enum": ["sequential", "random_access", "streaming", "memory_mapped"]
+          "enum": [
+            "sequential",
+            "random_access",
+            "streaming",
+            "memory_mapped"
+          ]
         },
         "bufferSize": {
           "type": "number",
@@ -384,14 +497,21 @@
         "decoding": {
           "type": "string",
           "description": "Payload decoding",
-          "enum": ["raw", "decoded", "selective"]
+          "enum": [
+            "raw",
+            "decoded",
+            "selective"
+          ]
         },
         "filtering": {
           "type": "object",
           "description": "Channel/topic filters"
         }
       },
-      "requiredProperties": ["supportedFormats", "readMode"],
+      "requiredProperties": [
+        "supportedFormats",
+        "readMode"
+      ],
       "examples": [
         "MF4/MCAP streaming reader with 50MB buffer, decoded payloads",
         "Memory-mapped MF4 reader with channel filtering"
@@ -399,7 +519,7 @@
     },
     "TraceFileWriter": {
       "description": "Writes trace files from virtual target output",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "outputFormat": {
           "type": "string",
@@ -408,12 +528,21 @@
         "writeMode": {
           "type": "string",
           "description": "Writing strategy",
-          "enum": ["buffered", "direct", "async"]
+          "enum": [
+            "buffered",
+            "direct",
+            "async"
+          ]
         },
         "compression": {
           "type": "string",
           "description": "Compression algorithm",
-          "enum": ["none", "deflate", "lz4", "zstd"]
+          "enum": [
+            "none",
+            "deflate",
+            "lz4",
+            "zstd"
+          ]
         },
         "bufferSize": {
           "type": "number",
@@ -423,7 +552,11 @@
         "encoding": {
           "type": "string",
           "description": "Payload encoding",
-          "enum": ["raw", "protobuf", "json"]
+          "enum": [
+            "raw",
+            "protobuf",
+            "json"
+          ]
         },
         "syncInterval": {
           "type": "number",
@@ -431,7 +564,10 @@
           "unit": "seconds"
         }
       },
-      "requiredProperties": ["outputFormat", "writeMode"],
+      "requiredProperties": [
+        "outputFormat",
+        "writeMode"
+      ],
       "examples": [
         "Async MF4 writer with deflate compression, 100MB buffer",
         "Direct MCAP writer with Protobuf encoding, 10s sync interval"
@@ -439,7 +575,7 @@
     },
     "LocalDevelopmentSetup": {
       "description": "Local development environment for virtual target",
-      "extendsEntity": "ExecutionContext",
+      "extendsEntity": "Process",
       "properties": {
         "developerId": {
           "type": "string",
@@ -456,19 +592,32 @@
         "buildSystem": {
           "type": "string",
           "description": "Build system",
-          "enum": ["CMake", "Make", "Bazel", "Meson"]
+          "enum": [
+            "CMake",
+            "Make",
+            "Bazel",
+            "Meson"
+          ]
         },
         "debugger": {
           "type": "string",
           "description": "Debugger tool",
-          "enum": ["gdb", "lldb", "Visual Studio"]
+          "enum": [
+            "gdb",
+            "lldb",
+            "Visual Studio"
+          ]
         },
         "ide": {
           "type": "string",
           "description": "IDE used"
         }
       },
-      "requiredProperties": ["developerId", "workspacePath", "compiler"],
+      "requiredProperties": [
+        "developerId",
+        "workspacePath",
+        "compiler"
+      ],
       "examples": [
         "Developer john-doe, clang++ with CMake and lldb",
         "Developer jane-smith, g++ with Bazel and gdb"
@@ -476,7 +625,7 @@
     },
     "CompilationProfile": {
       "description": "C++ compilation settings and flags",
-      "extendsEntity": "ConfigurationData",
+      "extendsEntity": "Config",
       "properties": {
         "profileName": {
           "type": "string",
@@ -485,12 +634,25 @@
         "optimizationLevel": {
           "type": "string",
           "description": "Compiler optimization",
-          "enum": ["O0", "O1", "O2", "O3", "Os", "Ofast"]
+          "enum": [
+            "O0",
+            "O1",
+            "O2",
+            "O3",
+            "Os",
+            "Ofast"
+          ]
         },
         "standard": {
           "type": "string",
           "description": "C++ standard",
-          "enum": ["c++11", "c++14", "c++17", "c++20", "c++23"]
+          "enum": [
+            "c++11",
+            "c++14",
+            "c++17",
+            "c++20",
+            "c++23"
+          ]
         },
         "warnings": {
           "type": "array",
@@ -509,7 +671,11 @@
           "description": "Linked libraries"
         }
       },
-      "requiredProperties": ["profileName", "optimizationLevel", "standard"],
+      "requiredProperties": [
+        "profileName",
+        "optimizationLevel",
+        "standard"
+      ],
       "examples": [
         "Debug profile: O0, c++17, all warnings, NDEBUG undefined",
         "Release profile: O3, c++20, Wall, NDEBUG defined"
@@ -517,7 +683,7 @@
     },
     "TimingModel": {
       "description": "Timing constraints and execution model for virtual target",
-      "extendsEntity": "ModelComponent",
+      "extendsEntity": "Service",
       "properties": {
         "modelName": {
           "type": "string",
@@ -544,18 +710,27 @@
         "deadlineHandling": {
           "type": "string",
           "description": "Deadline miss strategy",
-          "enum": ["abort", "warn", "skip", "continue"]
+          "enum": [
+            "abort",
+            "warn",
+            "skip",
+            "continue"
+          ]
         }
       },
-      "requiredProperties": ["modelName", "executionCycle", "taskSchedule"],
+      "requiredProperties": [
+        "modelName",
+        "executionCycle",
+        "taskSchedule"
+      ],
       "examples": [
-        "ADAS timing model: 10ms cycle, sensor fusion → control → output",
+        "ADAS timing model: 10ms cycle, sensor fusion \u2192 control \u2192 output",
         "Camera processing: 33ms cycle (30fps), 5ms jitter tolerance"
       ]
     },
     "HardwareAbstraction": {
       "description": "Hardware Abstraction Layer (HAL) for virtual target",
-      "extendsEntity": "SystemComponent",
+      "extendsEntity": "Service",
       "properties": {
         "halName": {
           "type": "string",
@@ -572,19 +747,31 @@
         "registerAccess": {
           "type": "string",
           "description": "Register access mode",
-          "enum": ["direct", "simulated", "mocked"]
+          "enum": [
+            "direct",
+            "simulated",
+            "mocked"
+          ]
         },
         "interruptHandling": {
           "type": "string",
           "description": "Interrupt simulation",
-          "enum": ["hardware", "software", "hybrid"]
+          "enum": [
+            "hardware",
+            "software",
+            "hybrid"
+          ]
         },
         "dmaSupport": {
           "type": "boolean",
           "description": "DMA simulation support"
         }
       },
-      "requiredProperties": ["halName", "ecuType", "peripherals"],
+      "requiredProperties": [
+        "halName",
+        "ecuType",
+        "peripherals"
+      ],
       "examples": [
         "ADAS ECU HAL with CAN, Ethernet, simulated registers, software interrupts",
         "Camera ECU HAL with MIPI, I2C, mocked registers, DMA support"
@@ -592,7 +779,7 @@
     },
     "SignalMapping": {
       "description": "Maps recorded signals to virtual target interfaces",
-      "extendsEntity": "ConfigurationData",
+      "extendsEntity": "Config",
       "properties": {
         "mappingName": {
           "type": "string",
@@ -613,15 +800,29 @@
         "synchronization": {
           "type": "string",
           "description": "Signal synchronization",
-          "enum": ["timestamp", "frame", "trigger", "none"]
+          "enum": [
+            "timestamp",
+            "frame",
+            "trigger",
+            "none"
+          ]
         },
         "interpolation": {
           "type": "string",
           "description": "Missing data interpolation",
-          "enum": ["none", "linear", "cubic", "zero_order_hold"]
+          "enum": [
+            "none",
+            "linear",
+            "cubic",
+            "zero_order_hold"
+          ]
         }
       },
-      "requiredProperties": ["mappingName", "sourceSignals", "targetInterfaces"],
+      "requiredProperties": [
+        "mappingName",
+        "sourceSignals",
+        "targetInterfaces"
+      ],
       "examples": [
         "Camera signal mapping with timestamp sync, linear interpolation",
         "CAN signal mapping with frame sync, scaling transformation"
@@ -629,7 +830,7 @@
     },
     "DebugConfiguration": {
       "description": "Debug settings for virtual target development",
-      "extendsEntity": "ConfigurationData",
+      "extendsEntity": "Config",
       "properties": {
         "configName": {
           "type": "string",
@@ -638,7 +839,12 @@
         "debugLevel": {
           "type": "string",
           "description": "Debug verbosity",
-          "enum": ["minimal", "normal", "verbose", "trace"]
+          "enum": [
+            "minimal",
+            "normal",
+            "verbose",
+            "trace"
+          ]
         },
         "breakpoints": {
           "type": "array",
@@ -659,10 +865,19 @@
         "loggingLevel": {
           "type": "string",
           "description": "Log verbosity",
-          "enum": ["ERROR", "WARN", "INFO", "DEBUG", "TRACE"]
+          "enum": [
+            "ERROR",
+            "WARN",
+            "INFO",
+            "DEBUG",
+            "TRACE"
+          ]
         }
       },
-      "requiredProperties": ["configName", "debugLevel"],
+      "requiredProperties": [
+        "configName",
+        "debugLevel"
+      ],
       "examples": [
         "Debug config: verbose, 10 breakpoints, watch all sensor inputs",
         "Release config: minimal debug, error logging only"
@@ -693,7 +908,7 @@
     "converts": {
       "description": "Format converter transforms data representation",
       "sourceEntityClass": "FormatConverter",
-      "targetEntityClass": "DataRepresentation"
+      "targetEntityClass": "File"
     },
     "abstracts": {
       "description": "HAL abstracts hardware for virtual target",

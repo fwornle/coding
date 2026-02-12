@@ -38,6 +38,12 @@ export interface PropertyDefinition {
   /** Human-readable description */
   description?: string;
 
+  /** Facet this property is tagged with */
+  facet?: string;
+
+  /** Whether this property is required (inline marker) */
+  required?: boolean;
+
   /** Allowed values for enum types */
   enum?: string[];
 
@@ -55,6 +61,9 @@ export interface PropertyDefinition {
 
   /** For array types: item type definition */
   items?: string | PropertyDefinition;
+
+  /** Example values */
+  examples?: string[];
 
   /** For object types: nested properties */
   properties?: Record<string, PropertyDefinition>;
@@ -78,11 +87,14 @@ export interface RelationshipDefinition {
   /** Relationship description */
   description: string;
 
-  /** Source entity class */
-  sourceEntityClass: string;
+  /** Facet this relationship belongs to */
+  facet?: string;
 
-  /** Target entity class */
-  targetEntityClass: string;
+  /** Source entity class (single or array for multi-source relationships) */
+  sourceEntityClass: string | string[];
+
+  /** Target entity class (single or array for multi-target relationships) */
+  targetEntityClass: string | string[];
 
   /** Relationship cardinality */
   cardinality?: Cardinality;
@@ -97,6 +109,9 @@ export interface RelationshipDefinition {
 export interface EntityDefinition {
   /** Entity class description */
   description: string;
+
+  /** Facet this entity belongs to */
+  facet?: string;
 
   /** Upper ontology entity this extends (for lower ontologies) */
   extendsEntity?: string;
@@ -132,6 +147,9 @@ export interface OntologyMetadata {
 
   /** Ontology description */
   description?: string;
+
+  /** Facet names used to organize entities and relationships */
+  facets?: string[];
 }
 
 /**

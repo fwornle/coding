@@ -359,27 +359,27 @@ export class OntologyManager {
   getAllEntityClasses(team?: string): string[] {
     const entityClasses = new Set<string>();
 
-    // Add upper ontology entities
+    // Add upper ontology entities (skip _comment_ keys)
     if (this.upperOntology) {
-      Object.keys(this.upperOntology.entities).forEach((cls) =>
-        entityClasses.add(cls)
-      );
+      Object.keys(this.upperOntology.entities)
+        .filter((k) => !k.startsWith('_comment_'))
+        .forEach((cls) => entityClasses.add(cls));
     }
 
     // Add team-specific lower ontology entities
     if (team) {
       const lowerOntology = this.lowerOntologies.get(team);
       if (lowerOntology) {
-        Object.keys(lowerOntology.entities).forEach((cls) =>
-          entityClasses.add(cls)
-        );
+        Object.keys(lowerOntology.entities)
+          .filter((k) => !k.startsWith('_comment_'))
+          .forEach((cls) => entityClasses.add(cls));
       }
     } else {
       // Add all lower ontology entities
       for (const lowerOntology of this.lowerOntologies.values()) {
-        Object.keys(lowerOntology.entities).forEach((cls) =>
-          entityClasses.add(cls)
-        );
+        Object.keys(lowerOntology.entities)
+          .filter((k) => !k.startsWith('_comment_'))
+          .forEach((cls) => entityClasses.add(cls));
       }
     }
 
@@ -392,22 +392,28 @@ export class OntologyManager {
   getAllRelationships(team?: string): Record<string, RelationshipDefinition> {
     const relationships: Record<string, RelationshipDefinition> = {};
 
-    // Add upper ontology relationships
+    // Add upper ontology relationships (skip _comment_ keys)
     if (this.upperOntology?.relationships) {
-      Object.assign(relationships, this.upperOntology.relationships);
+      for (const [key, val] of Object.entries(this.upperOntology.relationships)) {
+        if (!key.startsWith('_comment_')) relationships[key] = val as RelationshipDefinition;
+      }
     }
 
     // Add team-specific lower ontology relationships
     if (team) {
       const lowerOntology = this.lowerOntologies.get(team);
       if (lowerOntology?.relationships) {
-        Object.assign(relationships, lowerOntology.relationships);
+        for (const [key, val] of Object.entries(lowerOntology.relationships)) {
+          if (!key.startsWith('_comment_')) relationships[key] = val as RelationshipDefinition;
+        }
       }
     } else {
       // Add all lower ontology relationships
       for (const lowerOntology of this.lowerOntologies.values()) {
         if (lowerOntology.relationships) {
-          Object.assign(relationships, lowerOntology.relationships);
+          for (const [key, val] of Object.entries(lowerOntology.relationships)) {
+            if (!key.startsWith('_comment_')) relationships[key] = val as RelationshipDefinition;
+          }
         }
       }
     }
@@ -430,10 +436,14 @@ export class OntologyManager {
     }> = [];
 
     for (const [name, rel] of Object.entries(allRelationships)) {
-      if (rel.sourceEntityClass === entityClass) {
+      const sourceClasses = Array.isArray(rel.sourceEntityClass)
+        ? rel.sourceEntityClass : [rel.sourceEntityClass];
+      const targetClasses = Array.isArray(rel.targetEntityClass)
+        ? rel.targetEntityClass : [rel.targetEntityClass];
+      if (sourceClasses.includes(entityClass)) {
         entityRelationships.push({ name, definition: rel, direction: 'source' });
       }
-      if (rel.targetEntityClass === entityClass) {
+      if (targetClasses.includes(entityClass)) {
         entityRelationships.push({ name, definition: rel, direction: 'target' });
       }
     }
@@ -452,18 +462,18 @@ export class OntologyManager {
     teams: string[];
   } {
     const upperEntities = this.upperOntology
-      ? Object.keys(this.upperOntology.entities).length
+      ? Object.keys(this.upperOntology.entities).filter((k) => !k.startsWith('_comment_')).length
       : 0;
 
     let lowerEntities = 0;
     if (team) {
       const lowerOntology = this.lowerOntologies.get(team);
       lowerEntities = lowerOntology
-        ? Object.keys(lowerOntology.entities).length
+        ? Object.keys(lowerOntology.entities).filter((k) => !k.startsWith('_comment_')).length
         : 0;
     } else {
       for (const lowerOntology of this.lowerOntologies.values()) {
-        lowerEntities += Object.keys(lowerOntology.entities).length;
+        lowerEntities += Object.keys(lowerOntology.entities).filter((k) => !k.startsWith('_comment_')).length;
       }
     }
 

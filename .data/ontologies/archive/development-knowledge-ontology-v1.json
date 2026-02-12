@@ -1,0 +1,690 @@
+{
+  "name": "Development Knowledge Ontology",
+  "version": "1.0.0",
+  "type": "upper",
+  "description": "Generic upper ontology for development knowledge management, providing abstract base classes for patterns, insights, decisions, workflows, and system components that all team-specific ontologies extend",
+  "entities": {
+    "Pattern": {
+      "description": "A reusable solution to a commonly occurring problem in software development",
+      "properties": {
+        "patternName": {
+          "type": "string",
+          "description": "Unique identifier for the pattern"
+        },
+        "category": {
+          "type": "string",
+          "description": "Pattern category",
+          "enum": ["coding", "architectural", "integration", "testing", "deployment", "refactoring", "optimization"]
+        },
+        "problemContext": {
+          "type": "string",
+          "description": "The problem or situation this pattern addresses"
+        },
+        "solution": {
+          "type": "string",
+          "description": "The pattern's solution approach"
+        },
+        "consequences": {
+          "type": "array",
+          "description": "Trade-offs and consequences of applying the pattern",
+          "items": {
+            "type": "string",
+            "description": "Consequence description"
+          }
+        },
+        "applicability": {
+          "type": "array",
+          "description": "Conditions under which this pattern applies",
+          "items": {
+            "type": "string",
+            "description": "Applicability condition"
+          }
+        }
+      },
+      "requiredProperties": ["patternName", "category", "problemContext", "solution"],
+      "examples": [
+        "Repository Pattern for data access abstraction",
+        "Event Sourcing Pattern for audit trail"
+      ]
+    },
+    "Insight": {
+      "description": "An observation, learning, or understanding derived from analysis or experience",
+      "properties": {
+        "insightType": {
+          "type": "string",
+          "description": "Type of insight",
+          "enum": ["observation", "learning", "discovery", "hypothesis", "conclusion"]
+        },
+        "context": {
+          "type": "string",
+          "description": "Context in which the insight was derived"
+        },
+        "evidence": {
+          "type": "array",
+          "description": "Evidence supporting this insight",
+          "items": {
+            "type": "string",
+            "description": "Evidence item"
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "description": "Confidence level in the insight (0-1)",
+          "min": 0,
+          "max": 1
+        },
+        "actionable": {
+          "type": "boolean",
+          "description": "Whether this insight leads to actionable recommendations"
+        }
+      },
+      "requiredProperties": ["insightType", "context"],
+      "examples": [
+        "Performance bottleneck identified in database queries",
+        "Security vulnerability pattern discovered"
+      ]
+    },
+    "Decision": {
+      "description": "An architectural or design decision with rationale and alternatives considered",
+      "properties": {
+        "decisionId": {
+          "type": "string",
+          "description": "Unique decision identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Decision status",
+          "enum": ["proposed", "accepted", "deprecated", "superseded"]
+        },
+        "context": {
+          "type": "string",
+          "description": "Context and forces driving the decision"
+        },
+        "decisionMade": {
+          "type": "string",
+          "description": "The decision that was made"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Reasoning behind the decision"
+        },
+        "alternatives": {
+          "type": "array",
+          "description": "Alternatives considered",
+          "items": {
+            "type": "object",
+            "description": "Alternative option with pros/cons",
+            "properties": {
+              "option": {
+                "type": "string",
+                "description": "Alternative option"
+              },
+              "pros": {
+                "type": "string",
+                "description": "Pros of this option"
+              },
+              "cons": {
+                "type": "string",
+                "description": "Cons of this option"
+              }
+            }
+          }
+        },
+        "consequences": {
+          "type": "array",
+          "description": "Known consequences of the decision",
+          "items": {
+            "type": "string",
+            "description": "Consequence"
+          }
+        }
+      },
+      "requiredProperties": ["decisionId", "status", "context", "decisionMade", "rationale"],
+      "examples": [
+        "ADR-001: Use GraphDB for knowledge storage",
+        "ADR-002: Adopt event-driven architecture"
+      ]
+    },
+    "Workflow": {
+      "description": "A defined sequence of steps or process for accomplishing a task",
+      "properties": {
+        "workflowName": {
+          "type": "string",
+          "description": "Workflow identifier"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "What this workflow accomplishes"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Ordered list of workflow steps",
+          "items": {
+            "type": "object",
+            "description": "Workflow step",
+            "properties": {
+              "stepId": {
+                "type": "string",
+                "description": "Step identifier"
+              },
+              "action": {
+                "type": "string",
+                "description": "Action to perform"
+              },
+              "dependencies": {
+                "type": "array",
+                "description": "Dependencies on other steps",
+                "items": {
+                  "type": "string",
+                  "description": "Step ID"
+                }
+              }
+            }
+          }
+        },
+        "triggers": {
+          "type": "array",
+          "description": "Events or conditions that trigger this workflow",
+          "items": {
+            "type": "string",
+            "description": "Trigger condition"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "description": "Expected outputs of the workflow",
+          "items": {
+            "type": "string",
+            "description": "Output description"
+          }
+        }
+      },
+      "requiredProperties": ["workflowName", "purpose", "steps"],
+      "examples": [
+        "Incremental Analysis Workflow",
+        "Entity Refresh Workflow"
+      ]
+    },
+    "SystemComponent": {
+      "description": "A software component or service within a system",
+      "properties": {
+        "componentName": {
+          "type": "string",
+          "description": "Component identifier"
+        },
+        "componentType": {
+          "type": "string",
+          "description": "Type of component",
+          "enum": ["service", "library", "agent", "database", "api", "ui", "infrastructure"]
+        },
+        "responsibilities": {
+          "type": "array",
+          "description": "What this component is responsible for",
+          "items": {
+            "type": "string",
+            "description": "Responsibility"
+          }
+        },
+        "interfaces": {
+          "type": "array",
+          "description": "Interfaces exposed by this component",
+          "items": {
+            "type": "string",
+            "description": "Interface description"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "Other components this depends on",
+          "items": {
+            "type": "string",
+            "description": "Dependency name"
+          }
+        }
+      },
+      "requiredProperties": ["componentName", "componentType"],
+      "examples": [
+        "GraphDatabaseService (database, knowledge storage)",
+        "CoordinatorAgent (agent, workflow orchestration)"
+      ]
+    },
+    "ModelComponent": {
+      "description": "A component that represents a domain model or processing unit",
+      "properties": {
+        "modelName": {
+          "type": "string",
+          "description": "Model identifier"
+        },
+        "modelType": {
+          "type": "string",
+          "description": "Type of model",
+          "enum": ["domain", "processing", "classification", "embedding", "validation"]
+        },
+        "inputs": {
+          "type": "array",
+          "description": "Input requirements",
+          "items": {
+            "type": "string",
+            "description": "Input description"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "description": "Output specifications",
+          "items": {
+            "type": "string",
+            "description": "Output description"
+          }
+        },
+        "accuracy": {
+          "type": "number",
+          "description": "Model accuracy or performance metric (0-1)",
+          "min": 0,
+          "max": 1
+        }
+      },
+      "requiredProperties": ["modelName", "modelType"],
+      "examples": [
+        "EmbeddingClassifier (classification model)",
+        "OntologyClassifier (classification model)"
+      ]
+    },
+    "ConfigurationData": {
+      "description": "Configuration settings or parameters for system components",
+      "properties": {
+        "configName": {
+          "type": "string",
+          "description": "Configuration identifier"
+        },
+        "configPath": {
+          "type": "string",
+          "description": "File path or key path"
+        },
+        "format": {
+          "type": "string",
+          "description": "Configuration format",
+          "enum": ["json", "yaml", "env", "toml"]
+        },
+        "schema": {
+          "type": "string",
+          "description": "Schema or validation specification"
+        },
+        "reloadable": {
+          "type": "boolean",
+          "description": "Whether config can be reloaded at runtime"
+        },
+        "sensitive": {
+          "type": "boolean",
+          "description": "Whether config contains sensitive data"
+        }
+      },
+      "requiredProperties": ["configName", "format"],
+      "examples": [
+        "ontology-config.json (ontology settings)",
+        "constraints.yaml (constraint definitions)"
+      ]
+    },
+    "DataRepresentation": {
+      "description": "A data structure, format, or encoding",
+      "properties": {
+        "dataName": {
+          "type": "string",
+          "description": "Data representation identifier"
+        },
+        "format": {
+          "type": "string",
+          "description": "Data format",
+          "enum": ["json", "binary", "vector", "graph", "table", "tree"]
+        },
+        "schema": {
+          "type": "string",
+          "description": "Schema definition"
+        },
+        "storage": {
+          "type": "string",
+          "description": "Where data is stored"
+        },
+        "serialization": {
+          "type": "string",
+          "description": "Serialization method"
+        }
+      },
+      "requiredProperties": ["dataName", "format"],
+      "examples": [
+        "EmbeddingVector (384-dim float array)",
+        "KnowledgeGraph (Graphology structure)"
+      ]
+    },
+    "AnalysisArtifact": {
+      "description": "An artifact produced by analysis or processing",
+      "properties": {
+        "artifactName": {
+          "type": "string",
+          "description": "Artifact identifier"
+        },
+        "artifactType": {
+          "type": "string",
+          "description": "Type of artifact",
+          "enum": ["report", "log", "metric", "snapshot", "export", "checkpoint"]
+        },
+        "source": {
+          "type": "string",
+          "description": "What produced this artifact"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "When artifact was created"
+        },
+        "retention": {
+          "type": "string",
+          "description": "How long to keep this artifact"
+        }
+      },
+      "requiredProperties": ["artifactName", "artifactType", "source"],
+      "examples": [
+        "Session Log (LSL markdown file)",
+        "Analysis Checkpoint (incremental analysis state)"
+      ]
+    },
+    "DocumentationAsset": {
+      "description": "Documentation, diagrams, or explanatory content",
+      "properties": {
+        "assetName": {
+          "type": "string",
+          "description": "Asset identifier"
+        },
+        "assetType": {
+          "type": "string",
+          "description": "Type of documentation",
+          "enum": ["markdown", "diagram", "api_doc", "tutorial", "reference", "readme"]
+        },
+        "path": {
+          "type": "string",
+          "description": "File path"
+        },
+        "format": {
+          "type": "string",
+          "description": "File format",
+          "enum": ["md", "puml", "mermaid", "openapi", "html"]
+        },
+        "audience": {
+          "type": "string",
+          "description": "Target audience",
+          "enum": ["developer", "user", "admin", "all"]
+        }
+      },
+      "requiredProperties": ["assetName", "assetType", "path"],
+      "examples": [
+        "Architecture Diagram (PlantUML)",
+        "API Reference (OpenAPI spec)"
+      ]
+    },
+    "ExecutionContext": {
+      "description": "Runtime environment or execution context",
+      "properties": {
+        "contextName": {
+          "type": "string",
+          "description": "Context identifier"
+        },
+        "contextType": {
+          "type": "string",
+          "description": "Type of execution context",
+          "enum": ["process", "container", "session", "transaction", "workflow"]
+        },
+        "state": {
+          "type": "string",
+          "description": "Current state",
+          "enum": ["idle", "running", "paused", "completed", "failed"]
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource allocation",
+          "properties": {
+            "memory": {
+              "type": "string",
+              "description": "Memory allocation"
+            },
+            "cpu": {
+              "type": "string",
+              "description": "CPU allocation"
+            }
+          }
+        },
+        "timeout": {
+          "type": "number",
+          "description": "Execution timeout in milliseconds"
+        }
+      },
+      "requiredProperties": ["contextName", "contextType"],
+      "examples": [
+        "Workflow Execution Context",
+        "MCP Tool Execution Context"
+      ]
+    },
+    "QualityMetric": {
+      "description": "A measurable quality or performance indicator",
+      "properties": {
+        "metricName": {
+          "type": "string",
+          "description": "Metric identifier"
+        },
+        "metricType": {
+          "type": "string",
+          "description": "Type of metric",
+          "enum": ["performance", "quality", "accuracy", "coverage", "compliance", "health"]
+        },
+        "value": {
+          "type": "number",
+          "description": "Current metric value"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement"
+        },
+        "threshold": {
+          "type": "object",
+          "description": "Threshold definitions",
+          "properties": {
+            "warning": {
+              "type": "number",
+              "description": "Warning threshold"
+            },
+            "critical": {
+              "type": "number",
+              "description": "Critical threshold"
+            }
+          }
+        },
+        "trend": {
+          "type": "string",
+          "description": "Trend direction",
+          "enum": ["improving", "stable", "degrading"]
+        }
+      },
+      "requiredProperties": ["metricName", "metricType"],
+      "examples": [
+        "Classification Accuracy (0.95)",
+        "Response Time (< 100ms)"
+      ]
+    },
+    "Constraint": {
+      "description": "A rule or constraint that must be satisfied",
+      "properties": {
+        "constraintName": {
+          "type": "string",
+          "description": "Constraint identifier"
+        },
+        "constraintType": {
+          "type": "string",
+          "description": "Type of constraint",
+          "enum": ["validation", "security", "architecture", "style", "semantic"]
+        },
+        "severity": {
+          "type": "string",
+          "description": "Violation severity",
+          "enum": ["info", "warning", "error", "critical"]
+        },
+        "rule": {
+          "type": "string",
+          "description": "The constraint rule definition"
+        },
+        "enforcement": {
+          "type": "string",
+          "description": "How the constraint is enforced",
+          "enum": ["blocking", "warning", "logging"]
+        }
+      },
+      "requiredProperties": ["constraintName", "constraintType", "severity", "rule"],
+      "examples": [
+        "No hardcoded secrets (critical, blocking)",
+        "Max function length (warning)"
+      ]
+    },
+    "Integration": {
+      "description": "An integration point between systems or components",
+      "properties": {
+        "integrationName": {
+          "type": "string",
+          "description": "Integration identifier"
+        },
+        "integrationType": {
+          "type": "string",
+          "description": "Type of integration",
+          "enum": ["api", "event", "file", "database", "message_queue"]
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Communication protocol",
+          "enum": ["rest", "grpc", "websocket", "sse", "file_watch"]
+        },
+        "source": {
+          "type": "string",
+          "description": "Source system"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target system"
+        },
+        "dataFormat": {
+          "type": "string",
+          "description": "Data format exchanged"
+        }
+      },
+      "requiredProperties": ["integrationName", "integrationType", "source", "target"],
+      "examples": [
+        "MCP Tool Integration (rest API)",
+        "Graph Database Sync (event-driven)"
+      ]
+    }
+  },
+  "relationships": {
+    "extends": {
+      "description": "One entity extends or inherits from another",
+      "sourceEntityClass": "Pattern",
+      "targetEntityClass": "Pattern",
+      "cardinality": "many-to-one",
+      "properties": {
+        "inheritedProperties": "array"
+      }
+    },
+    "implements": {
+      "description": "A component implements a pattern or interface",
+      "sourceEntityClass": "SystemComponent",
+      "targetEntityClass": "Pattern",
+      "cardinality": "many-to-many",
+      "properties": {
+        "conformance": "string"
+      }
+    },
+    "depends_on": {
+      "description": "One entity depends on another",
+      "sourceEntityClass": "SystemComponent",
+      "targetEntityClass": "SystemComponent",
+      "cardinality": "many-to-many",
+      "properties": {
+        "dependencyType": "string"
+      }
+    },
+    "produces": {
+      "description": "A component or workflow produces an artifact",
+      "sourceEntityClass": "Workflow",
+      "targetEntityClass": "AnalysisArtifact",
+      "cardinality": "one-to-many",
+      "properties": {
+        "frequency": "string"
+      }
+    },
+    "consumes": {
+      "description": "A component consumes data from another",
+      "sourceEntityClass": "SystemComponent",
+      "targetEntityClass": "DataRepresentation",
+      "cardinality": "many-to-many",
+      "properties": {
+        "format": "string"
+      }
+    },
+    "validates_against": {
+      "description": "An entity is validated against a constraint or schema",
+      "sourceEntityClass": "DataRepresentation",
+      "targetEntityClass": "Constraint",
+      "cardinality": "many-to-many",
+      "properties": {
+        "validationMode": "string"
+      }
+    },
+    "documents": {
+      "description": "Documentation describes a component or pattern",
+      "sourceEntityClass": "DocumentationAsset",
+      "targetEntityClass": "SystemComponent",
+      "cardinality": "many-to-many",
+      "properties": {
+        "coverage": "string"
+      }
+    },
+    "measures": {
+      "description": "A metric measures an aspect of a component",
+      "sourceEntityClass": "QualityMetric",
+      "targetEntityClass": "SystemComponent",
+      "cardinality": "many-to-one",
+      "properties": {
+        "sampleRate": "string"
+      }
+    },
+    "informs": {
+      "description": "An insight informs a decision",
+      "sourceEntityClass": "Insight",
+      "targetEntityClass": "Decision",
+      "cardinality": "many-to-many",
+      "properties": {
+        "weight": "number"
+      }
+    },
+    "supersedes": {
+      "description": "One decision supersedes another",
+      "sourceEntityClass": "Decision",
+      "targetEntityClass": "Decision",
+      "cardinality": "one-to-one",
+      "properties": {
+        "reason": "string"
+      }
+    },
+    "integrates_with": {
+      "description": "A component integrates with another via an integration point",
+      "sourceEntityClass": "SystemComponent",
+      "targetEntityClass": "Integration",
+      "cardinality": "many-to-many",
+      "properties": {
+        "direction": "string"
+      }
+    },
+    "orchestrates": {
+      "description": "A workflow orchestrates components",
+      "sourceEntityClass": "Workflow",
+      "targetEntityClass": "SystemComponent",
+      "cardinality": "one-to-many",
+      "properties": {
+        "order": "number"
+      }
+    }
+  }
+}
