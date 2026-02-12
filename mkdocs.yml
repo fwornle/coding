@@ -78,6 +78,7 @@ nav:
     - Overview: core-systems/index.md
     - Live Session Logging: core-systems/lsl.md
     - Knowledge Management: core-systems/ukb-vkb.md
+    - Ontology: core-systems/ontology.md
     - Constraints: core-systems/constraints.md
     - Trajectories: core-systems/trajectories.md
   - Architecture:
