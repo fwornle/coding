@@ -266,6 +266,18 @@ export class OntologyClassifier {
       );
 
       if (classification) {
+        // Validate that the returned class is in the known entity class list
+        // LLMs can hallucinate class names (e.g., returning _comment_quality from ontology JSON)
+        if (classification.entityClass.startsWith('_comment_') ||
+            (entityClasses.length > 0 && !entityClasses.includes(classification.entityClass))) {
+          debugLog('LLM returned invalid entity class, rejecting', {
+            returnedClass: classification.entityClass,
+            validClasses: entityClasses.length
+          });
+          llmTimer.stop();
+          return null;
+        }
+
         // Use provider from response if available, otherwise infer from model name
         const provider = (response as any).provider || this.extractProviderFromModel(response.model);
         const inputTokens = response.usage?.promptTokens || 0;
@@ -290,7 +302,6 @@ export class OntologyClassifier {
           totalTokens,
         });
 
-        console.log(`[OntologyClassifier] Parsed LLM response: class=${classification.entityClass}, confidence=${classification.confidence}, model=${response.model}`);
         debugLog('Parsed LLM response', { class: classification.entityClass, confidence: classification.confidence, llmUsage: classification.llmUsage });
       } else {
         console.log(`[OntologyClassifier] Failed to parse LLM response - content: ${response.content?.substring(0, 200)}...`);
