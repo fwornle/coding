@@ -37,6 +37,9 @@ constraints:
   severity: error
   enabled: true
   file_pattern: '\.(js|ts|jsx|tsx|mjs|cjs)$'
+  tool_filter:
+  - Edit
+  - Write
   suggestion: 'Replace with: Logger.log(''info'', ''category'', message)'
   whitelist:
   - '**/.claude/plans/*.md'
@@ -216,6 +219,7 @@ constraints:
   - '**/README.md'
   - '**/CHANGELOG.md'
   - '**/CLAUDE.md'
+  - '**/MEMORY.md'
   - '**/INSTALL*.md'
   - CLAUDE.md
 - id: update-main-readme
