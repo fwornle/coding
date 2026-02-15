@@ -17,15 +17,21 @@
 
 ## UKB Workflow Control
 
-When user says "ukb", "full ukb", or "ukb full debug" -- start a workflow via the semantic-analysis server:
+When user says "ukb", "full ukb", or "ukb full debug":
 
-**Method 1**: `mcp__semantic-analysis__execute_workflow` MCP tool (when available)
-**Method 2**: Direct SSE call to port 3848 (see `memory/ukb-workflow.md` for script)
+**Step 1 — ALWAYS try the MCP tool first:**
+```
+mcp__semantic-analysis__execute_workflow
+  workflow_name: "batch-analysis"
+  async_mode: true
+  debug: true
+  parameters: {team: "coding", singleStepMode: true, mockLLM: true, stepIntoSubsteps: true}
+```
 
-**"ukb full debug" flags**: `debug: true`, `singleStepMode: true`, `mockLLM: true`, `stepIntoSubsteps: true`
+**Step 2 — ONLY if MCP tool is unavailable**, fall back to direct SSE call on port 3848 (see `memory/ukb-workflow.md`).
 
-- NEVER run `ukb` as a bash command -- it doesn't exist as CLI
-- NEVER use curl to port 3033 for workflows (that's health API)
+- NEVER run `ukb` as a bash command
+- NEVER use port 3033 for workflows
 - ALWAYS use `mockLLM: true` in debug mode
 
 ## Rebuilding After Code Changes
