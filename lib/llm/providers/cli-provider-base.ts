@@ -23,6 +23,11 @@ export abstract class CLIProviderBase extends BaseProvider {
   protected readonly cliSubcommand?: string;
 
   /**
+   * Whether this provider is using the HTTP proxy bridge instead of local CLI
+   */
+  protected _useProxy = false;
+
+  /**
    * Build command-line arguments for the request
    */
   protected abstract buildArgs(request: LLMCompletionRequest): string[];
@@ -171,6 +176,113 @@ export abstract class CLIProviderBase extends BaseProvider {
         return m.content; // User messages without prefix
       })
       .join('\n\n');
+  }
+
+  /**
+   * Check if the HTTP proxy bridge is available for this provider.
+   * Uses native fetch() (Node 22+). Returns true if proxy reports
+   * this provider as available.
+   */
+  protected async checkProxyAvailable(): Promise<boolean> {
+    const proxyUrl = process.env.LLM_CLI_PROXY_URL;
+    if (!proxyUrl) return false;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const response = await fetch(`${proxyUrl}/health`, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!response.ok) return false;
+
+      const data = (await response.json()) as {
+        providers?: Record<string, { available?: boolean }>;
+      };
+      return data.providers?.[this.name]?.available === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Complete a request via the HTTP proxy bridge.
+   * POSTs to LLM_CLI_PROXY_URL/api/complete and maps HTTP errors
+   * back to error types the circuit breaker understands.
+   */
+  protected async completeViaProxy(request: LLMCompletionRequest): Promise<LLMCompletionResult> {
+    const proxyUrl = process.env.LLM_CLI_PROXY_URL;
+    if (!proxyUrl) {
+      throw new Error('LLM_CLI_PROXY_URL not configured');
+    }
+
+    const startTime = Date.now();
+    const timeoutMs = this.config.timeout || 60000;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(`${proxyUrl}/api/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: this.name,
+          messages: request.messages,
+          model: this.resolveModel(request.tier),
+          maxTokens: request.maxTokens || 4096,
+          temperature: request.temperature,
+          tier: request.tier,
+          timeout: timeoutMs,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const errorData = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          type?: string;
+        };
+        const errorType = errorData.type || 'UNKNOWN';
+        const errorMsg = errorData.error || `HTTP ${response.status}`;
+
+        if (response.status === 429 || errorType === 'QUOTA_EXHAUSTED') {
+          throw new Error(`QUOTA_EXHAUSTED: ${errorMsg}`);
+        }
+        if (response.status === 401 || errorType === 'AUTH_ERROR') {
+          throw new Error(`AUTH_ERROR: ${errorMsg}`);
+        }
+        throw new Error(`Proxy error (${response.status}): ${errorMsg}`);
+      }
+
+      const data = (await response.json()) as {
+        content: string;
+        provider: string;
+        model: string;
+        tokens: { input: number; output: number; total: number };
+        latencyMs: number;
+      };
+
+      return {
+        content: data.content,
+        provider: this.name,
+        model: data.model,
+        tokens: data.tokens,
+        latencyMs: data.latencyMs || (Date.now() - startTime),
+        cached: false,
+        local: false,
+        mock: false,
+      };
+    } catch (error: unknown) {
+      clearTimeout(timeout);
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error(`Proxy request timed out after ${timeoutMs}ms`);
+        }
+        throw error;
+      }
+      throw new Error(`Proxy request failed: ${String(error)}`);
+    }
   }
 
   /**

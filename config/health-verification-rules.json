@@ -102,6 +102,16 @@
         "auto_heal_action": "restart_health_frontend",
         "expected_status": "optional"
       },
+      "llm_cli_proxy": {
+        "enabled": true,
+        "severity": "warning",
+        "check_type": "http_health",
+        "endpoint": "http://host.docker.internal:12435/health",
+        "timeout_ms": 3000,
+        "description": "LLM CLI Proxy - HTTP bridge to host claude/copilot CLIs",
+        "auto_heal": false,
+        "expected_status": "optional"
+      },
       "enhanced_transcript_monitor": {
         "enabled": true,
         "severity": "error",

@@ -27,30 +27,35 @@ export class CopilotProvider extends CLIProviderBase {
   }
 
   async initialize(): Promise<void> {
-    // Check if copilot-cli is installed
+    // Check if copilot-cli is installed locally
     const isInstalled = await this.checkCLIAvailable();
-    if (!isInstalled) {
-      console.info('[llm:copilot] copilot-cli not installed or not in PATH');
-      this._available = false;
+    if (isInstalled) {
+      try {
+        const { exitCode, stderr } = await this.spawnCLI(['--version'], undefined, 5000);
+        if (exitCode === 0) {
+          this._available = true;
+          this._useProxy = false;
+          console.info('[llm:copilot] Provider initialized (local CLI)');
+          return;
+        }
+        console.warn('[llm:copilot] CLI test failed:', stderr);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.warn('[llm:copilot] Local CLI error:', msg);
+      }
+    }
+
+    // Fallback: check if HTTP proxy bridge is available
+    const proxyAvailable = await this.checkProxyAvailable();
+    if (proxyAvailable) {
+      this._available = true;
+      this._useProxy = true;
+      console.info('[llm:copilot] Provider initialized (HTTP proxy)');
       return;
     }
 
-    // Test authentication
-    try {
-      const { exitCode, stderr } = await this.spawnCLI(['--version'], undefined, 5000);
-
-      if (exitCode !== 0) {
-        console.warn('[llm:copilot] CLI test failed:', stderr);
-        this._available = false;
-        return;
-      }
-
-      this._available = true;
-      console.info('[llm:copilot] Provider initialized successfully');
-    } catch (error: any) {
-      console.warn('[llm:copilot] Failed to initialize:', error.message);
-      this._available = false;
-    }
+    console.info('[llm:copilot] Neither local CLI nor proxy available');
+    this._available = false;
   }
 
   /**
@@ -103,11 +108,16 @@ export class CopilotProvider extends CLIProviderBase {
   }
 
   /**
-   * Complete an LLM request via copilot-cli
+   * Complete an LLM request via copilot-cli (local or proxy)
    */
   async complete(request: LLMCompletionRequest): Promise<LLMCompletionResult> {
     if (!this._available) {
       throw new Error('GitHub Copilot provider not available');
+    }
+
+    // Delegate to proxy bridge if using proxy mode
+    if (this._useProxy) {
+      return this.completeViaProxy(request);
     }
 
     const startTime = Date.now();
@@ -154,13 +164,14 @@ export class CopilotProvider extends CLIProviderBase {
         local: false,
         mock: false,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       // Re-throw with context
-      if (error.message.includes('QUOTA_EXHAUSTED')) {
+      if (msg.includes('QUOTA_EXHAUSTED')) {
         throw error; // Propagate quota errors for circuit breaker
       }
 
-      throw new Error(`GitHub Copilot provider failed: ${error.message}`);
+      throw new Error(`GitHub Copilot provider failed: ${msg}`);
     }
   }
 }

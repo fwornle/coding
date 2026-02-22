@@ -1031,6 +1031,55 @@ else
     print_info "Expected at: $CODING_ROOT/integrations/browser-access"
 fi
 
+print_check "LLM CLI Proxy (HTTP bridge to host CLI tools)"
+if dir_exists "$CODING_ROOT/integrations/llm-cli-proxy"; then
+    print_pass "LLM CLI Proxy directory found"
+
+    print_check "LLM CLI Proxy dependencies"
+    if [ -d "$CODING_ROOT/integrations/llm-cli-proxy/node_modules" ]; then
+        print_pass "LLM CLI Proxy dependencies installed"
+    else
+        print_repair "Installing LLM CLI Proxy dependencies..."
+        cd "$CODING_ROOT/integrations/llm-cli-proxy" && npm install
+        print_fixed "LLM CLI Proxy dependencies installed"
+    fi
+
+    print_check "LLM CLI Proxy build status"
+    if [ -f "$CODING_ROOT/integrations/llm-cli-proxy/dist/server.js" ]; then
+        print_pass "LLM CLI Proxy built"
+    else
+        print_repair "Building LLM CLI Proxy..."
+        cd "$CODING_ROOT/integrations/llm-cli-proxy" && npm run build
+        print_fixed "LLM CLI Proxy built"
+    fi
+
+    print_check "LLM CLI Proxy status (port 12435)"
+    if lsof -i :12435 -sTCP:LISTEN >/dev/null 2>&1; then
+        print_pass "LLM CLI Proxy is running"
+
+        # Test health endpoint
+        PROXY_HEALTH=$(curl -s http://localhost:12435/health 2>/dev/null)
+        if echo "$PROXY_HEALTH" | grep -q '"status":"ok"'; then
+            # Report available providers
+            CLAUDE_AVAIL=$(echo "$PROXY_HEALTH" | grep -o '"claude-code":{[^}]*"available":true' 2>/dev/null)
+            COPILOT_AVAIL=$(echo "$PROXY_HEALTH" | grep -o '"copilot":{[^}]*"available":true' 2>/dev/null)
+            PROVIDERS_MSG=""
+            if [ -n "$CLAUDE_AVAIL" ]; then PROVIDERS_MSG="claude-code"; fi
+            if [ -n "$COPILOT_AVAIL" ]; then
+                [ -n "$PROVIDERS_MSG" ] && PROVIDERS_MSG="$PROVIDERS_MSG, "
+                PROVIDERS_MSG="${PROVIDERS_MSG}copilot"
+            fi
+            print_pass "LLM CLI Proxy health OK (providers: ${PROVIDERS_MSG:-none})"
+        else
+            print_warning "LLM CLI Proxy health returned unexpected response"
+        fi
+    else
+        print_info "LLM CLI Proxy not running (optional - start with: cd integrations/llm-cli-proxy && npm start)"
+    fi
+else
+    print_info "LLM CLI Proxy not found (optional component)"
+fi
+
 print_check "Semantic analysis MCP server (git submodule)"
 if dir_exists "$CODING_ROOT/integrations/mcp-server-semantic-analysis"; then
     print_pass "Semantic analysis MCP server submodule found"
