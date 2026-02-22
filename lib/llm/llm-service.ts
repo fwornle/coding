@@ -56,11 +56,11 @@ export class LLMService extends EventEmitter {
   async initialize(configPath?: string): Promise<void> {
     if (this.initialized) return;
 
-    // Load config from YAML if not provided in constructor
-    if (!this.config.providers || Object.keys(this.config.providers).length === 0) {
-      this.config = await loadConfig(configPath);
-      this.registry = new ProviderRegistry(this.config);
-    }
+    // Always load YAML config — it contains the full provider priority chain
+    // including subscription providers (claude-code, copilot) that the
+    // hardcoded defaults omit. The YAML is the canonical config source.
+    this.config = await loadConfig(configPath);
+    this.registry = new ProviderRegistry(this.config);
 
     await this.registry.initializeAll();
     this.initialized = true;
