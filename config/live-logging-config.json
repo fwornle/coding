@@ -278,7 +278,9 @@
     "CLAUDE_API_KEY",
     "GEMINI_API_KEY",
     "ANTHROPIC_ADMIN_API_KEY",
-    "OPENAI_ADMIN_API_KEY"
+    "OPENAI_ADMIN_API_KEY",
+    "XAI_MANAGEMENT_KEY",
+    "XAI_TEAM_ID"
   ],
   "credit_checking": {
     "enabled": true,
@@ -292,7 +294,7 @@
   },
   "provider_credits": {
     "anthropic": {
-      "prepaidCredits": 18,
+      "prepaidCredits": 0,
       "description": "Set to your actual prepaid credit amount in USD (e.g., 20 for $20). Leave null to show pie symbol instead."
     },
     "openai": {

@@ -23,12 +23,12 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 
 **Native Mode:**
 ```
-[🏥✅] [Gq$2JAN A$18 O○ X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [Gq$2JAN A$18 O○ X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🐳] [🐳MCP:SA✅CM✅CGR✅] [🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Reading the Status Line
@@ -39,7 +39,7 @@ The Status Line provides a **compact, real-time view** of all system activity ac
 - `[🐳]` - **Docker Mode**: Indicator that system is running in Docker mode (only shown in Docker mode)
 - `[🐳MCP:SA✅CM✅CGR✅]` - **Docker MCP Health**: Health of containerized MCP SSE servers (Docker mode only)
 - `[🏥✅]` - **System Health**: Unified health (infrastructure + services)
-- `[Gq$2JAN A$18 O○ X$25]` - **API Quota**: LLM provider availability (see below)
+- `[Gq$0FEB A$0 O$0 X$25]` - **API Quota**: LLM provider spend/balance (see below)
 - `[C🟢 UT🫒]` - **Active Sessions**: Project abbreviations with activity icons
 - `🛡️ 67%` - **Constraint Compliance**: Code quality compliance percentage
 - `🔍 EX` - **Trajectory State**: Current development activity
@@ -69,27 +69,32 @@ The statusline-health-monitor writes detailed health to `.logs/statusline-health
 
 ### API Quota Monitoring
 
-The status line displays LLM provider availability using a simple, consistent format.
+The status line displays **live spending data** for all LLM providers using automatic API-based tracking.
 
-**Format**: `[Provider$X ...]` or `[Provider● ...]`
+**Format**: `[Provider$X ...]`
 
-**Provider Abbreviations**:
-- `Gq` - Groq (free tier or monthly billing)
-- `Ggl` - Google Gemini (free tier: 15 RPM, 1M TPD)
-- `A` - Anthropic Claude (requires Admin API key for usage data)
-- `O` - OpenAI (requires Admin API key for usage data)
-- `X` - X.AI Grok (free credits: $25)
+**Provider Abbreviations and Data Sources**:
+
+| Abbrev | Provider | Data Source | Env Vars Required |
+|--------|----------|-------------|-------------------|
+| `Gq` | Groq | BudgetTracker self-tracking (`.data/llm-usage-costs.json`) | `GROQ_API_KEY` |
+| `Ggl` | Google Gemini | Free tier (no tracking needed) | `GEMINI_API_KEY` |
+| `A` | Anthropic | Admin API (`/v1/organizations/cost_report`) | `ANTHROPIC_ADMIN_API_KEY` |
+| `O` | OpenAI | Admin API (`/v1/organization/costs`) | `OPENAI_ADMIN_API_KEY` |
+| `X` | X.AI Grok | Management API (`prepaid/balance`) | `XAI_MANAGEMENT_KEY` + `XAI_TEAM_ID` |
 
 **Display Logic**:
 
 | Scenario | Display | Meaning |
 |----------|---------|---------|
-| Monthly billing (Groq) | `Gq$2JAN` | $2 spent in January |
-| Prepaid credits configured | `A$18` | $18 remaining of prepaid amount |
-| Free tier (Groq, Google) | `Gq●` | Available (rate-limited only) |
-| No admin key | `O○` | Cannot get usage data |
+| Admin API: spend data | `A$2` | $2 spent this month (live from API) |
+| Admin API: with prepaid credits | `A$18` | $18 remaining of prepaid amount |
+| Monthly billing (Groq) | `Gq$0FEB` | $0 spent in February (auto-tracked) |
+| Management API (xAI) | `X$25` | $25 remaining prepaid balance |
+| Free tier (Google) | `Ggl●` | Available (rate-limited only) |
+| No admin key configured | `O○` | Cannot get usage data |
 
-**Pie Chart Symbols** (for availability):
+**Pie Chart Symbols** (used when percentage-based display applies):
 - `●` (full) - Fully available / >87.5% remaining
 - `◕` (¾) - 62.5-87.5% remaining
 - `◐` (½) - 37.5-62.5% remaining
@@ -97,39 +102,53 @@ The status line displays LLM provider availability using a simple, consistent fo
 - `○` (empty) - <12.5% remaining or no data
 
 **Examples**:
-- `[Gq$2JAN A$18 O○ X$25]` - Groq $2 spent in Jan, Anthropic $18 left, OpenAI no key, xAI $25 left
-- `[Gq● A$5 X$2]` - Groq free tier, low credits on Anthropic and xAI
-- `[A◐ O◔]` - Anthropic at ~50%, OpenAI at ~25% (percentage mode)
+- `[Gq$0FEB A$0 O$0 X$25]` - All providers live: Groq $0 in Feb, Anthropic $0 spent, OpenAI $0 spent, xAI $25 remaining
+- `[Gq$1FEB A$5 O$3 X$20]` - Active usage across all providers
+- `[A◐ O◔]` - Percentage mode (when prepaid credits configured)
+
+**Setup**:
+
+Run the interactive setup script to configure admin/management API keys:
+
+```bash
+node scripts/setup-api-keys.js
+```
+
+This validates each key with a test API call before saving to `.env`. Groq requires no setup (automatic self-tracking).
 
 **Configuration**:
 
-Configure provider credits in `config/live-logging-config.json`:
+Provider credits in `config/live-logging-config.json` are used as fallbacks or for prepaid balance display:
 
 ```json
 "provider_credits": {
   "groq": {
     "billingType": "monthly",
-    "monthlySpend": 2,
-    "billingMonth": "JAN",
+    "monthlySpend": 0,
+    "billingMonth": "FEB",
     "spendLimit": null
   },
-  "anthropic": { "prepaidCredits": 20 },
-  "openai": { "prepaidCredits": 50 },
+  "anthropic": { "prepaidCredits": 0 },
+  "openai": { "prepaidCredits": null },
   "xai": { "prepaidCredits": 25 }
 }
 ```
 
-**Groq Billing Types**:
-- `"billingType": "free"` - Free tier, shows pie symbol (`Gq●`)
-- `"billingType": "monthly"` - Monthly billing, shows spend + month (`Gq$2JAN`)
-  - `monthlySpend` - Current month spend (update from console.groq.com)
-  - `billingMonth` - 3-letter month abbreviation (JAN, FEB, etc.)
-  - `spendLimit` - Optional spend limit for warnings
+**Groq Self-Tracking**:
 
-**Admin API Keys** (required for real-time usage tracking):
-- Anthropic: `ANTHROPIC_ADMIN_API_KEY` - Get at console.anthropic.com → Settings → Admin API Keys
-- OpenAI: `OPENAI_ADMIN_API_KEY` - Get at platform.openai.com/settings/organization/admin-keys
-- Groq: No public billing API yet - update `monthlySpend` manually from console.groq.com
+Groq has no billing API. Instead, the Docker-based `BudgetTracker` (`src/inference/BudgetTracker.js`) tracks per-provider costs from every LLM call and writes them to `.data/llm-usage-costs.json`. The `api-quota-checker.js` reads this file for the Groq spend amount. The Playwright billing scraper is automatically bypassed when self-tracking data exists.
+
+**API Keys / Management Keys** (in `.env`):
+
+| Variable | Provider | Where to Get It |
+|----------|----------|----------------|
+| `ANTHROPIC_ADMIN_API_KEY` | Anthropic | console.anthropic.com → Settings → Admin API Keys |
+| `OPENAI_ADMIN_API_KEY` | OpenAI | platform.openai.com/settings/organization/admin-keys |
+| `XAI_MANAGEMENT_KEY` | xAI | console.x.ai → Settings → Management Keys |
+| `XAI_TEAM_ID` | xAI | console.x.ai team settings URL |
+| _(none needed)_ | Groq | Automatic via BudgetTracker self-tracking |
+
+**Environment Loading**: The `status-line-fast.cjs` cache reader automatically loads `.env` from the repo root, so admin keys defined there are available to all status line processes without needing to export them in the shell.
 
 ### Docker Mode Indicator
 
@@ -348,12 +367,12 @@ The status line displays information for **multiple active coding agent sessions
 
 **Single Active Session**:
 ```
-[🏥✅] [Gq$2JAN A$18] [C🟢] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥✅] [Gq$0FEB A$0 O$0 X$25] [C🟢] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 **Multiple Active Sessions**:
 ```
-[🏥⚠️] [Gq$2JAN A$18 X$25] [C🟢 UT🫒 CA🌲] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+[🏥⚠️] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒 CA🌲] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 Where:
@@ -511,7 +530,7 @@ node scripts/status-line-fast.cjs
 node scripts/combined-status-line.js
 
 # Example output:
-# [🏥⚠️] [Gq$2JAN A$18 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
+# [🏥⚠️] [Gq$0FEB A$0 O$0 X$25] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [📚✅] 📋17-18
 ```
 
 ### Troubleshooting
@@ -692,7 +711,10 @@ ps -eo pid,tty,comm | grep claude
 - `scripts/statusline-health-monitor.js` - Session health monitor daemon (detects running monitors, writes status)
 - `scripts/health-verifier.js` - Health status provider
 - `src/live-logging/RealTimeTrajectoryAnalyzer.js` - Trajectory state provider
-- `lib/api-quota-checker.js` - API quota provider (shared library)
+- `lib/api-quota-checker.js` - API quota provider (shared library, calls Admin/Management APIs)
+- `src/inference/BudgetTracker.js` - LLM cost tracking with file persistence (Docker)
+- `scripts/setup-api-keys.js` - Interactive admin/management API key setup
+- `.data/llm-usage-costs.json` - BudgetTracker cost output (Groq self-tracking)
 - `.lsl/global-registry.json` - LSL session registry
 - `.health/verification-status.json` - Health status cache
 - `.health/*-transcript-monitor-health.json` - Per-project health files (centralized in coding project)

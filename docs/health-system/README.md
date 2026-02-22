@@ -224,12 +224,12 @@ When running in Docker mode, the health system also monitors MCP SSE servers:
 - **Exchange Activity** - Tracks exchange count and last processed UUID
 - **Suspicious Activity** - Detects stuck or stale monitors
 
-### API Quota
-- **Groq** - Free tier (`Gq●`) or monthly billing (`Gq$2JAN`)
+### API Quota (Automatic Tracking)
+- **Groq** - Self-tracked via BudgetTracker (`Gq$0FEB`) or free tier (`Gq●`)
 - **Google Gemini** - Free tier quota (15 RPM, 1M TPD)
-- **Anthropic Claude** - Prepaid credits (`A$18`) or billing-based
-- **OpenAI** - Prepaid credits or billing-based
-- **X.AI (Grok)** - Free credits monitoring (`X$25`)
+- **Anthropic Claude** - Live spend via Admin API (`A$0`) or prepaid credits
+- **OpenAI** - Live spend via Admin API (`O$0`) or prepaid credits
+- **X.AI (Grok)** - Live balance via Management API (`X$25`) or static config
 
 ## How It Works
 
@@ -322,12 +322,12 @@ The status line appears automatically in Claude Code:
 
 **Native Mode:**
 ```
-[C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq$2JAN A$18 X$25] [📚✅] [🏥✅] 📋17-18
+[C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
 **Docker Mode:**
 ```
-[🐳] [🐳MCP:✅] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq$2JAN A$18 X$25] [📚✅] [🏥✅] 📋17-18
+[🐳] [🐳MCP:✅] [C🟢 UT🫒] [🛡️ 67% 🔍EX] [Gq$0FEB A$0 O$0 X$25] [📚✅] [🏥✅] 📋17-18
 ```
 
 **Components:**
@@ -335,7 +335,7 @@ The status line appears automatically in Claude Code:
 - `[🐳MCP:✅]` - Docker MCP health: SA=Semantic Analysis, CM=Constraint Monitor, CGR=Code Graph RAG
 - `[C🟢 UT🫒]` - Active sessions with activity icons (all sessions shown, 💤 for sleeping)
 - `[🛡️ 67% 🔍EX]` - Constraint compliance percentage + trajectory state
-- `[Gq$2JAN A$18 X$25]` - API quota status (Groq $2 spent in Jan, etc.)
+- `[Gq$0FEB A$0 O$0 X$25]` - API quota (live spend/balance from APIs)
 - `[📚✅]` - Knowledge system status (icons only, no counts)
 - `[🏥✅]` - Unified health (GCM + Health Verifier + Enforcement)
 - `📋17-18` - LSL time window (HHMM-HHMM)
@@ -380,7 +380,9 @@ See [Status Line System](./status-line.md) for complete documentation.
 - `scripts/health-remediation-actions.js` - Auto-healing actions
 - `scripts/start-services-robust.js` - Service startup with supervisor
 - `scripts/tmux-session-wrapper.sh` - Tmux session wrapper (configures status-line-fast.cjs)
-- `lib/api-quota-checker.js` - API quota checking (shared library)
+- `lib/api-quota-checker.js` - API quota checking (Admin/Management APIs + self-tracking)
+- `src/inference/BudgetTracker.js` - LLM cost tracking with `.data/llm-usage-costs.json` persistence
+- `scripts/setup-api-keys.js` - Interactive admin/management API key setup
 
 **Data Files**:
 - `.live-process-registry.json` - ProcessStateManager registry

@@ -2345,6 +2345,22 @@ class StatusLineHealthMonitor {
     if (this.billingScraperRunning) return;
 
     try {
+      // Short-circuit: if BudgetTracker file has valid Groq data, skip Playwright scraper
+      const usagePath = path.join(this.codingRepoPath, '.data', 'llm-usage-costs.json');
+      if (fs.existsSync(usagePath)) {
+        try {
+          const usageData = JSON.parse(fs.readFileSync(usagePath, 'utf8'));
+          const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+          const currentMonth = months[new Date().getMonth()];
+          if (usageData.billingMonth === currentMonth && usageData.providers?.groq) {
+            // Live usage tracking is active — no need for Playwright scraper
+            return;
+          }
+        } catch {
+          // Ignore parse errors — fall through to legacy scraper
+        }
+      }
+
       // Load config to check if auto-scrape is enabled and get interval
       const configPath = path.join(this.codingRepoPath, 'config', 'live-logging-config.json');
       if (!fs.existsSync(configPath)) return;
