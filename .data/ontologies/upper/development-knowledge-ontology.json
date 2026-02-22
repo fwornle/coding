@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "type": "upper",
   "description": "Upper ontology for software systems organized in six facets: Structure (what it is), Behavior (what it does), Operations (how it runs), Resilience (what goes wrong), Quality (how good it is), Evolution (how it changed). Complements the Development Knowledge Ontology which covers patterns, insights, and decisions.",
-
   "facets": [
     "structure",
     "behavior",
@@ -12,14 +11,11 @@
     "quality",
     "evolution"
   ],
-
   "entities": {
-
-    "_comment_structure": "=== FACET 1: STRUCTURE — What it IS ===",
-
+    "_comment_structure": "=== FACET 1: STRUCTURE \u2014 What it IS ===",
     "File": {
       "facet": "structure",
-      "description": "A single source file — the atomic unit of the code hierarchy",
+      "description": "A single source file \u2014 the atomic unit of the code hierarchy",
       "properties": {
         "path": {
           "type": "string",
@@ -29,7 +25,16 @@
         "language": {
           "type": "string",
           "description": "Programming language",
-          "enum": ["typescript", "javascript", "python", "shell", "json", "yaml", "markdown", "other"]
+          "enum": [
+            "typescript",
+            "javascript",
+            "python",
+            "shell",
+            "json",
+            "yaml",
+            "markdown",
+            "other"
+          ]
         },
         "purpose": {
           "type": "string",
@@ -38,23 +43,32 @@
         "complexity": {
           "type": "string",
           "description": "Coarse complexity assessment",
-          "enum": ["low", "medium", "high"],
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
           "facet": "quality"
         },
         "testCoverage": {
           "type": "string",
           "description": "Degree of test coverage",
-          "enum": ["none", "partial", "full"],
+          "enum": [
+            "none",
+            "partial",
+            "full"
+          ],
           "facet": "quality"
         }
       },
-      "requiredProperties": ["path"],
+      "requiredProperties": [
+        "path"
+      ],
       "examples": [
         "integrations/mcp-server-semantic-analysis/src/stdio-proxy.ts",
         "scripts/generate-docker-mcp-config.sh"
       ]
     },
-
     "Service": {
       "facet": "structure",
       "description": "A deployable or runnable unit composed of files",
@@ -67,7 +81,15 @@
         "serviceType": {
           "type": "string",
           "description": "Kind of service",
-          "enum": ["server", "proxy", "ui", "cli", "library", "agent", "worker"]
+          "enum": [
+            "server",
+            "proxy",
+            "ui",
+            "cli",
+            "library",
+            "agent",
+            "worker"
+          ]
         },
         "entryPoint": {
           "type": "string",
@@ -76,31 +98,51 @@
         "maturity": {
           "type": "string",
           "description": "Lifecycle stage of the service",
-          "enum": ["prototype", "active", "stable", "deprecated", "sunset"],
+          "enum": [
+            "prototype",
+            "active",
+            "stable",
+            "deprecated",
+            "sunset"
+          ],
           "facet": "quality"
         },
         "architectureStyle": {
           "type": "string",
           "description": "Primary architectural style",
-          "enum": ["event-driven", "request-response", "pipeline", "pub-sub", "batch"],
+          "enum": [
+            "event-driven",
+            "request-response",
+            "pipeline",
+            "pub-sub",
+            "batch"
+          ],
           "facet": "quality"
         },
         "patterns": {
           "type": "array",
           "description": "Coding/design patterns employed in this service",
-          "items": { "type": "string" },
+          "items": "string",
           "facet": "quality",
-          "examples": ["proxy", "circuit-breaker", "observer", "factory", "middleware-chain"]
+          "examples": [
+            "proxy",
+            "circuit-breaker",
+            "observer",
+            "factory",
+            "middleware-chain"
+          ]
         }
       },
-      "requiredProperties": ["serviceName", "serviceType"],
+      "requiredProperties": [
+        "serviceName",
+        "serviceType"
+      ],
       "examples": [
         "semantic-analysis-proxy (proxy, active)",
         "system-health-dashboard (ui, stable)",
         "vkb-server (server, active)"
       ]
     },
-
     "Feature": {
       "facet": "structure",
       "description": "A user-facing capability composed of one or more services",
@@ -117,23 +159,29 @@
         "maturity": {
           "type": "string",
           "description": "Lifecycle stage of the feature",
-          "enum": ["prototype", "active", "stable", "deprecated", "sunset"],
+          "enum": [
+            "prototype",
+            "active",
+            "stable",
+            "deprecated",
+            "sunset"
+          ],
           "facet": "quality"
         }
       },
-      "requiredProperties": ["featureName"],
+      "requiredProperties": [
+        "featureName"
+      ],
       "examples": [
         "MCP Tool Integration (stable)",
         "Knowledge Graph Visualization (active)",
         "Continuous Learning Pipeline (prototype)"
       ]
     },
-
-    "_comment_behavior": "=== FACET 2: BEHAVIOR — What it DOES ===",
-
+    "_comment_behavior": "=== FACET 2: BEHAVIOR \u2014 What it DOES ===",
     "Contract": {
       "facet": "behavior",
-      "description": "A specification of what a component promises to do — the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",
+      "description": "A specification of what a component promises to do \u2014 the intended behavior, interface, and invariants. This is the 'positive' counterpart to Fault (which captures what goes wrong).",
       "properties": {
         "contractName": {
           "type": "string",
@@ -147,34 +195,42 @@
         "inputs": {
           "type": "array",
           "description": "What the contract accepts",
-          "items": { "type": "string" }
+          "items": "string"
         },
         "outputs": {
           "type": "array",
           "description": "What the contract produces",
-          "items": { "type": "string" }
+          "items": "string"
         },
         "protocol": {
           "type": "string",
           "description": "Interaction protocol",
-          "enum": ["rest", "sse", "stdio", "ws", "function-call", "cli", "event"]
+          "enum": [
+            "rest",
+            "sse",
+            "stdio",
+            "ws",
+            "function-call",
+            "cli",
+            "event"
+          ]
         },
         "invariants": {
           "type": "array",
           "description": "Conditions that must always hold",
-          "items": { "type": "string" }
+          "items": "string"
         }
       },
-      "requiredProperties": ["contractName"],
+      "requiredProperties": [
+        "contractName"
+      ],
       "examples": [
         "MCP stdio-to-SSE bridge: accepts MCP requests on stdin, forwards to SSE server, returns responses on stdout",
         "Health endpoint: GET /health returns JSON with service status, always responds within 5s",
         "Knowledge graph query: accepts Cypher-like query string, returns array of matching entities"
       ]
     },
-
-    "_comment_operations": "=== FACET 3: OPERATIONS — How it RUNS ===",
-
+    "_comment_operations": "=== FACET 3: OPERATIONS \u2014 How it RUNS ===",
     "RuntimeDiagnostics": {
       "facet": "operations",
       "description": "Observable diagnostic output available while the system runs",
@@ -182,7 +238,14 @@
         "channel": {
           "type": "string",
           "description": "How the diagnostics are delivered",
-          "enum": ["file", "stderr", "stdout", "endpoint", "docker-logs", "browser-console"],
+          "enum": [
+            "file",
+            "stderr",
+            "stdout",
+            "endpoint",
+            "docker-logs",
+            "browser-console"
+          ],
           "required": true
         },
         "path": {
@@ -192,21 +255,26 @@
         "format": {
           "type": "string",
           "description": "Output format",
-          "enum": ["text", "json", "structured"]
+          "enum": [
+            "text",
+            "json",
+            "structured"
+          ]
         },
         "rotation": {
           "type": "string",
           "description": "Log rotation policy, if any"
         }
       },
-      "requiredProperties": ["channel"],
+      "requiredProperties": [
+        "channel"
+      ],
       "examples": [
         ".data/logs/mcp-proxy-semantic-analysis.log (file, text)",
         "docker logs coding-services (docker-logs, text)",
         "http://localhost:3033/health (endpoint, json)"
       ]
     },
-
     "StaticDiagnostics": {
       "facet": "operations",
       "description": "Checks that verify correctness without running the system",
@@ -214,7 +282,13 @@
         "checkType": {
           "type": "string",
           "description": "Kind of static check",
-          "enum": ["config-validation", "type-check", "lint", "schema", "dependency-audit"],
+          "enum": [
+            "config-validation",
+            "type-check",
+            "lint",
+            "schema",
+            "dependency-audit"
+          ],
           "required": true
         },
         "command": {
@@ -226,13 +300,14 @@
           "description": "File or directory the check applies to"
         }
       },
-      "requiredProperties": ["checkType"],
+      "requiredProperties": [
+        "checkType"
+      ],
       "examples": [
         "npx tsc --noEmit (type-check)",
         "docker-compose config --quiet (config-validation)"
       ]
     },
-
     "Port": {
       "facet": "operations",
       "description": "A network port used for inter-component communication",
@@ -245,21 +320,31 @@
         "protocol": {
           "type": "string",
           "description": "Communication protocol",
-          "enum": ["http", "sse", "ws", "tcp"]
+          "enum": [
+            "http",
+            "sse",
+            "ws",
+            "tcp"
+          ]
         },
         "host": {
           "type": "string",
           "description": "Host the port is bound to",
-          "enum": ["localhost", "container", "0.0.0.0"]
+          "enum": [
+            "localhost",
+            "container",
+            "0.0.0.0"
+          ]
         }
       },
-      "requiredProperties": ["portNumber"],
+      "requiredProperties": [
+        "portNumber"
+      ],
       "examples": [
-        "3848 (sse, localhost) — semantic-analysis",
-        "8080 (http, localhost) — VKB server"
+        "3848 (sse, localhost) \u2014 semantic-analysis",
+        "8080 (http, localhost) \u2014 VKB server"
       ]
     },
-
     "Config": {
       "facet": "operations",
       "description": "A configuration source that controls system behavior",
@@ -272,21 +357,33 @@
         "format": {
           "type": "string",
           "description": "Configuration format",
-          "enum": ["json", "yaml", "env", "sh", "toml"]
+          "enum": [
+            "json",
+            "yaml",
+            "env",
+            "sh",
+            "toml"
+          ]
         },
         "scope": {
           "type": "string",
           "description": "Where this config applies",
-          "enum": ["global", "project", "runtime"]
+          "enum": [
+            "global",
+            "project",
+            "runtime"
+          ]
         }
       },
-      "requiredProperties": ["configPath", "format"],
+      "requiredProperties": [
+        "configPath",
+        "format"
+      ],
       "examples": [
         "claude-code-mcp-docker.json (json, project)",
         "docker/docker-compose.yml (yaml, project)"
       ]
     },
-
     "Container": {
       "facet": "operations",
       "description": "A Docker container or compose service",
@@ -305,12 +402,13 @@
           "description": "Name in docker-compose.yml"
         }
       },
-      "requiredProperties": ["containerName"],
+      "requiredProperties": [
+        "containerName"
+      ],
       "examples": [
         "coding-services (custom image, compose)"
       ]
     },
-
     "Process": {
       "facet": "operations",
       "description": "A running OS-level process",
@@ -323,18 +421,23 @@
         "transport": {
           "type": "string",
           "description": "How the process communicates",
-          "enum": ["stdio", "http", "tcp", "ipc"]
+          "enum": [
+            "stdio",
+            "http",
+            "tcp",
+            "ipc"
+          ]
         }
       },
-      "requiredProperties": ["command"],
+      "requiredProperties": [
+        "command"
+      ],
       "examples": [
         "node dist/stdio-proxy.js (stdio)",
         "python -m codebase_rag.mcp.stdio_proxy (stdio)"
       ]
     },
-
-    "_comment_resilience": "=== FACET 4: RESILIENCE — What goes WRONG ===",
-
+    "_comment_resilience": "=== FACET 4: RESILIENCE \u2014 What goes WRONG ===",
     "Fault": {
       "facet": "resilience",
       "description": "A known failure mode with symptoms and resolution",
@@ -359,16 +462,22 @@
         "severity": {
           "type": "string",
           "description": "Impact level",
-          "enum": ["critical", "warning", "info"]
+          "enum": [
+            "critical",
+            "warning",
+            "info"
+          ]
         }
       },
-      "requiredProperties": ["faultName", "severity"],
+      "requiredProperties": [
+        "faultName",
+        "severity"
+      ],
       "examples": [
         "port-not-mapped: Docker port not exposed to host (critical)",
         "stale-process-on-port: Old process blocking a port after restart (warning)"
       ]
     },
-
     "Limitation": {
       "facet": "resilience",
       "description": "A known boundary, constraint, or area of technical debt. Not a failure, but an inherent limit on what the system can do. Covers: scalability limits, missing features, technical debt, and planned future work.",
@@ -385,7 +494,13 @@
         "category": {
           "type": "string",
           "description": "Kind of limitation",
-          "enum": ["technical-debt", "scalability", "missing-feature", "design-constraint", "dependency"]
+          "enum": [
+            "technical-debt",
+            "scalability",
+            "missing-feature",
+            "design-constraint",
+            "dependency"
+          ]
         },
         "impact": {
           "type": "string",
@@ -394,21 +509,26 @@
         "severity": {
           "type": "string",
           "description": "How important it is to address",
-          "enum": ["critical", "moderate", "low", "accepted"]
+          "enum": [
+            "critical",
+            "moderate",
+            "low",
+            "accepted"
+          ]
         }
       },
-      "requiredProperties": ["limitationName", "category"],
+      "requiredProperties": [
+        "limitationName",
+        "category"
+      ],
       "examples": [
         "no-proxy-retry: MCP proxies do not retry on transient SSE failures (technical-debt, moderate)",
         "single-container: All backend services run in one container, cannot scale independently (design-constraint, accepted)",
         "no-auth-on-health: Health endpoint has no authentication (missing-feature, low)"
       ]
     },
-
-    "_comment_quality": "=== FACET 5: QUALITY — How GOOD it is (no new nodes, properties on File/Service/Feature) ===",
-
-    "_comment_evolution": "=== FACET 6: EVOLUTION — How it CHANGED ===",
-
+    "_comment_quality": "=== FACET 5: QUALITY \u2014 How GOOD it is (no new nodes, properties on File/Service/Feature) ===",
+    "_comment_evolution": "=== FACET 6: EVOLUTION \u2014 How it CHANGED ===",
     "Revision": {
       "facet": "evolution",
       "description": "A significant change milestone in the codebase. Not every git commit, but a meaningful event that altered structure or behavior. The lower ontology may link to specific commit ranges.",
@@ -425,20 +545,38 @@
         "scope": {
           "type": "string",
           "description": "Breadth of the change",
-          "enum": ["file", "service", "feature", "system"]
+          "enum": [
+            "file",
+            "service",
+            "feature",
+            "system"
+          ]
         },
         "changeType": {
           "type": "string",
           "description": "Nature of the change",
-          "enum": ["introduction", "rewrite", "refactor", "extension", "deprecation", "removal"]
+          "enum": [
+            "introduction",
+            "rewrite",
+            "refactor",
+            "extension",
+            "deprecation",
+            "removal"
+          ]
         },
         "status": {
           "type": "string",
           "description": "Whether this revision is completed or planned",
-          "enum": ["completed", "in-progress", "planned"]
+          "enum": [
+            "completed",
+            "in-progress",
+            "planned"
+          ]
         }
       },
-      "requiredProperties": ["revisionName"],
+      "requiredProperties": [
+        "revisionName"
+      ],
       "examples": [
         "sse-proxy-rewrite: Rewrote proxy layer from REST to SSE (service, rewrite, completed)",
         "subscription-llm-providers: Subscription-based LLM provider tier (feature, extension, completed)",
@@ -446,29 +584,32 @@
       ]
     }
   },
-
   "relationships": {
-
     "_comment_structure_rels": "=== STRUCTURE RELATIONS ===",
-
     "part_of": {
       "facet": "structure",
-      "description": "Composition hierarchy: File → Service → Feature",
-      "sourceEntityClass": ["File", "Service"],
-      "targetEntityClass": ["Service", "Feature"],
+      "description": "Composition hierarchy: File \u2192 Service \u2192 Feature",
+      "sourceEntityClass": [
+        "File",
+        "Service"
+      ],
+      "targetEntityClass": [
+        "Service",
+        "Feature"
+      ],
       "cardinality": "many-to-one"
     },
-
     "_comment_behavior_rels": "=== BEHAVIOR RELATIONS ===",
-
     "fulfills": {
       "facet": "behavior",
       "description": "A service or file fulfills (implements) a contract",
-      "sourceEntityClass": ["Service", "File"],
+      "sourceEntityClass": [
+        "Service",
+        "File"
+      ],
       "targetEntityClass": "Contract",
       "cardinality": "many-to-many"
     },
-
     "depends_on_contract": {
       "facet": "behavior",
       "description": "A service depends on a contract being available, regardless of which service fulfills it",
@@ -476,17 +617,20 @@
       "targetEntityClass": "Contract",
       "cardinality": "many-to-many"
     },
-
     "_comment_operations_rels": "=== OPERATIONS RELATIONS ===",
-
     "diagnosed_by": {
       "facet": "operations",
       "description": "Links a component to its diagnostic outputs (runtime or static)",
-      "sourceEntityClass": ["File", "Service"],
-      "targetEntityClass": ["RuntimeDiagnostics", "StaticDiagnostics"],
+      "sourceEntityClass": [
+        "File",
+        "Service"
+      ],
+      "targetEntityClass": [
+        "RuntimeDiagnostics",
+        "StaticDiagnostics"
+      ],
       "cardinality": "many-to-many"
     },
-
     "logs_to": {
       "facet": "operations",
       "description": "A process writes output to a diagnostic channel",
@@ -494,7 +638,6 @@
       "targetEntityClass": "RuntimeDiagnostics",
       "cardinality": "one-to-many"
     },
-
     "connects_to": {
       "facet": "operations",
       "description": "A service connects to a port as a client",
@@ -502,7 +645,6 @@
       "targetEntityClass": "Port",
       "cardinality": "many-to-many"
     },
-
     "listens_on": {
       "facet": "operations",
       "description": "A service listens on a port",
@@ -510,7 +652,6 @@
       "targetEntityClass": "Port",
       "cardinality": "many-to-one"
     },
-
     "configured_by": {
       "facet": "operations",
       "description": "A service reads its configuration from a config source",
@@ -518,7 +659,6 @@
       "targetEntityClass": "Config",
       "cardinality": "many-to-many"
     },
-
     "runs_in": {
       "facet": "operations",
       "description": "A service runs inside a container",
@@ -526,7 +666,6 @@
       "targetEntityClass": "Container",
       "cardinality": "many-to-one"
     },
-
     "spawns": {
       "facet": "operations",
       "description": "A service launches a process",
@@ -534,9 +673,7 @@
       "targetEntityClass": "Process",
       "cardinality": "one-to-many"
     },
-
     "_comment_dependency_rels": "=== DEPENDENCY RELATIONS ===",
-
     "depends_on": {
       "facet": "structure",
       "description": "A service requires another service to function",
@@ -544,7 +681,6 @@
       "targetEntityClass": "Service",
       "cardinality": "many-to-many"
     },
-
     "proxies_for": {
       "facet": "structure",
       "description": "A service acts as a proxy or bridge for another service",
@@ -552,9 +688,7 @@
       "targetEntityClass": "Service",
       "cardinality": "one-to-one"
     },
-
     "_comment_resilience_rels": "=== RESILIENCE RELATIONS ===",
-
     "affects": {
       "facet": "resilience",
       "description": "A fault manifests in a service",
@@ -562,7 +696,6 @@
       "targetEntityClass": "Service",
       "cardinality": "many-to-many"
     },
-
     "revealed_by": {
       "facet": "resilience",
       "description": "A fault is visible in runtime diagnostics",
@@ -570,7 +703,6 @@
       "targetEntityClass": "RuntimeDiagnostics",
       "cardinality": "many-to-many"
     },
-
     "prevented_by": {
       "facet": "resilience",
       "description": "A static check can catch this fault before runtime",
@@ -578,7 +710,6 @@
       "targetEntityClass": "StaticDiagnostics",
       "cardinality": "many-to-many"
     },
-
     "caused_by": {
       "facet": "resilience",
       "description": "A fault is a downstream consequence of another fault",
@@ -586,25 +717,27 @@
       "targetEntityClass": "Fault",
       "cardinality": "many-to-one"
     },
-
     "limited_by": {
       "facet": "resilience",
       "description": "A service or feature has a known limitation",
-      "sourceEntityClass": ["Service", "Feature"],
+      "sourceEntityClass": [
+        "Service",
+        "Feature"
+      ],
       "targetEntityClass": "Limitation",
       "cardinality": "many-to-many"
     },
-
     "_comment_evolution_rels": "=== EVOLUTION RELATIONS ===",
-
     "changed_in": {
       "facet": "evolution",
       "description": "A file or service was introduced or modified in a revision",
-      "sourceEntityClass": ["File", "Service"],
+      "sourceEntityClass": [
+        "File",
+        "Service"
+      ],
       "targetEntityClass": "Revision",
       "cardinality": "many-to-many"
     },
-
     "precedes": {
       "facet": "evolution",
       "description": "Chronological ordering: this revision came before that one",
@@ -612,7 +745,6 @@
       "targetEntityClass": "Revision",
       "cardinality": "one-to-one"
     },
-
     "addressed_in": {
       "facet": "evolution",
       "description": "A limitation is being resolved in a revision (completed or planned)",

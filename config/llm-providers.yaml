@@ -7,7 +7,7 @@ providers:
   # Subscription providers (zero cost)
   claude-code:
     cliCommand: "claude"
-    timeout: 60000
+    timeout: 120000
     models:
       fast: "sonnet"
       standard: "sonnet"
@@ -18,11 +18,11 @@ providers:
 
   copilot:
     cliCommand: "copilot-cli"
-    timeout: 60000
+    timeout: 120000
     models:
-      fast: "gpt-4o-mini"
-      standard: "gpt-4o"
-      premium: "gpt-4o"
+      fast: "gpt-4.1"
+      standard: "claude-sonnet-4.5"
+      premium: "claude-opus-4.6"
     quotaTracking:
       enabled: true
       softLimitPerHour: 100

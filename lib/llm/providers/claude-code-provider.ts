@@ -21,7 +21,7 @@ export class ClaudeCodeProvider extends CLIProviderBase {
         premium: 'opus',
       },
       defaultModel: 'sonnet',
-      timeout: 60000, // 60 seconds
+      timeout: 120000, // 120 seconds — Claude CLI can be slow for large prompts
       ...config,
     });
   }

@@ -16,12 +16,12 @@ export class CopilotProvider extends CLIProviderBase {
   constructor(config: Partial<ProviderConfig> = {}) {
     super({
       models: {
-        fast: 'gpt-4o-mini',
-        standard: 'gpt-4o',
-        premium: 'gpt-4o', // Copilot may support claude-opus-4, fallback to gpt-4o
+        fast: 'gpt-4.1',
+        standard: 'claude-sonnet-4.5',
+        premium: 'claude-opus-4.6',
       },
-      defaultModel: 'gpt-4o',
-      timeout: 60000, // 60 seconds
+      defaultModel: 'claude-sonnet-4.5',
+      timeout: 120000, // 120 seconds — copilot CLI can be slow
       ...config,
     });
   }
@@ -95,16 +95,16 @@ export class CopilotProvider extends CLIProviderBase {
    */
   protected resolveModel(tier?: ModelTier): string {
     const tierMap: Record<ModelTier, string> = {
-      fast: 'gpt-4o-mini',
-      standard: 'gpt-4o',
-      premium: 'gpt-4o', // Could be 'claude-opus-4' if available
+      fast: 'gpt-4.1',
+      standard: 'claude-sonnet-4.5',
+      premium: 'claude-opus-4.6',
     };
 
     if (tier && tierMap[tier]) {
       return tierMap[tier];
     }
 
-    return 'gpt-4o'; // Default
+    return 'claude-sonnet-4.5'; // Default
   }
 
   /**
