@@ -145,8 +145,8 @@ export function getDefaultConfig(): LLMServiceConfig {
       },
     },
     providerPriority: {
-      fast: ['claude-code', 'copilot', 'groq'] as ProviderName[],
-      standard: ['claude-code', 'copilot', 'groq', 'anthropic', 'openai'] as ProviderName[],
+      fast: ['groq', 'claude-code', 'copilot'] as ProviderName[],
+      standard: ['groq', 'claude-code', 'copilot', 'anthropic', 'openai'] as ProviderName[],
       premium: ['claude-code', 'copilot', 'anthropic', 'openai', 'groq'] as ProviderName[],
     },
     taskTiers: {
