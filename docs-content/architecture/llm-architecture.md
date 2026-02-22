@@ -83,6 +83,7 @@ The system supports 10 LLM providers with tier-based model selection:
 - Automatic quota tracking with persistent storage
 - Exponential backoff on exhaustion (5m → 15m → 1h)
 - Seamless fallback to API providers
+- **Docker mode**: Falls back to [LLM CLI Proxy](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
 
 #### 2. GitHub Copilot
 **CLI Command**: `copilot-cli`
@@ -103,6 +104,13 @@ The system supports 10 LLM providers with tier-based model selection:
 - Shared quota tracking system
 - Automatic provider rotation on exhaustion
 - Zero API costs
+- **Docker mode**: Falls back to [LLM CLI Proxy](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
+
+---
+
+### LLM CLI Proxy (Docker Bridge)
+
+When running inside Docker, CLI tools (`claude`, `copilot-cli`) are unavailable. The [LLM CLI Proxy](../integrations/llm-cli-proxy.md) runs on the host (port 12435) and forwards requests to local CLIs. Each CLI provider automatically detects and uses the proxy during initialization when the `LLM_CLI_PROXY_URL` environment variable is set.
 
 ---
 

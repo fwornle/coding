@@ -175,6 +175,7 @@ const PORTS = {
   MEMGRAPH_BOLT: parseInt(process.env.MEMGRAPH_BOLT_PORT || '7687', 10),
   MEMGRAPH_HTTPS: parseInt(process.env.MEMGRAPH_HTTPS_PORT || '7444', 10),
   MEMGRAPH_LAB: parseInt(process.env.MEMGRAPH_LAB_PORT || '3100', 10),
+  LLM_CLI_PROXY: parseInt(process.env.LLM_CLI_PROXY_PORT || '12435', 10),
 };
 
 // Service configurations
@@ -976,6 +977,65 @@ const SERVICE_CONFIGS = {
       // Vite dev server responds on the port
       return isPortListening(PORTS.SYSTEM_HEALTH_DASHBOARD);
     }
+  },
+
+  llmCliProxy: {
+    name: 'LLM CLI Proxy',
+    required: false, // OPTIONAL - host-side HTTP bridge for CLI LLM providers
+    maxRetries: 2,
+    timeout: 15000,
+    startFn: async () => {
+      console.log('[LLMCliProxy] Starting LLM CLI proxy bridge...');
+
+      // Check if already running on the port
+      if (await isPortListening(PORTS.LLM_CLI_PROXY)) {
+        console.log(`[LLMCliProxy] Already running on port ${PORTS.LLM_CLI_PROXY} - using existing instance`);
+        return { pid: 'already-running', service: 'llm-cli-proxy', skipRegistration: true };
+      }
+
+      const proxyDir = path.join(CODING_DIR, 'integrations/llm-cli-proxy');
+      const distEntry = path.join(proxyDir, 'dist/server.js');
+
+      // Check if built
+      if (!fs.existsSync(distEntry)) {
+        // Try to build
+        if (fs.existsSync(path.join(proxyDir, 'node_modules'))) {
+          console.log('[LLMCliProxy] dist/server.js not found - building...');
+          try {
+            execSync('npm run build', { cwd: proxyDir, timeout: 30000, stdio: 'pipe' });
+          } catch (buildError) {
+            throw new Error(`Build failed: ${buildError.message}`);
+          }
+        } else {
+          throw new Error('node_modules not found - run: cd integrations/llm-cli-proxy && npm install && npm run build');
+        }
+      }
+
+      const child = spawn('node', [distEntry], {
+        detached: true,
+        stdio: ['ignore', 'ignore', 'ignore'],
+        cwd: proxyDir,
+        env: {
+          ...process.env,
+          LLM_CLI_PROXY_PORT: String(PORTS.LLM_CLI_PROXY)
+        }
+      });
+
+      child.unref();
+
+      // Brief wait for process to start
+      await sleep(1000);
+
+      if (!isProcessRunning(child.pid)) {
+        throw new Error('LLM CLI proxy process died immediately');
+      }
+
+      return { pid: child.pid, port: PORTS.LLM_CLI_PROXY, service: 'llm-cli-proxy' };
+    },
+    healthCheckFn: async (result) => {
+      if (result.skipRegistration) return true;
+      return createHttpHealthCheck(PORTS.LLM_CLI_PROXY, '/health')(result);
+    }
   }
 };
 
@@ -1365,6 +1425,27 @@ async function startAllServices() {
     // No PSM registration for Docker-based service
   } else {
     results.degraded.push(memgraphResult);
+  }
+
+  console.log('');
+
+  // 9. OPTIONAL: LLM CLI Proxy (host-side HTTP bridge to CLI LLM providers)
+  const llmCliProxyResult = await startServiceWithRetry(
+    SERVICE_CONFIGS.llmCliProxy.name,
+    SERVICE_CONFIGS.llmCliProxy.startFn,
+    SERVICE_CONFIGS.llmCliProxy.healthCheckFn,
+    {
+      required: SERVICE_CONFIGS.llmCliProxy.required,
+      maxRetries: SERVICE_CONFIGS.llmCliProxy.maxRetries,
+      timeout: SERVICE_CONFIGS.llmCliProxy.timeout
+    }
+  );
+
+  if (llmCliProxyResult.status === 'success') {
+    results.successful.push(llmCliProxyResult);
+    await registerWithPSM(llmCliProxyResult, 'integrations/llm-cli-proxy/dist/server.js');
+  } else {
+    results.degraded.push(llmCliProxyResult);
   }
 
   console.log('');
