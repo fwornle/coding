@@ -2356,6 +2356,200 @@ ensure_dmr_model() {
     fi
 }
 
+# Setup LLM CLI Proxy - HTTP bridge to host CLI tools (claude, copilot-cli)
+# for Docker containers. Port 12435, adjacent to DMR's port 12434.
+setup_llm_cli_proxy() {
+    local proxy_port="${LLM_CLI_PROXY_PORT:-12435}"
+    local proxy_dir="$CODING_REPO/integrations/llm-cli-proxy"
+    local has_cli=false
+
+    info "Setting up LLM CLI Proxy (optional)..."
+
+    # Check if claude CLI is available
+    if command -v claude >/dev/null 2>&1; then
+        local claude_version
+        claude_version=$(claude --version 2>/dev/null | head -1)
+        success "  claude CLI found: $claude_version"
+        has_cli=true
+    else
+        info "  claude CLI not found"
+        echo ""
+        echo -e "  ${CYAN}The 'claude' CLI enables routing LLM requests through your Claude Max subscription.${NC}"
+        echo -e "  Install: ${GREEN}npm install -g @anthropic-ai/claude-code${NC}"
+        if confirm_system_change \
+            "Install claude CLI globally via npm" \
+            "Runs: npm install -g @anthropic-ai/claude-code"; then
+            if npm install -g @anthropic-ai/claude-code 2>/dev/null; then
+                success "  claude CLI installed"
+                has_cli=true
+            else
+                warning "  Failed to install claude CLI"
+            fi
+        fi
+    fi
+
+    # Check if copilot-cli is available
+    if command -v copilot-cli >/dev/null 2>&1; then
+        local copilot_version
+        copilot_version=$(copilot-cli --version 2>/dev/null | head -1)
+        success "  copilot-cli found: $copilot_version"
+        has_cli=true
+    else
+        info "  copilot-cli not found (optional)"
+    fi
+
+    # If no CLI tools available, skip proxy setup
+    if [[ "$has_cli" != "true" ]]; then
+        info "No CLI tools available - skipping LLM CLI Proxy setup"
+        SKIPPED_SYSTEM_DEPS+=("llm-cli-proxy")
+        return 0
+    fi
+
+    # Build the proxy
+    if [[ -d "$proxy_dir" ]]; then
+        info "Building LLM CLI Proxy..."
+        (cd "$proxy_dir" && npm install && npm run build) 2>&1 | tail -3
+        if [[ -f "$proxy_dir/dist/server.js" ]]; then
+            success "  LLM CLI Proxy built successfully"
+        else
+            warning "  LLM CLI Proxy build failed"
+            INSTALLATION_WARNINGS+=("LLM CLI Proxy: Build failed")
+            return 1
+        fi
+    else
+        warning "  LLM CLI Proxy directory not found at $proxy_dir"
+        return 1
+    fi
+
+    # Check if already running
+    if lsof -i :"$proxy_port" -sTCP:LISTEN >/dev/null 2>&1; then
+        success "  LLM CLI Proxy already running on port $proxy_port"
+        return 0
+    fi
+
+    # Offer to install as persistent service
+    case "$(uname -s)" in
+        Darwin*)
+            create_llm_proxy_launchd "$proxy_dir" "$proxy_port"
+            ;;
+        Linux*)
+            create_llm_proxy_systemd "$proxy_dir" "$proxy_port"
+            ;;
+        *)
+            info "  Start manually: cd $proxy_dir && npm start"
+            ;;
+    esac
+}
+
+# Create macOS LaunchAgent for LLM CLI Proxy
+create_llm_proxy_launchd() {
+    local proxy_dir="$1"
+    local proxy_port="$2"
+    local plist_path="$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
+    local node_path
+    node_path=$(which node)
+
+    if confirm_system_change \
+        "Install LLM CLI Proxy as a LaunchAgent (starts at login)" \
+        "Creates $plist_path"; then
+
+        mkdir -p "$HOME/Library/LaunchAgents"
+        cat > "$plist_path" << PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.llm-cli-proxy</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${node_path}</string>
+        <string>${proxy_dir}/dist/server.js</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>${proxy_dir}</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LLM_CLI_PROXY_PORT</key>
+        <string>${proxy_port}</string>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:${HOME}/.nvm/versions/node/$(node -v)/bin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${proxy_dir}/logs/stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>${proxy_dir}/logs/stderr.log</string>
+</dict>
+</plist>
+PLIST_EOF
+
+        mkdir -p "$proxy_dir/logs"
+        launchctl load "$plist_path" 2>/dev/null
+        sleep 2
+
+        if lsof -i :"$proxy_port" -sTCP:LISTEN >/dev/null 2>&1; then
+            success "  LLM CLI Proxy running as LaunchAgent on port $proxy_port"
+        else
+            warning "  LaunchAgent installed but proxy may not have started yet"
+            info "  Check: launchctl list | grep llm-cli-proxy"
+        fi
+    else
+        info "  Start manually: cd $proxy_dir && npm start"
+    fi
+}
+
+# Create Linux systemd user service for LLM CLI Proxy
+create_llm_proxy_systemd() {
+    local proxy_dir="$1"
+    local proxy_port="$2"
+    local service_path="$HOME/.config/systemd/user/llm-cli-proxy.service"
+    local node_path
+    node_path=$(which node)
+
+    if confirm_system_change \
+        "Install LLM CLI Proxy as a systemd user service" \
+        "Creates $service_path"; then
+
+        mkdir -p "$HOME/.config/systemd/user"
+        cat > "$service_path" << SYSTEMD_EOF
+[Unit]
+Description=LLM CLI Proxy - HTTP bridge to host CLI tools
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${proxy_dir}
+ExecStart=${node_path} ${proxy_dir}/dist/server.js
+Environment=LLM_CLI_PROXY_PORT=${proxy_port}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+SYSTEMD_EOF
+
+        mkdir -p "$proxy_dir/logs"
+        systemctl --user daemon-reload
+        systemctl --user enable llm-cli-proxy.service
+        systemctl --user start llm-cli-proxy.service
+        sleep 2
+
+        if systemctl --user is-active llm-cli-proxy.service >/dev/null 2>&1; then
+            success "  LLM CLI Proxy running as systemd service on port $proxy_port"
+        else
+            warning "  systemd service installed but may not have started"
+            info "  Check: systemctl --user status llm-cli-proxy"
+        fi
+    else
+        info "  Start manually: cd $proxy_dir && npm start"
+    fi
+}
+
 # Legacy: Install Ollama for local LLM inference (DEPRECATED - use DMR instead)
 # Kept for backward compatibility on systems without Docker Desktop
 install_ollama() {
@@ -2674,6 +2868,7 @@ main() {
     initialize_knowledge_databases
     install_plantuml
     setup_local_llm  # DMR preferred, Ollama as fallback
+    setup_llm_cli_proxy  # HTTP bridge for claude/copilot CLI in Docker
     detect_network_and_set_repos
     test_proxy_connectivity
     install_memory_visualizer

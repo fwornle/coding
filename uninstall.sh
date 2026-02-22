@@ -155,6 +155,50 @@ if [[ -d "$CODING_REPO/integrations/browser-access" ]]; then
     echo "    Source code preserved"
 fi
 
+# Clean up LLM CLI Proxy
+if [[ -d "$CODING_REPO/integrations/llm-cli-proxy" ]]; then
+    echo "  Cleaning LLM CLI Proxy..."
+
+    # Unload LaunchAgent if present (macOS)
+    if [[ -f "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist" ]]; then
+        echo "    Unloading LaunchAgent..."
+        launchctl unload "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist" 2>/dev/null || true
+        rm -f "$HOME/Library/LaunchAgents/com.coding.llm-cli-proxy.plist"
+        echo "    Removed LaunchAgent"
+    fi
+
+    # Stop systemd service if present (Linux)
+    if [[ -f "$HOME/.config/systemd/user/llm-cli-proxy.service" ]]; then
+        echo "    Stopping systemd service..."
+        systemctl --user stop llm-cli-proxy.service 2>/dev/null || true
+        systemctl --user disable llm-cli-proxy.service 2>/dev/null || true
+        rm -f "$HOME/.config/systemd/user/llm-cli-proxy.service"
+        systemctl --user daemon-reload 2>/dev/null || true
+        echo "    Removed systemd service"
+    fi
+
+    # Kill any remaining proxy processes
+    pkill -f "llm-cli-proxy" 2>/dev/null || true
+
+    # Remove build artifacts
+    if [[ -d "$CODING_REPO/integrations/llm-cli-proxy/node_modules" ]]; then
+        rm -rf "$CODING_REPO/integrations/llm-cli-proxy/node_modules"
+        echo "    Removed node_modules"
+    fi
+
+    if [[ -d "$CODING_REPO/integrations/llm-cli-proxy/dist" ]]; then
+        rm -rf "$CODING_REPO/integrations/llm-cli-proxy/dist"
+        echo "    Removed dist"
+    fi
+
+    if [[ -d "$CODING_REPO/integrations/llm-cli-proxy/logs" ]]; then
+        rm -rf "$CODING_REPO/integrations/llm-cli-proxy/logs"
+        echo "    Removed logs"
+    fi
+
+    echo "    Source code preserved"
+fi
+
 # Note: memory-visualizer and mcp-server-semantic-analysis are git submodules
 # and have already been cleaned above
 

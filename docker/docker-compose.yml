@@ -49,6 +49,8 @@ services:
       - DMR_PORT=12434
       # Ollama fallback (if DMR unavailable) - also on host
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # LLM CLI Proxy - HTTP bridge to host's claude/copilot-cli commands
+      - LLM_CLI_PROXY_URL=http://host.docker.internal:12435
     ports:
       - "8080:8080"     # VKB Server
       - "3847:3847"     # Browser Access SSE
