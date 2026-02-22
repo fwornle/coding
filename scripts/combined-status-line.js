@@ -553,8 +553,8 @@ class CombinedStatusLine {
       const statusData = JSON.parse(readFileSync(statusPath, 'utf8'));
       const age = Date.now() - new Date(statusData.lastUpdate).getTime();
 
-      // Stale if > 2 minutes old (verifier runs every 60s)
-      if (age > 120000) {
+      // Stale if > 3 minutes old (verifier runs every 60s, allow for slow cycles)
+      if (age > 180000) {
         return { status: 'stale', ...statusData };
       }
 
@@ -681,11 +681,12 @@ class CombinedStatusLine {
                               guardsMatch[1] === '🟡' ? 'warning' : 'unhealthy';
       }
       
-      // Check if health file is recent (within 30 seconds)
+      // Check if health file is recent (within 60 seconds)
+      // The daemon writes every ~15s but health checks can take longer during probes
       const stats = fs.statSync(healthStatusFile);
       const age = Date.now() - stats.mtime.getTime();
 
-      if (age > 30000) {
+      if (age > 60000) {
         result.status = 'stale';
         result.gcm.status = 'stale';
 
@@ -716,39 +717,51 @@ class CombinedStatusLine {
             console.error(`DEBUG: Stale file auto-correction: filtered sessions to ${Object.keys(validatedSessions).join(', ')} based on running monitors: ${[...runningMonitors].join(', ')}`);
           }
         } else {
-          // No running monitors found - clear all sessions (crashed state)
-          result.sessions = {};
-          if (process.env.DEBUG_STATUS) {
-            console.error('DEBUG: Stale file auto-correction: cleared all sessions (no running monitors detected)');
+          // No running monitors — but sessions may still be valid if agent processes
+          // (claude, copilot, opencode) are running. Trust the status file data when
+          // it was recently written by the daemon, just slightly outside the freshness window.
+          // Only clear if file is VERY stale (> 5 minutes = daemon is truly dead)
+          if (age > 300000) {
+            result.sessions = {};
+            if (process.env.DEBUG_STATUS) {
+              console.error('DEBUG: Stale file auto-correction: cleared all sessions (file >5min old, daemon likely dead)');
+            }
           }
+          // Otherwise keep sessions from daemon's last write — it validates them already
         }
       }
 
       // CRITICAL: Check for stale trajectory data in CURRENT project only
       // GCM status should only reflect issues in the project where it's displayed
+      // Skip trajectory check when no transcript monitors are running — trajectory
+      // is maintained by the monitor, so a stale trajectory without a monitor is expected
       let currentProjectTrajectoryIssue = null;
 
       // Determine current project from environment or working directory
       const currentProjectPath = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
+      const currentProjectName = currentProjectPath.split('/').pop();
 
-      // Check trajectory for current project only
-      const currentTrajectoryPath = join(currentProjectPath, '.specstory', 'trajectory', 'live-state.json');
-      if (existsSync(currentTrajectoryPath)) {
-        const trajStats = fs.statSync(currentTrajectoryPath);
-        const trajAge = Date.now() - trajStats.mtime.getTime();
-        const oneHour = 60 * 60 * 1000;
+      // Only check trajectory if a transcript monitor is running for this project
+      const trajRunningMonitors = this.getRunningTranscriptMonitorsSync();
+      const hasMonitorForCurrentProject = trajRunningMonitors.has(currentProjectName);
 
-        if (trajAge > oneHour) {
-          const ageMinutes = Math.floor(trajAge / 1000 / 60);
-          currentProjectTrajectoryIssue = `stale tr`;
-        }
-      } else {
-        // Current project session active but no trajectory file
-        const currentProjectName = currentProjectPath.split('/').pop();
-        const currentSession = result.sessions[currentProjectName] || result.sessions['coding'] || result.sessions['C'];
+      if (hasMonitorForCurrentProject) {
+        // Check trajectory for current project only
+        const currentTrajectoryPath = join(currentProjectPath, '.specstory', 'trajectory', 'live-state.json');
+        if (existsSync(currentTrajectoryPath)) {
+          const trajStats = fs.statSync(currentTrajectoryPath);
+          const trajAge = Date.now() - trajStats.mtime.getTime();
+          const oneHour = 60 * 60 * 1000;
 
-        if (currentSession && currentSession.status === 'healthy') {
-          currentProjectTrajectoryIssue = 'no tr';
+          if (trajAge > oneHour) {
+            currentProjectTrajectoryIssue = `stale tr`;
+          }
+        } else {
+          // Monitor running but no trajectory file
+          const currentSession = result.sessions[currentProjectName] || result.sessions['coding'] || result.sessions['C'];
+          if (currentSession && currentSession.status === 'healthy') {
+            currentProjectTrajectoryIssue = 'no tr';
+          }
         }
       }
 
@@ -1623,6 +1636,7 @@ class CombinedStatusLine {
     // Store GCM status for health indicator (calculated first since health is first in display)
     const gcmIcon = globalHealth?.gcm?.icon || '🟡';
     const gcmHealthy = gcmIcon === '✅';
+
 
     // Unified Health Status - FIRST in status line
     // Merges GCM + Health Verifier into single indicator showing overall system health
