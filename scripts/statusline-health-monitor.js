@@ -282,18 +282,32 @@ class StatusLineHealthMonitor {
 
       // Method 2: Find non-Claude agent processes (copilot, opencode, etc.)
       // These binaries show full path in ps comm field, so match on basename
+      // Also check process elapsed time — zombies surviving VSCode restarts get filtered
+      const ZOMBIE_THRESHOLD_MS = 48 * 60 * 60 * 1000; // 48 hours
       for (const agentName of ['copilot', 'opencode']) {
-        let agentPids = '';
+        let agentLines = '';
         try {
-          agentPids = execSync(`ps -eo pid,comm | awk '/${agentName}$/ {print $1}'`, { encoding: 'utf8', timeout: 5000 });
+          agentLines = execSync(`ps -eo pid,etime,comm | awk '$3 ~ /${agentName}$/ {print $1, $2}'`, { encoding: 'utf8', timeout: 5000 });
         } catch (psError) {
           // agent not running is normal
         }
 
-        if (agentPids && agentPids.trim()) {
-          for (const pidStr of agentPids.trim().split('\n')) {
-            const pid = pidStr.trim();
-            if (pid) extractProjectFromPid(pid);
+        if (agentLines && agentLines.trim()) {
+          for (const line of agentLines.trim().split('\n')) {
+            const [pid, etime] = line.trim().split(/\s+/);
+            if (!pid) continue;
+
+            // Filter zombie agents — processes alive >48h are stale
+            // (survived VSCode restarts, terminal closures, etc.)
+            if (etime) {
+              const elapsedMs = this.parseEtime(etime);
+              if (elapsedMs > ZOMBIE_THRESHOLD_MS) {
+                this.log(`Skipping zombie ${agentName} PID ${pid} (running ${etime})`, 'DEBUG');
+                continue;
+              }
+            }
+
+            extractProjectFromPid(pid);
           }
         }
       }
@@ -350,8 +364,26 @@ class StatusLineHealthMonitor {
         for (const [projectName, projectInfo] of Object.entries(registry.projects || {})) {
           // Check if monitor is running for this project
           if (!runningMonitors.has(projectName)) {
-            // No monitor running - show as dormant/sleeping with special icon
-            // Check if there's a recent transcript to determine if session is known
+            // No monitor running — check if an agent (claude/copilot/opencode) is at least running
+            const hasAgentSession = agentSessions.has(projectName);
+
+            // If NO agent running AND health file says "stopped" (stale) → skip entirely
+            if (!hasAgentSession) {
+              const projectPath = path.join(agenticDir, projectName);
+              const healthFile = this.getCentralizedHealthFile(projectPath);
+              if (fs.existsSync(healthFile)) {
+                try {
+                  const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+                  const healthFileAge = healthData.timestamp ? Date.now() - healthData.timestamp : 0;
+                  if (healthData.status === 'stopped' && healthFileAge > 300000) { // >5 min since stopped
+                    this.log(`Skipping registry session ${projectName} (stopped ${Math.round(healthFileAge / 60000)}min ago, no agent)`, 'DEBUG');
+                    continue; // Skip — session is definitively closed
+                  }
+                } catch { /* fall through to transcript check */ }
+              }
+            }
+
+            // No monitor — check transcript for recent activity
             const claudeProjectDir = path.join(homeDir, '.claude', 'projects', `${claudeProjectPrefix}${projectName}`);
             if (fs.existsSync(claudeProjectDir)) {
               try {
@@ -367,16 +399,17 @@ class StatusLineHealthMonitor {
                   const mostRecent = transcriptFiles[0];
                   const age = Date.now() - mostRecent.stats.mtime.getTime();
                   // Only show no-monitor sessions if:
-                  // 1. Claude session is running (virgin/idle session), OR
+                  // 1. Claude/copilot/opencode session is running (virgin/idle session), OR
                   // 2. Very recent activity (< 5 min) suggesting session just closed
-                  // Sessions with older transcripts but no Claude process are truly closed - omit them
-                  const hasAgentSession = agentSessions.has(projectName);
+                  // Sessions with older transcripts but no agent process are truly closed - omit them
                   const isVeryRecent = age < 300000; // 5 minutes
                   if (hasAgentSession || isVeryRecent) {
+                    // Use graduated icon based on transcript age (same progression as monitored sessions)
+                    const iconData = hasAgentSession ? this.iconFromAge(age) : { status: 'closing', icon: '💤', details: 'closing' };
                     sessions[projectName] = {
-                      status: 'no-monitor',
-                      icon: '💤',
-                      details: hasAgentSession ? 'virgin' : 'closing'
+                      ...iconData,
+                      status: iconData.status || 'no-monitor',
+                      details: iconData.details || (hasAgentSession ? 'virgin' : 'closing')
                     };
                   }
                 }
@@ -424,16 +457,12 @@ class StatusLineHealthMonitor {
                 const mostRecent = transcriptFiles[0];
                 const age = Date.now() - mostRecent.stats.mtime.getTime();
                 // Only show no-monitor sessions if:
-                // 1. Claude session is running (virgin/idle session), OR
-                // 2. Very recent activity (< 5 min) suggesting session just closed
-                const hasAgentSession = agentSessions.has(projectName);
+                // 1. Agent session is running, OR 2. Very recent activity (< 5 min)
+                const hasAgent = agentSessions.has(projectName);
                 const isVeryRecent = age < 300000; // 5 minutes
-                if (hasAgentSession || isVeryRecent) {
-                  sessions[projectName] = {
-                    status: 'no-monitor',
-                    icon: '💤',
-                    details: hasAgentSession ? 'virgin' : 'closing'
-                  };
+                if (hasAgent || isVeryRecent) {
+                  const iData = hasAgent ? this.iconFromAge(age) : { status: 'closing', icon: '💤', details: 'closing' };
+                  sessions[projectName] = { ...iData, details: iData.details || (hasAgent ? 'virgin' : 'closing') };
                 }
               }
             } catch (e) {
@@ -567,17 +596,12 @@ class StatusLineHealthMonitor {
               if (transcriptFiles.length > 0) {
                 const mostRecent = transcriptFiles[0];
                 const age = Date.now() - mostRecent.stats.mtime.getTime();
-                // Only show no-monitor sessions if:
-                // 1. Claude session is running (virgin/idle session), OR
-                // 2. Very recent activity (< 5 min) suggesting session just closed
-                const hasAgentSession = agentSessions.has(projectName);
+                // Only show no-monitor sessions if agent running OR very recent
+                const hasAgent3 = agentSessions.has(projectName);
                 const isVeryRecent = age < 300000; // 5 minutes
-                if (hasAgentSession || isVeryRecent) {
-                  sessions[projectName] = {
-                    status: 'no-monitor',
-                    icon: '💤',
-                    details: hasAgentSession ? 'virgin' : 'closing'
-                  };
+                if (hasAgent3 || isVeryRecent) {
+                  const iData3 = hasAgent3 ? this.iconFromAge(age) : { status: 'closing', icon: '💤', details: 'closing' };
+                  sessions[projectName] = { ...iData3, details: iData3.details || (hasAgent3 ? 'virgin' : 'closing') };
                 }
               }
             } catch (e) {
@@ -641,10 +665,19 @@ class StatusLineHealthMonitor {
         try {
           const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
           const transcriptAge = healthData.transcriptInfo?.ageMs || 0;
+          // Fallback: if transcriptInfo is missing (e.g. stopped sessions), use health file timestamp
+          const healthFileAge = healthData.timestamp ? Date.now() - healthData.timestamp : 0;
+          const effectiveAge = transcriptAge > 0 ? transcriptAge : healthFileAge;
 
-          // Remove orphaned sessions (stale transcript + no agent)
-          if (transcriptAge > SIX_HOURS_MS) {
-            this.log(`Filtering out orphaned session ${projectName} (transcript age: ${Math.round(transcriptAge / 3600000)}h, no agent)`, 'DEBUG');
+          // Remove orphaned sessions (stale transcript/health + no agent)
+          if (effectiveAge > SIX_HOURS_MS) {
+            this.log(`Filtering out orphaned session ${projectName} (effective age: ${Math.round(effectiveAge / 3600000)}h, no agent)`, 'DEBUG');
+            continue;
+          }
+
+          // Also filter stopped sessions with stale health files
+          if (healthData.status === 'stopped' && healthFileAge > SIX_HOURS_MS) {
+            this.log(`Filtering out stopped session ${projectName} (stopped ${Math.round(healthFileAge / 3600000)}h ago, no agent)`, 'DEBUG');
             continue;
           }
         } catch (readError) {
@@ -662,9 +695,28 @@ class StatusLineHealthMonitor {
     for (const [projectName, sessionData] of Object.entries(cleanedSessions)) {
       const hasRunningAgent = agentSessions.has(projectName);
 
-      if (hasRunningAgent || sessionData.status === 'no-monitor') {
-        // Agent is running, or already handled as no-monitor — keep
+      if (hasRunningAgent) {
+        // Agent is running — always keep
         liveSessions[projectName] = sessionData;
+      } else if (sessionData.status === 'no-monitor') {
+        // No-monitor sessions without a running agent should only persist briefly
+        // If the health file shows "stopped" and is old, don't keep it
+        const projectPath = path.join(agenticDir, projectName);
+        const healthFile = this.getCentralizedHealthFile(projectPath);
+        let keepSession = true;
+        if (fs.existsSync(healthFile)) {
+          try {
+            const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+            const healthFileAge = healthData.timestamp ? Date.now() - healthData.timestamp : 0;
+            if (healthData.status === 'stopped' && healthFileAge > 300000) { // 5 minutes
+              keepSession = false;
+              this.log(`Removed stale no-monitor session ${projectName} (stopped ${Math.round(healthFileAge / 60000)}min ago)`, 'DEBUG');
+            }
+          } catch { /* keep on error */ }
+        }
+        if (keepSession) {
+          liveSessions[projectName] = sessionData;
+        }
       } else {
         this.log(`Removed closed session ${projectName} from statusline (agent not running, was: ${sessionData.status})`, 'DEBUG');
       }
@@ -680,6 +732,11 @@ class StatusLineHealthMonitor {
         try {
           if (fs.existsSync(healthFile)) {
             const healthData = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+            // Skip age cap for stopped monitors — their data is stale and would incorrectly
+            // show 0ms age (= green) because transcript/uptime fields are missing
+            if (healthData.status === 'stopped') {
+              continue;
+            }
             const uptimeMs = (healthData.metrics?.uptimeSeconds || 0) * 1000;
             const transcriptAge = healthData.transcriptInfo?.ageMs || 0;
             // Skip age cap when transcript is "not_found" — ageMs=0 means "no transcript",
@@ -710,6 +767,20 @@ class StatusLineHealthMonitor {
     if (age < 21600000) return { status: 'dormant', icon: '🪨', details: 'Session dormant' };
     if (age < 86400000) return { status: 'inactive', icon: '⚫', details: 'Session inactive' };
     return { status: 'sleeping', icon: '💤', details: 'Session sleeping' };
+  }
+
+  /**
+   * Parse ps etime format to milliseconds
+   * Format: [[dd-]hh:]mm:ss (e.g. "14-03:25:30", "03:25:30", "25:30")
+   */
+  parseEtime(etime) {
+    const match = etime.match(/(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)/);
+    if (!match) return 0;
+    const days = parseInt(match[1] || '0');
+    const hours = parseInt(match[2] || '0');
+    const minutes = parseInt(match[3] || '0');
+    const seconds = parseInt(match[4] || '0');
+    return ((days * 24 + hours) * 3600 + minutes * 60 + seconds) * 1000;
   }
 
   /**
@@ -2374,17 +2445,16 @@ class StatusLineHealthMonitor {
       // Format status line
       const statusLine = this.formatStatusLine(gcmHealth, sessionHealth, constraintHealth, databaseHealth, vkbHealth, browserAccessHealth, healthDashboardHealth, dockerMCPHealth);
 
-      // Only update if changed to avoid unnecessary updates
+      // Write status file for Claude Code integration
+      // IMPORTANT: Always write/touch the file even when content hasn't changed,
+      // because combined-status-line.js uses file mtime to check freshness
+      const statusFile = path.join(this.codingRepoPath, '.logs', 'statusline-health-status.txt');
+      const tempFile = statusFile + '.tmp.' + process.pid;
+      fs.writeFileSync(tempFile, statusLine);
+      fs.renameSync(tempFile, statusFile);  // rename is atomic on POSIX filesystems
+
       if (statusLine !== this.lastStatus) {
         this.lastStatus = statusLine;
-
-        // Write to status file for Claude Code integration
-        // STABILITY FIX: Use atomic write (write to temp file, then rename) to prevent race conditions
-        const statusFile = path.join(this.codingRepoPath, '.logs', 'statusline-health-status.txt');
-        const tempFile = statusFile + '.tmp.' + process.pid;
-        fs.writeFileSync(tempFile, statusLine);
-        fs.renameSync(tempFile, statusFile);  // rename is atomic on POSIX filesystems
-
         this.log(`Status updated: ${statusLine}`);
 
         // Emit status for any listeners
