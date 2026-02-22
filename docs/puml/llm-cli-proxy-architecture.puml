@@ -1,0 +1,79 @@
+@startuml llm-cli-proxy-architecture
+!include _standard-style.puml
+
+title LLM CLI Proxy Bridge Architecture\nHost-side HTTP bridge for Docker container CLI access
+
+top to bottom direction
+
+package "Docker Container (coding-services)" {
+  component [Semantic Analysis\nMCP Server] as semantic <<core>>
+  component [LLM Service\n(Provider Registry)] as llmservice <<core>>
+  component [Claude-Code\nProvider] as claudeprov <<agent>>
+  component [Copilot\nProvider] as copilotprov <<agent>>
+  component [Groq Provider] as groqprov <<api>>
+  component [Anthropic Provider] as anthropicprov <<api>>
+
+  llmservice -down-> claudeprov : priority 1
+  llmservice -down-> copilotprov : priority 2
+  llmservice -down-> groqprov : priority 3
+  llmservice -down-> anthropicprov : priority 4
+  semantic -down-> llmservice : LLM requests
+}
+
+rectangle "host.docker.internal" {
+  package "Host Machine (port 12435)" {
+    component [LLM CLI Proxy\nExpress Server] as proxy <<api>>
+    component [POST /api/complete] as complete <<api>>
+    component [GET /health] as health <<api>>
+    component [CLI Spawner\n(child_process)] as spawner <<util>>
+
+    proxy -down-> complete
+    proxy -down-> health
+    complete -down-> spawner
+  }
+
+  package "Host CLI Tools" {
+    component [claude CLI\n(Claude Max)] as claude <<cli>>
+    component [copilot-cli\n(GitHub Copilot)] as copilot <<cli>>
+  }
+
+  spawner -down-> claude : spawn --print
+  spawner -down-> copilot : spawn --prompt
+}
+
+cloud "Cloud APIs" {
+  component [Anthropic API] as anthropicapi <<external>>
+  component [Groq API] as groqapi <<external>>
+}
+
+' Cross-boundary connections
+claudeprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:12435
+copilotprov SYNC_LINE proxy : HTTP via\nhost.docker.internal:12435
+groqprov ASYNC_LINE groqapi : HTTPS API
+anthropicprov ASYNC_LINE anthropicapi : HTTPS API
+
+note right of proxy
+  **Stateless HTTP Bridge**
+  - No caching (Docker handles it)
+  - No queuing (CircuitBreaker in Docker)
+  - stdin for large prompts (>200KB)
+  - Error codes map to provider errors
+  - Provider availability cached 60s
+end note
+
+note right of claude
+  **Zero per-token cost**
+  Claude Max subscription
+  via host's claude CLI
+end note
+
+note bottom of llmservice
+  **Provider Priority Chain**
+  1. claude-code (proxy) -- free
+  2. copilot (proxy) -- free
+  3. groq -- API key
+  4. anthropic -- API key
+  5. openai -- API key
+end note
+
+@enduml

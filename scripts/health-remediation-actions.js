@@ -191,6 +191,9 @@ export class HealthRemediationActions {
         case 'regenerate_services_file':
           result = await this.regenerateServicesFile(issueDetails);
           break;
+        case 'check_llm_cli_proxy':
+          result = await this.checkLLMCLIProxy(issueDetails);
+          break;
         default:
           this.log(`Unknown action: ${actionName}`, 'ERROR');
           return {
@@ -842,6 +845,40 @@ export class HealthRemediationActions {
       return {
         success: true,
         message: `Services status file regenerated with ${servicesRunning.length} active services`
+      };
+
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Check LLM CLI Proxy status (informational only - host service, no auto-heal)
+   * The proxy runs on the host at port 12435 and bridges CLI tools for Docker.
+   */
+  async checkLLMCLIProxy(details) {
+    try {
+      this.log('Checking LLM CLI Proxy status...');
+
+      // In Docker mode, check via host.docker.internal
+      const proxyHost = this.isDocker ? 'host.docker.internal' : 'localhost';
+      const proxyPort = process.env.LLM_CLI_PROXY_PORT || '12435';
+      const proxyUrl = `http://${proxyHost}:${proxyPort}/health`;
+
+      const isHealthy = await this.checkHttpHealth(proxyUrl, 3000);
+
+      if (isHealthy) {
+        return {
+          success: true,
+          message: `LLM CLI Proxy is running on port ${proxyPort}`
+        };
+      }
+
+      // Proxy not running - provide guidance (cannot auto-heal host services from Docker)
+      return {
+        success: false,
+        message: `LLM CLI Proxy not responding on port ${proxyPort}. ` +
+          'Start on host: cd integrations/llm-cli-proxy && npm start'
       };
 
     } catch (error) {
