@@ -15,6 +15,9 @@
 
 import { EventEmitter } from 'events';
 import { encode } from 'gpt-tokenizer'; // For token estimation
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Pricing per 1M tokens (input + output averaged)
 const PRICING = {
@@ -64,6 +67,11 @@ export class BudgetTracker extends EventEmitter {
     // DuckDB connection (will be initialized later)
     this.db = null;
 
+    // File persistence for cost summary
+    this._flushTimer = null;
+    this._flushDebounceMs = 30000; // Max once per 30s
+    this._costFilePath = this._resolveCostFilePath();
+
     // Stats
     this.stats = {
       totalCost: 0,
@@ -84,6 +92,9 @@ export class BudgetTracker extends EventEmitter {
     if (this.initialized) {
       return;
     }
+
+    // Load persisted cost data from disk (survives Docker restarts)
+    this._loadPersistedCosts();
 
     // Load DuckDB (will be implemented when DatabaseManager is ready)
     await this.initializeDuckDB();
@@ -287,6 +298,9 @@ export class BudgetTracker extends EventEmitter {
     this.stats.byOperationType[operationType].tokens += tokens;
     this.stats.byOperationType[operationType].count++;
 
+    // Schedule flush to disk (debounced, max once per 30s)
+    this._scheduleFlush();
+
     // Persist to DuckDB
     await this.persistCostEvent({
       tokens,
@@ -362,10 +376,115 @@ export class BudgetTracker extends EventEmitter {
       this.currentMonthUsage = 0;
       this.alertedAt.clear();
 
+      // Reset per-provider stats for new month
+      this.stats.byProvider = {};
+      this.stats.totalCost = 0;
+      this.stats.totalTokens = 0;
+
+      // Flush reset to disk
+      this._flushCostSummary();
+
       // Reload from database (in case of restart)
       await this.loadCurrentMonthUsage();
 
       this.emit('month-rollover', { newMonth: currentMonth, usage: this.currentMonthUsage });
+    }
+  }
+
+  /**
+   * Resolve path to .data/llm-usage-costs.json
+   */
+  _resolveCostFilePath() {
+    const repoRoot = process.env.CODING_REPO
+      || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+    return path.join(repoRoot, '.data', 'llm-usage-costs.json');
+  }
+
+  /**
+   * Load persisted cost data from disk on startup
+   */
+  _loadPersistedCosts() {
+    try {
+      if (!fs.existsSync(this._costFilePath)) return;
+      const data = JSON.parse(fs.readFileSync(this._costFilePath, 'utf8'));
+      const currentMonthAbbrev = this._getCurrentMonthAbbrev();
+
+      // Only restore if same billing month
+      if (data.billingMonth !== currentMonthAbbrev) return;
+
+      // Restore per-provider stats
+      if (data.providers) {
+        for (const [provider, stats] of Object.entries(data.providers)) {
+          if (!this.stats.byProvider[provider]) {
+            this.stats.byProvider[provider] = { cost: 0, tokens: 0, count: 0 };
+          }
+          this.stats.byProvider[provider].cost = stats.cost || 0;
+          this.stats.byProvider[provider].tokens = stats.tokens || 0;
+          this.stats.byProvider[provider].count = stats.count || 0;
+        }
+        // Recalculate totals from restored providers
+        this.stats.totalCost = Object.values(this.stats.byProvider)
+          .reduce((sum, p) => sum + p.cost, 0);
+        this.stats.totalTokens = Object.values(this.stats.byProvider)
+          .reduce((sum, p) => sum + p.tokens, 0);
+      }
+
+      process.stdout.write(`[BudgetTracker] Restored costs from disk: $${this.stats.totalCost.toFixed(4)}\n`);
+    } catch (error) {
+      console.warn('[BudgetTracker] Failed to load persisted costs:', error.message);
+    }
+  }
+
+  /**
+   * Get current month as 3-letter abbreviation (JAN, FEB, etc.)
+   */
+  _getCurrentMonthAbbrev() {
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return months[new Date().getMonth()];
+  }
+
+  /**
+   * Flush cost summary to disk (debounced)
+   * Writes .data/llm-usage-costs.json atomically (write .tmp, rename)
+   */
+  _scheduleFlush() {
+    if (this._flushTimer) return; // Already scheduled
+    this._flushTimer = setTimeout(() => {
+      this._flushTimer = null;
+      this._flushCostSummary();
+    }, this._flushDebounceMs);
+  }
+
+  /**
+   * Write cost summary to disk immediately
+   */
+  _flushCostSummary() {
+    try {
+      const dir = path.dirname(this._costFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      const data = {
+        billingMonth: this._getCurrentMonthAbbrev(),
+        lastUpdated: new Date().toISOString(),
+        providers: {}
+      };
+
+      for (const [provider, stats] of Object.entries(this.stats.byProvider)) {
+        data.providers[provider] = {
+          cost: Math.round(stats.cost * 1000000) / 1000000, // 6 decimal places
+          tokens: stats.tokens,
+          count: stats.count
+        };
+      }
+
+      // Atomic write: write to tmp, then rename
+      const tmpPath = this._costFilePath + '.tmp';
+      fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2));
+      fs.renameSync(tmpPath, this._costFilePath);
+    } catch (error) {
+      console.warn('[BudgetTracker] Failed to flush costs to disk:', error.message);
     }
   }
 

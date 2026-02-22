@@ -9,7 +9,22 @@ const { spawn } = require('child_process');
 const codingRepo = process.env.CODING_REPO || path.join(__dirname, '..');
 const cacheFile = path.join(codingRepo, '.logs', 'combined-status-line-cache.txt');
 const cslScript = path.join(__dirname, 'combined-status-line.js');
-const env = { ...process.env, CODING_REPO: codingRepo };
+
+// Load .env file so admin/management API keys are available
+const envFromFile = {};
+try {
+  const envContent = fs.readFileSync(path.join(codingRepo, '.env'), 'utf8');
+  for (const line of envContent.split('\n')) {
+    if (line && !line.startsWith('#') && line.includes('=')) {
+      const idx = line.indexOf('=');
+      const key = line.slice(0, idx).trim();
+      const val = line.slice(idx + 1).trim();
+      if (key && !process.env[key]) envFromFile[key] = val;
+    }
+  }
+} catch { /* .env missing — not fatal */ }
+
+const env = { ...process.env, ...envFromFile, CODING_REPO: codingRepo };
 
 let cacheAgeMs = Infinity;
 try {

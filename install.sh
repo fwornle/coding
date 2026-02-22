@@ -2838,6 +2838,27 @@ setup_vscode_extension() {
     return 0
 }
 
+# Optional: Set up admin/management API keys for real-time spend tracking
+setup_api_admin_keys() {
+    info "API Admin Key Setup (for real-time spend tracking in status bar)"
+    info "This step is optional - press Enter to skip each provider."
+
+    if [[ ! -f "$CODING_REPO/scripts/setup-api-keys.js" ]]; then
+        warning "setup-api-keys.js not found, skipping admin key setup"
+        return 0
+    fi
+
+    if confirm_system_change \
+        "Run interactive API admin key setup" \
+        "This will prompt for optional admin API keys (Anthropic, OpenAI, xAI) and write them to .env"; then
+        node "$CODING_REPO/scripts/setup-api-keys.js" || {
+            warning "API key setup encountered errors (non-fatal)"
+        }
+    else
+        info "Skipping API admin key setup (can run later: node scripts/setup-api-keys.js)"
+    fi
+}
+
 # Main installation flow
 main() {
     echo -e "${PURPLE}🚀 Agent-Agnostic Coding Tools - Universal Installer${NC}"
@@ -2894,7 +2915,8 @@ main() {
     create_project_local_settings
     install_constraint_monitor_hooks
     verify_installation
-    
+    setup_api_admin_keys
+
     # Create activation script for immediate use
     cat > "$CODING_REPO/.activate" << EOF
 #!/bin/bash
