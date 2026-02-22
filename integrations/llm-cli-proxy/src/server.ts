@@ -90,20 +90,16 @@ const CLI_CONFIGS: Record<string, CLIConfig> = {
       premium: 'opus',
     },
     defaultModel: 'sonnet',
-    buildArgs: (prompt, model, maxTokens, temperature) => {
-      const args = ['--print', '--silent', '--model', model, '--max-tokens', maxTokens.toString()];
-      if (temperature !== undefined) {
-        args.push('--temperature', temperature.toString());
-      }
+    buildArgs: (prompt, model, _maxTokens, _temperature) => {
+      // claude CLI supports: --print, --model, --output-format
+      // It does NOT support: --silent, --max-tokens, --temperature
+      const args = ['--print', '--model', model, '--output-format', 'text'];
       args.push(prompt);
       return args;
     },
     useStdinForPrompt: (prompt) => Buffer.byteLength(prompt, 'utf8') > MAX_CLI_ARG_LENGTH,
-    buildArgsWithStdin: (model, maxTokens, temperature) => {
-      const args = ['--print', '--silent', '--model', model, '--max-tokens', maxTokens.toString()];
-      if (temperature !== undefined) {
-        args.push('--temperature', temperature.toString());
-      }
+    buildArgsWithStdin: (model, _maxTokens, _temperature) => {
+      const args = ['--print', '--model', model, '--output-format', 'text'];
       // claude reads from stdin when no positional prompt argument is given
       return args;
     },
@@ -239,7 +235,9 @@ function mapErrorToStatus(stderr: string): { status: number; type: string } {
     lower.includes('quota exceeded') ||
     lower.includes('monthly limit') ||
     lower.includes('usage limit') ||
-    lower.includes('too many requests')
+    lower.includes('too many requests') ||
+    lower.includes('credit balance') ||
+    lower.includes('balance is too low')
   ) {
     return { status: 429, type: 'QUOTA_EXHAUSTED' };
   }
@@ -314,9 +312,11 @@ app.post('/api/complete', async (req, res) => {
     }
 
     if (cliResult.exitCode !== 0) {
-      const { status: httpStatus, type } = mapErrorToStatus(cliResult.stderr);
+      // Some CLIs write errors to stdout (e.g. claude CLI), so check both
+      const errorOutput = cliResult.stderr.trim() || cliResult.stdout.trim();
+      const { status: httpStatus, type } = mapErrorToStatus(errorOutput);
       res.status(httpStatus).json({
-        error: cliResult.stderr.trim() || `CLI exited with code ${cliResult.exitCode}`,
+        error: errorOutput || `CLI exited with code ${cliResult.exitCode}`,
         type,
         provider,
         exitCode: cliResult.exitCode,
