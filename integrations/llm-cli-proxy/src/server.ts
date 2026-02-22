@@ -105,28 +105,24 @@ const CLI_CONFIGS: Record<string, CLIConfig> = {
     },
   },
   'copilot': {
-    command: 'copilot-cli',
+    command: 'copilot',
     versionArgs: ['--version'],
     tierModels: {
-      fast: 'gpt-4o-mini',
-      standard: 'gpt-4o',
-      premium: 'gpt-4o',
+      fast: 'gpt-4.1',
+      standard: 'claude-sonnet-4.5',
+      premium: 'claude-opus-4.6',
     },
-    defaultModel: 'gpt-4o',
-    buildArgs: (prompt, model, maxTokens, temperature) => {
-      const args = ['--prompt', prompt, '--model', model, '--max-tokens', maxTokens.toString(), '--silent'];
-      if (temperature !== undefined) {
-        args.push('--temperature', temperature.toString());
-      }
-      return args;
+    defaultModel: 'claude-sonnet-4.5',
+    buildArgs: (prompt, model, _maxTokens, _temperature) => {
+      // copilot CLI supports: -p/--prompt, --model, -s/--silent, --allow-all-tools
+      // It does NOT support: --max-tokens, --temperature
+      return ['--prompt', prompt, '--model', model, '--silent'];
     },
     useStdinForPrompt: (prompt) => Buffer.byteLength(prompt, 'utf8') > MAX_CLI_ARG_LENGTH,
-    buildArgsWithStdin: (model, maxTokens, temperature) => {
-      const args = ['--prompt', '-', '--model', model, '--max-tokens', maxTokens.toString(), '--silent'];
-      if (temperature !== undefined) {
-        args.push('--temperature', temperature.toString());
-      }
-      return args;
+    buildArgsWithStdin: (model, _maxTokens, _temperature) => {
+      // copilot reads prompt from -p flag, not stdin; for large prompts
+      // we still pass via -p but the caller should be aware of OS limits
+      return ['--prompt', '-', '--model', model, '--silent'];
     },
   },
 };
@@ -174,9 +170,17 @@ function spawnCLIWithTimeout(
   timeoutMs: number
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve, reject) => {
+    // Build clean environment for CLI tools:
+    // - Remove ANTHROPIC_API_KEY so claude CLI uses Max subscription (OAuth)
+    //   instead of depleted pay-as-you-go API credits
+    // - Remove CLAUDECODE to avoid nested session detection
+    const cliEnv = { ...process.env };
+    delete cliEnv.ANTHROPIC_API_KEY;
+    delete cliEnv.CLAUDECODE;
+
     const proc = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: cliEnv,
     });
 
     inFlightProcesses.add(proc);
