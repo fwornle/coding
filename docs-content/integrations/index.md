@@ -100,6 +100,20 @@ MCP servers and tools that extend the coding infrastructure.
 
     [:octicons-arrow-right-24: Details](dashboard.md)
 
+-   :material-swap-horizontal:{ .lg .middle } **LLM CLI Proxy**
+
+    ---
+
+    HTTP bridge to host CLI tools for Docker containers.
+
+    - Forwards to `claude` and `copilot-cli`
+    - Zero-cost subscription routing
+    - Automatic provider fallback
+
+    **Port**: 12435 (Host)
+
+    [:octicons-arrow-right-24: Details](llm-cli-proxy.md)
+
 </div>
 
 ---
@@ -117,6 +131,7 @@ MCP servers and tools that extend the coding infrastructure.
 | Memgraph | 7687 | Bolt | N/A |
 | Memgraph Lab | 3100 | HTTP | N/A |
 | Qdrant | 6333/6334 | HTTP/gRPC | `/health` |
+| LLM CLI Proxy | 12435 | HTTP | `/health` |
 
 ---
 

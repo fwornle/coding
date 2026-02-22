@@ -94,6 +94,7 @@ nav:
     - Code Graph RAG: integrations/code-graph-rag.md
     - Serena: integrations/serena.md
     - Dashboard: integrations/dashboard.md
+    - LLM CLI Proxy: integrations/llm-cli-proxy.md
   - Guides:
     - Overview: guides/index.md
     - Agent Integration: guides/agent-integration.md

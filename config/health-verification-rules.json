@@ -106,7 +106,7 @@
         "enabled": true,
         "severity": "warning",
         "check_type": "http_health",
-        "endpoint": "http://host.docker.internal:12435/health",
+        "endpoint": "http://localhost:12435/health",
         "timeout_ms": 3000,
         "description": "LLM CLI Proxy - HTTP bridge to host claude/copilot CLIs",
         "auto_heal": false,
