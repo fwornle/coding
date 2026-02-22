@@ -33,6 +33,11 @@ package "Running Services" {
   component [VKB Server] as VKB <<api>>
 }
 
+package "Host Services (external)" {
+  component [LLM CLI Proxy\n:12435] as LLMProxy <<api>>
+  component [Docker Model Runner\n:12434] as DMR <<infra>>
+}
+
 ' Connections from top to center
 LaunchClaude -down-> PSM_Registry : register session
 Cleanup -down-> PSM_Registry : cleanup session services
@@ -47,6 +52,10 @@ Verifier -up-> PSM_Registry : verify system health
 Dashboard -up-> Coordinator : managed by
 TranscriptMon -up-> Coordinator : managed by
 VKB -up-> StartScript : started by
+
+' Host services (not managed by PSM)
+Verifier -down-> LLMProxy : health check\n(warning severity)
+Verifier -down-> DMR : health check
 
 note right of PSM_Registry
   **Single Source of Truth**

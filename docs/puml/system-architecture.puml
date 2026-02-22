@@ -70,6 +70,12 @@ package "AI Agent Integration" {
   [Knowledge Retriever\n(Ontology-aware)] as retriever
 }
 
+package "LLM Provider Layer" {
+  [LLM CLI Proxy\n(host:12435)] as llmproxy
+  [Docker Model Runner\n(host:12434)] as dmr
+  [Cloud APIs\n(Groq, Anthropic, OpenAI)] as cloudapi
+}
+
 ' === Online Learning Flow ===
 transcripts --> monitor : File changes
 monitor --> extractor : New exchanges
@@ -93,6 +99,11 @@ vkbserver --> server : Start/manage
 server --> graphdb : Query entities
 server --> visualizer : Serve data
 visualizer --> browser : Interactive viz
+
+' === LLM Provider Flow ===
+extractor --> llmproxy : CLI-based LLM\n(claude/copilot via proxy)
+extractor --> dmr : Local LLM\n(llama.cpp)
+extractor --> cloudapi : API-based LLM\n(Groq, Anthropic)
 
 ' === Retrieval Flow ===
 claude --> retriever : Knowledge queries

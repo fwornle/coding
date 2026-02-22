@@ -119,6 +119,21 @@ The system is built on **self-contained integration components**, each with its 
 
 **Documentation:** [integrations/browser-access/](../integrations/browser-access/)
 
+### LLM CLI Proxy Bridge
+
+**HTTP bridge enabling Docker containers to use host-side CLI tools**
+
+- Routes LLM requests through host's `claude` CLI (Claude Max subscription)
+- Falls back from local CLI to proxy automatically when running in Docker
+- Stateless bridge on port 12435 (adjacent to DMR on 12434)
+- Supports `claude-code` and `copilot` providers via HTTP
+
+![LLM CLI Proxy Architecture](images/llm-cli-proxy-architecture.png)
+
+**Why**: Inside Docker, CLI tools aren't available. Without the proxy, the UKB workflow falls back to Groq/llama-70b. With the proxy, it routes through the host's Claude Max subscription at zero per-token cost.
+
+**Documentation:** [integrations/llm-cli-proxy/](../integrations/llm-cli-proxy/)
+
 ### VSCode CoPilot Integration
 
 **Enhanced GitHub CoPilot with knowledge management**
@@ -341,7 +356,7 @@ coding --claude
 ![Docker Architecture](images/docker-architecture.png)
 
 **Architecture:**
-- **Host**: Claude CLI + lightweight stdio proxies
+- **Host**: Claude CLI + lightweight stdio proxies + LLM CLI Proxy (12435) + DMR (12434)
 - **Containers**: MCP SSE servers on ports 3847-3850
 - **Databases**: Qdrant (6333), Redis (6379), Memgraph (7687)
 
