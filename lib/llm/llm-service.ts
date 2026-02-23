@@ -298,17 +298,28 @@ export class LLMService extends EventEmitter {
     // Resolve provider chain and try each
     const chain = this.registry.resolveProviderChain(request);
 
+    const chainNames = chain.map(c => c.provider.name);
+    const cbState = this.circuitBreaker.getFailures();
+    const skipped: string[] = [];
+
+    // Always log chain resolution for debugging provider selection
+    console.info(`[llm] chain=[${chainNames}] tier=${request.tier || 'default'} task=${request.taskType || '-'} op=${request.operationType || '-'}`);
+
     for (const { provider, model } of chain) {
-      if (this.circuitBreaker.isOpen(provider.name)) continue;
+      if (this.circuitBreaker.isOpen(provider.name)) {
+        skipped.push(`${provider.name}(f=${cbState[provider.name] || 0})`);
+        continue;
+      }
 
       try {
-        // Override model in request for the selected provider
-        const providerRequest = { ...request, tier: undefined };
+        // Keep the tier so the provider resolves the correct model for this tier
+        const providerRequest = { ...request };
         const result = await provider.complete(providerRequest);
         const latencyMs = Date.now() - startTime;
         result.latencyMs = latencyMs;
 
         this.circuitBreaker.recordSuccess(provider.name);
+        console.info(`[llm] used=${provider.name}/${result.model} tier=${request.tier || 'default'} ${skipped.length > 0 ? `skipped=[${skipped}]` : ''} ${latencyMs}ms`);
         this.metrics.recordCall(provider.name, result.model, result.tokens, latencyMs, request.operationType);
 
         // Record subscription usage for subscription providers
