@@ -131,6 +131,11 @@ export class ProviderRegistry {
     // 3. Walk provider priority for that tier
     const priority = this.config.providerPriority?.[tier] || ['groq', 'anthropic', 'openai'];
 
+    // Debug: log tier resolution and priority chain
+    if (tier === 'premium') {
+      console.info(`[llm:registry] tier=${tier} priority=[${priority}] reqTier=${request.tier} taskType=${request.taskType} agentId=${request.agentId}`);
+    }
+
     for (const providerName of priority) {
       const provider = this.providers.get(providerName as ProviderName);
       if (!provider?.isAvailable()) continue;

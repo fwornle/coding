@@ -60,13 +60,13 @@ providers:
     premium: "o4-mini"
 
 # Default provider priority per tier
-# Groq first for fast/standard — direct API is much faster than CLI proxies
-# CLI proxies (claude-code, copilot) spawn a full process per request (~2-4 min)
-# so they're only practical for premium/interactive use, not bulk batch work
+# Groq first for ALL tiers — direct API calls complete in ~1-3s
+# CLI proxies (claude-code, copilot) take 20-30s per request due to process spawning
+# They serve as fallbacks only, not primary providers for batch work
 provider_priority:
-  fast: ["groq", "claude-code", "copilot"]
-  standard: ["groq", "claude-code", "copilot", "anthropic", "openai"]
-  premium: ["claude-code", "copilot", "anthropic", "openai", "groq"]
+  fast: ["groq", "anthropic", "openai", "claude-code", "copilot"]
+  standard: ["groq", "anthropic", "openai", "claude-code", "copilot"]
+  premium: ["groq", "anthropic", "openai", "claude-code", "copilot"]
 
 # Task-to-tier mapping
 task_tiers:
