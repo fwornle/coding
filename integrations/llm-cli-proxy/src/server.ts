@@ -108,7 +108,7 @@ const CLI_CONFIGS: Record<string, CLIConfig> = {
     command: 'copilot',
     versionArgs: ['--version'],
     tierModels: {
-      fast: 'gpt-4.1',
+      fast: 'claude-haiku-4.5',
       standard: 'claude-sonnet-4.5',
       premium: 'claude-opus-4.6',
     },
