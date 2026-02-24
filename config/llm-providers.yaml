@@ -20,7 +20,7 @@ providers:
     cliCommand: "copilot-cli"
     timeout: 120000
     models:
-      fast: "gpt-4.1"
+      fast: "claude-haiku-4.5"        # Benchmarked: 5s sequential, 0.77s @10 parallel
       standard: "claude-sonnet-4.5"
       premium: "claude-opus-4.6"
     quotaTracking:
@@ -60,13 +60,13 @@ providers:
     premium: "o4-mini"
 
 # Default provider priority per tier
-# Groq first for ALL tiers — direct API calls complete in ~1-3s
-# CLI proxies (claude-code, copilot) take 20-30s per request due to process spawning
-# They serve as fallbacks only, not primary providers for batch work
+# Copilot first — scales beautifully with parallelism (0.77s effective @10 concurrent)
+# Batch agents already use Promise.all, so copilot as primary unlocks peak throughput
+# Groq second as fast API fallback, then claude-code, then paid APIs
 provider_priority:
-  fast: ["groq", "anthropic", "openai", "claude-code", "copilot"]
-  standard: ["groq", "anthropic", "openai", "claude-code", "copilot"]
-  premium: ["groq", "anthropic", "openai", "claude-code", "copilot"]
+  fast: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  premium: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
 
 # Task-to-tier mapping
 task_tiers:

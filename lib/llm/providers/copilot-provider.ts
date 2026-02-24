@@ -6,7 +6,7 @@
  */
 
 import { CLIProviderBase } from './cli-provider-base.js';
-import type { LLMCompletionRequest, LLMCompletionResult, ProviderConfig, ProviderName, ModelTier } from '../types.js';
+import type { LLMCompletionRequest, LLMCompletionResult, ProviderConfig, ProviderName } from '../types.js';
 
 export class CopilotProvider extends CLIProviderBase {
   readonly name: ProviderName = 'copilot';
@@ -16,7 +16,7 @@ export class CopilotProvider extends CLIProviderBase {
   constructor(config: Partial<ProviderConfig> = {}) {
     super({
       models: {
-        fast: 'gpt-4.1',
+        fast: 'claude-haiku-4.5',
         standard: 'claude-sonnet-4.5',
         premium: 'claude-opus-4.6',
       },
@@ -88,23 +88,6 @@ export class CopilotProvider extends CLIProviderBase {
     // copilot-cli returns plain text response
     // May need adjustment based on actual CLI output format
     return stdout.trim();
-  }
-
-  /**
-   * Override model resolution for copilot models
-   */
-  protected resolveModel(tier?: ModelTier): string {
-    const tierMap: Record<ModelTier, string> = {
-      fast: 'gpt-4.1',
-      standard: 'claude-sonnet-4.5',
-      premium: 'claude-opus-4.6',
-    };
-
-    if (tier && tierMap[tier]) {
-      return tierMap[tier];
-    }
-
-    return 'claude-sonnet-4.5'; // Default
   }
 
   /**

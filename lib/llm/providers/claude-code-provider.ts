@@ -6,7 +6,7 @@
  */
 
 import { CLIProviderBase } from './cli-provider-base.js';
-import type { LLMCompletionRequest, LLMCompletionResult, ProviderConfig, ProviderName, ModelTier } from '../types.js';
+import type { LLMCompletionRequest, LLMCompletionResult, ProviderConfig, ProviderName } from '../types.js';
 
 export class ClaudeCodeProvider extends CLIProviderBase {
   readonly name: ProviderName = 'claude-code';
@@ -88,24 +88,6 @@ export class ClaudeCodeProvider extends CLIProviderBase {
   protected parseResponse(stdout: string): string {
     // Claude CLI returns plain text response
     return stdout.trim();
-  }
-
-  /**
-   * Override model resolution to map tier to CLI model names
-   */
-  protected resolveModel(tier?: ModelTier): string {
-    // Map tier to CLI model names
-    const tierMap: Record<ModelTier, string> = {
-      fast: 'sonnet',
-      standard: 'sonnet',
-      premium: 'opus',
-    };
-
-    if (tier && tierMap[tier]) {
-      return tierMap[tier];
-    }
-
-    return 'sonnet'; // Default to sonnet
   }
 
   /**
