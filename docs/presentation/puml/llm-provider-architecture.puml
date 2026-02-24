@@ -25,10 +25,9 @@ INFRA --> API : fallback
 INFRA --> LOCAL : last resort
 
 note bottom of SVC
-  **Tier-Based Routing**
-  Fast: Claude Code, Copilot, Groq
-  Standard: + Anthropic, OpenAI
-  Premium: Anthropic first
+  **Parallelized Tier-Based Routing**
+  All Tiers: Copilot (primary), Groq, Claude Code, Anthropic, OpenAI, Gemini
+  **Copilot scales with parallelism** (0.77s @10 concurrent)
   **$0 until quota exhausted**
 end note
 

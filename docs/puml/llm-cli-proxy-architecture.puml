@@ -13,9 +13,9 @@ package "Docker Container (coding-services)" {
   component [Groq Provider] as groqprov <<api>>
   component [Anthropic Provider] as anthropicprov <<api>>
 
-  llmservice -down-> claudeprov : priority 1
-  llmservice -down-> copilotprov : priority 2
-  llmservice -down-> groqprov : priority 3
+  llmservice -down-> copilotprov : priority 1 (parallelized)
+  llmservice -down-> groqprov : priority 2
+  llmservice -down-> claudeprov : priority 3
   llmservice -down-> anthropicprov : priority 4
   semantic -down-> llmservice : LLM requests
 }
@@ -69,11 +69,13 @@ end note
 
 note bottom of llmservice
   **Provider Priority Chain**
-  1. claude-code (proxy) -- free
-  2. copilot (proxy) -- free
-  3. groq -- API key
+  1. copilot (proxy) -- free, parallelism-optimized
+  2. groq -- API key, fast fallback
+  3. claude-code (proxy) -- free
   4. anthropic -- API key
   5. openai -- API key
+  6. gemini -- API key
+  7. github-models -- API key
 end note
 
 @enduml

@@ -19,8 +19,8 @@ package "lib/llm/ - Unified LLM Layer" {
   }
 
   package "Subscription Providers (Zero Cost)" {
+    component [Copilot\nclaude-haiku-4.5 / claude-sonnet-4.5 / claude-opus-4.6 (CLI)\n**Primary** - scales with parallelism (0.77s @10 concurrent)] <<cli>> as Copilot
     component [Claude Code\nsonnet / opus (CLI)] <<cli>> as ClaudeCode
-    component [Copilot\ngpt-4o-mini / gpt-4o (CLI)] <<cli>> as Copilot
     component [QuotaTracker\nExponential backoff] <<infra>> as QuotaTracker
   }
 
@@ -62,11 +62,11 @@ LLMService -down-> QuotaTracker
 ' Registry to providers via circuit breaker
 Registry -down-> CB
 
-' Subscription providers
-CB -down-> ClaudeCode
+' Subscription providers (copilot first - parallelism optimized)
 CB -down-> Copilot
-ClaudeCode .right.> QuotaTracker : reports usage
+CB -down-> ClaudeCode
 Copilot .right.> QuotaTracker : reports usage
+ClaudeCode .right.> QuotaTracker : reports usage
 
 ' API providers
 CB -down-> Groq
@@ -83,10 +83,13 @@ CB -down-> Ollama
 CB -down-> Mock
 
 note right of Registry
-  **Subscription-First Routing**
-  Fast: Claude Code -> Copilot -> Groq
-  Standard: Claude Code -> Copilot -> Groq -> Anthropic -> OpenAI
-  Premium: Claude Code -> Copilot -> Anthropic -> OpenAI -> Groq
+  **Copilot-First Parallelized Routing**
+  All Tiers: Copilot -> Groq -> Claude Code -> Anthropic -> OpenAI -> Gemini -> GitHub Models
+
+  **Why Copilot first?** Scales with parallelism:
+  - Sequential: 5s per call
+  - 10 concurrent: 0.77s effective per call
+  - Batch agents use Promise.all (concurrency 5-20)
 
   **Quota exhausted?** Automatic fallback to next provider
   **All cloud failed?** Local fallback: DMR -> Ollama

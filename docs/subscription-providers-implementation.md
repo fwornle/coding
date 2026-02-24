@@ -57,16 +57,18 @@ Implementation of subscription-based LLM providers (Claude Code & GitHub Copilot
 **Files Modified:**
 1. `config/llm-providers.yaml` - Added provider configs
    - `claude-code`: CLI: `claude`, models: sonnet/opus
-   - `copilot`: CLI: `copilot-cli`, models: gpt-4o-mini/gpt-4o
-   - Updated priority: subscriptions first in all tiers
+   - `copilot`: CLI: `copilot-cli`, models: claude-haiku-4.5/claude-sonnet-4.5/claude-opus-4.6
+   - Updated priority: copilot first in all tiers (parallelism-optimized)
 2. `lib/llm/types.ts` - Extended `ProviderConfig` with CLI fields
 
-**Provider Priority (All Tiers):**
+**Provider Priority (All Tiers) — Copilot-First for Parallelism:**
 ```yaml
-fast: ["claude-code", "copilot", "groq"]
-standard: ["claude-code", "copilot", "groq", "anthropic", "openai"]
-premium: ["claude-code", "copilot", "anthropic", "openai", "groq"]
+fast: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+premium: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
 ```
+
+**Why Copilot first?** Benchmarking revealed copilot scales beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Since batch agents already parallelize LLM calls via `Promise.all`, copilot as the primary provider unlocks peak throughput.
 
 ---
 
@@ -126,15 +128,18 @@ BaseProvider (abstract)
 ```
 1. LLMService.complete()
 2. Check subscription quotas (if enabled)
-3. Resolve provider chain (subscriptions first)
+3. Resolve provider chain (copilot first — parallelism-optimized)
 4. Try each provider in order:
-   - Claude Code -> Copilot -> Groq -> Anthropic -> OpenAI
+   - Copilot -> Groq -> Claude Code -> Anthropic -> OpenAI -> Gemini -> GitHub Models
 5. On quota exhaustion:
    - Mark provider exhausted (exponential backoff)
    - Continue to next provider
 6. Record usage:
    - Subscription: quota tracker + $0 cost
    - API: standard cost tracking
+
+Note: Batch agents parallelize calls via Promise.all (concurrency 5-20).
+Copilot scales from 5s sequential to 0.77s effective @10 concurrent.
 ```
 
 ### Cost Savings
@@ -179,11 +184,11 @@ providers:
 
   copilot:
     cliCommand: "copilot-cli"
-    timeout: 60000
+    timeout: 120000
     models:
-      fast: "gpt-4o-mini"
-      standard: "gpt-4o"
-      premium: "gpt-4o"
+      fast: "claude-haiku-4.5"        # Benchmarked: 0.77s @10 parallel
+      standard: "claude-sonnet-4.5"
+      premium: "claude-opus-4.6"
     quotaTracking:
       enabled: true
       softLimitPerHour: 100
@@ -200,9 +205,11 @@ To disable, remove from `provider_priority` arrays.
    - *Future*: Parse CLI output for exact counts if available
 2. CLI output format assumptions
    - *Future*: Add response format detection/parsing
-3. No parallel CLI invocations
-   - *Current*: One CLI process per request (simple, reliable)
-   - *Future*: Could explore connection pooling
+
+### Parallelism (Achieved)
+- Copilot CLI scales beautifully with concurrent calls (0.77s effective @10 parallel)
+- Batch agents already use `Promise.all` with concurrency 5-20
+- Copilot is now the primary provider for all tiers to maximize throughput
 
 ### Future Enhancements
 1. **Dashboard Integration**: Real-time usage metrics

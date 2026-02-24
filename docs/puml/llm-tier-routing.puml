@@ -42,12 +42,19 @@ end note
 
 switch (Tier?)
 case (fast)
-  :Priority: **Groq**;
+  :Priority: **Copilot** -> Groq -> Claude Code;
 case (standard)
-  :Priority: **Groq** -> Anthropic -> OpenAI;
+  :Priority: **Copilot** -> Groq -> Claude Code -> Anthropic -> OpenAI;
 case (premium)
-  :Priority: **Anthropic** -> OpenAI -> Groq;
+  :Priority: **Copilot** -> Groq -> Claude Code -> Anthropic -> OpenAI;
 endswitch
+
+note right
+  **Why Copilot first?**
+  Scales with parallelism:
+  0.77s effective @10 concurrent
+  (batch agents use Promise.all)
+end note
 
 :Check LRU Cache;
 

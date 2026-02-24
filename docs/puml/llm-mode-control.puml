@@ -41,10 +41,13 @@ package "Local LLM Providers" {
   component "llama.cpp Server\n(custom port)" as llamacpp <<infra>>
 }
 
+package "Subscription CLI Providers" {
+  component "Copilot\n(parallelized)" as copilot <<cli>>
+}
+
 cloud "Cloud APIs" {
   component "Groq" as groq <<external>>
   component "Anthropic" as anthropic <<external>>
-  component "OpenAI" as openai <<external>>
 }
 
 ' Flows
@@ -56,9 +59,9 @@ progress --> analyzer : read llmState
 analyzer --> mock : if mode=mock
 analyzer --> dmr : if mode=local
 analyzer ..> llamacpp : fallback
-analyzer --> groq : if mode=public
+analyzer --> copilot : if mode=public (primary)
+analyzer ..> groq : fallback
 analyzer ..> anthropic : fallback
-analyzer ..> openai : fallback
 
 nodeBadge --> redux : read mode
 
