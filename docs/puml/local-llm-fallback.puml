@@ -52,7 +52,7 @@ note right
   **Provider Priority**
   1. DMR (Docker Desktop 4.40+)
   2. llama.cpp direct (manual setup)
-  3. Cloud APIs (Groq > Anthropic > OpenAI)
+  3. Cloud APIs (Copilot > Groq > Claude Code > Anthropic > OpenAI)
 end note
 
 @enduml

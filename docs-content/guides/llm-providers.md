@@ -61,9 +61,9 @@ claude --print --silent "Say hello"
 - ✅ Exponential backoff on exhaustion
 - ✅ Seamless fallback to API providers
 
-### GitHub Copilot (Zero Cost)
+### GitHub Copilot (Primary Provider — Parallelism-Optimized)
 
-Route requests through your GitHub Copilot subscription.
+Route requests through your GitHub Copilot subscription. **This is the primary provider for all tiers** because it scales beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Batch agents already use `Promise.all`, so copilot as primary unlocks peak throughput.
 
 **Setup:**
 
@@ -85,11 +85,13 @@ copilot-cli --prompt "Say hello" --silent
 
 **Supported Models:**
 
-- `gpt-4o-mini` (fast tier)
-- `gpt-4o` (standard and premium tiers)
+- `claude-haiku-4.5` (fast tier — benchmarked fastest at 0.77s @10 parallel)
+- `claude-sonnet-4.5` (standard tier)
+- `claude-opus-4.6` (premium tier)
 
 **Features:**
 - ✅ Zero per-token cost
+- ✅ **Parallelism-optimized** (0.77s effective @10 concurrent)
 - ✅ Shared quota tracking
 - ✅ Automatic rotation on exhaustion
 - ✅ Work and personal subscriptions supported
@@ -271,8 +273,8 @@ curl -X POST http://localhost:12434/v1/models/pull \
 
 All LLM requests route through the `lib/llm/` unified layer, which provides:
 
-- **10 providers**: 2 subscription (Claude Code, Copilot), 5 cloud API, 2 local, 1 mock
-- **Subscription-first routing**: Always tries zero-cost subscriptions before paid APIs
+- **10 providers**: 2 subscription (Copilot, Claude Code), 5 cloud API, 2 local, 1 mock
+- **Copilot-first parallelized routing**: Copilot scales with concurrency (0.77s @10 parallel), always tried first
 - **Tier-based routing**: Automatic provider selection based on task complexity
 - **Quota tracking**: Persistent usage tracking with exponential backoff
 - **Circuit breaker**: Prevents cascading failures (threshold: 5 failures, reset: 60s)
@@ -291,18 +293,18 @@ Requests are automatically routed based on task complexity and cost optimization
 
 | Tier | Use Cases | Provider Priority | Cost |
 |------|-----------|-------------------|------|
-| **Fast** | Simple extraction, parsing, basic classification | Claude Code → Copilot → Groq | **$0** → Lowest |
-| **Standard** | Semantic analysis, ontology classification, documentation | Claude Code → Copilot → Groq → Anthropic → OpenAI | **$0** → Medium |
-| **Premium** | Insight generation, pattern recognition, QA review | Claude Code → Copilot → Anthropic → OpenAI → Groq | **$0** → Highest |
+| **Fast** | Simple extraction, parsing, basic classification | Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models | **$0** → Lowest |
+| **Standard** | Semantic analysis, ontology classification, documentation | Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models | **$0** → Medium |
+| **Premium** | Insight generation, pattern recognition, QA review | Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models | **$0** → Highest |
 
 ### Routing Flow
 
 ```mermaid
 flowchart TB
     A[LLM Request] --> B{Determine Tier}
-    B -->|Fast| C[Claude Code → Copilot → Groq]
-    B -->|Standard| D[Claude Code → Copilot → Groq → Anthropic → OpenAI]
-    B -->|Premium| E[Claude Code → Copilot → Anthropic → OpenAI → Groq]
+    B -->|Fast| C[Copilot → Groq → Claude Code → ...]
+    B -->|Standard| D[Copilot → Groq → Claude Code → Anthropic → OpenAI → ...]
+    B -->|Premium| E[Copilot → Groq → Claude Code → Anthropic → OpenAI → ...]
     C --> F{Quota Available?}
     D --> F
     E --> F
@@ -330,10 +332,11 @@ flowchart TB
 Tier routing is configured in `config/llm-providers.yaml`:
 
 ```yaml
+# Copilot first — scales with parallelism (0.77s effective @10 concurrent)
 provider_priority:
-  fast: ["claude-code", "copilot", "groq"]
-  standard: ["claude-code", "copilot", "groq", "anthropic", "openai"]
-  premium: ["claude-code", "copilot", "anthropic", "openai", "groq"]
+  fast: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  premium: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
 
 task_tiers:
   fast:

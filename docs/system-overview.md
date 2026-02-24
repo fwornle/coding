@@ -130,7 +130,7 @@ The system is built on **self-contained integration components**, each with its 
 
 ![LLM CLI Proxy Architecture](images/llm-cli-proxy-architecture.png)
 
-**Why**: Inside Docker, CLI tools aren't available. Without the proxy, the UKB workflow falls back to Groq/llama-70b. With the proxy, it routes through the host's Claude Max subscription at zero per-token cost.
+**Why**: Inside Docker, CLI tools aren't available. Without the proxy, the UKB workflow falls back to paid API providers (Groq, Anthropic). With the proxy, it routes through GitHub Copilot (primary, parallelism-optimized) and Claude Max subscriptions at zero per-token cost. Copilot scales beautifully with parallelism — 0.77s effective per call at 10 concurrent requests.
 
 **Documentation:** [integrations/llm-cli-proxy/](../integrations/llm-cli-proxy/)
 

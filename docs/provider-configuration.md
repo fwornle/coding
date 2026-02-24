@@ -47,13 +47,13 @@ node scripts/enhanced-transcript-monitor.js
 
 ## Tier-Based Routing
 
-The system uses tier-based provider routing via the `lib/llm/` unified layer:
+The system uses tier-based provider routing via the `lib/llm/` unified layer, with **Copilot as the primary provider** for all tiers. Copilot scales beautifully with parallelism (0.77s effective per call at 10 concurrent), and batch agents already use `Promise.all` with concurrency 5-20.
 
 | Tier | Provider Priority | Use Cases |
 |------|-------------------|-----------|
-| **Fast** | Groq | Simple extraction, parsing, basic classification |
-| **Standard** | Groq → Anthropic → OpenAI | Semantic analysis, ontology classification |
-| **Premium** | Anthropic → OpenAI → Groq | Insight generation, pattern recognition, QA review |
+| **Fast** | Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models | Simple extraction, parsing, basic classification |
+| **Standard** | Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models | Semantic analysis, ontology classification |
+| **Premium** | Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models | Insight generation, pattern recognition, QA review |
 | **Local Fallback** | DMR → Ollama | Always available when cloud providers fail |
 
 See [LLM Architecture](../docs-content/architecture/llm-architecture.md) for complete tier configuration.

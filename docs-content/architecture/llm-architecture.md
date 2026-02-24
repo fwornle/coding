@@ -10,9 +10,10 @@ The `lib/llm/` unified LLM support layer consolidates three previously separate 
 - **After**: Single unified layer with shared infrastructure, tier-based routing, circuit breaker, and LRU cache
 
 **Key Features:**
-- **Zero-cost routing** via Claude Code and GitHub Copilot subscriptions
+- **Parallelized copilot-first routing** — Copilot scales beautifully with parallelism (0.77s effective per call at 10 concurrent)
+- **Zero-cost routing** via GitHub Copilot and Claude Code subscriptions
 - **Automatic fallback** to paid APIs on quota exhaustion
-- **Subscription-first priority** across all tiers
+- **Batch-optimized** — agents already use `Promise.all` with concurrency 5-20, copilot as primary unlocks peak throughput
 - **Optimistic quota tracking** with exponential backoff
 
 ---
@@ -85,15 +86,17 @@ The system supports 10 LLM providers with tier-based model selection:
 - Seamless fallback to API providers
 - **Docker mode**: Falls back to [LLM CLI Proxy](../integrations/llm-cli-proxy.md) on `host.docker.internal:12435`
 
-#### 2. GitHub Copilot
+#### 2. GitHub Copilot (Primary Provider)
 **CLI Command**: `copilot-cli`
 **Cost**: $0 per token (uses existing GitHub Copilot subscription)
 
 | Tier | Model | Description |
 |------|-------|-------------|
-| Fast | `gpt-4o-mini` | Small, fast model |
-| Standard | `gpt-4o` | Standard quality |
-| Premium | `gpt-4o` | Premium quality |
+| Fast | `claude-haiku-4.5` | Benchmarked: 5s sequential, 0.77s @10 parallel |
+| Standard | `claude-sonnet-4.5` | Claude Sonnet 4.5 via Copilot |
+| Premium | `claude-opus-4.6` | Claude Opus 4.6 via Copilot |
+
+**Why Copilot is primary**: Performance benchmarks revealed that copilot CLI calls scale beautifully with parallelism — 0.77s effective per call at 10 concurrent (vs 5s sequential). Since batch agents already parallelize LLM calls via `Promise.all` (concurrency 5-20), copilot as the first-choice provider unlocks peak throughput.
 
 **Requirements**:
 - Install Copilot CLI: `npm install -g @githubnext/github-copilot-cli`
@@ -197,21 +200,21 @@ The system routes requests to providers based on task complexity and cost optimi
 - Simple extraction and parsing
 - Basic classification
 - File pattern matching
-- **Provider Priority**: Claude Code → Copilot → Groq
+- **Provider Priority**: Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models
 
 **Standard Tier** (zero cost → balanced cost/quality)
 - Semantic code analysis
 - Git history analysis
 - Documentation linking
 - Ontology classification
-- **Provider Priority**: Claude Code → Copilot → Groq → Anthropic → OpenAI
+- **Provider Priority**: Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models
 
 **Premium Tier** (zero cost → highest quality)
 - Insight generation
 - Pattern recognition
 - Quality assurance review
 - Deep code analysis
-- **Provider Priority**: Claude Code → Copilot → Anthropic → OpenAI → Groq
+- **Provider Priority**: Copilot → Groq → Claude Code → Anthropic → OpenAI → Gemini → GitHub Models
 
 ### Task-to-Tier Mapping
 
@@ -236,12 +239,14 @@ Tasks are automatically mapped to tiers based on their complexity:
 
 ### Fallback Chain
 
-1. **Primary**: Try providers in tier priority order
-2. **Subscription check**: Verify quota availability (claude-code, copilot)
+1. **Primary**: Try providers in priority order (copilot first — parallelism-optimized)
+2. **Subscription check**: Verify quota availability (copilot, claude-code)
 3. **Circuit breaker check**: Skip failed providers temporarily
 4. **Cache check**: Return cached results if available
-5. **API fallback**: Use paid API providers (Groq, Anthropic, OpenAI)
+5. **API fallback**: Use paid API providers (Groq, Anthropic, OpenAI, Gemini, GitHub Models)
 6. **Local fallback**: DMR → Ollama (always available, no API costs)
+
+**Parallelism**: Batch agents call LLMService via `Promise.all` (concurrency 5-20). Copilot scales from 5s sequential to 0.77s effective per call at 10 concurrent, making it ideal as the primary provider.
 
 ---
 
@@ -276,12 +281,12 @@ When quota is exhausted, the system applies exponential backoff:
 ### Automatic Fallback
 
 ```
-Request → Check Claude Code quota
+Request → Check Copilot quota (primary — parallelism-optimized)
        ↓ (exhausted)
-       → Check Copilot quota
-       ↓ (exhausted)
-       → Use Groq (paid API)
+       → Use Groq (paid API, fast fallback)
        ↓ (circuit breaker open)
+       → Check Claude Code quota
+       ↓ (exhausted)
        → Use Anthropic (paid API)
        ↓ (all failed)
        → Use DMR (local)
@@ -392,11 +397,11 @@ providers:
 
   copilot:
     cliCommand: "copilot-cli"
-    timeout: 60000
+    timeout: 120000
     models:
-      fast: "gpt-4o-mini"
-      standard: "gpt-4o"
-      premium: "gpt-4o"
+      fast: "claude-haiku-4.5"        # Benchmarked: 0.77s @10 parallel
+      standard: "claude-sonnet-4.5"
+      premium: "claude-opus-4.6"
     quotaTracking:
       enabled: true
       softLimitPerHour: 100
@@ -413,12 +418,14 @@ providers:
     fast: "claude-haiku-4-5"
     standard: "claude-sonnet-4-5"
     premium: "claude-opus-4-6"
-  # ... more providers
+  # ... more providers (openai, gemini, github-models)
 
+# Copilot first — scales with parallelism (0.77s effective @10 concurrent)
+# Batch agents use Promise.all, so copilot as primary unlocks peak throughput
 provider_priority:
-  fast: ["claude-code", "copilot", "groq"]
-  standard: ["claude-code", "copilot", "groq", "anthropic", "openai"]
-  premium: ["claude-code", "copilot", "anthropic", "openai", "groq"]
+  fast: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  premium: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
 
 cache:
   maxSize: 1000
@@ -466,7 +473,7 @@ export SEMANTIC_ANALYSIS_MODE=local
 
 ### Cost Optimization Strategies
 
-1. **Subscription-first routing**: Use zero-cost subscriptions before paid APIs
+1. **Copilot-first parallelized routing**: Copilot scales with concurrency (0.77s @10 parallel), batch agents use Promise.all
 2. **Tier-based routing**: Use cheapest provider that meets quality requirements
 3. **Caching**: Avoid duplicate LLM calls (1-hour TTL)
 4. **Automatic fallback**: Switch to paid APIs only when subscriptions exhausted
@@ -487,10 +494,11 @@ export SEMANTIC_ANALYSIS_MODE=local
 - **Total: ~$2.05 per run**
 
 **After subscriptions** (until quota exhausted):
-- Fast: $0 (Claude Code)
-- Standard: $0 (Claude Code)
-- Premium: $0 (Claude Code)
+- Fast: $0 (Copilot/claude-haiku-4.5, parallelized)
+- Standard: $0 (Copilot/claude-sonnet-4.5)
+- Premium: $0 (Copilot/claude-opus-4.6)
 - **Total: $0.00 per run** ✅
+- **Bonus: ~3x faster** via parallelized copilot calls
 
 **Estimated savings**: ~$50-100/month for active development
 

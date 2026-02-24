@@ -6,7 +6,7 @@ The LLM CLI Proxy is an HTTP bridge that runs on the host machine, forwarding LL
 
 **Port**: 12435 (host)
 
-**Why it exists**: Inside Docker, CLI tools like `claude --print` and `copilot-cli` are unavailable. Without the proxy, the LLM provider chain falls back to paid API providers (Anthropic, OpenAI) or lower-quality alternatives (Groq/Llama). The proxy bridges this gap, allowing Docker workloads to use Claude Max and GitHub Copilot subscriptions at zero incremental cost.
+**Why it exists**: Inside Docker, CLI tools like `claude --print` and `copilot-cli` are unavailable. Without the proxy, the LLM provider chain falls back to paid API providers (Groq, Anthropic, OpenAI). The proxy bridges this gap, allowing Docker workloads to use GitHub Copilot (primary, parallelism-optimized) and Claude Max subscriptions at zero incremental cost. Copilot scales beautifully with parallelism — 0.77s effective per call at 10 concurrent requests.
 
 ---
 
@@ -34,11 +34,12 @@ sequenceDiagram
 
 ### Provider Fallback Chain
 
-The unified LLM layer tries providers in this order:
+The unified LLM layer tries providers in this order (copilot first for parallelism):
 
-1. **Local CLI** (native mode) - direct `claude`/`copilot-cli` execution
-2. **HTTP Proxy** (Docker mode) - via LLM CLI Proxy on host
-3. **Cloud APIs** - Anthropic, OpenAI, Groq (paid, per-token)
+1. **Copilot CLI** (primary) - direct `copilot-cli` or via HTTP Proxy — parallelism-optimized
+2. **Groq** - fast API fallback
+3. **Claude Code CLI** - direct `claude` or via HTTP Proxy
+4. **Cloud APIs** - Anthropic, OpenAI, Gemini, GitHub Models (paid, per-token)
 
 Each CLI provider (`claude-code`, `copilot`) checks for local CLI first, then falls back to the proxy automatically during initialization.
 
