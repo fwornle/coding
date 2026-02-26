@@ -72,7 +72,18 @@ export class ProviderRegistry {
       this.providers.set('mock', mockInstance);
     }
 
+    // Log summary of available providers and priority chains
+    const available = Array.from(this.providers.entries())
+      .filter(([_, p]) => p.isAvailable())
+      .map(([name]) => name);
+    const tiers: Array<'fast' | 'standard' | 'premium'> = ['fast', 'standard', 'premium'];
+    const chains = tiers.map(tier => {
+      const priority = this.config.providerPriority?.[tier] || ['groq', 'anthropic', 'openai'];
+      const resolved = (priority as string[]).filter(p => this.providers.get(p as ProviderName)?.isAvailable());
+      return `${tier}=[${resolved.join('→')}]`;
+    });
     console.info(`[llm] ${this.providers.size} providers registered: ${Array.from(this.providers.keys()).join(', ')}`);
+    console.info(`[llm] Available: ${available.join(', ')} | Chains: ${chains.join(' ')}`);
   }
 
   /**

@@ -42,7 +42,7 @@ import {
   FlaskConical,
   Cloud,
 } from 'lucide-react'
-import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, useWorkflowDefinitions } from './workflow'
+import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, TIER_COLORS, useWorkflowDefinitions } from './workflow'
 import type { SubStep } from './workflow'
 import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
@@ -2587,9 +2587,22 @@ function SubStepDetailsSidebar({
   const runtimeInputs = getRuntimeInputs()
   const runtimeOutputs = getRuntimeOutputs()
 
-  // LLM usage badge color
-  const getLlmUsageBadge = (usage?: string) => {
-    switch (usage) {
+  // LLM usage badge — show resolved model@provider when runtime info available
+  const getLlmUsageBadge = (usage?: string, runtimeProvider?: string) => {
+    const tier = usage || 'none'
+    const colors = TIER_COLORS[tier] || TIER_COLORS.none
+
+    // If we have runtime provider info (e.g. "sonnet@claude-code"), show that with tier color
+    if (runtimeProvider) {
+      return (
+        <Badge className={`${colors.bg} ${colors.text} text-[10px] font-mono`} title={`${tier} tier: ${runtimeProvider}`}>
+          {runtimeProvider.length > 20 ? runtimeProvider.slice(0, 20) : runtimeProvider}
+        </Badge>
+      )
+    }
+
+    // Fallback to static tier label
+    switch (tier) {
       case 'none':
         return <Badge variant="outline" className="text-gray-500">No LLM</Badge>
       case 'fast':
@@ -2619,7 +2632,7 @@ function SubStepDetailsSidebar({
             </Button>
             <CardTitle className="text-lg">{substep.name}</CardTitle>
           </div>
-          {getLlmUsageBadge(substep.llmUsage)}
+          {getLlmUsageBadge(substep.llmUsage, llmInfo?.provider)}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
           Sub-step {substepIndex + 1} of {agentSubsteps?.length || 0} in {agentId.replace(/_/g, ' ')}

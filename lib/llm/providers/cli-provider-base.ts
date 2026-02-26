@@ -185,7 +185,10 @@ export abstract class CLIProviderBase extends BaseProvider {
    */
   protected async checkProxyAvailable(): Promise<boolean> {
     const proxyUrl = process.env.LLM_CLI_PROXY_URL;
-    if (!proxyUrl) return false;
+    if (!proxyUrl) {
+      console.info(`[llm:proxy] ${this.name}: no LLM_CLI_PROXY_URL configured`);
+      return false;
+    }
 
     try {
       const controller = new AbortController();
@@ -193,13 +196,21 @@ export abstract class CLIProviderBase extends BaseProvider {
       const response = await fetch(`${proxyUrl}/health`, { signal: controller.signal });
       clearTimeout(timeout);
 
-      if (!response.ok) return false;
+      if (!response.ok) {
+        console.info(`[llm:proxy] ${this.name}: proxy health check failed (HTTP ${response.status}) at ${proxyUrl}/health`);
+        return false;
+      }
 
       const data = (await response.json()) as {
         providers?: Record<string, { available?: boolean }>;
       };
-      return data.providers?.[this.name]?.available === true;
-    } catch {
+      const isAvailable = data.providers?.[this.name]?.available === true;
+      const allProviders = data.providers ? Object.keys(data.providers).filter(k => data.providers![k]?.available) : [];
+      console.info(`[llm:proxy] ${this.name}: proxy=${proxyUrl} available=${isAvailable} (proxy providers: ${allProviders.join(', ') || 'none'})`);
+      return isAvailable;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.info(`[llm:proxy] ${this.name}: proxy check failed at ${proxyUrl}/health — ${msg}`);
       return false;
     }
   }

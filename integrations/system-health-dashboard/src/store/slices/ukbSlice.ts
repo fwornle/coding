@@ -105,7 +105,9 @@ export interface StepInfo {
   status: StepStatus
   duration?: number
   tokensUsed?: number
-  llmProvider?: string
+  llmProvider?: string       // Formatted model@provider (e.g. "sonnet@claude-code")
+  llmModel?: string          // Raw model name (e.g. "claude-sonnet-4-5")
+  llmProviderName?: string   // Raw provider name (e.g. "claude-code", "copilot", "groq")
   llmCalls?: number
   error?: string
   outputs?: Record<string, any>
