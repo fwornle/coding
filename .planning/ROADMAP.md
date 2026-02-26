@@ -52,6 +52,6 @@ Three phases of surgical bug-fixing to restore the UKB multi-agent analysis pipe
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Pipeline Data Quality | 0/2 | Planning complete | - |
+| 1. Core Pipeline Data Quality | 1/2 | In Progress|  |
 | 2. Insight Generation & Data Routing | 0/? | Not started | - |
 | 3. Significance & Quality Ranking | 0/? | Not started | - |

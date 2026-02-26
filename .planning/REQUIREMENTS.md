@@ -7,13 +7,13 @@
 
 ### Pattern Extraction
 
-- [ ] **PTRN-01**: Pattern extraction parser handles markdown-formatted LLM responses (numbered lists, bold markers) from Groq and other providers
-- [ ] **PTRN-02**: Pattern extraction parser handles JSON-formatted LLM responses as fallback
-- [ ] **PTRN-03**: Pattern extraction produces non-zero patterns from a codebase with real architectural decisions
+- [x] **PTRN-01**: Pattern extraction parser handles markdown-formatted LLM responses (numbered lists, bold markers) from Groq and other providers
+- [x] **PTRN-02**: Pattern extraction parser handles JSON-formatted LLM responses as fallback
+- [x] **PTRN-03**: Pattern extraction produces non-zero patterns from a codebase with real architectural decisions
 
 ### Entity Naming
 
-- [ ] **NAME-01**: Entity names use correct PascalCase (e.g., "PathAnalyzerPattern" not "Pathanalyzerpattern")
+- [x] **NAME-01**: Entity names use correct PascalCase (e.g., "PathAnalyzerPattern" not "Pathanalyzerpattern")
 - [ ] **NAME-02**: Entity names are semantically meaningful (not concatenated type + description fragments)
 
 ### Observation Quality
@@ -66,10 +66,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PTRN-01 | Phase 1 | Pending |
-| PTRN-02 | Phase 1 | Pending |
-| PTRN-03 | Phase 1 | Pending |
-| NAME-01 | Phase 1 | Pending |
+| PTRN-01 | Phase 1 | Complete |
+| PTRN-02 | Phase 1 | Complete |
+| PTRN-03 | Phase 1 | Complete |
+| NAME-01 | Phase 1 | Complete |
 | NAME-02 | Phase 1 | Pending |
 | OBSV-01 | Phase 1 | Pending |
 | OBSV-02 | Phase 1 | Pending |
