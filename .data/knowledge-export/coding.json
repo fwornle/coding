@@ -2452,26 +2452,57 @@
           }
         }
       ],
-      "significance": 0.8,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-02-23T07:19:15.141Z",
-        "last_updated": "2026-02-23T07:19:15.141Z",
-        "significance": 8,
+        "last_updated": "2026-02-26T12:01:40.766Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2026-02-23T07:19:10.694Z",
-          "last_updated": "2026-02-23T07:19:10.694Z",
-          "team": "coding",
-          "created_by": "workflow_persist",
-          "version": "1.0",
-          "ontology": {
-            "ontologyName": "coding",
+          "significance": 8,
+          "originalMetadata": {
+            "created_at": "2026-02-23T07:19:10.694Z",
+            "last_updated": "2026-02-23T07:19:10.694Z",
+            "team": "coding",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "hybrid",
+              "confidence": 0.9
+            },
+            "classificationConfidence": 0.9,
             "classificationMethod": "hybrid",
-            "confidence": 0.9
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "disabled"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 0,
+              "totalIssues": 116,
+              "criticalIssues": 116,
+              "validatedAt": "2026-02-23T07:19:12.940Z",
+              "mode": "lenient"
+            },
+            "invalidating_commits": [],
+            "staleness_score": 100,
+            "staleness_check_at": "2026-02-23T07:19:12.940Z",
+            "staleness_method": "git-based"
           },
-          "classificationConfidence": 0.9,
-          "classificationMethod": "hybrid",
+          "source": "manual",
+          "team": "coding",
+          "created_at": "2026-02-23T07:19:15.141Z",
+          "last_updated": "2026-02-26T12:01:39.617Z",
+          "ontology": {
+            "preClassified": true,
+            "originalMethod": "unknown"
+          },
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -2481,14 +2512,14 @@
           "contentValidation": {
             "overallValid": false,
             "overallScore": 0,
-            "totalIssues": 116,
-            "criticalIssues": 116,
-            "validatedAt": "2026-02-23T07:19:12.940Z",
+            "totalIssues": 113,
+            "criticalIssues": 113,
+            "validatedAt": "2026-02-26T12:01:39.670Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-02-23T07:19:12.940Z",
+          "staleness_check_at": "2026-02-26T12:01:39.670Z",
           "staleness_method": "git-based"
         }
       },
@@ -3346,30 +3377,64 @@
           "metadata": {
             "source": "workflow_persist"
           }
-        }
+        },
+        "When working with Api in this codebase, changes often span multiple modules. Key files: `2026-02-26_0700-0800_c197ef.md`, `config.ts`, `types.ts`"
       ],
-      "significance": 0.9,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-02-23T07:19:15.145Z",
-        "last_updated": "2026-02-23T07:19:15.145Z",
-        "significance": 9,
+        "last_updated": "2026-02-26T12:01:40.768Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2026-02-23T07:19:10.694Z",
-          "last_updated": "2026-02-23T07:19:10.694Z",
+          "significance": 9,
+          "originalMetadata": {
+            "created_at": "2026-02-23T07:19:10.694Z",
+            "last_updated": "2026-02-23T07:19:10.694Z",
+            "team": "coding",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "validated_file_path": "/coding/knowledge-management/insights/ApiHandlesExternalCommunication.md",
+            "has_insight_document": true,
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "hybrid",
+              "confidence": 0.95
+            },
+            "classificationConfidence": 0.95,
+            "classificationMethod": "hybrid",
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "disabled"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 0,
+              "totalIssues": 110,
+              "criticalIssues": 110,
+              "validatedAt": "2026-02-23T07:19:13.525Z",
+              "mode": "lenient"
+            },
+            "invalidating_commits": [],
+            "staleness_score": 100,
+            "staleness_check_at": "2026-02-23T07:19:13.525Z",
+            "staleness_method": "git-based"
+          },
+          "source": "manual",
           "team": "coding",
-          "created_by": "workflow_persist",
-          "version": "1.0",
+          "created_at": "2026-02-23T07:19:15.145Z",
+          "last_updated": "2026-02-26T12:01:39.668Z",
           "validated_file_path": "/coding/knowledge-management/insights/ApiHandlesExternalCommunication.md",
           "has_insight_document": true,
           "ontology": {
-            "ontologyName": "coding",
-            "classificationMethod": "hybrid",
-            "confidence": 0.95
+            "preClassified": true,
+            "originalMethod": "unknown"
           },
-          "classificationConfidence": 0.95,
-          "classificationMethod": "hybrid",
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -3381,12 +3446,12 @@
             "overallScore": 0,
             "totalIssues": 110,
             "criticalIssues": 110,
-            "validatedAt": "2026-02-23T07:19:13.525Z",
+            "validatedAt": "2026-02-26T12:01:39.678Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-02-23T07:19:13.525Z",
+          "staleness_check_at": "2026-02-26T12:01:39.678Z",
           "staleness_method": "git-based"
         }
       },
@@ -3798,28 +3863,61 @@
           }
         }
       ],
-      "significance": 0.9,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-02-23T07:19:15.147Z",
-        "last_updated": "2026-02-23T07:19:15.147Z",
-        "significance": 9,
+        "last_updated": "2026-02-26T12:01:40.770Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2026-02-23T07:19:10.694Z",
-          "last_updated": "2026-02-23T07:19:10.694Z",
+          "significance": 9,
+          "originalMetadata": {
+            "created_at": "2026-02-23T07:19:10.694Z",
+            "last_updated": "2026-02-23T07:19:10.694Z",
+            "team": "coding",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "validated_file_path": "/coding/knowledge-management/insights/ComponentReusableUiBuildingBlocks.md",
+            "has_insight_document": true,
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "hybrid",
+              "confidence": 0.95
+            },
+            "classificationConfidence": 0.95,
+            "classificationMethod": "hybrid",
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "disabled"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 0,
+              "totalIssues": 113,
+              "criticalIssues": 113,
+              "validatedAt": "2026-02-23T07:19:13.522Z",
+              "mode": "lenient"
+            },
+            "invalidating_commits": [],
+            "staleness_score": 100,
+            "staleness_check_at": "2026-02-23T07:19:13.522Z",
+            "staleness_method": "git-based"
+          },
+          "source": "manual",
           "team": "coding",
-          "created_by": "workflow_persist",
-          "version": "1.0",
+          "created_at": "2026-02-23T07:19:15.147Z",
+          "last_updated": "2026-02-26T12:01:39.671Z",
           "validated_file_path": "/coding/knowledge-management/insights/ComponentReusableUiBuildingBlocks.md",
           "has_insight_document": true,
           "ontology": {
-            "ontologyName": "coding",
-            "classificationMethod": "hybrid",
-            "confidence": 0.95
+            "preClassified": true,
+            "originalMethod": "unknown"
           },
-          "classificationConfidence": 0.95,
-          "classificationMethod": "hybrid",
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -3831,12 +3929,12 @@
             "overallScore": 0,
             "totalIssues": 113,
             "criticalIssues": 113,
-            "validatedAt": "2026-02-23T07:19:13.522Z",
+            "validatedAt": "2026-02-26T12:01:39.680Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-02-23T07:19:13.522Z",
+          "staleness_check_at": "2026-02-26T12:01:39.680Z",
           "staleness_method": "git-based"
         }
       },
@@ -4694,30 +4792,64 @@
           "metadata": {
             "source": "workflow_persist"
           }
-        }
+        },
+        "When working with Promise in this codebase, changes often span multiple modules. Key files: `2026-02-26_0700-0800_c197ef.md`, `config.ts`, `provider-registry.ts`"
       ],
-      "significance": 0.9,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-02-23T07:19:15.165Z",
-        "last_updated": "2026-02-23T07:19:15.165Z",
-        "significance": 9,
+        "last_updated": "2026-02-26T12:01:40.772Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2026-02-23T07:19:10.913Z",
-          "last_updated": "2026-02-23T07:19:10.913Z",
+          "significance": 9,
+          "originalMetadata": {
+            "created_at": "2026-02-23T07:19:10.913Z",
+            "last_updated": "2026-02-23T07:19:10.913Z",
+            "team": "coding",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "validated_file_path": "/coding/knowledge-management/insights/PromiseHandlesAsynchronousOperations.md",
+            "has_insight_document": true,
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "hybrid",
+              "confidence": 0.95
+            },
+            "classificationConfidence": 0.95,
+            "classificationMethod": "hybrid",
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "disabled"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 0,
+              "totalIssues": 115,
+              "criticalIssues": 115,
+              "validatedAt": "2026-02-23T07:19:14.900Z",
+              "mode": "lenient"
+            },
+            "invalidating_commits": [],
+            "staleness_score": 100,
+            "staleness_check_at": "2026-02-23T07:19:14.900Z",
+            "staleness_method": "git-based"
+          },
+          "source": "manual",
           "team": "coding",
-          "created_by": "workflow_persist",
-          "version": "1.0",
+          "created_at": "2026-02-23T07:19:15.165Z",
+          "last_updated": "2026-02-26T12:01:39.664Z",
           "validated_file_path": "/coding/knowledge-management/insights/PromiseHandlesAsynchronousOperations.md",
           "has_insight_document": true,
           "ontology": {
-            "ontologyName": "coding",
-            "classificationMethod": "hybrid",
-            "confidence": 0.95
+            "preClassified": true,
+            "originalMethod": "unknown"
           },
-          "classificationConfidence": 0.95,
-          "classificationMethod": "hybrid",
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -4729,12 +4861,12 @@
             "overallScore": 0,
             "totalIssues": 115,
             "criticalIssues": 115,
-            "validatedAt": "2026-02-23T07:19:14.900Z",
+            "validatedAt": "2026-02-26T12:01:39.674Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-02-23T07:19:14.900Z",
+          "staleness_check_at": "2026-02-26T12:01:39.674Z",
           "staleness_method": "git-based"
         }
       },
@@ -5144,30 +5276,64 @@
           "metadata": {
             "source": "workflow_persist"
           }
-        }
+        },
+        "When working with Service in this codebase, changes often span multiple modules. Key files: `2026-02-26_0700-0800_c197ef.md`, `config.ts`, `provider-registry.ts`"
       ],
-      "significance": 0.9,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-02-23T07:19:15.170Z",
-        "last_updated": "2026-02-23T07:19:15.170Z",
-        "significance": 9,
+        "last_updated": "2026-02-26T12:01:40.775Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2026-02-23T07:19:10.913Z",
-          "last_updated": "2026-02-23T07:19:10.913Z",
+          "significance": 9,
+          "originalMetadata": {
+            "created_at": "2026-02-23T07:19:10.913Z",
+            "last_updated": "2026-02-23T07:19:10.913Z",
+            "team": "coding",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "validated_file_path": "/coding/knowledge-management/insights/ServiceContainsBusinessLogic.md",
+            "has_insight_document": true,
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "hybrid",
+              "confidence": 0.95
+            },
+            "classificationConfidence": 0.95,
+            "classificationMethod": "hybrid",
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "disabled"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 0,
+              "totalIssues": 104,
+              "criticalIssues": 104,
+              "validatedAt": "2026-02-23T07:19:13.523Z",
+              "mode": "lenient"
+            },
+            "invalidating_commits": [],
+            "staleness_score": 100,
+            "staleness_check_at": "2026-02-23T07:19:13.523Z",
+            "staleness_method": "git-based"
+          },
+          "source": "manual",
           "team": "coding",
-          "created_by": "workflow_persist",
-          "version": "1.0",
+          "created_at": "2026-02-23T07:19:15.170Z",
+          "last_updated": "2026-02-26T12:01:39.665Z",
           "validated_file_path": "/coding/knowledge-management/insights/ServiceContainsBusinessLogic.md",
           "has_insight_document": true,
           "ontology": {
-            "ontologyName": "coding",
-            "classificationMethod": "hybrid",
-            "confidence": 0.95
+            "preClassified": true,
+            "originalMethod": "unknown"
           },
-          "classificationConfidence": 0.95,
-          "classificationMethod": "hybrid",
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -5177,14 +5343,14 @@
           "contentValidation": {
             "overallValid": false,
             "overallScore": 0,
-            "totalIssues": 104,
-            "criticalIssues": 104,
-            "validatedAt": "2026-02-23T07:19:13.523Z",
+            "totalIssues": 107,
+            "criticalIssues": 107,
+            "validatedAt": "2026-02-26T12:01:39.675Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-02-23T07:19:13.523Z",
+          "staleness_check_at": "2026-02-26T12:01:39.675Z",
           "staleness_method": "git-based"
         }
       },
@@ -5596,26 +5762,57 @@
           }
         }
       ],
-      "significance": 0.8,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-02-23T07:19:15.175Z",
-        "last_updated": "2026-02-23T07:19:15.175Z",
-        "significance": 8,
+        "last_updated": "2026-02-26T12:01:40.782Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2026-02-23T07:19:10.693Z",
-          "last_updated": "2026-02-23T07:19:10.693Z",
-          "team": "coding",
-          "created_by": "workflow_persist",
-          "version": "1.0",
-          "ontology": {
-            "ontologyName": "coding",
+          "significance": 8,
+          "originalMetadata": {
+            "created_at": "2026-02-23T07:19:10.693Z",
+            "last_updated": "2026-02-23T07:19:10.693Z",
+            "team": "coding",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "hybrid",
+              "confidence": 0.95
+            },
+            "classificationConfidence": 0.95,
             "classificationMethod": "hybrid",
-            "confidence": 0.95
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "disabled"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 0,
+              "totalIssues": 117,
+              "criticalIssues": 117,
+              "validatedAt": "2026-02-23T07:19:13.528Z",
+              "mode": "lenient"
+            },
+            "invalidating_commits": [],
+            "staleness_score": 100,
+            "staleness_check_at": "2026-02-23T07:19:13.528Z",
+            "staleness_method": "git-based"
           },
-          "classificationConfidence": 0.95,
-          "classificationMethod": "hybrid",
+          "source": "manual",
+          "team": "coding",
+          "created_at": "2026-02-23T07:19:15.175Z",
+          "last_updated": "2026-02-26T12:01:39.667Z",
+          "ontology": {
+            "preClassified": true,
+            "originalMethod": "unknown"
+          },
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -5627,12 +5824,12 @@
             "overallScore": 0,
             "totalIssues": 117,
             "criticalIssues": 117,
-            "validatedAt": "2026-02-23T07:19:13.528Z",
+            "validatedAt": "2026-02-26T12:01:39.678Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-02-23T07:19:13.528Z",
+          "staleness_check_at": "2026-02-26T12:01:39.678Z",
           "staleness_method": "git-based"
         }
       },
@@ -6724,28 +6921,58 @@
           "metadata": {
             "source": "workflow_persist"
           }
-        }
+        },
+        "**ModularRepositoryStructure**\n- Decision: Using a modular repository structure for better organization\n- Rationale: Easier maintenance and scalability\n- Example: `git submodule add https://github.com/feature-repo.git`\n- Tradeoffs: Pro: Better code organization; Con: More complexity in dependency management\n- Evidence: commit: 2025-09-01T23:54:38.000Z - Migrated to modular repository structure"
       ],
-      "significance": 0.7,
+      "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-02-25T08:58:03.138Z",
-        "last_updated": "2026-02-25T08:58:03.138Z",
-        "significance": 7,
+        "last_updated": "2026-02-26T12:02:24.947Z",
+        "significance": 5,
         "originalMetadata": {
-          "created_at": "2026-02-25T08:57:33.022Z",
-          "last_updated": "2026-02-25T08:57:33.022Z",
-          "team": "coding",
-          "created_by": "workflow_persist",
-          "version": "1.0",
-          "ontology": {
-            "ontologyName": "coding",
+          "significance": 7,
+          "originalMetadata": {
+            "created_at": "2026-02-25T08:57:33.022Z",
+            "last_updated": "2026-02-25T08:57:33.022Z",
+            "team": "coding",
+            "created_by": "workflow_persist",
+            "version": "1.0",
+            "ontology": {
+              "ontologyName": "coding",
+              "classificationMethod": "heuristic",
+              "confidence": 0.9099999999999999
+            },
+            "classificationConfidence": 0.9099999999999999,
             "classificationMethod": "heuristic",
-            "confidence": 0.9099999999999999
+            "validation": {
+              "valid": true,
+              "errors": [],
+              "warnings": [],
+              "mode": "disabled"
+            },
+            "contentValidation": {
+              "overallValid": false,
+              "overallScore": 100,
+              "totalIssues": 0,
+              "criticalIssues": 0,
+              "validatedAt": "2026-02-25T08:58:03.131Z",
+              "mode": "lenient"
+            },
+            "staleness_score": 100,
+            "staleness_check_at": "2026-02-25T08:58:03.131Z"
           },
-          "classificationConfidence": 0.9099999999999999,
-          "classificationMethod": "heuristic",
+          "source": "manual",
+          "team": "coding",
+          "created_at": "2026-02-25T08:58:03.138Z",
+          "last_updated": "2026-02-26T12:02:10.008Z",
+          "ontology": {
+            "preClassified": true,
+            "originalMethod": "unknown"
+          },
+          "classificationConfidence": 0.8,
+          "classificationMethod": "pre-classified-skip",
           "validation": {
             "valid": true,
             "errors": [],
@@ -6754,14 +6981,16 @@
           },
           "contentValidation": {
             "overallValid": false,
-            "overallScore": 100,
-            "totalIssues": 0,
-            "criticalIssues": 0,
-            "validatedAt": "2026-02-25T08:58:03.131Z",
+            "overallScore": 80,
+            "totalIssues": 1,
+            "criticalIssues": 1,
+            "validatedAt": "2026-02-26T12:02:10.016Z",
             "mode": "lenient"
           },
+          "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-02-25T08:58:03.131Z"
+          "staleness_check_at": "2026-02-26T12:02:10.016Z",
+          "staleness_method": "git-based"
         }
       },
       "source": "manual",
@@ -6978,6 +7207,429 @@
           },
           "staleness_score": 100,
           "staleness_check_at": "2026-02-25T08:58:03.264Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "DecoratorAddsBehaviorObjects",
+      "entityType": "KnowledgeEntity",
+      "observations": [],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-26T12:02:04.997Z",
+        "last_updated": "2026-02-26T12:02:04.997Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-26T12:01:39.616Z",
+          "last_updated": "2026-02-26T12:01:39.616Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "hybrid",
+            "confidence": 0.82
+          },
+          "classificationConfidence": 0.82,
+          "classificationMethod": "hybrid",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-26T12:02:04.991Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-26T12:02:04.991Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "FactoryCreatesObjectsWithout",
+      "entityType": "KnowledgeEntity",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "factory: Creates objects without specifying exact classes",
+          "date": "2026-02-26T12:02:09.701Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-26T12:02:36.349Z",
+        "last_updated": "2026-02-26T12:02:36.349Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-26T12:02:09.701Z",
+          "last_updated": "2026-02-26T12:02:09.701Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "hybrid",
+            "confidence": 0.88
+          },
+          "classificationConfidence": 0.88,
+          "classificationMethod": "hybrid",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-26T12:02:36.344Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-26T12:02:36.344Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "ModularservicearchitectureDecisionUsingModular",
+      "entityType": "MonitoringLayer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**ModularServiceArchitecture**\n- Decision: Using a modular approach for service integration and management\n- Rationale: To provide a flexible and scalable way of adding or removing services and to improve system maintainability\n- Example: `const services = [new Service1(), new Service2()]; services.forEach(service => service.start());`\n- Tradeoffs: Pro: Improved system maintainability and scalability; Con: Increased complexity and potential for service dependency issues\n- Evidence: commit: feat: re-development of services layer, life-cycle management and services health monitoring, file: lib/services/start-services.js",
+          "date": "2026-02-26T12:02:09.769Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-26T12:02:39.864Z",
+        "last_updated": "2026-02-26T12:02:39.864Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-26T12:02:09.769Z",
+          "last_updated": "2026-02-26T12:02:09.769Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.88
+          },
+          "classificationConfidence": 0.88,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-26T12:02:39.860Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-26T12:02:39.860Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "StandaloneconstraintmonitorDecisionUsingStandalone",
+      "entityType": "ConstraintRule",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**StandaloneConstraintMonitor**\n- Decision: Using a standalone repository for constraint monitor\n- Rationale: Easier maintenance and updates\n- Example: `git clone https://github.com/constraint-monitor.git`\n- Tradeoffs: Pro: Easier maintenance; Con: More complexity in dependency management\n- Evidence: commit: 2025-09-01T23:54:38.000Z - Migrated to standalone constraint monitor repo",
+          "date": "2026-02-26T12:02:09.826Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-26T12:02:39.938Z",
+        "last_updated": "2026-02-26T12:02:39.938Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-26T12:02:09.826Z",
+          "last_updated": "2026-02-26T12:02:09.826Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.75
+          },
+          "classificationConfidence": 0.75,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-26T12:02:39.918Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-26T12:02:39.918Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "McpconstraintmonitorarchitectureDecisionUseMcp",
+      "entityType": "ConstraintRule",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**McpConstraintMonitorArchitecture**\n- Decision: Use the `mcp-constraint-monitor` submodule for semantic detection\n- Rationale: The `mcp-constraint-monitor` submodule provides a robust and scalable solution for semantic detection\n- Example: `integrations/mcp-constraint-monitor`\n- Tradeoffs: Pro: Robust and scalable solution; Con: Additional complexity\n- Evidence: commit: 2025-10-11T16:06:51.000Z - feat: enable semantic detection for key constraints, file: integrations/mcp-constraint-monitor",
+          "date": "2026-02-26T12:02:09.827Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-26T12:02:39.962Z",
+        "last_updated": "2026-02-26T12:02:39.962Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-26T12:02:09.827Z",
+          "last_updated": "2026-02-26T12:02:09.827Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.75
+          },
+          "classificationConfidence": 0.75,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-26T12:02:39.956Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-26T12:02:39.956Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "RealtimetrajectoryanalyzerarchitectureDecisionUseHeartbeat",
+      "entityType": "TrajectoryState",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**RealTimeTrajectoryAnalyzerArchitecture**\n- Decision: Use a heartbeat to keep the `live-state.json` file fresh\n- Rationale: A heartbeat ensures that the `live-state.json` file remains up-to-date and accurate\n- Example: `fix: add heartbeat to keep live-state.json fresh`\n- Tradeoffs: Pro: Ensures accurate and up-to-date data; Con: Additional complexity\n- Evidence: commit: 2025-10-07T12:04:45.000Z - fix: add heartbeat to keep live-state.json fresh, file: src/live-logging/RealTimeTrajectoryAnalyzer.js",
+          "date": "2026-02-26T12:02:09.827Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-26T12:02:39.979Z",
+        "last_updated": "2026-02-26T12:02:39.979Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-26T12:02:09.827Z",
+          "last_updated": "2026-02-26T12:02:09.827Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.9
+          },
+          "classificationConfidence": 0.9,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-26T12:02:39.975Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-26T12:02:39.975Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "RealtimetrajectoryanalyzerpatternProblemHowKeep",
+      "entityType": "TrajectoryState",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**RealTimeTrajectoryAnalyzerPattern**\n- Problem: How to keep the `live-state.json` file fresh\n- Solution: Add a heartbeat to the `RealTimeTrajectoryAnalyzer` class\n- Example: `fix: add heartbeat to keep live-state.json fresh`\n- DO: ALWAYS use a heartbeat to keep the `live-state.json` file fresh; Use the `fix` commit type for bug fixes\n- DON'T: NEVER modify the `RealTimeTrajectoryAnalyzer` class without adding a heartbeat; Avoid using the `feat` commit type for bug fixes\n- Evidence: commit: 2025-10-07T12:04:45.000Z - fix: add heartbeat to keep live-state.json fresh, file: src/live-logging/RealTimeTrajectoryAnalyzer.js",
+          "date": "2026-02-26T12:02:09.828Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-26T12:02:39.998Z",
+        "last_updated": "2026-02-26T12:02:39.998Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-26T12:02:09.828Z",
+          "last_updated": "2026-02-26T12:02:09.828Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.9
+          },
+          "classificationConfidence": 0.9,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-26T12:02:39.995Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-26T12:02:39.995Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "PathanalyzerpatternProblemHowConsider",
+      "entityType": "CodingArtifact",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**PathAnalyzerPattern**\n- Problem: How to consider both coding and local file access in the path analyzer\n- Solution: Update the `PathAnalyzer` class to consider both coding and local file access\n- Example: `feat: path now considering both coding and local file access`\n- DO: ALWAYS consider both coding and local file access in the path analyzer; Use the `feat` commit type for new feature additions\n- DON'T: NEVER modify the `PathAnalyzer` class without considering both coding and local file access; Avoid using the `chore` commit type for feature additions\n- Evidence: commit: 2025-10-17T09:00:45.000Z - feat: path now considering both coding and local file access, file: src/live-logging/PathAnalyzer.js",
+          "date": "2026-02-26T12:02:09.829Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-26T12:02:40.021Z",
+        "last_updated": "2026-02-26T12:02:40.021Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-26T12:02:09.829Z",
+          "last_updated": "2026-02-26T12:02:09.829Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.9
+          },
+          "classificationConfidence": 0.9,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-26T12:02:40.017Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-26T12:02:40.017Z"
         }
       },
       "source": "manual",
@@ -7521,13 +8173,69 @@
       "relationType": "contains",
       "confidence": 1,
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "DecoratorAddsBehaviorObjects",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "FactoryCreatesObjectsWithout",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ModularservicearchitectureDecisionUsingModular",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "StandaloneconstraintmonitorDecisionUsingStandalone",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "McpconstraintmonitorarchitectureDecisionUseMcp",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "RealtimetrajectoryanalyzerarchitectureDecisionUseHeartbeat",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "RealtimetrajectoryanalyzerpatternProblemHowKeep",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "PathanalyzerpatternProblemHowConsider",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
     }
   ],
   "metadata": {
-    "last_updated": "2026-02-25T09:22:26.289Z",
+    "last_updated": "2026-02-26T12:10:00.164Z",
     "team": "coding",
-    "entity_count": 49,
-    "relation_count": 77,
+    "entity_count": 57,
+    "relation_count": 85,
     "exported_by": "GraphDatabaseService",
     "export_version": "1.0"
   }
