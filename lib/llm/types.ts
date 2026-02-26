@@ -113,6 +113,7 @@ export interface DMRConfig {
 export interface LLMServiceConfig {
   providers?: Record<string, Partial<ProviderConfig>>;
   providerPriority?: Partial<Record<ModelTier, ProviderName[]>>;
+  taskProviderPriority?: Record<string, ProviderName[]>;
   taskTiers?: Record<string, string[]>;
   agentOverrides?: Record<string, ModelTier>;
   operatorTiers?: Record<string, ModelTier>;

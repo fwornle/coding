@@ -139,8 +139,11 @@ export class ProviderRegistry {
     // 2. Determine tier
     const tier = this.resolveTier(request);
 
-    // 3. Walk provider priority for that tier
-    const priority = this.config.providerPriority?.[tier] || ['groq', 'anthropic', 'openai'];
+    // 3. Check task-level provider priority override (e.g., skip slow providers for specific tasks)
+    const taskPriority = request.taskType && this.config.taskProviderPriority?.[request.taskType];
+
+    // 4. Walk provider priority for that tier (task override takes precedence)
+    const priority = taskPriority || this.config.providerPriority?.[tier] || ['groq', 'anthropic', 'openai'];
 
     // Debug: log tier resolution and priority chain
     if (tier === 'premium') {
