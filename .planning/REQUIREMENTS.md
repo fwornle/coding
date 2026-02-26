@@ -14,19 +14,19 @@
 ### Entity Naming
 
 - [x] **NAME-01**: Entity names use correct PascalCase (e.g., "PathAnalyzerPattern" not "Pathanalyzerpattern")
-- [ ] **NAME-02**: Entity names are semantically meaningful (not concatenated type + description fragments)
+- [x] **NAME-02**: Entity names are semantically meaningful (not concatenated type + description fragments)
 
 ### Observation Quality
 
-- [ ] **OBSV-01**: Observations are LLM-synthesized from actual code analysis, not hardcoded template strings
-- [ ] **OBSV-02**: Observations capture architectural patterns, design decisions, and component significance — not commit message paraphrases
+- [x] **OBSV-01**: Observations are LLM-synthesized from actual code analysis, not hardcoded template strings
+- [x] **OBSV-02**: Observations capture architectural patterns, design decisions, and component significance — not commit message paraphrases
 - [ ] **OBSV-03**: Observations are quality-ranked before the 50-cap truncation so most meaningful observations survive
 
 ### Data Routing
 
 - [ ] **DATA-01**: Semantic entity data accumulates across batches via `allBatchSemanticEntities` accumulator (prevents data loss during batch compaction)
 - [ ] **DATA-02**: `synthesizeInsights` returns properly structured data (not wrapped in `{_timing}` object that breaks `Array.isArray()` check)
-- [ ] **DATA-03**: Semantic analysis uses `analysisDepth: 'deep'` instead of `'surface'` for meaningful code understanding
+- [x] **DATA-03**: Semantic analysis uses `analysisDepth: 'deep'` instead of `'surface'` for meaningful code understanding
 
 ### Insight Documents
 
@@ -70,13 +70,13 @@
 | PTRN-02 | Phase 1 | Complete |
 | PTRN-03 | Phase 1 | Complete |
 | NAME-01 | Phase 1 | Complete |
-| NAME-02 | Phase 1 | Pending |
-| OBSV-01 | Phase 1 | Pending |
-| OBSV-02 | Phase 1 | Pending |
+| NAME-02 | Phase 1 | Complete |
+| OBSV-01 | Phase 1 | Complete |
+| OBSV-02 | Phase 1 | Complete |
 | OBSV-03 | Phase 3 | Pending |
 | DATA-01 | Phase 2 | Pending |
 | DATA-02 | Phase 2 | Pending |
-| DATA-03 | Phase 1 | Pending |
+| DATA-03 | Phase 1 | Complete |
 | INSD-01 | Phase 2 | Pending |
 | INSD-02 | Phase 2 | Pending |
 | INSD-03 | Phase 2 | Pending |

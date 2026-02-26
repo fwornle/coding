@@ -6,7 +6,7 @@ Three phases of surgical bug-fixing to restore the UKB multi-agent analysis pipe
 
 ## Phases
 
-- [ ] **Phase 1: Core Pipeline Data Quality** - Fix pattern extraction parser, entity naming, and observation template substitution so the pipeline produces real content
+- [x] **Phase 1: Core Pipeline Data Quality** - Fix pattern extraction parser, entity naming, and observation template substitution so the pipeline produces real content (completed 2026-02-26)
 - [ ] **Phase 2: Insight Generation & Data Routing** - Fix data accumulators and timing wrapper so insight documents are generated and linked to entities
 - [ ] **Phase 3: Significance & Quality Ranking** - Fix significance score normalization and observation ranking so high-value entities surface correctly
 
@@ -52,6 +52,6 @@ Three phases of surgical bug-fixing to restore the UKB multi-agent analysis pipe
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Pipeline Data Quality | 1/2 | In Progress|  |
+| 1. Core Pipeline Data Quality | 2/2 | Complete   | 2026-02-26 |
 | 2. Insight Generation & Data Routing | 0/? | Not started | - |
 | 3. Significance & Quality Ranking | 0/? | Not started | - |
