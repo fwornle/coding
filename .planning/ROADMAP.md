@@ -22,7 +22,9 @@ Three phases of surgical bug-fixing to restore the UKB multi-agent analysis pipe
   3. Observations in `coding.json` contain code-specific analysis language, not slot-filled commit file extension strings
   4. Semantic analysis runs with `analysisDepth: 'deep'` (visible in workflow execution logs)
   5. Pattern parser handles both JSON and markdown-numbered LLM response formats without returning empty results
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 01-01-PLAN.md -- Fix pattern extraction parser + pattern name formatter (PTRN-01, PTRN-02, PTRN-03, NAME-01)
+  - [ ] 01-02-PLAN.md -- Fix entity naming, replace template observations with LLM synthesis, switch to deep analysis (NAME-01, NAME-02, OBSV-01, OBSV-02, DATA-03)
 
 ### Phase 2: Insight Generation & Data Routing
 **Goal**: Insight documents are written to `knowledge-management/insights/` and linked to their corresponding knowledge graph entities
@@ -50,6 +52,6 @@ Three phases of surgical bug-fixing to restore the UKB multi-agent analysis pipe
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Pipeline Data Quality | 0/? | Not started | - |
+| 1. Core Pipeline Data Quality | 0/2 | Planning complete | - |
 | 2. Insight Generation & Data Routing | 0/? | Not started | - |
 | 3. Significance & Quality Ranking | 0/? | Not started | - |
