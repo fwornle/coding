@@ -66,29 +66,29 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PTRN-01 | — | Pending |
-| PTRN-02 | — | Pending |
-| PTRN-03 | — | Pending |
-| NAME-01 | — | Pending |
-| NAME-02 | — | Pending |
-| OBSV-01 | — | Pending |
-| OBSV-02 | — | Pending |
-| OBSV-03 | — | Pending |
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| INSD-01 | — | Pending |
-| INSD-02 | — | Pending |
-| INSD-03 | — | Pending |
-| INSD-04 | — | Pending |
-| QUAL-01 | — | Pending |
-| QUAL-02 | — | Pending |
+| PTRN-01 | Phase 1 | Pending |
+| PTRN-02 | Phase 1 | Pending |
+| PTRN-03 | Phase 1 | Pending |
+| NAME-01 | Phase 1 | Pending |
+| NAME-02 | Phase 1 | Pending |
+| OBSV-01 | Phase 1 | Pending |
+| OBSV-02 | Phase 1 | Pending |
+| OBSV-03 | Phase 3 | Pending |
+| DATA-01 | Phase 2 | Pending |
+| DATA-02 | Phase 2 | Pending |
+| DATA-03 | Phase 1 | Pending |
+| INSD-01 | Phase 2 | Pending |
+| INSD-02 | Phase 2 | Pending |
+| INSD-03 | Phase 2 | Pending |
+| INSD-04 | Phase 2 | Pending |
+| QUAL-01 | Phase 3 | Pending |
+| QUAL-02 | Phase 2 | Pending |
 
 **Coverage:**
 - v1 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17 ⚠️
+- Mapped to phases: 17
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after initial definition*
+*Last updated: 2026-02-26 after roadmap creation*
