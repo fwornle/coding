@@ -17,9 +17,17 @@
 
 ## UKB Workflow Control
 
-When user says "ukb", "full ukb", or "ukb full debug":
+**CRITICAL: Match parameters to what user actually says!**
 
-**Step 1 — ALWAYS try the MCP tool first:**
+**"ukb", "full ukb", "ukb full"** → PRODUCTION mode (real LLM calls, runs continuously):
+```
+mcp__semantic-analysis__execute_workflow
+  workflow_name: "batch-analysis"
+  async_mode: true
+  parameters: {team: "coding"}
+```
+
+**"ukb full debug", "ukb debug"** → DEBUG mode (mock LLM, single-step):
 ```
 mcp__semantic-analysis__execute_workflow
   workflow_name: "batch-analysis"
@@ -28,11 +36,11 @@ mcp__semantic-analysis__execute_workflow
   parameters: {team: "coding", singleStepMode: true, mockLLM: true, stepIntoSubsteps: true}
 ```
 
-**Step 2 — ONLY if MCP tool is unavailable**, fall back to direct SSE call on port 3848 (see `memory/ukb-workflow.md`).
+**Fallback — ONLY if MCP tool is unavailable**, use direct SSE call on port 3848 (see `memory/ukb-workflow.md`).
 
 - NEVER run `ukb` as a bash command
 - NEVER use port 3033 for workflows
-- ALWAYS use `mockLLM: true` in debug mode
+- NEVER default to debug mode unless user explicitly says "debug"
 
 ## Rebuilding After Code Changes
 
