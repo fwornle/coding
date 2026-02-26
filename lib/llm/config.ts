@@ -94,6 +94,7 @@ function normalizeConfig(raw: any): LLMServiceConfig {
   return {
     providers: raw.providers,
     providerPriority: raw.provider_priority || raw.providerPriority,
+    taskProviderPriority: raw.task_provider_priority || raw.taskProviderPriority,
     taskTiers: raw.task_tiers || raw.taskTiers,
     agentOverrides: raw.agent_overrides || raw.agentOverrides,
     operatorTiers: raw.operator_tiers || raw.operatorTiers,

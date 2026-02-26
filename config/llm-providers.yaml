@@ -68,6 +68,12 @@ provider_priority:
   standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
   premium: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
 
+# Task-level provider priority overrides
+# Overrides the tier-based priority for specific tasks that need different routing
+# Use case: copilot proxy times out (120s) on large prompts; route to groq first
+task_provider_priority:
+  semantic_code_analysis: ["groq", "copilot", "claude-code", "anthropic", "openai"]
+
 # Task-to-tier mapping
 task_tiers:
   # Tier 1: Fast - Simple extraction and parsing
