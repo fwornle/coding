@@ -73,6 +73,7 @@ provider_priority:
 # Use case: copilot proxy times out (120s) on large prompts; route to groq first
 task_provider_priority:
   semantic_code_analysis: ["groq", "copilot", "claude-code", "anthropic", "openai"]
+  ontology_classification: ["groq", "copilot", "claude-code", "anthropic", "openai"]
 
 # Task-to-tier mapping
 task_tiers:
