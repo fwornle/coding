@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import type { StepInfo } from '@/store/slices/ukbSlice'
 import { Logger, LogCategories } from '@/utils/logging'
+import { TIER_COLORS, AGENT_SUBSTEPS, STEP_TO_AGENT } from './constants'
 
 interface TraceModalProps {
   open: boolean
@@ -46,6 +47,7 @@ interface TraceEventUI {
   outputs?: Record<string, any>
   error?: string
   startOffset: number // ms from workflow start
+  llmTier?: string    // fast/standard/premium/none — for bar coloring
 }
 
 export function TraceModal({
@@ -70,6 +72,26 @@ export function TraceModal({
     }
   }, [open, workflowName, steps])
 
+  // Resolve LLM tier for a step name from AGENT_SUBSTEPS definitions
+  const resolveStepTier = (stepName: string): string | undefined => {
+    // Check if stepName maps to an agent+substep
+    const agentId = STEP_TO_AGENT[stepName]
+    if (!agentId) return undefined
+    const substeps = AGENT_SUBSTEPS[agentId]
+    if (!substeps) return undefined
+    // Find the matching substep by checking substep IDs in STEP_TO_SUBSTEP-style patterns
+    // The step name often contains the substep id as a suffix
+    for (const sub of substeps) {
+      if (stepName.includes(sub.id) || stepName === agentId) {
+        return sub.llmUsage || 'none'
+      }
+    }
+    // If step maps to an agent but not a specific substep, check if ALL substeps use same tier
+    const tiers = new Set(substeps.map(s => s.llmUsage || 'none'))
+    if (tiers.size === 1) return substeps[0].llmUsage || 'none'
+    return 'standard' // Mixed tiers, default to standard
+  }
+
   // Convert steps to trace events with timing
   const { events, totalDuration, stats } = useMemo(() => {
     let offset = 0
@@ -92,6 +114,7 @@ export function TraceModal({
         outputs: step.outputs,
         error: step.error,
         startOffset: offset,
+        llmTier: resolveStepTier(step.name),
       }
       traceEvents.push(event)
 
@@ -159,29 +182,43 @@ export function TraceModal({
     return `${minutes}m ${seconds}s`
   }
 
-  // Format model name for display - shorten common model names
+  // Format model name for display - show model@provider when possible
   const formatModelName = (modelOrProvider: string): string => {
-    // Handle aggregated provider lists like "groq, ollama"
-    if (modelOrProvider.includes(', ')) {
-      // Multiple providers - show as multi
-      return 'multi-llm'
+    // Already formatted as model@provider from backend
+    if (modelOrProvider.includes('@')) {
+      // Shorten model part: claude-sonnet-4-5@claude-code → sonnet@claude-code
+      const [model, provider] = modelOrProvider.split('@', 2)
+      const shortModel = shortenModel(model)
+      const result = `${shortModel}@${provider}`
+      return result.length > 18 ? result.slice(0, 18) : result
     }
-    // Clean up common model name patterns for better display
-    const model = modelOrProvider.toLowerCase()
-    if (model.includes('llama') && model.includes('70b')) return 'llama-70b'
-    if (model.includes('llama') && model.includes('8b')) return 'llama-8b'
-    if (model.includes('llama')) return 'llama'
-    if (model.includes('gemma')) return 'gemma'
-    if (model.includes('mixtral')) return 'mixtral'
-    if (model.includes('claude')) return 'claude'
-    if (model.includes('gpt-4')) return 'gpt-4'
-    if (model.includes('gpt-3')) return 'gpt-3.5'
-    if (model === 'anthropic') return 'claude'
-    if (model === 'groq') return 'groq'
-    if (model === 'ollama') return 'ollama'
-    if (model === 'openai') return 'openai'
-    // Return first 12 chars if too long
-    return modelOrProvider.length > 12 ? modelOrProvider.slice(0, 12) : modelOrProvider
+
+    // Handle aggregated provider lists like "groq, ollama"
+    if (modelOrProvider.includes(', ')) return 'multi-llm'
+
+    // Single model or provider name — shorten
+    return shortenModel(modelOrProvider)
+  }
+
+  // Shorten model identifiers for compact badge display
+  const shortenModel = (model: string): string => {
+    const m = model.toLowerCase()
+    if (m.includes('sonnet'))  return 'sonnet'
+    if (m.includes('haiku'))   return 'haiku'
+    if (m.includes('opus'))    return 'opus'
+    if (m.includes('llama') && m.includes('70b')) return 'llama-70b'
+    if (m.includes('llama') && m.includes('8b'))  return 'llama-8b'
+    if (m.includes('llama'))   return 'llama'
+    if (m.includes('gemma'))   return 'gemma'
+    if (m.includes('mixtral')) return 'mixtral'
+    if (m.includes('claude'))  return 'claude'
+    if (m.includes('gpt-4'))   return 'gpt-4'
+    if (m.includes('gpt-3'))   return 'gpt-3.5'
+    if (m === 'anthropic') return 'claude'
+    if (m === 'groq') return 'groq'
+    if (m === 'ollama') return 'ollama'
+    if (m === 'openai') return 'openai'
+    return model.length > 15 ? model.slice(0, 15) : model
   }
 
   const getStatusIcon = (status: string) => {
@@ -303,7 +340,7 @@ export function TraceModal({
                           {event.name}
                         </div>
 
-                        {/* Duration Bar - Waterfall style */}
+                        {/* Duration Bar - Waterfall style, tier-colored for completed steps */}
                         <div className="flex-1 flex items-center gap-2">
                           {/* Offset spacer */}
                           <div
@@ -313,10 +350,15 @@ export function TraceModal({
                                 : '0%',
                             }}
                           />
-                          {/* Duration bar */}
+                          {/* Duration bar: use tier color for completed steps, status color otherwise */}
                           <div
-                            className={`h-4 rounded ${getStatusColor(event.status)} opacity-80`}
+                            className={`h-4 rounded opacity-80 ${
+                              event.status === 'completed' && event.llmTier
+                                ? (TIER_COLORS[event.llmTier]?.bar || 'bg-green-500')
+                                : getStatusColor(event.status)
+                            }`}
                             style={{ width: `${barWidth}%`, minWidth: '4px' }}
+                            title={event.llmTier ? `${event.llmTier} tier` : undefined}
                           />
                         </div>
 

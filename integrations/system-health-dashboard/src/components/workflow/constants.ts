@@ -570,6 +570,15 @@ export const LAYOUT_CONFIG = {
   },
 }
 
+// LLM tier color classes for consistent badge/bar styling
+// Used by trace-modal and ukb-workflow-modal
+export const TIER_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
+  fast:     { bg: 'bg-green-500',  text: 'text-white', bar: 'bg-green-500' },
+  standard: { bg: 'bg-blue-500',   text: 'text-white', bar: 'bg-blue-500' },
+  premium:  { bg: 'bg-purple-500', text: 'text-white', bar: 'bg-purple-500' },
+  none:     { bg: 'bg-gray-200',   text: 'text-gray-600', bar: 'bg-gray-300' },
+}
+
 // Sub-step definitions for agents with multiple internal operations
 // MOVED HERE from multi-agent-graph.tsx to avoid circular imports
 export interface SubStep {
