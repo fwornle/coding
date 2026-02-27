@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-27T13:08:24.166Z"
+last_updated: "2026-02-27T13:14:05.987Z"
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 1 of 3 (Core Pipeline Data Quality)
-Plan: 3 of 5 in current phase
-Status: In progress
-Last activity: 2026-02-27 — Completed 01-03-PLAN.md (JSON parse fence stripping + Docker knowledge-management bind-mount)
+Plan: 5 of 5 in current phase (COMPLETE)
+Status: Phase 1 Complete
+Last activity: 2026-02-27 -- Completed 01-05-PLAN.md (LLM pattern enrichment + trace report fixes)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 10 | 3 tasks | 2 files |
 | Phase 01 P04 | 2 | 2 tasks | 2 files |
 | Phase 01 P03 | 3 | 2 tasks | 2 files |
+| Phase 01 P05 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,9 @@ Recent decisions affecting current work:
 - [Phase 01]: Normalize at assignment: use normalizedName local var from toPascalCase before building observation return objects
 - [Phase 01]: Apply fence-stripping only to the two unfixed methods (createEntityObservation, createSemanticInsightObservation) -- createArchitecturalDecisionObservation and createCodeEvolutionObservation already had the fix
 - [Phase 01]: knowledge-management Docker mount is read-write (no :ro) because container must write insight files to that path
+- [Phase 01]: Merge LLM keyPatterns into architecturalPatterns post-generateSemanticInsights to break 10-pattern regex ceiling
+- [Phase 01]: Loss metric input for semantic_analysis uses filesAnalyzed + patterns (correct abstraction), not commits (category error)
+- [Phase 01]: materialsUsed reads from InsightDocument fields with fallback -- forward-compatible for future InsightDocument enrichment
 
 ### Pending Todos
 
@@ -85,5 +89,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 01-04-PLAN.md (PascalCase normalization for all 7 naming bypass paths)
+Stopped at: Completed 01-05-PLAN.md (Phase 1 fully complete)
 Resume file: None
