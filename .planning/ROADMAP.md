@@ -6,7 +6,7 @@ Three phases of surgical bug-fixing to restore the UKB multi-agent analysis pipe
 
 ## Phases
 
-- [x] **Phase 1: Core Pipeline Data Quality** - Fix pattern extraction parser, entity naming, and observation template substitution so the pipeline produces real content (completed 2026-02-26)
+- [ ] **Phase 1: Core Pipeline Data Quality** - Fix pattern extraction parser, entity naming, and observation template substitution so the pipeline produces real content
 - [ ] **Phase 2: Insight Generation & Data Routing** - Fix data accumulators and timing wrapper so insight documents are generated and linked to entities
 - [ ] **Phase 3: Significance & Quality Ranking** - Fix significance score normalization and observation ranking so high-value entities surface correctly
 
@@ -22,9 +22,14 @@ Three phases of surgical bug-fixing to restore the UKB multi-agent analysis pipe
   3. Observations in `coding.json` contain code-specific analysis language, not slot-filled commit file extension strings
   4. Semantic analysis runs with `analysisDepth: 'deep'` (visible in workflow execution logs)
   5. Pattern parser handles both JSON and markdown-numbered LLM response formats without returning empty results
-**Plans**: 2 plans
-  - [ ] 01-01-PLAN.md -- Fix pattern extraction parser + pattern name formatter (PTRN-01, PTRN-02, PTRN-03, NAME-01)
-  - [ ] 01-02-PLAN.md -- Fix entity naming, replace template observations with LLM synthesis, switch to deep analysis (NAME-01, NAME-02, OBSV-01, OBSV-02, DATA-03)
+  6. Per-batch entity diversity exceeds the 10-pattern hardcoded vocabulary
+**Plans**: 5 plans
+Plans:
+  - [x] 01-01-PLAN.md -- Fix pattern extraction parser + pattern name formatter (PTRN-01, PTRN-02, PTRN-03, NAME-01)
+  - [x] 01-02-PLAN.md -- Fix entity naming, replace template observations with LLM synthesis, switch to deep analysis (NAME-01, NAME-02, OBSV-01, OBSV-02, DATA-03)
+  - [ ] 01-03-PLAN.md -- [GAP] Fix JSON.parse fence stripping in 2 observation methods + Docker bind-mount (OBSV-01, OBSV-02)
+  - [ ] 01-04-PLAN.md -- [GAP] Fix all 7 entity naming bypass paths across both agent files (NAME-01, NAME-02)
+  - [ ] 01-05-PLAN.md -- [GAP] Enrich per-batch patterns with LLM output + fix trace report metrics (PTRN-01, PTRN-02, DATA-03)
 
 ### Phase 2: Insight Generation & Data Routing
 **Goal**: Insight documents are written to `knowledge-management/insights/` and linked to their corresponding knowledge graph entities
@@ -52,6 +57,6 @@ Three phases of surgical bug-fixing to restore the UKB multi-agent analysis pipe
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Pipeline Data Quality | 2/2 | Complete   | 2026-02-26 |
+| 1. Core Pipeline Data Quality | 2/5 | Gap closure | - |
 | 2. Insight Generation & Data Routing | 0/? | Not started | - |
 | 3. Significance & Quality Ranking | 0/? | Not started | - |
