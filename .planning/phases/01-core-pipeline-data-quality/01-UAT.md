@@ -1,9 +1,9 @@
 ---
-status: complete
+status: diagnosed
 phase: 01-core-pipeline-data-quality
 source: [01-01-SUMMARY.md, 01-02-SUMMARY.md]
 started: 2026-02-27T06:00:00Z
-updated: 2026-02-27T12:30:00Z
+updated: 2026-02-27T12:15:00Z
 ---
 
 ## Current Test
@@ -54,40 +54,67 @@ skipped: 0
 
 - truth: "parseArchitecturalPatternsFromLLM extracts patterns from LLM responses and pipeline retains data through stages"
   status: failed
-  reason: "User reported: 93% data loss across pipeline. 293 concepts in, 20 entities out. Log line '1778 patterns' refers to reading existing observations, not new pattern extraction. Cannot confirm parseArchitecturalPatternsFromLLM works in production."
+  reason: "User reported: 93% data loss across pipeline. 293 concepts in, 20 entities out. Log line '1778 patterns' refers to reading existing observations, not new pattern extraction."
   severity: blocker
   test: 1
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Entity vocabulary hardcoded to 10 patterns in semantic-analysis-agent.ts:532-547 (getPatternDescription). parseArchitecturalPatternsFromLLM only runs at finalization (not per-batch), returned 0 patterns because all 3 parse strategies failed on actual LLM response format. '93% loss' is a category error in ukb-trace-report.ts:416 comparing commits to entities."
+  artifacts:
+    - path: "integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts"
+      issue: "getPatternDescription() hardcodes 10-pattern vocabulary, pure regex matching"
+    - path: "integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts"
+      issue: "parseArchitecturalPatternsFromLLM returned 0 patterns at finalization, parse strategies failed on actual response format"
+    - path: "integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts"
+      issue: "Data loss metric compares commits to entities (category error), lossReasons never populated"
+  missing:
+    - "parseArchitecturalPatternsFromLLM needs to handle actual LLM prose response format"
+    - "Entity creation needs LLM-driven pattern extraction per batch, not hardcoded vocabulary"
+    - "Trace report loss metric needs to compare semantically equivalent units"
+  debug_session: ".planning/debug/pattern-extraction-data-loss.md"
 
 - truth: "Entity names use correct PascalCase throughout all naming code paths"
   status: failed
-  reason: "User reported: Many entities have mangled lowercase names (PathanalyzerimplementationProblemImplementingPath). Fixes applied to toPascalCase/generateCleanEntityName but another code path still produces broken names."
+  reason: "User reported: Many entities have mangled lowercase names. Fixes applied to 3 of 7 naming paths."
   severity: major
   test: 2
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Phase 01 fixed toPascalCase, generateCleanEntityName, generateEntityName. Four bypass paths untouched in observation-generation-agent.ts: createEntityObservation (uses raw entity.name), createSessionObservation (inline naming with same bug), createPatternObservation (raw pattern.name), createInsightDocumentObservation (raw insightDoc.name). Three independent naming functions in insight-generation-agent.ts also untouched: generateMeaningfulPatternName, formatPatternName (different from the one fixed), generateMeaningfulNameAndTitle."
+  artifacts:
+    - path: "integrations/mcp-server-semantic-analysis/src/agents/observation-generation-agent.ts"
+      issue: "4 of 7 naming paths unfixed: createEntityObservation, createSessionObservation, createPatternObservation, createInsightDocumentObservation"
+    - path: "integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts"
+      issue: "3 independent naming functions unfixed: generateMeaningfulPatternName, formatPatternName (different instance), generateMeaningfulNameAndTitle"
+  missing:
+    - "Apply PascalCase fix to all 7 naming paths in observation-generation-agent.ts"
+    - "Apply PascalCase fix to all 3 naming functions in insight-generation-agent.ts"
+  debug_session: ".planning/debug/entity-naming-paths.md"
 
 - truth: "Observations are LLM-synthesized with meaningful content, not templates or mock data"
   status: failed
-  reason: "User reported: 293 LLM synthesis failures fell back to raw content. 63 template fallbacks. Insight docs contain mock data with qualityScore: 0, empty sections. LLM synthesis attempted but failing at scale."
+  reason: "User reported: 293 LLM synthesis failures fell back to raw content. 63 template fallbacks. Insight docs contain mock data."
   severity: blocker
   test: 4
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "LLM calls SUCCEED but JSON.parse fails. createEntityObservation (line 948) and createSemanticInsightObservation (line 1337) call JSON.parse(result.insights) WITHOUT stripping markdown fences. The fixed methods (createArchitecturalDecisionObservation, createCodeEvolutionObservation) DO strip fences. Insight docs on disk contain mock data from previous debug run because Docker bind-mount excludes knowledge-management/insights/ directory. Trace reporter hardcodes empty arrays for materialsUsed in ukb-trace-report.ts:554."
+  artifacts:
+    - path: "integrations/mcp-server-semantic-analysis/src/agents/observation-generation-agent.ts"
+      issue: "createEntityObservation (line 948) and createSemanticInsightObservation (line 1337) missing markdown fence stripping before JSON.parse"
+    - path: "integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts"
+      issue: "traceInsightGeneration hardcodes materialsUsed to empty arrays, qualityScore falls back to 0"
+    - path: "docker/docker-compose.yml"
+      issue: "knowledge-management/insights/ not bind-mounted to host, insight docs lost on container stop"
+  missing:
+    - "Add markdown fence stripping to createEntityObservation and createSemanticInsightObservation before JSON.parse"
+    - "Add knowledge-management bind-mount to docker-compose.yml"
+    - "Wire materialsUsed and qualityScore in trace reporter"
+  debug_session: ".planning/debug/llm-synthesis-failures.md"
 
 - truth: "Analysis depth 'deep' produces richer output than 'surface'"
   status: failed
   reason: "User reported: Cannot confirm deep analysis had effect. Pipeline produced no meaningful output regardless of depth setting."
   severity: major
   test: 5
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "The analysisDepth: deep setting is correctly applied in coordinator.ts but its effect is masked by upstream structural issues: hardcoded 10-pattern vocabulary, JSON.parse failures on LLM responses, and insight docs not persisted to host. Deep analysis may be working but its output is lost before it can be observed."
+  artifacts:
+    - path: "integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts"
+      issue: "Setting is correct but effect masked by upstream failures"
+  missing:
+    - "Fix upstream issues first, then re-verify depth impact"
   debug_session: ""
