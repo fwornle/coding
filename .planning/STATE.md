@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-26T18:48:32.080Z"
+last_updated: "2026-02-27T13:08:24.166Z"
 progress:
   total_phases: 1
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 0
+  total_plans: 5
+  completed_plans: 4
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 1 of 3 (Core Pipeline Data Quality)
-Plan: 2 of ? in current phase
+Plan: 3 of 5 in current phase
 Status: In progress
-Last activity: 2026-02-26 — Completed 01-02-PLAN.md (LLM synthesis observations + naming fixes)
+Last activity: 2026-02-27 — Completed 01-03-PLAN.md (JSON parse fence stripping + Docker knowledge-management bind-mount)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -49,6 +49,8 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 01 P01 | 5 | 2 tasks | 1 files |
 | Phase 01 P02 | 10 | 3 tasks | 2 files |
+| Phase 01 P04 | 2 | 2 tasks | 2 files |
+| Phase 01 P03 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -66,6 +68,10 @@ Recent decisions affecting current work:
 - [Phase 01]: LLM synthesis preferred over template strings; fallback provides basic content from input data
 - [Phase 01]: PascalCase preservation: remove .toLowerCase() from slice(1) calls in all naming functions
 - [Phase 01]: Deep analysis depth enables LLM to see full file contents instead of truncated surface view
+- [Phase 01]: formatPatternName already correct from Phase 01 Plan 01 - verified and left unchanged
+- [Phase 01]: Normalize at assignment: use normalizedName local var from toPascalCase before building observation return objects
+- [Phase 01]: Apply fence-stripping only to the two unfixed methods (createEntityObservation, createSemanticInsightObservation) -- createArchitecturalDecisionObservation and createCodeEvolutionObservation already had the fix
+- [Phase 01]: knowledge-management Docker mount is read-write (no :ro) because container must write insight files to that path
 
 ### Pending Todos
 
@@ -78,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26
-Stopped at: Completed 01-02-PLAN.md (LLM synthesis observations + PascalCase naming fix + deep analysis depth)
+Last session: 2026-02-27
+Stopped at: Completed 01-04-PLAN.md (PascalCase normalization for all 7 naming bypass paths)
 Resume file: None
