@@ -57,6 +57,6 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Pipeline Data Quality | 2/5 | Gap closure | - |
+| 1. Core Pipeline Data Quality | 4/5 | In Progress|  |
 | 2. Insight Generation & Data Routing | 0/? | Not started | - |
 | 3. Significance & Quality Ranking | 0/? | Not started | - |
