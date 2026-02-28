@@ -44,15 +44,30 @@ mcp__semantic-analysis__execute_workflow
 
 ## Rebuilding After Code Changes
 
+**CRITICAL: This project uses git submodules.** Code changes to submodule TS source do NOT take effect until BOTH steps are done:
+
+1. **`npm run build`** inside the submodule (compiles TS → `dist/`)
+2. **Docker rebuild** if the service runs in a container
+
+Forgetting step 1 is a recurring issue — committed source looks correct but `dist/` stays stale and the container runs old code.
+
+**Submodules requiring both steps:**
+- `integrations/mcp-server-semantic-analysis`
+- `integrations/mcp-constraint-monitor`
+- `integrations/code-graph-rag`
+
+**After ANY code change to a submodule:**
+```bash
+cd integrations/<submodule> && npm run build
+cd /Users/Q284340/Agentic/coding/docker && docker-compose build coding-services && docker-compose up -d coding-services
+```
+
 **Dashboard UI** (`integrations/system-health-dashboard/`): Bind-mounted, no Docker rebuild needed:
 ```bash
 cd /Users/Q284340/Agentic/coding/integrations/system-health-dashboard && npm run build
 ```
 
-**Backend services** (require Docker rebuild): `mcp-server-semantic-analysis`, `mcp-constraint-monitor`, `browser-access`, `vkb-server`
-```bash
-cd /Users/Q284340/Agentic/coding/docker && docker-compose build coding-services && docker-compose up -d coding-services
-```
+**Config files** (`integrations/mcp-server-semantic-analysis/config/`): Bind-mounted read-only, no rebuild needed.
 
 ## Knowledge Management
 
