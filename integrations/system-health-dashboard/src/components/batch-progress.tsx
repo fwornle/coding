@@ -27,6 +27,7 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react'
+import { TIER_MODELS } from '@/components/workflow/constants'
 
 // API port for the system health API
 const API_PORT = 3033
@@ -286,9 +287,9 @@ export default function BatchProgress({ onStatusChange }: BatchProgressProps) {
             {/* Name */}
             <span className="text-xs font-medium">{op.shortName}</span>
 
-            {/* Tier badge */}
+            {/* Tier badge — color indicates tier, text shows model */}
             <Badge className={`text-[8px] h-4 mt-1 ${tierColors.bg} ${tierColors.text} ${tierColors.border}`}>
-              {op.tier}
+              {TIER_MODELS[op.tier] || op.tier}
             </Badge>
 
             {/* Duration */}
@@ -313,7 +314,7 @@ export default function BatchProgress({ onStatusChange }: BatchProgressProps) {
             <Separator className="my-1" />
             <div className="text-xs flex justify-between">
               <span>Tier:</span>
-              <Badge className={`text-[8px] h-4 ${tierColors.bg} ${tierColors.text}`}>{op.tier}</Badge>
+              <Badge className={`text-[8px] h-4 ${tierColors.bg} ${tierColors.text}`}>{TIER_MODELS[op.tier] || op.tier}</Badge>
             </div>
             <div className="text-xs flex justify-between">
               <span>Status:</span>

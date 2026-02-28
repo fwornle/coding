@@ -579,6 +579,36 @@ export const TIER_COLORS: Record<string, { bg: string; text: string; bar: string
   none:     { bg: 'bg-gray-200',   text: 'text-gray-600', bar: 'bg-gray-300' },
 }
 
+// Short display names for the LLM model at each tier
+// Derived from model-tiers.yaml provider_priority + provider models
+export const TIER_MODELS: Record<string, string> = {
+  fast: 'llama-8b',
+  standard: 'llama-70b',
+  premium: 'sonnet',
+  none: 'none',
+}
+
+// Shorten model identifiers for compact badge display
+export const shortenModel = (model: string): string => {
+  const m = model.toLowerCase()
+  if (m.includes('sonnet'))  return 'sonnet'
+  if (m.includes('haiku'))   return 'haiku'
+  if (m.includes('opus'))    return 'opus'
+  if (m.includes('llama') && m.includes('70b')) return 'llama-70b'
+  if (m.includes('llama') && m.includes('8b'))  return 'llama-8b'
+  if (m.includes('llama'))   return 'llama'
+  if (m.includes('gemma'))   return 'gemma'
+  if (m.includes('mixtral')) return 'mixtral'
+  if (m.includes('claude'))  return 'claude'
+  if (m.includes('gpt-4'))   return 'gpt-4'
+  if (m.includes('gpt-3'))   return 'gpt-3.5'
+  if (m === 'anthropic') return 'claude'
+  if (m === 'groq') return 'groq'
+  if (m === 'ollama') return 'ollama'
+  if (m === 'openai') return 'openai'
+  return model.length > 15 ? model.slice(0, 15) : model
+}
+
 // Sub-step definitions for agents with multiple internal operations
 // MOVED HERE from multi-agent-graph.tsx to avoid circular imports
 export interface SubStep {

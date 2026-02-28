@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import type { StepInfo } from '@/store/slices/ukbSlice'
 import { Logger, LogCategories } from '@/utils/logging'
-import { TIER_COLORS, AGENT_SUBSTEPS, STEP_TO_AGENT } from './constants'
+import { TIER_COLORS, TIER_MODELS, AGENT_SUBSTEPS, STEP_TO_AGENT, shortenModel } from './constants'
 
 interface TraceModalProps {
   open: boolean
@@ -200,26 +200,7 @@ export function TraceModal({
     return shortenModel(modelOrProvider)
   }
 
-  // Shorten model identifiers for compact badge display
-  const shortenModel = (model: string): string => {
-    const m = model.toLowerCase()
-    if (m.includes('sonnet'))  return 'sonnet'
-    if (m.includes('haiku'))   return 'haiku'
-    if (m.includes('opus'))    return 'opus'
-    if (m.includes('llama') && m.includes('70b')) return 'llama-70b'
-    if (m.includes('llama') && m.includes('8b'))  return 'llama-8b'
-    if (m.includes('llama'))   return 'llama'
-    if (m.includes('gemma'))   return 'gemma'
-    if (m.includes('mixtral')) return 'mixtral'
-    if (m.includes('claude'))  return 'claude'
-    if (m.includes('gpt-4'))   return 'gpt-4'
-    if (m.includes('gpt-3'))   return 'gpt-3.5'
-    if (m === 'anthropic') return 'claude'
-    if (m === 'groq') return 'groq'
-    if (m === 'ollama') return 'ollama'
-    if (m === 'openai') return 'openai'
-    return model.length > 15 ? model.slice(0, 15) : model
-  }
+  // shortenModel is now imported from constants
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -369,7 +350,7 @@ export function TraceModal({
 
                         {/* LLM indicator - show specific model name with fallback warning */}
                         <div className="w-24 text-right">
-                          {event.llmProvider && (
+                          {(event.llmProvider || event.llmTier) && (
                             <Badge
                               variant="outline"
                               className={`text-[10px] h-5 truncate max-w-[90px] ${
@@ -378,11 +359,13 @@ export function TraceModal({
                               title={
                                 (event as any).llmModeFallback
                                   ? `Fallback: intended ${(event as any).llmIntendedMode}, actual ${(event as any).llmActualMode} (${event.llmProvider})`
-                                  : event.llmProvider
+                                  : event.llmProvider || (event.llmTier ? `${event.llmTier} tier` : '')
                               }
                             >
                               {(event as any).llmModeFallback && '⚠️ '}
-                              {formatModelName(event.llmProvider)}
+                              {event.llmProvider
+                                ? formatModelName(event.llmProvider)
+                                : TIER_MODELS[event.llmTier || ''] || event.llmTier}
                             </Badge>
                           )}
                         </div>
