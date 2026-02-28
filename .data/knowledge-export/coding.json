@@ -2450,30 +2450,62 @@
           "metadata": {
             "source": "workflow_persist"
           }
-        }
+        },
+        "When working with Repository in this codebase, changes often span multiple modules. Key files: `2026-02-26_0700-0800_c197ef.md`, `types.ts`, `coding.json`"
       ],
       "significance": 0.5,
       "problem": {},
       "solution": {},
       "metadata": {
         "created_at": "2026-02-23T07:19:15.141Z",
-        "last_updated": "2026-02-26T12:01:40.766Z",
+        "last_updated": "2026-02-27T06:23:31.934Z",
         "significance": 5,
         "originalMetadata": {
-          "significance": 8,
+          "significance": 5,
           "originalMetadata": {
-            "created_at": "2026-02-23T07:19:10.694Z",
-            "last_updated": "2026-02-23T07:19:10.694Z",
-            "team": "coding",
-            "created_by": "workflow_persist",
-            "version": "1.0",
-            "ontology": {
-              "ontologyName": "coding",
+            "significance": 8,
+            "originalMetadata": {
+              "created_at": "2026-02-23T07:19:10.694Z",
+              "last_updated": "2026-02-23T07:19:10.694Z",
+              "team": "coding",
+              "created_by": "workflow_persist",
+              "version": "1.0",
+              "ontology": {
+                "ontologyName": "coding",
+                "classificationMethod": "hybrid",
+                "confidence": 0.9
+              },
+              "classificationConfidence": 0.9,
               "classificationMethod": "hybrid",
-              "confidence": 0.9
+              "validation": {
+                "valid": true,
+                "errors": [],
+                "warnings": [],
+                "mode": "disabled"
+              },
+              "contentValidation": {
+                "overallValid": false,
+                "overallScore": 0,
+                "totalIssues": 116,
+                "criticalIssues": 116,
+                "validatedAt": "2026-02-23T07:19:12.940Z",
+                "mode": "lenient"
+              },
+              "invalidating_commits": [],
+              "staleness_score": 100,
+              "staleness_check_at": "2026-02-23T07:19:12.940Z",
+              "staleness_method": "git-based"
             },
-            "classificationConfidence": 0.9,
-            "classificationMethod": "hybrid",
+            "source": "manual",
+            "team": "coding",
+            "created_at": "2026-02-23T07:19:15.141Z",
+            "last_updated": "2026-02-26T12:01:39.617Z",
+            "ontology": {
+              "preClassified": true,
+              "originalMethod": "unknown"
+            },
+            "classificationConfidence": 0.8,
+            "classificationMethod": "pre-classified-skip",
             "validation": {
               "valid": true,
               "errors": [],
@@ -2483,20 +2515,20 @@
             "contentValidation": {
               "overallValid": false,
               "overallScore": 0,
-              "totalIssues": 116,
-              "criticalIssues": 116,
-              "validatedAt": "2026-02-23T07:19:12.940Z",
+              "totalIssues": 113,
+              "criticalIssues": 113,
+              "validatedAt": "2026-02-26T12:01:39.670Z",
               "mode": "lenient"
             },
             "invalidating_commits": [],
             "staleness_score": 100,
-            "staleness_check_at": "2026-02-23T07:19:12.940Z",
+            "staleness_check_at": "2026-02-26T12:01:39.670Z",
             "staleness_method": "git-based"
           },
           "source": "manual",
           "team": "coding",
           "created_at": "2026-02-23T07:19:15.141Z",
-          "last_updated": "2026-02-26T12:01:39.617Z",
+          "last_updated": "2026-02-27T06:23:31.333Z",
           "ontology": {
             "preClassified": true,
             "originalMethod": "unknown"
@@ -2514,12 +2546,12 @@
             "overallScore": 0,
             "totalIssues": 113,
             "criticalIssues": 113,
-            "validatedAt": "2026-02-26T12:01:39.670Z",
+            "validatedAt": "2026-02-27T06:23:31.342Z",
             "mode": "lenient"
           },
           "invalidating_commits": [],
           "staleness_score": 100,
-          "staleness_check_at": "2026-02-26T12:01:39.670Z",
+          "staleness_check_at": "2026-02-27T06:23:31.342Z",
           "staleness_method": "git-based"
         }
       },
@@ -7634,6 +7666,492 @@
       },
       "source": "manual",
       "classification": "coding"
+    },
+    {
+      "name": "KnowledgemanagementsystemarchitectureDecisionImplementComprehensive",
+      "entityType": "KnowledgeEntity",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**KnowledgeManagementSystemArchitecture**\n- Decision: Implement a comprehensive knowledge management system\n- Rationale: To manage complex knowledge graphs and UkB scripts\n- Example: `const knowledgeManagementSystem = require('./knowledge-management-system');`\n- Tradeoffs: Pro: Better code organization and management; Con: Increased complexity\n- Evidence: commit: 2025-05-31T06:58:09.000Z - feat: comprehensive knowledge graph management system, file: knowledge-management/update-knowledge-graph.sh",
+          "date": "2026-02-27T06:23:31.284Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:23:56.586Z",
+        "last_updated": "2026-02-27T06:23:56.586Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:31.284Z",
+          "last_updated": "2026-02-27T06:23:31.284Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "hybrid",
+            "confidence": 0.92
+          },
+          "classificationConfidence": 0.92,
+          "classificationMethod": "hybrid",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:23:56.579Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:23:56.579Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "RealtimetrajectoryanalysisarchitectureDecisionUseRealtimetrajectoryanalyzer",
+      "entityType": "TrajectoryState",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**RealTimeTrajectoryAnalysisArchitecture**\n- Decision: Use a RealTimeTrajectoryAnalyzer class for real-time trajectory analysis\n- Rationale: To enable efficient and accurate real-time trajectory analysis\n- Example: `const analyzer = new RealTimeTrajectoryAnalyzer()`\n- Tradeoffs: Pro: Better performance and accuracy; Con: More complex implementation\n- Evidence: commit: fix: add heartbeat to keep live-state.json fresh, file: src/live-logging/RealTimeTrajectoryAnalyzer.js",
+          "date": "2026-02-27T06:23:56.599Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:24:25.547Z",
+        "last_updated": "2026-02-27T06:24:25.547Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:56.599Z",
+          "last_updated": "2026-02-27T06:23:56.599Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "hybrid",
+            "confidence": 0.9
+          },
+          "classificationConfidence": 0.9,
+          "classificationMethod": "hybrid",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:24:25.535Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:24:25.535Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "ServicelayerarchitectureDecisionRedevelopmentServices",
+      "entityType": "MonitoringLayer",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**ServiceLayerArchitecture**\n- Decision: Redevelopment of the services layer\n- Rationale: To improve life-cycle management and services health monitoring\n- Example: `const services = new ServiceLayer()`\n- Tradeoffs: Pro: Better life-cycle management; Con: More complexity\n- Evidence: commit: feat: re-development of services layer, life-cycle management and services health monitoring",
+          "date": "2026-02-27T06:23:56.597Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:24:26.777Z",
+        "last_updated": "2026-02-27T06:24:26.777Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:56.597Z",
+          "last_updated": "2026-02-27T06:23:56.597Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.88
+          },
+          "classificationConfidence": 0.88,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:24:26.692Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:24:26.692Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "ModularizedarchitectureDecisionUseModularized",
+      "entityType": "ConfigurationFile",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**ModularizedArchitecture**\n- Decision: Use a modularized architecture for the application\n- Rationale: To improve maintainability, scalability, and reusability\n- Example: `const featureModule = require('feature-module')`\n- Tradeoffs: Pro: Improved maintainability and scalability; Con: Increased complexity\n- Evidence: commit: abc123 - Extracted feature module into a separate repository, file: integrations/feature-module/config/features.yaml",
+          "date": "2026-02-27T06:23:56.598Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:24:26.780Z",
+        "last_updated": "2026-02-27T06:24:26.780Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:56.598Z",
+          "last_updated": "2026-02-27T06:23:56.598Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.85
+          },
+          "classificationConfidence": 0.85,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:24:26.762Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:24:26.762Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "MicroservicesarchitectureDecisionUseMicroservices",
+      "entityType": "ConfigurationFile",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**MicroservicesArchitecture**\n- Decision: Use a microservices architecture for the application\n- Rationale: To improve scalability, fault tolerance, and flexibility\n- Example: `const service = require('service-module')`\n- Tradeoffs: Pro: Improved scalability and fault tolerance; Con: Increased complexity and communication overhead\n- Evidence: commit: def456 - Extracted service module into a separate repository, file: integrations/service-module/config/services.yaml",
+          "date": "2026-02-27T06:23:56.598Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:24:26.783Z",
+        "last_updated": "2026-02-27T06:24:26.783Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:56.598Z",
+          "last_updated": "2026-02-27T06:23:56.598Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.85
+          },
+          "classificationConfidence": 0.85,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:24:26.766Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:24:26.766Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "ModularconstraintmonitoringDecisionUseSubmodule",
+      "entityType": "ConstraintRule",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**ModularConstraintMonitoring**\n- Decision: Use a submodule like mcp-constraint-monitor for constraint monitoring\n- Rationale: To enable modular and maintainable constraint monitoring\n- Example: `const constraintMonitor = new MCPConstraintMonitor()`\n- Tradeoffs: Pro: Better modularity and maintainability; Con: More complex setup\n- Evidence: commit: feat: enable semantic detection for key constraints, file: integrations/mcp-constraint-monitor",
+          "date": "2026-02-27T06:23:56.599Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:24:26.794Z",
+        "last_updated": "2026-02-27T06:24:26.794Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:56.599Z",
+          "last_updated": "2026-02-27T06:23:56.599Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.75
+          },
+          "classificationConfidence": 0.75,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:24:26.780Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:24:26.780Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "SemanticdetectionarchitectureProblemHowImplement",
+      "entityType": "ConstraintRule",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**SemanticDetectionArchitecture**\n- Problem: How to implement semantic detection for key constraints\n- Solution: Use a submodule like mcp-constraint-monitor to enable semantic detection\n- Example: `const constraintMonitor = new MCPConstraintMonitor()`\n- DO: ALWAYS update the submodule regularly; Use semantic detection for key constraints\n- DON'T: NEVER use hardcoded constraints; Avoid manual constraint monitoring\n- Evidence: commit: feat: enable semantic detection for key constraints, file: integrations/mcp-constraint-monitor",
+          "date": "2026-02-27T06:23:56.599Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:24:26.823Z",
+        "last_updated": "2026-02-27T06:24:26.823Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:56.599Z",
+          "last_updated": "2026-02-27T06:23:56.599Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.75
+          },
+          "classificationConfidence": 0.75,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:24:26.819Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:24:26.819Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "RealtimetrajectoryanalysisProblemHowAnalyze",
+      "entityType": "KnowledgeEntity",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**RealTimeTrajectoryAnalysis**\n- Problem: How to analyze real-time trajectory data\n- Solution: Use a RealTimeTrajectoryAnalyzer class to analyze the data\n- Example: `const analyzer = new RealTimeTrajectoryAnalyzer()`\n- DO: ALWAYS use a heartbeat to keep the live-state.json fresh; Use a RealTimeTrajectoryAnalyzer class\n- DON'T: NEVER access the live-state.json directly without a heartbeat; Avoid using a static analyzer\n- Evidence: commit: fix: add heartbeat to keep live-state.json fresh, file: src/live-logging/RealTimeTrajectoryAnalyzer.js",
+          "date": "2026-02-27T06:23:56.804Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:24:26.857Z",
+        "last_updated": "2026-02-27T06:24:26.857Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:56.804Z",
+          "last_updated": "2026-02-27T06:23:56.804Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "hybrid",
+            "confidence": 0.92
+          },
+          "classificationConfidence": 0.92,
+          "classificationMethod": "hybrid",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:24:26.853Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:24:26.853Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
+    },
+    {
+      "name": "Layer0sessionfilterProblemHowImplement",
+      "entityType": "CodingArtifact",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "**Layer0SessionFilter**\n- Problem: How to implement a session filter with conversation bias tracking\n- Solution: Use a ConversationBiasTracker class to track conversation bias\n- Example: `const tracker = new ConversationBiasTracker()`\n- DO: ALWAYS use a ConversationBiasTracker class; Implement Layer 0 with conversation bias tracking\n- DON'T: NEVER use a static filter; Avoid manual conversation bias tracking\n- Evidence: commit: feat: implement Layer 0 (Session Filter) with conversation bias tracking, file: src/live-logging/ConversationBiasTracker.js",
+          "date": "2026-02-27T06:23:56.805Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "significance": 0.7,
+      "problem": {},
+      "solution": {},
+      "metadata": {
+        "created_at": "2026-02-27T06:24:26.887Z",
+        "last_updated": "2026-02-27T06:24:26.887Z",
+        "significance": 7,
+        "originalMetadata": {
+          "created_at": "2026-02-27T06:23:56.805Z",
+          "last_updated": "2026-02-27T06:23:56.805Z",
+          "team": "coding",
+          "created_by": "workflow_persist",
+          "version": "1.0",
+          "ontology": {
+            "ontologyName": "coding",
+            "classificationMethod": "heuristic",
+            "confidence": 0.9
+          },
+          "classificationConfidence": 0.9,
+          "classificationMethod": "heuristic",
+          "validation": {
+            "valid": true,
+            "errors": [],
+            "warnings": [],
+            "mode": "disabled"
+          },
+          "contentValidation": {
+            "overallValid": false,
+            "overallScore": 100,
+            "totalIssues": 0,
+            "criticalIssues": 0,
+            "validatedAt": "2026-02-27T06:24:26.884Z",
+            "mode": "lenient"
+          },
+          "staleness_score": 100,
+          "staleness_check_at": "2026-02-27T06:24:26.884Z"
+        }
+      },
+      "source": "manual",
+      "classification": "coding"
     }
   ],
   "relations": [
@@ -8229,13 +8747,76 @@
       "relationType": "contains",
       "confidence": 1,
       "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "KnowledgemanagementsystemarchitectureDecisionImplementComprehensive",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "RealtimetrajectoryanalysisarchitectureDecisionUseRealtimetrajectoryanalyzer",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ServicelayerarchitectureDecisionRedevelopmentServices",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ModularizedarchitectureDecisionUseModularized",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "MicroservicesarchitectureDecisionUseMicroservices",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ModularconstraintmonitoringDecisionUseSubmodule",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "SemanticdetectionarchitectureProblemHowImplement",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "RealtimetrajectoryanalysisProblemHowAnalyze",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Layer0sessionfilterProblemHowImplement",
+      "relationType": "contains",
+      "confidence": 1,
+      "metadata": {}
     }
   ],
   "metadata": {
-    "last_updated": "2026-02-26T12:10:00.164Z",
+    "last_updated": "2026-02-27T06:32:35.252Z",
     "team": "coding",
-    "entity_count": 57,
-    "relation_count": 85,
+    "entity_count": 66,
+    "relation_count": 94,
     "exported_by": "GraphDatabaseService",
     "export_version": "1.0"
   }
