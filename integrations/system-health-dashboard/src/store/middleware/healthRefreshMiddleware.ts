@@ -101,11 +101,6 @@ class HealthRefreshManager {
     // This allows the Redux slice to handle it the same way
     const isTerminalState = ['cancelled', 'completed', 'failed'].includes(progress.status)
 
-    if (isTerminalState) {
-      // Terminal state - let normal polling handle cleanup
-      return
-    }
-
     // Calculate step counts from stepsDetail
     let completedSteps = progress.completedSteps || 0
     let totalSteps = progress.totalSteps || 0
@@ -130,8 +125,8 @@ class HealthRefreshManager {
       stepsFailed: progress.stepsFailed || [],
       elapsedSeconds: progress.elapsedSeconds || 0,
       logFile: null,
-      isAlive: progress.status === 'running',
-      health: 'healthy',
+      isAlive: !isTerminalState && progress.status === 'running',
+      health: isTerminalState ? 'dead' : 'healthy',
       heartbeatAgeSeconds: 0,
       progressPercent: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
       steps: progress.stepsDetail || [],
@@ -146,9 +141,10 @@ class HealthRefreshManager {
       _refreshKey: `mcp-inline-${Date.now()}`, // Force React re-render
     }
 
-    // Dispatch update with fresh data
+    // Dispatch update with fresh data — including terminal states so UI transitions properly
+    const summaryRunning = isTerminalState ? 0 : 1
     this.store.dispatch(fetchUKBStatusSuccess({
-      summary: { total: 1, running: 1, stale: 0, frozen: 0, dead: 0 },
+      summary: { total: 1, running: summaryRunning, stale: 0, frozen: 0, dead: isTerminalState ? 1 : 0 },
       processes: [inlineProcess],
       _lastRefresh: Date.now(),
       _fromSSE: true, // Flag to indicate this came from SSE
