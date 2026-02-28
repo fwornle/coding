@@ -42,7 +42,7 @@ import {
   FlaskConical,
   Cloud,
 } from 'lucide-react'
-import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, TIER_COLORS, useWorkflowDefinitions } from './workflow'
+import { MultiAgentGraph as UKBWorkflowGraph, WorkflowLegend, TraceModal, AGENT_SUBSTEPS, TIER_COLORS, TIER_MODELS, useWorkflowDefinitions } from './workflow'
 import type { SubStep } from './workflow'
 import { UKBNodeDetailsSidebar } from './ukb-workflow-graph'
 import type { RootState } from '@/store'
@@ -2601,19 +2601,15 @@ function SubStepDetailsSidebar({
       )
     }
 
-    // Fallback to static tier label
-    switch (tier) {
-      case 'none':
-        return <Badge variant="outline" className="text-gray-500">No LLM</Badge>
-      case 'fast':
-        return <Badge className="bg-green-500 text-white">Fast LLM</Badge>
-      case 'standard':
-        return <Badge className="bg-blue-500 text-white">Standard LLM</Badge>
-      case 'premium':
-        return <Badge className="bg-purple-500 text-white">Premium LLM</Badge>
-      default:
-        return <Badge variant="outline">Unknown</Badge>
+    // Fallback to static model name from tier mapping (color indicates tier)
+    if (tier === 'none') {
+      return <Badge variant="outline" className="text-gray-500">No LLM</Badge>
     }
+    const modelName = TIER_MODELS[tier]
+    if (modelName) {
+      return <Badge className={`${colors.bg} ${colors.text}`}>{modelName}</Badge>
+    }
+    return <Badge variant="outline">{tier}</Badge>
   }
 
   return (
