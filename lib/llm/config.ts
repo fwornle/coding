@@ -158,16 +158,16 @@ export function getDefaultConfig(): LLMServiceConfig {
       standard: [
         'git_history_analysis', 'vibe_history_analysis', 'semantic_code_analysis',
         'documentation_linking', 'web_search_summarization', 'ontology_classification',
-        'content_validation', 'deduplication_similarity',
+        'content_validation', 'deduplication_similarity', 'observation_generation',
       ],
       premium: [
-        'insight_generation', 'observation_generation', 'pattern_recognition',
+        'insight_generation', 'pattern_recognition',
         'quality_assurance_review', 'deep_code_analysis', 'entity_significance_scoring',
       ],
     },
     agentOverrides: {
       insight_generation: 'premium' as ModelTier,
-      observation_generation: 'premium' as ModelTier,
+      observation_generation: 'standard' as ModelTier,
       quality_assurance: 'premium' as ModelTier,
       semantic_analysis: 'standard' as ModelTier,
       git_history: 'standard' as ModelTier,

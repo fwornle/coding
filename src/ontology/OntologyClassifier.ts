@@ -125,11 +125,11 @@ export class OntologyClassifier {
         };
         highestConfidence = topHeuristic.confidence;
 
-        // If confidence is very high (>= 0.98), skip LLM
-        // NOTE: Threshold raised from 0.92 to 0.98 to ensure LLM is used more often
-        // Heuristics typically return 0.94-0.95 for good matches, so 0.98 threshold
-        // ensures LLM is used in most cases for semantic verification
-        if (topHeuristic.confidence >= 0.98) {
+        // If confidence is good (>= 0.85), skip LLM — heuristic is sufficient.
+        // LLM verification per entity is extremely expensive in batch workflows
+        // (dozens of entities × 30 batches = hundreds of extra LLM calls).
+        // Heuristics typically return 0.94-0.95 for good matches.
+        if (topHeuristic.confidence >= 0.85) {
           console.log(`[OntologyClassifier] Skipping LLM - heuristic confidence ${topHeuristic.confidence} >= 0.98 for class: ${topHeuristic.entityClass}`);
           return this.finalizeClassification(
             bestClassification,

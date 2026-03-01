@@ -95,11 +95,11 @@ task_tiers:
     - ontology_classification
     - content_validation
     - deduplication_similarity
+    - observation_generation
 
   # Tier 3: Premium - Deep understanding required
   premium:
     - insight_generation
-    - observation_generation
     - pattern_recognition
     - quality_assurance_review
     - deep_code_analysis
@@ -108,7 +108,7 @@ task_tiers:
 # Agent-level overrides (maps agent_id to tier)
 agent_overrides:
   insight_generation: premium
-  observation_generation: premium
+  observation_generation: standard
   quality_assurance: premium
   semantic_analysis: standard
   git_history: standard

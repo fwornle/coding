@@ -314,7 +314,14 @@ export class LLMService extends EventEmitter {
       try {
         // Keep the tier so the provider resolves the correct model for this tier
         const providerRequest = { ...request };
-        const result = await provider.complete(providerRequest);
+        // Hard timeout per provider call — prevents infinite hangs
+        const perCallTimeout = request.timeout || 120_000; // 2 min max per provider
+        const result = await Promise.race([
+          provider.complete(providerRequest),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Provider ${provider.name} timed out after ${perCallTimeout}ms`)), perCallTimeout)
+          ),
+        ]);
         const latencyMs = Date.now() - startTime;
         result.latencyMs = latencyMs;
 
