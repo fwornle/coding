@@ -829,6 +829,64 @@
       "examples": [
         ".global-service-registry.json (coordinator PID, multi-project tracking)"
       ]
+    },
+    "Component": {
+      "description": "A top-level architectural component (L1) of the Coding project hierarchy, grouping related knowledge entities under a named subsystem",
+      "properties": {
+        "componentName": {
+          "type": "string",
+          "description": "PascalCase component name matching the component manifest"
+        },
+        "aliases": {
+          "type": "array",
+          "description": "Alternative names used to match entities to this component"
+        },
+        "keywords": {
+          "type": "array",
+          "description": "Heuristic matching keywords for entity classification"
+        },
+        "level": {
+          "type": "number",
+          "description": "Hierarchy level (always 1 for Component)"
+        }
+      },
+      "requiredProperties": [
+        "componentName"
+      ],
+      "examples": [
+        "LiveLoggingSystem",
+        "KnowledgeManagement",
+        "SemanticAnalysis",
+        "CodingPatterns"
+      ]
+    },
+    "SubComponent": {
+      "description": "A named subsystem (L2) nested within a Component, grouping related Detail entities under a focused concern",
+      "properties": {
+        "componentName": {
+          "type": "string",
+          "description": "PascalCase sub-component name"
+        },
+        "parentComponent": {
+          "type": "string",
+          "description": "Name of the L1 parent component"
+        },
+        "level": {
+          "type": "number",
+          "description": "Hierarchy level (always 2 for SubComponent)"
+        }
+      },
+      "requiredProperties": [
+        "componentName",
+        "parentComponent"
+      ],
+      "examples": [
+        "ManualLearning",
+        "OnlineLearning",
+        "Pipeline",
+        "Ontology",
+        "Insights"
+      ]
     }
   },
   "relationships": {
