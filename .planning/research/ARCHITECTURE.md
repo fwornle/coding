@@ -1,542 +1,590 @@
 # Architecture Research
 
-**Domain:** UKB Multi-Agent Analysis Pipeline (`integrations/mcp-server-semantic-analysis`)
-**Researched:** 2026-02-26
-**Confidence:** HIGH — based on direct code inspection of all major agents, coordinator, workflow YAML, and current knowledge export
+**Domain:** Hierarchical Knowledge Graph Integration -- adding entity hierarchy (Project to Component to SubComponent to Detail) to existing Graphology + LevelDB + VKB stack
+**Researched:** 2026-03-01
+**Confidence:** HIGH -- based on direct code inspection of GraphDatabaseService, GraphDatabaseAdapter, coordinator, persistence-agent, KGOperators, VKB frontend (Redux store, D3 graph), API routes, and live knowledge export
 
 ---
 
-## System Overview
+## System Overview (Current State)
 
-The pipeline is a 14-agent DAG workflow executed by `CoordinatorAgent` within a separate child process (`workflow-runner.ts`). The MCP server spawns the workflow runner as a subprocess; the runner writes progress to `.data/workflow-progress.json` and the dashboard polls that file.
+The existing system is a flat-entity knowledge graph with rudimentary hierarchy in storage but none in UI or pipeline logic.
 
-Entry point: `mcp__semantic-analysis__execute_workflow` tool call triggers `sse-server.ts` which spawns `workflow-runner.ts` as a child process. The runner instantiates `CoordinatorAgent` and calls `executeBatchWorkflow()`.
+**Layer: MCP SERVER (Docker: coding-services)**
+- CoordinatorAgent -> 14-agent batch pipeline
+- PersistenceAgent -> GraphDatabaseAdapter
 
-### Pipeline Structure
+**Layer: STORAGE**
+- Graphology (in-memory graph) <-> LevelDB (.data/knowledge-graph/)
+- JSON export at .data/knowledge-export/coding.json: 126 flat entities, 0 relations
 
-The workflow runs in three sequential phases:
+**Layer: VKB VIEWER (localhost:8080)**
+- React + Redux + D3 force-directed graph
+- Flat node list -> force-layout -> click for details
 
-**Phase 0 — Initialization (once):** `plan_batches` via `BatchScheduler`. Determines how many 50-commit windows exist in git history.
+### What Already Exists
 
-**Phase 1 — Batch Loop (N iterations):** Each iteration processes one 50-commit window through 7 steps:
-1. `extract_batch_commits` (GitHistoryAgent)
-2. `extract_batch_sessions` (VibeHistoryAgent)
-3. `batch_semantic_analysis` (SemanticAnalysisAgent) — 4 substeps
-4. `generate_batch_observations` (ObservationGenerationAgent) — 2 substeps
-5. `classify_with_ontology` (OntologyClassificationAgent) — 3 substeps
-6. `kg_operators` (KGOperators) — 6 substeps (conv, aggr, embed, dedup, pred, merge)
-7. `batch_qa` + `save_batch_checkpoint`
+GraphDatabaseService already has partial hierarchy logic:
 
-**Phase 2 — Finalization (once, after all batches):** 8 steps run sequentially:
-1. `index_codebase` (CodeGraphAgent) — parallel with link_documentation
-2. `link_documentation` (DocumentationLinkerAgent)
-3. `synthesize_code_insights` (CodeGraphAgent, LLM, 30 entities)
-4. `transform_code_entities` (CodeGraphAgent)
-5. `final_persist` (PersistenceAgent) — writes to GraphDB + shared-memory JSON
-6. **[EXPLICIT CODE BLOCK — not YAML]** `generate_insights` (InsightGenerationAgent)
-7. `web_search` (WebSearchAgent)
-8. `final_dedup` (DeduplicationAgent)
-9. `final_validation` (ContentValidationAgent)
+- Node IDs use `{team}:{entityName}` pattern (e.g., `coding:LiveLoggingSystem`)
+- When `entityType === 'Project'`, auto-creates `CollectiveKnowledge -> includes -> Project` edge
+- `_linkCollectiveKnowledgeToProjects()` method exists for retroactive linking
+- Edge schema: `{ id, relation_type, team, created_at, auto_generated }`
+
+This means hierarchy edges are already natively supported by Graphology's multi-edge graph. What is missing is: (1) parent/level attributes on nodes, (2) pipeline assigning those attributes, (3) VKB rendering a tree view.
+
+---
+
+## Hierarchy Schema Design
+
+### Extended KGEntity Interface
+
+The current `KGEntity` in `kg-operators.ts:31` has `type` but not `entityType`, `metadata`, or any hierarchy fields. Adding hierarchy fields requires extending this interface without breaking the cast pattern in coordinator.ts (`as KGEntity` after adding extra fields):
+
+```typescript
+// kg-operators.ts -- extend existing KGEntity
+export interface KGEntity {
+  id: string;
+  name: string;
+  type: string;
+  observations: string[];
+  significance: number;
+  embedding?: number[];
+  role?: 'core' | 'non-core';
+  batchId?: string;
+  timestamp?: string;
+  references?: string[];
+  enrichedContext?: string;
+
+  // NEW: hierarchy fields
+  hierarchyLevel?: 0 | 1 | 2 | 3;  // 0=Project, 1=Component, 2=SubComponent, 3=Detail
+  parentName?: string;              // name of parent entity (not ID, to stay team-agnostic)
+  isHierarchyNode?: boolean;        // true for Project/Component/SubComponent scaffold nodes
+}
+```
+
+### Extended SharedMemoryEntity Interface
+
+`SharedMemoryEntity` in `persistence-agent.ts` has `entityType` and `metadata`. Hierarchy goes into `metadata` to avoid breaking the shared-memory JSON schema contract:
+
+```typescript
+// persistence-agent.ts -- extend EntityMetadata
+export interface EntityMetadata {
+  created_at: string;
+  last_updated: string;
+  // ... existing fields ...
+
+  // NEW: hierarchy fields (stored in metadata to preserve backward compat)
+  hierarchyLevel?: 0 | 1 | 2 | 3;
+  parentEntityName?: string;
+  childEntityNames?: string[];      // populated by migration and pipeline
+  isScaffoldNode?: boolean;         // true for curated component/project nodes
+}
+```
+
+### GraphDatabaseService Node Attributes
+
+The Graphology node already stores arbitrary attributes. Hierarchy attributes flow through transparently because `storeEntity()` does `{ ...entityWithoutRelationships }` spread. No change to GraphDatabaseService itself is needed -- new attributes land automatically.
+
+What DOES need changing: the `storeRelationship()` call must be triggered for `child_of` / `contains` hierarchy edges. Currently relationships are only stored from `entity.relationships[]` array on the entity, or manually. The migration script and pipeline must explicitly call `storeRelationship(child, parent, 'child_of')`.
+
+### Hierarchy Edge Types
+
+Two edge type conventions to follow (matching existing `relation_type` field):
+
+| Edge Type | Direction | Meaning |
+|-----------|-----------|---------|
+| `child_of` | child -> parent | Entity belongs to parent component |
+| `contains` | parent -> child | Parent contains child (inverse of child_of) |
+
+Use `child_of` as the canonical type (child->parent direction) to match graph traversal semantics. `contains` can be added as a convenience inverse. The existing `includes` edge (CollectiveKnowledge -> Project) should remain unchanged.
+
+---
+
+## Component Boundaries (New vs Modified)
+
+**New Components:**
+- `scripts/migrate-to-hierarchy.js` -- one-time migration script
+- `integrations/mcp-server-semantic-analysis/src/agents/hierarchy-classifier.ts` -- assigns hierarchy during pipeline
+- `integrations/mcp-server-semantic-analysis/config/component-manifest.yaml` -- curated L1/L2 definitions (bind-mounted, no rebuild)
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/TreeNavigation.tsx` -- tree sidebar for VKB
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/HierarchyBreadcrumb.tsx` -- path display in NodeDetails
+- `integrations/memory-visualizer/src/utils/hierarchyHelpers.ts` -- pure tree-building functions
+
+**Modified Components:**
+- `integrations/mcp-server-semantic-analysis/src/agents/kg-operators.ts` -- KGEntity interface extension
+- `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` -- EntityMetadata extension + child_of edge creation
+- `integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts` -- call HierarchyClassifier after ontology step
+- `integrations/memory-visualizer/src/store/slices/graphSlice.ts` -- Entity interface: add hierarchyLevel, parentEntityName
+- `integrations/memory-visualizer/src/store/slices/navigationSlice.ts` -- Node interface: add hierarchyLevel, parentEntityName
+- `integrations/memory-visualizer/src/store/slices/filtersSlice.ts` -- add setHierarchyFilter action
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/index.tsx` -- add TreeNavigation panel
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/NodeDetails.tsx` -- show parent/children
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/GraphVisualization.tsx` -- apply hierarchy filter
+
+**Unchanged:**
+- `src/knowledge-management/GraphDatabaseService.js` -- no changes needed (hierarchy flows through spread)
+- `lib/vkb-server/api-routes.js` -- no changes needed (passes through node attributes)
+- `lib/vkb-server/express-server.js` -- no changes needed
+- `config/workflows/batch-analysis.yaml` -- no YAML step changes needed (hierarchy is inline in coordinator)
+
+---
+
+## Data Flow: Hierarchy Assignment During Batch Analysis
+
+### Current Flow (No Hierarchy)
+
+```
+ObservationAgent -> KGEntity[]
+                      |
+OntologyClassificationAgent -> KGEntity[] (with entityType set)
+                      |
+KGOperators (conv/aggr/embed/dedup/pred/merge)
+                      |
+accumulatedKG.entities (flat list)
+                      |
+PersistenceAgent -> GraphDB
+```
+
+### New Flow (With Hierarchy)
+
+```
+ObservationAgent -> KGEntity[]
+                      |
+OntologyClassificationAgent -> KGEntity[] (with entityType set)
+                      |
+HierarchyClassifier.assignHierarchy()       [NEW - inline in coordinator]
+  Loads config/component-manifest.yaml
+  For each entity: match name/type against component aliases
+  Assigns hierarchyLevel (0/1/2/3) and parentName
+  Creates scaffold nodes for L0/L1/L2 if missing from accumulatedKG
+                      |
+KGOperators (conv/aggr/embed/dedup/pred/merge)
+                      |
+accumulatedKG.entities (entities with hierarchyLevel + parentName)
+                      |
+PersistenceAgent -> GraphDB
+  For each entity: if parentName set -> storeRelationship(entity.name, parentName, 'child_of')
+```
+
+### HierarchyClassifier Design
+
+The classifier uses fast manifest lookup with LLM fallback for ambiguous entities:
+
+```typescript
+// src/agents/hierarchy-classifier.ts (NEW FILE)
+
+export interface ComponentManifest {
+  project: string;            // "Coding" -- L0 node name
+  components: Array<{
+    name: string;             // e.g. "LiveLoggingSystem"
+    aliases: string[];        // e.g. ["LSL", "LiveLogging", "log-streaming"]
+    subComponents?: Array<{
+      name: string;           // e.g. "ManualLearning"
+      aliases: string[];
+    }>;
+  }>;
+}
+
+export class HierarchyClassifier {
+  private manifest: ComponentManifest;
+
+  // Fast path: name/alias matching against manifest (~0ms, no LLM)
+  assignFromManifest(entity: KGEntity): { level: 0|1|2|3; parentName?: string } | null
+
+  // Slow path: LLM-based classification for entities that don't match aliases (~1s)
+  async assignByLLM(entity: KGEntity, components: string[]): Promise<{ level: 0|1|2|3; parentName: string }>
+
+  // Main entry point -- skips entities that already have hierarchyLevel set
+  async assignHierarchy(entities: KGEntity[]): Promise<KGEntity[]>
+}
+```
+
+The manifest is stored in `config/component-manifest.yaml` (bind-mounted read-only, no Docker rebuild needed):
+
+```yaml
+# config/component-manifest.yaml
+project: Coding
+components:
+  - name: LiveLoggingSystem
+    aliases: [LSL, LiveLogging, log-streaming, realtime-logging]
+    subComponents:
+      - name: SessionCapture
+        aliases: [specstory, vibe-session, session-log]
+  - name: LLMAbstraction
+    aliases: [llm-provider, dmr, model-routing, SemanticAnalyzer]
+  - name: DockerizedServices
+    aliases: [docker, container, compose, coding-services]
+  - name: Trajectory
+    aliases: [trajectory-analyzer, live-state, trajectory-generation]
+  - name: KnowledgeManagement
+    aliases: [knowledge-graph, ukb, vkb, knowledge-base]
+    subComponents:
+      - name: ManualLearning
+        aliases: [ukb-script, update-knowledge]
+      - name: OnlineLearning
+        aliases: [batch-analysis, semantic-analysis]
+  - name: ConstraintSystem
+    aliases: [constraint-monitor, mcp-constraint, ConstraintRule]
+  - name: CodingPatterns
+    aliases: [coding-practice, pattern, workflow, generic-wisdom]
+```
+
+### Coordinator Integration Point
+
+In `coordinator.ts`, after the `classify_with_ontology` step completes and before `kg_operators`. This is an inline call within the existing batch loop -- no YAML step change needed:
+
+```typescript
+// coordinator.ts -- inside executeBatchWorkflow(), per-batch loop
+// After: classify_with_ontology step completes, batchEntities has entityType set
+// Before: kg_operators.applyAll(...)
+
+// NEW: Assign hierarchy (pure classification, ~50ms per batch for fast path)
+const entitiesWithHierarchy = await this.hierarchyClassifier.assignHierarchy(batchEntities);
+// entitiesWithHierarchy replaces batchEntities going into kg_operators
+```
+
+---
+
+## Data Flow: Migration Script
+
+The one-time migration operates directly on the GraphDB and JSON export, bypassing the pipeline entirely.
+
+**Input:** `.data/knowledge-export/coding.json` (126 entities, 0 relations)
+
+**Process in `scripts/migrate-to-hierarchy.js`:**
+1. Load all 126 entities from coding.json
+2. Create scaffold nodes: Coding (L0), L1 components, L2 subComponents
+3. For each existing entity:
+   - Run fast manifest matching (alias check against entity name + entityType)
+   - If no match: run LLM classification (entity name + observations -> which component?)
+   - Assign hierarchyLevel, parentName
+   - Merge-or-keep check: if < 3 observations AND generic name -> merge observations into parent and mark for deletion; otherwise keep as Detail (L3) leaf
+4. Call `GraphDatabaseAdapter.storeEntity()` for all scaffold nodes
+5. Call `GraphDatabaseAdapter.storeRelationship()` for all child_of edges
+6. Re-export to coding.json
+
+**Output:** `.data/knowledge-export/coding.json` (updated: scaffold nodes + 126 entities, with hierarchy edges)
+
+The migration uses `GraphDatabaseAdapter` (not direct `GraphDatabaseService`) to ensure it works through the VKB HTTP API if the server is running, respecting the lock-free architecture.
+
+---
+
+## Data Flow: VKB Tree Navigation
+
+### Current VKB Data Flow
+
+```
+GET /api/entities?team=coding
+  -> flat Entity[] (no hierarchy attributes)
+  -> Redux graphSlice.entities (flat array)
+  -> GraphVisualization: D3 force-layout, all 126 nodes, no hierarchy
+  -> NodeDetails: name + observations (no parent/children)
+```
+
+### New VKB Data Flow
+
+```
+GET /api/entities?team=coding
+  -> Entity[] (metadata.hierarchyLevel and metadata.parentEntityName now populated)
+  -> Redux graphSlice.entities (same structure, metadata richer)
+  -> buildHierarchyTree(entities) selector [NEW pure function]
+  -> TreeNavigation.tsx [NEW left panel]
+     Coding (L0)
+       LiveLoggingSystem (L1)
+         SessionCapture (L2)
+         LiveLoggingArchitectureDecision (L3 leaf)
+       KnowledgeManagement (L1)
+         ManualLearning (L2)
+         OnlineLearning (L2)
+  -> Click L1/L2 node: dispatch setHierarchyFilter -> D3 shows subtree only
+  -> Click L3 leaf: selectNode -> NodeDetails (existing behavior)
+  -> NodeDetails: HierarchyBreadcrumb + children list + existing observations
+```
+
+### VKB Tree Implementation
+
+Build a derived selector that transforms the flat `entities[]` array into a tree structure. No API change needed -- `hierarchyLevel` and `parentEntityName` come through `metadata` in the existing entity payload.
+
+```typescript
+// src/utils/hierarchyHelpers.ts -- NEW FILE
+export interface TreeNode {
+  entity: Entity;
+  children: TreeNode[];
+  level: 0 | 1 | 2 | 3;
+}
+
+export function buildHierarchyTree(entities: Entity[]): TreeNode[] {
+  const nodeMap = new Map<string, TreeNode>();
+  const roots: TreeNode[] = [];
+
+  // Create tree nodes for all entities
+  for (const entity of entities) {
+    nodeMap.set(entity.name, {
+      entity,
+      children: [],
+      level: (entity.metadata?.hierarchyLevel ?? 3) as 0|1|2|3,
+    });
+  }
+
+  // Link parent-child relationships
+  for (const entity of entities) {
+    const node = nodeMap.get(entity.name)!;
+    const parentName = entity.metadata?.parentEntityName;
+    if (parentName && nodeMap.has(parentName)) {
+      nodeMap.get(parentName)!.children.push(node);
+    } else if ((entity.metadata?.hierarchyLevel ?? 3) === 0) {
+      roots.push(node);
+    }
+  }
+
+  return roots;
+}
+```
+
+`TreeNavigation.tsx` renders the tree as a collapsible `ul/li` list (no D3 needed -- pure React). On click, dispatches `setHierarchyFilter` to `filtersSlice`. `GraphVisualization.tsx` applies the filter to restrict D3 to entities at or below the clicked node.
+
+The D3 force-directed graph is preserved -- it still shows force-layout within the filtered subtree. This is additive, not a rewrite.
 
 ---
 
 ## Component Responsibilities
 
-| Agent | File | Responsibility |
-|-------|------|----------------|
-| `BatchScheduler` | `agents/batch-scheduler.ts` | Plans 50-commit windows from git log; tracks progress |
-| `GitHistoryAgent` | `agents/git-history-agent.ts` | Extracts commits per batch with stats |
-| `VibeHistoryAgent` | `agents/vibe-history-agent.ts` | Extracts `.specstory` session logs correlated to commits |
-| `SemanticAnalysisAgent` | `agents/semantic-analysis-agent.ts` | LLM-based semantic analysis of commits + sessions; produces architecturalPatterns, keyPatterns |
-| `ObservationGenerationAgent` | `agents/observation-generation-agent.ts` | Transforms semantic entities into `StructuredObservation[]` via LLM synthesis |
-| `OntologyClassificationAgent` | `agents/ontology-classification-agent.ts` | Classifies entity types against upper + lower ontology JSONs |
-| `KGOperators` | `agents/kg-operators.ts` | 6 Tree-KG operators (conv, aggr, embed, dedup, pred, merge) |
-| `QualityAssuranceAgent` | `agents/quality-assurance-agent.ts` | Validates batch output quality |
-| `BatchCheckpointManager` | `utils/batch-checkpoint-manager.ts` | Persists per-batch progress for crash recovery |
-| `CodeGraphAgent` | `agents/code-graph-agent.ts` | AST-based code indexing via Memgraph; LLM synthesis of 30 entities |
-| `DocumentationLinkerAgent` | `agents/documentation-linker-agent.ts` | Links .md and .puml files to code entities |
-| `PersistenceAgent` | `agents/persistence-agent.ts` | Writes entities to GraphDB (LevelDB) and shared-memory JSON |
-| `InsightGenerationAgent` | `agents/insight-generation-agent.ts` | Generates insight .md documents with PlantUML diagrams |
-| `WebSearchAgent` | `agents/web-search.ts` | Searches external sources for similar patterns |
-| `DeduplicationAgent` | `agents/deduplication.ts` | Merges duplicate entities |
-| `ContentValidationAgent` | `agents/content-validation-agent.ts` | Final validation of entity accuracy |
-| `CoordinatorAgent` | `agents/coordinator.ts` | Orchestrates all agents; owns all state; 5428 lines |
-| `SmartOrchestrator` | `orchestrator/smart-orchestrator.ts` | Confidence-based routing, retry decisions |
+| Component | Responsibility | New/Modified |
+|-----------|---------------|-------------|
+| `HierarchyClassifier` | Assign hierarchyLevel + parentName per entity; scaffold node creation | NEW |
+| `component-manifest.yaml` | Curated L1/L2 component definitions and aliases | NEW |
+| `migrate-to-hierarchy.js` | One-time: classify 126 entities, create scaffold nodes, store edges | NEW |
+| `TreeNavigation.tsx` | VKB tree panel: collapsible hierarchy, dispatches filter on click | NEW |
+| `HierarchyBreadcrumb.tsx` | Shows root-to-node path in NodeDetails | NEW |
+| `hierarchyHelpers.ts` | Pure functions: buildHierarchyTree, getAncestors, getDescendants | NEW |
+| `KGEntity` interface | Add hierarchyLevel, parentName, isHierarchyNode (all optional) | MODIFIED |
+| `EntityMetadata` interface | Add hierarchyLevel, parentEntityName, childEntityNames, isScaffoldNode | MODIFIED |
+| `coordinator.ts` | Call HierarchyClassifier after ontology step, before kg_operators | MODIFIED |
+| `persistence-agent.ts` | After storeEntity: if parentName set -> storeRelationship(child_of) | MODIFIED |
+| `graphSlice.ts` | Entity interface: add metadata.hierarchyLevel, parentEntityName | MODIFIED |
+| `navigationSlice.ts` | Node interface: add metadata.hierarchyLevel, parentEntityName | MODIFIED |
+| `filtersSlice.ts` | Add setHierarchyFilter action | MODIFIED |
+| `KnowledgeGraph/index.tsx` | Add TreeNavigation panel alongside filters | MODIFIED |
+| `NodeDetails.tsx` | Show HierarchyBreadcrumb and children list | MODIFIED |
+| `GraphVisualization.tsx` | Apply hierarchy filter to restrict D3 node set | MODIFIED |
 
 ---
 
-## Data Transformations at Each Stage
+## Build Order (Dependency-Aware)
 
-### Stage 1: Batch Data Extraction
-
-**Input:** git commit range (startCommit, endCommit hash strings)
-
-**Output — GitHistoryAgent:**
-```typescript
-{
-  commits: GitCommit[],  // { hash, message, date, files: GitFileChange[], stats: CommitStats }
-  filteredCount: number
-}
-```
-
-**Output — VibeHistoryAgent:**
-```typescript
-{
-  sessions: Session[],  // { exchanges: [{userMessage, assistantMessage}], filename, timestamp }
-  correlations: {}
-}
-```
-
-### Stage 2: Semantic Analysis
-
-**Input:**
-```typescript
-analyzeGitAndVibeData(gitAnalysis, vibeAnalysis, { analysisDepth: 'surface' })
-```
-
-The coordinator always calls with `analysisDepth: 'surface'` (coordinator.ts line ~2637). This triggers a cheaper LLM call path.
-
-**Output:**
-```typescript
-SemanticAnalysisResult = {
-  codeAnalysis: {
-    architecturalPatterns: Array<{ name, files, description, confidence }>
-  },
-  semanticInsights: {
-    keyPatterns: string[],       // e.g. ["TypeScript", "Docker"]
-    architecturalDecisions: string[]  // e.g. ["ModularRepo: Use modular structure..."]
-  },
-  confidence: number
-}
-```
-
-**Critical failure path:** When LLM fails (timeout, no credit), `generateSemanticInsights()` falls back to `generateRuleBasedInsights()` which produces:
-- `keyPatterns` = file extension names from the analyzed files (e.g. "TypeScript", "YAML")
-- `architecturalDecisions` = first 5 git commit messages reformatted as "Decision: [commit message]"
-
-This is the root cause of "commit-message parroting" observations.
-
-### Stage 3: Observation Generation (First Call — Inside Semantic Block)
-
-The coordinator calls `observationAgent.generateStructuredObservations()` TWICE per batch.
-
-**First call** (coordinator.ts ~line 2650, inside the semantic analysis try-block):
-- **Input:** `enrichedGitAnalysis` (with `architecturalDecisions` array derived from semantic patterns), `vibeAnalysis`, `insightsForObservation` (array of insight objects from semantic patterns)
-- **Output:** `{ observations: StructuredObservation[] }` immediately used to build `batchEntities: KGEntity[]`
-- **Purpose:** Produces the entities that flow through `classify_with_ontology` and `kg_operators`
-
-**Entity name construction** (coordinator.ts ~line 2742):
-```typescript
-batchEntities = obsResult.observations.map((obs: any) => ({
-  id: `${currentBatchId}-${(obs.name || 'unnamed').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`,
-  name: obs.name || 'Unnamed Entity',   // e.g. "RealtimetrajectoryanalyzerpatternProblemHowKeep"
-  entityType: obs.entityType || 'Unclassified',
-  observations: Array.isArray(obs.observations)
-    ? obs.observations.map((o: any) => typeof o === 'string' ? o : (o?.content || String(o)))
-    : [],
-  significance: obs.significance || 5,
-}))
-```
-
-The `obs.name` for entities generated from git analysis comes from `generateFromGitAnalysis()` in `observation-generation-agent.ts`. That method concatenates the architectural decision `type` (e.g. "RealtimeTrajectoryAnalyzerPattern") with first words of description (e.g. "ProblemHowKeep") without inserting spaces — producing mangled names.
-
-### Stage 4: Observation Generation (Second Call — Separate Step)
-
-**Second call** (`generate_batch_observations` step, coordinator.ts ~line 2850):
-- **Input:** `enrichedGitAnalysisForObs` (same enriched git), wrapped vibe sessions, `{ entities: batchEntities, relations: batchRelations }` (from first call's output)
-- **The `generateFromSemanticAnalysis()` path** processes `semanticAnalysis.entities` (the batchEntities array)
-- Per entity, calls `createEntityObservation(entity)` which does an LLM synthesis call:
-
-```typescript
-// insight-generation-agent.ts ~line 813
-const prompt = `Synthesize a concise, actionable observation from this entity data:
-Entity: ${entity.name}
-Type: ${entity.type}
-Raw Observations: ${rawContent}  // <-- whatever came from first call
-
-Provide a JSON response with:
-{ "synthesizedContent": string, "keyPattern": string | null, ... }`;
-```
-
-**Output:** `batchObservations: StructuredObservation[]` pushed to `allBatchObservations` accumulator array.
-
-If the first call produced thin observations (because LLM fell back to rule-based), the second call's LLM synthesis input is also thin — it can only work with what was given.
-
-### Stage 5: Ontology Classification
-
-**Input:** `batchEntities` mapped to `{ name, entityType: 'Unclassified', observations[], significance }[]`
-
-**Output:**
-```typescript
-{
-  classified: Array<{ original: { name, entityType }, ontologyMetadata: { ontologyClass, confidence } }>,
-  summary: { classifiedCount, unclassifiedCount }
-}
-```
-
-Entities are updated in-place: `batchEntities` gets `ontologyMetadata` merged in. The entity type changes from 'Unclassified' to e.g. 'MCPAgent', 'ConstraintRule', 'KnowledgeEntity'.
-
-### Stage 6: KG Operators
-
-**Input:** `{ entities: batchEntities, batchContext, accumulatedKG, weights }`
-
-**Output:** Updated `accumulatedKG` — entities and relations accumulated across all batches.
-
-```typescript
-KGEntity = { id, name, entityType, type, observations: string[], significance, batchId, timestamp }
-```
-
-The `accumulatedKG` object grows across all batches. After all batches complete it contains all entities and relations from the entire git history window.
-
-### Stage 7: Finalization — Persistence
-
-**final_persist inputs (from YAML template resolution):**
-```
-entities: accumulatedKG.entities         // KGEntity[] from batch phase
-code_entities: transform_code_entities.result   // from CGR finalization
-team: params.team
-```
-
-**What PersistenceAgent.persistEntities() does:**
-- Writes each entity to `GraphDatabaseAdapter` (LevelDB at `.data/knowledge-graph/`)
-- Writes to `shared-memory-coding.json`
-- Does NOT write insight documents (that's InsightGenerationAgent's job)
-
-**After finalization YAML loop completes**, the coordinator exports the graph:
-```typescript
-await (persistenceAgent as any).graphDB.exportToJSON('.data/knowledge-export/coding.json')
-```
-
-### Stage 8: Finalization — Insight Generation (Critical Broken Flow)
-
-After all finalization YAML steps complete, the coordinator runs an EXPLICIT insight generation block NOT via `executeStepWithTimeout`. This block (coordinator.ts ~line 3797) is guarded by:
-
-```typescript
-if (insightAgent && !execution.results['generate_insights']?.insightDocuments?.length) {
-```
-
-**Data the explicit block passes to `generateComprehensiveInsights()`:**
-
-| Parameter | Source | Status |
-|-----------|--------|--------|
-| `git_analysis_results.commits` | Scraped from `execution.results['extract_batch_commits']` | EMPTY — compacted |
-| Fallback: `allBatchCommits` | Dedicated accumulator array | Available |
-| `vibe_analysis_results.sessions` | Scraped from `execution.results['extract_batch_sessions']` | EMPTY — compacted |
-| Fallback: `allBatchSessions` | Dedicated accumulator array | Available |
-| `semantic_analysis_results.entities` | Scraped from `execution.results['batch_semantic_analysis']` | EMPTY — compacted |
-| Fallback: `accumulatedKG.entities` | In-memory accumulatedKG | Available but summary only |
-| `observations` | `allBatchObservations` | Available — primary source |
-| `code_graph_results` | `execution.results['index_codebase']` | Available (not compacted) |
-| `code_synthesis_results` | `execution.results['synthesize_code_insights']` | Available (not compacted) |
-
-**The `generateComprehensiveInsights` flow:**
-
-1. Filter commits (remove trivial: typo/format with < 5 changes, merge commits with < 10 changes)
-2. Call `generatePatternCatalog()` — extracts patterns from all data sources
-3. Filter patterns: `significance >= 3` AND not in thin-pattern exclusion list AND not purely statistical evidence
-4. If `significantPatterns.length === 0`: return `{ skipped: true, insights_generated: 0 }` — zero insight documents written
-5. If patterns found: call `generateInsightDocument(pattern)` for top 20 patterns in batches of 10 (parallel)
-6. `generateInsightDocument()` calls LLM to write full markdown + PlantUML diagrams
-7. Documents written to `knowledge-management/insights/` via `fs.writeFile()`
-
-**`generatePatternCatalog()` sources (in order):**
-1. Code graph patterns from `index_codebase` result (AST-based: language distribution, circular deps, high complexity)
-2. Architectural patterns from git commits via `extractArchitecturalPatternsFromCommits()` — **EMPTY if commits are lost to compaction**
-3. Implementation patterns from `gitAnalysis.codeEvolution`
-4. Design patterns from `semanticAnalysis.codeAnalysis`
-5. Solution patterns from `vibeAnalysis.problemSolutionPairs`
-6. Documentation patterns from `docSemanticsResults` (not populated in batch mode currently)
-7. Code synthesis patterns from `codeSynthesisResults` (from `synthesize_code_insights` — available)
-8. Observation patterns from `allBatchObservations` via `extractPatternsFromObservations()`
-
----
-
-## Where Insight Generation Breaks
-
-### Break Point 1: Surface-depth semantic analysis produces thin entity observations
-
-**Location:** `coordinator.ts` line ~2637
-
-```typescript
-const semanticResult = await semanticAgent.analyzeGitAndVibeData(
-  gitAnalysis, vibeAnalysis,
-  { analysisDepth: 'surface' }   // always 'surface' for batch efficiency
-);
-```
-
-Surface depth = fewer files analyzed + less detailed LLM prompt. When LLM fails → `generateRuleBasedInsights()` fallback produces:
-- `keyPatterns`: file extension names ("TypeScript", "YAML")
-- `architecturalDecisions`: first 5 commit messages reformatted
-
-These flow into `insightsForObservation.insights` which the first ObservationAgent call uses as its primary source — producing entities with commit-message observations.
-
-### Break Point 2: Entity names are constructed by concatenating without spaces
-
-**Location:** `observation-generation-agent.ts` `generateFromGitAnalysis()` method
-
-The method transforms git architectural decision objects into entity names by concatenating `type` + first words of `description`. The transformation uses `replace(/[-_]/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').split(/\s+/).map(...).join('')` which produces PascalCase tokens joined with no separator:
-
-- Input: `{ type: "RealtimeTrajectoryAnalyzerPattern", description: "Problem: How to keep live-state.json fresh" }`
-- Output entity name: `"RealtimetrajectoryanalyzerpatternProblemHowKeep"`
-
-### Break Point 3: Commit data is compacted before insight generation can use it
-
-**Location:** `coordinator.ts` batch memory compaction block (~line 3566)
-
-```typescript
-const batchStepsToCompact = [
-  'extract_batch_commits',     // <-- compacted
-  'extract_batch_sessions',    // <-- compacted
-  'batch_semantic_analysis',   // <-- compacted
-  'generate_batch_observations'
-];
-```
-
-The explicit insight generation block tries to scrape commits from `execution.results` first:
-```typescript
-for (const [key, value] of Object.entries(execution.results)) {
-  if (key.startsWith('extract_batch_commits') && (value as any)?.commits) {
-    allCommits.push(...((value as any).commits || []));
-  }
-}
-```
-
-This yields zero commits (results are `{ _compacted: true }`). The fallback `allBatchCommits` array IS populated correctly — but it's a fallback path, not the primary. Similarly `allSemanticEntities` has no fallback and ends up empty.
-
-### Break Point 4: Thin observations produce low-significance patterns that all get filtered
-
-**Location:** `insight-generation-agent.ts` `generateComprehensiveInsights()` significance filter
-
-```typescript
-const significantPatterns = patternCatalog.patterns
-  .filter(p => p.significance < 3 ? (filterStats.lowSignificance++, false) : true)
-  .filter(p => THIN_PATTERN_NAMES.includes(p.name) ? (filterStats.thinPatternNames++, false) : true)
-  .filter(p => {
-    const hasOnlyStats = evidence.every(e => /^(Total|Functions|Classes...)/.test(e));
-    return !hasOnlyStats;
-  });
-
-if (significantPatterns.length === 0) {
-  return { skipped: true, insights_generated: 0 };
-}
-```
-
-When observations are thin, `extractPatternsFromObservations()` assigns `significance = obs.significance || 5` (default 5). This passes the >= 3 filter. But if the only patterns come from code-graph statistics (language distribution etc.), those get filtered as "thin". If commits are empty, `extractArchitecturalPatternsFromCommits([])` returns 0 patterns. Result: either 0 patterns (skipped) or patterns that pass filters but produce low-quality insight documents.
-
----
-
-## Specific Code Paths
-
-### Path A: Successful insight document generation (target state)
+The four deliverables have strict dependencies:
 
 ```
-[Batch N]
-SemanticAnalysisAgent.generateLLMInsights()  // LLM succeeds
-  → architecturalPatterns: [{ name: "DockerCompose", description: "Multi-container orchestration..." }]
-  → keyPatterns: ["MCP Agent Pattern", "Repository Pattern"]
-
-ObservationAgent CALL 1 (inside semantic block)
-  → createEntityObservation() — LLM synthesizes from rich entity observations
-  → batchEntities: [{ name: "DockerComposePattern", observations: ["Orchestrates 8 services..."] }]
-
-ObservationAgent CALL 2 (generate_batch_observations step)
-  → createEntityObservation({ observations: ["Orchestrates 8 services..."] })
-  → LLM synthesizes: "Docker Compose orchestrates 8 services including VKB, Memgraph..."
-  → allBatchObservations.push({ significance: 7, observations: ["Docker Compose orchestrates..."] })
-
-[Finalization]
-InsightGenerationAgent.generateComprehensiveInsights({
-  observations: allBatchObservations  // rich StructuredObservation[]
-})
-  → extractPatternsFromObservations():
-    → pattern.significance = 7 (from obs.significance)
-    → pattern.evidence = ["Docker Compose orchestrates 8 services including VKB, Memgraph..."]
-    → pattern.name = "DockerCompose"
-  → significantPatterns.length = 12  (passes >= 3 filter)
-  → generateInsightDocument(pattern):
-    → LLM: write detailed analysis of DockerCompose pattern
-    → PlantUML diagram generated
-    → File written: knowledge-management/insights/docker-compose.md
+Phase 1: Schema + Config
+  -> Phase 2: Migration (needs schema, accesses live GraphDB)
+  -> Phase 3: Pipeline HierarchyClassifier (needs schema, benefits from migration data for testing)
+  -> Phase 4: VKB Tree Navigation (needs hierarchical data from Phase 2+3 to be testable)
 ```
 
-### Path B: Current broken state
+### Phase 1: Schema + Config (no runtime impact, no Docker needed)
 
-```
-[Batch N]
-SemanticAnalysisAgent.generateLLMInsights()  // LLM timeout or credit exhaustion
-  → FALLBACK: generateRuleBasedInsights()
-  → keyPatterns: ["TypeScript", "YAML", "JavaScript"]
-  → architecturalDecisions: ["fix: add heartbeat to keep live-state.json fresh"]
+1. Extend `KGEntity` in `kg-operators.ts` -- add optional hierarchy fields
+2. Extend `EntityMetadata` in `persistence-agent.ts` -- add hierarchy to metadata
+3. Add `Component` and `SubComponent` to `coding-ontology.json` lower ontology
+4. Create `config/component-manifest.yaml` -- curated L1/L2/L3 list (bind-mounted, no rebuild)
+5. Extend `Entity` in `graphSlice.ts` -- add `metadata.hierarchyLevel`, `metadata.parentEntityName`
+6. Extend `Node` in `navigationSlice.ts` -- same additions
+7. Create `src/utils/hierarchyHelpers.ts` in memory-visualizer -- pure functions, no runtime deps
 
-ObservationAgent CALL 1 (inside semantic block)
-  → insightsForObservation.insights = [
-      { description: "TypeScript: TypeScript", type: "pattern", confidence: 0.6 },
-      { description: "YAML: YAML", type: "pattern", confidence: 0.6 }
-    ]
-  → generateFromSemanticAnalysis({ insights: [...] })  // thin
-  → OR generateFromGitAnalysis(enrichedGitAnalysis)
-    → architecturalDecisions[0].type = "RealtimeTrajectoryAnalyzerPattern"
-    → entityName = "RealtimetrajectoryanalyzerpatternProblemHowKeep"  // mangled
-    → observations: ["**RealTimeTrajectoryAnalyzerPattern**\n- Problem: How to keep..."]
-  → batchEntities: [{ name: "RealtimetrajectoryanalyzerpatternProblemHowKeep", observations: ["**..."] }]
+After steps 1-3: `npm run build` in `integrations/mcp-server-semantic-analysis` + Docker rebuild for coding-services. Steps 4-7 have no build requirements.
 
-[After batch — memory compaction]
-execution.results['extract_batch_commits'] = { _compacted: true }  // LOST
+### Phase 2: Migration Script (standalone, runs against live GraphDB)
 
-[Finalization]
-InsightGenerationAgent.generateComprehensiveInsights({
-  git_analysis_results: { commits: [] },   // scraping yields [] (compacted)
-  observations: allBatchObservations       // thin: significance=5, evidence=["This entity tracks..."]
-})
-  → extractArchitecturalPatternsFromCommits([]) → 0 patterns
-  → extractPatternsFromObservations(allBatchObservations):
-    → significance = 5 (default)
-    → evidence = ["This entity tracks development activity"]
-    → passes significance >= 3 filter
-    → passes hasOnlyStats check (not purely stats)
-  → significantPatterns.length = 8 (passes)
-  → generateInsightDocument(pattern):
-    → LLM: write insight for "RealtimetrajectoryanalyzerpatternProblemHowKeep"
-    → No real code context in evidence
-    → Generic insight document OR LLM error → no document written
-```
+1. Write `scripts/migrate-to-hierarchy.js`
+2. Test: `node scripts/migrate-to-hierarchy.js --dry-run`
+3. Run: `node scripts/migrate-to-hierarchy.js`
 
-### Path C: Zero insight documents (skipped)
+No Docker rebuild needed -- script runs on the host, routes to VKB API if running.
 
-```
-[When all commits are trivial or pattern extraction yields only statistical patterns]
-generatePatternCatalog():
-  → extractCodeGraphPatterns() → ["Large-Scale Codebase Pattern"]  // in thin-pattern exclusion list
-  → extractArchitecturalPatternsFromCommits([]) → 0 patterns
-  → extractPatternsFromObservations([]) → 0 patterns (empty allBatchObservations)
+### Phase 3: Pipeline HierarchyClassifier
 
-significantPatterns = []  // all filtered out
-return { skipped: true, insights_generated: 0 }
-```
+1. Create `src/agents/hierarchy-classifier.ts`
+2. Modify `coordinator.ts` -- call classifier after ontology, before kg_operators
+3. Modify `persistence-agent.ts` -- storeRelationship(child_of) after storeEntity when parentName set
+4. `npm run build` in `integrations/mcp-server-semantic-analysis`
+5. Docker rebuild for coding-services
+
+Test: run `ukb full` with `maxBatches: 1` and verify new entities have hierarchyLevel set.
+
+### Phase 4: VKB Tree Navigation
+
+1. Create `TreeNavigation.tsx` -- collapsible tree using `buildHierarchyTree()`
+2. Add `setHierarchyFilter` to `filtersSlice.ts`
+3. Apply hierarchy filter in `GraphVisualization.tsx`
+4. Create `HierarchyBreadcrumb.tsx`
+5. Update `KnowledgeGraph/index.tsx` -- add TreeNavigation panel
+6. Update `NodeDetails.tsx` -- add breadcrumb and children list
+7. `npm run build` in `integrations/system-health-dashboard` (bind-mounted, no Docker rebuild)
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Two-Phase Batch + Finalization Workflow
+### Pattern 1: Additive Schema Extension
 
-**What:** All batch work (commit analysis) runs in a loop; expensive single-pass operations (CGR, insights) run once after all batches complete.
-**When to use:** When historical data must be analyzed chronologically but final synthesis needs the complete picture.
-**Trade-offs:** Good for memory efficiency via per-batch compaction. Bad for data availability in finalization — compacted step results cannot be scraped.
+**What:** Add hierarchy fields as optional fields to existing interfaces. Never replace or remove existing fields.
+**When to use:** Adding features to a working system where backward compatibility matters.
+**Trade-offs:** Safe -- existing code paths continue to work. Existing entities without hierarchy fields are valid. The GraphDatabaseService spread pattern (`{ ...entityWithoutRelationships }`) passes new attributes through automatically with zero changes to storage code.
 
-### Pattern 2: Dedicated Accumulator Arrays (partial implementation)
+```typescript
+// Correct -- new fields are optional
+export interface KGEntity {
+  // existing required fields unchanged
+  hierarchyLevel?: 0 | 1 | 2 | 3;  // optional, existing entities unaffected
+  parentName?: string;
+}
 
-**What:** Critical data is accumulated into dedicated arrays (`allBatchCommits`, `allBatchSessions`, `allBatchObservations`) that are immune to per-batch compaction.
-**Current state:** Commits, sessions, and observations have accumulators. Semantic entities (`allSemanticEntities`) was attempted but only works if `execution.results['batch_semantic_analysis']` is not compacted — which it is.
-**Fix direction:** Add `allBatchSemanticEntities` accumulator populated immediately after semantic analysis, before compaction.
+// Wrong -- breaks all existing KGEntity construction sites
+export interface KGEntity {
+  hierarchyLevel: 0 | 1 | 2 | 3;   // required, would break all existing usage
+}
+```
 
-### Pattern 3: YAML Step + Explicit Code Fallback
+### Pattern 2: Scaffold-First Hierarchy
 
-**What:** The `generate_insights` YAML step runs via `executeStepWithTimeout` but receives null parameters (YAML template bindings to `accumulatedKG` fail because it is not a real step result). The explicit code block after the YAML loop provides the actual insight generation using the correct accumulator data.
-**Current state:** The guard `!execution.results['generate_insights']?.insightDocuments?.length` works — if YAML step fails, explicit block runs. If YAML step produces empty result (common), explicit block also runs.
-**Implication:** The YAML `generate_insights` step definition is effectively dead code; all insight generation happens via the explicit block.
+**What:** Create hierarchy structure (Coding -> L1 components -> L2 subComponents) as explicit graph nodes before assigning existing entities into it.
+**When to use:** The hierarchy skeleton is curated by the user, not inferred from data.
+**Trade-offs:** Migration and pipeline can do a simple name lookup rather than on-demand creation. Scaffold nodes are always present before leaf entities try to reference them as parents.
 
-### Pattern 4: Dual Observation Generation per Batch
+```typescript
+// Migration: create scaffolds before processing existing entities
+await adapter.storeEntity({ name: 'Coding', entityType: 'Project',
+  metadata: { hierarchyLevel: 0, isScaffoldNode: true } });
+await adapter.storeEntity({ name: 'LiveLoggingSystem', entityType: 'Component',
+  metadata: { hierarchyLevel: 1, isScaffoldNode: true, parentEntityName: 'Coding' } });
+// ... then process existing 126 entities and assign them under scaffold nodes
+```
 
-**What:** `ObservationGenerationAgent.generateStructuredObservations()` is called twice per batch with different inputs and for different purposes.
-**Call 1 (inside semantic block):** Produces `batchEntities: KGEntity[]` that flow through ontology classification and KG operators.
-**Call 2 (separate step):** Produces `batchObservations: StructuredObservation[]` that flow into `allBatchObservations` for finalization insight generation.
-**Problem:** The two calls process the same underlying data twice. Call 2 receives Call 1's output as input — it synthesizes from already-synthesized content, compounding quality issues.
+### Pattern 3: Lock-Free GraphDB Access via VKB API
 
----
+**What:** Migration script and pipeline both use `GraphDatabaseAdapter`, which routes to the VKB HTTP API (localhost:8080) when running, direct LevelDB access otherwise.
+**When to use:** Any script that runs while the VKB server may be up.
+**Trade-offs:** LevelDB has an exclusive lock. Bypassing the adapter and opening LevelDB directly from a script while the VKB server holds the lock causes `EBUSY`. The adapter already handles this routing automatically.
 
-## Data Flow Summary Table
+```javascript
+// Correct -- adapter auto-routes based on server availability
+const adapter = new GraphDatabaseAdapter(DEFAULT_DB_PATH, 'coding');
+await adapter.initialize();  // routes to API if server up, direct if not
+await adapter.storeRelationship({ from: childName, to: parentName, relationType: 'child_of' });
 
-| Step | Input Format | Output Format | Accumulated? |
-|------|-------------|---------------|-------------|
-| `extract_batch_commits` | hash range | `GitCommit[]` | `allBatchCommits[]` (dedicated) |
-| `extract_batch_sessions` | `GitCommit[]` | `Session[]` | `allBatchSessions[]` (dedicated) |
-| `batch_semantic_analysis` | commits + sessions | `SemanticAnalysisResult` | Compacted after batch — no accumulator |
-| `generate_batch_observations` (call 1) | semantic insights | `KGEntity[]` | `accumulatedKG.entities` via kg_operators |
-| `generate_batch_observations` (call 2) | entities + enriched git | `StructuredObservation[]` | `allBatchObservations[]` (dedicated) |
-| `classify_with_ontology` | `KGEntity[]` | classified entities in-place | via `accumulatedKG` |
-| `kg_operators` | classified entities | merged `accumulatedKG` | `accumulatedKG` grows |
-| `index_codebase` | repo HEAD | AST index | `execution.results` (not compacted) |
-| `synthesize_code_insights` | AST index | `SynthesisResult[]` | `execution.results` (not compacted) |
-| `transform_code_entities` | AST + synthesis | `KGEntity[]` (code) | passed to `final_persist` |
-| `final_persist` | `accumulatedKG.entities` + code entities | LevelDB + JSON | exported to `coding.json` |
-| `generate_insights` | `allBatchObservations` + code synthesis | `InsightDocument[]` | files written to `insights/` |
+// Wrong -- bypasses lock-free routing, causes EBUSY if VKB server is running
+const graphDB = new GraphDatabaseService({ dbPath: DEFAULT_DB_PATH });
+await graphDB.initialize();
+```
 
----
+### Pattern 4: Manifest-First, LLM-Fallback Classification
 
-## Integration Points
+**What:** Match entities against the curated component manifest first (O(n x aliases) string matching). Only call LLM for entities that don't match any alias.
+**When to use:** Classification where the target classes are known and well-defined.
+**Trade-offs:** The majority of entities match a component alias. LLM calls are ~1s each. With a well-crafted alias list, LLM may only need to handle 10-20% of entities, keeping migration fast (< 30s total) and pipeline overhead minimal (< 100ms per batch for fast path).
 
-### LLM Provider Chain
+### Pattern 5: Frontend Tree from Flat API (No New Backend Endpoint)
 
-- **`SemanticAnalyzer`** (used by ObservationAgent, OntologyAgent, InsightAgent): routes via `providers/dmr-provider.ts` through configured provider chain
-- **`SemanticAnalysisAgent`**: uses direct `LLMService` from `../../../../lib/llm/dist/index.js`
-- Provider selection: `config/model-tiers.yaml` (fast/standard/premium tiers) + `config/orchestrator.yaml`
-- Tier assignments in `batch-analysis.yaml`: semantic analysis = `premium`, observation generation = `premium`, ontology = `standard`, insight generation = `premium`
-
-### Storage
-
-| Store | Location | Written By | Read By |
-|-------|----------|-----------|---------|
-| GraphDB (LevelDB) | `.data/knowledge-graph/` | `PersistenceAgent` via `GraphDatabaseAdapter` | Dashboard via health API |
-| JSON export | `.data/knowledge-export/coding.json` | `coordinator.ts` explicit export block | VKB viewer |
-| Shared memory | `shared-memory-coding.json` | `PersistenceAgent` | Legacy consumers |
-| Insight docs | `knowledge-management/insights/*.md` | `InsightGenerationAgent` directly | VKB viewer, humans |
-| Progress | `.data/workflow-progress.json` | `workflow-runner.ts` + `coordinator.ts` | Dashboard (polling) |
-| Checkpoints | `.data/batch-checkpoints/` | `BatchCheckpointManager` | `BatchScheduler` on resume |
-
-### Key Config Files
-
-| File | Controls |
-|------|----------|
-| `config/workflows/batch-analysis.yaml` | Step definitions, phase assignments, timeouts |
-| `config/model-tiers.yaml` | LLM tier routing (fast/standard/premium) |
-| `config/orchestrator.yaml` | Retry counts, concurrency, mock mode settings |
-| `config/agents.yaml` | Agent-level configuration |
-| `.data/ontologies/upper/development-knowledge-ontology.json` | Entity class hierarchy |
-| `.data/ontologies/lower/coding-ontology.json` | Project-specific entity classes |
+**What:** The existing `/api/entities` endpoint returns entities with hierarchy attributes in metadata. Frontend builds the tree using `buildHierarchyTree()` pure function.
+**When to use:** Backend data model is already adequate and only presentation changes.
+**Trade-offs:** No backend changes needed. Tree-building logic lives in the frontend where it's easier to test and iterate. The flat entity list remains the canonical API -- hierarchy is a view over the same data.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Compacting Then Scraping
+### Anti-Pattern 1: Hierarchy Only in Edges, Not Node Attributes
 
-**What happens:** After compacting `execution.results['batch_semantic_analysis']`, the explicit insight block tries to scrape `allSemanticEntities` from those compacted results.
-**Why it's wrong:** Results are replaced with `{ _compacted: true }` — scraping produces empty arrays.
-**Do this instead:** Use dedicated accumulator arrays populated immediately when data is available, before any compaction can happen. Add `allBatchSemanticEntities` array alongside `allBatchCommits`.
+**What happens:** Hierarchy encoded purely as graph edges. Level and parent derived by traversing edges at query time.
+**Why it's wrong:** VKB API returns flat entity lists -- no graph traversal. Frontend cannot display `hierarchyLevel` or `parentName` without additional API calls per entity.
+**Do this instead:** Store `hierarchyLevel` and `parentEntityName` as node attributes AND create the edges. Attributes make data self-describing for flat API responses; edges enable graph traversal queries. Both are needed.
 
-### Anti-Pattern 2: Surface-Depth Analysis for All Batches
+### Anti-Pattern 2: Adding Hierarchy Logic to GraphDatabaseService.storeEntity()
 
-**What happens:** `analysisDepth: 'surface'` is hardcoded for all batches in the coordinator.
-**Why it's wrong:** Surface depth produces a smaller LLM prompt, fewer files analyzed, and more frequent fallback to rule-based insights. Rule-based insights produce commit-message paraphrases.
-**Do this instead:** Use 'deep' depth (or at minimum give the LLM more commit context). The cost difference per batch is low relative to the quality gain.
+**What happens:** Hierarchy inference (auto-create parent nodes, auto-create edges) added directly inside `storeEntity()`.
+**Why it's wrong:** `GraphDatabaseService` is used by multiple consumers. Adding hierarchy logic there creates tight coupling -- every entity write triggers hierarchy inference, which may not be correct for all consumers.
+**Do this instead:** Hierarchy assignment happens BEFORE calling `storeEntity()`. The entity is fully attributed when it reaches storage. Relationship storage is an explicit call after entity storage, not an implicit side effect.
 
-### Anti-Pattern 3: Double Observation Generation
+### Anti-Pattern 3: New /api/entities/tree Endpoint
 
-**What happens:** Two LLM synthesis passes per batch, with Call 2 synthesizing from Call 1's already-synthesized output.
-**Why it's wrong:** Compounds quality issues. If Call 1 produces thin content, Call 2 cannot recover.
-**Do this instead:** Merge into one call. Use the rich `StructuredObservation[]` format from the start, and have that same output serve both the KG operator pipeline and the insight generation accumulator.
+**What happens:** A new backend endpoint returns entities structured as a tree JSON.
+**Why it's wrong:** Duplicates tree-building logic in the backend. Adds complexity to api-routes.js and KnowledgeQueryService. The existing /api/entities already returns all needed data if entities have hierarchy attributes.
+**Do this instead:** Build the tree in the frontend from the flat entity list using `buildHierarchyTree()` in `hierarchyHelpers.ts`.
 
-### Anti-Pattern 4: YAML Template Bindings to Non-Step Results
+### Anti-Pattern 4: Rewriting VKB's D3 Graph for Tree Layout
 
-**What happens:** `generate_insights` YAML step uses `{{accumulatedKG.entities}}` — but `accumulatedKG` is stored as `execution.results['accumulatedKG']`, not a real step result from a named agent.
-**Why it's wrong:** `resolveParameterTemplates()` cannot resolve this — returns null. The YAML step effectively always runs with empty entity lists.
-**Do this instead:** Remove the `generate_insights` YAML step entirely (since the explicit code block handles it), or store `accumulatedKG` as a proper step result.
+**What happens:** Replacing force-directed D3 graph with `d3.tree()` hierarchy layout for the entire VKB view.
+**Why it's wrong:** Force-directed layout is valuable for seeing relationship clusters within a component. The existing D3 code is working and complex -- rewriting it is high risk for low gain.
+**Do this instead:** Add a tree navigation panel ALONGSIDE the existing D3 graph. Tree panel acts as a filter/drill-down UI. D3 shows the selected subtree using its existing force-directed layout. Additive, not a rewrite.
+
+### Anti-Pattern 5: LLM Classification for Every Entity on Every Pipeline Run
+
+**What happens:** HierarchyClassifier calls LLM for every entity in every batch, including entities already in `accumulatedKG` with hierarchy assigned from previous batches.
+**Why it's wrong:** Entities in `accumulatedKG` from previous batches already have `hierarchyLevel` and `parentName` set via dedup+merge. Re-classifying wastes tokens and time.
+**Do this instead:** Skip entities where `hierarchyLevel !== undefined`. Only classify newly encountered entities.
+
+---
+
+## Integration Points with Existing Ontology
+
+The ontology currently defines entity classes but not hierarchy classes. Two new classes need adding to `coding-ontology.json`:
+
+```json
+{
+  "classes": {
+    "Component": {
+      "description": "A major subsystem of the Coding project (L1 hierarchy node)",
+      "parent": "Project",
+      "properties": { "hierarchyLevel": 1, "isScaffoldNode": true }
+    },
+    "SubComponent": {
+      "description": "A sub-area within a Component (L2 hierarchy node)",
+      "parent": "Component",
+      "properties": { "hierarchyLevel": 2, "isScaffoldNode": true }
+    }
+  }
+}
+```
+
+Without this, `OntologyClassificationAgent` will classify scaffold nodes as 'Unclassified', causing `GraphDatabaseAdapter.storeEntity()` to throw (`Cannot store entity: entityType is Unclassified`).
+
+**Recommended approach:** Scaffold nodes bypass the pipeline entirely -- they are created by the migration script and HierarchyClassifier with their type already set to 'Component' or 'SubComponent'. They never flow through `OntologyClassificationAgent`. The ontology addition just satisfies PersistenceAgent's validation check.
+
+---
+
+## Scalability Considerations
+
+This is a single-user, single-team system. Scalability concerns are about data volume, not concurrent users.
+
+| Scale | Entity Count | Concern | Approach |
+|-------|-------------|---------|----------|
+| Current | 126 entities | None | Any approach works |
+| After 10 pipeline runs | ~500 entities | VKB D3 performance | Hierarchy filter limits visible nodes to ~10-30 |
+| After 100 pipeline runs | ~2000 entities | LevelDB query time | Graphology in-memory stays fast; hierarchy pruning helps |
+
+The D3 force simulation is the bottleneck. With subtree filtering (show only the selected component's entities), the visible node count drops from ~500 to ~10-30, well within D3's performance envelope.
 
 ---
 
 ## Sources
 
-- Direct inspection of `integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts` (5428 lines)
-- `integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts` (5802 lines)
-- `integrations/mcp-server-semantic-analysis/src/agents/observation-generation-agent.ts`
-- `integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts`
-- `integrations/mcp-server-semantic-analysis/config/workflows/batch-analysis.yaml`
-- `integrations/mcp-server-semantic-analysis/src/workflow-runner.ts`
-- `.data/knowledge-export/coding.json` (live output: 57 entities, 22 with low quality indicators)
-- `integrations/mcp-server-semantic-analysis/CRITICAL-ARCHITECTURE-ISSUES.md` (historical context)
+- Direct inspection of `src/knowledge-management/GraphDatabaseService.js` -- storeEntity(), storeRelationship(), CollectiveKnowledge auto-linking logic (lines 200-420)
+- `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` -- lock-free routing pattern (lines 1-200)
+- `integrations/mcp-server-semantic-analysis/src/agents/kg-operators.ts` -- KGEntity interface (lines 31-43)
+- `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` -- SharedMemoryEntity, EntityMetadata interfaces (lines 1-150)
+- `integrations/mcp-server-semantic-analysis/config/workflows/batch-analysis.yaml` -- 16-step pipeline, phase assignments, coordinator integration points
+- `lib/vkb-server/api-routes.js` -- REST endpoints, entity pass-through pattern
+- `lib/ukb-unified/core/VkbApiClient.js` -- API client interface
+- `integrations/memory-visualizer/src/store/slices/graphSlice.ts` -- Entity, Relation, GraphState interfaces
+- `integrations/memory-visualizer/src/store/slices/navigationSlice.ts` -- Node interface (D3 simulation fields)
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/GraphVisualization.tsx` -- D3 force layout, filter chain
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/NodeDetails.tsx` -- detail panel structure
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/index.tsx` -- component composition, Redux integration
+- `.data/knowledge-export/coding.json` -- live entity snapshot (126 entities, 0 relations, type distribution: 46 KnowledgeEntity, 19 MCPAgent, 12 WorkflowDefinition, 11 ConstraintRule, 10 SemanticAnalyzer, 6 ConfigurationFile, 5 CodingArtifact, 4 GraphDatabase, 1 Project, 1 System)
+- `scripts/knowledge-management/migrate-entities.js` -- existing migration script as implementation reference
 
 ---
 
-*Architecture research for: UKB multi-agent analysis pipeline*
-*Researched: 2026-02-26*
+*Architecture research for: hierarchical knowledge graph restructuring (v2.0 milestone)*
+*Researched: 2026-03-01*

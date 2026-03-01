@@ -1,216 +1,208 @@
 # Project Research Summary
 
-**Project:** UKB Multi-Agent Analysis Pipeline (mcp-server-semantic-analysis)
-**Domain:** Multi-agent knowledge graph construction from git history + session logs
-**Researched:** 2026-02-26
+**Project:** Hierarchical Knowledge Graph Restructuring (v2.0 Milestone)
+**Domain:** Multi-agent knowledge graph pipeline — flat-to-hierarchical entity migration
+**Researched:** 2026-03-01
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The UKB pipeline is a 14-agent DAG workflow that analyzes a git repository's commit history and AI session logs (`.specstory/`) to construct a knowledge graph of architectural patterns, design decisions, and code entities. The pipeline is well-architected in terms of its overall structure — batch processing with checkpoint resume, a two-phase execution model (batch loop then finalization), and a custom multi-agent framework — but has several concrete, traceable bugs that prevent its primary output (insight documents) from ever being generated. The pipeline currently runs to completion and produces 57 entities in LevelDB, but those entities have mangled names, uniform significance scores, template-filled observations, and zero linked insight documents.
+This milestone restructures the existing flat-entity knowledge graph (126 entities, 0 relations, single-level) into a 4-level hierarchy: Coding (L0 root) -> major components like LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns (L1) -> sub-components like ManualLearning, OnlineLearning (L2) -> detail leaf entities (L3). The existing Graphology + LevelDB storage already supports this natively — node attributes are arbitrary JSON and edges are typed — but no code currently sets hierarchy fields or creates parent-child edges. The work is an additive extension to working infrastructure, not a rewrite.
 
-The recommended approach is surgical bug-fixing rather than architectural redesign. The core architecture (14-agent DAG, YAML workflow, Graphology + LevelDB storage, CoordinatorAgent orchestration) is sound and working. Three specific failure chains account for the entire quality gap: (1) LLM output format mismatch in pattern extraction causes zero patterns to be extracted from valid LLM responses; (2) the `toPascalCase()` bug introduced on Feb 15, 2026 destroys entity name capitalization; and (3) template-based observation generation in `createArchitecturalDecisionObservation()` produces slot-filled strings instead of semantic content. All three have clear, low-risk fixes.
+The recommended approach follows a strict 4-phase sequence dictated by hard dependencies: (1) schema first so all interfaces are consistent before any data moves, (2) one-time migration to retrofit the 126 existing entities into the hierarchy, (3) pipeline changes so future `ukb full` runs produce hierarchical entities, (4) VKB tree navigation UI as the final consumer. Attempting any phase out of order creates an inconsistent mixed state that is costly to debug. The two largest complexity items are the entity merge operation (merging ~40-50 generic nodes into CodingPatterns) and pipeline hierarchy assignment (which changes the create-then-classify order to classify-hierarchy-then-create).
 
-The primary risk during the fix project is regression — fixing one agent's output format may cascade into downstream parsing failures in other agents that now expect the broken format. Every fix should be validated against a full workflow run report, not just unit-level output. The secondary risk is that LLM provider fallbacks (Groq -> Anthropic -> OpenAI) may produce different output formats than the primary provider, causing format-mismatch pitfalls to recur after deployment. All LLM parsing should use JSON schemas rather than line-by-line text parsing to eliminate this class of bug permanently.
+The dominant risk category is silent field loss through the pipeline. The v1.0 milestone already suffered the `entityType`/`type` disconnect bug where classification results were silently discarded at persistence. The hierarchy fields (`parentId`, `level`, `hierarchyPath`) will face the same trap: TypeScript structural typing allows extra fields through casts without verifying they survive explicit object literal reconstruction in `processEntity()`. Every phase must include an end-to-end round-trip test that verifies hierarchy fields survive from coordinator through deduplication through `persistEntities()` through `storeEntity()` through `getEntity()` before declaring the phase complete.
 
 ## Key Findings
 
-### Current Stack (Established, Working)
+### Recommended Stack
 
-The stack is entirely custom-built — no third-party agent framework (no LangChain, no AutoGen). All findings are from direct code inspection with HIGH confidence.
+The existing stack requires only two new npm packages. `graphology-traversal` ^0.3.1 is needed in the MCP server submodule to perform BFS from the Coding root node — it is the official Graphology standard library package and is peer-compatible with the installed graphology ^0.25.4. `react-arborist` ^3.4.3 is needed in the VKB viewer for the tree panel — it is virtualized, has built-in TypeScript types, requires no design system, and is compatible with React 18.2.0. All other dependencies (`graphology-dag`, `@radix-ui/react-collapsible`, Node.js built-in `fetch`) are already installed.
+
+The migration script requires no new packages — it follows the established pattern from `scripts/purge-knowledge-entities.js`, using the VKB HTTP API at localhost:8080 to avoid LevelDB lock conflicts. No new backend API routes are required: the existing `/api/entities` endpoint already passes through node attributes, so `parentId` and `level` appear automatically once stored.
 
 **Core technologies:**
-- **Custom `BaseAgent<TInput, TOutput>`** — abstract base class for all 14 agents; typed input/output with confidence/issues/routing metadata
-- **`CoordinatorAgent` (5428 lines)** — central orchestrator; owns all in-memory state (`accumulatedKG`, `allBatchCommits`, `allBatchObservations`); executes YAML DAG steps
-- **`SmartOrchestrator`** — confidence-propagating routing layer wrapping CoordinatorAgent
-- **Custom `@coding/llm` library** — singleton `LLMService` with circuit breakers, caching, mode routing (mock/local/public), budget tracking
-- **Graphology ^0.25.4 + LevelDB ^10.0.0** — in-memory KG + persistent storage; working correctly; do not modify
-- **YAML workflow definitions** — DAG step definitions in `config/workflows/batch-analysis.yaml`; template references (`{{accumulatedKG.entities}}`) are partially broken for non-step data
-- **Anthropic/OpenAI/Groq/Gemini SDKs** — direct SDK bindings, no abstraction layer; subscription providers (Copilot) prioritized to reduce API cost
-- **code-graph-rag (Python + Tree-sitter + Memgraph)** — AST-based code indexing; 46,222 entities already indexed; gracefully degrades when unavailable
+- `graphology` ^0.25.4 (installed): in-memory graph — hierarchy edges stored via `storeRelationship()` with `relationType: 'contains'`
+- `graphology-traversal` ^0.3.1 (new, MCP server): BFS/DFS from root node for tree building and migration ordering
+- `graphology-dag` (installed): `hasCycle()` and `willCreateCycle()` guards during migration edge creation
+- `react-arborist` ^3.4.3 (new, VKB viewer): virtualized collapsible tree panel with TypeScript support
+- `level` ^10.0.0 (installed): LevelDB persistence — no changes; hierarchy fields flow through automatically via attribute spread
+- Node.js 18+ `fetch` (built-in): migration script HTTP calls to VKB API
 
-**What the stack does not need:** No new libraries, no framework changes, no storage migration. The infrastructure is correct.
+**Critical version requirement:** Docker rebuild is mandatory after every TypeScript change to `integrations/mcp-server-semantic-analysis/` — the container copies `dist/` at build time. No hot-reload exists. This is the single most common failure mode in this project.
 
-### Feature Landscape
+### Expected Features
 
-**Working correctly (do not touch):**
-- Batch scheduling (26 batches of 50 commits from 1260 total commits) and checkpoint resume
-- Git history extraction per batch (`GitCommit[]` with file diffs)
-- Code graph indexing (46,222 AST entities in Memgraph)
-- Documentation linking (2,977 links across 531 documents)
-- Knowledge graph persistence (Graphology + LevelDB, VKB export)
-- Deduplication and content validation
-- Ontology classification (heuristic + LLM; assigns MCPAgent, GraphDatabase, etc.)
-- Workflow report generation
+The milestone delivers a functional hierarchy from migration through pipeline through UI. Five features are P1 (required for milestone completion); four are P2 (add within milestone sprint when P1 is stable); three are deferred to v3+.
 
-**Confirmed broken (requires fixes):**
-- **Insight document generation** — produces 0 valid documents due to pattern extraction returning 0 results (Pitfall 1)
-- **Entity naming** — mangled lowercase due to `toPascalCase()` bug (Pitfall 2)
-- **Observation content** — template-filled commit-message paraphrases, not semantic analysis (Pitfall 3)
-- **Significance scores** — all entities at 0.5 (fraction storage bug) with no differentiation
-- **YAML `generate_insights` step** — dead code; template bindings to `accumulatedKG` never resolve; explicit code block handles insight generation instead
+**Must have (P1 — table stakes):**
+- Schema extension: `parentId`, `level`, `hierarchyPath` on `KGEntity`, `SharedMemoryEntity`, `persistEntities()` parameter, and `GraphEntity` adapter — all four simultaneously in one commit
+- Seed script: create L2 component nodes (LSL, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns) with descriptions before migration
+- One-time migration script: classify all 126 entities, merge generic nodes into CodingPatterns, assign hierarchy fields, create `contains` edges
+- Pipeline hierarchy assignment: `HierarchyClassifier` agent inserted after ontology step, before kg_operators; uses `component-manifest.yaml` for fast alias matching with LLM fallback
+- VKB tree navigation panel: collapsible tree sidebar, entity detail on click, breadcrumb trail
 
-**MVP target:** 10+ entities with significance >= 6, 5+ entities with `has_insight_document: true`, insight documents >= 100 lines with real content, PascalCase entity names, 3+ entity categories beyond MCPAgent/GraphDatabase.
+**Should have (P2 — add when P1 stable):**
+- Component summary observations: LLM-synthesized descriptions on L1/L2 nodes
+- Level-scoped API queries: `?level=2` and `?parentId=coding:KnowledgeManagement` filters on `/api/entities`
+- Architecture diagrams on L2 nodes: PlantUML metadata field rendered in VKB as collapsible panel
 
-**What to defer (do not implement now):**
-- `correlate_with_codebase` step (currently commented out in YAML)
-- Per-batch insight generation (wrong phase — code graph indexes HEAD only)
-- Increasing agent count (architecture stays fixed)
+**Defer (v3+):**
+- Full-text semantic search across observations (requires Qdrant activation, separate milestone)
+- Auto-discovery of additional L3 sub-components via embedding clustering
+- Hierarchy decay/pruning for stale nodes (`KnowledgeDecayTracker.js` already stubbed)
 
-### Architecture: Key Patterns and Boundaries
+**Key anti-features to avoid:**
+- Fully automated LLM assignment for all 126 entities — too expensive and inaccurate for a one-time migration; use keyword heuristics first, LLM only for ~10-20% ambiguous entities
+- Hierarchy beyond 4 levels — UX becomes unusable
+- Real-time hierarchy update during pipeline runs — race conditions with concurrent agents writing to the same parent node in LevelDB
+- New `/api/entities/tree` backend endpoint — unnecessary; build the tree in the frontend from `parentId` attributes on the flat entity list
 
-The pipeline uses a **two-phase batch + finalization** architecture. Batch phase (26 iterations) processes commits chronologically; finalization phase runs once to produce final outputs. This is the correct design — do not collapse phases.
+### Architecture Approach
 
-**Critical data flow boundary:** CoordinatorAgent maintains dedicated accumulator arrays (`allBatchCommits`, `allBatchSessions`, `allBatchObservations`) that survive per-batch memory compaction. `allBatchSemanticEntities` is NOT implemented — semantic entities are only in `execution.results['batch_semantic_analysis']` which gets compacted. This is the data-loss path.
+The architecture is additive throughout. No existing components are replaced. `GraphDatabaseService.storeEntity()` requires zero changes because the existing `{ ...entityWithoutRelationships }` spread automatically stores any extra attributes. Four new files are created (HierarchyClassifier, component-manifest.yaml, migration script, TreeNavigation/HierarchyBreadcrumb in VKB). Eight existing files are modified with targeted additions. The storage layer, VKB API server, and workflow YAML are unchanged.
 
-**Broken YAML template resolution:** `generate_insights` YAML step uses `{{accumulatedKG.entities}}` — `accumulatedKG` is a JavaScript variable in CoordinatorAgent scope, not a named step result, so template resolution always returns null. The explicit code block at coordinator.ts ~line 3797 is the actual insight generation path. The YAML step is dead code.
+The data flow for hierarchy assignment follows: `OntologyClassificationAgent` sets `entityType` (existing) -> `HierarchyClassifier.assignHierarchy()` (new, inline in coordinator) sets `hierarchyLevel` and `parentName` from manifest lookup -> `KGOperators` dedup/merge (modified to preserve hierarchy fields) -> `PersistenceAgent.processEntity()` (modified to copy hierarchy fields into `SharedMemoryEntity`) -> `GraphDatabaseService.storeEntity()` (unchanged) + explicit `storeRelationship(child, parent, 'contains')` call.
 
-**Double observation generation anti-pattern:** `ObservationGenerationAgent.generateStructuredObservations()` is called twice per batch. Call 1 produces `KGEntity[]` for the KG operator pipeline. Call 2 synthesizes from Call 1's already-thin output — compounding quality issues. These should be merged into one call.
+**Major components:**
+1. `HierarchyClassifier` (new) — fast manifest alias matching with LLM fallback; creates scaffold nodes for missing L1/L2 parents; skips entities already classified (where `hierarchyLevel !== undefined`)
+2. `component-manifest.yaml` (new) — curated L1/L2 definitions and aliases; bind-mounted, no Docker rebuild needed on config changes
+3. `migrate-to-hierarchy.js` (new) — one-time script; reads from live graph via `GraphDatabaseAdapter`; dry-run flag required; creates scaffold nodes, classifies 126 entities, merges generics, stores `contains` edges
+4. `TreeNavigation.tsx` (new) — VKB collapsible tree panel built from `buildHierarchyTree()` pure function; dispatches `setHierarchyFilter` on click; pure React `ul/li`, no D3
+5. `HierarchyBreadcrumb.tsx` (new) — shows root-to-node path in NodeDetails panel computed from `parentId` chain
 
-**Major components (all working correctly at infrastructure level):**
+**Key pattern — Manifest-First, LLM-Fallback Classification:** Match entities against curated aliases (O(n x aliases), ~0ms) before calling LLM. With a well-crafted alias list, LLM handles only ~10-20% of entities, keeping migration under 30s and per-batch overhead under 100ms.
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| `CoordinatorAgent` | Infrastructure working | Logic bugs in data routing |
-| `SmartOrchestrator` | Working | Mostly falls through to "proceed" given low confidence scores |
-| `LLMService` + provider chain | Working | Circuit breakers, caching functional |
-| `GraphDatabaseAdapter` | Working | Lock-free via VKB HTTP API when server running |
-| `InsightGenerationAgent` | Infrastructure working | Pattern extraction parser is broken |
-| `BatchCheckpointManager` | Working | Resume from any batch works |
+**Key pattern — Frontend Tree from Flat API:** Build `TreeNode[]` hierarchy in the frontend from `parentId` attributes already present on the flat `/api/entities` response. No new backend endpoint needed.
 
 ### Critical Pitfalls
 
-1. **LLM output format mismatch in pattern extraction** — The parser in `parseArchitecturalPatternsFromLLM()` uses regex `^(Pattern|Architecture|Design):\s*(.+)` but Groq returns markdown-numbered format (`1. **Pattern: KnowledgeBaseUpdatePattern**`). Zero patterns extracted. **Fix:** Change LLM prompt to request JSON schema output; parse JSON instead of line-by-line.
+1. **KGEntity/SharedMemoryEntity field disconnect** — Hierarchy fields added to `KGEntity` but not to `SharedMemoryEntity`'s explicit object literal construction in `processEntity()` will be silently discarded at persistence. TypeScript structural typing does not catch this. This is the same mechanism as the v1.0 `entityType`/`type` disconnect bug. Prevention: update all four interfaces simultaneously in Phase 1 and write a round-trip integration test.
 
-2. **`toPascalCase()` bug destroys interior capitals** — Introduced commit `ee72322` (Feb 15, 2026). The function lowercases all non-first characters: `word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()` — turning `PathAnalyzer` into `Pathanalyzer`. **Fix:** Remove `.toLowerCase()` — use `word.slice(1)` unchanged.
+2. **Dedup operator collapses parent nodes on second pipeline run** — `mergeEntities()` uses `...existing` spread then overwrites select fields. If an incoming entity has `parentId: undefined` (unset), it overwrites the component node's `parentId`. Prevention: add null-coalescing in `mergeEntities()`: `parentId: incoming.parentId ?? existing.parentId`. Add component node names to `PROTECTED_ENTITY_TYPES`.
 
-3. **Template-filled observation generation** — `createArchitecturalDecisionObservation()` fills hardcoded strings from commit file extensions ("This X pattern is applicable when building JSON, JavaScript, Markdown systems"). **Fix:** Replace with LLM synthesis call, same as `createEntityObservation()` already does correctly.
+3. **LevelDB and JSON export out of sync after migration** — A migration script that bypasses `GraphDatabaseAdapter` and opens LevelDB directly will not attach `GraphKnowledgeExporter`, leaving the JSON export stale. Prevention: always use `GraphDatabaseAdapter` (not `GraphDatabaseService` directly); stop VKB server before running migration so the adapter enters direct-mode and attaches the exporter.
 
-4. **`code_synthesis_results` passed as empty timing wrapper** — When Memgraph is unavailable, `synthesizeInsights` returns `[]`; spread with `wrapWithTiming` produces `{_timing: {...}}` object; `Array.isArray()` check in insight agent fails silently. **Fix:** Return structured skip object `{synthesisResults: [], skipped: true}`; unwrap before passing.
+4. **LLM hierarchy misclassification by surface name patterns** — Without component descriptions in the prompt, LLMs match on surface keywords ("Docker" -> DockerizedServices even for trajectory debug entities). Prevention: build keyword heuristics first; include component descriptions (not just names) in LLM prompt; manually audit a 20-entity sample.
 
-5. **Significance stored as fraction, read back as fraction** — `UKBDatabaseWriter` stores `confidence: significance / 10`; `GraphDatabaseService.getEntities()` reads `confidence` field back as `significance`. All entities show 0.5. **Fix:** Normalize in `GraphDatabaseService.getEntities()` read path.
+5. **Docker rebuild forgotten after TypeScript changes** — Documented in CLAUDE.md and MEMORY.md as a recurring issue. Container health endpoint shows "healthy" regardless of code version. The container silently runs stale `dist/`. Prevention: make `stat dist/agents/kg-operators.js` mtime vs `src/agents/kg-operators.ts` mtime check the first item in every phase's completion checklist.
+
+**Additional pitfalls:**
+- D3 force layout collapses when hierarchy edges are added (120+ edges on 136 nodes creates hub-and-spoke collapse) — filter `contains` edges from D3 link force; tree navigation uses React, not D3
+- Bold formatting reintroduced from stale `coding.json` if migration reads from the JSON export rather than live LevelDB — verify with `grep -c '\*\*' .data/knowledge-export/coding.json` = 0 before migration
 
 ## Implications for Roadmap
 
-The fix project has a clear dependency order based on the pipeline's data flow. Each bug blocks downstream quality, so fixes must follow the pipeline's execution order.
+The phase structure is dictated by hard dependencies. Schema must precede everything. Migration must precede pipeline changes (deploying hierarchical pipeline to a flat graph creates a mixed state that complicates the tree view). Pipeline must run before VKB tree is useful to validate against real data. Four phases, no reordering.
 
-### Phase 1: Core Pipeline Data Quality (P1 Fixes)
+### Phase 1: Schema and Configuration Foundation
 
-**Rationale:** All downstream quality depends on what `ObservationGenerationAgent` and `SemanticAnalysisAgent` produce in each batch. Fixing the pattern extraction parser (Pitfall 1), entity naming (Pitfall 2), and observation template replacement (Pitfall 3) unblocks insight generation entirely.
+**Rationale:** All other phases write or read hierarchy fields. If the interfaces are inconsistent, field loss is silent and debugging is expensive. This is the lesson from the v1.0 entityType/type bug. Phase 1 has zero runtime impact and no Docker rebuild requirement — type changes only in MCP server submodule; VKB type changes are build-only.
+**Delivers:** Consistent TypeScript interfaces across all four systems (MCP server `KGEntity`, persistence `SharedMemoryEntity`/`processEntity()`, GraphDB adapter `GraphEntity`, VKB `Entity`/`Node` Redux interfaces); `component-manifest.yaml` with curated L1/L2 definitions; `hierarchyHelpers.ts` pure functions in VKB.
+**Addresses:** P1 schema feature; resolves pitfall 1 (field disconnect) and pitfall 5 (processEntity omission).
+**Avoids:** Silent field loss; interface divergence; TypeScript type errors in Phase 2+.
 
-**Delivers:**
-- LLM-synthesized, entity-specific observations instead of template strings
-- Correctly capitalized PascalCase entity names
-- `extractArchitecturalPatternsFromCommits()` returning actual patterns (currently 0)
-- Pattern catalog with significance >= 3 passing filter thresholds
+Files: `kg-operators.ts` (KGEntity interface), `persistence-agent.ts` (EntityMetadata interface + processEntity explicit construction), `graph-database-adapter.ts` (GraphEntity interface), `graphSlice.ts` and `navigationSlice.ts` (VKB Entity/Node interfaces), `coding-ontology.json` (add Component and SubComponent classes), `config/component-manifest.yaml` (new), `src/utils/hierarchyHelpers.ts` (new).
 
-**Addresses features:** Observation quality, entity naming, pattern extraction
-**Avoids pitfalls:** Pitfall 1 (parser), Pitfall 2 (toPascalCase), Pitfall 3 (templates)
+Post-phase validation: TypeScript compiles with `--strict` in both submodule and VKB; integration test passes entity with `parentId` through `persistEntities()` and returns it from `getEntity()` with `parentId` intact.
 
-**Specific changes:**
-- `insight-generation-agent.ts`: Change `extractArchitecturalPatternsFromCommits` prompt to JSON schema; update parser to `JSON.parse()` instead of regex
-- `observation-generation-agent.ts`: Fix `toPascalCase` (remove `.toLowerCase()`); replace `createArchitecturalDecisionObservation` templates with LLM synthesis
-- `coordinator.ts` line ~2637: Change `analysisDepth: 'surface'` to `'deep'` to reduce rule-based fallback frequency
+### Phase 2: One-Time Migration
 
-**Research flag:** No additional research needed — all code paths are fully traced.
+**Rationale:** Migration operates on the live graph and produces the hierarchical structure that Phase 3 (pipeline) and Phase 4 (VKB) depend on for realistic testing. Running migration before pipeline changes means pipeline changes can be validated against real hierarchical data. Migration is standalone — does not require Docker rebuild.
+**Delivers:** 126 existing entities classified into hierarchy; ~10 new scaffold L1/L2 component nodes created; ~40-50 generic entities merged into CodingPatterns; `contains` edges connecting all children to parents; JSON export updated and bold-free.
+**Addresses:** P1 migration feature; P1 entity merge feature; CodingPatterns aggregation.
+**Avoids:** Stale JSON export (pitfall 3); bold formatting reintroduction; LevelDB lock conflict (use `GraphDatabaseAdapter`).
 
-### Phase 2: Insight Generation Data Routing
+Files: `scripts/knowledge-management/migrate-to-hierarchy.js` (new, follows `purge-knowledge-entities.js` pattern).
 
-**Rationale:** Even with Phase 1 fixes producing quality observations, the insight generation step will still fail if it receives empty commit arrays (compaction problem) or a timing wrapper instead of synthesis results (Pitfall 4). Data routing must be fixed so insight generation receives the rich context it was designed to consume.
+Post-phase validation: `python3 -c "import json; d=json.load(open('.data/knowledge-export/coding.json')); print(len(d['entities']))"` shows 136+; `queryRelations({ relationType: 'contains' })` returns > 0; `grep -c '\*\*' .data/knowledge-export/coding.json` returns 0.
 
-**Delivers:**
-- Insight documents written to `knowledge-management/insights/` with real content (target: >= 100 lines)
-- `has_insight_document: true` set in entity metadata
-- PlantUML diagrams generated for top patterns
+### Phase 3: Pipeline Hierarchy Assignment
 
-**Addresses features:** Insight document generation (currently 0 docs), `has_insight_document` linkage
-**Avoids pitfalls:** Pitfall 4 (timing wrapper), Pitfall 5 (silent skip with no visibility)
+**Rationale:** Once migration establishes the hierarchy, new entities from `ukb full` must slot into it. This requires changes to the coordinator and persistence agent, which both require Docker rebuild. Phase 3 is the most pipeline-invasive change — keep it after migration so issues can be isolated from migration issues.
+**Delivers:** `HierarchyClassifier` agent with manifest alias matching and LLM fallback; coordinator calls it after ontology step, before kg_operators; `persistEntities()` creates `contains` edges after `storeEntity()`; `mergeEntities()` null-coalesces hierarchy fields; component nodes added to `PROTECTED_ENTITY_TYPES`.
+**Addresses:** P1 pipeline hierarchy assignment; resolves pitfall 2 (dedup collapse); resolves pitfall 4 (LLM misclassification via heuristics-first).
+**Avoids:** Component node orphaning on second pipeline run; LLM cost on already-classified entities (skip where `hierarchyLevel !== undefined`).
 
-**Specific changes:**
-- `coordinator.ts`: Add `allBatchSemanticEntities` accumulator array populated immediately after semantic analysis (before compaction)
-- `code-graph-agent.ts`: Return `{synthesisResults: [], skipped: true, reason: '...'}` when Memgraph unavailable; unwrap in coordinator before passing to insight agent
-- `coordinator.ts`: Remove dead YAML `generate_insights` step or add explicit comment; pass `allBatchSemanticEntities` to `generateComprehensiveInsights`
-- `persistence-agent.ts`: Set `has_insight_document: true` and `validated_file_path` when insight file exists at persist time (or add post-insight linking pass)
+Files: `src/agents/hierarchy-classifier.ts` (new), `coordinator.ts` (call HierarchyClassifier after ontology), `persistence-agent.ts` (storeRelationship for child_of after storeEntity; PROTECTED_ENTITY_TYPES update), `kg-operators.ts` (mergeEntities null-coalescing).
 
-**Research flag:** No additional research needed — code paths are fully traced.
+Post-phase validation: Run `ukb full` with `maxBatches: 1`; verify new entities have `hierarchyLevel` set; run a second time and verify component nodes still have `level` and `parentId` (dedup preservation test).
 
-### Phase 3: Significance and Quality Ranking
+### Phase 4: VKB Tree Navigation UI
 
-**Rationale:** After Phases 1 and 2 produce real content, the quality differentiation layer needs fixing so high-value entities float to the top and the significance scale (1-10) is meaningful throughout the pipeline.
+**Rationale:** The UI is the final consumer. Phase 4 requires hierarchical data from Phase 2 (migration) and Phase 3 (pipeline) to be meaningful and testable. VKB changes are bind-mounted — no Docker rebuild, only `npm run build` in `integrations/system-health-dashboard`.
+**Delivers:** Collapsible tree sidebar showing Coding -> L1 -> L2 -> L3 with click-to-filter; breadcrumb trail in NodeDetails; `setHierarchyFilter` in Redux; D3 graph filters to selected subtree; legacy-flat entities without `parentId` shown in "Uncategorized" bucket without errors.
+**Addresses:** P1 VKB tree navigation; P1 breadcrumb trail; P2 level-scoped API filters (additive `?level=` and `?parentId=` query params on existing route).
+**Avoids:** D3 force layout collapse (pitfall 7) — filter `contains` edges from D3 link force; tree panel uses React `ul/li`, not D3.
 
-**Delivers:**
-- Entities with differentiated significance scores (1-10 range, not all 0.5)
-- KG operator `aggr` step correctly promoting high-significance entities to "core" role
-- Observation quality ranking (LLM-synthesized > template-based) before 50-observation cap
+Files: `TreeNavigation.tsx` (new), `HierarchyBreadcrumb.tsx` (new), `filtersSlice.ts` (setHierarchyFilter action), `KnowledgeGraph/index.tsx` (add TreeNavigation panel), `NodeDetails.tsx` (breadcrumb + children list), `GraphVisualization.tsx` (hierarchy edge filter on D3 link force), `lib/vkb-server/api-routes.js` (add `?level=` and `?parentId=` query params).
 
-**Addresses features:** Significance differentiation, entity role assignment
-**Avoids pitfalls:** Pitfall 5 (uniform scores), Pitfall 7 (fraction storage), Pitfall 8 (50-observation cap drops good observations)
-
-**Specific changes:**
-- `GraphDatabaseService.getEntities()`: Normalize: `significance = attributes.significance ?? Math.round((attributes.confidence || 0.5) * 10)`
-- `kg-operators.ts` `mergeEntities()`: Quality-rank observations before applying 50-obs cap (prefer observations with code references and file paths)
-- `observation-generation-agent.ts` + coordinator: Ensure LLM-assigned significance (not always `|| 5` default) propagates through KG operator pipeline
-
-**Research flag:** No additional research needed.
+Post-phase validation: VKB shows 6 L1 component nodes in tree; clicking a component filters D3 graph to its subtree; entities without `parentId` render in "Uncategorized" bucket without errors.
 
 ### Phase Ordering Rationale
 
-- **Phase 1 before Phase 2:** Pattern extraction fix (Phase 1) is required before insight generation routing (Phase 2) matters — routing quality data into a broken parser produces the same zero-document result.
-- **Phase 2 before Phase 3:** Significance differentiation only matters when there is real content to differentiate. Running Phase 3 on template-based observations would produce misleadingly high significance scores for garbage content.
-- **All three phases are contained within one service:** `integrations/mcp-server-semantic-analysis`. No cross-service changes required.
-- **Infrastructure changes are not needed:** Storage, transport, agent count, Docker configuration, and MCP server interface remain unchanged.
+The dependency chain is: schema (defines types) -> migration (populates hierarchy data) -> pipeline (maintains it going forward) -> UI (displays it). Each phase requires the previous phases' outputs to work correctly. Phase 4 (VKB) could theoretically run in parallel with Phase 3 (Pipeline) once Phase 2 (Migration) provides test data, but sequential ordering reduces debugging complexity if issues arise.
+
+The 4-phase structure also isolates Docker rebuild requirements: Phases 1 and 2 require no Docker rebuild (type-only changes and standalone script). Phase 3 requires Docker rebuild (coordinator and persistence agent changes). Phase 4 requires only `npm run build` in the bind-mounted VKB. This limits risky rebuild operations to Phase 3 only.
 
 ### Research Flags
 
-Phases with fully traced code paths (skip deeper research):
-- **Phase 1:** All bugs traced to specific lines with code evidence in logs. No unknowns.
-- **Phase 2:** All data routing paths traced through CoordinatorAgent. Accumulator pattern is well-established (`allBatchCommits` as reference implementation).
-- **Phase 3:** Normalization paths traced through `GraphDatabaseService` and `kg-operators.ts`.
+Phases with standard patterns — can proceed without `gsd:research-phase`:
+- **Phase 1 (Schema):** Pure TypeScript interface extension; well-documented additive pattern; all code paths traced
+- **Phase 2 (Migration):** Follows established `purge-knowledge-entities.js` pattern; `GraphMigrationService` provides backup/verify structure; code paths clear
+- **Phase 4 (VKB):** React component addition with Redux; standard patterns; `buildHierarchyTree()` pure function is straightforward
 
-Phases that warrant validation against a production run before marking done:
-- **Phase 2** (insight generation): End-to-end validation requires a full pipeline run (26 batches + finalization, approximately 2-4 hours). Use `--singleStepMode` with `mockLLM: false` for the finalization phase only to validate without re-running all batches.
+Phase likely needing a spike before full implementation:
+- **Phase 3 (Pipeline) — HierarchyClassifier LLM fallback:** The prompt engineering for LLM hierarchy classification with component descriptions as context has not been designed or validated. The alias keyword list needs construction. Recommend a 20-entity classification spike before building the full classifier: test classification accuracy on a representative sample before committing to the approach.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All from direct code inspection. No inference. |
-| Features | HIGH | Working/broken status verified against production run report (batch-analysis-2026-01-20) and `coding.json` entity export. |
-| Architecture | HIGH | CoordinatorAgent fully traced (5428 lines), all data paths documented with line numbers. |
-| Pitfalls | HIGH | All 5 critical pitfalls traced to specific log files (`/logs/pattern-extraction-result-*.json`) and code lines. Git commit `ee72322` identified as the toPascalCase regression. |
+| Stack | HIGH | All packages verified against npm registry live on 2026-03-01; peer dependencies confirmed; installed versions verified from package.json |
+| Features | HIGH | Based on direct codebase inspection of all affected files; entity type distribution confirmed from live coding.json (126 entities, 0 relations) |
+| Architecture | HIGH | Based on direct code inspection of GraphDatabaseService, GraphDatabaseAdapter, coordinator, persistence-agent, VKB Redux store, and D3 graph component; data flow traced through actual code |
+| Pitfalls | HIGH | All 8 pitfalls derived from direct code inspection; KGEntity/SharedMemoryEntity disconnect is a known production bug pattern (v1.0); Docker rebuild is a documented recurring issue |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Vibe history correlation accuracy** — `VibeHistoryAgent` correlates session logs to commits by timestamp. Whether this correlation is accurate (correct sessions matched to correct commits) is unverified. Low priority since vibe data is supplementary to git analysis, but should be validated during Phase 1 testing.
+- **HierarchyClassifier LLM prompt design:** The specific prompt format for LLM fallback classification has not been researched. The keyword heuristic alias list covers known entity types (LSLSession -> LiveLoggingSystem, MCPAgent -> KnowledgeManagement) but edge cases for ~20-25 ambiguous entities need validation. Recommend a 20-entity classification spike in Phase 3 before committing.
 
-- **LLM provider behavior differences** — Pattern extraction fix uses JSON schema prompting, but different providers (Groq vs Anthropic vs Copilot) may still return subtly different JSON structures. Implement a validation step that logs malformed responses rather than silently returning empty results.
+- **Entity merge criteria for CodingPatterns:** The criteria for "merge vs. keep as leaf" (< 3 observations AND generic name) are estimates. The actual count of mergeable entities has not been verified by running the criteria against the live entity list. Recommend a dry-run report as the first migration step before any data modification.
 
-- **`correlate_with_codebase` TODO** — Currently commented out in YAML with a TODO comment and no implementation in `CodeGraphAgent`. This feature would distinguish active vs. historical patterns. Not blocking for MVP but will affect long-term accuracy of the entity set. Flag for post-MVP work.
+- **D3 force simulation fix prototyping:** The pitfall (D3 collapse with hierarchy edges) is identified but the specific fix (filter `contains` edges from D3 link force) has not been prototyped. Fallback is simply not rendering hierarchy edges in D3 at all — low risk.
 
-- **Duplicate observation accumulation on resume runs** — When the workflow resumes from checkpoint, `allBatchObservations` is re-populated from scratch. Whether already-completed batches' observations are re-added needs verification. The checkpoint system prevents re-running batches, but the accumulator arrays are populated from `execution.results` which may contain compacted results depending on when the resume happens.
+- **`queryEntities()` snake_case handling for `parentId`:** The existing `queryEntities()` returns `entity_name` and `entity_type` in snake_case. It is unclear whether `parentId` will be returned as `parent_id` or `parentId` from the API. Needs a quick runtime test in Phase 2 before finalizing the migration script's update calls.
 
 ## Sources
 
-### Primary (HIGH confidence — direct code inspection)
+### Primary (HIGH confidence — direct code inspection, 2026-03-01)
+- `integrations/mcp-server-semantic-analysis/src/agents/kg-operators.ts` — KGEntity interface (line 31), mergeEntities(), deduplication()
+- `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` — SharedMemoryEntity, EntityMetadata, processEntity() explicit construction, PROTECTED_ENTITY_TYPES
+- `integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts` — entityType/type fix pattern (line ~3098), template wiring, pipeline step order
+- `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` — dual-mode routing, GraphKnowledgeExporter attachment pattern
+- `src/knowledge-management/GraphDatabaseService.js` — storeEntity() spread, queryEntities() snake_case return shape, CollectiveKnowledge auto-linking
+- `lib/vkb-server/api-routes.js` — REST endpoint surface, entity pass-through
+- `integrations/memory-visualizer/src/store/slices/graphSlice.ts` — Entity interface, Redux state shape
+- `integrations/memory-visualizer/src/components/KnowledgeGraph/GraphVisualization.tsx` — D3 force layout, no edge-type filtering currently
+- `integrations/memory-visualizer/package.json` — React 18.2.0, D3 7.8.5, Tailwind 3.4.1, TypeScript 5.3.3
+- `integrations/mcp-server-semantic-analysis/package.json` — graphology ^0.25.4, level ^10.0.0
+- `.data/knowledge-export/coding.json` — live snapshot: 126 entities, 0 relations, type distribution (46 KnowledgeEntity, 19 MCPAgent, 12 WorkflowDefinition, 11 ConstraintRule, 10 SemanticAnalyzer, etc.)
+- `scripts/purge-knowledge-entities.js` — VKB HTTP API pattern reference for migration scripts
 
-All sources are local codebase files. No external documentation was required.
+### Primary (HIGH confidence — npm registry, 2026-03-01)
+- `npm view graphology-traversal` — version 0.3.1, peer deps `graphology-types >=0.20.0` satisfied by installed graphology ^0.25.4
+- `npm view react-arborist` — version 3.4.3, peer deps `react >= 16.14` satisfied by installed React 18.2.0
 
-- `integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts` — 5428 lines, fully read
-- `integrations/mcp-server-semantic-analysis/src/agents/insight-generation-agent.ts` — 5802 lines, key methods traced
-- `integrations/mcp-server-semantic-analysis/src/agents/observation-generation-agent.ts` — template strings identified
-- `integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts` — fallback path traced
-- `integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts` — timing wrapper bug identified
-- `integrations/mcp-server-semantic-analysis/src/knowledge-management/GraphDatabaseService.js` — significance normalization gap
-- `integrations/mcp-server-semantic-analysis/config/workflows/batch-analysis.yaml` — YAML step definitions
-- `lib/llm/` — full LLM service and provider chain
-- `.data/knowledge-export/coding.json` — 57 entities inspected (0 with `has_insight_document: true`)
-- `.data/workflow-reports/batch-analysis-2026-01-20T07-07-57-874Z.md` — production run report
-- `/logs/pattern-extraction-result-1769877223136.json` — confirms `totalPatterns: 0` from valid LLM response
-- `/logs/insight-generation-input-1769877218503.json` — confirms timing wrapper bug in `code_synthesis_results`
-- `git show ee72322` — confirms `toPascalCase` regression date (Feb 15, 2026)
+### Secondary (MEDIUM confidence — web research)
+- Graphology standard library docs (traversal, DAG) — BFS/DFS API, cycle detection API
+- Hierarchical Knowledge Graph UX patterns — max 4 levels, drill-down navigation best practices
+- LeanRAG hierarchical KG aggregation — parent node observation synthesis patterns
+- Nielsen Norman Group breadcrumbs UX — breadcrumb placement and behavior
+- react-arborist GitHub — React 18 compatibility, virtualized rendering, built-in TypeScript types
 
 ---
-*Research completed: 2026-02-26*
+*Research completed: 2026-03-01*
 *Ready for roadmap: yes*
