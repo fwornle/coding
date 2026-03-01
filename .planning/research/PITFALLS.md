@@ -1,245 +1,293 @@
 # Pitfalls Research
 
-**Domain:** UKB Multi-Agent Analysis Pipeline (mcp-server-semantic-analysis)
-**Researched:** 2026-02-26
-**Confidence:** HIGH — all findings traced to specific code paths, log files, and git history
+**Domain:** Hierarchical Knowledge Graph Restructuring (flat-to-tree migration on Graphology + LevelDB)
+**Researched:** 2026-03-01
+**Confidence:** HIGH — based on direct codebase inspection of all affected layers
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: LLM Output Format Mismatch in Pattern Extraction
+### Pitfall 1: KGEntity/SharedMemoryEntity Field Disconnect Breaks Hierarchy Fields
 
 **What goes wrong:**
-The `extractArchitecturalPatternsFromCommits` method sends a prompt asking the LLM to format output as plain text (`Pattern: [Name]` / `Description: [text]` / `Significance: [1-10]`). The LLM (Groq llama-3.3-70b) consistently returns markdown-numbered-list format. The parser never matches. Result: 0 patterns extracted, 0 insight documents generated.
+`KGEntity` (kg-operators.ts:31) has `type` but not `entityType` or `metadata`. `SharedMemoryEntity` (persistence-agent.ts) has `entityType` and `metadata`. When hierarchy fields (`parentId`, `level`, `hierarchyPath`) are added to one interface but not the other, they silently vanish as entities flow through the pipeline. The coordinator already casts `entity as KGEntity` to bridge the existing disconnect — this cast strips any fields not in `KGEntity` at the TypeScript type level, though they survive at runtime as long as no explicit pick/filter operation runs. This exact pattern caused the entityType loss bug in v1.0: entities arrived at persistence as "Unclassified" despite being classified earlier, because only `entity.type` was updated but not `entity.entityType`.
 
 **Why it happens:**
-The prompt in `insight-generation-agent.ts` ~line 3800 specifies:
-```
-OUTPUT FORMAT:
-For each pattern found, use this format:
-Pattern: [Specific Descriptive Name]
-Description: [...]
-Significance: [1-10]
-```
-But Groq returns:
-```markdown
-#### 1. KnowledgeBaseUpdatePattern
-- **Description**: ...
-- **Significance**: 8/10
-```
-The parser regex `^(Pattern|Architecture|Design):\s*(.+)` (line 4818) does NOT match `1. **Pattern: KnowledgeBaseUpdatePattern**`.
-
-**Evidence:**
-- `/Users/Q284340/Agentic/coding/logs/pattern-extraction-result-1769877223136.json`: `totalPatterns: 0` despite 10 valid patterns in LLM response
-- `/Users/Q284340/Agentic/coding/logs/pattern-extraction-result-1769877208698.json`: Shows LLM returned `"1. **Pattern: KnowledgeGraphUpdatePattern**"` — parser could not match it
-- Code: `src/agents/insight-generation-agent.ts`, `parseArchitecturalPatternsFromLLM()`, line pattern match
+The coordinator uses `const updated: any = { ...entity }` then `return updated as KGEntity` (line 3118). This is a widening cast TypeScript does not verify. Fields present on the concrete object but absent from `KGEntity` survive at runtime — but any typed assignment downstream that destructures only `KGEntity` fields will silently discard them. If `persistEntities()` parameter type is not extended to include `parentId`, TypeScript infers the parameter does not carry it, and developers reading the code will assume it is absent.
 
 **How to avoid:**
-Change the prompt to request JSON output with a schema, then parse JSON. Alternatively, extend the regex to handle markdown formats: `^\d+\.\s+\*{0,2}(Pattern|Architecture):\s*\*{0,2}(.+)`.
+Update ALL interfaces in a single commit: `KGEntity` in kg-operators.ts, `SharedMemoryEntity` in persistence-agent.ts, the `persistEntities()` parameter type, `GraphEntity` in graph-database-adapter.ts. Write a TypeScript integration test that passes a `KGEntity` with `parentId` through the coordinator transform, then calls `persistEntities()`, then calls `graphDB.getEntity()` and asserts `parentId` is present on the returned node.
 
 **Warning signs:**
-- `pattern-extraction-result-*.json` in `logs/` shows `totalPatterns: 0` with non-empty LLM response
-- Workflow completes but `generate_insights.insights_generated === 0`
+- `parentId` appears in coordinator debug logs but is absent from `getEntity()` output
+- No TypeScript errors after interface change — suspicious if no test exercises the full chain
+- `storeEntity()` attributes spread in GraphDatabaseService.js does not log `parentId`
 
-**Phase to address:** Phase 1 (core pipeline fix)
+**Phase to address:**
+Phase 1 (Schema Definition) — before any pipeline or migration code is written.
 
 ---
 
-### Pitfall 2: toPascalCase Destroys Interior Capitals in Entity Names
+### Pitfall 2: Migration Leaves LevelDB and JSON Export Out of Sync
 
 **What goes wrong:**
-Entities get mangled names like `PathanalyzerpatternProblemHowConsider` instead of `PathAnalyzerPatternProblemHowConsider`.
+The system has two storage representations: Graphology in-memory graph persisted to LevelDB, and a JSON export file (`.data/knowledge-export/coding.json`) maintained by `GraphKnowledgeExporter` via events. A migration script that runs while the VKB server is up will route writes through the VKB API (`createEntity()`). A script that runs while the server is down must use `GraphDatabaseService` directly AND attach `GraphKnowledgeExporter` manually — if this attachment is skipped, LevelDB is updated but the JSON export stays stale. The VKB viewer at the next startup will load from LevelDB (correct) but the JSON export will show the pre-migration state (incorrect), causing confusion about whether migration succeeded.
 
 **Why it happens:**
-Commit `ee72322` (Feb 15, 2026) introduced `toPascalCase()` in `observation-generation-agent.ts`:
-```typescript
-return words
-  .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-  .join('');
-```
-When splitting "PathAnalyzerPattern" on camelCase boundaries → ["Path", "Analyzer", "Pattern"] → lowercasing each tail → "Pathanalyzerpattern". Additionally, type and description are concatenated: `${typeFormatted}${descriptionFirst4Words}` where description = "Problem: How to consider both" → first 4 words = "Problem How Consider Both" → "PathanalyzerpatternProblemHowConsider".
-
-**Evidence:**
-- `coding.json` entities: `PathanalyzerpatternProblemHowConsider`, `RealtimetrajectoryanalyzerpatternProblemHowKeep`, `ConstraintmonitorimplementationProblemImplementingConstraint`
-- Code: `src/agents/observation-generation-agent.ts`, `toPascalCase()` method, line ~1680; `generateEntityName()` method, line ~1657
+`GraphDatabaseAdapter.initialize()` conditionally attaches `GraphKnowledgeExporter` with the comment "CRITICAL: Attach GraphKnowledgeExporter to maintain JSON sync" — this was already a production bug. The conditional logic is: if VKB API is available, use API mode (JSON export handled server-side); if not, attach the exporter manually. A migration script that instantiates `GraphDatabaseService` directly, bypassing the adapter, will never attach the exporter.
 
 **How to avoid:**
-Fix `toPascalCase` to use `.slice(1)` without `.toLowerCase()`:
-```typescript
-.map(word => word.charAt(0).toUpperCase() + word.slice(1))
-```
-Also reconsider concatenating `type + description`: the type prefix often adds noise (e.g., "ProblemSolution") — use description words only.
+Always use `GraphDatabaseAdapter` (not raw `GraphDatabaseService`) in migration scripts. Stop the VKB server before running migration to force direct-access mode, which will attach the exporter. After migration, verify: `python3 -c "import json; d=json.load(open('.data/knowledge-export/coding.json')); print(len(d['entities']))"` should include the new component nodes.
 
 **Warning signs:**
-- Entity names contain consecutive lowercase letters where PascalCase words should be: `Pathanalyzerpattern` vs `PathAnalyzerPattern`
-- Entity names contain generic English words in the middle: `ProblemHowConsider`
+- `coding.json` entity count is 126 after migration that should produce 136 (126 + ~10 component nodes)
+- VKB UI shows correct hierarchy after server restart but JSON export lacks parent nodes
+- Log output of migration script is missing "GraphKnowledgeExporter attached for JSON sync"
 
-**Phase to address:** Phase 1 (core pipeline fix)
+**Phase to address:**
+Phase 2 (Migration) — in the migration script's initialization and post-migration verification steps.
 
 ---
 
-### Pitfall 3: Observations Are Template-Filled Commit-Message Paraphrases
+### Pitfall 3: Dedup Operator Collapses Parent Nodes on Subsequent Pipeline Runs
 
 **What goes wrong:**
-Observations read like: "When working with api in this codebase, changes often span multiple modules. Key files: `enhanced-transcript-monitor.js`..." This is a slot-filled template using file names from commit diffs, not semantic analysis.
+`KGOperators.deduplication()` normalizes names with `entity.name.toLowerCase().replace(/[^a-z0-9]/g, '')`. On the first pipeline run after migration, the pipeline creates a new "KnowledgeManagement" entity. Dedup sees an existing "KnowledgeManagement" node (the migrated component node) and merges them via `mergeEntities()`. The `mergeEntities()` method uses `...existing` as base then overwrites with select fields from `incoming`. If the new pipeline entity does not carry `parentId` (because the hierarchy assignment LLM step was skipped for this batch), the merged result gets `parentId: undefined` from incoming, overwriting the component node's `parentId`. After the pipeline run, the component node is orphaned.
 
 **Why it happens:**
-`observation-generation-agent.ts`, `createArchitecturalDecisionObservation()` generates hardcoded templates:
-```typescript
-content: `When working with ${decision.type} in this codebase, changes often span multiple modules. Key files: ${keyFiles}`
-content: `This ${decision.type} pattern is applicable when building ${techList} systems...`
-```
-Where `techList` is derived from file extensions via `extractTechnologiesFromFiles()` — returning `"JSON, JavaScript, Markdown"` from commit file paths.
-
-The upstream `git-history-agent.ts`, `identifyArchitecturalDecisions()` uses keyword matching to produce:
-```typescript
-description: `Pattern implementation: ${commit.message}` // verbatim commit message
-```
-So the pipeline: commit message → architectural decision description → template observation.
-
-**Evidence:**
-- `/Users/Q284340/Agentic/coding/logs/persist-trace-1769877196254.json`: Entity `ApiHandlesExternalCommunication` observations contain `"When working with api in this codebase..."` and `"This api pattern is applicable when building JSON, JavaScript, Markdown systems..."`
-- `src/agents/observation-generation-agent.ts`, `createArchitecturalDecisionObservation()`: hardcoded template strings at lines ~303-322
-- `src/agents/git-history-agent.ts`, `identifyArchitecturalDecisions()` lines ~574-610: commit message prefix templates
+`mergeEntities()` in kg-operators.ts merges with `...existing` spread then overwrites `type`, `significance`, `role`, `embedding`, `observations`, `references`, `enrichedContext`, `timestamp`. It does not explicitly handle hierarchy fields — they will survive via the `...existing` spread IF incoming does not also have them set. But if incoming has `parentId: undefined` (present but undefined), the spread will overwrite with undefined.
 
 **How to avoid:**
-Replace template generation with LLM-synthesized observations. The `createEntityObservation()` method already does LLM synthesis correctly. Apply the same pattern to `createArchitecturalDecisionObservation()`. The `analyzeGitAndVibeData()` LLM call in `semantic-analysis-agent.ts` already extracts real patterns — ensure those flow to observation generation rather than the keyword-matched decisions.
+Add explicit preservation in `mergeEntities()`:
+```typescript
+parentId: incoming.parentId ?? existing.parentId,
+level: incoming.level ?? existing.level,
+hierarchyPath: incoming.hierarchyPath ?? existing.hierarchyPath,
+```
+This is a 3-line targeted fix. Alternatively, protect component nodes with the `PROTECTED_ENTITY_TYPES` map in persistence-agent.ts, which prevents re-classification but not re-merging — also add a `PROTECTED_FROM_MERGE` check in the dedup operator for nodes with `entityType === 'Component'`.
 
 **Warning signs:**
-- Observations contain the phrase "When working with X in this codebase, changes often span multiple modules"
-- "This X pattern is applicable when building Y, Z systems"
-- Technologies listed are file extensions (JSON, JavaScript, Markdown) not actual frameworks
+- Component nodes have correct `parentId` after migration but `parentId` is absent after next `ukb full`
+- Graph has 10 component nodes before pipeline run but 9 after (one was merged with a leaf)
+- Coordinator log shows dedup merging a component-named entity
 
-**Phase to address:** Phase 1 (critical fix) and Phase 2 (LLM-based quality)
+**Phase to address:**
+Phase 3 (Pipeline Hierarchy Support) — when `mergeEntities()` is modified to carry hierarchy fields.
 
 ---
 
-### Pitfall 4: code_synthesis_results Is Passed as Empty Timing Wrapper Object
+### Pitfall 4: LLM Hierarchy Assignment Misclassifies Entities by Name Pattern
 
 **What goes wrong:**
-When Memgraph is unavailable, `synthesizeInsights` returns `[]`. After `wrapWithTiming`, the coordinator stores `{_timing: {...}}`. The insight generation agent receives `code_synthesis_results: {_parameters: {...}, _timing: {...}}` and `Array.isArray(result)` returns false — synthesis patterns are never extracted.
+When asking an LLM "Which component does this entity belong to: LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, or KnowledgeManagement?", the LLM pattern-matches on surface keywords rather than semantic content. Entities with "Docker" or "container" in their name get placed under DockerizedServices even if the entity is actually about debugging workflow in a containerized environment (which belongs under Trajectory). Entities with "pattern" in their name may land under CodingPatterns regardless of domain. With 126 entities and ~5-7 target components, expect ~20-30% misclassification with a naive LLM prompt.
 
 **Why it happens:**
-`src/agents/code-graph-agent.ts`, `synthesizeInsights()`: when `!connectionCheck.connected`, returns `[]`. An empty array spread with timing info `{...[], _timing: {...}}` produces `{_timing: {...}}` — no synthesis data. The insight agent checks `Array.isArray(codeSynthesisResults)` which is false for the wrapped object.
-
-**Evidence:**
-- `/Users/Q284340/Agentic/coding/logs/insight-generation-input-1769877218503.json`:
-  ```json
-  "code_synthesis_results": {"_parameters": {...}, "_timing": {...}}
-  ```
-  Only metadata keys, no synthesis array.
-- `src/agents/insight-generation-agent.ts` line ~1042: `if (codeSynthesisResults && Array.isArray(codeSynthesisResults) && codeSynthesisResults.length > 0)` — this correctly guards but receives a wrapped object not an array.
+The existing ontology classification step has the same problem — it uses LLM for entities that heuristics can't classify. For the new hierarchy step, the LLM has even less signal because component names are project-specific and not in its training data. The LLM cannot infer that "LiveLoggingSystem" is specifically about the LSL session logging feature without a clear description.
 
 **How to avoid:**
-`synthesizeInsights` should return a structured skip object when Memgraph is unavailable:
+Build a keyword heuristic first: `lsl`, `session`, `live log`, `hook` → LiveLoggingSystem; `llm`, `anthropic`, `model`, `embedding`, `token` → LLMAbstraction; `docker`, `compose`, `container`, `port` → DockerizedServices; `trajectory`, `planning`, `roadmap`, `gsd` → Trajectory; `knowledge`, `ukb`, `entity`, `graph`, `vkb` → KnowledgeManagement. Only call LLM for entities that match no heuristic keyword. Include component descriptions (not just names) in the LLM prompt. After first run, manually audit 20% sample and feed corrections back as few-shot examples.
+
+**Warning signs:**
+- One component has 3x more children than expected
+- Entities clearly about LLM calls appear under DockerizedServices
+- Component assignment changes between pipeline runs for the same entity name
+
+**Phase to address:**
+Phase 3 (Pipeline Hierarchy Support) — when the hierarchy assignment logic is built.
+
+---
+
+### Pitfall 5: TypeScript Strict Mode Does Not Catch Field Loss Through JSON Template Parameters
+
+**What goes wrong:**
+Workflow steps communicate via template parameters: `"entities": "{{accumulatedKG.entities}}"`. These are resolved at runtime by the coordinator, not at compile time. TypeScript cannot verify that a field added to `KGEntity` is actually present in the resolved `accumulatedKG.entities` value. Additionally, the `persistEntities()` method's typed parameter `entities: Array<{ name: string; entityType: string; observations: string[]; significance: number }>` does not include `parentId`. TypeScript does not reject callers that pass objects with extra fields (structural typing allows this). The field is present in the object passed at runtime but is silently ignored by `processEntity()` when it builds the `SharedMemoryEntity`, because `SharedMemoryEntity` construction in `processEntity` is an explicit object literal that picks only the fields it knows about.
+
+**Why it happens:**
+Look at the explicit `SharedMemoryEntity` construction in `persistEntities` → `processEntity`:
 ```typescript
-return { synthesisResults: [], skipped: true, reason: 'Memgraph unavailable' };
+const sharedMemoryEntity: SharedMemoryEntity = {
+  id: ..., name: entity.name, entityType: entity.entityType,
+  significance: entity.significance || 5, observations: [...], relationships: [], metadata: {...}
+};
 ```
-OR: unwrap the timing wrapper before passing to insight generation — pass `execution.results['synthesize_code_insights']?.synthesisResults` or similar.
+`parentId` is not in this object literal. Even if `entity.parentId` exists, it is never copied to `sharedMemoryEntity`. This is not a type error — it is a silent omission.
+
+**How to avoid:**
+The explicit construction in `processEntity` must be updated to spread or explicitly copy hierarchy fields: `parentId: (entity as any).parentId`. Better: update `SharedMemoryEntity` to include hierarchy fields and update the explicit object literal. Write a test that calls `persistEntities()` with an entity that has `parentId: 'coding:KnowledgeManagement'` and then calls `getEntity()` to verify `parentId` is stored.
 
 **Warning signs:**
-- `insight-generation-input-*.json` shows `code_synthesis_results` with only `_parameters` and `_timing` keys
-- Code synthesis log shows "Memgraph not connected, skipping synthesis"
+- `parentId` present in `accumulatedKG.entities[0]` (visible in coordinator logs) but absent in `storeEntityToGraph()` call logs
+- After persistence, `graphDB.getEntity(name, team)` returns node without `parentId` attribute
+- The explicit object literal in `processEntity` does not include `parentId` after interface update
 
-**Phase to address:** Phase 1 (defensive coding)
+**Phase to address:**
+Phase 1 (Schema Definition) — update the explicit construction at the same time as the interface.
 
 ---
 
-### Pitfall 5: Silent Skip of Insight Generation With No User Visibility
+### Pitfall 6: Migration Reintroduces Bold Formatting Stripped in v1.0
 
 **What goes wrong:**
-When `generateComprehensiveInsights` finds 0 significant patterns after filtering, it returns `{skipped: true, insights_generated: 0}`. The workflow reports "completed" with no indication that insight documents were not generated.
+The v1.0 bold-stripping fix (2026-03-01) applied `**` removal to 102 existing entities via PUT API calls, updating LevelDB. However, `.data/knowledge-export/coding.json` was last modified at `2026-03-01T09:32:04`. If the JSON export was not regenerated after the bold-strip fix, it contains the old bolded observations. A migration script that reads from `coding.json` as its source of truth will reintroduce `**` formatting into the migrated entities, undoing the v1.0 fix.
 
 **Why it happens:**
-The filter chain in `generateComprehensiveInsights`:
-1. `significance < 3` filter (removes all patterns if extraction returned 0)
-2. `THIN_PATTERN_NAMES` filter (removes statistical-only patterns from code-graph)
-3. Statistical-only evidence filter
-
-All three can combine to remove all patterns. The resulting skip is silent from the user's perspective.
-
-**Evidence:**
-- `src/agents/insight-generation-agent.ts` lines ~800-824: returns `{skipped: true, skip_reason: '...', insights_generated: 0}` with no error
-- The coordinator stores this as a success: `execution.results['generate_insights'] = this.wrapWithTiming(insightResult, ...)`
+The JSON export is driven by `GraphKnowledgeExporter` events. If the VKB PUT API calls that stripped bold formatting triggered `entity:stored` events, the export should be current. But if the server was down during the strip operation (direct LevelDB writes), the export may be stale. The migration timestamp and the bold-strip timestamp are the same day (2026-03-01), creating ambiguity about which happened first.
 
 **How to avoid:**
-Fix the root cause (Pitfall 1 — pattern extraction). Additionally, surface the skip reason in the workflow progress file and the workflow report summary so it appears in the dashboard.
+Before migration, verify the export is current: check `coding.json` entities for `**` strings with `grep -c '\*\*' .data/knowledge-export/coding.json`. If count > 0, regenerate the export from LevelDB before using it as migration source. Alternatively, read migration source directly from LevelDB via `graphDB.queryEntities()`, not from the JSON file.
 
 **Warning signs:**
-- Workflow dashboard shows `generate_insights: completed` with 0 documents
-- `workflow-progress.json` shows step completed with `insights_generated: 0`
+- `grep '\*\*' .data/knowledge-export/coding.json` returns matches
+- Post-migration VKB shows `**bold**` text in observation panels
+- `coding.json` `last_modified` on entities is earlier than 2026-03-01T09:32:04
 
-**Phase to address:** Phase 1 (root cause fix) + Phase 3 (observability)
+**Phase to address:**
+Phase 2 (Migration) — in the pre-migration data validation step.
 
 ---
 
-## Moderate Pitfalls
-
-### Pitfall 6: generateEntityName Type Prefix Makes Names Opaque
+### Pitfall 7: VKB D3 Force Layout Collapses When Hierarchy Edges Are Added
 
 **What goes wrong:**
-`generateEntityName('ProblemSolution', "PathAnalyzerPattern - Problem: How to consider both")` produces `ProblemhowconsiderBoth` — the meaningful part (PathAnalyzer) is buried.
+`GraphVisualization.tsx` renders a D3 force-directed simulation. Currently there are 0 explicit relations in the graph. Adding `contains` edges from 10 component nodes to their respective ~12 children each creates 120+ edges in a graph with ~136 nodes. D3 force layout treats all edges as attractive springs — hierarchy edges pull parents toward all their children simultaneously, causing the layout to collapse into dense hub-and-spoke clusters. The simulation may not stabilize, causing continuous movement in the UI.
 
 **Why it happens:**
-The function takes first 4 words of description after removing special chars: "PathAnalyzerPattern Problem How Consider" → first 4 = "PathAnalyzerPattern Problem How Consider" → with toPascalCase bug → "Pathanalyzerpattermproblemhowconsider".
+D3 force-directed layout is designed for peer-relation graphs. It does not have built-in support for hierarchical containment semantics. The current VKB codebase has no edge-type filtering in the force simulation — all edges from `queryRelations()` are fed into `transformToD3Format()` and included in the simulation.
 
 **How to avoid:**
-Use `generateCleanEntityName` (which filters filler words and rejects garbage) instead of `generateEntityName` for all observation creation paths. Or: extract the entity's main subject from the description using LLM, not just first 4 words.
+Add a view toggle in VKB: "Tree View" uses `d3.hierarchy()` with collapsible nodes, "Graph View" uses the existing force layout with hierarchy edges filtered out. For the tree view, build the hierarchy from `parentId` attributes on entities (not from relation edges) to avoid a separate API call. Filter `contains` edge type from the force simulation's link force. This requires changes to `graphHelpers.ts`'s `getRelationsForEntities()` to accept an excluded-types parameter.
 
-**Phase to address:** Phase 1 or Phase 2
+**Warning signs:**
+- After adding hierarchy edges, VKB graph view shows tight clusters with no visible connections between clusters
+- D3 simulation takes >3 seconds to stabilize or never stabilizes
+- Component nodes are invisible (hidden behind leaf nodes due to force attraction)
+
+**Phase to address:**
+Phase 4 (VKB Tree Navigation) — when hierarchy edges are first rendered in VKB.
 
 ---
 
-### Pitfall 7: Significance Values Stored as Fractions in Knowledge Export
+### Pitfall 8: Docker Build Forgotten After TypeScript Interface Changes
 
 **What goes wrong:**
-All entities in `coding.json` show `significance: 0.5` or `significance: 0.7` instead of integer values 1-10.
+All TypeScript changes to `integrations/mcp-server-semantic-analysis/src/**` require two steps: `npm run build` inside the submodule, then `docker-compose build coding-services && docker-compose up -d coding-services`. Forgetting step 2 means the Docker container runs the old `dist/` while the source has the new hierarchy logic. The pipeline will run without errors — entities will be produced — but they will have no `parentId` because the old code does not set it. This is the most common recurring failure mode documented in CLAUDE.md and MEMORY.md.
 
 **Why it happens:**
-`UKBDatabaseWriter.storeEntity` converts: `confidence: (significance || 5) / 10`. `GraphDatabaseService.getEntities` reads: `significance: attributes.significance || attributes.confidence`. Since the stored key is `confidence` (not `significance`), it reads the fraction. The export passes it through unchanged.
+The container build copies `dist/` at image build time. Changes to TypeScript source only update the local `dist/` via `npm run build`, but the container keeps its own copy. There is no hot-reload for production containers. The container health endpoint at http://localhost:3033 shows "healthy" regardless of whether the code version matches.
 
 **How to avoid:**
-`GraphDatabaseService.getEntities()` should normalize: `significance: attributes.significance ? attributes.significance : Math.round((attributes.confidence || 0.5) * 10)`.
+After ANY TypeScript change to the submodule:
+```bash
+cd integrations/mcp-server-semantic-analysis && npm run build
+cd /Users/Q284340/Agentic/coding/docker && docker-compose build coding-services && docker-compose up -d coding-services
+```
+Add a build timestamp to the startup log or health endpoint so the container version is visible. Make "verify Docker is running new code" the first item in every phase's verification checklist.
 
-**Phase to address:** Phase 3 (data quality cleanup)
+**Warning signs:**
+- `dist/agents/kg-operators.js` `mtime` is earlier than `src/agents/kg-operators.ts` `mtime`
+- Pipeline runs cleanly but produces flat entities with no hierarchy fields
+- Container shows "healthy" but pipeline behavior matches pre-change code
+
+**Phase to address:**
+Every phase. Make it step 1 of each phase's completion checklist.
 
 ---
 
-### Pitfall 8: 50-Observation Cap Retains Low-Quality Template Observations
+## Technical Debt Patterns
 
-**What goes wrong:**
-`kg-operators.ts` `mergeEntities()` caps observations at 50 (FIFO, keeping most recent). Entities that were created with template-based observations early in the batch accumulate 50 low-quality observations, blocking higher-quality later observations.
+Shortcuts that seem reasonable but create long-term problems.
 
-**How to avoid:**
-Apply quality ranking before the cap: prefer observations with code references (backtick-enclosed identifiers), specific file paths, or longer/more detailed text. Short template strings should rank lowest.
-
-**Phase to address:** Phase 2 (quality improvement)
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Hard-code L2 component list in config YAML | Avoids LLM discovery call | New components from future pipeline runs never appear; list becomes stale after a month | MVP only — plan discovery mechanism for v2.1 |
+| Store `parentId` as a nested field inside `EntityMetadata` | No interface changes to KGEntity needed | `parentId` buried in `metadata.parentId`, not directly queryable; VKB must dig into metadata for every entity; dedup cannot easily preserve it | Never — makes hierarchy second-class |
+| Use existing `related_to` edge type for parent-child relations | No graph schema changes | Parent-child and semantic relations are indistinguishable; cannot filter hierarchy edges for tree vs. graph view | Never — use a dedicated `contains` relation type |
+| Run migration with VKB server running (API mode) | Simpler — no server stop/start | Each entity triggers ontology re-classification: ~5-10s × 126 entities = 10-21 minutes vs. ~30s direct | Never for production migration |
+| Skip migrating low-significance flat entities | Faster migration, less noise | Mixed flat/hierarchical graph; VKB tree must handle parentless entities; dedup treats them as peers of component nodes | Acceptable if orphan entities are tagged as "legacy-flat" and VKB handles them gracefully |
 
 ---
 
-## Phase-Specific Warnings
+## Integration Gotchas
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Pattern extraction LLM prompt | Groq returning markdown instead of plain text | Request JSON output with schema; parse JSON not line-by-line |
-| Entity naming | toPascalCase bug destroys capitals | Fix `.toLowerCase()` → `.slice(1)` in toPascalCase |
-| Observation template removal | Template strings still present in generateFromGitAnalysis | Replace with LLM-synthesized content |
-| Memgraph integration | synthesizeInsights returns empty array | Return structured skip object; guard with Array.isArray after unwrapping |
-| Significance normalization | Fraction values in export | Normalize in GraphDatabaseService read path |
-| Observation quality ranking | FIFO merge drops good observations | Quality-rank before cap |
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| `GraphDatabaseService.storeEntity()` | Assuming extra fields on the entity object are ignored | `storeEntity()` uses `...entityWithoutRelationships` spread — extra fields ARE stored as node attributes. Verify with `graph.getNodeAttributes(nodeId)`. |
+| `queryEntities()` return shape | Expecting `entity.name` and `entity.entityType` (camelCase) | `queryEntities()` returns `entity_name` and `entity_type` (snake_case) for SQL compatibility. VKB `DatabaseClient.Entity` uses snake_case. Internal node attributes use camelCase. Do not mix them. |
+| `PROTECTED_ENTITY_TYPES` in persistence-agent.ts | Assuming new component nodes are auto-protected | Only `'Coding'` and `'CollectiveKnowledge'` are currently protected. New component nodes will be re-classified by the ontology step unless explicitly added to `PROTECTED_ENTITY_TYPES` OR given valid pre-classification metadata that makes `hasValidPreClassification()` return true. |
+| Hierarchy edge storage | Calling `storeRelationship(parent, child, 'related_to')` | Use `'contains'` or `'has-child'` as relation type. `queryRelations({ relationType: 'contains' })` is the only way to retrieve hierarchy edges specifically. |
+| GraphDatabaseAdapter dual-mode | Writing via adapter when VKB server is up, assuming direct-mode behavior | In API mode, writes go to VKB server which handles JSON export. In direct mode, migration script must verify `GraphKnowledgeExporter` is attached. Check adapter's `useApi` flag in logs. |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Loading all entities without pagination in migration | OOM or hang on `getAllEntities()` | Use `queryEntities({ limit: 50, offset: N })` in batches | At ~500+ entities |
+| Edge prediction runs over hierarchy edges | Adamic-Adar inflated for all entities under same parent; false high-confidence sibling edges | Filter `source: 'explicit'` hierarchy edges from the edge prediction loop — or mark hierarchy edges with a flag that excludes them from AA scoring | Immediately after adding hierarchy edges |
+| Generating embeddings for new component nodes with no observations | Low-quality embeddings waste compute; component nodes pulled toward unrelated entities in embedding space | Do not call `nodeEmbedding()` on nodes with 0 observations; set `embedding: undefined` and skip them | Immediately on first pipeline run post-migration |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **KGEntity interface extended:** `parentId` exists in KGEntity, SharedMemoryEntity, `persistEntities()` parameter, and GraphEntity (adapter) — all four.
+- [ ] **`processEntity()` construction updated:** The explicit `SharedMemoryEntity` object literal in `persistEntities` copies `parentId` from the incoming entity.
+- [ ] **Migration entity count verified:** `python3 -c "import json; d=json.load(open('.data/knowledge-export/coding.json')); print(len(d['entities']))"` shows 136+ (126 + component nodes).
+- [ ] **Parent edges exist:** `queryRelations({ team: 'coding', relationType: 'contains' })` returns > 0 results. Current graph has 0 relations — if still 0 after migration, hierarchy edges were not created.
+- [ ] **Docker rebuilt:** `stat dist/agents/kg-operators.js` mtime is AFTER `stat src/agents/kg-operators.ts` mtime.
+- [ ] **Bold formatting absent:** `grep -c '\*\*' .data/knowledge-export/coding.json` returns 0.
+- [ ] **Pipeline preserves hierarchy on second run:** After `ukb full`, component nodes still have `level` and `parentId`. Run twice to confirm dedup does not strip them.
+- [ ] **PROTECTED_ENTITY_TYPES updated:** All L2 component names added so ontology step does not re-classify them.
+- [ ] **VKB handles parentless entities:** Legacy-flat entities with no `parentId` render under "Uncategorized" in tree view, not as errors.
+
+---
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| LevelDB and JSON export out of sync | LOW | Stop VKB; call `graphDB.exportToJSON('coding', '.data/knowledge-export/coding.json')`; restart VKB |
+| Migration run twice (duplicate component nodes) | MEDIUM | `node scripts/purge-knowledge-entities.js --dry-run` to identify duplicates; delete by name; re-run migration with idempotency check |
+| `parentId` stripped after pipeline run | MEDIUM | Find which step drops the field via coordinator debug logs; fix `mergeEntities()` or type mapping; re-run pipeline |
+| Docker running stale code | LOW | `cd docker && docker-compose build coding-services && docker-compose up -d coding-services` |
+| D3 layout broken by hierarchy edges | LOW | Add edge type filter to force simulation — exclude `contains` edges from D3 link force |
+| Wrong component assignment (>30% misclassified) | HIGH | Manual re-assignment via VKB PUT API; improve keyword heuristic; update LLM prompt with component descriptions and few-shot examples; re-run pipeline |
+| Bold formatting reintroduced | LOW | Re-run bold-strip script via PUT API; regenerate JSON export |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| KGEntity/SharedMemoryEntity field disconnect | Phase 1 (Schema) | TypeScript compiles with `--strict`; integration test: parentId round-trips through full pipeline |
+| `processEntity()` silently drops parentId | Phase 1 (Schema) | `getEntity()` after `persistEntities()` returns node with `parentId` attribute |
+| LevelDB/JSON export out of sync | Phase 2 (Migration) | Entity counts match in JSON export and `getStatistics()` API |
+| Bold formatting reintroduced | Phase 2 (Migration) | `grep -c '\*\*' .data/knowledge-export/coding.json` returns 0 |
+| Dedup collapses parent nodes | Phase 3 (Pipeline) | After second pipeline run, component nodes retain `level` and `parentId` |
+| LLM hierarchy misclassification | Phase 3 (Pipeline) | Manual 20-entity audit; no component has >3x the entities of another |
+| PROTECTED_ENTITY_TYPES not updated | Phase 3 (Pipeline) | After `ukb full`, component nodes retain `entityType: 'Component'` |
+| D3 layout breaks with hierarchy edges | Phase 4 (VKB) | Tree view renders; graph view hides hierarchy edges; no force simulation collapse |
+| Docker build forgotten | Every phase | `dist/` mtime > `src/` mtime; first item in each phase completion checklist |
 
 ---
 
 ## Sources
 
-- Code inspection: `integrations/mcp-server-semantic-analysis/src/agents/` — all agent files
-- Runtime logs: `/Users/Q284340/Agentic/coding/logs/` — pattern extraction, insight generation, persist traces
-- Knowledge export: `.data/knowledge-export/coding.json` (57 entities, all significance 0.5-0.7, 0 insight documents)
-- Git history: `git show ee72322` — `toPascalCase` bug introduced Feb 15, 2026
-- Workflow definition: `config/workflows/batch-analysis.yaml`
-- Insight trace: `logs/insight-generation-input-1769877218503.json`
+- Direct inspection: `integrations/mcp-server-semantic-analysis/src/agents/kg-operators.ts` — KGEntity interface (line 31), mergeEntities(), deduplication()
+- Direct inspection: `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts` — SharedMemoryEntity, persistEntities(), processEntity() explicit construction, storeEntityToGraph(), PROTECTED_ENTITY_TYPES
+- Direct inspection: `integrations/mcp-server-semantic-analysis/src/agents/coordinator.ts` — entityType/type fix at lines 3102-3118, `as KGEntity` cast pattern, template parameter wiring
+- Direct inspection: `integrations/mcp-server-semantic-analysis/src/storage/graph-database-adapter.ts` — dual-mode routing, GraphKnowledgeExporter attachment (direct-mode only)
+- Direct inspection: `integrations/mcp-server-semantic-analysis/src/knowledge-management/GraphDatabaseService.js` — storeEntity() attribute spread, queryEntities() snake_case return shape, hierarchy edge auto-creation for Project nodes
+- Direct inspection: `integrations/memory-visualizer/src/api/databaseClient.ts` — Entity interface with snake_case fields
+- Direct inspection: `integrations/memory-visualizer/src/components/KnowledgeGraph/GraphVisualization.tsx` — D3 force layout, no edge-type filtering
+- Direct inspection: `.data/knowledge-export/coding.json` — 126 entities, 0 relations, export schema uses entity_name/entity_type
+- MEMORY.md: Bold-stripping fix 2026-03-01, entityType/type disconnect fix 2026-03-01
+- CLAUDE.md: Docker submodule rebuild requirement (recurring issue)
 
 ---
-*Pitfalls research for: UKB pipeline — zero insights and trivial observations diagnosis*
-*Researched: 2026-02-26*
+*Pitfalls research for: Hierarchical Knowledge Graph Restructuring (flat-to-tree on Graphology + LevelDB)*
+*Researched: 2026-03-01*
+*Confidence: HIGH — all pitfalls derived from direct code inspection; no WebSearch-only claims*
