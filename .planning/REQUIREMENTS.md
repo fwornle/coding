@@ -5,6 +5,13 @@
 
 ## v1 Requirements
 
+### v1.0 Gap Closure (Regressed Requirements)
+
+- [ ] **OBSV-01**: Observations are LLM-synthesized via batch processing (not per-item calls)
+- [ ] **OBSV-02**: Observations capture architectural patterns with code-specific analysis language
+- [ ] **DATA-03**: `analysisDepth` is user-configurable (surface default, deep available via settings)
+
+
 ### Schema & Configuration
 
 - [x] **SCHM-01**: KGEntity interface extended with optional `parentId`, `level`, `hierarchyPath` fields (backward-compatible)
@@ -85,12 +92,15 @@
 | VKB-03 | Phase 7 | Pending |
 | VKB-04 | Phase 7 | Pending |
 | VKB-05 | Phase 7 | Pending |
+| OBSV-01 | Phase 1 (Plan 01-06) | Pending |
+| OBSV-02 | Phase 1 (Plan 01-06) | Pending |
+| DATA-03 | Phase 1 (Plan 01-07) | Pending |
 
 **Coverage:**
-- v1 requirements: 20 total
-- Mapped to phases: 20
+- v1 requirements: 23 total
+- Mapped to phases: 23
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-01 after initial definition*
+*Last updated: 2026-03-01 after v1.0 gap closure phase additions*
