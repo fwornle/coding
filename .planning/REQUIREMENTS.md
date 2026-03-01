@@ -9,8 +9,8 @@
 
 - [x] **SCHM-01**: KGEntity interface extended with optional `parentId`, `level`, `hierarchyPath` fields (backward-compatible)
 - [x] **SCHM-02**: SharedMemoryEntity/EntityMetadata extended with `hierarchyLevel`, `parentEntityName`, `childEntityNames`, `isScaffoldNode` fields
-- [ ] **SCHM-03**: `Component` and `SubComponent` entity types added to `coding-ontology.json` so ontology validation accepts scaffold nodes
-- [ ] **SCHM-04**: `component-manifest.yaml` defines L1/L2 component hierarchy (names, aliases, descriptions) as the source of truth for classification
+- [x] **SCHM-03**: `Component` and `SubComponent` entity types added to `coding-ontology.json` so ontology validation accepts scaffold nodes
+- [x] **SCHM-04**: `component-manifest.yaml` defines L1/L2 component hierarchy (names, aliases, descriptions) as the source of truth for classification
 
 ### One-Time Migration
 
@@ -67,8 +67,8 @@
 |-------------|-------|--------|
 | SCHM-01 | Phase 4 | Complete |
 | SCHM-02 | Phase 4 | Complete |
-| SCHM-03 | Phase 4 | Pending |
-| SCHM-04 | Phase 4 | Pending |
+| SCHM-03 | Phase 4 | Complete |
+| SCHM-04 | Phase 4 | Complete |
 | MIGR-01 | Phase 5 | Pending |
 | MIGR-02 | Phase 5 | Pending |
 | MIGR-03 | Phase 5 | Pending |
