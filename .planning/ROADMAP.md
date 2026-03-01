@@ -93,7 +93,10 @@ Four phases that transform the flat knowledge graph (126 entities, 0 relations) 
   3. `coding-ontology.json` accepts `Component` and `SubComponent` entity types without validation errors
   4. `component-manifest.yaml` lists all named L1 components (LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns) with aliases and descriptions
   5. Existing pipeline runs against unmodified data produce no errors from the schema changes (backward compatibility holds)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+  - [x] 04-01-PLAN.md -- Extend TypeScript interfaces across MCP server and VKB viewer with hierarchy fields (SCHM-01, SCHM-02)
+  - [ ] 04-02-PLAN.md -- Author component manifest YAML, extend ontology with Component/SubComponent types, create manifest loader types (SCHM-03, SCHM-04)
 
 #### Phase 5: One-Time Migration
 **Goal**: All 126 existing entities are placed in the hierarchy with parent assignments, new scaffold nodes exist for the Coding root and all L1/L2 components, and generic entities are merged into CodingPatterns
@@ -135,7 +138,7 @@ Four phases that transform the flat knowledge graph (126 entities, 0 relations) 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 4. Schema & Configuration Foundation | 0/? | Not started | - |
+| 4. Schema & Configuration Foundation | 1/2 | In Progress | - |
 | 5. One-Time Migration | 0/? | Not started | - |
 | 6. Pipeline Hierarchy Assignment | 0/? | Not started | - |
 | 7. VKB Tree Navigation | 0/? | Not started | - |
