@@ -2,7 +2,7 @@
 
 ## Milestones
 
-- **v1.0** — UKB Pipeline Fix & Improvement (Phases 1-3, Phase 1 complete)
+- **v1.0** — UKB Pipeline Fix & Improvement (Phases 1-3, Phase 1 gap closure in progress)
 - **v2.0** — Hierarchical Knowledge Restructuring (Phases 4-7, current milestone)
 
 ---
@@ -25,16 +25,18 @@
   1. `extractArchitecturalPatternsFromCommits()` returns non-zero patterns from a codebase run (log file shows `totalPatterns > 0`)
   2. Entity names in the knowledge export use correct PascalCase (e.g., `PathAnalyzerPattern` not `Pathanalyzerpattern`)
   3. Observations in `coding.json` contain code-specific analysis language, not slot-filled commit file extension strings
-  4. Semantic analysis runs with `analysisDepth: 'deep'` (visible in workflow execution logs)
+  4. `analysisDepth` is configurable via settings (surface default, deep available) and visible in workflow execution logs
   5. Pattern parser handles both JSON and markdown-numbered LLM response formats without returning empty results
   6. Per-batch entity diversity exceeds the 10-pattern hardcoded vocabulary
-**Plans**: 5 plans
+**Plans**: 7 plans
 Plans:
   - [x] 01-01-PLAN.md -- Fix pattern extraction parser + pattern name formatter (PTRN-01, PTRN-02, PTRN-03, NAME-01)
   - [x] 01-02-PLAN.md -- Fix entity naming, replace template observations with LLM synthesis, switch to deep analysis (NAME-01, NAME-02, OBSV-01, OBSV-02, DATA-03)
   - [ ] 01-03-PLAN.md -- [GAP] Fix JSON.parse fence stripping in 2 observation methods + Docker bind-mount (OBSV-01, OBSV-02)
   - [ ] 01-04-PLAN.md -- [GAP] Fix all 7 entity naming bypass paths across both agent files (NAME-01, NAME-02)
   - [ ] 01-05-PLAN.md -- [GAP] Enrich per-batch patterns with LLM output + fix trace report metrics (PTRN-01, PTRN-02, DATA-03)
+  - [ ] 01-06-PLAN.md -- [GAP] Batch LLM observation synthesis to replace per-item null constants (OBSV-01, OBSV-02)
+  - [ ] 01-07-PLAN.md -- [GAP] Make analysisDepth configurable with surface/deep option (DATA-03)
 
 #### Phase 2: Insight Generation & Data Routing
 **Goal**: Insight documents are written to `knowledge-management/insights/` and linked to their corresponding knowledge graph entities
@@ -62,7 +64,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Pipeline Data Quality | 4/5 | In Progress | - |
+| 1. Core Pipeline Data Quality | 4/7 | In Progress (gap closure) | - |
 | 2. Insight Generation & Data Routing | 0/? | Deferred | - |
 | 3. Significance & Quality Ranking | 0/? | Deferred | - |
 
