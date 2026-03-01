@@ -76,7 +76,7 @@ Four phases that transform the flat knowledge graph (126 entities, 0 relations) 
 
 ### Phases
 
-- [ ] **Phase 4: Schema & Configuration Foundation** - Extend TypeScript interfaces across all four systems and author the component manifest so hierarchy fields are consistently typed before any data moves
+- [x] **Phase 4: Schema & Configuration Foundation** - Extend TypeScript interfaces across all four systems and author the component manifest so hierarchy fields are consistently typed before any data moves (completed 2026-03-01)
 - [ ] **Phase 5: One-Time Migration** - Classify all 126 existing entities into the hierarchy, create scaffold nodes, merge generic entities into CodingPatterns, and store `contains` edges
 - [ ] **Phase 6: Pipeline Hierarchy Assignment** - Insert HierarchyClassifier into the coordinator pipeline so future `ukb full` runs slot new entities into the hierarchy automatically
 - [ ] **Phase 7: VKB Tree Navigation** - Add collapsible tree sidebar, breadcrumb navigation, and subtree filtering to the VKB viewer
@@ -138,7 +138,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 4. Schema & Configuration Foundation | 1/2 | In Progress | - |
+| 4. Schema & Configuration Foundation | 2/2 | Complete   | 2026-03-01 |
 | 5. One-Time Migration | 0/? | Not started | - |
 | 6. Pipeline Hierarchy Assignment | 0/? | Not started | - |
 | 7. VKB Tree Navigation | 0/? | Not started | - |
