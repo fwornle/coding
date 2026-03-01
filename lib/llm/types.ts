@@ -46,6 +46,7 @@ export interface LLMCompletionRequest {
   // Behavior flags
   skipCache?: boolean;
   forcePaid?: boolean;
+  timeout?: number;  // Per-provider timeout in ms (default: 120000)
 }
 
 export interface LLMCompletionResult {

@@ -392,8 +392,8 @@ export function TraceModal({
 
                       {/* Expanded Output */}
                       {isExpanded && event.outputs && (
-                        <div className="ml-10 p-3 bg-muted/30 rounded text-xs font-mono overflow-x-auto">
-                          <pre className="whitespace-pre-wrap">
+                        <div className="ml-10 p-3 bg-muted/30 rounded text-xs font-mono overflow-hidden max-w-full">
+                          <pre className="whitespace-pre-wrap break-all overflow-x-auto max-w-full">
                             {JSON.stringify(event.outputs, null, 2)}
                           </pre>
                         </div>
@@ -478,7 +478,7 @@ export function TraceModal({
                         Output
                       </h4>
                       <ScrollArea className="h-48">
-                        <pre className="text-xs font-mono bg-muted/50 p-2 rounded whitespace-pre-wrap">
+                        <pre className="text-xs font-mono bg-muted/50 p-2 rounded whitespace-pre-wrap break-all max-w-full overflow-hidden">
                           {JSON.stringify(selectedEvent.outputs, null, 2)}
                         </pre>
                       </ScrollArea>

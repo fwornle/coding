@@ -6,8 +6,8 @@
         "base_url": "https://api.x.ai/v1",
         "usage_endpoint": null,
         "console_url": "https://console.x.ai",
-        "free_credits": 25.0,
-        "default_limit": 20.0,
+        "free_credits": 25,
+        "default_limit": 20,
         "rate_limit": {
           "requests_per_second": 1,
           "requests_per_hour": 60
@@ -219,7 +219,7 @@
     }
   },
   "constraint_monitor": {
-    "compliance_threshold": 8.0,
+    "compliance_threshold": 8,
     "max_violations": 5
   },
   "trajectory_analysis": {
@@ -253,12 +253,30 @@
       "status_line_integration": true
     },
     "trajectory_states": {
-      "exploring": { "icon": "🔍EX", "description": "Information gathering phase" },
-      "on_track": { "icon": "📈ON", "description": "Productive trajectory progression" },
-      "off_track": { "icon": "📉OFF", "description": "Deviating from optimal path" },
-      "implementing": { "icon": "⚙️IMP", "description": "Active code modification" },
-      "verifying": { "icon": "✅VER", "description": "Testing and validation phase" },
-      "blocked": { "icon": "🚫BLK", "description": "Intervention preventing action" }
+      "exploring": {
+        "icon": "🔍EX",
+        "description": "Information gathering phase"
+      },
+      "on_track": {
+        "icon": "📈ON",
+        "description": "Productive trajectory progression"
+      },
+      "off_track": {
+        "icon": "📉OFF",
+        "description": "Deviating from optimal path"
+      },
+      "implementing": {
+        "icon": "⚙️IMP",
+        "description": "Active code modification"
+      },
+      "verifying": {
+        "icon": "✅VER",
+        "description": "Testing and validation phase"
+      },
+      "blocked": {
+        "icon": "🚫BLK",
+        "description": "Intervention preventing action"
+      }
     }
   },
   "file_patterns": {
@@ -308,7 +326,7 @@
     "groq": {
       "billingType": "monthly",
       "monthlySpend": 0,
-      "billingMonth": "FEB",
+      "billingMonth": "MAR",
       "spendLimit": null,
       "autoScrape": true,
       "scrapeIntervalMinutes": 15,
