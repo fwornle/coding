@@ -1,15 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Hierarchical Knowledge Restructuring
-status: in-progress
-last_updated: "2026-03-01T14:43:00.000Z"
+milestone: v1.0
+milestone_name: — UKB Pipeline Fix & Improvement
+status: unknown
+last_updated: "2026-03-01T18:13:36.660Z"
 progress:
-  total_phases: 4
-  completed_phases: 1
-  total_plans: 8
-  completed_plans: 2
-current_phase: 5
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 7
+  completed_plans: 7
 ---
 
 # Project State
