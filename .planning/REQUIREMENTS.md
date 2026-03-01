@@ -1,94 +1,96 @@
-# Requirements: UKB Pipeline Fix & Improvement
+# Requirements: Hierarchical Knowledge Restructuring
 
-**Defined:** 2026-02-26
-**Core Value:** Running `ukb full` must produce meaningful knowledge graph entities with rich insight documents
+**Defined:** 2026-03-01
+**Core Value:** Knowledge graph organized as navigable hierarchy — not a flat soup of disconnected entities
 
 ## v1 Requirements
 
-### Pattern Extraction
+### Schema & Configuration
 
-- [x] **PTRN-01**: Pattern extraction parser handles markdown-formatted LLM responses (numbered lists, bold markers) from Groq and other providers
-- [x] **PTRN-02**: Pattern extraction parser handles JSON-formatted LLM responses as fallback
-- [x] **PTRN-03**: Pattern extraction produces non-zero patterns from a codebase with real architectural decisions
+- [ ] **SCHM-01**: KGEntity interface extended with optional `parentId`, `level`, `hierarchyPath` fields (backward-compatible)
+- [ ] **SCHM-02**: SharedMemoryEntity/EntityMetadata extended with `hierarchyLevel`, `parentEntityName`, `childEntityNames`, `isScaffoldNode` fields
+- [ ] **SCHM-03**: `Component` and `SubComponent` entity types added to `coding-ontology.json` so ontology validation accepts scaffold nodes
+- [ ] **SCHM-04**: `component-manifest.yaml` defines L1/L2 component hierarchy (names, aliases, descriptions) as the source of truth for classification
 
-### Entity Naming
+### One-Time Migration
 
-- [x] **NAME-01**: Entity names use correct PascalCase (e.g., "PathAnalyzerPattern" not "Pathanalyzerpattern")
-- [x] **NAME-02**: Entity names are semantically meaningful (not concatenated type + description fragments)
+- [ ] **MIGR-01**: Migration script creates scaffold nodes (Coding project root, L1 components, L2 sub-components) from component manifest
+- [ ] **MIGR-02**: Migration script classifies existing 126 entities into the hierarchy by assigning `parentId` and `level`
+- [ ] **MIGR-03**: Generic/low-value entities merged into parent component nodes (observations rolled up, original nodes removed)
+- [ ] **MIGR-04**: Migration has `--dry-run` mode showing classification and merge decisions before executing
+- [ ] **MIGR-05**: Migration reads from VKB HTTP API (not direct LevelDB) to avoid lock conflicts and keep JSON export in sync
 
-### Observation Quality
+### Pipeline Hierarchy Assignment
 
-- [x] **OBSV-01**: Observations are LLM-synthesized from actual code analysis, not hardcoded template strings
-- [x] **OBSV-02**: Observations capture architectural patterns, design decisions, and component significance — not commit message paraphrases
-- [ ] **OBSV-03**: Observations are quality-ranked before the 50-cap truncation so most meaningful observations survive
+- [ ] **PIPE-01**: New HierarchyClassifier assigns `parentId` and `level` to entities during pipeline batch processing
+- [ ] **PIPE-02**: HierarchyClassifier uses keyword heuristics first, LLM fallback for ambiguous entities
+- [ ] **PIPE-03**: Coordinator integrates HierarchyClassifier after ontology classification, before KG operators
+- [ ] **PIPE-04**: Dedup operator's `mergeEntities()` preserves `parentId` from component nodes (no silent field loss)
+- [ ] **PIPE-05**: PersistenceAgent passes hierarchy fields through to storage without dropping them
+- [ ] **PIPE-06**: Component/scaffold nodes added to protected entity types (not deleted by dedup or purge)
 
-### Data Routing
+### VKB Tree Navigation
 
-- [ ] **DATA-01**: Semantic entity data accumulates across batches via `allBatchSemanticEntities` accumulator (prevents data loss during batch compaction)
-- [ ] **DATA-02**: `synthesizeInsights` returns properly structured data (not wrapped in `{_timing}` object that breaks `Array.isArray()` check)
-- [x] **DATA-03**: Semantic analysis uses `analysisDepth: 'deep'` instead of `'surface'` for meaningful code understanding
-
-### Insight Documents
-
-- [ ] **INSD-01**: Insight documents are generated for significant entities (non-zero count on a real codebase)
-- [ ] **INSD-02**: Insight documents contain rich markdown content: problem statement, solution analysis, code examples, applicability guidance (matching MVIReduxArchitecturePattern.md quality bar)
-- [ ] **INSD-03**: Insight documents include PlantUML or Mermaid diagrams where architecturally relevant
-- [ ] **INSD-04**: Generated insight documents are linked to their corresponding knowledge graph entities at persist time
-
-### Significance & Logging
-
-- [ ] **QUAL-01**: Significance scores are stored and retrieved correctly (no fraction/integer normalization bugs)
-- [ ] **QUAL-02**: Insight generation skip reasons are logged visibly (not silently swallowed)
+- [ ] **VKB-01**: Collapsible tree sidebar showing Coding → Components → SubComponents → Detail hierarchy
+- [ ] **VKB-02**: Clicking a tree node navigates to that entity's detail view
+- [ ] **VKB-03**: Breadcrumb navigation showing current position in hierarchy (e.g., Coding > KnowledgeManagement > OnlineLearning)
+- [ ] **VKB-04**: D3 graph view filters hierarchy `contains` edges to avoid visual collapse of force layout
+- [ ] **VKB-05**: Component detail view shows description, child count, and aggregated observation summary
 
 ## v2 Requirements
 
-### Pipeline Observability
+### Advanced Hierarchy
 
-- **OBSB-01**: Dashboard shows per-agent execution status during pipeline run
-- **OBSB-02**: Dashboard shows insight generation progress in real-time
+- **HIER-01**: Drag-and-drop reclassification of entities in VKB tree
+- **HIER-02**: Auto-suggest hierarchy placement for new entities based on semantic similarity
+- **HIER-03**: Hierarchy depth analytics (which components have the most knowledge)
 
-### Advanced Analysis
+### Deferred from v1.0
 
-- **ADVN-01**: `correlate_with_codebase` step implemented for cross-referencing patterns with live code
-- **ADVN-02**: Duplicate observation detection during batch accumulation on resume runs
+- **INSD-01**: Insight document generation for significant entities
+- **INSD-02**: Rich markdown insight documents with diagrams
+- **QUAL-01**: Significance score normalization
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| VKB viewer changes | Viewer is functioning correctly |
-| Knowledge graph storage changes | Storage/export layer is fine |
-| Reducing agent count | 13-14 agent architecture stays |
-| MCP server interface changes | `ukb full` invocation must remain unchanged |
-| Agent framework rewrite | Custom framework is architecturally sound |
+| Full-text search (Qdrant) | Over-engineering; tree navigation solves discovery |
+| Real-time hierarchy updates during pipeline | Batch completion is sufficient; real-time adds complexity |
+| Force-directed graph with hierarchy rendering | Tree sidebar is the navigation tool; D3 graph stays flat |
+| Agent framework rewrite | Architecture is sound |
+| MCP server interface changes | `ukb full` invocation unchanged |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PTRN-01 | Phase 1 | Complete |
-| PTRN-02 | Phase 1 | Complete |
-| PTRN-03 | Phase 1 | Complete |
-| NAME-01 | Phase 1 | Complete |
-| NAME-02 | Phase 1 | Complete |
-| OBSV-01 | Phase 1 | Complete |
-| OBSV-02 | Phase 1 | Complete |
-| OBSV-03 | Phase 3 | Pending |
-| DATA-01 | Phase 2 | Pending |
-| DATA-02 | Phase 2 | Pending |
-| DATA-03 | Phase 1 | Complete |
-| INSD-01 | Phase 2 | Pending |
-| INSD-02 | Phase 2 | Pending |
-| INSD-03 | Phase 2 | Pending |
-| INSD-04 | Phase 2 | Pending |
-| QUAL-01 | Phase 3 | Pending |
-| QUAL-02 | Phase 2 | Pending |
+| SCHM-01 | Phase 4 | Pending |
+| SCHM-02 | Phase 4 | Pending |
+| SCHM-03 | Phase 4 | Pending |
+| SCHM-04 | Phase 4 | Pending |
+| MIGR-01 | Phase 5 | Pending |
+| MIGR-02 | Phase 5 | Pending |
+| MIGR-03 | Phase 5 | Pending |
+| MIGR-04 | Phase 5 | Pending |
+| MIGR-05 | Phase 5 | Pending |
+| PIPE-01 | Phase 6 | Pending |
+| PIPE-02 | Phase 6 | Pending |
+| PIPE-03 | Phase 6 | Pending |
+| PIPE-04 | Phase 6 | Pending |
+| PIPE-05 | Phase 6 | Pending |
+| PIPE-06 | Phase 6 | Pending |
+| VKB-01 | Phase 7 | Pending |
+| VKB-02 | Phase 7 | Pending |
+| VKB-03 | Phase 7 | Pending |
+| VKB-04 | Phase 7 | Pending |
+| VKB-05 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 17 total
-- Mapped to phases: 17
+- v1 requirements: 20 total
+- Mapped to phases: 20
 - Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after roadmap creation*
+*Requirements defined: 2026-03-01*
+*Last updated: 2026-03-01 after initial definition*
