@@ -9,7 +9,7 @@
 
 - [ ] **OBSV-01**: Observations are LLM-synthesized via batch processing (not per-item calls)
 - [ ] **OBSV-02**: Observations capture architectural patterns with code-specific analysis language
-- [ ] **DATA-03**: `analysisDepth` is user-configurable (surface default, deep available via settings)
+- [x] **DATA-03**: `analysisDepth` is user-configurable (surface default, deep available via settings)
 
 
 ### Schema & Configuration
@@ -94,7 +94,7 @@
 | VKB-05 | Phase 7 | Pending |
 | OBSV-01 | Phase 1 (Plan 01-06) | Pending |
 | OBSV-02 | Phase 1 (Plan 01-06) | Pending |
-| DATA-03 | Phase 1 (Plan 01-07) | Pending |
+| DATA-03 | Phase 1 (Plan 01-07) | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total
