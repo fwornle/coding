@@ -1,35 +1,30 @@
 # Milestones
 
-## v1.0 — UKB Pipeline Fix & Improvement
+## v1.0 UKB Pipeline Fix & Improvement (Shipped: 2026-03-03)
 
-**Status:** Partially complete (Phase 1 done, Phases 2-3 deferred)
-**Dates:** 2026-02-26 to 2026-03-01
+**Phases completed:** 2 phases (1 + 4), 9 plans
+**Audit status:** tech_debt (12/12 executed requirements satisfied, Phases 2-3 deferred)
 
-### What Shipped
-- Pattern extraction parser — handles both JSON and markdown LLM responses
-- Entity naming — correct PascalCase, meaningful names
-- Observation quality — LLM-synthesized from actual code analysis
-- Deep analysis mode enabled across pipeline
-- Garbage insight names fixed (removed forced "Pattern" suffix, added blocklist)
-- Bold markdown formatting stripped from existing entities
-- Knowledge purge: 339 → 126 entities
+**Key accomplishments:**
+- Multi-format pattern extraction parser (JSON + markdown + LLM retry) with generic name filtering
+- Correct PascalCase entity naming across all 7 naming paths
+- LLM-synthesized observations in all 4 observation creation methods
+- Configurable analysisDepth parameter (surface/deep/comprehensive)
+- TypeScript interfaces extended with hierarchy fields across 4 systems (KGEntity, SharedMemoryEntity, VKB Entity/Node)
+- Component manifest (8 L1 + 5 L2 components) and ontology types (Component/SubComponent)
 
-### What Was Deferred
-- Insight document generation (INSD-01 through INSD-04)
-- Data routing fixes (DATA-01, DATA-02)
-- Significance scoring (QUAL-01, OBSV-03)
-- Quality logging (QUAL-02)
+**Deferred to future milestones:**
+- Phase 2: Insight Generation & Data Routing (7 requirements)
+- Phase 3: Significance & Quality Ranking (2 requirements)
 
-### Key Decisions
-- Fix existing pipeline surgically — architecture is sound
-- Phase order follows pipeline execution order
-- All fixes contained within `integrations/mcp-server-semantic-analysis`
+**Known gaps:**
+- SC-2 (hierarchy field round-trip persistence) deferred to Phase 5
+- 4 human verification items pending runtime confirmation
 
 ### Phases
 | Phase | Name | Plans | Status |
 |-------|------|-------|--------|
-| 1 | Core Pipeline Data Quality | 5/5 | Complete |
+| 1 | Core Pipeline Data Quality | 7/7 | Complete (2026-03-02) |
 | 2 | Insight Generation & Data Routing | 0/? | Deferred |
 | 3 | Significance & Quality Ranking | 0/? | Deferred |
-
-**Last phase number used:** 3 (via GSD), but also 5 ad-hoc plans within Phase 1
+| 4 | Schema & Configuration Foundation | 2/2 | Complete (2026-03-01) |
