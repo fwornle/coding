@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An agentic coding environment with a multi-agent UKB analysis pipeline, knowledge graph storage (Graphology + LevelDB), and VKB viewer. The pipeline analyzes codebases to produce knowledge entities with observations and insight documents. Currently the knowledge graph contains 126 flat, granular entities — this milestone restructures them into a navigable hierarchy.
+An agentic coding environment with a multi-agent UKB analysis pipeline, knowledge graph storage (Graphology + LevelDB), and VKB viewer. The pipeline analyzes codebases to produce knowledge entities with observations and insight documents. v1.0 shipped a working pipeline with correct pattern extraction, entity naming, and LLM-synthesized observations. v2.0 restructures the flat knowledge graph (126 entities) into a navigable hierarchy.
 
 ## Core Value
 
@@ -12,37 +12,29 @@ The knowledge graph must be organized as a navigable hierarchy (Project → Comp
 
 **Goal:** Transform the flat knowledge graph into a tree structure with curated component nodes, merge generic entities, update the pipeline to maintain hierarchy on future runs, and add tree navigation to the VKB viewer.
 
-**Target features:**
-- Hierarchical entity model (Project → Component → SubComponent → Detail)
-- One-time migration of existing 126 entities into the hierarchy
-- Pipeline produces hierarchical entities natively on future runs
-- VKB viewer with tree/drill-down navigation
-- Architecture diagrams attached to component nodes
+**Foundation shipped (v1.0 Phase 4):** TypeScript interfaces extended with hierarchy fields, component manifest authored, ontology types added.
+
+**Remaining:** Phase 5 (migration), Phase 6 (pipeline), Phase 7 (VKB tree nav)
 
 ## Requirements
 
 ### Validated
 
-<!-- Shipped and confirmed valuable from v1.0. -->
-
-- ✓ Pattern extraction handles JSON + markdown LLM responses — v1.0 Phase 1
-- ✓ Entity names use correct PascalCase — v1.0 Phase 1
-- ✓ Observations are LLM-synthesized, not template strings — v1.0 Phase 1
-- ✓ Deep analysis mode enabled — v1.0 Phase 1
-- ✓ Garbage insight names filtered via blocklist — v1.0 ad-hoc
-- ✓ Bold formatting stripped from observations — v1.0 ad-hoc
+- ✓ Pattern extraction handles JSON + markdown LLM responses — v1.0
+- ✓ Entity names use correct PascalCase — v1.0
+- ✓ Observations are LLM-synthesized, not template strings — v1.0
+- ✓ analysisDepth is configurable (surface/deep/comprehensive) — v1.0
+- ✓ Garbage insight names filtered via blocklist — v1.0
+- ✓ Bold formatting stripped from observations — v1.0
+- ✓ KGEntity/SharedMemoryEntity/VKB interfaces extended with hierarchy fields — v1.0
+- ✓ Component manifest defines L1/L2 hierarchy as source of truth — v1.0
+- ✓ Ontology accepts Component/SubComponent entity types — v1.0
 
 ### Active
 
-- [ ] Hierarchical entity model in storage schema (parent-child relationships in Graphology/LevelDB)
-- [ ] Top-level "Coding" project node with L2 components underneath
-- [ ] L2 components: LSL, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, plus discovered ones
-- [ ] L3 sub-components (e.g., KnowledgeManagement → ManualLearning, OnlineLearning)
-- [ ] One-time migration: merge generic/low-value entities into parent nodes, keep high-value as leaves
-- [ ] Pipeline produces hierarchical entities on future runs (hierarchy assignment during batch analysis)
-- [ ] VKB viewer tree navigation (drill Coding → Component → SubComponent → Detail)
-- [ ] Component nodes carry descriptions, architecture diagrams, and coding-relevant observations
-- [ ] Generic "programming wisdom" nodes merged into a CodingPatterns component
+- [ ] One-time migration of existing entities into hierarchy (MIGR-01..05)
+- [ ] Pipeline hierarchy assignment for future runs (PIPE-01..06)
+- [ ] VKB tree navigation with drill-down and breadcrumbs (VKB-01..05)
 
 ### Out of Scope
 
@@ -57,9 +49,9 @@ The knowledge graph must be organized as a navigable hierarchy (Project → Comp
 - **Knowledge graph storage:** `.data/knowledge-graph/` (Graphology + LevelDB + JSON exports)
 - **Export file:** `.data/knowledge-export/coding.json` (126 entities, flat structure)
 - **VKB viewer:** `vkb` command, runs on http://localhost:8080
-- **Key interface:** `KGEntity` in `kg-operators.ts:31` has `type` but NOT `entityType` or `metadata`. Coordinator casts via `as KGEntity` after adding extra fields. Persistence uses `SharedMemoryEntity.entityType`.
-- **Named L2 components from user:** LiveLoggingSystem (LSL), LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement
-- **L3 example:** KnowledgeManagement → ManualLearning, OnlineLearning
+- **Key interface:** `KGEntity` in `kg-operators.ts` — hierarchy fields added (parentId, level, hierarchyPath)
+- **Component manifest:** `config/component-manifest.yaml` — 8 L1 + 5 L2 components
+- **v1.0 shipped:** 2026-03-03, 2 phases, 9 plans, 12/12 requirements satisfied
 
 ## Constraints
 
@@ -74,9 +66,11 @@ The knowledge graph must be organized as a navigable hierarchy (Project → Comp
 |----------|-----------|---------|
 | Fix existing pipeline, not redesign | Pipeline worked before — architecture is sound | ✓ Good |
 | Keep batched execution mode | Working and wanted | ✓ Good |
-| Defer v1.0 Phases 2-3 | Pipeline quality is good enough; hierarchy is higher priority | — Pending |
+| Defer v1.0 Phases 2-3 | Pipeline quality is good enough; hierarchy is higher priority | ✓ Good (shipped v1.0) |
+| All hierarchy fields optional (?) | Full backward compatibility | ✓ Good |
 | Selective merge of existing entities | Merge generic, keep high-value leaves | — Pending |
-| User's component list + auto-discovery | Start with named components, discover additional from data | — Pending |
+| Manifest-first, LLM-fallback classification | Keyword aliases cover ~80%, LLM handles ~20% | — Pending |
+| Phase 7 depends on Phase 5 not Phase 6 | Can run after migration data exists | — Pending |
 
 ---
-*Last updated: 2026-03-01 after milestone v2.0 initialization*
+*Last updated: 2026-03-03 after v1.0 milestone completion*
