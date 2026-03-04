@@ -213,6 +213,9 @@ constraints:
   severity: error
   enabled: true
   applies_to: file_path
+  tool_filter:
+  - Edit
+  - Write
   suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md or ALL-CAPS-FILE.md'
   whitelist:
   # Fixed: Use **/ prefix for proper glob matching on full paths
@@ -222,6 +225,17 @@ constraints:
   - '**/MEMORY.md'
   - '**/INSTALL*.md'
   - CLAUDE.md
+  # GSD planning files use uppercase by convention
+  - '**/.planning/**/ROADMAP.md'
+  - '**/.planning/**/STATE.md'
+  - '**/.planning/**/PROJECT.md'
+  - '**/.planning/**/REQUIREMENTS.md'
+  - '**/.planning/**/*-CONTEXT.md'
+  - '**/.planning/**/*-RESEARCH.md'
+  - '**/.planning/**/*-PLAN*.md'
+  - '**/.planning/**/*-VERIFICATION.md'
+  - '**/.planning/**/*-VALIDATION.md'
+  - '**/.planning/**/SUMMARY.md'
 - id: update-main-readme
   group: documentation
   pattern: (?i)readme.*(?:update|modify|change).*(?:structure|format|content)
