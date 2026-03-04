@@ -49,9 +49,6 @@
       "name": "Coding",
       "entityType": "Project",
       "observations": [
-        "Main project for semantic analysis, knowledge management, and developer tooling",
-        "Contains: UKB pipeline, VKB viewer, MCP servers, Docker services, system health dashboard",
-        "Key paths: src/knowledge-management/, integrations/mcp-server-semantic-analysis/, lib/vkb-server/",
         "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windo; LLMAbstraction: LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model c; DockerizedServices: DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constr; Trajectory: Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and impl; KnowledgeManagement: KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph dat; CodingPatterns: CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable ac; ConstraintSystem: ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations ag; SemanticAnalysis: SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and.",
         "Project contains 8 L1 components: LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns, ConstraintSystem, SemanticAnalysis"
       ],
@@ -59,7 +56,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.575Z",
-        "last_updated": "2026-03-04T12:45:16.934Z"
+        "last_updated": "2026-03-04T16:42:48.785Z"
       },
       "problem": {},
       "solution": {},
@@ -471,15 +468,15 @@
       "name": "LiveLoggingSystem",
       "entityType": "Component",
       "observations": [
-        "Live session logging infrastructure capturing Claude Code conversations. Handles session windowing, file routing, classification layers, and transcript capture.",
         "LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windowing, file routing, classification layers, and transcript capture.. It contains 0 sub-components: .",
+        "LiveLoggingSystem handles live session logging infrastructure capturing claude code conversations. handles session windowing, file routing, classification layers, and transcript capture.",
         "Component uses keywords: session, logging, transcript, LSL, classification, windowing, specstory",
         "Known aliases: LSL, live-logging, session-logging, SpecStory"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.699Z",
-        "last_updated": "2026-03-04T12:45:16.963Z"
+        "last_updated": "2026-03-04T16:42:19.483Z"
       },
       "id": "mc4flkgp5ipmm"
     },
@@ -487,15 +484,17 @@
       "name": "LLMAbstraction",
       "entityType": "Component",
       "observations": [
-        "Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.",
         "LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.. It contains 0 sub-components: .",
+        "LLMAbstraction handles abstraction layer over llm providers (anthropic, openai, groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.",
         "Component uses keywords: LLM, provider, anthropic, openai, groq, tier, model, dmr",
-        "Known aliases: llm-cli, llm-proxy, model-abstraction, DMR"
+        "Serves as Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing. within the Coding component at hierarchy path Coding/LLMAbstraction",
+        "LLMAbstraction is an L1 Component entity under Coding in the project knowledge hierarchy",
+        "Primary implementation in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts with 5 related source file(s) including integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, integrations/mcp-server-semantic-analysis/src/providers/dmr-provider.ts, lib/llm/llm-service.ts"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.707Z",
-        "last_updated": "2026-03-04T12:45:17.041Z"
+        "last_updated": "2026-03-04T16:42:51.452Z"
       },
       "id": "mc4flkgs99eop"
     },
@@ -503,15 +502,17 @@
       "name": "DockerizedServices",
       "entityType": "Component",
       "observations": [
-        "Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.",
         "DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.. It contains 0 sub-components: .",
+        "DockerizedServices handles docker containerization layer for all coding services including semantic analysis mcp, constraint monitor, code-graph-rag, and supporting databases.",
         "Component uses keywords: docker, container, compose, service, deployment, memgraph, redis",
-        "Known aliases: docker, containers, coding-services"
+        "Serves as Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases. within the Coding component at hierarchy path Coding/DockerizedServices",
+        "DockerizedServices is an L1 Component entity under Coding in the project knowledge hierarchy",
+        "Primary implementation in integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts with 5 related source file(s) including integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts, lib/llm/llm-service.ts, lib/service-starter.js"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.711Z",
-        "last_updated": "2026-03-04T12:45:17.042Z"
+        "last_updated": "2026-03-04T16:43:21.532Z"
       },
       "id": "mc4flkg22cvl1q"
     },
@@ -519,15 +520,17 @@
       "name": "Trajectory",
       "entityType": "Component",
       "observations": [
-        "AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.",
         "Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.. It contains 0 sub-components: .",
+        "Trajectory handles ai trajectory and planning system managing project milestones, gsd workflow, phase planning, and implementation task tracking.",
         "Component uses keywords: trajectory, milestone, planning, phase, GSD, roadmap, spec",
-        "Known aliases: GSD, planning, milestone, phases"
+        "Serves as AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking. within the Coding component at hierarchy path Coding/Trajectory",
+        "Trajectory is an L1 Component entity under Coding in the project knowledge hierarchy",
+        "Primary implementation in lib/integrations/specstory-adapter.js with 1 related source file(s) including lib/integrations/specstory-adapter.js"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.715Z",
-        "last_updated": "2026-03-04T12:45:17.061Z"
+        "last_updated": "2026-03-04T16:43:13.910Z"
       },
       "id": "mc4flkga1xqjr"
     },
@@ -535,17 +538,16 @@
       "name": "KnowledgeManagement",
       "entityType": "Component",
       "observations": [
-        "Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.",
         "KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.. It contains 2 sub-components: ManualLearning, OnlineLearning.",
+        "KnowledgeManagement handles knowledge graph storage, query, and lifecycle management including the vkb server, graph database, entity persistence, and knowledge decay tracking.",
         "Component uses keywords: knowledge, graph, entity, VKB, UKB, LevelDB, Graphology, persistence, decay",
-        "Known aliases: knowledge-graph, KG, VKB, UKB",
         "Sub-component ManualLearning: Knowledge created or curated by humans: manually authored entities, direct edits, and hand-crafted observations.",
         "Sub-component OnlineLearning: Knowledge extracted automatically by the batch analysis pipeline from git history, LSL sessions, and code analysis."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.720Z",
-        "last_updated": "2026-03-04T12:45:17.047Z"
+        "last_updated": "2026-03-04T16:43:38.350Z"
       },
       "id": "mc4flkg17znsjl"
     },
@@ -553,13 +555,13 @@
       "name": "ManualLearning",
       "entityType": "SubComponent",
       "observations": [
-        "Knowledge created or curated by humans: manually authored entities, direct edits, and hand-crafted observations.",
-        "ManualLearning is a sub-component of KnowledgeManagement"
+        "ManualLearning is a sub-component of KnowledgeManagement",
+        "Handles Knowledge created or curated by humans: manually authored entities, direct edits, and hand-crafted observations."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.726Z",
-        "last_updated": "2026-03-04T12:45:18.207Z"
+        "last_updated": "2026-03-04T16:44:37.922Z"
       },
       "id": "mc4flkg3msrows"
     },
@@ -567,13 +569,13 @@
       "name": "OnlineLearning",
       "entityType": "SubComponent",
       "observations": [
-        "Knowledge extracted automatically by the batch analysis pipeline from git history, LSL sessions, and code analysis.",
-        "OnlineLearning is a sub-component of KnowledgeManagement"
+        "OnlineLearning is a sub-component of KnowledgeManagement",
+        "Handles Knowledge extracted automatically by the batch analysis pipeline from git history, LSL sessions, and code analysis."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.731Z",
-        "last_updated": "2026-03-04T12:45:18.211Z"
+        "last_updated": "2026-03-04T16:44:41.802Z"
       },
       "id": "mc4flkg1aeu1jj"
     },
@@ -581,14 +583,15 @@
       "name": "CodingPatterns",
       "entityType": "Component",
       "observations": [
-        "General programming wisdom, design patterns, best practices, and coding conventions applicable across the project. Catch-all for entities not fitting other components.",
+        "CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable across the project. Catch-all for entities not fitting other components.. It contains 0 sub-components: .",
+        "CodingPatterns handles general programming wisdom, design patterns, best practices, and coding conventions applicable across the project. catch-all for entities not fitting other components.",
         "Component uses keywords: pattern, convention, practice, design, approach, idiom, anti-pattern",
-        "Known aliases: patterns, best-practices, conventions"
+        "The CodingPatterns component utilizes the design principles outlined in the codingConventions.md file (docs/codingConventions.md) to ensure consistency across the project, particularly in the implementation of the Singleton pattern in the DatabaseConnector class (src/DatabaseConnector.js)."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.736Z",
-        "last_updated": "2026-03-04T12:45:17.045Z"
+        "last_updated": "2026-03-04T16:43:48.163Z"
       },
       "id": "mc4flkg30u7wy5"
     },
@@ -596,15 +599,17 @@
       "name": "ConstraintSystem",
       "entityType": "Component",
       "observations": [
-        "Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.",
         "ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.. It contains 0 sub-components: .",
+        "ConstraintSystem handles constraint monitoring and enforcement system that validates code actions and file operations against configured rules during claude code sessions.",
         "Component uses keywords: constraint, rule, validation, enforcement, hook, violation",
-        "Known aliases: constraints, constraint-monitor, enforcement"
+        "Serves as Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions. within the Coding component at hierarchy path Coding/ConstraintSystem",
+        "ConstraintSystem is an L1 Component entity under Coding in the project knowledge hierarchy",
+        "Primary implementation in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts with 5 related source file(s) including integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, lib/agent-api/hooks/hook-config.js, scripts/violation-capture-service.js"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.741Z",
-        "last_updated": "2026-03-04T12:45:17.049Z"
+        "last_updated": "2026-03-04T16:44:11.286Z"
       },
       "id": "mc4flkg12nbo98"
     },
@@ -612,11 +617,9 @@
       "name": "SemanticAnalysis",
       "entityType": "Component",
       "observations": [
-        "Semantic analysis pipeline for automated knowledge extraction from codebase changes",
         "SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and LSL sessions to extract and persist structured knowledge entities.. It contains 3 sub-components: Pipeline, Ontology, Insights.",
         "SemanticAnalysis handles multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and lsl sessions to extract and persist structured knowledge entities.",
         "Component uses keywords: semantic, analysis, agent, pipeline, batch, ontology, classification, coordinator",
-        "Known aliases: semantic-analysis, MCP, pipeline, batch-analysis",
         "Sub-component Pipeline: The batch processing pipeline agents: coordinator, observation generation, KG operators, deduplication, and persistence.",
         "Sub-component Ontology: The ontology classification system: upper/lower ontology definitions, entity type resolution, and validation.",
         "Sub-component Insights: Insight generation, pattern catalog extraction, and knowledge report authoring."
@@ -624,7 +627,7 @@
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.746Z",
-        "last_updated": "2026-03-04T12:45:17.056Z"
+        "last_updated": "2026-03-04T16:44:16.720Z"
       },
       "id": "mc4flkg1jyy23i"
     },
@@ -632,13 +635,13 @@
       "name": "Pipeline",
       "entityType": "SubComponent",
       "observations": [
-        "The batch processing pipeline agents: coordinator, observation generation, KG operators, deduplication, and persistence.",
-        "Pipeline is a sub-component of SemanticAnalysis"
+        "Pipeline is a sub-component of SemanticAnalysis",
+        "Handles The batch processing pipeline agents: coordinator, observation generation, KG operators, deduplication, and persistence."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.750Z",
-        "last_updated": "2026-03-04T12:45:18.215Z"
+        "last_updated": "2026-03-04T16:45:02.643Z"
       },
       "id": "mc4flkg53173y"
     },
@@ -646,13 +649,13 @@
       "name": "Ontology",
       "entityType": "SubComponent",
       "observations": [
-        "The ontology classification system: upper/lower ontology definitions, entity type resolution, and validation.",
-        "Ontology is a sub-component of SemanticAnalysis"
+        "Ontology is a sub-component of SemanticAnalysis",
+        "Handles The ontology classification system: upper/lower ontology definitions, entity type resolution, and validation."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.753Z",
-        "last_updated": "2026-03-04T12:45:18.219Z"
+        "last_updated": "2026-03-04T16:45:04.925Z"
       },
       "id": "mc4flkgti3r81"
     },
@@ -660,13 +663,13 @@
       "name": "Insights",
       "entityType": "SubComponent",
       "observations": [
-        "Insight generation, pattern catalog extraction, and knowledge report authoring.",
-        "Insights is a sub-component of SemanticAnalysis"
+        "Insights is a sub-component of SemanticAnalysis",
+        "Handles Insight generation, pattern catalog extraction, and knowledge report authoring."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.757Z",
-        "last_updated": "2026-03-04T12:45:18.295Z"
+        "last_updated": "2026-03-04T16:45:26.950Z"
       },
       "id": "mc4flkg1oy27et"
     },
@@ -1448,7 +1451,7 @@
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-03-04T12:45:24.214Z",
+    "exported_at": "2026-03-04T16:45:32.004Z",
     "total_entities": 40,
     "total_relations": 82,
     "description": "Coding project infrastructure and patterns"
