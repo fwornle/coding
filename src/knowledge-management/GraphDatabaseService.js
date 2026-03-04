@@ -252,19 +252,19 @@ export class GraphDatabaseService extends EventEmitter {
       // Check if content has actually changed (exclude timestamps from comparison)
       const contentChanged = this._hasContentChanged(existingAttrs, attributes);
 
+      if (!contentChanged) {
+        // Skip update entirely if no content change - don't mark dirty, don't emit event
+        return nodeId;
+      }
+
       // Merge attributes instead of full replace - preserve created_at
       // Only update last_modified if content actually changed
       const mergedAttributes = {
         ...existingAttrs,
         ...attributes,
         created_at: existingAttrs.created_at || attributes.created_at, // Preserve original creation date
-        last_modified: contentChanged ? new Date().toISOString() : existingAttrs.last_modified
+        last_modified: new Date().toISOString()
       };
-
-      if (!contentChanged) {
-        // Skip update entirely if no content change - don't mark dirty, don't emit event
-        return nodeId;
-      }
 
       this.graph.replaceNodeAttributes(nodeId, mergedAttributes);
     } else {
@@ -350,7 +350,11 @@ export class GraphDatabaseService extends EventEmitter {
       'confidence',
       'source',
       'significance',
-      'quick_reference'
+      'quick_reference',
+      'parentEntityName',
+      'hierarchyLevel',
+      'isScaffoldNode',
+      'childEntityNames'
     ];
 
     for (const field of contentFields) {
@@ -1079,7 +1083,12 @@ export class GraphDatabaseService extends EventEmitter {
           last_modified: attributes.last_modified,
           session_id: attributes.session_id || null,
           embedding_id: attributes.embedding_id || null,
-          metadata: attributes.metadata || {}
+          metadata: attributes.metadata || {},
+          // Hierarchy fields
+          parentEntityName: attributes.parentEntityName || null,
+          hierarchyLevel: attributes.hierarchyLevel != null ? attributes.hierarchyLevel : null,
+          isScaffoldNode: attributes.isScaffoldNode || false,
+          childEntityNames: attributes.childEntityNames || []
         });
         return;
       }
@@ -1121,7 +1130,12 @@ export class GraphDatabaseService extends EventEmitter {
         last_modified: attributes.last_modified,
         session_id: attributes.session_id || null,
         embedding_id: attributes.embedding_id || null,
-        metadata: attributes.metadata || {}
+        metadata: attributes.metadata || {},
+        // Hierarchy fields
+        parentEntityName: attributes.parentEntityName || null,
+        hierarchyLevel: attributes.hierarchyLevel != null ? attributes.hierarchyLevel : null,
+        isScaffoldNode: attributes.isScaffoldNode || false,
+        childEntityNames: attributes.childEntityNames || []
       });
     });
 
@@ -1168,7 +1182,12 @@ export class GraphDatabaseService extends EventEmitter {
         last_modified: attributes.last_modified,
         session_id: attributes.session_id || null,
         embedding_id: attributes.embedding_id || null,
-        metadata: attributes.metadata || {}
+        metadata: attributes.metadata || {},
+        // Hierarchy fields
+        parentEntityName: attributes.parentEntityName || null,
+        hierarchyLevel: attributes.hierarchyLevel != null ? attributes.hierarchyLevel : null,
+        isScaffoldNode: attributes.isScaffoldNode || false,
+        childEntityNames: attributes.childEntityNames || []
       });
     });
 

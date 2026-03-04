@@ -449,6 +449,12 @@ export class KnowledgeQueryService {
         metadata
       };
 
+      // Forward hierarchy fields if present
+      if (entity.parentEntityName !== undefined) graphEntity.parentEntityName = entity.parentEntityName;
+      if (entity.hierarchyLevel !== undefined) graphEntity.hierarchyLevel = entity.hierarchyLevel;
+      if (entity.isScaffoldNode !== undefined) graphEntity.isScaffoldNode = entity.isScaffoldNode;
+      if (entity.childEntityNames !== undefined) graphEntity.childEntityNames = entity.childEntityNames;
+
       const nodeId = await graphDB.storeEntity(graphEntity, { team });
 
       if (this.debug) {
