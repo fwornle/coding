@@ -59,6 +59,12 @@ export class UKBDatabaseWriter {
       }
     };
 
+    // Forward hierarchy fields if present
+    if (entity.parentEntityName !== undefined) entityData.parentEntityName = entity.parentEntityName;
+    if (entity.hierarchyLevel !== undefined) entityData.hierarchyLevel = entity.hierarchyLevel;
+    if (entity.isScaffoldNode !== undefined) entityData.isScaffoldNode = entity.isScaffoldNode;
+    if (entity.childEntityNames !== undefined) entityData.childEntityNames = entity.childEntityNames;
+
     try {
       await this.queryService.storeEntity(entityData);
 
@@ -97,6 +103,11 @@ export class UKBDatabaseWriter {
         last_updated: new Date().toISOString()
       }
     };
+    // Forward hierarchy fields if present
+    if (updates.parentEntityName !== undefined) entityData.parentEntityName = updates.parentEntityName;
+    if (updates.hierarchyLevel !== undefined) entityData.hierarchyLevel = updates.hierarchyLevel;
+    if (updates.isScaffoldNode !== undefined) entityData.isScaffoldNode = updates.isScaffoldNode;
+    if (updates.childEntityNames !== undefined) entityData.childEntityNames = updates.childEntityNames;
 
     if (this.debug) {
       console.log(`[UKBDatabaseWriter] Updating entity: ${entityName}`);
