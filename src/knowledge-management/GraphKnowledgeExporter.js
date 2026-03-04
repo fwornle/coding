@@ -456,7 +456,7 @@ export class GraphKnowledgeExporter {
         relations.push({
           from: sourceAttributes.name,
           to: targetAttributes.name,
-          relationType: attributes.type || 'related-to',
+          relationType: attributes.type || attributes.relation_type || 'related-to',
           metadata: attributes.metadata || {}
         });
       }

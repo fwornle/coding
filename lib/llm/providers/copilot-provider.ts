@@ -21,7 +21,7 @@ export class CopilotProvider extends CLIProviderBase {
         premium: 'claude-opus-4.6',
       },
       defaultModel: 'claude-sonnet-4.5',
-      timeout: 120000, // 120 seconds — copilot CLI can be slow
+      timeout: 30000, // 30 seconds — fail fast to let next provider in chain try
       ...config,
     });
   }

@@ -7,7 +7,7 @@ providers:
   # Subscription providers (zero cost)
   claude-code:
     cliCommand: "claude"
-    timeout: 120000
+    timeout: 30000
     models:
       fast: "sonnet"
       standard: "sonnet"
@@ -18,7 +18,7 @@ providers:
 
   copilot:
     cliCommand: "copilot-cli"
-    timeout: 120000
+    timeout: 30000
     models:
       fast: "claude-haiku-4.5"        # Benchmarked: 5s sequential, 0.77s @10 parallel
       standard: "claude-sonnet-4.5"
@@ -74,6 +74,8 @@ provider_priority:
 task_provider_priority:
   semantic_code_analysis: ["groq", "copilot", "claude-code", "anthropic", "openai"]
   ontology_classification: ["groq", "copilot", "claude-code", "anthropic", "openai"]
+  observation_generation: ["groq", "copilot", "claude-code", "anthropic", "openai"]
+  content_analysis: ["groq", "copilot", "claude-code", "anthropic", "openai"]
 
 # Task-to-tier mapping
 task_tiers:
