@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: -- Wave-Based Hierarchical Semantic Analysis
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-03-04T12:28:44.032Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-04T12:33:54.872Z"
 last_activity: 2026-03-04 — Completed Plan 03 of Phase 5 (wave agents)
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 75
 ---
 
@@ -51,6 +51,7 @@ Progress: [████████░░] 75%
 
 *Updated after each plan completion*
 | Phase 05 P03 | 4min | 2 tasks | 2 files |
+| Phase 05 P02 | 7min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Progress: [████████░░] 75%
 - [Phase 05-03]: Wave2 LLM error fallback builds entities from manifest without enrichment (graceful degradation)
 - [Phase 05-03]: Wave3 filters generic L3 names (Configuration, Utils, Types) to avoid low-value nodes
 - [Phase 05-03]: Agent wrapper pattern: constructor(repoPath, team), ensureLLMInitialized(), execute(input)
+- [Phase 05-02]: CGR file scoping uses runCypherQuery with graceful fallback -- intelligentQuery does not exist on CodeGraphAgent
+- [Phase 05-02]: Work-stealing concurrency pattern for runWithConcurrency -- shared index counter, workers pull tasks when idle
+- [Phase 05-02]: Ontology pre-population in mapEntityToSharedMemory prevents redundant LLM re-classification during persistence
 
 ### Critical Pitfalls
 
@@ -83,6 +87,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T12:28:44.029Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-03-04T12:33:54.869Z
+Stopped at: Completed 05-02-PLAN.md
 Resume with: `/gsd:execute-phase 05 --plan 04`
