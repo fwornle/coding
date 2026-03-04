@@ -18,7 +18,7 @@ Requirements for wave-based hierarchical semantic analysis. Each maps to roadmap
 
 ### Entity Quality
 
-- [ ] **QUAL-01**: Each entity produced by the pipeline has 3+ meaningful, specific observations (not one-liner stubs)
+- [x] **QUAL-01**: Each entity produced by the pipeline has 3+ meaningful, specific observations (not one-liner stubs)
 - [ ] **QUAL-02**: Each entity gets a detailed insight document (markdown with architecture context, purpose, patterns)
 - [ ] **QUAL-03**: Insight documents include PlantUML diagrams for architectural entities
 - [ ] **QUAL-04**: VKB entity detail panel shows "Detailed Insight" link to the insight document
@@ -73,7 +73,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WAVE-04 | Phase 5 | Complete |
 | WAVE-05 | Phase 5 | Complete |
 | WAVE-06 | Phase 5 | Complete |
-| QUAL-01 | Phase 6 | Pending |
+| QUAL-01 | Phase 6 | Complete |
 | QUAL-02 | Phase 6 | Pending |
 | QUAL-03 | Phase 6 | Pending |
 | QUAL-04 | Phase 8 | Pending |
