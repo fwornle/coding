@@ -1105,6 +1105,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
         return 'Complete Analysis'
       case 'incremental-analysis':
         return 'Incremental Analysis'
+      case 'wave-analysis':
+        return 'Wave Analysis'
       default:
         return name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
     }
@@ -1206,6 +1208,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
       const workflowName = activeCurrentProcess.workflowName || ''
       const statsKey = workflowName.includes('complete') ? 'complete-analysis' :
                        workflowName.includes('incremental') ? 'incremental-analysis' :
+                       workflowName.includes('wave') ? 'wave-analysis' :
                        'batch-analysis'
       return stepTimingStatistics.workflowTypes[statsKey] || null
     }
