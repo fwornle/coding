@@ -27,9 +27,9 @@ Requirements for wave-based hierarchical semantic analysis. Each maps to roadmap
 ### Hierarchy Completeness
 
 - [x] **HIER-01**: L1 components have comprehensive sub-node coverage reflecting actual architecture (not just 2-3 children)
-- [ ] **HIER-02**: Sub-nodes represent real architectural aspects discovered from code analysis, not generic labels
+- [x] **HIER-02**: Sub-nodes represent real architectural aspects discovered from code analysis, not generic labels
 - [x] **HIER-03**: Component manifest is auto-extended based on wave analysis discoveries
-- [ ] **HIER-04**: Each hierarchy level provides self-sufficient knowledge useful at that granularity
+- [x] **HIER-04**: Each hierarchy level provides self-sufficient knowledge useful at that granularity
 
 ### VKB Visualization
 
@@ -79,9 +79,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUAL-04 | Phase 8 | Pending |
 | QUAL-05 | Phase 6 | Complete |
 | HIER-01 | Phase 7 | Complete |
-| HIER-02 | Phase 7 | Pending |
+| HIER-02 | Phase 7 | Complete |
 | HIER-03 | Phase 7 | Complete |
-| HIER-04 | Phase 7 | Pending |
+| HIER-04 | Phase 7 | Complete |
 | VKB-01 | Phase 8 | Pending |
 | VKB-02 | Phase 8 | Pending |
 | VKB-03 | Phase 8 | Pending |
