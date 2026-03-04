@@ -51,13 +51,15 @@
       "observations": [
         "Main project for semantic analysis, knowledge management, and developer tooling",
         "Contains: UKB pipeline, VKB viewer, MCP servers, Docker services, system health dashboard",
-        "Key paths: src/knowledge-management/, integrations/mcp-server-semantic-analysis/, lib/vkb-server/"
+        "Key paths: src/knowledge-management/, integrations/mcp-server-semantic-analysis/, lib/vkb-server/",
+        "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windo; LLMAbstraction: LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model c; DockerizedServices: DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constr; Trajectory: Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and impl; KnowledgeManagement: KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph dat; CodingPatterns: CodingPatterns is a component of the Coding project. General programming wisdom, design patterns, best practices, and coding conventions applicable ac; ConstraintSystem: ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations ag; SemanticAnalysis: SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and.",
+        "Project contains 8 L1 components: LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns, ConstraintSystem, SemanticAnalysis"
       ],
       "significance": 0.5,
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.575Z",
-        "last_updated": "2026-03-04T06:19:43.163Z"
+        "last_updated": "2026-03-04T12:45:16.934Z"
       },
       "problem": {},
       "solution": {},
@@ -172,41 +174,6 @@
       "problem": {},
       "solution": {},
       "id": "mc4flkgt3o5ws"
-    },
-    {
-      "name": "VkbCli",
-      "entityType": "MCPAgent",
-      "observations": [
-        {
-          "type": "architecture",
-          "content": "Core components: VkbApiClient",
-          "date": "2025-12-22T13:00:32.734Z",
-          "metadata": {
-            "confidence": 0.9,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T13:00:32.736Z"
-          }
-        },
-        {
-          "type": "rule",
-          "content": "Use 'vkb' command for visualization (http://localhost:8080) and MCP semantic-analysis tools for programmatic access",
-          "date": "2025-12-22T13:00:32.734Z",
-          "metadata": {
-            "confidence": 0.95,
-            "source": "entity-refresh",
-            "refreshedAt": "2025-12-22T13:00:32.736Z"
-          }
-        }
-      ],
-      "significance": 0.5,
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-30T06:14:08.583Z",
-        "last_updated": "2026-03-04T06:19:04.273Z"
-      },
-      "problem": {},
-      "solution": {},
-      "id": "mc4flkgsmmjil"
     },
     {
       "name": "SemanticAnalysisWorkflowIssue",
@@ -499,6 +466,489 @@
       "problem": {},
       "solution": {},
       "id": "mc4flkg2wjrziw"
+    },
+    {
+      "name": "LiveLoggingSystem",
+      "entityType": "Component",
+      "observations": [
+        "Live session logging infrastructure capturing Claude Code conversations. Handles session windowing, file routing, classification layers, and transcript capture.",
+        "LiveLoggingSystem is a component of the Coding project. Live session logging infrastructure capturing Claude Code conversations. Handles session windowing, file routing, classification layers, and transcript capture.. It contains 0 sub-components: .",
+        "Component uses keywords: session, logging, transcript, LSL, classification, windowing, specstory",
+        "Known aliases: LSL, live-logging, session-logging, SpecStory"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.699Z",
+        "last_updated": "2026-03-04T12:45:16.963Z"
+      },
+      "id": "mc4flkgp5ipmm"
+    },
+    {
+      "name": "LLMAbstraction",
+      "entityType": "Component",
+      "observations": [
+        "Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.",
+        "LLMAbstraction is a component of the Coding project. Abstraction layer over LLM providers (Anthropic, OpenAI, Groq) enabling provider-agnostic model calls, tier-based routing, and mock mode for testing.. It contains 0 sub-components: .",
+        "Component uses keywords: LLM, provider, anthropic, openai, groq, tier, model, dmr",
+        "Known aliases: llm-cli, llm-proxy, model-abstraction, DMR"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.707Z",
+        "last_updated": "2026-03-04T12:45:17.041Z"
+      },
+      "id": "mc4flkgs99eop"
+    },
+    {
+      "name": "DockerizedServices",
+      "entityType": "Component",
+      "observations": [
+        "Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.",
+        "DockerizedServices is a component of the Coding project. Docker containerization layer for all coding services including semantic analysis MCP, constraint monitor, code-graph-rag, and supporting databases.. It contains 0 sub-components: .",
+        "Component uses keywords: docker, container, compose, service, deployment, memgraph, redis",
+        "Known aliases: docker, containers, coding-services"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.711Z",
+        "last_updated": "2026-03-04T12:45:17.042Z"
+      },
+      "id": "mc4flkg22cvl1q"
+    },
+    {
+      "name": "Trajectory",
+      "entityType": "Component",
+      "observations": [
+        "AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.",
+        "Trajectory is a component of the Coding project. AI trajectory and planning system managing project milestones, GSD workflow, phase planning, and implementation task tracking.. It contains 0 sub-components: .",
+        "Component uses keywords: trajectory, milestone, planning, phase, GSD, roadmap, spec",
+        "Known aliases: GSD, planning, milestone, phases"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.715Z",
+        "last_updated": "2026-03-04T12:45:17.061Z"
+      },
+      "id": "mc4flkga1xqjr"
+    },
+    {
+      "name": "KnowledgeManagement",
+      "entityType": "Component",
+      "observations": [
+        "Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.",
+        "KnowledgeManagement is a component of the Coding project. Knowledge graph storage, query, and lifecycle management including the VKB server, graph database, entity persistence, and knowledge decay tracking.. It contains 2 sub-components: ManualLearning, OnlineLearning.",
+        "Component uses keywords: knowledge, graph, entity, VKB, UKB, LevelDB, Graphology, persistence, decay",
+        "Known aliases: knowledge-graph, KG, VKB, UKB",
+        "Sub-component ManualLearning: Knowledge created or curated by humans: manually authored entities, direct edits, and hand-crafted observations.",
+        "Sub-component OnlineLearning: Knowledge extracted automatically by the batch analysis pipeline from git history, LSL sessions, and code analysis."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.720Z",
+        "last_updated": "2026-03-04T12:45:17.047Z"
+      },
+      "id": "mc4flkg17znsjl"
+    },
+    {
+      "name": "ManualLearning",
+      "entityType": "SubComponent",
+      "observations": [
+        "Knowledge created or curated by humans: manually authored entities, direct edits, and hand-crafted observations.",
+        "ManualLearning is a sub-component of KnowledgeManagement"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.726Z",
+        "last_updated": "2026-03-04T12:45:18.207Z"
+      },
+      "id": "mc4flkg3msrows"
+    },
+    {
+      "name": "OnlineLearning",
+      "entityType": "SubComponent",
+      "observations": [
+        "Knowledge extracted automatically by the batch analysis pipeline from git history, LSL sessions, and code analysis.",
+        "OnlineLearning is a sub-component of KnowledgeManagement"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.731Z",
+        "last_updated": "2026-03-04T12:45:18.211Z"
+      },
+      "id": "mc4flkg1aeu1jj"
+    },
+    {
+      "name": "CodingPatterns",
+      "entityType": "Component",
+      "observations": [
+        "General programming wisdom, design patterns, best practices, and coding conventions applicable across the project. Catch-all for entities not fitting other components.",
+        "Component uses keywords: pattern, convention, practice, design, approach, idiom, anti-pattern",
+        "Known aliases: patterns, best-practices, conventions"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.736Z",
+        "last_updated": "2026-03-04T12:45:17.045Z"
+      },
+      "id": "mc4flkg30u7wy5"
+    },
+    {
+      "name": "ConstraintSystem",
+      "entityType": "Component",
+      "observations": [
+        "Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.",
+        "ConstraintSystem is a component of the Coding project. Constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions.. It contains 0 sub-components: .",
+        "Component uses keywords: constraint, rule, validation, enforcement, hook, violation",
+        "Known aliases: constraints, constraint-monitor, enforcement"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.741Z",
+        "last_updated": "2026-03-04T12:45:17.049Z"
+      },
+      "id": "mc4flkg12nbo98"
+    },
+    {
+      "name": "SemanticAnalysis",
+      "entityType": "Component",
+      "observations": [
+        "Semantic analysis pipeline for automated knowledge extraction from codebase changes",
+        "SemanticAnalysis is a component of the Coding project. Multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and LSL sessions to extract and persist structured knowledge entities.. It contains 3 sub-components: Pipeline, Ontology, Insights.",
+        "SemanticAnalysis handles multi-agent semantic analysis pipeline (batch-analysis workflow) that processes git history and lsl sessions to extract and persist structured knowledge entities.",
+        "Component uses keywords: semantic, analysis, agent, pipeline, batch, ontology, classification, coordinator",
+        "Known aliases: semantic-analysis, MCP, pipeline, batch-analysis",
+        "Sub-component Pipeline: The batch processing pipeline agents: coordinator, observation generation, KG operators, deduplication, and persistence.",
+        "Sub-component Ontology: The ontology classification system: upper/lower ontology definitions, entity type resolution, and validation.",
+        "Sub-component Insights: Insight generation, pattern catalog extraction, and knowledge report authoring."
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.746Z",
+        "last_updated": "2026-03-04T12:45:17.056Z"
+      },
+      "id": "mc4flkg1jyy23i"
+    },
+    {
+      "name": "Pipeline",
+      "entityType": "SubComponent",
+      "observations": [
+        "The batch processing pipeline agents: coordinator, observation generation, KG operators, deduplication, and persistence.",
+        "Pipeline is a sub-component of SemanticAnalysis"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.750Z",
+        "last_updated": "2026-03-04T12:45:18.215Z"
+      },
+      "id": "mc4flkg53173y"
+    },
+    {
+      "name": "Ontology",
+      "entityType": "SubComponent",
+      "observations": [
+        "The ontology classification system: upper/lower ontology definitions, entity type resolution, and validation.",
+        "Ontology is a sub-component of SemanticAnalysis"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.753Z",
+        "last_updated": "2026-03-04T12:45:18.219Z"
+      },
+      "id": "mc4flkgti3r81"
+    },
+    {
+      "name": "Insights",
+      "entityType": "SubComponent",
+      "observations": [
+        "Insight generation, pattern catalog extraction, and knowledge report authoring.",
+        "Insights is a sub-component of SemanticAnalysis"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T06:50:00.757Z",
+        "last_updated": "2026-03-04T12:45:18.295Z"
+      },
+      "id": "mc4flkg1oy27et"
+    },
+    {
+      "name": "ManualLearningCore",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ManualLearningCore handles the core logic for ManualLearning",
+          "date": "2026-03-04T12:45:19.095Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the KnowledgeManagement component hierarchy",
+          "date": "2026-03-04T12:45:19.095Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.116Z",
+        "last_updated": "2026-03-04T12:45:19.116Z"
+      },
+      "id": "mc4flkg2sb7z8d"
+    },
+    {
+      "name": "ManualLearningHandler",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ManualLearningHandler handles the handler logic for ManualLearning",
+          "date": "2026-03-04T12:45:19.095Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the KnowledgeManagement component hierarchy",
+          "date": "2026-03-04T12:45:19.095Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.119Z",
+        "last_updated": "2026-03-04T12:45:19.119Z"
+      },
+      "id": "mc4flkg2ksezye"
+    },
+    {
+      "name": "PipelineHandler",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "PipelineHandler handles the handler logic for Pipeline",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the SemanticAnalysis component hierarchy",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.123Z",
+        "last_updated": "2026-03-04T12:45:19.123Z"
+      },
+      "id": "mc4flkg19p1ujc"
+    },
+    {
+      "name": "OnlineLearningCore",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "OnlineLearningCore handles the core logic for OnlineLearning",
+          "date": "2026-03-04T12:45:19.095Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the KnowledgeManagement component hierarchy",
+          "date": "2026-03-04T12:45:19.095Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.125Z",
+        "last_updated": "2026-03-04T12:45:19.125Z"
+      },
+      "id": "mc4flkg3kbvehc"
+    },
+    {
+      "name": "OntologyHandler",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "OntologyHandler handles the handler logic for Ontology",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the SemanticAnalysis component hierarchy",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.129Z",
+        "last_updated": "2026-03-04T12:45:19.129Z"
+      },
+      "id": "mc4flkggfgdej"
+    },
+    {
+      "name": "OnlineLearningHandler",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "OnlineLearningHandler handles the handler logic for OnlineLearning",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the KnowledgeManagement component hierarchy",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.162Z",
+        "last_updated": "2026-03-04T12:45:19.162Z"
+      },
+      "id": "mc4flkg4hkfo0p"
+    },
+    {
+      "name": "PipelineCore",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "PipelineCore handles the core logic for Pipeline",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the SemanticAnalysis component hierarchy",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.164Z",
+        "last_updated": "2026-03-04T12:45:19.164Z"
+      },
+      "id": "mc4flkg8oaxs1"
+    },
+    {
+      "name": "OntologyCore",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "OntologyCore handles the core logic for Ontology",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the SemanticAnalysis component hierarchy",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.166Z",
+        "last_updated": "2026-03-04T12:45:19.166Z"
+      },
+      "id": "mc4flkgdrbuj6"
+    },
+    {
+      "name": "InsightsCore",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "InsightsCore handles the core logic for Insights",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the SemanticAnalysis component hierarchy",
+          "date": "2026-03-04T12:45:19.096Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.167Z",
+        "last_updated": "2026-03-04T12:45:19.167Z"
+      },
+      "id": "mc4flkgdq9vie"
+    },
+    {
+      "name": "InsightsHandler",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "InsightsHandler handles the handler logic for Insights",
+          "date": "2026-03-04T12:45:19.097Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Part of the SemanticAnalysis component hierarchy",
+          "date": "2026-03-04T12:45:19.097Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-04T12:45:19.179Z",
+        "last_updated": "2026-03-04T12:45:19.179Z"
+      },
+      "id": "mc4flkgy3fzn5"
     }
   ],
   "relations": [
@@ -511,12 +961,6 @@
     {
       "from": "KnowledgePersistencePattern",
       "to": "UkbCli",
-      "relationType": "extends",
-      "metadata": {}
-    },
-    {
-      "from": "KnowledgePersistencePattern",
-      "to": "VkbCli",
       "relationType": "extends",
       "metadata": {}
     },
@@ -557,18 +1001,6 @@
       "metadata": {}
     },
     {
-      "from": "VkbCli",
-      "to": "Coding",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "SemanticAnalysisWorkflowIssue",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "ComprehensiveSemanticAnalysis",
       "to": "Coding",
       "relationType": "implemented_in",
@@ -600,37 +1032,7 @@
     },
     {
       "from": "Coding",
-      "to": "KnowledgePersistencePattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "UkbCli",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "CodingWorkflow",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
       "to": "Coding",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "VkbCli",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "SemanticAnalysisAgentSystemImplementation",
       "relationType": "contains",
       "metadata": {}
     },
@@ -638,36 +1040,6 @@
       "from": "SemanticAnalysisAgentSystemImplementation",
       "to": "Coding",
       "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "ConfigurationPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "ComprehensiveSemanticAnalysis",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "VSCodeExtensionBridgePattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "MCPMemoryLoggingIntegrationPattern",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
-      "from": "Coding",
-      "to": "ApiPattern",
-      "relationType": "contains",
       "metadata": {}
     },
     {
@@ -701,48 +1073,384 @@
       "metadata": {}
     },
     {
-      "from": "Coding",
+      "from": "CollectiveKnowledge",
+      "to": "Coding",
+      "relationType": "includes",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "UkbCli",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "MCPMemoryLoggingIntegrationPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "VSCodeExtensionBridgePattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "KnowledgePersistencePattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "ApiPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "KnowledgeBaseUpdatesPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "ApiRefactoringPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "AgentArchitecturePattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "ManualLearning",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "OnlineLearning",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "SemanticAnalysisAgentSystemImplementation",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "ComprehensiveSemanticAnalysis",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "CodingWorkflow",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "SemanticAnalysisWorkflowIssue",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "McpAgentDevelopmentPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "Pipeline",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "Ontology",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "Insights",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "ConfigurationPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Ontology",
       "to": "OntologySupportPattern",
       "relationType": "contains",
       "metadata": {}
     },
     {
       "from": "Coding",
-      "to": "AgentArchitecturePattern",
+      "to": "LiveLoggingSystem",
       "relationType": "contains",
       "metadata": {}
     },
     {
       "from": "Coding",
-      "to": "McpAgentDevelopmentPattern",
+      "to": "LLMAbstraction",
       "relationType": "contains",
       "metadata": {}
     },
     {
       "from": "Coding",
-      "to": "ApiRefactoringPattern",
+      "to": "DockerizedServices",
       "relationType": "contains",
       "metadata": {}
     },
     {
       "from": "Coding",
-      "to": "KnowledgeBaseUpdatesPattern",
+      "to": "Trajectory",
       "relationType": "contains",
       "metadata": {}
     },
     {
-      "from": "CollectiveKnowledge",
-      "to": "Coding",
-      "relationType": "includes",
+      "from": "Coding",
+      "to": "KnowledgeManagement",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "CodingPatterns",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ConstraintSystem",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "SemanticAnalysis",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "LiveLoggingSystem",
+      "relationType": "parent-child",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "LLMAbstraction",
+      "relationType": "parent-child",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "DockerizedServices",
+      "relationType": "parent-child",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Trajectory",
+      "relationType": "parent-child",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "KnowledgeManagement",
+      "relationType": "parent-child",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "CodingPatterns",
+      "relationType": "parent-child",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ConstraintSystem",
+      "relationType": "parent-child",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "SemanticAnalysis",
+      "relationType": "parent-child",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Pipeline",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ManualLearning",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "OnlineLearning",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Ontology",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "Insights",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "PipelineHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "OnlineLearningCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ManualLearningCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "ManualLearningHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "OntologyHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "OntologyCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "OnlineLearningHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "PipelineCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "InsightsCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Coding",
+      "to": "InsightsHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ManualLearning",
+      "to": "ManualLearningCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ManualLearning",
+      "to": "ManualLearningHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "OnlineLearning",
+      "to": "OnlineLearningCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "OnlineLearning",
+      "to": "OnlineLearningHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Pipeline",
+      "to": "PipelineCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Pipeline",
+      "to": "PipelineHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Ontology",
+      "to": "OntologyCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Ontology",
+      "to": "OntologyHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Insights",
+      "to": "InsightsCore",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Insights",
+      "to": "InsightsHandler",
+      "relationType": "contains",
       "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-03-04T06:19:57.045Z",
-    "total_entities": 18,
-    "total_relations": 39,
+    "exported_at": "2026-03-04T12:45:24.214Z",
+    "total_entities": 40,
+    "total_relations": 82,
     "description": "Coding project infrastructure and patterns"
   }
 }
