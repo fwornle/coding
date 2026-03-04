@@ -9,11 +9,11 @@ Requirements for wave-based hierarchical semantic analysis. Each maps to roadmap
 
 ### Wave Orchestration
 
-- [ ] **WAVE-01**: Pipeline executes analysis in hierarchical waves (L0→L1→L2→L3) instead of a flat batch pass
+- [x] **WAVE-01**: Pipeline executes analysis in hierarchical waves (L0→L1→L2→L3) instead of a flat batch pass
 - [ ] **WAVE-02**: Wave 1 agent surveys the entire project and produces L0 Project node + L1 Component nodes with comprehensive summaries
 - [ ] **WAVE-03**: Wave 2 agents receive L1 results and produce L2 SubComponent nodes with detailed observations per component
 - [ ] **WAVE-04**: Wave 3 agents receive L2 results and produce L3 Detail nodes with specific, deep knowledge
-- [ ] **WAVE-05**: Wave controller ensures wave N completes fully before wave N+1 spawns
+- [x] **WAVE-05**: Wave controller ensures wave N completes fully before wave N+1 spawns
 - [ ] **WAVE-06**: Within each wave, agents run in parallel (one agent per parent node being expanded)
 
 ### Entity Quality
@@ -67,11 +67,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WAVE-01 | Phase 5 | Pending |
+| WAVE-01 | Phase 5 | Complete |
 | WAVE-02 | Phase 5 | Pending |
 | WAVE-03 | Phase 5 | Pending |
 | WAVE-04 | Phase 5 | Pending |
-| WAVE-05 | Phase 5 | Pending |
+| WAVE-05 | Phase 5 | Complete |
 | WAVE-06 | Phase 5 | Pending |
 | QUAL-01 | Phase 6 | Pending |
 | QUAL-02 | Phase 6 | Pending |

@@ -46,7 +46,7 @@ Four phases that replace the flat batch DAG with a wave-based multi-agent system
   5. Within each wave, multiple agents run in parallel (one per parent node being expanded), observable via concurrent log entries
 **Plans:** 4 plans
 Plans:
-- [ ] 05-01-PLAN.md -- Wave types, YAML config, and routing plumbing
+- [x] 05-01-PLAN.md -- Wave types, YAML config, and routing plumbing
 - [ ] 05-02-PLAN.md -- WaveController orchestrator and Wave1ProjectAgent (L0+L1)
 - [ ] 05-03-PLAN.md -- Wave2ComponentAgent (L2) and Wave3DetailAgent (L3)
 - [ ] 05-04-PLAN.md -- Build, deploy, integration smoke test, and human verification
@@ -91,7 +91,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 5. Wave Orchestration | v2.0 | 0/4 | Planning complete | - |
+| 5. Wave Orchestration | v2.0 | 1/4 | In Progress | - |
 | 6. Entity Quality | v2.0 | 0/? | Not started | - |
 | 7. Hierarchy Completeness | v2.0 | 0/? | Not started | - |
 | 8. VKB Tree Navigation | v2.0 | 0/? | Not started | - |
