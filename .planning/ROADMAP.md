@@ -75,7 +75,11 @@ Plans:
   2. Sub-node names and descriptions reflect real architectural aspects found in code (e.g., "BatchScheduler", "LLMRetryPolicy") rather than generic labels (e.g., "Pipeline", "Insights")
   3. Running `ukb full` on an evolved codebase auto-extends the component manifest with newly discovered components or sub-components
   4. Reading any single hierarchy level (L1 components alone, or L2 sub-components alone) provides useful, self-contained knowledge without needing to drill into children
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 07-01-PLAN.md -- Type contracts, manifest write-back function, Docker mount change
+- [ ] 07-02-PLAN.md -- Wire L3 suggestions and L1 keywords into wave agents, self-sufficiency prompts
+- [ ] 07-03-PLAN.md -- Build, deploy, smoke test, and human verification
 
 #### Phase 8: VKB Tree Navigation
 **Goal**: Users can navigate the full knowledge hierarchy in the VKB viewer through a tree sidebar with drill-down, breadcrumbs, and direct access to insight documents
@@ -97,5 +101,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 5. Wave Orchestration | 4/4 | Complete   | 2026-03-04 | - |
 | 6. Entity Quality | 3/3 | Complete   | 2026-03-04 | - |
-| 7. Hierarchy Completeness | v2.0 | 0/? | Not started | - |
+| 7. Hierarchy Completeness | v2.0 | 0/3 | Planned | - |
 | 8. VKB Tree Navigation | v2.0 | 0/? | Not started | - |
