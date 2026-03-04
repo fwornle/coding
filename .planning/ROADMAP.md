@@ -27,7 +27,7 @@ Four phases that replace the flat batch DAG with a wave-based multi-agent system
 
 ### Phases
 
-- [ ] **Phase 5: Wave Orchestration** - Replace flat batch DAG with hierarchical wave controller executing L0->L1->L2->L3 agents
+- [x] **Phase 5: Wave Orchestration** - Replace flat batch DAG with hierarchical wave controller executing L0->L1->L2->L3 agents (completed 2026-03-04)
 - [ ] **Phase 6: Entity Quality** - Rich multi-observation entities with detailed insight documents and PlantUML diagrams
 - [ ] **Phase 7: Hierarchy Completeness** - Comprehensive sub-node coverage reflecting actual architecture from code analysis
 - [ ] **Phase 8: VKB Tree Navigation** - Collapsible tree sidebar with subtree filtering, breadcrumbs, and insight links
@@ -44,12 +44,12 @@ Four phases that replace the flat batch DAG with a wave-based multi-agent system
   3. Wave 2 agents each receive their parent L1 node context and produce SubComponent nodes (L2) with parent-child relationships set
   4. Wave 3 agents produce Detail nodes (L3) linked to their L2 parents, with knowledge specific to that detail scope
   5. Within each wave, multiple agents run in parallel (one per parent node being expanded), observable via concurrent log entries
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 Plans:
 - [x] 05-01-PLAN.md -- Wave types, YAML config, and routing plumbing
-- [ ] 05-02-PLAN.md -- WaveController orchestrator and Wave1ProjectAgent (L0+L1)
-- [ ] 05-03-PLAN.md -- Wave2ComponentAgent (L2) and Wave3DetailAgent (L3)
-- [ ] 05-04-PLAN.md -- Build, deploy, integration smoke test, and human verification
+- [x] 05-02-PLAN.md -- WaveController orchestrator and Wave1ProjectAgent (L0+L1)
+- [x] 05-03-PLAN.md -- Wave2ComponentAgent (L2) and Wave3DetailAgent (L3)
+- [x] 05-04-PLAN.md -- Build, deploy, integration smoke test, and human verification
 
 #### Phase 6: Entity Quality
 **Goal**: Every entity produced by wave agents carries rich, specific observations and a detailed insight document that makes the entity self-explanatory
@@ -91,7 +91,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 5. Wave Orchestration | v2.0 | 1/4 | In Progress | - |
+| 5. Wave Orchestration | 4/4 | Complete   | 2026-03-04 | - |
 | 6. Entity Quality | v2.0 | 0/? | Not started | - |
 | 7. Hierarchy Completeness | v2.0 | 0/? | Not started | - |
 | 8. VKB Tree Navigation | v2.0 | 0/? | Not started | - |
