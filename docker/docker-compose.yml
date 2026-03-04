@@ -69,7 +69,7 @@ services:
       - ${HOME}/Agentic:/workspace:ro
       # Config files (live-mounted to avoid staleness)
       - ${CODING_REPO:-.}/.env:/coding/.env:ro
-      - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:ro
+      - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:rw
       # Dashboard build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
     networks:
