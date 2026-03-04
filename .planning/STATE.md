@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: -- Wave-Based Hierarchical Semantic Analysis
-status: completed
-stopped_at: Phase 6 context gathered
-last_updated: "2026-03-04T15:20:25.878Z"
-last_activity: 2026-03-04 — Completed Plan 04 of Phase 5 (build, deploy, smoke test)
+status: executing
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-03-04T16:21:54.797Z"
+last_activity: 2026-03-04 — Completed Plan 01 of Phase 6 (observation quality enforcement)
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 7
+  completed_plans: 5
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Wave-based multi-agent pipeline producing self-sufficient hierarchical knowledge
-**Current focus:** Phase 5 — Wave Orchestration (complete)
+**Current focus:** Phase 6 — Entity Quality (in progress)
 
 ## Current Position
 
-Phase: 5 of 8 (Wave Orchestration)
-Plan: 4 of 4 in current phase (completed)
-Status: Phase 5 Complete
-Last activity: 2026-03-04 — Completed Plan 04 of Phase 5 (build, deploy, smoke test)
+Phase: 6 of 8 (Entity Quality)
+Plan: 1 of 3 in current phase (completed)
+Status: Phase 6 In Progress
+Last activity: 2026-03-04 — Completed Plan 01 of Phase 6 (observation quality enforcement)
 
 Progress: [██████████] 100%
 
@@ -53,6 +53,7 @@ Progress: [██████████] 100%
 | Phase 05 P03 | 4min | 2 tasks | 2 files |
 | Phase 05 P02 | 7min | 2 tasks | 2 files |
 | Phase 05 P04 | 15min | 3 tasks | 4 files |
+| Phase 06 P01 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Progress: [██████████] 100%
 - [Phase 05-02]: Ontology pre-population in mapEntityToSharedMemory prevents redundant LLM re-classification during persistence
 - [Phase 05-04]: No source code changes needed -- Plans 01-03 code compiled cleanly together (type-contract-first validated)
 - [Phase 05-04]: Both mock LLM and real LLM (groq/llama-3.3-70b) paths confirmed working for wave-analysis
+- [Phase 06-01]: Lenient isSpecificObservation: 80+ chars always pass, 30+ with code artifact indicator pass
+- [Phase 06-01]: Three-step observation validation: filter generic -> LLM retry -> supplement from description/hierarchy/CGR
+- [Phase 06-01]: Validation duplicated per agent class rather than shared utility to avoid cross-agent coupling
 
 ### Critical Pitfalls
 
@@ -90,6 +94,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T15:20:25.872Z
-Stopped at: Phase 6 context gathered
+Last session: 2026-03-04T16:21:39.103Z
+Stopped at: Completed 06-01-PLAN.md
 Resume with: Phase 6 planning needed
