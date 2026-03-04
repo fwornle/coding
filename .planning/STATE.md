@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Wave-Based Hierarchical Semantic Analysis
 status: planning
-last_updated: "2026-03-04T09:00:00.000Z"
+last_updated: "2026-03-04T10:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -18,24 +18,46 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Wave-based multi-agent pipeline producing self-sufficient hierarchical knowledge
-**Current focus:** v2.0 restarted — wave-based architecture replaces flat DAG approach
+**Current focus:** Phase 5 — Wave Orchestration (ready to plan)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-04 — Milestone v2.0 restarted with wave-based vision
+Phase: 5 of 8 (Wave Orchestration)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-03-04 — Roadmap created for v2.0 (4 phases, 19 requirements)
+
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0 (v2.0)
+- Average duration: -
+- Total execution time: 0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+**Recent Trend:**
+- Last 5 plans: -
+- Trend: -
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
 ### Decisions
 
 - [v2.0]: Replace flat DAG with wave-based multi-agent system
-- [v2.0]: Each wave operates at one hierarchy level (L0→L1→L2→L3)
+- [v2.0]: Each wave operates at one hierarchy level (L0->L1->L2->L3)
 - [v2.0]: Entities need rich observations (not one-liners) and insight documents
 - [v2.0]: VKB blue gradient: darker at stem (#1565c0), lighter at leaves (#bbdefb)
-- [v1.0→v2.0]: Hierarchy schema fields already shipped; 30 entities already in hierarchy
+- [v1.0->v2.0]: Hierarchy schema fields already shipped; 30 entities already in hierarchy
+- [v2.0]: QUAL-04 (insight links in VKB) assigned to Phase 8 (VKB) not Phase 6 (Quality)
 
 ### Critical Pitfalls
 
@@ -52,5 +74,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Defining v2.0 requirements (wave-based restart)
-Resume with: Continue milestone definition flow
+Stopped at: Roadmap created, ready to plan Phase 5
+Resume with: `/gsd:plan-phase 5`
