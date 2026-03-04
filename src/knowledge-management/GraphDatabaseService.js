@@ -287,9 +287,9 @@ export class GraphDatabaseService extends EventEmitter {
         if (this.graph.hasNode(collectiveKnowledgeId)) {
           const relationEdgeId = `${collectiveKnowledgeId}__includes__${nodeId}`;
           if (!this.graph.hasEdge(relationEdgeId)) {
-            this.graph.addEdge(collectiveKnowledgeId, nodeId, {
+            this.graph.addEdgeWithKey(relationEdgeId, collectiveKnowledgeId, nodeId, {
               id: relationEdgeId,
-              relation_type: 'includes',
+              type: 'includes',
               team: options.team,
               created_at: new Date().toISOString(),
               auto_generated: true
@@ -404,9 +404,9 @@ export class GraphDatabaseService extends EventEmitter {
 
       const relationEdgeId = `${collectiveKnowledgeId}__includes__${nodeId}`;
       if (!this.graph.hasEdge(relationEdgeId)) {
-        this.graph.addEdge(collectiveKnowledgeId, nodeId, {
+        this.graph.addEdgeWithKey(relationEdgeId, collectiveKnowledgeId, nodeId, {
           id: relationEdgeId,
-          relation_type: 'includes',
+          type: 'includes',
           team: team,
           created_at: new Date().toISOString(),
           auto_generated: true
@@ -619,7 +619,7 @@ export class GraphDatabaseService extends EventEmitter {
       const existingEdges = this.graph.edges(fromId, toId);
       for (const eid of existingEdges) {
         const edgeAttrs = this.graph.getEdgeAttributes(eid);
-        const edgeType = (edgeAttrs.type || '').replace(/\s+/g, '_'); // Normalize for comparison
+        const edgeType = (edgeAttrs.type || edgeAttrs.relation_type || '').replace(/\s+/g, '_'); // Normalize for comparison
         if (edgeType === normalizedType) {
           existingEdge = eid;
           break;
@@ -737,7 +737,7 @@ export class GraphDatabaseService extends EventEmitter {
     const edgeGroups = new Map();
 
     this.graph.forEachEdge((edgeId, attributes, source, target) => {
-      const normalizedType = normalizeType(attributes.type);
+      const normalizedType = normalizeType(attributes.type || attributes.relation_type);
       const key = `${source}__${normalizedType}__${target}`;
       if (!edgeGroups.has(key)) {
         edgeGroups.set(key, []);
@@ -1225,8 +1225,11 @@ export class GraphDatabaseService extends EventEmitter {
       // Filter by team (check edge metadata)
       if (team && attributes.team !== team) return;
 
+      // Normalize type: support both 'type' and legacy 'relation_type' attribute
+      const edgeType = attributes.type || attributes.relation_type;
+
       // Filter by relationship type
-      if (relationType && attributes.type !== relationType) return;
+      if (relationType && edgeType !== relationType) return;
 
       // Get entity names for from/to
       const sourceAttrs = this.graph.getNodeAttributes(source);
@@ -1237,7 +1240,7 @@ export class GraphDatabaseService extends EventEmitter {
         id: edge,
         from_entity_id: source,
         to_entity_id: target,
-        relation_type: attributes.type,
+        relation_type: edgeType,
         confidence: attributes.confidence !== undefined ? attributes.confidence : 1.0,
         team: attributes.team || 'default',
         created_at: attributes.created_at || new Date().toISOString(),

@@ -839,11 +839,13 @@
         },
         "aliases": {
           "type": "array",
-          "description": "Alternative names used to match entities to this component"
+          "description": "Alternative names used to match entities to this component",
+          "items": "string"
         },
         "keywords": {
           "type": "array",
-          "description": "Heuristic matching keywords for entity classification"
+          "description": "Heuristic matching keywords for entity classification",
+          "items": "string"
         },
         "level": {
           "type": "number",
