@@ -77,7 +77,7 @@ Plans:
   4. Reading any single hierarchy level (L1 components alone, or L2 sub-components alone) provides useful, self-contained knowledge without needing to drill into children
 **Plans:** 3 plans
 Plans:
-- [ ] 07-01-PLAN.md -- Type contracts, manifest write-back function, Docker mount change
+- [x] 07-01-PLAN.md -- Type contracts, manifest write-back function, Docker mount change
 - [ ] 07-02-PLAN.md -- Wire L3 suggestions and L1 keywords into wave agents, self-sufficiency prompts
 - [ ] 07-03-PLAN.md -- Build, deploy, smoke test, and human verification
 
@@ -101,5 +101,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 5. Wave Orchestration | 4/4 | Complete   | 2026-03-04 | - |
 | 6. Entity Quality | 3/3 | Complete   | 2026-03-04 | - |
-| 7. Hierarchy Completeness | v2.0 | 0/3 | Planned | - |
+| 7. Hierarchy Completeness | v2.0 | 1/3 | In Progress | - |
 | 8. VKB Tree Navigation | v2.0 | 0/? | Not started | - |
