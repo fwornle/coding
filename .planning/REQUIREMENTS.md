@@ -67,31 +67,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WAVE-01 | TBD | Pending |
-| WAVE-02 | TBD | Pending |
-| WAVE-03 | TBD | Pending |
-| WAVE-04 | TBD | Pending |
-| WAVE-05 | TBD | Pending |
-| WAVE-06 | TBD | Pending |
-| QUAL-01 | TBD | Pending |
-| QUAL-02 | TBD | Pending |
-| QUAL-03 | TBD | Pending |
-| QUAL-04 | TBD | Pending |
-| QUAL-05 | TBD | Pending |
-| HIER-01 | TBD | Pending |
-| HIER-02 | TBD | Pending |
-| HIER-03 | TBD | Pending |
-| HIER-04 | TBD | Pending |
-| VKB-01 | TBD | Pending |
-| VKB-02 | TBD | Pending |
-| VKB-03 | TBD | Pending |
-| VKB-04 | TBD | Pending |
+| WAVE-01 | Phase 5 | Pending |
+| WAVE-02 | Phase 5 | Pending |
+| WAVE-03 | Phase 5 | Pending |
+| WAVE-04 | Phase 5 | Pending |
+| WAVE-05 | Phase 5 | Pending |
+| WAVE-06 | Phase 5 | Pending |
+| QUAL-01 | Phase 6 | Pending |
+| QUAL-02 | Phase 6 | Pending |
+| QUAL-03 | Phase 6 | Pending |
+| QUAL-04 | Phase 8 | Pending |
+| QUAL-05 | Phase 6 | Pending |
+| HIER-01 | Phase 7 | Pending |
+| HIER-02 | Phase 7 | Pending |
+| HIER-03 | Phase 7 | Pending |
+| HIER-04 | Phase 7 | Pending |
+| VKB-01 | Phase 8 | Pending |
+| VKB-02 | Phase 8 | Pending |
+| VKB-03 | Phase 8 | Pending |
+| VKB-04 | Phase 8 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after milestone restart*
+*Last updated: 2026-03-04 — traceability updated with phase mappings*

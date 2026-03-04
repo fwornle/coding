@@ -2,77 +2,91 @@
 
 ## Milestones
 
-- ✅ **v1.0** — UKB Pipeline Fix & Improvement (shipped 2026-03-03) → [archive](milestones/v1.0-ROADMAP.md)
-- 🚧 **v2.0** — Hierarchical Knowledge Restructuring (Phases 5-7, in progress)
+- v1.0 -- UKB Pipeline Fix & Improvement (shipped 2026-03-03) -> [archive](milestones/v1.0-ROADMAP.md)
+- v2.0 -- Wave-Based Hierarchical Semantic Analysis (Phases 5-8, in progress)
 
 ---
 
 <details>
-<summary>✅ v1.0 UKB Pipeline Fix & Improvement — SHIPPED 2026-03-03</summary>
+<summary>v1.0 UKB Pipeline Fix & Improvement -- SHIPPED 2026-03-03</summary>
 
-- [x] Phase 1: Core Pipeline Data Quality (7/7 plans) — completed 2026-03-02
-- [x] Phase 4: Schema & Configuration Foundation (2/2 plans) — completed 2026-03-01
-- [ ] Phase 2: Insight Generation & Data Routing — Deferred
-- [ ] Phase 3: Significance & Quality Ranking — Deferred
+- [x] Phase 1: Core Pipeline Data Quality (7/7 plans) -- completed 2026-03-02
+- [x] Phase 4: Schema & Configuration Foundation (2/2 plans) -- completed 2026-03-01
+- [ ] Phase 2: Insight Generation & Data Routing -- Deferred
+- [ ] Phase 3: Significance & Quality Ranking -- Deferred
 
 </details>
 
 ---
 
-## v2.0 — Hierarchical Knowledge Restructuring
+## v2.0 -- Wave-Based Hierarchical Semantic Analysis
 
 ### Overview
 
-Three remaining phases that transform the flat knowledge graph (126 entities, 0 relations) into a navigable Project → Component → SubComponent → Detail hierarchy. Schema foundation (Phase 4) shipped in v1.0.
+Four phases that replace the flat batch DAG with a wave-based multi-agent system. Wave orchestration provides the execution model (Phase 5). Entity quality ensures each wave agent produces rich, documented knowledge (Phase 6). Hierarchy completeness drives comprehensive sub-node discovery from actual code analysis (Phase 7). VKB tree navigation exposes the hierarchy to users with drill-down and breadcrumbs (Phase 8). Foundation from v1.0: hierarchy schema fields, 30 entities organized L0-L3, component manifest, VKB blue gradient.
 
 ### Phases
 
-- [ ] **Phase 5: One-Time Migration** - Classify all 126 existing entities into the hierarchy, create scaffold nodes, merge generic entities into CodingPatterns, and store `contains` edges
-- [ ] **Phase 6: Pipeline Hierarchy Assignment** - Insert HierarchyClassifier into the coordinator pipeline so future `ukb full` runs slot new entities into the hierarchy automatically
-- [ ] **Phase 7: VKB Tree Navigation** - Add collapsible tree sidebar, breadcrumb navigation, and subtree filtering to the VKB viewer
+- [ ] **Phase 5: Wave Orchestration** - Replace flat batch DAG with hierarchical wave controller executing L0->L1->L2->L3 agents
+- [ ] **Phase 6: Entity Quality** - Rich multi-observation entities with detailed insight documents and PlantUML diagrams
+- [ ] **Phase 7: Hierarchy Completeness** - Comprehensive sub-node coverage reflecting actual architecture from code analysis
+- [ ] **Phase 8: VKB Tree Navigation** - Collapsible tree sidebar with subtree filtering, breadcrumbs, and insight links
 
 ### Phase Details
 
-#### Phase 5: One-Time Migration
-**Goal**: All existing entities are placed in the hierarchy with parent assignments, new scaffold nodes exist for the Coding root and all L1/L2 components, and generic entities are merged into CodingPatterns
+#### Phase 5: Wave Orchestration
+**Goal**: The pipeline executes analysis in sequential waves where each wave operates at one hierarchy level, producing parent nodes before spawning child-level agents
 **Depends on**: Phase 4 (v1.0, shipped)
-**Requirements**: MIGR-01, MIGR-02, MIGR-03, MIGR-04, MIGR-05
+**Requirements**: WAVE-01, WAVE-02, WAVE-03, WAVE-04, WAVE-05, WAVE-06
 **Success Criteria** (what must be TRUE):
-  1. `--dry-run` mode prints a classification report without modifying any data
-  2. After migration, `queryRelations({ relationType: 'contains' })` returns more than 100 edges
-  3. The Coding root node and at least 6 L1 component scaffold nodes exist with descriptions
-  4. Generic/low-value entities removed; observations rolled up on parent CodingPatterns node
-  5. `grep -c '\*\*' .data/knowledge-export/coding.json` returns 0
+  1. Running `ukb full` executes analysis in distinct waves visible in logs (Wave 1: L0/L1, Wave 2: L2, Wave 3: L3) rather than a single flat batch pass
+  2. Wave 1 produces a Project root node (L0) and Component nodes (L1) with summary observations before Wave 2 begins
+  3. Wave 2 agents each receive their parent L1 node context and produce SubComponent nodes (L2) with parent-child relationships set
+  4. Wave 3 agents produce Detail nodes (L3) linked to their L2 parents, with knowledge specific to that detail scope
+  5. Within each wave, multiple agents run in parallel (one per parent node being expanded), observable via concurrent log entries
 **Plans**: TBD
 
-#### Phase 6: Pipeline Hierarchy Assignment
-**Goal**: New entities produced by `ukb full` are automatically assigned to the correct component, and scaffold nodes survive repeated pipeline runs
+#### Phase 6: Entity Quality
+**Goal**: Every entity produced by wave agents carries rich, specific observations and a detailed insight document that makes the entity self-explanatory
 **Depends on**: Phase 5
-**Requirements**: PIPE-01, PIPE-02, PIPE-03, PIPE-04, PIPE-05, PIPE-06
+**Requirements**: QUAL-01, QUAL-02, QUAL-03, QUAL-05
 **Success Criteria** (what must be TRUE):
-  1. `ukb full` with `maxBatches: 1` produces entities with `hierarchyLevel` and `parentId` set
-  2. Second `ukb full` leaves scaffold nodes intact (dedup does not overwrite)
-  3. HierarchyClassifier uses keyword heuristics first, LLM for ambiguous (visible in logs)
-  4. Component/scaffold nodes protected from dedup/purge deletion
-  5. Hierarchy fields appear in `coding.json` for new entities
+  1. Each entity in the knowledge graph has 3 or more observations that are specific to that entity (not generic boilerplate)
+  2. Each entity has an associated insight document (markdown) containing architecture context, purpose description, and key patterns
+  3. Insight documents for architectural entities (Components, SubComponents) include rendered PlantUML diagrams
+  4. Insight documents reference related entities by name and describe parent-child relationships in context
 **Plans**: TBD
 
-#### Phase 7: VKB Tree Navigation
-**Goal**: Users can navigate the knowledge hierarchy in the VKB viewer with tree drill-down and breadcrumbs
-**Depends on**: Phase 5
-**Requirements**: VKB-01, VKB-02, VKB-03, VKB-04, VKB-05
+#### Phase 7: Hierarchy Completeness
+**Goal**: Wave analysis produces comprehensive sub-node trees that reflect real architectural structure discovered from code, with each level providing standalone useful knowledge
+**Depends on**: Phase 5, Phase 6
+**Requirements**: HIER-01, HIER-02, HIER-03, HIER-04
 **Success Criteria** (what must be TRUE):
-  1. Collapsible tree sidebar with Coding root, L1 components, and children
-  2. Clicking component node filters D3 graph to that subtree
-  3. Breadcrumb trail computed from `parentId` chain
-  4. D3 force layout renders correctly with `contains` edges
-  5. Entities without `parentId` appear in "Uncategorized" bucket
+  1. L1 component nodes have sub-node counts reflecting their actual complexity (e.g., a complex component like SemanticAnalysis has 8+ children, not 2-3)
+  2. Sub-node names and descriptions reflect real architectural aspects found in code (e.g., "BatchScheduler", "LLMRetryPolicy") rather than generic labels (e.g., "Pipeline", "Insights")
+  3. Running `ukb full` on an evolved codebase auto-extends the component manifest with newly discovered components or sub-components
+  4. Reading any single hierarchy level (L1 components alone, or L2 sub-components alone) provides useful, self-contained knowledge without needing to drill into children
+**Plans**: TBD
+
+#### Phase 8: VKB Tree Navigation
+**Goal**: Users can navigate the full knowledge hierarchy in the VKB viewer through a tree sidebar with drill-down, breadcrumbs, and direct access to insight documents
+**Depends on**: Phase 5 (wave data), Phase 7 (complete hierarchy)
+**Requirements**: VKB-01, VKB-02, VKB-03, VKB-04, QUAL-04
+**Success Criteria** (what must be TRUE):
+  1. VKB viewer shows a collapsible tree sidebar listing the full hierarchy (Project -> Components -> SubComponents -> Details)
+  2. Clicking any tree node filters the D3 graph view to show only that node and its subtree
+  3. Breadcrumb trail above the graph view shows the path from root to current context (e.g., Coding > SemanticAnalysis > BatchScheduler)
+  4. Blue gradient visualization is preserved -- darker shade at stem/root level (#1565c0), lighter at leaf level (#bbdefb)
+  5. Entity detail panel includes a "Detailed Insight" link that opens the entity's insight document
 **Plans**: TBD
 
 ### Progress
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 5. One-Time Migration | 0/? | Not started | - |
-| 6. Pipeline Hierarchy Assignment | 0/? | Not started | - |
-| 7. VKB Tree Navigation | 0/? | Not started | - |
+**Execution Order:** Phases execute sequentially: 5 -> 6 -> 7 -> 8
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 5. Wave Orchestration | v2.0 | 0/? | Not started | - |
+| 6. Entity Quality | v2.0 | 0/? | Not started | - |
+| 7. Hierarchy Completeness | v2.0 | 0/? | Not started | - |
+| 8. VKB Tree Navigation | v2.0 | 0/? | Not started | - |
