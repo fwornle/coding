@@ -28,7 +28,7 @@ Four phases that replace the flat batch DAG with a wave-based multi-agent system
 ### Phases
 
 - [x] **Phase 5: Wave Orchestration** - Replace flat batch DAG with hierarchical wave controller executing L0->L1->L2->L3 agents (completed 2026-03-04)
-- [ ] **Phase 6: Entity Quality** - Rich multi-observation entities with detailed insight documents and PlantUML diagrams
+- [x] **Phase 6: Entity Quality** - Rich multi-observation entities with detailed insight documents and PlantUML diagrams (completed 2026-03-04)
 - [ ] **Phase 7: Hierarchy Completeness** - Comprehensive sub-node coverage reflecting actual architecture from code analysis
 - [ ] **Phase 8: VKB Tree Navigation** - Collapsible tree sidebar with subtree filtering, breadcrumbs, and insight links
 
@@ -60,11 +60,11 @@ Plans:
   2. Each entity has an associated insight document (markdown) containing architecture context, purpose description, and key patterns
   3. Insight documents for architectural entities (Components, SubComponents) include rendered PlantUML diagrams
   4. Insight documents reference related entities by name and describe parent-child relationships in context
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 Plans:
-- [ ] 06-01-PLAN.md -- Enhance wave agent LLM prompts and add observation validation with retry/supplementation
-- [ ] 06-02-PLAN.md -- Wire InsightGenerationAgent into WaveController as finalization step with cross-references
-- [ ] 06-03-PLAN.md -- Build, deploy, smoke test, and human verification
+- [x] 06-01-PLAN.md -- Enhance wave agent LLM prompts and add observation validation with retry/supplementation
+- [x] 06-02-PLAN.md -- Wire InsightGenerationAgent into WaveController as finalization step with cross-references
+- [x] 06-03-PLAN.md -- Build, deploy, smoke test, and human verification
 
 #### Phase 7: Hierarchy Completeness
 **Goal**: Wave analysis produces comprehensive sub-node trees that reflect real architectural structure discovered from code, with each level providing standalone useful knowledge
@@ -96,6 +96,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 5. Wave Orchestration | 4/4 | Complete   | 2026-03-04 | - |
-| 6. Entity Quality | v2.0 | 0/3 | Planned | - |
+| 6. Entity Quality | 3/3 | Complete   | 2026-03-04 | - |
 | 7. Hierarchy Completeness | v2.0 | 0/? | Not started | - |
 | 8. VKB Tree Navigation | v2.0 | 0/? | Not started | - |
