@@ -2,19 +2,24 @@
 
 ## What This Is
 
-An agentic coding environment with a multi-agent UKB analysis pipeline, knowledge graph storage (Graphology + LevelDB), and VKB viewer. The pipeline analyzes codebases to produce knowledge entities with observations and insight documents. v1.0 shipped a working pipeline with correct pattern extraction, entity naming, and LLM-synthesized observations. v2.0 restructures the flat knowledge graph (126 entities) into a navigable hierarchy.
+An agentic coding environment with a multi-agent UKB analysis pipeline, knowledge graph storage (Graphology + LevelDB), and VKB viewer. The pipeline analyzes codebases to produce knowledge entities with observations and insight documents. v1.0 shipped a working pipeline with correct pattern extraction, entity naming, and LLM-synthesized observations. v2.0 replaces the flat batch DAG with a wave-based multi-agent system that builds hierarchical knowledge top-down: project survey → component deep-dive → detail expansion.
 
 ## Core Value
 
-The knowledge graph must be organized as a navigable hierarchy (Project → Component → SubComponent → Detail) so users can drill into specific areas and the pipeline produces well-placed, contextual knowledge — not a flat soup of disconnected entities.
+The semantic analysis pipeline must operate as a hierarchical wave-based multi-agent system — not a flat DAG — producing self-sufficient knowledge at every level, with rich observations, detailed insight documents, and proper parent-child structure from stem to leaves.
 
-## Current Milestone: v2.0 Hierarchical Knowledge Restructuring
+## Current Milestone: v2.0 Wave-Based Hierarchical Semantic Analysis
 
-**Goal:** Transform the flat knowledge graph into a tree structure with curated component nodes, merge generic entities, update the pipeline to maintain hierarchy on future runs, and add tree navigation to the VKB viewer.
+**Goal:** Revamp the UKB pipeline from a flat batch DAG into a multi-agent system operating in hierarchical waves. Wave 1 identifies project building blocks with comprehensive summaries. Wave 2 creates sub-nodes for each component with detailed insights (md, puml/png). Wave 3+ adds sub-sub-nodes with increasing detail. Each hierarchy level is self-sufficient and useful on its own.
 
-**Foundation shipped (v1.0 Phase 4):** TypeScript interfaces extended with hierarchy fields, component manifest authored, ontology types added.
+**Foundation available:** Hierarchy fields in schema (v1.0 Phase 4), 30 entities already organized L0→L3 (migration script), VKB blue gradient (darker at stem, lighter at leaves).
 
-**Remaining:** Phase 5 (migration), Phase 6 (pipeline), Phase 7 (VKB tree nav)
+**Key changes from flat DAG:**
+- Pipeline runs in waves (L0→L1→L2→L3), not a single flat pass
+- Each wave spawns agents focused on one hierarchy level
+- Observations are rich and numerous (not one-liner stubs)
+- Every entity gets detailed insight documents (markdown + PlantUML)
+- Sub-nodes reflect actual architecture, not just "Pipeline" / "Insights"
 
 ## Requirements
 
@@ -32,33 +37,37 @@ The knowledge graph must be organized as a navigable hierarchy (Project → Comp
 
 ### Active
 
-- [ ] One-time migration of existing entities into hierarchy (MIGR-01..05)
-- [ ] Pipeline hierarchy assignment for future runs (PIPE-01..06)
-- [ ] VKB tree navigation with drill-down and breadcrumbs (VKB-01..05)
+- [ ] Wave-based pipeline orchestration (replaces flat batch DAG)
+- [ ] Rich multi-observation entities with detailed insight documents
+- [ ] Hierarchical agent spawning (wave 1→2→3)
+- [ ] VKB tree navigation with drill-down and breadcrumbs
+- [ ] Self-sufficient knowledge at each hierarchy level
 
 ### Out of Scope
 
-- v1.0 deferred work (insight documents, significance scoring) — revisit after v2.0
+- v1.0 deferred work (significance scoring) — revisit after v2.0
 - Changing the MCP server interface — `ukb full` invocation stays the same
-- Agent framework rewrite — custom framework is architecturally sound
+- Agent framework rewrite — extend existing coordinator, don't rewrite
 - Real-time pipeline monitoring — v2+ concern
 
 ## Context
 
 - **Pipeline location:** `integrations/mcp-server-semantic-analysis`
 - **Knowledge graph storage:** `.data/knowledge-graph/` (Graphology + LevelDB + JSON exports)
-- **Export file:** `.data/knowledge-export/coding.json` (126 entities, flat structure)
+- **Export file:** `.data/knowledge-export/coding.json` (30 entities, hierarchical L0→L3)
 - **VKB viewer:** `vkb` command, runs on http://localhost:8080
-- **Key interface:** `KGEntity` in `kg-operators.ts` — hierarchy fields added (parentId, level, hierarchyPath)
+- **Key interface:** `KGEntity` in `kg-operators.ts` — hierarchy fields (parentId, level, hierarchyPath)
 - **Component manifest:** `config/component-manifest.yaml` — 8 L1 + 5 L2 components
-- **v1.0 shipped:** 2026-03-03, 2 phases, 9 plans, 12/12 requirements satisfied
+- **Current pipeline:** DAG steps in `coordinator.ts` — batch extraction → observation synthesis → persistence
+- **Current problem:** Entities have 1 banal observation each, 2-3 sub-nodes per component (should be many more)
 
 ## Constraints
 
 - **Storage:** Must work with existing Graphology + LevelDB infrastructure
 - **Interface:** `ukb full` / `mcp__semantic-analysis__execute_workflow` must remain unchanged
-- **Architecture:** Build on existing multi-agent pipeline; add hierarchy support, don't redesign
+- **Architecture:** Extend existing coordinator; add wave orchestration on top of DAG
 - **Backward compat:** VKB viewer must still display entities even if hierarchy features aren't fully loaded
+- **Build pipeline:** Submodule build + Docker rebuild required for pipeline changes
 
 ## Key Decisions
 
@@ -68,9 +77,9 @@ The knowledge graph must be organized as a navigable hierarchy (Project → Comp
 | Keep batched execution mode | Working and wanted | ✓ Good |
 | Defer v1.0 Phases 2-3 | Pipeline quality is good enough; hierarchy is higher priority | ✓ Good (shipped v1.0) |
 | All hierarchy fields optional (?) | Full backward compatibility | ✓ Good |
-| Selective merge of existing entities | Merge generic, keep high-value leaves | — Pending |
-| Manifest-first, LLM-fallback classification | Keyword aliases cover ~80%, LLM handles ~20% | — Pending |
-| Phase 7 depends on Phase 5 not Phase 6 | Can run after migration data exists | — Pending |
+| Replace flat DAG with wave-based agents | Flat pass produces shallow knowledge; waves produce depth | — Pending |
+| Wave-per-level architecture | Each wave operates at one hierarchy level, spawns next | — Pending |
+| Rich observations + insight docs per entity | One-liner observations are insufficient for useful knowledge | — Pending |
 
 ---
-*Last updated: 2026-03-03 after v1.0 milestone completion*
+*Last updated: 2026-03-04 after v2.0 milestone restart (wave-based)*
