@@ -1589,8 +1589,35 @@ class SystemHealthAPIServer {
             // Initialize progress file with debug/test settings BEFORE starting workflow
             // This ensures the coordinator sees these settings from the very first step
             const progressPath = join(codingRoot, '.data', 'workflow-progress.json');
+
+            // Check for existing active workflow and kill it before starting a new one
+            if (existsSync(progressPath)) {
+                try {
+                    const existing = JSON.parse(readFileSync(progressPath, 'utf8'));
+                    if (existing.status === 'running' || existing.status === 'starting') {
+                        if (existing.pid && typeof existing.pid === 'number') {
+                            try { process.kill(existing.pid, 'SIGTERM'); } catch (e) { /* already dead */ }
+                        }
+                        const existingAbortPath = join(codingRoot, '.data', 'workflow-abort.json');
+                        writeFileSync(existingAbortPath, JSON.stringify({
+                            abort: true,
+                            workflowId: existing.workflowId || existing.executionId,
+                            reason: 'Replaced by new workflow start'
+                        }));
+                        // Brief delay to let abort signal propagate
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // Clean up abort file so new workflow doesn't immediately abort
+                        try { unlinkSync(existingAbortPath); } catch (e) { /* ignore */ }
+                    }
+                } catch (e) {
+                    // Ignore parse errors on stale progress file
+                }
+            }
+
+            const workflowId = `wf-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
             const initialProgress = {
                 status: 'starting',
+                workflowId,
                 workflowName,
                 team,
                 repositoryPath: repoPath,
