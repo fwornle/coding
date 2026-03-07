@@ -60,13 +60,12 @@ providers:
     premium: "o4-mini"
 
 # Default provider priority per tier
-# Copilot first — scales beautifully with parallelism (0.77s effective @10 concurrent)
-# Batch agents already use Promise.all, so copilot as primary unlocks peak throughput
-# Groq second as fast API fallback, then claude-code, then paid APIs
+# Groq first — fastest API provider with reliable availability (~2-3s per call)
+# Copilot/claude-code proxy can timeout at 30s, so they come after groq
 provider_priority:
-  fast: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
-  standard: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
-  premium: ["copilot", "groq", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  fast: ["groq", "copilot", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  standard: ["groq", "copilot", "claude-code", "anthropic", "openai", "gemini", "github-models"]
+  premium: ["groq", "copilot", "claude-code", "anthropic", "openai", "gemini", "github-models"]
 
 # Task-level provider priority overrides
 # Overrides the tier-based priority for specific tasks that need different routing
