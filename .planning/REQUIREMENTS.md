@@ -118,30 +118,30 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AGNT-01 | — | Pending |
-| AGNT-02 | — | Pending |
-| AGNT-03 | — | Pending |
-| AGNT-04 | — | Pending |
-| AGNT-05 | — | Pending |
-| KGOP-01 | — | Pending |
-| KGOP-02 | — | Pending |
-| KGOP-03 | — | Pending |
-| KGOP-04 | — | Pending |
-| KGOP-05 | — | Pending |
-| KGOP-06 | — | Pending |
-| QUAL-06 | — | Pending |
-| QUAL-07 | — | Pending |
-| QUAL-08 | — | Pending |
-| QUAL-09 | — | Pending |
-| OBSV-01 | — | Pending |
-| OBSV-02 | — | Pending |
-| OBSV-03 | — | Pending |
-| OBSV-04 | — | Pending |
+| AGNT-01 | Phase 9 | Pending |
+| AGNT-02 | Phase 9 | Pending |
+| AGNT-03 | Phase 9 | Pending |
+| AGNT-04 | Phase 9 | Pending |
+| AGNT-05 | Phase 9 | Pending |
+| KGOP-01 | Phase 10 | Pending |
+| KGOP-02 | Phase 10 | Pending |
+| KGOP-03 | Phase 10 | Pending |
+| KGOP-04 | Phase 10 | Pending |
+| KGOP-05 | Phase 10 | Pending |
+| KGOP-06 | Phase 10 | Pending |
+| QUAL-06 | Phase 11 | Pending |
+| QUAL-07 | Phase 11 | Pending |
+| QUAL-08 | Phase 11 | Pending |
+| QUAL-09 | Phase 11 | Pending |
+| OBSV-01 | Phase 12 | Pending |
+| OBSV-02 | Phase 12 | Pending |
+| OBSV-03 | Phase 12 | Pending |
+| OBSV-04 | Phase 12 | Pending |
 
 **Coverage:**
 - v2.1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
-*Last updated: 2026-03-07*
+*Last updated: 2026-03-07 after v2.1 roadmap creation*
