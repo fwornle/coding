@@ -57,12 +57,12 @@ export function useWorkflowDefinitions(workflowName?: string) {
   // The API may return partial data, so we need constants as a safety net
   // Constants take precedence for critical mappings (like operator_* → kg_operators)
   return {
-    agents: agents.length > 0 ? agents : WORKFLOW_AGENTS,
+    agents: agents?.length > 0 ? agents : WORKFLOW_AGENTS,
     orchestrator: orchestrator || ORCHESTRATOR_NODE,
-    edges: edges.length > 0 ? edges : MULTI_AGENT_EDGES,
-    stepToAgent: { ...STEP_TO_AGENT, ...stepToAgent },  // Merge: constants first, API overrides
-    stepToSubStep: { ...STEP_TO_SUBSTEP, ...stepToSubStep },  // Merge: constants first, API overrides
-    agentSubSteps: { ...AGENT_SUBSTEPS, ...agentSubSteps },  // Merge: constants first, API overrides
+    edges: edges?.length > 0 ? edges : MULTI_AGENT_EDGES,
+    stepToAgent: { ...STEP_TO_AGENT, ...(stepToAgent || {}) },  // Merge: constants first, API overrides
+    stepToSubStep: { ...STEP_TO_SUBSTEP, ...(stepToSubStep || {}) },  // Merge: constants first, API overrides
+    agentSubSteps: { ...AGENT_SUBSTEPS, ...(agentSubSteps || {}) },  // Merge: constants first, API overrides
     isLoading,
     error
   }

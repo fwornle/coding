@@ -406,6 +406,15 @@ export const STEP_TO_AGENT: Record<string, string> = {
   'generate_insights': 'insight_generation',
   'final_dedup': 'deduplication',
   'final_validation': 'content_validation',
+  // Wave-analysis sub-steps (map to existing agents for graph visualization)
+  'wave1_init': 'batch_scheduler',
+  'wave1_analyze': 'semantic_analysis',
+  'wave1_persist': 'persistence',
+  'wave2_analyze': 'semantic_analysis',
+  'wave2_persist': 'persistence',
+  'wave3_analyze': 'semantic_analysis',
+  'wave3_persist': 'persistence',
+  'wave4_insights': 'insight_generation',
   // Complete/incremental workflow steps
   'git_history': 'git_history',
   'vibe_history': 'vibe_history',
