@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
 status: executing
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-03-07T13:52:18.228Z"
-last_activity: 2026-03-07 -- Completed 10-02 KG Operator Logic
+stopped_at: Completed 10-03-PLAN.md
+last_updated: "2026-03-07T17:45:00.000Z"
+last_activity: 2026-03-07 -- Completed 10-03 KG Operator Wiring
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 88
+  completed_plans: 6
+  percent: 96
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Wave-based multi-agent pipeline producing self-sufficient hierarchical knowledge
-**Current focus:** Phase 10 in progress -- KG operator logic complete, wiring next
+**Current focus:** Phase 10 complete -- all KG operators wired and verified
 
 ## Current Position
 
-Phase: 10 of 12 (KG Operations Restoration) -- IN PROGRESS
-Plan: 2 of 3 (10-01 and 10-02 complete)
+Phase: 10 of 12 (KG Operations Restoration) -- COMPLETE
+Plan: 3 of 3 (all complete)
 Status: Executing
-Last activity: 2026-03-07 -- Completed 10-02 KG Operator Logic
+Last activity: 2026-03-07 -- Completed 10-03 KG Operator Wiring
 
-Progress: [█████████░] 88%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (v2.1)
-- Average duration: 3min
-- Total execution time: 13min
+- Total plans completed: 6 (v2.1)
+- Average duration: 5min
+- Total execution time: 28min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -46,6 +46,7 @@ Progress: [█████████░] 88%
 | 09    | 03   | 4min     | 2     | 3     |
 | 10    | 01   | 2min     | 2     | 3     |
 | 10    | 02   | 2min     | 2     | 1     |
+| 10    | 03   | 15min    | 2     | 3     |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Progress: [█████████░] 88%
 - [Phase 10]: Used spawn instead of execFile for stdin piping to Python subprocess
 - [Phase 10]: Graceful fallback returns empty arrays on embedding failure rather than throwing
 - [Phase 10]: Batch all entities in one subprocess call per locked decision
+- [10-03]: Operators called individually (not applyAll) for per-operator dashboard progress
+- [10-03]: Operator message-to-step-name mapping in updateProgress for correct progress tracking
 
 ### Critical Pitfalls
 
@@ -78,7 +81,7 @@ Progress: [█████████░] 88%
 - **LevelDB/JSON sync**: Must use GraphDatabaseAdapter, not GraphDatabaseService
 - **Docker rebuild**: Pipeline changes require submodule build + Docker rebuild
 - **Wave agents use own LLM calls**: Not routed through SemanticAnalyzer -- no trace data (Phase 9 fixes this)
-- **KG operators never called**: Wave persistence skips conv/aggr/embed/dedup/pred/merge (Phase 10 fixes this)
+- **KG operators never called**: FIXED in 10-03 -- all 6 operators wired between wave3_persist and wave4_insights
 
 ### Blockers/Concerns
 
@@ -86,6 +89,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T13:52:15.101Z
-Stopped at: Completed 10-01-PLAN.md
-Resume with: `/gsd:execute-phase 10` (Plan 10-03 next)
+Last session: 2026-03-07T17:45:00.000Z
+Stopped at: Completed 10-03-PLAN.md
+Resume with: `/gsd:execute-phase 11` (Phase 11 next)
