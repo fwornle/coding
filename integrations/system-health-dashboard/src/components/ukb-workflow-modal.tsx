@@ -1474,9 +1474,42 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
             {/* Main Content - 3 column layout: [Left Info | Graph | Details] */}
             <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
-              {/* Left Column: Legend */}
+              {/* Left Column: Legend + optional Wave Indicator */}
               <div className="w-36 flex-shrink-0 flex flex-col gap-3">
                 <WorkflowLegend />
+                {/* Wave progress indicator for wave-analysis workflows */}
+                {activeCurrentProcess.workflowName === 'wave-analysis' && (() => {
+                  const WAVE_LABELS: Record<number, string> = { 1: 'Project & Components', 2: 'SubComponents', 3: 'Details', 4: 'Insight Docs' }
+                  // Derive wave statuses from sub-steps (each wave's last sub-step determines completion)
+                  const steps = activeCurrentProcess.steps || []
+                  const waveStatuses = [1, 2, 3, 4].map(waveNum => {
+                    const waveSteps = steps.filter((s: { name: string }) => s.name.startsWith(`wave${waveNum}_`))
+                    if (waveSteps.some((s: { status: string }) => s.status === 'running')) return 'running'
+                    if (waveSteps.length > 0 && waveSteps.every((s: { status: string }) => s.status === 'completed')) return 'completed'
+                    if (waveSteps.some((s: { status: string }) => s.status === 'completed')) return 'running'
+                    return 'pending'
+                  })
+                  return (
+                    <div className="border rounded-md p-2 bg-muted/30">
+                      <div className="text-xs font-semibold text-muted-foreground mb-1.5">Waves</div>
+                      <div className="space-y-1">
+                        {waveStatuses.map((status, idx) => {
+                          const waveNum = idx + 1
+                          return (
+                            <div key={waveNum} className="flex items-center gap-1.5 text-xs">
+                              {status === 'completed' && <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />}
+                              {status === 'running' && <Loader2 className="h-3 w-3 text-blue-500 animate-spin flex-shrink-0" />}
+                              {status === 'pending' && <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+                              <span className={status === 'running' ? 'text-blue-700 font-medium' : status === 'completed' ? 'text-green-700' : 'text-muted-foreground'}>
+                                W{waveNum}: {WAVE_LABELS[waveNum]}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Center: Workflow Graph - key only changes on workflow identity, not step updates */}

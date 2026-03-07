@@ -3186,7 +3186,14 @@ export function UKBNodeDetailsSidebar({
       }
     }
     // Fall back to top-level steps for non-batch steps or if batch step not found
-    return process.steps?.find(s => STEP_TO_AGENT[s.name] === agentId || s.name === agentId)
+    // When multiple steps map to the same agent (e.g., wave1_analyze, wave2_analyze → semantic_analysis),
+    // pick the most relevant: running > failed > completed > pending
+    const STATUS_PRIORITY: Record<string, number> = { running: 4, failed: 3, completed: 2, pending: 1, skipped: 0 }
+    const agentSteps = (process.steps || []).filter(s => STEP_TO_AGENT[s.name] === agentId || s.name === agentId)
+    if (agentSteps.length === 0) return undefined
+    return agentSteps.reduce((best, step) =>
+      (STATUS_PRIORITY[step.status] || 0) > (STATUS_PRIORITY[best.status] || 0) ? step : best
+    )
   }, [agentId, isBatchWorkflow, currentBatch, process.steps])
 
   // Use same fallback logic as getNodeStatus in the graph

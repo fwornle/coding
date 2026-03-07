@@ -22,7 +22,7 @@
 **"ukb", "full ukb", "ukb full"** → PRODUCTION mode (real LLM calls, runs continuously):
 ```
 mcp__semantic-analysis__execute_workflow
-  workflow_name: "batch-analysis"
+  workflow_name: "wave-analysis"
   async_mode: true
   parameters: {team: "coding"}
 ```
@@ -30,7 +30,7 @@ mcp__semantic-analysis__execute_workflow
 **"ukb full debug", "ukb debug"** → DEBUG mode (mock LLM, single-step):
 ```
 mcp__semantic-analysis__execute_workflow
-  workflow_name: "batch-analysis"
+  workflow_name: "wave-analysis"
   async_mode: true
   debug: true
   parameters: {team: "coding", singleStepMode: true, mockLLM: true, stepIntoSubsteps: true}
