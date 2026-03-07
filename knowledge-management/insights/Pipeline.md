@@ -2,103 +2,121 @@
 
 **Type:** SubComponent
 
-PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.json steps, each step declaring explicit depends_on edges
+PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
 
 ## What It Is  
 
-The **Pipeline** sub‑component lives inside the `SemanticAnalysis` parent and is defined primarily through the JSON file **`pipeline-configuration.json`**.  This file enumerates every pipeline step together with an explicit `depends_on` list that forms a directed‑acyclic graph (DAG).  At runtime the **`PipelineCoordinator`** reads this configuration, builds the DAG, and drives execution by applying a topological sort.  The coordinator is the entry point for the pipeline; it creates a **`PipelineConfigurator`** to translate the JSON into an in‑memory graph, a **`DAGDependencyResolver`** to compute the execution order, and a **`ConcurrentExecutor`** that actually runs the steps.  Supporting agents such as **`ObservationGenerator`**, **`KGOperator`**, **`DeduplicationAgent`**, **`PersistenceAgent`**, and **`PipelineAgent`** provide the concrete work that each step performs – from enriching entities with metadata to persisting them in the graph database and handling failures.
+The **Pipeline** sub‑component lives inside the **SemanticAnalysis** parent component and is the engine that drives the end‑to‑end processing of knowledge‑graph entities. Its definition is anchored in the file **`pipeline-configuration.yaml`**, which declares every step of the workflow together with explicit `depends_on` edges that form a directed‑acyclic graph (DAG). At runtime the **`PipelineController`** reads this YAML file, builds the DAG, and executes the steps in a topologically‑sorted order. The controller works hand‑in‑hand with **`PipelineCoordinator.runPipeline()`**, which is responsible for orchestrating the step execution, handling any runtime errors and applying retry logic where needed. Supporting agents such as **`ObservationGenerator.mapEntityToKG()`**, **`PersistenceAgent.persistEntity()`**, and **`KGOperator.applyDeduplication()`** are invoked as individual pipeline steps, each contributing a focused piece of functionality (metadata pre‑population, transactional persistence, and deduplication respectively).  
 
-## Architecture and Design  
-
-The pipeline follows a **DAG‑based execution architecture**.  By declaring explicit `depends_on` edges in `pipeline-configuration.json`, the system guarantees a deterministic, cycle‑free ordering of work.  The **`DAGDependencyResolver`** consumes this configuration and produces a topologically sorted list of steps, which is the classic algorithmic pattern for dependency resolution.  Execution is delegated to the **`ConcurrentExecutor`**, which employs a **thread‑pool with work‑stealing** (implemented in `KGOperator.runWithConcurrency()`).  A shared `nextIndex` counter lets idle workers pull the next ready task immediately, maximizing CPU utilisation without the overhead of a central scheduler.
-
-Error handling is encapsulated in **`PipelineAgent.handlePipelineFailure()`**, which applies **exponential back‑off retry logic** to transient failures, ensuring robustness without overwhelming downstream services.  Data quality is enforced early by **`DeduplicationAgent.removeDuplicates()`**, which uses a **Bloom filter** – a space‑efficient probabilistic data structure – to filter out duplicate entities before they enter the graph.  Finally, **`PersistenceAgent.persistEntity()`** writes enriched entities and their relationships through a **graph‑database adapter**, a pattern shared across the `SemanticAnalysis` component for consistent storage semantics.
-
-## Implementation Details  
-
-1. **Pipeline configuration** – The file `pipeline-configuration.json` contains an array of step objects, each with a `name` and a `depends_on` list.  `PipelineConfigurator.configurePipeline()` parses this file, validates the DAG (rejecting cycles), and builds an internal representation (likely a map of step name → step object plus adjacency lists).  
-
-2. **Dependency resolution** – `DAGDependencyResolver` receives the configured graph and runs a topological sort (Kahn’s algorithm or DFS‑based).  The result is an ordered queue that respects all declared dependencies, guaranteeing that a step is only scheduled once its predecessors have completed.  
-
-3. **Concurrent execution** – `ConcurrentExecutor` creates a fixed‑size thread pool.  Each worker calls `KGOperator.runWithConcurrency()`, which increments a shared atomic `nextIndex` to fetch the next step from the sorted queue.  When a worker finishes its current step, it immediately attempts to steal work by re‑reading `nextIndex`, ensuring that no thread stays idle while work remains.  
-
-4. **Entity enrichment** – `ObservationGenerator.mapEntityToObservation()` is invoked by pipeline steps that need to generate observations.  It pre‑populates fields such as `entityType` and `metadata.observationClass`, avoiding repeated look‑ups later in the pipeline.  
-
-5. **Deduplication** – Before persisting, `DeduplicationAgent.removeDuplicates()` checks each entity against a Bloom filter.  The filter’s false‑positive rate is tuned to the expected volume of entities, providing fast O(1) checks with minimal memory overhead.  
-
-6. **Persistence** – `PersistenceAgent.persistEntity()` hands the enriched, deduplicated entity to a **graph‑database adapter** (the same adapter used by sibling components like `OntologyManager` and `KnowledgeGraphConstructor`).  This adapter abstracts the underlying graph store (e.g., Neo4j or JanusGraph) and handles relationship creation atomically.  
-
-7. **Failure handling** – If any step throws a recoverable exception, `PipelineAgent.handlePipelineFailure()` schedules a retry with exponential back‑off (e.g., 100 ms → 200 ms → 400 ms … up to a configurable ceiling).  After exhausting retries, the failure is propagated upward, allowing the `PipelineCoordinator` to decide whether to abort the whole pipeline or continue with independent branches.
-
-## Integration Points  
-
-The **Pipeline** is tightly coupled with its parent `SemanticAnalysis`.  All agents that participate in the pipeline (e.g., `ObservationGenerator`, `KGOperator`, `DeduplicationAgent`, `PersistenceAgent`) are part of the broader multi‑agent ecosystem described in the parent’s documentation.  The **graph‑database adapter** used by `PersistenceAgent` is the same abstraction employed by sibling components such as `OntologyManager` and `KnowledgeGraphConstructor`, ensuring a unified persistence contract across the system.  
-
-`PipelineCoordinator` is invoked by the sibling component **`SemanticAnalysisPipeline.PipelineOrchestrator.orchestratePipeline()`**, which acts as the external trigger for the whole pipeline run.  The orchestrator passes runtime parameters (e.g., the specific `pipeline-configuration.json` version) to the coordinator.  Downstream, the **`Insights`** sibling consumes the persisted entities via GraphQL queries to generate rule‑based insights (`InsightGenerator.generateInsights()`).  Upstream, the **`DataIngestion`** sibling supplies raw entities that flow into the pipeline through the `ObservationGenerator`.  
-
-The **`ConcurrentExecutor`** shares its thread‑pool implementation with other concurrent agents in the parent component (e.g., the work‑stealing logic in `KGOperator` mirrors the pattern used in the `ContentValidation` agents), reinforcing a consistent concurrency model across the codebase.
-
-## Usage Guidelines  
-
-1. **Define clear dependencies** – When adding a new step to `pipeline-configuration.json`, always list its direct predecessors in `depends_on`.  The DAG validator will reject cycles, so ensure the graph remains acyclic.  
-
-2. **Leverage pre‑populated metadata** – Use `ObservationGenerator.mapEntityToObservation()` early in a step if you need `entityType` or `metadata.observationClass`.  Relying on this method avoids redundant look‑ups and keeps downstream agents lightweight.  
-
-3. **Respect the concurrency contract** – Do not block the thread inside a step longer than necessary.  If a step must perform I/O, prefer asynchronous APIs or off‑load the work to a dedicated worker pool.  The work‑stealing mechanism assumes that tasks complete promptly to keep the pool saturated.  
-
-4. **Tune the Bloom filter** – The `DeduplicationAgent`’s filter size and hash count are configured via environment variables.  Adjust these values when the expected entity volume changes to keep the false‑positive rate within acceptable bounds.  
-
-5. **Handle retries gracefully** – When writing custom steps, throw recoverable exceptions (e.g., network timeouts) that `PipelineAgent.handlePipelineFailure()` can catch.  For non‑recoverable errors, raise a distinct exception type so the coordinator can abort the pipeline cleanly.  
-
-6. **Persist through the adapter only** – Direct database calls bypassing the graph‑database adapter break the abstraction and may cause schema mismatches.  Always route persistence through `PersistenceAgent.persistEntity()`.  
+Because **Pipeline** is a child of the **`DagBasedExecutionModel`** entity, the DAG construction logic lives inside that child component, while the surrounding agents are siblings to other SemanticAnalysis agents like **Ontology**, **Insights**, **CodeKnowledgeGraph**, **EntityValidator**, **LLMFacade**, **WorkflowOrchestrator**, **GraphDatabaseAdapter**, and **MemgraphAdapter**. This positioning makes the Pipeline the central orchestrator that strings together the capabilities offered by those sibling agents into a coherent, data‑driven workflow.
 
 ---
 
-### 1. Architectural patterns identified  
-* **DAG‑based execution** (topological sort) – ensures deterministic ordering.  
-* **Work‑stealing thread pool** – maximizes parallelism while minimizing idle threads.  
-* **Bloom‑filter deduplication** – fast, memory‑efficient duplicate detection.  
-* **Exponential back‑off retry** – resilient handling of transient failures.  
-* **Adapter pattern** for graph‑database access – isolates storage implementation.
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Explicit DAG in JSON** trades flexibility for compile‑time safety; adding steps is straightforward but requires careful dependency specification.  
-* **Work‑stealing** improves throughput at the cost of slightly more complex synchronization (shared `nextIndex`).  
-* **Bloom filter** offers O(1) checks but introduces a controllable false‑positive rate; the system accepts occasional redundant persistence to keep memory usage low.  
-* **Retry with exponential back‑off** balances rapid recovery against overload risk, but may increase overall latency for persistently failing steps.  
+The architecture that emerges from the observations is a **DAG‑driven, step‑oriented pipeline** built on top of a declarative configuration file. The key design pattern is **Declarative Workflow Definition**: the `pipeline-configuration.yaml` file lists steps and their `depends_on` relationships, allowing the system to infer execution order without hard‑coding it. The **`PipelineController`** materialises this pattern by parsing the YAML, constructing a **DagBasedExecutionModel**, and applying a **topological sort** to produce a deterministic execution sequence.  
 
-### 3. System structure insights  
-The pipeline is a self‑contained execution engine nested under `SemanticAnalysis`.  Its children (`DAGDependencyResolver`, `PipelineConfigurator`, `ConcurrentExecutor`) form a clear pipeline construction → ordering → execution chain.  Shared services (graph‑database adapter, work‑stealing thread pool) are reused by sibling components, reinforcing a cohesive architectural layer across the parent component.
+Error handling and resilience are addressed through the **Coordinator pattern** embodied by **`PipelineCoordinator.runPipeline()`**. This component wraps each step execution with try‑catch logic, logs failures, and triggers configurable retries, ensuring that transient issues do not abort the whole workflow.  
 
-### 4. Scalability considerations  
-* **Horizontal scaling** can be achieved by increasing the thread‑pool size in `ConcurrentExecutor`; the work‑stealing design automatically distributes tasks.  
-* **Bloom filter sizing** must be revisited as entity volume grows to keep false‑positive rates low.  
-* **DAG complexity** impacts the cost of topological sorting, but this is a one‑time O(V+E) operation per pipeline run, which scales linearly with step count.  
-* **Graph‑database throughput** becomes the bottleneck when many entities are persisted concurrently; the adapter may need connection pooling or batch writes to sustain load.
+Data integrity is guaranteed by a **Transactional Persistence pattern** implemented in **`PersistenceAgent.persistEntity()`**. Each step that writes to the knowledge graph does so within a transaction scope, committing only when the step completes successfully. This aligns with the overall pipeline’s need for **atomicity** across multiple dependent steps.  
 
-### 5. Maintainability assessment  
-The use of declarative JSON for pipeline definition, together with isolated responsibilities (configuration, dependency resolution, execution, observation mapping, deduplication, persistence, failure handling), yields high modularity.  Each concern lives in a dedicated class, making unit testing straightforward.  However, the reliance on a shared `nextIndex` counter requires careful concurrency testing to avoid race conditions.  Documentation of `pipeline-configuration.json` schemas and Bloom filter parameters is essential to prevent configuration drift as the system evolves.
+Finally, the pipeline incorporates a **Deduplication strategy** via **`KGOperator.applyDeduplication()`**, which uses entity identifiers and attached metadata to prune duplicate entities before they are persisted. This reflects a **Data Cleansing** concern baked directly into the pipeline rather than as a post‑processing step.
+
+No micro‑service or event‑driven infrastructure is mentioned, so the design stays within a **single‑process, in‑memory orchestration** model, relying on the configuration‑driven DAG to drive parallelism (if any) and ordering.
+
+---
+
+## Implementation Details  
+
+### Core Files & Classes  
+* **`pipeline-configuration.yaml`** – The single source of truth for the pipeline workflow. Each entry defines a step name, the class or function to invoke, and a `depends_on` list that creates the DAG edges.  
+* **`PipelineController`** – Reads the YAML, builds the **DagBasedExecutionModel**, and invokes a **topological sort** algorithm to produce an execution queue. The controller then hands the queue to the coordinator.  
+* **`DagBasedExecutionModel`** (child component) – Provides the data structures (nodes, edges) and the sorting routine. It is responsible for detecting cycles and reporting configuration errors early.  
+* **`PipelineCoordinator.runPipeline()`** – Iterates over the sorted step list, calling each step’s entry point. It wraps calls in a retry loop, respects per‑step timeout settings, and aggregates error information for reporting.  
+* **`ObservationGenerator.mapEntityToKG()`** – The first pipeline step for most flows. It enriches incoming raw entities with `entityType` and `metadata.kgClass`, preventing downstream agents from re‑classifying the same entity with an LLM.  
+* **`PersistenceAgent.persistEntity()`** – Executes within a transaction (likely using the underlying **GraphDatabaseAdapter** or **MemgraphAdapter**). It writes the enriched entity to the knowledge graph and commits only on success.  
+* **`KGOperator.applyDeduplication()`** – Scans the current batch of entities, compares their identifiers and metadata, and removes duplicates before the persistence step.  
+
+### Execution Flow  
+1. **Configuration Load** – `PipelineController` parses `pipeline-configuration.yaml`.  
+2. **DAG Construction** – Using the child **DagBasedExecutionModel**, nodes are created for each step, and edges are added per `depends_on`. A cycle detection pass guarantees a valid DAG.  
+3. **Topological Sort** – The model returns an ordered list respecting dependencies.  
+4. **Orchestration** – `PipelineCoordinator.runPipeline()` receives the list and executes steps sequentially (or in parallel where steps are independent). Each step is called via its fully‑qualified class/method reference.  
+5. **Step Logic** – For example, `ObservationGenerator.mapEntityToKG()` enriches entities; `KGOperator.applyDeduplication()` removes duplicates; `PersistenceAgent.persistEntity()` writes to the graph inside a transaction.  
+6. **Error & Retry** – If a step throws an exception, the coordinator logs the failure, applies the configured retry count, and either proceeds (if recoverable) or aborts the pipeline, rolling back any open transactions.  
+
+All of these pieces are tightly coupled through the shared configuration file, which means adding, removing, or re‑ordering steps only requires editing `pipeline-configuration.yaml`—no code changes to the controller or coordinator are needed.
+
+---
+
+## Integration Points  
+
+* **SemanticAnalysis (Parent)** – The Pipeline is invoked by the SemanticAnalysis orchestrator when a new batch of raw data (e.g., git history or LSL session logs) arrives. SemanticAnalysis passes the raw entities to the first pipeline step, `ObservationGenerator.mapEntityToKG()`.  
+* **Ontology & EntityValidator (Siblings)** – After the Pipeline has persisted enriched entities, the **OntologyClassifier** (from the Ontology sibling) may be called to further classify entities against the hierarchical ontology definitions in `ontology-definitions.yaml`. Likewise, **EntityValidator.validateEntity()** can be triggered downstream to enforce schema constraints using the metadata set during `mapEntityToKG()`.  
+* **LLMFacade (Sibling)** – While the Pipeline deliberately avoids redundant LLM calls by pre‑populating `entityType` and `metadata.kgClass`, any step that still requires language‑model assistance can obtain an LLM instance via `LLMFacade.getLLMModel()`.  
+* **GraphDatabaseAdapter / MemgraphAdapter (Siblings)** – The transactional persistence performed by `PersistenceAgent.persistEntity()` relies on one of these adapters to open a transaction, execute write queries, and commit/rollback. The choice of adapter is typically configured elsewhere in the system and injected into the PersistenceAgent.  
+* **WorkflowOrchestrator (Sibling)** – At a higher level, the **WorkflowOrchestrator** may schedule the entire Pipeline run as part of a larger multi‑agent workflow (e.g., after code parsing by CodeKnowledgeGraphBuilder).  
+
+All interfaces are driven by method signatures observed (`mapEntityToKG()`, `persistEntity()`, `applyDeduplication()`, `runPipeline()`) and the shared configuration file, ensuring loose coupling while preserving a clear contract between components.
+
+---
+
+## Usage Guidelines  
+
+1. **Define Steps Declaratively** – Always add or modify pipeline behavior by editing `pipeline-configuration.yaml`. Declare each step’s `depends_on` relationships explicitly to guarantee correct ordering.  
+2. **Keep Steps Idempotent** – Because the coordinator may retry failed steps, each step should be safe to run multiple times without side‑effects (e.g., use up‑serts in the persistence layer).  
+3. **Leverage Pre‑populated Metadata** – Do not re‑invoke the LLM for classification inside later steps; rely on the `entityType` and `metadata.kgClass` fields set by `ObservationGenerator.mapEntityToKG()`. This reduces latency and cost.  
+4. **Respect Transaction Boundaries** – When extending the pipeline with new persistence logic, wrap database writes in the same transactional pattern used by `PersistenceAgent.persistEntity()`. This ensures atomicity across dependent steps.  
+5. **Test DAG Validity** – Before deploying a new configuration, run the DAG construction routine locally to confirm there are no cycles or missing dependencies. The `DagBasedExecutionModel` will raise an error if the graph is invalid.  
+6. **Monitor Deduplication** – If you introduce new entity identifier schemes, update `KGOperator.applyDeduplication()` accordingly so that duplicates are still detected correctly.  
+
+Following these conventions keeps the pipeline robust, reproducible, and easy to evolve.
+
+---
+
+### Architectural patterns identified  
+* **Declarative Workflow (YAML‑driven DAG)** – pipeline‑configuration.yaml defines steps and dependencies.  
+* **Coordinator/Orchestrator pattern** – `PipelineCoordinator.runPipeline()` manages execution, error handling, and retries.  
+* **Transactional Persistence** – `PersistenceAgent.persistEntity()` uses transactions to guarantee data consistency.  
+* **Data Cleansing/Deduplication** – `KGOperator.applyDeduplication()` implements a deduplication strategy based on identifiers and metadata.  
+
+### Design decisions and trade‑offs  
+* **Configuration‑first vs. code‑first** – By externalising step ordering to YAML, the system gains flexibility (easy re‑ordering) at the cost of runtime validation overhead.  
+* **Single‑process orchestration** – Simpler to reason about and debug, but may limit horizontal scalability; parallelism is only achievable when steps are independent in the DAG.  
+* **Pre‑populating metadata** – Reduces LLM calls and improves performance, but requires early, accurate classification; mis‑classifications propagate downstream.  
+* **Transactional writes** – Guarantees consistency but may increase latency for large batches; developers must be aware of transaction size limits.  
+
+### System structure insights  
+* **Pipeline** sits as a child of **DagBasedExecutionModel**, inheriting the DAG construction logic.  
+* It acts as the glue between the parent **SemanticAnalysis** orchestrator and sibling agents that provide domain‑specific capabilities (ontology classification, validation, graph persistence).  
+* The modular step design encourages reuse: any sibling component that implements a `run()`‑style method can be dropped into the pipeline by declaring it in the YAML.  
+
+### Scalability considerations  
+* **Parallel execution** is possible for DAG branches without dependencies; extending the coordinator to launch those branches concurrently would improve throughput.  
+* **Transaction size** may become a bottleneck for massive entity batches; consider chunking persistence steps or using bulk‑load APIs of the underlying graph database.  
+* **Deduplication cost** grows with batch size; indexing on entity identifiers and metadata will be essential to keep `applyDeduplication()` performant.  
+
+### Maintainability assessment  
+The declarative DAG approach yields high maintainability: pipeline behaviour lives in a readable YAML file, and new steps can be added without touching core controller code. The clear separation of concerns (metadata enrichment, deduplication, persistence) aligns with the single‑responsibility principle, making each class easy to test in isolation. However, the reliance on correct YAML definitions places a burden on configuration reviewers, and the lack of an explicit schema for the YAML may lead to subtle runtime errors if a step name or dependency is misspelled. Introducing schema validation (e.g., JSON‑Schema for the YAML) would further improve maintainability without altering the core architecture.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
 
 ### Children
-- [DAGDependencyResolver](./DAGDependencyResolver.md) -- The pipeline-configuration.json file defines the steps and their dependencies, which are then used by the DAGDependencyResolver to determine the execution order
-- [PipelineConfigurator](./PipelineConfigurator.md) -- The PipelineConfigurator class has a method called configurePipeline that takes the pipeline-configuration.json file as input and returns a configured pipeline graph
-- [ConcurrentExecutor](./ConcurrentExecutor.md) -- The ConcurrentExecutor class uses a thread pool to execute pipeline steps concurrently, with each thread executing a separate step
+- [DagBasedExecutionModel](./DagBasedExecutionModel.md) -- The pipeline-configuration.yaml file defines the steps and their dependencies, which are used to construct the DAG.
 
 ### Siblings
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification model with upper and lower ontology definitions in ontology-definitions.json
-- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a rule-based system to generate insights from entity relationships
-- [OntologyManagement](./OntologyManagement.md) -- OntologyManager.loadOntology() loads ontology definitions from a graph database using a graph database adapter
-- [SemanticAnalysisPipeline](./SemanticAnalysisPipeline.md) -- PipelineOrchestrator.orchestratePipeline() coordinates the execution of pipeline steps
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- KnowledgeGraphConstructor.constructGraph() constructs a knowledge graph from code entities and relationships
-- [ContentValidation](./ContentValidation.md) -- ContentValidator.validateContent() validates entity content against a set of predefined validation rules
-- [DataIngestion](./DataIngestion.md) -- DataIngestionAgent.ingestData() ingests data from various sources using a data ingestion framework
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.connectToDatabase() connects to a graph database using a database connection protocol
+- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
+- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a pattern-based approach to generate insights from knowledge entities
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
+- [EntityValidator](./EntityValidator.md) -- EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
+- [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
+- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.persistEntity() persists the entity to the graph database
+- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
 
 
 ---

@@ -2,143 +2,107 @@
 
 **Type:** SubComponent
 
-PatternExtractor.extractPatterns() utilizes a graph mining algorithm to extract patterns from entity relationships
+InsightConfiguration.yaml defines the insight generation workflow, including pattern definitions and report templates
 
 ## What It Is  
 
-**Insights** is a *SubComponent* of the **SemanticAnalysis** parent component. The core of the sub‑component lives in three TypeScript source files that are referenced throughout the observations:  
-
-* `InsightGenerator.ts` – implements **InsightGenerator.generateInsights()** and hosts the **InsightRules** rule registry.  
-* `PatternMiner.ts` – implements **PatternExtractor.extractPatterns()** (exposed as the **PatternMiner** class) and contains the graph‑mining logic.  
-* `ReportGenerator.ts` – implements **KnowledgeReportAuthor.authorReport()** (exposed as the **ReportGenerator** class) and drives the template‑based knowledge‑report creation.  
-
-Together these files form a pipeline that turns raw entity‑relationship data (produced upstream by the **SemanticAnalysisPipeline**, **CodeKnowledgeGraph**, and other sibling components) into validated, actionable insights and a consumable knowledge report. The sub‑component also includes **InsightValidator.validateInsights()**, which enforces a static set of validation rules before the insights are handed off to downstream consumers.
-
----
+The **Insights** sub‑component lives inside the *SemanticAnalysis* hierarchy and is responsible for turning raw knowledge entities into consumable, higher‑level observations.  All of its behaviour is driven from the declarative file **`InsightConfiguration.yaml`**, which lives alongside the other configuration artefacts of the SemanticAnalysis suite (e.g., `pipeline-configuration.yaml`, `ontology-definitions.yaml`).  The core runtime classes that implement the workflow are **`InsightGenerator`**, **`PatternCatalogExtractor`**, **`KnowledgeReportAuthor`**, **`InsightManager`**, and **`InsightUtils`**.  Each of these classes exposes a single public entry point that appears in the source tree of the Insights module (e.g., `InsightGenerator.generateInsights()`, `PatternCatalogExtractor.extractPatterns()`, etc.).  The sub‑component therefore acts as a self‑contained pipeline that consumes *knowledge entities* produced by upstream agents (OntologyClassifier, CodeKnowledgeGraphBuilder, EntityValidator, …) and emits *insight objects* and *reports* that downstream consumers (e.g., UI dashboards, export services) can render.
 
 ## Architecture and Design  
 
-The design of **Insights** follows a *modular rule‑based* and *graph‑mining* architecture that is tightly coupled to the surrounding **SemanticAnalysis** ecosystem.  
+The observations reveal a **configuration‑driven pipeline** architecture.  `InsightConfiguration.yaml` enumerates the *pattern definitions* and *report templates* that the pipeline must apply, allowing new insight types to be added without code changes.  At runtime, **`InsightManager.loadInsight()`** reads this YAML file, instantiates the required classes, and wires them together.  This mirrors the same declarative approach used by the sibling **Pipeline** component (which reads `pipeline-configuration.yaml`) and the **Ontology** component (which reads `ontology-definitions.yaml`), reinforcing a system‑wide convention of externalising workflow logic.
 
-1. **Rule‑Based Generation** – `InsightGenerator.generateInsights()` consults the **InsightRules** registry (defined in `InsightGenerator.ts`). Each rule is a self‑contained unit that can be added or removed without touching the generator core, a pattern explicitly called out in the child component description. This reflects a **Strategy**‑like approach where the generator delegates decision‑making to interchangeable rule objects.  
+Two classic design patterns are evident:
 
-2. **Graph‑Mining Pattern Extraction** – `PatternExtractor.extractPatterns()` (implemented in `PatternMiner.ts`) operates on a graph representation of entity relationships. The component uses a **graph mining algorithm** (the exact algorithm is not named, but the observation makes clear that traversal is central). This aligns with a **Data‑Driven Traversal** pattern: the graph structure is the primary data source, and the miner walks the graph to discover recurring sub‑structures or motifs.  
+1. **Strategy** – `PatternCatalogExtractor.extractPatterns()` implements a pluggable strategy for locating and extracting reusable patterns from knowledge entities.  The extractor can be swapped (e.g., a regex‑based extractor vs. an LLM‑driven extractor) simply by changing the configuration entry that points to a concrete implementation class.
 
-3. **Template‑Based Reporting** – `KnowledgeReportAuthor.authorReport()` (in `ReportGenerator.ts`) builds a knowledge report by filling a predefined template with the generated insights and extracted patterns. This is a classic **Template Method** pattern where the skeleton of the report is fixed, and variable sections are populated at runtime.  
+2. **Factory / Reflection** – `InsightUtils.getInsightClass()` acts as a lightweight factory that resolves a string identifier (taken from the YAML) to a concrete insight class.  This enables the generator to remain agnostic of concrete insight types while still creating strongly‑typed objects.
 
-4. **Validation Layer** – `InsightValidator.validateInsights()` provides a defensive gate that checks each insight against a static list of validation rules. This adds a **Decorator‑like** validation step that can be extended with additional rules as the system evolves.  
+The **Template Method** pattern is also implicit in `KnowledgeReportAuthor.authorReport()`.  The method follows a fixed skeleton (gather insights → apply pattern → render using a template) while delegating the actual rendering logic to the report template defined in the configuration file.
 
-Interaction among the three child components is linear: the **InsightGenerator** produces raw insights, the **PatternMiner** enriches them with discovered patterns, the **InsightValidator** filters out any that violate the predefined rules, and finally the **ReportGenerator** formats the validated set into a consumable document. This pipeline mirrors the **Pipeline** sibling component’s DAG‑based execution model, albeit on a much smaller scale and with a fixed order of operations.
-
----
+Interaction among the components follows a **linear, staged flow**:  
+`InsightGenerator.generateInsights()` → `PatternCatalogExtractor.extractPatterns()` → `KnowledgeReportAuthor.authorReport()`.  Each stage consumes the output of the previous one, mirroring the DAG‑style execution model used by the sibling **Pipeline** component, albeit in a more tightly coupled, domain‑specific chain.
 
 ## Implementation Details  
 
-### Insight Generation (`InsightGenerator.ts`)  
-* **Class:** `InsightGenerator`  
-* **Method:** `generateInsights()` – iterates over the **InsightRules** collection held in a `RuleRegistry`. Each rule implements a common interface (e.g., `apply(entityGraph): Insight`). The method aggregates the results into an `Insight[]` collection. Because the registry is modular, developers can drop new rule modules into the `rules/` directory and register them in `RuleRegistry` without altering the generator logic.  
+* **`InsightGenerator.generateInsights()`** – This method is the entry point for the insight creation phase.  It iterates over the collection of *knowledge entities* supplied by the parent SemanticAnalysis agents, applies the pattern catalog (see below), and constructs domain‑specific insight objects.  The generation logic is driven by the pattern definitions read from `InsightConfiguration.yaml`, meaning that the generator does not contain hard‑coded heuristics.
 
-### Pattern Extraction (`PatternMiner.ts`)  
-* **Class:** `PatternMiner` (exposed as `PatternExtractor`)  
-* **Method:** `extractPatterns()` – receives the same entity graph used by the generator. It builds a **graph‑based data structure** (likely an adjacency list or similar) that enables efficient traversal. The mining algorithm walks the graph, looking for recurring sub‑graphs that match pre‑defined pattern templates (e.g., frequent co‑occurrence of certain entity types). The output is a collection of `Pattern` objects that capture the structural signature and supporting metadata.  
+* **`PatternCatalogExtractor.extractPatterns()`** – Implemented as a strategy, this class receives a knowledge entity and returns a set of *pattern matches*.  The extractor consults the pattern catalog (a data structure populated from the YAML file) and may employ different extraction techniques (e.g., AST analysis, LLM prompting).  Because the extractor is strategy‑based, new extraction algorithms can be introduced by registering a new implementation class in the configuration.
 
-### Insight Validation (`InsightValidator`)  
-* **Class:** `InsightValidator` (stand‑alone utility)  
-* **Method:** `validateInsights(insights: Insight[])` – loops through a hard‑coded list of validation rules (e.g., “no duplicate insight IDs”, “confidence score > threshold”). Each rule returns a boolean; insights that fail any rule are either discarded or flagged for review. This step guarantees that only high‑quality insights progress to reporting.  
+* **`KnowledgeReportAuthor.authorReport()`** – Once insights and patterns are available, this component produces a human‑readable report.  It pulls the appropriate *report template* from `InsightConfiguration.yaml`, injects the insight data, and renders the final document (e.g., Markdown, HTML, or PDF).  The method abstracts away the rendering engine, allowing the system to switch templates without touching code.
 
-### Report Generation (`ReportGenerator.ts`)  
-* **Class:** `ReportGenerator` (exposed as `KnowledgeReportAuthor`)  
-* **Method:** `authorReport(insights: Insight[], patterns: Pattern[])` – loads a report template (likely a Handlebars, Mustache, or similar text/template file). It injects the validated insights and extracted patterns into template variables, producing a final document (e.g., Markdown, HTML, or PDF). Because the template is externalized, the report format can be altered without recompiling the code, supporting the “easy customization” claim.  
+* **`InsightManager.loadInsight()`** – This bootstrapper reads `InsightConfiguration.yaml`, resolves class names via `InsightUtils.getInsightClass()`, and assembles the pipeline objects.  It also performs validation of the configuration (ensuring required fields are present) and registers the generated insight types with the broader SemanticAnalysis runtime so that downstream components can query them.
 
-All four classes share a common **entity‑relationship graph** data model that originates from the **CodeKnowledgeGraph** sibling component. The sub‑component does not persist its own data; instead, it consumes in‑memory graph structures passed down from upstream agents (e.g., the **SemanticAnalysisPipeline** orchestrator).
+* **`InsightUtils.getInsightClass()`** – A utility that maps a string identifier (e.g., `"CodeComplexityInsight"`) to the concrete class implementing that insight.  It typically uses reflection or a simple lookup table populated during the manager’s loading phase.  This indirection decouples the generator from concrete implementations and supports plug‑in style extensions.
 
----
+All of these classes reside in the *Insights* module and share a common package namespace (e.g., `semanticanalysis.insights.*`).  They rely on the same logging, error‑handling, and configuration utilities used by sibling components, ensuring a consistent developer experience across the entire SemanticAnalysis ecosystem.
 
 ## Integration Points  
 
-* **Upstream – SemanticAnalysisPipeline / CodeKnowledgeGraph** – The **Insights** sub‑component receives the entity‑relationship graph produced by `KnowledgeGraphConstructor.constructGraph()` (from the **CodeKnowledgeGraph** sibling). This graph is the input for both the insight generator and the pattern miner.  
+The Insights sub‑component sits directly after the **EntityValidator** and **CodeKnowledgeGraphBuilder** stages of the parent SemanticAnalysis pipeline.  Validated knowledge entities flow into `InsightGenerator`, which then produces insight objects that are registered back into the central knowledge store (the GraphDatabaseAdapter/MemgraphAdapter used by the whole system).  Downstream, the **WorkflowOrchestrator** can schedule periodic runs of the insight pipeline based on the DAG defined in `pipeline-configuration.yaml`.  Additionally, the **LLMFacade** may be consulted by `PatternCatalogExtractor` when a pattern extraction strategy requires language‑model assistance.
 
-* **Sibling – Ontology / OntologyManagement** – Insight rules often reference ontology concepts defined in the **Ontology** component. The `InsightRules` registry may import ontology definitions via the `OntologyManager.loadOntology()` API, ensuring that generated insights are semantically aligned with the system’s taxonomy.  
+From a dependency perspective, the Insights module imports:
 
-* **Downstream – ReportConsumer / ContentValidation** – The final knowledge report emitted by `ReportGenerator.authorReport()` is typically handed to the **ContentValidation** sibling for further quality checks, or stored in the **GraphDatabaseAdapter** for persistence.  
+* `semanticanalysis.config.InsightConfiguration.yaml` (configuration source)  
+* `semanticanalysis.utils.InsightUtils` (class resolution)  
+* `semanticanalysis.persistence.GraphDatabaseAdapter` (to persist generated insights)  
+* Optional LLM services via `LLMFacade.getLLMModel()` when using LLM‑based pattern extraction.
 
-* **Internal – Validation Layer** – `InsightValidator.validateInsights()` acts as a gatekeeper between generation/mining and reporting, ensuring that downstream components only see vetted data.  
-
-* **Configuration – PipelineCoordinator** – Although **Insights** does not expose its own DAG, it is invoked as a step within the broader pipeline orchestrated by `PipelineOrchestrator.orchestratePipeline()`. The step order (generate → extract → validate → report) is enforced by the pipeline configuration, mirroring the DAG‑based execution model used by the **Pipeline** sibling.  
-
----
+Conversely, external consumers such as reporting dashboards or export services query the persisted insights through the same GraphDatabaseAdapter that other components use, ensuring a single source of truth.
 
 ## Usage Guidelines  
 
-1. **Rule Management** – When adding a new insight rule, place the implementation in the `rules/` folder of `InsightGenerator.ts` and register it with `RuleRegistry`. Ensure the rule conforms to the shared `InsightRule` interface; otherwise, the generator will throw a type error at runtime.  
+1. **Define patterns and templates declaratively** – Add new pattern definitions or report templates only to `InsightConfiguration.yaml`.  Avoid hard‑coding logic inside `InsightGenerator` or `PatternCatalogExtractor`; the system expects all variability to be expressed in the YAML file.
 
-2. **Pattern Definition** – New pattern templates should be added to the `PatternMiner` configuration. Because the miner relies on graph traversal, patterns must be expressible as sub‑graph signatures; overly complex patterns may degrade performance.  
+2. **Register new insight classes** – When introducing a novel insight type, implement the class (e.g., `MyCustomInsight`) and reference its fully‑qualified name in the YAML.  The manager will resolve it via `InsightUtils.getInsightClass()`.  Ensure the class follows the expected constructor signature (typically a knowledge entity or a pattern match collection).
 
-3. **Validation Rule Updates** – Extend `InsightValidator` only by adding new static validation functions. Do not modify existing rules unless you fully understand the downstream impact, as validation failures can silently drop insights from the final report.  
+3. **Choose the appropriate extraction strategy** – If a pattern requires sophisticated language understanding, configure the extractor to use an LLM‑based strategy via `LLMFacade`.  For simple syntactic patterns, a lightweight regex extractor is preferable for performance.
 
-4. **Report Template Customization** – To change the output format, edit the external template file referenced by `ReportGenerator.authorReport()`. Keep placeholder names consistent with the data structures (`{{insight.title}}`, `{{pattern.description}}`, etc.) to avoid rendering errors.  
+4. **Validate configuration before deployment** – Run `InsightManager.loadInsight()` in a test environment to catch missing fields or class‑resolution errors early.  The manager performs sanity checks that mirror those in the sibling Pipeline component.
 
-5. **Performance Monitoring** – Because the pattern miner works on a graph, monitor the size of the entity graph passed in. If the graph grows beyond a few hundred thousand nodes, consider partitioning the graph or running the miner in a background worker to avoid blocking the pipeline.  
+5. **Persist and version insights** – Because insights are stored in the graph database, treat them as versioned artefacts.  When updating patterns, consider the impact on existing insight nodes and whether migration scripts are required.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified  
+* Configuration‑driven pipeline (YAML‑based workflow)  
+* Strategy (pattern extraction)  
+* Factory / Reflection (class resolution)  
+* Template Method (report authoring)
 
-* **Strategy / Rule Registry** – modular insight rules.  
-* **Graph Traversal / Data‑Driven Mining** – pattern extraction over entity graphs.  
-* **Template Method** – report generation via external templates.  
-* **Decorator‑like Validation** – post‑generation validation step.  
-* **Pipeline Integration** – linear step ordering within a broader DAG orchestrated by the pipeline sibling.
+### Design decisions and trade‑offs  
+* **Declarative configuration** provides extensibility without code changes but adds a runtime dependency on correct YAML syntax.  
+* **Strategy pattern** enables swapping extraction algorithms, at the cost of slightly more complex wiring in `InsightManager`.  
+* **Factory‑style class lookup** decouples generation from concrete insight types, but relies on reflection which can be slower and harder to debug if class names are misspelled.
 
-### Design Decisions and Trade‑offs  
+### System structure insights  
+Insights is a thin, linear pipeline that consumes validated knowledge entities from the parent SemanticAnalysis component and feeds back enriched insight nodes into the shared graph database.  It mirrors the architectural style of sibling modules (Pipeline, Ontology, etc.) by using external YAML definitions and shared utility services.
 
-* **Modularity vs. Overhead** – The rule registry offers extensibility but introduces a registration cost at start‑up; a very large rule set could increase initialization time.  
-* **Graph‑Centric Mining** – Provides expressive power for pattern discovery but ties performance to graph size; scaling may require graph partitioning or incremental mining.  
-* **Template‑Based Reporting** – Enables rapid format changes without code changes, yet places the burden of template correctness on non‑code assets.  
-* **Static Validation Rules** – Guarantees consistency but may become a bottleneck if validation logic grows complex; dynamic rule loading could improve flexibility at the expense of predictability.
+### Scalability considerations  
+* The pattern extraction step can be parallelised because each knowledge entity is independent; the existing DAG execution model in the Pipeline component can be reused to run multiple `InsightGenerator` instances concurrently.  
+* Heavy LLM‑based extraction strategies may become a bottleneck; they should be isolated behind an asynchronous service or cached where possible.  
+* Persisting large volumes of insight nodes in Memgraph may require sharding or index tuning, but the component itself does not impose additional load beyond what the underlying graph adapter already handles.
 
-### System Structure Insights  
-
-* **Parent‑Child Relationship** – Insights sits under **SemanticAnalysis**, consuming its graph output and feeding back higher‑level knowledge artifacts.  
-* **Sibling Collaboration** – Shares ontology definitions with **Ontology**, receives graph data from **CodeKnowledgeGraph**, and participates in the same pipeline orchestrated by **PipelineCoordinator**.  
-* **Child Components** – **InsightRules**, **PatternMiner**, and **ReportGenerator** each encapsulate a distinct phase of the insight pipeline, reinforcing separation of concerns.
-
-### Scalability Considerations  
-
-* The linear pipeline (generate → extract → validate → report) can be parallelized at the rule level (multiple rules applied concurrently) and at the pattern‑mining level (graph partitioning).  
-* Validation is currently a synchronous, in‑process step; for massive insight volumes, moving validation to an async worker queue could improve throughput.  
-* Report generation is I/O‑bound; streaming the output rather than assembling it entirely in memory would help when reports become large.
-
-### Maintainability Assessment  
-
-* **High** – The modular rule registry and template‑driven reporting promote easy updates.  
-* **Medium** – The graph‑mining code may become intricate as patterns evolve; clear documentation of the graph schema is essential.  
-* **Low Risk** – Validation rules are static and centralized, making them straightforward to audit, though care must be taken when extending them to avoid unintended side effects.  
-
-Overall, the **Insights** sub‑component demonstrates a clean, rule‑driven architecture that leverages the rich graph data produced by its parent **SemanticAnalysis** component while remaining extensible through well‑defined child modules.
+### Maintainability assessment  
+The heavy reliance on configuration files keeps the codebase small and focused, which is a strong maintainability advantage.  Adding new insight types or patterns is a matter of editing YAML and optionally providing a new class implementation.  However, the indirection introduced by `InsightUtils.getInsightClass()` and the strategy pattern can make static analysis harder; thorough unit tests and integration tests that validate the full loading‑and‑execution flow are essential to avoid runtime surprises.  Overall, the design aligns well with the rest of the SemanticAnalysis ecosystem, promoting consistency and ease of onboarding for developers familiar with the sibling components.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.
-
-### Children
-- [InsightRules](./InsightRules.md) -- InsightRules (InsightGenerator.ts) utilizes a modular design, allowing for easy addition or removal of rules through the use of a RuleRegistry class
-- [PatternMiner](./PatternMiner.md) -- PatternMiner (PatternMiner.ts) employs a graph-based data structure to represent entity relationships, facilitating efficient pattern discovery through the use of graph traversal algorithms
-- [ReportGenerator](./ReportGenerator.md) -- ReportGenerator (ReportGenerator.ts) utilizes a template-based approach to create reports, allowing for easy customization of the report structure and content through the use of template variables
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.json steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification model with upper and lower ontology definitions in ontology-definitions.json
-- [OntologyManagement](./OntologyManagement.md) -- OntologyManager.loadOntology() loads ontology definitions from a graph database using a graph database adapter
-- [SemanticAnalysisPipeline](./SemanticAnalysisPipeline.md) -- PipelineOrchestrator.orchestratePipeline() coordinates the execution of pipeline steps
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- KnowledgeGraphConstructor.constructGraph() constructs a knowledge graph from code entities and relationships
-- [ContentValidation](./ContentValidation.md) -- ContentValidator.validateContent() validates entity content against a set of predefined validation rules
-- [DataIngestion](./DataIngestion.md) -- DataIngestionAgent.ingestData() ingests data from various sources using a data ingestion framework
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.connectToDatabase() connects to a graph database using a database connection protocol
+- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
+- [EntityValidator](./EntityValidator.md) -- EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
+- [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
+- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.persistEntity() persists the entity to the graph database
+- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
 
 
 ---
 
-*Generated from 4 observations*
+*Generated from 6 observations*

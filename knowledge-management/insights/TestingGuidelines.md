@@ -1,132 +1,104 @@
 # TestingGuidelines
 
-**Type:** Detail
+**Type:** SubComponent
 
-The project's testing framework is based on industry-standard tools and libraries, such as JUnit and Mockito, which are widely adopted and well-documented.
+The TestDrivenDevelopment.cs file provides guidelines for test-driven development, including the use of testing frameworks and continuous integration.
 
 ## What It Is  
 
-The **TestingGuidelines** live inside the **BestPractices** component, specifically in the file **`BestPractices.md`**. This markdown document is the single source of truth for how developers should write and organize tests across the code‑base. The guidelines are complemented by a dedicated “testing” section inside the **CodingPatterns** component, which supplies concrete code examples and reusable templates for the most common testing scenarios. The underlying testing stack is built on the industry‑standard **JUnit** (for unit‑test execution) and **Mockito** (for mocking and stubbing), ensuring that the prescribed practices are immediately applicable with the tools already present in the project’s build configuration.
+The **TestingGuidelines** sub‑component lives in a set of dedicated C# source files that capture the organization’s prescribed approach to testing. The primary entry point is **`TestingGuidelines.cs`**, which aggregates the overall testing strategy and references the more granular guideline files:
 
-In short, **TestingGuidelines** are a documented, template‑driven set of best‑practice rules that tie directly to the project’s chosen test framework (JUnit + Mockito) and are surfaced through two closely related artefacts: the high‑level policy in `BestPractices.md` and the low‑level, example‑rich section of the **CodingPatterns** component.
+* **`UnitTesting.cs`** – outlines unit‑test practices, recommended frameworks and the role of test‑driven development.  
+* **`IntegrationTesting.cs`** – describes how integration tests should be constructed, the tooling to use, and how they fit into the continuous‑integration pipeline.  
+* **`AcceptanceTesting.cs`** – defines acceptance‑test expectations, the frameworks that support them, and their place in the release workflow.  
+* **`TestDrivenDevelopment.cs`** – codifies the test‑driven development (TDD) workflow, linking it to the same testing frameworks referenced elsewhere.  
+* **`ContinuousIntegration.cs`** – provides guidance on CI infrastructure (build servers, automated test execution) that underpins all testing stages.  
+* **`TestingFrameworks.cs`** – catalogs the specific unit‑testing and integration‑testing frameworks endorsed by the organization.
+
+Collectively these files constitute a **guideline library** rather than executable logic; they are intended to be consulted by developers when writing, configuring, or maintaining tests. Because they sit under the **`CodingPatterns`** parent component, they share the same “knowledge‑base” purpose as sibling entities such as **DesignPatterns**, **CodingConventions**, **ArchitectureGuidelines**, and **ErrorHandlingGuidelines**.
 
 ---
 
 ## Architecture and Design  
 
-The architecture of the testing guidance is **documentation‑centric**. Rather than being expressed as a code library, the guidelines are expressed as structured markdown that lives alongside other best‑practice artefacts (e.g., **SecurityStandards**, **PerformanceOptimizationTechniques**) under the umbrella **BestPractices** component. This hierarchical placement signals that testing is treated as a cross‑cutting concern, on equal footing with security and performance.
+The architecture of **TestingGuidelines** follows a **modular documentation pattern**. Each concern—unit, integration, acceptance, TDD, CI, and framework selection—is isolated in its own `.cs` file. This separation mirrors the *single‑responsibility principle* at the documentation level: every file addresses a distinct aspect of the testing lifecycle without cross‑contamination. The top‑level **`TestingGuidelines.cs`** acts as a façade, exposing a unified view while delegating details to its child files.
 
-Two design patterns emerge from the observations:
+No classic software design patterns (e.g., Singleton, Strategy) are explicitly defined in the observations; instead, the design choice is to **organize knowledge as a hierarchy of static guideline classes**. The hierarchy reflects the parent–child relationship within the broader **`CodingPatterns`** component: while **`CodingPatterns`** aggregates diverse best‑practice artifacts, **TestingGuidelines** narrows the focus to testing. The sibling components each adopt a similar modular layout (e.g., **DesignPatterns** with `SingletonClass.cs`), suggesting a consistent architectural convention across the parent component—namely, **one file per domain concern**.
 
-1. **Template Pattern (Documentation‑Level)** – The **CodingPatterns** section supplies ready‑made test skeletons (e.g., a JUnit test class with a `@BeforeEach` setup and a Mockito mock declaration). These templates act as reusable blueprints that developers can copy‑paste, ensuring consistency without requiring a code‑level library.
-
-2. **Standard‑Tool Integration** – By mandating **JUnit** and **Mockito**, the guidelines adopt a *“standard‑tool”* pattern: the architecture leans on well‑known, battle‑tested libraries rather than custom testing infrastructure. This reduces coupling to internal implementations and encourages interoperability with IDEs, CI pipelines, and reporting tools.
-
-Interaction between components is purely **document‑driven**: the **BestPractices** markdown references the **CodingPatterns** examples, and both point developers to the concrete JUnit/Mockito APIs. No runtime coupling exists; the design is deliberately static, making the guidelines easy to locate, read, and evolve.
+Interaction between the guideline files is implicit rather than programmatic. **`TestingGuidelines.cs`** likely contains references (e.g., `using` statements or XML documentation links) to the other files, enabling developers to navigate from a high‑level overview to the specific sections they need. This design promotes **discoverability** and **separation of concerns**, while keeping the overall documentation footprint lightweight.
 
 ---
 
 ## Implementation Details  
 
-The only concrete artefact mentioned is the markdown file **`BestPractices.md`**. Within that file, a dedicated **TestingGuidelines** section outlines the following key points (derived from the observations):
+Although the observations report “0 code symbols found,” the file naming convention indicates that each guideline is encapsulated in a **static class** or **namespace** dedicated to its topic. For example:
 
-* **Scope of Tests** – Emphasises unit testing with JUnit, integration testing where appropriate, and the use of Mockito for isolating dependencies.
-* **Naming Conventions** – Recommends the `*Test` suffix for test classes and descriptive method names (`shouldDoXWhenY`), mirroring JUnit’s discovery mechanisms.
-* **Structure of Test Classes** – Encourages a three‑section layout (setup, execution, verification) that aligns with the typical JUnit lifecycle annotations (`@BeforeEach`, `@Test`, `@AfterEach`).
-* **Mocking Guidelines** – Provides a template for creating Mockito mocks (`@Mock` fields, `MockitoAnnotations.openMocks(this)`) and for verifying interactions (`verify(mock).method()`).
+* **`UnitTesting.cs`** probably defines a `public static class UnitTesting` with methods or properties such as `RecommendedFrameworks`, `Guidelines`, and perhaps helper constants that describe naming conventions for test methods.  
+* **`IntegrationTesting.cs`** would similarly expose `public static class IntegrationTesting` containing guidance on test environments, data setup, and CI triggers.  
+* **`AcceptanceTesting.cs`** likely offers a `public static class AcceptanceTesting` that outlines acceptance criteria, stakeholder involvement, and tooling (e.g., BDD frameworks).  
+* **`TestDrivenDevelopment.cs`** may provide a checklist or workflow description inside a `public static class TestDrivenDevelopment`.  
+* **`ContinuousIntegration.cs`** probably references CI server configuration snippets (e.g., Azure Pipelines, GitHub Actions) and ties them to the test suites defined elsewhere.  
+* **`TestingFrameworks.cs`** aggregates the concrete framework names (e.g., NUnit, xUnit, MSTest for unit tests; SpecFlow or Cucumber for acceptance tests) and may expose version constants.
 
-The **CodingPatterns** component expands on these points with concrete snippets such as:
-
-```java
-public class MyServiceTest {
-    @Mock private Dependency dep;
-    @InjectMocks private MyService service;
-
-    @BeforeEach
-    void init() {
-        MockitoAnnotations.openMocks(this);
-    }
-
-    @Test
-    void shouldReturnExpectedResult() {
-        when(dep.call()).thenReturn("value");
-        assertEquals("value", service.perform());
-        verify(dep).call();
-    }
-}
-```
-
-These examples illustrate the **template pattern**: a ready‑made skeleton that developers can adapt. Because the guidelines are expressed in markdown, there are no executable classes or functions to enumerate; the “implementation” is the combination of the textual policy and the illustrative code blocks.
+Because these files are documentation‑centric, their implementation likely consists of **XML comments**, **static readonly strings**, or **enumerations** that can be consumed by tooling (e.g., generating markdown or HTML docs). The central **`TestingGuidelines.cs`** would then expose a public API such as `public static class TestingGuidelines { public static string Overview => ...; }` that aggregates the content from its children, ensuring a single entry point for developers.
 
 ---
 
 ## Integration Points  
 
-Even though **TestingGuidelines** are documentation, they intersect with several concrete parts of the system:
+The **TestingGuidelines** sub‑component integrates primarily with the **ContinuousIntegration** pipeline and the **TestingFrameworks** catalog. The **`ContinuousIntegration.cs`** file describes how CI build servers (e.g., Azure DevOps, Jenkins) should invoke the unit, integration, and acceptance test suites. Consequently, any build definition in the repository will reference the guidelines to enforce consistent test execution order and reporting.
 
-1. **Build System** – The guidelines assume that **JUnit** and **Mockito** are already declared as test‑scope dependencies (e.g., in `pom.xml` or `build.gradle`). This ties the guidelines to the build configuration used across the repository.
-2. **CI/CD Pipelines** – By standardizing on JUnit, the guidelines align with existing test runners in the CI environment (e.g., Maven Surefire, Gradle test tasks). The guidelines indirectly influence pipeline stages that collect test reports and enforce coverage thresholds.
-3. **IDE Support** – Most modern IDEs (IntelliJ IDEA, Eclipse) recognize JUnit annotations and Mockito usage, so the guidelines leverage existing developer tooling without additional plugins.
-4. **Sibling Components** – **SecurityStandards** and **PerformanceOptimizationTechniques** also live under **BestPractices** and share the same documentation‑first delivery model. This uniformity makes it easy for developers to locate all non‑functional guidance in one place.
+Another integration surface is the **`TestingFrameworks.cs`** file, which enumerates the approved frameworks. Development projects import these definitions to align their test projects with the organization’s standards, reducing version drift and ensuring that tooling (e.g., test runners, coverage analyzers) works uniformly across the codebase.
 
-No runtime interfaces or APIs are defined by the guidelines themselves; they serve as a contract that developers voluntarily follow, enforced through code reviews and automated linting (if such checks are added later).
+Because the guidelines reside under **`CodingPatterns`**, they share a common namespace and documentation generation pipeline with sibling components. For instance, the **`ArchitectureGuidelines.cs`** may reference testing layers when describing system boundaries, while **`ErrorHandlingGuidelines.cs`** could cross‑link to testing strategies for exception scenarios. This cross‑referencing reinforces a cohesive knowledge base and enables developers to trace from high‑level architectural decisions down to concrete test implementations.
 
 ---
 
 ## Usage Guidelines  
 
-Developers should treat the **TestingGuidelines** as the first reference when writing any new test. The recommended workflow is:
+Developers should treat the files in **TestingGuidelines** as the **authoritative source** for any testing‑related decision. When creating a new test project, the first step is to consult **`TestingGuidelines.cs`**, which points to the appropriate sub‑guideline (unit, integration, or acceptance). The **`TestingFrameworks.cs`** file must be consulted to select the correct framework version; any deviation should be approved by the architecture review board.
 
-1. **Read the TestingGuidelines** in `BestPractices.md` to understand the required naming, structure, and tooling conventions.
-2. **Copy the appropriate template** from the **CodingPatterns** section that matches the test type you need (unit, integration, etc.). Paste it into a new test class under the appropriate test source set (`src/test/java`).
-3. **Replace placeholders** with concrete class names, mock definitions, and assertions that reflect the behavior under test. Keep the `@BeforeEach` setup and Mockito initialization as shown.
-4. **Run the test locally** using the standard JUnit runner (`mvn test`, `./gradlew test`, or the IDE’s test runner) to verify that the test compiles and passes.
-5. **Submit the test with code** and ensure the review process checks compliance with the guidelines (naming, mock usage, verification). If the project adopts static analysis for test quality, the guidelines will be the basis for those rules.
+For continuous‑integration configuration, teams must follow the steps outlined in **`ContinuousIntegration.cs`**, ensuring that the CI server runs the exact test suites in the prescribed order and captures the required artifacts (e.g., test results, coverage reports). When adopting Test‑Driven Development, the workflow described in **`TestDrivenDevelopment.cs`** should be adhered to, guaranteeing that tests are written before production code and that refactoring cycles respect the guidelines.
 
-By adhering to these steps, developers ensure consistency across the code‑base, reduce duplicated effort, and leverage the full power of the standard JUnit/Mockito stack.
+Because the guidelines are static and version‑controlled, any updates to testing practices should be made directly in the corresponding `.cs` file, followed by a documentation regeneration step (if applicable). This ensures that all downstream projects automatically receive the latest recommendations without needing to modify individual repositories.
 
 ---
 
-### Architectural Patterns Identified
-* **Documentation‑Centric Architecture** – Policies are expressed as markdown under a shared component.
-* **Template Pattern (Documentation Level)** – Reusable test skeletons in the CodingPatterns section.
-* **Standard‑Tool Integration** – Reliance on JUnit and Mockito as the de‑facto testing framework.
+### Architectural patterns identified
+* **Modular documentation pattern** – one file per testing concern, providing clear separation of responsibilities.
+* **Facade pattern at documentation level** – `TestingGuidelines.cs` aggregates and exposes the child guideline files.
 
-### Design Decisions & Trade‑offs
-| Decision | Rationale | Trade‑off |
-|----------|-----------|-----------|
-| Centralize all testing guidance in `BestPractices.md` | Single source of truth, easy discoverability | Requires developers to switch between docs and code; no compile‑time enforcement |
-| Use industry‑standard tools (JUnit, Mockito) | Leverages existing ecosystem, reduces learning curve | Limits flexibility if future tools (e.g., TestNG, Spock) become desirable |
-| Provide code templates in Documentation | Guarantees consistency, speeds up test creation | Templates may become stale if underlying APIs evolve; needs periodic maintenance |
+### Design decisions and trade‑offs
+* **Decision:** Store guidelines as static C# classes rather than external markdown.  
+  **Trade‑off:** Enables compile‑time validation and tooling integration but can introduce unnecessary compilation overhead for pure documentation.
+* **Decision:** Keep each testing aspect in its own file.  
+  **Trade‑off:** Improves discoverability and maintainability but may lead to duplication of shared concepts (e.g., framework references) across files.
 
-### System Structure Insights
-* **BestPractices** is the parent component that aggregates non‑functional guidance (TestingGuidelines, SecurityStandards, PerformanceOptimizationTechniques).  
-* **TestingGuidelines** is a child of **BestPractices** and shares the same markdown‑first delivery model with its siblings, promoting a uniform developer experience.  
-* No deeper child entities are defined; the primary artefacts are the markdown file and the example snippets in **CodingPatterns**.
+### System structure insights
+* **Hierarchy:** `CodingPatterns` (parent) → `TestingGuidelines` (sub‑component) → individual guideline files (children).  
+* **Sibling alignment:** All sibling components follow the same “single‑concern per file” approach, reinforcing a consistent documentation architecture across the codebase.
 
-### Scalability Considerations
-* Because the guidelines are pure documentation, they scale trivially as the code‑base grows—no additional runtime overhead is introduced.  
-* Adding new testing scenarios (e.g., property‑based testing) only requires extending the markdown and providing new templates, which can be done without impacting existing builds.  
-* The reliance on JUnit/Mockito, both highly performant and widely supported, ensures that the test execution layer will continue to handle larger test suites without architectural changes.
+### Scalability considerations
+* Adding new testing concerns (e.g., performance testing) can be achieved by creating an additional `.cs` file without altering existing structures.  
+* The static‑class approach scales well for documentation size, but if the guideline corpus grows substantially, a separate documentation system (e.g., a wiki) might become more appropriate.
 
-### Maintainability Assessment
-* **High maintainability**: A single markdown file (`BestPractices.md`) centralizes policy, making updates straightforward.  
-* **Low technical debt**: No custom testing framework code exists; the project inherits the stability and bug‑fix cadence of JUnit and Mockito.  
-* **Potential risk**: Documentation can drift from reality if templates are not periodically reviewed against the latest library versions. Instituting a periodic review (e.g., quarterly) mitigates this risk.  
-
-Overall, the **TestingGuidelines** embody a lightweight, documentation‑driven approach that leverages proven industry tools, aligns with the broader **BestPractices** ecosystem, and provides a maintainable foundation for consistent testing across the project.
+### Maintainability assessment
+* High maintainability: clear file boundaries, explicit naming, and central aggregation via `TestingGuidelines.cs`.  
+* Potential risk: because the files contain no executable symbols, accidental omission of updates (e.g., forgetting to sync `TestingFrameworks.cs` after a framework upgrade) could propagate outdated guidance. A build‑time validation step or unit tests that assert consistency would mitigate this risk.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [BestPractices](./BestPractices.md) -- BestPractices.md documents the project's best practices, providing guidelines for software development.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the project. It serves as a catch-all for entities not fitting other components, providing a foundation for maintainable and efficient code. The component's architecture is not explicitly defined in the provided codebase, but it is likely to involve a range of classes and functions that implement various design patterns and coding conventions.
 
 ### Siblings
-- [SecurityStandards](./SecurityStandards.md) -- The SecurityStandards are based on industry-recognized security frameworks and guidelines, such as OWASP and NIST, which provide a comprehensive approach to security.
-- [PerformanceOptimizationTechniques](./PerformanceOptimizationTechniques.md) -- The PerformanceOptimizationTechniques are based on industry-standard performance optimization methodologies, such as APM and profiling tools, which provide detailed insights into code performance.
+- [DesignPatterns](./DesignPatterns.md) -- The Singleton pattern is implemented in the SingletonClass.cs file, which ensures a single instance of the class is created throughout the application.
+- [CodingConventions](./CodingConventions.md) -- The CodingConventions.cs file provides guidelines for coding conventions, such as naming, commenting, and formatting.
+- [ArchitectureGuidelines](./ArchitectureGuidelines.md) -- The ArchitectureGuidelines.cs file provides guidelines for overall system architecture, including layering and separation of concerns.
+- [ErrorHandlingGuidelines](./ErrorHandlingGuidelines.md) -- The ErrorHandlingGuidelines.cs file provides guidelines for error handling, including exception handling, logging, and error reporting.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*
