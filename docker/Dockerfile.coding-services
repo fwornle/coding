@@ -65,6 +65,13 @@ RUN uv venv --python 3.12 .venv && \
     uv pip install -e "." && \
     uv pip install -e ".[treesitter-full]" || true
 
+# Embedding model for KG operators
+WORKDIR /coding/integrations/mcp-server-semantic-analysis
+RUN uv venv --python 3.12 .embedding-venv && \
+    . .embedding-venv/bin/activate && \
+    uv pip install sentence-transformers numpy && \
+    python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
 # ============================================================
 # Stage 4: Build TypeScript projects
 # ============================================================
@@ -110,8 +117,9 @@ COPY --from=builder /coding/scripts ./scripts
 COPY --from=builder /coding/config ./config
 COPY --from=builder /coding/knowledge-management ./knowledge-management
 
-# Copy Python virtual environment
+# Copy Python virtual environments
 COPY --from=python-deps /coding/integrations/code-graph-rag/.venv ./integrations/code-graph-rag/.venv
+COPY --from=python-deps /coding/integrations/mcp-server-semantic-analysis/.embedding-venv ./integrations/mcp-server-semantic-analysis/.embedding-venv
 COPY integrations/code-graph-rag/ ./integrations/code-graph-rag/
 
 # Copy configuration files
