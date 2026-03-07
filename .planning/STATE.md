@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
 status: executing
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-03-07T10:51:10.344Z"
-last_activity: 2026-03-07 -- Completed 09-01 Agent Pipeline Foundation
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-03-07T10:56:01Z"
+last_activity: 2026-03-07 -- Completed 09-02 Wave Agent Integration
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -26,22 +26,23 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 9 of 12 (Agent Pipeline Integration) -- first phase of v2.1
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Executing
-Last activity: 2026-03-07 -- Completed 09-01 Agent Pipeline Foundation
+Last activity: 2026-03-07 -- Completed 09-02 Wave Agent Integration
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████░░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v2.1)
-- Average duration: 2min
-- Total execution time: 2min
+- Total plans completed: 2 (v2.1)
+- Average duration: 2.5min
+- Total execution time: 5min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 09    | 01   | 2min     | 2     | 3     |
+| 09    | 02   | 3min     | 2     | 4     |
 
 ## Accumulated Context
 
@@ -55,6 +56,9 @@ Progress: [███░░░░░░░] 33%
 - [v2.1]: Phase ordering: agents first (9), then KG ops (10), then QA gate (11), then observability (12)
 - [09-01]: Used underscore-prefixed fields on EnrichedEntity for transient analysis data
 - [09-01]: analyzeEntityCode() throws on failure -- caller handles fallback per locked decision
+- [09-02]: Wave 1 uses 2 LLM calls (structure+synthesis) not SemanticAnalysisAgent -- per locked decision
+- [09-02]: SemanticAnalysisAgent replaces observations entirely, not merge -- deeper analysis supersedes
+- [09-02]: Per-entity ontology classification via classifyEntity() replaces batch classifyWaveEntities()
 
 ### Critical Pitfalls
 
@@ -71,6 +75,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T10:50:18Z
-Stopped at: Completed 09-01-PLAN.md
-Resume with: `/gsd:execute-phase 09` (Plan 02 next)
+Last session: 2026-03-07T10:56:01Z
+Stopped at: Completed 09-02-PLAN.md
+Resume with: `/gsd:execute-phase 09` (Plan 03 next)
