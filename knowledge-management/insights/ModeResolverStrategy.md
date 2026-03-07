@@ -2,117 +2,77 @@
 
 **Type:** Detail
 
-The ModeResolverStrategy would be implemented as a separate module or class, potentially utilizing a factory pattern to create instances of different mode resolver implementations.
+The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
 
 ## What It Is  
 
-The **ModeResolverStrategy** is a dedicated component that encapsulates the logic for determining which *mode* (for example, “standard”, “experimental”, “debug”, etc.) should be used for a particular LLM provider at runtime.  Although the observations do not list an exact source‑file location, they describe the strategy as being implemented as a **separate module or class** that is owned by the **LLMProviderManager**.  In the overall hierarchy, the manager‑level entity (LLMProviderManager) holds a reference to the strategy so that every time a provider is requested the manager can ask the strategy to resolve the appropriate mode before delegating further work.
-
-The strategy is not a monolithic, hard‑coded switch.  Instead, it is designed to be **configurable** – it can read external configuration files or environment variables to decide which mode applies to a given provider.  Moreover, it can **cache or memoize** the results of a resolution, thereby avoiding repeated look‑ups for frequently accessed providers and keeping the resolution overhead low.
-
----
+`ModeResolverStrategy.java` is the concrete implementation of the **strategy** used by the **ModeResolver** component to decide which operating mode an LLM provider should run in. The class lives in the codebase as a top‑level Java source file named **ModeResolverStrategy.java**. Its sole responsibility is to examine the provider’s configuration—information that is maintained by the **ModeConfiguration** entity and stored in the `providers.json` descriptor—and, with the help of the **ProviderRegistry**, translate that configuration into a concrete operating mode (e.g., *online*, *offline*, *streaming*, etc.). The resolved mode is then consumed by the parent **ModeResolver**, which delegates the decision‑making to this strategy implementation.
 
 ## Architecture and Design  
 
-The observations point to a **factory‑style approach**: the ModeResolverStrategy is likely constructed via a small factory that decides which concrete resolver implementation to instantiate based on configuration.  This aligns with the classic *Factory* pattern, where the client (LLMProviderManager) does not need to know the exact class that performs the resolution; it only depends on the abstract Strategy interface.
+The design surrounding `ModeResolverStrategy` is explicitly built around the **Strategy pattern**. The parent component **ModeResolver** holds a reference to an abstraction (likely an interface such as `ModeResolverStrategy`) and at runtime injects the concrete `ModeResolverStrategy` implementation. This decouples the mode‑resolution algorithm from the resolver’s orchestration logic, enabling alternative strategies (e.g., a mock strategy for testing or a future “dynamic” strategy) to be swapped without touching the resolver itself.  
 
-Because the strategy may need to read **external configuration files or environment variables**, it follows a **configuration‑driven design**.  The configuration source becomes a dependency of the strategy, allowing operators to change provider‑mode mappings without touching code.  This design also supports **override semantics** – environment variables can supersede file‑based defaults, giving administrators a quick way to tweak behavior in different deployment contexts.
-
-The mention of **caching or memoization** introduces an **optimization layer** that sits inside the strategy implementation.  The cache can be a simple in‑memory map keyed by provider identifier, storing the resolved mode for the lifetime of the process.  This choice trades a small amount of memory for a reduction in I/O (reading config files) and CPU cycles (re‑evaluating rules).
-
-Within the broader system, the ModeResolverStrategy shares its *parent* (LLMProviderManager) with two sibling managers:
-
-* **ProviderRegistryManager** – responsible for registering and retrieving provider instances.  
-* **ProviderLifecycleManager** – orchestrates the initialization and activation hooks of providers.
-
-All three managers collaborate: the registry supplies the concrete provider object, the lifecycle manager ensures the provider is ready to be used, and the mode resolver decides *how* the provider should behave for the current request.  This separation of concerns keeps each manager focused on a single responsibility while allowing them to be composed together.
-
----
+Interaction flows follow a clear **collaborative chain**: `ModeResolver` → `ModeResolverStrategy` → `ProviderRegistry` → `ModeConfiguration`. The strategy reaches out to `ProviderRegistry` to fetch the current provider configuration, then consults `ModeConfiguration`—the sibling component that encapsulates configuration semantics—to interpret the raw JSON data and produce an enum or object representing the operating mode. This layered approach isolates concerns: `ProviderRegistry` handles registration and storage, `ModeConfiguration` handles parsing/validation, and `ModeResolverStrategy` handles the decision logic.
 
 ## Implementation Details  
 
-Even though no concrete symbols were listed, the observations give a clear picture of the internal structure:
+Although the source file does not expose explicit method signatures in the observations, the functional intent is clear. `ModeResolverStrategy` likely implements a method such as `OperatingMode resolve(String providerId)` (or a similarly named entry point). Inside this method, the strategy queries `ProviderRegistry` (e.g., `ProviderRegistry.getProviderConfig(providerId)`) to obtain a configuration payload that mirrors the structure of `providers.json`. The payload is then handed to `ModeConfiguration`, perhaps via a call like `ModeConfiguration.fromConfig(providerConfig)`, which interprets flags, version numbers, or capability descriptors to decide which mode applies. The result is returned to the caller—`ModeResolver`—which can then instantiate the appropriate runtime components or adjust request handling accordingly.
 
-1. **Strategy Interface** – an abstract contract (e.g., `IModeResolverStrategy`) exposing a method such as `resolveMode(providerId: string): Mode`.  LLMProviderManager depends only on this interface.
-
-2. **Concrete Implementations** – one or more classes that implement the interface.  A typical implementation might be `ConfigBasedModeResolver` which:
-   * Loads a JSON/YAML configuration file at startup (or lazily on first use).  
-   * Reads environment variables (e.g., `PROVIDER_<ID>_MODE`) to allow runtime overrides.  
-   * Merges the two sources, applying precedence rules (env > file > default).
-
-3. **Factory** – a static or injectable factory (e.g., `ModeResolverFactory.create()`) that inspects the current environment and returns the appropriate concrete resolver.  The factory abstracts away the decision of whether to use a simple in‑process resolver, a remote configuration service, or a mock resolver for tests.
-
-4. **Caching Layer** – the concrete resolver can wrap its core resolution logic with a memoization map.  The first call for a given `providerId` computes the mode and stores it; subsequent calls return the cached value.  The cache can be invalidated on configuration reload events, ensuring that updates are eventually reflected without a full restart.
-
-5. **Error Handling** – the resolver should surface a clear exception or fallback mode when a provider’s configuration is missing or malformed, allowing the LLMProviderManager to degrade gracefully.
-
-All of these pieces are encapsulated within the dedicated module, keeping the public surface minimal (the strategy interface) while allowing internal flexibility.
-
----
+Because the class is the only concrete strategy referenced, it serves as the **default** resolution mechanism. The use of a dedicated Java file (`ModeResolverStrategy.java`) reinforces a single‑responsibility principle: all logic that maps provider configuration to an operating mode resides in one place, making it straightforward to audit, test, and evolve.
 
 ## Integration Points  
 
-* **LLMProviderManager** – owns an instance of the strategy and invokes `resolveMode` each time a provider is fetched from the **ProviderRegistryManager**.  The resolved mode may dictate which endpoint, model variant, or request‑level flags the manager passes downstream.
+`ModeResolverStrategy` sits at the intersection of three major system pieces:
 
-* **ProviderRegistryManager** – supplies the raw provider objects but does not concern itself with mode selection.  The registry and the resolver are loosely coupled; the resolver only needs the provider’s identifier, not the provider instance itself.
+1. **Parent – ModeResolver**: The resolver holds a reference to the strategy and calls its resolve method whenever a mode decision is required. This tight coupling is limited to the strategy interface, preserving flexibility.  
+2. **Sibling – ProviderRegistry**: The strategy depends on the registry to fetch up‑to‑date provider configurations. Any change in how providers are stored (e.g., moving from an in‑memory map to a database) will affect only the registry’s contract, leaving the strategy untouched.  
+3. **Sibling – ModeConfiguration**: The strategy leverages this component to interpret raw configuration data. If the configuration schema evolves (new fields, deprecations), updates are confined to `ModeConfiguration`, again isolating impact.
 
-* **ProviderLifecycleManager** – may need to know the resolved mode when triggering lifecycle hooks (e.g., a provider might need to load a different model checkpoint in “experimental” mode).  The lifecycle manager can query the resolver directly or receive the mode from the manager as part of the activation payload.
-
-* **Configuration Sources** – external files (commonly located under a `config/` directory) and environment variables are the primary data feeds for the resolver.  Any change to these sources should trigger a reload mechanism, which the resolver can listen to (e.g., via a file‑watcher or a signal from a configuration service).
-
-* **Testing Utilities** – because the resolver is abstracted behind an interface, unit tests for LLMProviderManager can inject a mock resolver that returns deterministic modes, enabling isolated testing of higher‑level logic.
-
----
+No child components are described, indicating that `ModeResolverStrategy` does not expose further sub‑strategies or delegate to additional helpers beyond the two siblings mentioned.
 
 ## Usage Guidelines  
 
-1. **Prefer the Factory** – when constructing an LLMProviderManager, always obtain the ModeResolverStrategy through the provided factory rather than instantiating a concrete class directly.  This guarantees that the correct configuration source and caching behavior are applied consistently across the codebase.
+Developers should treat `ModeResolverStrategy` as the canonical way to obtain an operating mode for any registered LLM provider. When extending the system, the recommended approach is to **implement a new strategy class** that adheres to the same interface and inject it into `ModeResolver` via constructor or dependency‑injection configuration. Directly manipulating provider configurations is discouraged; instead, updates should go through `ProviderRegistry`, ensuring that the strategy always sees a consistent view of the data.  
 
-2. **Keep Configuration Centralized** – store provider‑mode mappings in a single configuration file (e.g., `mode-config.yaml`) and document the environment‑variable overrides.  Avoid scattering mode decisions across multiple places; the resolver should be the sole authority.
+Testing should focus on the strategy in isolation by mocking `ProviderRegistry` and `ModeConfiguration` to supply deterministic configurations and verify that the expected mode is returned. Because the strategy is the sole decision point, any changes to mode‑resolution rules must be accompanied by unit tests that cover all configuration permutations defined in `providers.json`.  
 
-3. **Cache Awareness** – be mindful that the resolver caches results.  If you modify the configuration at runtime, invoke the resolver’s `invalidateCache()` (or an equivalent API) or trigger a full reload event so that the new settings are respected.
-
-4. **Handle Missing Modes Gracefully** – always anticipate that `resolveMode` could return `undefined` or throw an error if a provider is misconfigured.  LLMProviderManager should define a sensible default mode (such as “standard”) to maintain service continuity.
-
-5. **Testing** – inject a stub implementation of the strategy in unit tests.  The stub should implement the same interface but return a predetermined mode, allowing you to verify that higher‑level components react correctly without relying on external files or environment variables.
+When adding new operating modes, developers must extend `ModeConfiguration` to recognize the new mode flag and update the strategy’s resolution logic accordingly. This keeps the system’s evolution predictable and confined to the three collaborating components.
 
 ---
 
-### Architectural patterns identified  
+### Architectural Patterns Identified
+- **Strategy Pattern** – `ModeResolver` delegates mode‑resolution to `ModeResolverStrategy`.
+- **Facade‑like Collaboration** – `ModeResolverStrategy` acts as a façade over `ProviderRegistry` and `ModeConfiguration`.
 
-* **Factory Pattern** – for creating concrete resolver instances based on configuration.  
-* **Strategy Pattern** – the resolver itself is a strategy that can be swapped out.  
-* **Configuration‑Driven Design** – external files and env vars drive behavior.  
-* **Caching / Memoization** – internal optimization to avoid repeated resolution work.
+### Design Decisions and Trade‑offs
+- **Separation of Concerns**: Mode resolution is isolated from provider registration and configuration parsing, improving testability and maintainability.  
+- **Single Default Strategy**: Simplicity for the common case, but introduces a single point of change if multiple resolution policies become necessary.  
+- **Dependency on Registry & Configuration**: Tight coupling to these siblings ensures up‑to‑date data but requires stable contracts; any breaking change in the registry or configuration API propagates to the strategy.
 
-### Design decisions and trade‑offs  
+### System Structure Insights
+- The system is organized around a **core resolver** (`ModeResolver`) that orchestrates mode selection via interchangeable strategies.  
+- **ProviderRegistry** and **ModeConfiguration** are sibling services that supply data and semantics, respectively, to the strategy layer.  
+- The hierarchy is shallow: parent (`ModeResolver`) → strategy (`ModeResolverStrategy`) → siblings (`ProviderRegistry`, `ModeConfiguration`).
 
-* **Separation of concerns** (manager vs. resolver) improves testability but adds an extra indirection layer.  
-* **Config‑first approach** gives flexibility at the cost of runtime validation complexity.  
-* **In‑process caching** reduces latency but consumes memory; cache invalidation logic must be carefully managed to avoid stale modes.
+### Scalability Considerations
+- Adding new providers does not affect the strategy; the registry scales horizontally to store more entries.  
+- Introducing additional strategies (e.g., per‑tenant or feature‑flag driven) can be done without refactoring `ModeResolver`, supporting future scaling of decision logic.  
+- The current design assumes that configuration lookup (`ProviderRegistry`) is inexpensive; if the registry grows large, caching within the strategy may be needed.
 
-### System structure insights  
-
-The system is organized around three manager‑level components under the **LLMProviderManager** umbrella: a registry for locating providers, a lifecycle manager for bootstrapping them, and the ModeResolverStrategy for determining operational mode.  This triad enables clear responsibilities and easy extension (e.g., adding new resolver implementations without touching the registry).
-
-### Scalability considerations  
-
-* **Horizontal scaling** – because the resolver caches per‑process, each instance of the service maintains its own cache; this is acceptable for modest traffic but may lead to duplicated work across many pods.  A shared cache (e.g., Redis) could be introduced if cross‑instance consistency becomes a requirement.  
-* **Configuration size** – the resolver’s performance is linear in the number of provider entries; using a map keyed by provider ID keeps look‑ups O(1).  Large configuration files should be parsed once at startup.
-
-### Maintainability assessment  
-
-The clear interface and factory abstraction make the ModeResolverStrategy easy to evolve: new resolution rules or data sources can be added by implementing a new concrete class.  The reliance on external configuration keeps the codebase small and declarative, but it also introduces a maintenance burden to keep configuration files and environment variables synchronized.  The caching layer is straightforward, but developers must remember to expose cache‑clear hooks to avoid stale data after configuration changes.  Overall, the design balances flexibility with simplicity, supporting maintainable growth as the set of providers or modes expands.
+### Maintainability Assessment
+- **High maintainability**: Clear separation, limited public API, and reliance on well‑defined sibling components make the codebase easy to understand and modify.  
+- **Extensibility**: New strategies or modes can be added with minimal impact on existing code, thanks to the interface‑based delegation.  
+- **Risk**: Because the strategy directly couples to both `ProviderRegistry` and `ModeConfiguration`, any breaking change in those components requires coordinated updates, but the single responsibility of the strategy keeps the impact localized.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMProviderManager](./LLMProviderManager.md) -- LLMProviderManager uses a provider registry to manage the different LLM providers, as seen in the provider-registry.ts file
+- [ModeResolver](./ModeResolver.md) -- ModeResolver uses a strategy pattern in ModeResolverStrategy.java to resolve the operating mode based on the provider configuration in providers.json
 
 ### Siblings
-- [ProviderRegistryManager](./ProviderRegistryManager.md) -- The provider-registry.ts file is expected to contain the implementation of the ProviderRegistryManager, which would define the interface for provider registration and retrieval.
-- [ProviderLifecycleManager](./ProviderLifecycleManager.md) -- The ProviderLifecycleManager would be responsible for invoking the initialization and activation methods of registered providers, potentially using a template method pattern to standardize the lifecycle hooks.
+- [ModeConfiguration](./ModeConfiguration.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
+- [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry is responsible for managing the registration of LLM providers, which includes storing their configurations and modes.
 
 
 ---

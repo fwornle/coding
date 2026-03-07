@@ -1,84 +1,107 @@
 # SpecstoryAdapter
 
-**Type:** Detail
+**Type:** SubComponent
 
-The use of a separate adapter class implies a deliberate design decision to decouple the GSDWorkflowManager from the specifics of the Specstory extension, allowing for potential substitutions or modif...
+SpecstoryAdapter utilizes the SpecstoryConnectionManager to establish connections to the Specstory extension, providing methods for initialization and logging conversations.
 
 ## What It Is  
 
-The **SpecstoryAdapter** is a dedicated integration class that lives in the file **`lib/integrations/specstory-adapter.js`**. Its sole responsibility is to mediate communication between the **GSDWorkflowManager** and the external **Specstory** extension. By encapsulating all Specstory‑specific logic inside this adapter, the broader workflow engine can remain agnostic of the concrete API, payload formats, or authentication details required by Specstory. The adapter is therefore the concrete “plug‑in” that enables the GSD workflow system to incorporate Specstory‑driven capabilities without leaking those details into the core manager.
+The **SpecstoryAdapter** is a sub‑component that lives inside the **Trajectory** parent component.  Its sole responsibility is to expose a *single, unified interface* for all interactions with the **Specstory** extension, no matter whether the underlying transport is an HTTP API, an IPC channel, or any future protocol.  The adapter is configured through a **config.json** file that lives alongside the other Trajectory configuration assets, and it delegates the low‑level connection work to its child **SpecstoryConnectionManager**.  All logging of connection events and conversation data is performed by the adapter (and by the sibling **ConversationLogger**) so that callers—such as **TrajectoryController**—receive a clean, protocol‑agnostic API.
 
 ## Architecture and Design  
 
-The placement of **SpecstoryAdapter** under the **`lib/integrations/`** namespace signals a modular integration layer. The design follows the classic **Adapter pattern**: the GSDWorkflowManager expects a well‑defined interface for “extension communication,” and SpecstoryAdapter implements that contract for the Specstory service. This decoupling is a deliberate architectural decision that isolates external‑service volatility from the workflow core, allowing the manager to swap adapters (e.g., for a different extension) with minimal impact.
+The design of **SpecstoryAdapter** follows a **modular, pluggable architecture**.  The presence of a **ConnectionMethodFactory** indicates a **Factory pattern** that creates concrete connection objects (e.g., an HTTP client or an IPC client) on demand.  By abstracting each transport behind a common interface, the adapter effectively implements a **Strategy pattern**: the runtime‑selected strategy (HTTP vs. IPC) is hidden behind the adapter’s public methods.  The adapter’s relationship with **SpecstoryConnectionManager** forms a *composition* relationship— the manager owns the lifecycle of the concrete connection objects produced by the factory and supplies higher‑level operations such as “initialize” and “logConversation”.  
 
-Within the **GSDWorkflowManager** hierarchy, the adapter sits alongside sibling components such as **WorkflowTracker** and **GSDWorkflowController**. All three share the same parent—GSDWorkflowManager—and collectively provide a cohesive workflow orchestration stack: the controller drives lifecycle events, the tracker records operational state, and the adapter bridges to external extensions. The fact that the adapter is a separate module rather than being inlined within the manager underscores an extensibility‑first mindset, where new integrations can be added by simply dropping a new adapter class into the **`lib/integrations/`** folder.
+Error resilience is provided by the **ErrorHandlingMechanism**, which the observations describe as possibly employing a retry policy (e.g., exponential backoff with jitter).  This mechanism is encapsulated within the adapter’s error‑handling path, ensuring that any exception raised during connection establishment is caught, logged, and optionally retried before bubbling up to callers.  The overall architecture therefore consists of a thin façade (**SpecstoryAdapter**) that coordinates configuration, connection creation, error handling, and logging, while delegating specialized work to its child components.
 
 ## Implementation Details  
 
-Although the source snapshot does not expose individual methods, the naming and location of **SpecstoryAdapter** imply a few concrete responsibilities:
+* **SpecstoryAdapter** – the entry point for external code.  It reads **config.json** at startup to determine which connection protocol(s) are enabled and which parameters (URLs, socket paths, time‑outs) should be used.  It exposes methods such as `initialize()` and `logConversation(message: string)`, which internally forward calls to **SpecstoryConnectionManager**.  
 
-1. **Connection Management** – establishing and maintaining any required network sessions, authentication tokens, or client objects needed to talk to Specstory.
-2. **Request Translation** – converting internal GSD workflow commands into the request format expected by Specstory (e.g., mapping a “start step” into a Specstory API call).
-3. **Response Handling** – interpreting Specstory’s responses, normalizing them into a shape the GSDWorkflowManager can consume, and surfacing errors in a consistent way.
+* **SpecstoryConnectionManager** – instantiated by the adapter and tasked with managing the active connection.  It asks the **ConnectionMethodFactory** to produce a concrete connection object based on the configuration.  Once a connection is obtained, the manager performs any protocol‑specific handshake and maintains the session state required for subsequent logging calls.  
 
-Because the adapter is a class, it likely encapsulates state (such as cached credentials) and exposes a set of public methods that the manager invokes at key workflow milestones. The separation into its own file (`specstory-adapter.js`) also makes it straightforward to unit‑test in isolation, mock, or replace with a stub during integration testing of the manager.
+* **ConnectionMethodFactory** – a dedicated module that encapsulates the creation logic for each supported protocol.  For an HTTP configuration it returns an object that knows how to issue REST calls; for IPC it returns a wrapper around Node.js’s `net` or `child_process` channels.  Because the factory is a separate child component, adding a new protocol (e.g., WebSocket) would only require a new concrete class and a registration entry, leaving the adapter unchanged.  
+
+* **ErrorHandlingMechanism** – sits alongside the connection flow.  When **SpecstoryConnectionManager** encounters a failure (e.g., network timeout, socket error), the mechanism decides whether to retry, back‑off, or surface the error.  The observations suggest an exponential backoff with jitter, which helps avoid thundering‑herd problems during transient outages.  
+
+* **Logging** – both the adapter and the sibling **ConversationLogger** contribute to observability.  The adapter logs connection‑level events (successful initialization, reconnection attempts, fatal errors) while **ConversationLogger** formats and persists the actual conversation payloads.  All log entries are emitted through a common logger, making debugging across the **Trajectory** subsystem straightforward.
 
 ## Integration Points  
 
-The **SpecstoryAdapter** interacts directly with two primary system boundaries:
+The **SpecstoryAdapter** is tightly integrated with several other parts of the system:
 
-- **Upstream** – The **GSDWorkflowManager** calls into the adapter whenever a workflow step requires Specstory functionality. The manager treats the adapter as a black box that fulfills a defined contract (e.g., `executeAction(actionPayload)`), allowing the manager to remain unchanged if the underlying extension evolves.
-- **Downstream** – The adapter communicates with the external **Specstory** service, which may involve HTTP(S) endpoints, WebSocket streams, or SDK calls. All configuration needed for this downstream connection (base URL, API keys, timeout settings) is expected to be supplied to the adapter, likely via constructor parameters or a configuration object.
+* **Trajectory** – as the parent component, Trajectory orchestrates the overall workflow and invokes the adapter during project‑milestone processing.  The adapter’s configuration file lives in the same directory hierarchy as the rest of Trajectory’s settings, ensuring a single source of truth for connection preferences.  
 
-Sibling components do not directly call the adapter, but they share the same lifecycle context provided by the manager. For example, **WorkflowTracker** may log events generated by the adapter’s responses, while **GSDWorkflowController** may trigger adapter actions as part of its state‑transition logic.
+* **TrajectoryController** – a sibling that drives the end‑to‑end flow.  It calls the adapter (via **SpecstoryConnectionManager**) to initialize the Specstory link and to forward conversation data generated during planning activities.  
+
+* **ConversationLogger** – another sibling that consumes the adapter’s `logConversation` calls to persist formatted logs.  Because both entities share the same logging infrastructure, correlation IDs can be attached to each entry, enabling traceability across the entire Trajectory stack.  
+
+* **FileWatchHandler** – while not directly involved in connection establishment, it monitors the directory where **ConversationLogger** writes log files.  Any new file events can trigger further processing, creating a feedback loop that indirectly depends on the adapter’s successful operation.  
+
+* **SpecstoryConnectionManager**, **ConnectionMethodFactory**, and **ErrorHandlingMechanism** – the child components that the adapter composes.  Their public interfaces (e.g., `createConnection()`, `handleError(error)`) are the only points of contact, keeping the adapter’s surface area minimal and stable.
 
 ## Usage Guidelines  
 
-1. **Instantiate Through the Manager** – Developers should never create a `new SpecstoryAdapter()` directly in application code. Instead, obtain the adapter via the **GSDWorkflowManager**, which ensures the correct configuration and lifecycle handling.
-2. **Treat the Adapter as Stateless Between Calls** – While the adapter may cache authentication tokens, callers should avoid storing adapter state themselves. Rely on the manager to manage the adapter’s lifecycle.
-3. **Handle Errors Uniformly** – The manager expects the adapter to surface errors in a consistent format (e.g., throwing a `SpecstoryError`). Propagate these errors up to the manager so that **WorkflowTracker** can record them and **GSDWorkflowController** can decide on retries or aborts.
-4. **Extend Carefully** – If a new version of Specstory introduces breaking changes, create a new adapter class (e.g., `SpecstoryV2Adapter`) in the same `lib/integrations/` directory and update the manager’s configuration to point to the new class, rather than modifying the existing adapter.
-5. **Unit Test in Isolation** – Because the adapter isolates all external calls, unit tests should mock the Specstory endpoints and verify that the adapter correctly translates inputs/outputs. This keeps the broader workflow tests fast and deterministic.
+1. **Configuration First** – always ensure that **config.json** accurately reflects the desired protocol and endpoint details before invoking `SpecstoryAdapter.initialize()`.  Mis‑configured URLs or socket paths will cause the **ErrorHandlingMechanism** to enter its retry loop, potentially delaying start‑up.  
+
+2. **Initialize Early** – call `initialize()` as part of the Trajectory start‑up sequence (for example, inside `TrajectoryController.start()`).  This guarantees that the connection is ready before any conversation logging occurs.  
+
+3. **Prefer the Unified API** – client code should never interact directly with **SpecstoryConnectionManager** or the concrete connection objects.  All operations must go through the adapter’s methods so that future protocol changes remain transparent to callers.  
+
+4. **Handle Exceptions Gracefully** – while the adapter’s internal error handling will retry transient failures, permanent errors (e.g., authentication failure) will be propagated as exceptions.  Callers should catch these exceptions and decide whether to abort the workflow or fall back to an offline mode.  
+
+5. **Leverage Logging** – the adapter emits detailed logs for connection lifecycle events.  Enable verbose logging in development environments to surface issues early, and route logs to a centralized monitoring system in production to aid troubleshooting.  
+
+6. **Extending Protocols** – when adding a new transport, implement a new concrete class in the **ConnectionMethodFactory** and register it.  No changes to the adapter’s code are required, preserving backward compatibility.  
 
 ---
 
-### 1. Architectural patterns identified  
-- **Adapter pattern** – isolates external Specstory API behind a stable internal interface.  
-- **Modular integration layer** – adapters live in `lib/integrations/`, supporting plug‑and‑play extensions.
+### Architectural patterns identified  
+* **Factory pattern** – implemented by `ConnectionMethodFactory` to create protocol‑specific connection objects.  
+* **Strategy pattern** – the adapter selects a connection strategy (HTTP, IPC) at runtime based on configuration.  
+* **Composition** – `SpecstoryAdapter` composes `SpecstoryConnectionManager`, `ConnectionMethodFactory`, and `ErrorHandlingMechanism`.  
+* **Retry/Back‑off pattern** – encapsulated in `ErrorHandlingMechanism` for transient error resilience.  
 
-### 2. Design decisions and trade‑offs  
-- **Decoupling**: By separating Specstory concerns, the core workflow manager stays lightweight and easier to evolve.  
-- **Flexibility vs. Overhead**: Introducing an adapter adds a thin indirection layer, which incurs minimal runtime overhead but greatly improves replaceability.  
-- **Single Responsibility**: The adapter focuses solely on Specstory interaction, avoiding “God class” tendencies in the manager.
+### Design decisions and trade‑offs  
+* **Unified façade vs. direct protocol use** – choosing a single adapter simplifies consumer code but adds an indirection layer that may incur minimal latency.  
+* **Modular factory** – promotes extensibility (easy to add new protocols) at the cost of a slightly larger codebase and the need to maintain a registration map.  
+* **Configuration‑driven protocol selection** – provides flexibility but requires rigorous validation of `config.json` to avoid runtime mis‑configuration.  
+* **Centralized error handling** – improves reliability but can mask specific low‑level error details unless logs are examined.  
 
-### 3. System structure insights  
-- **Parent‑child relationship**: `GSDWorkflowManager → SpecstoryAdapter`.  
-- **Sibling collaboration**: `WorkflowTracker` and `GSDWorkflowController` operate in parallel, sharing the manager’s orchestration context while the adapter handles external calls.  
-- **Integration folder**: All third‑party connectors are co‑located, making the integration surface explicit and discoverable.
+### System structure insights  
+* The **SpecstoryAdapter** sits at the intersection of Trajectory’s planning logic and the external Specstory extension, acting as the sole gateway.  
+* Its child components each address a single concern: connection creation, connection management, and error handling, reflecting a clean separation of responsibilities.  
+* Sibling components share common logging and file‑watch infrastructure, indicating a cohesive observability strategy across the Trajectory subsystem.  
 
-### 4. Scalability considerations  
-- Because the adapter is stateless between calls (aside from optional token caching), it can be instantiated per request or shared as a singleton without contention.  
-- Adding more adapters (e.g., for other extensions) follows the same pattern, allowing the workflow system to scale horizontally by simply provisioning additional manager instances that each load the required adapters.
+### Scalability considerations  
+* Supporting additional protocols scales linearly: each new protocol adds a factory entry and a concrete connection class without impacting existing code paths.  
+* The retry/back‑off mechanism protects against spikes in transient failures, but extremely high connection‑failure rates could still saturate the retry queue; monitoring and circuit‑breaker logic may be needed for large‑scale deployments.  
+* Logging is performed synchronously within the adapter; in high‑throughput scenarios, async log buffering or external log aggregation services should be considered to avoid I/O bottlenecks.  
 
-### 5. Maintainability assessment  
-- **High maintainability**: The clear separation of concerns means changes to Specstory’s API affect only `specstory-adapter.js`.  
-- **Testability**: Isolated adapter logic enables focused unit tests, reducing regression risk.  
-- **Extensibility**: New external services can be integrated by adding new adapter classes in the same directory, preserving the existing manager codebase.  
-
-Overall, the **SpecstoryAdapter** exemplifies a clean, extensible integration point within the GSD workflow ecosystem, balancing decoupling, testability, and future growth without introducing unnecessary complexity.
+### Maintainability assessment  
+* The clear separation into **SpecstoryAdapter**, **SpecstoryConnectionManager**, **ConnectionMethodFactory**, and **ErrorHandlingMechanism** yields high maintainability: each module can be unit‑tested in isolation.  
+* Configuration‑driven behavior reduces the need for code changes when switching protocols, easing operational maintenance.  
+* The reliance on a single **config.json** file centralizes settings, but also creates a single point of failure; validation tooling and schema enforcement are advisable.  
+* The use of well‑known patterns (Factory, Strategy, Retry) aligns with common developer expectations, facilitating onboarding and future enhancements.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [GSDWorkflowManager](./GSDWorkflowManager.md) -- GSDWorkflowManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension and manage the GSD workflow.
+- [Trajectory](./Trajectory.md) -- The Trajectory component is a complex system managing project milestones, GSD workflow, phase planning, and implementation task tracking. It employs various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive planning infrastructure. The component's architecture involves multiple connection methods, including HTTP API, Inter-Process Communication (IPC), and file watch directory, to interact with the Specstory extension. The SpecstoryAdapter class plays a central role in this component, providing methods for initialization, logging conversations, and connecting to the Specstory extension via different methods.
+
+### Children
+- [SpecstoryConnectionManager](./SpecstoryConnectionManager.md) -- The SpecstoryConnectionManager utilizes the ConnectionMethodFactory to create and manage different connection methods, as suggested by the parent component analysis.
+- [ConnectionMethodFactory](./ConnectionMethodFactory.md) -- The ConnectionMethodFactory is likely to be implemented as a separate module or class, allowing for easy maintenance and extension of connection methods.
+- [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- The ErrorHandlingMechanism may employ a retry policy, such as exponential backoff with jitter, to handle transient errors and improve the overall reliability of the connection.
 
 ### Siblings
-- [WorkflowTracker](./WorkflowTracker.md) -- The WorkflowTracker's role in the GSDWorkflowManager suggests an emphasis on operational visibility and control, which is crucial for managing complex workflows.
-- [GSDWorkflowController](./GSDWorkflowController.md) -- While direct evidence from source code is lacking, the GSDWorkflowController's hypothetical presence is supported by the need for a component to manage the workflow's lifecycle, a common requirement in workflow management systems.
+- [SpecstoryConnectionManager](./SpecstoryConnectionManager.md) -- SpecstoryConnectionManager utilizes the SpecstoryAdapter class to establish connections to the Specstory extension, providing methods for initialization and logging conversations.
+- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger utilizes the SpecstoryAdapter class to log conversations, providing methods for formatting log entries and handling errors.
+- [FileWatchHandler](./FileWatchHandler.md) -- FileWatchHandler utilizes the Node.js fs module to watch a directory for new log files, providing methods for handling file system events.
+- [TrajectoryController](./TrajectoryController.md) -- TrajectoryController utilizes the SpecstoryConnectionManager to establish connections to the Specstory extension, providing methods for initialization and logging conversations.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

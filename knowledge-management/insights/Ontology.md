@@ -2,145 +2,135 @@
 
 **Type:** SubComponent
 
-OntologyValidator.useValidationRules() provides a flexible framework for defining custom validation rules
+OntologyClassifier uses a hierarchical classification model with upper and lower ontology definitions in ontology-definitions.json
 
 ## What It Is  
 
-The **Ontology** sub‑component lives inside the `SemanticAnalysis` parent (the multi‑agent system that processes git history and LSL sessions).  Although the source tree does not expose concrete file‑system locations in the supplied observations, the key entry points are the public classes and methods that appear throughout the code base:  
+The **Ontology** sub‑component lives inside the **SemanticAnalysis** multi‑agent system and is the authoritative source of classification knowledge for all downstream agents. Its static definition files reside in the repository at  
 
-* `OntologyClassifier.useUpperOntology()` – drives classification using the top‑level hierarchy of the ontology.  
-* `OntologyClassifier.useLowerOntology()` – enables a finer‑grained, leaf‑level classification.  
-* `EntityResolver.resolveEntityType()` together with `EntityResolver.useTypeInference()` – resolves an entity’s type, optionally inferring it when explicit metadata is missing.  
-* `OntologyValidator.validateEntity()` and `OntologyValidator.useValidationRules()` – enforce consistency and allow custom validation logic.  
-* `OntologyManager.loadOntology()` – loads ontology definitions from a variety of formats (OWL, RDF, …).  
+```
+/…/ontology-definitions.json
+```  
 
-Together these pieces implement a **hierarchical ontology engine** that can ingest external ontology definitions, classify entities at multiple granularity levels, resolve their types efficiently (via caching), and validate them against a flexible rule set.  The sub‑component also owns three child modules – `EntityTypeResolver`, `OntologyLoader`, and `ValidationRulesEngine` – each encapsulating a distinct responsibility within the overall ontology workflow.
+where the *upper* and *lower* ontology layers are declared. At runtime the **OntologyManager** loads these definitions from a graph database through a dedicated *graph‑database adapter*. The loaded model is then consumed by three child agents: **OntologyClassifier**, **EntityTypePredictor** (exposed via `EntityTypeResolver.resolveEntityType()`), and **ValidationRules** (enforced by `ValidationAgent.validateEntity()`). Incremental changes to the ontology are applied by **OntologyUpdater**, which uses a diff‑based approach to keep the live model in sync without full reloads.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a **layered, modular architecture** built around clear separation of concerns:
+Ontology is built as a **multi‑agent, hierarchical classification subsystem** that follows a clear separation of concerns:
 
-1. **Classification Layer** – `OntologyClassifier` exposes two complementary strategies: `useUpperOntology()` for coarse, hierarchical classification and `useLowerOntology()` for fine‑grained classification.  This dual‑strategy approach mirrors the **Strategy pattern**, allowing the caller to pick the appropriate level of detail without altering the classifier’s internal mechanics.
+1. **Data‑source layer** – `OntologyManager.loadOntology()` abstracts the persistence mechanism. It pulls the ontology graph from a graph database using a *graph‑database adapter*, keeping the component independent of the underlying storage technology.  
 
-2. **Resolution Layer** – `EntityResolver` is responsible for turning a raw entity into a concrete type.  `resolveEntityType()` performs the lookup, while `useTypeInference()` adds an inference step when the type cannot be directly resolved.  The presence of a **caching mechanism** (explicitly noted in the observation) indicates a **Cache‑Aside** strategy that improves performance by avoiding repeated ontology traversals.
+2. **Definition layer** – The JSON file `ontology-definitions.json` stores the *upper* (broad categories) and *lower* (fine‑grained) ontology definitions. These definitions are the contract that all downstream agents rely on.  
 
-3. **Validation Layer** – `OntologyValidator` checks that an entity’s metadata aligns with the ontology.  `useValidationRules()` supplies a plug‑in‑style framework for custom rules, which is an instance of the **Policy/Strategy pattern**: validation behavior can be swapped or extended without modifying the validator core.
+3. **Classification layer** – `OntologyClassifier` implements a **hierarchical classification model**. It first matches an entity against the upper ontology, then refines the match using the lower ontology. This mirrors the classic “coarse‑to‑fine” pattern and enables rapid early rejection of non‑matching entities.  
 
-4. **Loading Layer** – `OntologyManager.loadOntology()` supports multiple ontology serialisations (OWL, RDF).  This is an **Adapter**‑like capability that abstracts the concrete file format behind a uniform loading interface, enabling the rest of the system to work with a canonical in‑memory model regardless of source.
+4. **Prediction layer** – `EntityTypeResolver.resolveEntityType()` introduces a **machine‑learning‑based predictor**. When static rules are insufficient, the predictor consults a trained model (trained on historic entity characteristics) to infer the most likely `entityType`.  
 
-The **child components** (`EntityTypeResolver`, `OntologyLoader`, `ValidationRulesEngine`) are each tightly coupled to the corresponding layer described above, reinforcing the **Single‑Responsibility Principle**.  The parent `SemanticAnalysis` component orchestrates these layers through its agents (e.g., `OntologyClassificationAgent`), while sibling components such as `Pipeline` or `ConcurrencyManager` provide orthogonal concerns (execution ordering, threading) that the ontology sub‑component can leverage but does not dictate.
+5. **Validation layer** – `ValidationAgent.validateEntity()` enforces **rule‑based validation** of the entity’s metadata (`entityType`, `metadata.ontologyClass`) against the current ontology definitions. This ensures data integrity before entities are persisted or further processed.  
+
+6. **Update layer** – `OntologyUpdater.updateOntology()` applies **diff‑based incremental updates**. Rather than re‑loading the entire ontology, only the changed fragments are merged, reducing latency and avoiding disruption of in‑flight classification jobs.
+
+The component sits under the **SemanticAnalysis** parent, sharing the same graph‑database adapter and intelligent routing mechanisms used by sibling components such as **Pipeline**, **Insights**, and **OntologyManagement**. Its children (OntologyClassifier, EntityTypePredictor, ValidationRules) are tightly coupled through the shared definition model but remain loosely coupled in implementation, allowing independent evolution.
 
 ---
 
 ## Implementation Details  
 
-### Classification (`OntologyClassifier`)  
-* **`useUpperOntology()`** walks the top‑level hierarchy of the loaded ontology.  It likely retrieves a root node and follows parent‑child links until a matching concept is found, returning the highest‑level classification.  
-* **`useLowerOntology()`** descends deeper, possibly iterating over child nodes of the matched upper concept to locate the most specific leaf node that still satisfies the entity’s attributes.
+### OntologyManager  
+*Class*: `OntologyManager`  
+*Method*: `loadOntology()` – Connects to the graph database via the **graph‑database adapter** (the same adapter used by sibling components like `PipelineCoordinator`). It retrieves the ontology graph, materializes it into an in‑memory structure, and registers it with the rest of the Ontology subsystem.  
 
-Both methods rely on the **hierarchical structure** supplied by the `OntologyLoader` (see below) and share a common internal representation of the ontology graph (e.g., adjacency lists or a directed acyclic graph).
+### OntologyClassifier  
+*Class*: `OntologyClassifier`  
+*Data*: `ontology-definitions.json` (upper & lower layers)  
+The classifier parses the JSON file at startup, building two lookup tables: one for the upper ontology (high‑level categories) and one for the lower ontology (specific classes). Classification proceeds in two passes:  
+1. **Upper‑pass** – quick hash‑lookup to find candidate top‑level categories.  
+2. **Lower‑pass** – a deeper match against the candidate’s child classes, using attribute similarity heuristics defined in the JSON.  
 
-### Resolution (`EntityResolver`)  
-* **`resolveEntityType()`** first checks an in‑memory cache (as per the observation) to see if the entity’s type has already been computed.  If a cache miss occurs, it delegates to the `EntityTypeResolver` child, which consults the classifier’s output.  
-* **`useTypeInference()`** augments the resolver with inference rules (e.g., “if an entity has property X and lacks explicit type, assume type Y”).  This step is optional and can be toggled per call, giving callers control over strict vs. heuristic resolution.
+### EntityTypeResolver  
+*Class*: `EntityTypeResolver`  
+*Method*: `resolveEntityType()` – Invokes a pre‑trained **machine‑learning model** (likely a lightweight classifier such as a decision tree or shallow neural net) that consumes contextual features extracted from the entity (e.g., surrounding code tokens, file path patterns). The model returns a probability distribution over possible `entityType`s; the highest‑scoring type is selected.  
 
-### Validation (`OntologyValidator`)  
-* **`validateEntity()`** receives an entity and runs it through the `ValidationRulesEngine`.  The engine executes a collection of rule objects supplied via `useValidationRules()`.  Because the rule set is configurable, developers can add domain‑specific checks (e.g., mandatory metadata fields, cross‑ontology consistency) without altering core validator code.
+### ValidationAgent  
+*Class*: `ValidationAgent`  
+*Method*: `validateEntity()` – Performs a deterministic check that the entity’s `entityType` and `metadata.ontologyClass` exist in the current ontology definitions. It also verifies that required metadata fields conform to the schema described in **ValidationRules** (e.g., mandatory fields, allowed value ranges). Failure triggers a rejection event that is routed back to the originating agent in the **SemanticAnalysis** pipeline.  
 
-### Loading (`OntologyManager`)  
-* **`loadOntology()`** detects the file extension or explicit format flag and dispatches to the appropriate parser (OWL parser, RDF parser).  The resulting data structure is stored in a shared repository that the classifier, resolver, and validator all reference.  By supporting multiple formats, the system can ingest ontologies from diverse sources (public vocabularies, internal taxonomies).
+### OntologyUpdater  
+*Class*: `OntologyUpdater`  
+*Method*: `updateOntology()` – Accepts a *diff* payload describing additions, deletions, or modifications to ontology nodes. The updater merges these changes into the in‑memory ontology model and persists the delta back to the graph database. Because only the delta is processed, ongoing classification jobs continue uninterrupted, and the system can apply updates with near‑real‑time latency.  
 
-### Child Modules  
-* **`EntityTypeResolver`** implements the hierarchical lookup logic used by both `useUpperOntology` and `useLowerOntology`.  
-* **`OntologyLoader`** encapsulates the format‑specific parsers invoked by `OntologyManager.loadOntology()`.  
-* **`ValidationRulesEngine`** maintains the rule registry and executes them in a deterministic order during validation.
+All three child agents read from the same in‑memory representation populated by `OntologyManager`, guaranteeing consistency across classification, prediction, and validation phases.
 
 ---
 
 ## Integration Points  
 
-* **Parent – `SemanticAnalysis`**: The ontology sub‑component is instantiated and coordinated by agents such as `OntologyClassificationAgent`.  These agents feed raw entities extracted from git history or LSL sessions into `EntityResolver`, then hand the classified entities to downstream agents (e.g., `CodeGraphAgent`).  
+1. **Parent – SemanticAnalysis** – The Ontology subsystem is invoked by the **SemanticAnalysis** orchestrator whenever a new knowledge entity is extracted from Git history or LSL sessions. The orchestrator first calls `OntologyManager.loadOntology()` (or relies on a cached model) and then routes the entity through the classification‑prediction‑validation pipeline.  
 
-* **Siblings**:  
-  * `Pipeline` may schedule ontology‑related tasks as DAG steps, ensuring that loading (`OntologyManager.loadOntology()`) occurs before classification.  
-  * `ConcurrencyManager` can provide the thread pool used by `EntityResolver`’s cache or by the `ValidationRulesEngine` when validating large batches of entities.  
-  * `DataStorage` persists the validated, classified entities, while `SecurityManager` ensures that only authorized agents invoke ontology loading or rule definition APIs.
+2. **Sibling – OntologyManagement** – Both Ontology and OntologyManagement share the `OntologyManager.loadOntology()` implementation, reinforcing a single source of truth for the graph‑database adapter. OntologyManagement may expose higher‑level CRUD APIs that ultimately generate the diff payload consumed by `OntologyUpdater.updateOntology()`.  
 
-* **Children**:  
-  * `EntityTypeResolver` is invoked by both the classifier and the resolver, acting as the shared lookup service.  
-  * `OntologyLoader` supplies the in‑memory graph that the classifier traverses.  
-  * `ValidationRulesEngine` receives rule definitions from configuration files or from higher‑level components (e.g., a UI that lets domain experts add custom validation logic).
+3. **Sibling – Pipeline & Insights** – The **Pipeline** component’s DAG configuration can include a step that invokes `OntologyClassifier` to tag entities before they flow downstream. The **Insights** generator later consumes the enriched entity metadata (including `entityType` and `ontologyClass`) to produce relationship‑based insights via its rule engine.  
 
-* **External Interfaces**: The `OntologyManager.loadOntology()` method likely accepts a file path or URL, making it a natural integration point for CI pipelines that generate or update ontology artifacts.  The caching layer in `EntityResolver` may expose metrics (hit/miss rates) that monitoring tools can consume.
+4. **External – GraphDatabaseAdapter** – All persistence interactions (load, update) funnel through the shared graph‑database adapter, ensuring consistent transaction semantics and connection pooling across the system.  
+
+5. **Runtime – ValidationRules** – Validation rules are defined alongside the ontology definitions and are consulted by `ValidationAgent.validateEntity()` before any entity is persisted to the **CodeKnowledgeGraph** or emitted to downstream consumers.  
 
 ---
 
 ## Usage Guidelines  
 
-1. **Load Before Use** – Always invoke `OntologyManager.loadOntology()` early in the application lifecycle (e.g., during agent initialization).  Loading must complete successfully before any classification, resolution, or validation calls are made; otherwise the hierarchical structures will be empty and methods will return defaults or errors.
+* **Initialize Once, Reuse Often** – Call `OntologyManager.loadOntology()` at application start‑up (or when a major version change occurs) and keep the in‑memory model alive. Subsequent agents should reference this shared instance rather than re‑loading the JSON or graph data.  
 
-2. **Select the Appropriate Classification Strategy** – Use `useUpperOntology()` when a broad categorisation is sufficient (e.g., grouping entities for high‑level dashboards).  Switch to `useLowerOntology()` when downstream processes need precise type information (e.g., generating code graphs).  Mixing both in the same workflow can lead to inconsistent type assignments.
+* **Prefer Diff Updates** – When extending or correcting the ontology, generate a diff payload and feed it to `OntologyUpdater.updateOntology()`. This avoids full reloads, reduces latency, and preserves classification continuity.  
 
-3. **Leverage Caching Wisely** – The cache behind `EntityResolver.resolveEntityType()` is transparent to callers, but developers should be aware that stale cache entries can persist if the underlying ontology is re‑loaded at runtime.  After a reload, invoke a cache invalidation routine (if provided) or restart the resolver component.
+* **Combine Rules and ML** – Use the hierarchical rules in `OntologyClassifier` for deterministic, high‑confidence matches. Fall back to `EntityTypeResolver.resolveEntityType()` only when the rule‑based path yields no match or when confidence is below a configurable threshold.  
 
-4. **Define Validation Rules Early** – Populate the rule set via `OntologyValidator.useValidationRules()` before any entities are validated.  Because the rule engine is extensible, adding a new rule does not require recompilation; however, ensure that rule ordering does not introduce unintended side effects (e.g., a rule that mutates entity metadata should run after all read‑only checks).
+* **Validate Early** – Run `ValidationAgent.validateEntity()` immediately after classification/prediction. Reject or flag entities that violate `entityType` or `metadata.ontologyClass` constraints before they enter the pipeline or graph construction phases.  
 
-5. **Thread‑Safety** – The ontology structures are read‑only after loading, making them safe for concurrent reads.  The cache inside `EntityResolver` must be thread‑safe; rely on the `ConcurrencyManager`’s thread‑pool utilities when performing bulk resolution to avoid race conditions.
+* **Version the JSON** – Treat `ontology-definitions.json` as a versioned artifact (e.g., via Git tags). Any change to the static definitions should be accompanied by a corresponding diff for the graph database to keep both sources synchronized.  
 
-6. **Error Handling** – All public methods should propagate meaningful exceptions (e.g., `OntologyLoadException`, `ClassificationException`).  Agents higher in the `SemanticAnalysis` hierarchy should catch these and decide whether to abort the current pipeline step or continue with degraded functionality.
+* **Monitor Model Drift** – Periodically evaluate the performance of the ML model used by `EntityTypeResolver`. If prediction accuracy degrades, retrain the model on fresh labeled data and redeploy without touching the rule‑based classifier.  
+
+* **Respect Concurrency Model** – The parent **SemanticAnalysis** component employs work‑stealing concurrency. Ensure that all Ontology agents are thread‑safe: read‑only operations on the in‑memory ontology are safe, while updates via `OntologyUpdater` must acquire the appropriate write lock provided by the graph‑database adapter.  
 
 ---
 
-### Architectural patterns identified  
-* **Strategy** – `useUpperOntology` / `useLowerOntology` for selectable classification granularity.  
-* **Cache‑Aside** – caching inside `EntityResolver.resolveEntityType`.  
-* **Policy/Strategy** – pluggable validation rules via `useValidationRules`.  
-* **Adapter** – `OntologyManager.loadOntology` abstracts OWL, RDF, and potentially other formats.  
-* **Single‑Responsibility** – distinct child components (`EntityTypeResolver`, `OntologyLoader`, `ValidationRulesEngine`) each own a focused concern.
+### Summary of Architectural Insights  
 
-### Design decisions and trade‑offs  
-* **Flexibility vs. Complexity** – Supporting multiple ontology formats and custom validation rules offers great extensibility but introduces additional parsing code and rule‑management overhead.  
-* **Performance vs. Freshness** – Caching accelerates type resolution but requires explicit invalidation on ontology reloads to avoid stale results.  
-* **Granular Classification** – Providing both upper and lower ontology paths gives callers control but adds the burden of choosing the correct strategy for each use case.
+| Aspect | Observation‑based Insight |
+|--------|----------------------------|
+| **Architectural patterns** | Hierarchical (coarse‑to‑fine) classification, diff‑based incremental update, graph‑database adapter abstraction, rule‑based validation, ML‑augmented prediction, multi‑agent separation of concerns. |
+| **Design decisions & trade‑offs** | • JSON static definitions give fast deterministic look‑ups but require synchronization with the graph DB.<br>• ML predictor adds flexibility at the cost of model maintenance.<br>• Diff‑based updates improve availability vs full reloads, but require a robust diff generation pipeline. |
+| **System structure** | Parent **SemanticAnalysis** orchestrates agents; Ontology shares persistence adapters with siblings; children (Classifier, Predictor, ValidationRules) consume a unified in‑memory ontology model. |
+| **Scalability considerations** | • Hierarchical lookup scales logarithmically with ontology size.<br>• Diff updates keep latency low under frequent changes.<br>• Graph DB back‑end can handle large, highly connected ontologies; the adapter abstracts scaling details.<br>• ML inference can be horizontally scaled via model serving. |
+| **Maintainability assessment** | Clear module boundaries (load, classify, predict, validate, update) make the codebase approachable. Versioned JSON and diff‑based updates simplify change management. The reliance on a single graph‑database adapter reduces duplication but mandates careful version compatibility across siblings. Overall, the design supports incremental evolution with minimal disruption. |
 
-### System structure insights  
-* Ontology sits as a **core knowledge service** within `SemanticAnalysis`, exposing classification, resolution, and validation APIs used by several agents.  
-* Its child modules enforce **modular boundaries**, enabling independent evolution (e.g., adding a new ontology format only touches `OntologyLoader`).  
-* Sibling components supply **cross‑cutting concerns** (pipeline orchestration, concurrency, persistence) that the ontology layer consumes without embedding those responsibilities.
-
-### Scalability considerations  
-* The **hierarchical graph** can scale to large ontologies because classification traverses only relevant branches; however, deep hierarchies may increase lookup depth.  
-* The **cache** mitigates repeated traversals, allowing the system to handle high‑throughput entity streams (e.g., bulk git commit processing).  
-* Validation rule execution can be parallelised via the `ConcurrencyManager` thread pool, provided rules are stateless.
-
-### Maintainability assessment  
-* Clear separation of concerns and well‑named methods (`useUpperOntology`, `resolveEntityType`) make the codebase approachable.  
-* Extensibility points (format adapters, validation policy injection) are explicit, reducing the risk of hidden coupling.  
-* The primary maintenance burden lies in keeping the **caching lifecycle** synchronized with ontology reloads and ensuring that added validation rules do not unintentionally interfere with one another.  
-
-Overall, the Ontology sub‑component demonstrates a thoughtfully modular design that balances extensibility, performance, and clarity, fitting neatly into the broader multi‑agent architecture of `SemanticAnalysis`.
+These insights should guide developers and architects in extending, debugging, and scaling the **Ontology** sub‑component while staying aligned with the existing system conventions.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various agents, including the OntologyClassificationAgent, SemanticAnalysisAgent, and CodeGraphAgent, to perform tasks such as ontology classification, semantic analysis, and code graph construction. The component's architecture is designed to facilitate the integration of multiple agents and enable the efficient processing of large amounts of data.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.
 
 ### Children
-- [EntityTypeResolver](./EntityTypeResolver.md) -- The EntityTypeResolver utilizes a hierarchical ontology structure, as defined in the OntologyClassifier, to determine the type of each entity, ensuring consistency across the classification process.
-- [OntologyLoader](./OntologyLoader.md) -- The OntologyLoader is designed to handle ontology definitions from various sources, providing flexibility in how the ontology is constructed and updated, which is reflected in the use of the OntologyClassifier's useUpperOntology method.
-- [ValidationRulesEngine](./ValidationRulesEngine.md) -- The ValidationRulesEngine is tightly integrated with the OntologyClassifier and EntityTypeResolver, allowing for the validation of entities against their resolved types and the ontology structure as a whole.
+- [OntologyClassifier](./OntologyClassifier.md) -- The ontology-definitions.json file contains the upper and lower ontology definitions used by the OntologyClassifier, which are loaded and utilized for entity classification.
+- [EntityTypePredictor](./EntityTypePredictor.md) -- The EntityTypePredictor uses a machine learning model to predict entity types, which is trained on a dataset of entities and their characteristics, as suggested by the parent component analysis.
+- [ValidationRules](./ValidationRules.md) -- The ValidationRules are defined to ensure that entity metadata fields conform to a specific format and structure, as implied by the parent context of the SemanticAnalysis component.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineAgent uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Insights](./Insights.md) -- InsightGenerator.usePatternCatalog() leverages a pre-defined catalog of patterns to identify insights
-- [ConcurrencyManager](./ConcurrencyManager.md) -- ConcurrencyManager.useThreadPool() utilizes a thread pool to manage concurrent tasks
-- [DataStorage](./DataStorage.md) -- DataStorage.useDatabase() utilizes a relational database to store processed data
-- [SecurityManager](./SecurityManager.md) -- SecurityManager.useAuthentication() utilizes authentication mechanisms to verify user identities
+- [Pipeline](./Pipeline.md) -- PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.json steps, each step declaring explicit depends_on edges
+- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a rule-based system to generate insights from entity relationships
+- [OntologyManagement](./OntologyManagement.md) -- OntologyManager.loadOntology() loads ontology definitions from a graph database using a graph database adapter
+- [SemanticAnalysisPipeline](./SemanticAnalysisPipeline.md) -- PipelineOrchestrator.orchestratePipeline() coordinates the execution of pipeline steps
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- KnowledgeGraphConstructor.constructGraph() constructs a knowledge graph from code entities and relationships
+- [ContentValidation](./ContentValidation.md) -- ContentValidator.validateContent() validates entity content against a set of predefined validation rules
+- [DataIngestion](./DataIngestion.md) -- DataIngestionAgent.ingestData() ingests data from various sources using a data ingestion framework
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.connectToDatabase() connects to a graph database using a database connection protocol
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 5 observations*

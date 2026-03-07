@@ -2,132 +2,121 @@
 
 **Type:** SubComponent
 
-The resolver applies a mode estimation strategy to predict the mode for a given LLM provider, as seen in the mode-estimation-strategy.ts file
+ModeResolver uses a strategy pattern in ModeResolverStrategy.java to resolve the operating mode based on the provider configuration in providers.json
 
 ## What It Is  
 
-The **ModeResolver** sub‑component lives primarily in the `src/mode-resolver/` folder (e.g., `mode-resolver.ts`) and is the orchestrator that decides which *mode* an LLM provider should operate in at any point in time.  Its responsibilities are exposed through a class named **`ModeResolver`** that is instantiated via dependency injection, receiving a **sensitivity classifier** (the same classifier used by the sibling `SensitivityClassifier` component).  The resolver relies on a **mode registry** (`mode-registry.ts`) to look up the concrete mode implementations and on a **mode estimation strategy** (`mode-estimation-strategy.ts`) to predict the most appropriate mode for a given provider.  When a mode change is required, the resolver works together with the `LLMProviderManager` (see `llm-provider-manager.ts`) to apply the new mode, handling any required asynchronous updates through the `mode-updates.ts` module.
+ModeResolver is a **sub‑component** that lives inside the **LLMAbstraction** façade.  Its concrete implementation is spread across three core source files that appear in the code base:
 
-In short, ModeResolver is the decision‑making engine that couples the **LLMAbstraction** parent component with its child pieces—**ModeRegistryManager**, **ModeEstimationStrategy**, and **ModeSwitchingMechanism**—to deliver a scalable, type‑safe way of selecting and switching LLM operational modes.
+* `ModeResolverStrategy.java` – encapsulates the **strategy** used to decide which operating mode a provider should run in, based on the JSON configuration found in `providers.json`.  
+* `ModeResolverSingleton.java` – guarantees that the whole application works with a **single, globally‑available** instance of ModeResolver.  
+* `ProviderRegistry.java` – supplies ModeResolver with the current catalogue of registered LLM providers and the mode each provider advertises.
+
+Together these files give ModeResolver the responsibility of translating static provider configuration into a runtime‑ready “mode” (e.g., *mock*, *live*, *tier‑based*).  The component is a child of **LLMAbstraction**, shares the same layer as sibling components **ProviderRegistry** and **CompletionRequestHandler**, and owns three child entities: **ModeConfiguration**, **ProviderRegistry**, and **ModeResolverStrategy**.
 
 ---
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is a **registry‑driven, strategy‑based** design built on top of **dependency injection** and **asynchronous programming**.  The **ModeRegistryManager** (implemented in `mode-registry.ts`) acts as a central catalog where each mode registers itself together with the strategy required to activate it.  This mirrors the pattern used by the sibling `ProviderRegistry` and `LLMProviderManager`, which also employ a registry to manage multiple providers.  By keeping the registry separate from the resolver, the system isolates the *what* (available modes) from the *when* (selection logic), enhancing modularity.
+The observations reveal a deliberately layered architecture built around well‑known **design patterns**:
 
-The **ModeEstimationStrategy** (found in `mode-estimation-strategy.ts`) follows the classic **Strategy Pattern**: different estimation algorithms can be swapped without touching the resolver core.  The resolver simply invokes the strategy’s `estimate` method to obtain a candidate mode for a given LLM provider.  This design aligns with the parent `LLMAbstraction` component’s broader use of strategies for provider selection and budgeting, reinforcing a consistent architectural language across the codebase.
+1. **Strategy Pattern** – `ModeResolverStrategy.java` implements the algorithmic variation for mode resolution.  By isolating the decision logic in a strategy class, the system can swap or extend resolution algorithms (e.g., a rule‑based strategy vs. a machine‑learning‑driven one) without touching the surrounding code.  
 
-Interaction between components is orchestrated through **dependency injection**.  The `ModeResolver` class receives a sensitivity classifier (shared with `SensitivityClassifier`) at construction time, allowing the resolver to factor in input‑prompt sensitivity when estimating a mode.  The resolver also references the `LLMProviderManager` to retrieve the current provider context and to trigger mode switches.  All cross‑component calls are asynchronous, using `async/await` (as demonstrated in `mode-updates.ts`), which ensures non‑blocking updates and fits the overall async nature of LLM operations described in the parent component.
+2. **Singleton Pattern** – `ModeResolverSingleton.java` enforces a single instance of ModeResolver throughout the application lifecycle.  This guarantees a consistent view of provider modes and eliminates the overhead of repeatedly constructing the resolver.  
 
-Overall, the architecture is **layered**: the top‑level `LLMAbstraction` composes the resolver, the resolver composes the registry and estimation strategy, and the registry in turn holds concrete mode implementations.  This layering supports clear separation of concerns while reusing patterns already present in sibling components.
+3. **Dependency on ProviderRegistry** – ModeResolver does not own the provider catalogue itself; it delegates that responsibility to `ProviderRegistry.java`.  This separation of concerns mirrors the **factory** approach used by the sibling **ProviderRegistry** component (via `ProviderFactory.java`) and keeps registration logic distinct from mode‑resolution logic.
+
+The component therefore follows a **modular, composition‑over‑inheritance** style: the parent **LLMAbstraction** orchestrates high‑level LLM interactions, while ModeResolver focuses exclusively on mode determination.  Interaction with siblings is minimal – ModeResolver only calls into ProviderRegistry to retrieve the latest provider list, whereas CompletionRequestHandler consumes the resolved mode when routing a request through its pipeline (`CompletionRequestPipeline.java`).
 
 ---
 
 ## Implementation Details  
 
-1. **`mode-registry.ts` – ModeRegistryManager**  
-   The file defines a **`ModeRegistry`** class (or similarly named export) that provides methods such as `registerMode(name, implementation)` and `getMode(name)`.  It encapsulates the **mode management interface** and stores a mapping from mode identifiers to concrete strategy objects.  This registry is the single source of truth for what modes exist and how they should be instantiated.
+### Core Classes  
 
-2. **`mode-resolver.ts` – ModeResolver**  
-   The core class is **`ModeResolver`**. Its constructor receives a **sensitivity classifier** (injected from the parent `LLMAbstraction`) and likely also a reference to the `ModeRegistry`.  The resolver exposes an async method—e.g., `resolveMode(providerId)`—that performs the following steps:  
-   * Query the `LLMProviderManager` for the current provider configuration.  
-   * Invoke the **ModeEstimationStrategy** (`estimate(provider, classifier)`) to obtain a candidate mode name.  
-   * Retrieve the concrete mode implementation from the `ModeRegistry`.  
-   * Use the **ModeSwitchingMechanism** (internal or delegated) to apply the mode, awaiting any async side‑effects defined in `mode-updates.ts`.  
+| File | Class | Role |
+|------|-------|------|
+| `ModeResolverStrategy.java` | `ModeResolverStrategy` | Implements the **strategy** interface for mode resolution. It reads the provider entry from `providers.json`, extracts the configured mode, and returns a concrete `ModeConfiguration` object. |
+| `ModeResolverSingleton.java` | `ModeResolverSingleton` | Holds a **static** reference to the sole `ModeResolver` instance. The `getInstance()` method lazily constructs the resolver on first call, ensuring thread‑safe, lazy initialization (the observation does not specify synchronization, but typical singleton implementations include it). |
+| `ProviderRegistry.java` | `ProviderRegistry` | Exposes `getRegisteredProviders()` (or a similarly named method) that returns a collection of provider descriptors, each containing a mode field. ModeResolver invokes this to obtain the data required by the strategy. |
 
-   The use of TypeScript’s type system is evident: the resolver’s signatures are strongly typed, guaranteeing that only valid mode identifiers and provider objects are passed around, which improves maintainability and catches errors at compile time.
+### Flow  
 
-3. **`mode-estimation-strategy.ts` – ModeEstimationStrategy**  
-   This module implements one or more estimation algorithms (e.g., `SimpleEstimationStrategy`, `ContextualEstimationStrategy`).  Each strategy conforms to a common interface, perhaps `ModeEstimationStrategy { estimate(provider, classifier): string }`.  The resolver can be configured with a specific strategy at runtime, enabling easy experimentation or A/B testing of different prediction heuristics.
+1. **Initialisation** – When the application starts, `ModeResolverSingleton.getInstance()` is called (often from the LLMAbstraction bootstrap). The singleton creates a `ModeResolver` object that internally holds a reference to `ModeResolverStrategy` and `ProviderRegistry`.  
 
-4. **`mode-updates.ts` – Asynchronous Mode Updates**  
-   The file contains helper functions such as `applyModeChange(mode, provider)` that return promises.  The resolver awaits these functions, ensuring that any required network calls, configuration reloads, or warm‑up steps complete before the new mode becomes active.  This async handling mirrors the pattern used across the system for LLM calls, budget tracking, and provider registration.
+2. **Resolution Request** – A caller (e.g., `CompletionRequestHandler`) asks the resolver for the mode of a specific provider. The resolver forwards the request to `ModeResolverStrategy`, passing the provider identifier.  
 
-5. **`llm-provider-manager.ts` – Integration Hook**  
-   The resolver calls into `LLMProviderManager` to fetch the active provider and to notify it when a mode switch occurs.  This tight coupling is intentional: the provider manager is the authority on which LLM instance is in use, and the resolver must coordinate with it to keep the provider’s operational mode in sync.
+3. **Strategy Execution** – `ModeResolverStrategy` looks up the provider in the list supplied by `ProviderRegistry`. It reads the mode value from the JSON configuration (`providers.json`) and constructs a `ModeConfiguration` instance that encapsulates the resolved mode (including any auxiliary flags such as “mock‑only”).  
 
-Collectively, these pieces form a cohesive pipeline: **registry → estimation → switching → asynchronous update**, all typed and injected for flexibility.
+4. **Result Propagation** – The resolved `ModeConfiguration` is returned to the caller, which can then decide how to route the request (e.g., through a mock adapter or a live API client).
+
+Because the strategy is a separate class, adding a new resolution algorithm (for example, a dynamic mode based on runtime load) only requires creating a new strategy implementation and wiring it into the singleton – no changes to the surrounding infrastructure are needed.
 
 ---
 
 ## Integration Points  
 
-- **Parent – LLMAbstraction**: The `LLMAbstraction` component composes the `ModeResolver` alongside other siblings (`BudgetTracker`, `SensitivityClassifier`, `ProviderRegistry`).  Dependency injection is used at this level to provide the resolver with the shared sensitivity classifier and possibly a concrete estimation strategy.  This ensures that mode decisions respect the same sensitivity rules applied elsewhere in the system.
+* **Parent – LLMAbstraction**: LLMAbstraction treats ModeResolver as a black‑box service for “mode lookup”.  During its façade initialisation it obtains the singleton instance and injects it wherever mode information is required (e.g., request routing, provider health checks).  
 
-- **Sibling – LLMProviderManager**: The resolver queries `LLMProviderManager` for the current provider context and informs it when a mode change occurs.  The manager, in turn, uses its own provider registry (as described in its `provider-registry.ts` file) to locate the correct LLM instance.
+* **Sibling – ProviderRegistry**: ModeResolver directly depends on ProviderRegistry to fetch the current set of providers and their static configurations.  Any change to provider registration (addition, removal, or mode update) propagates automatically to ModeResolver because the registry is consulted at each resolution call.  
 
-- **Sibling – SensitivityClassifier**: The classifier is injected into the resolver, allowing the estimation strategy to factor prompt sensitivity into its mode prediction.  This shared dependency promotes consistent handling of sensitive inputs across the entire LLM pipeline.
+* **Sibling – CompletionRequestHandler**: The handler’s pipeline (`CompletionRequestPipeline.java`) consumes the `ModeConfiguration` produced by ModeResolver to decide which concrete completion client to invoke (mock vs. live).  This creates a clear contract: the pipeline only needs the mode, not the underlying provider details.  
 
-- **Child – ModeRegistryManager**: The resolver relies on the registry to retrieve concrete mode objects.  Adding a new mode simply means registering it in `mode-registry.ts`; the resolver automatically gains visibility without code changes.
+* **Children – ModeConfiguration & ModeResolverStrategy**: `ModeConfiguration` is the data carrier produced by the strategy.  The strategy itself is the extensibility point for future resolution logic.  Both are encapsulated within ModeResolver, keeping the public API minimal (typically a `resolveMode(providerId)` method).  
 
-- **Child – ModeEstimationStrategy**: The resolver delegates the “which mode?” question to this strategy.  Swapping strategies (e.g., from a simple heuristic to a machine‑learning‑based predictor) requires only re‑binding the strategy implementation, thanks to the strategy interface.
-
-- **Child – ModeSwitchingMechanism**: Though not explicitly named in the observations, the mechanism is tightly coupled with the registry and is responsible for invoking the async update helpers in `mode-updates.ts`.  It serves as the bridge between the logical mode object and the runtime changes needed on the LLM provider.
-
-All integration points are typed, asynchronous, and resolved through DI, which keeps the system loosely coupled while preserving compile‑time safety.
+* **External Configuration – providers.json**: The JSON file is the single source of truth for provider‑specific mode settings.  Because the strategy reads directly from this file (via ProviderRegistry), the system remains configuration‑driven and does not require code changes to adjust modes.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Instantiate via DI** – When constructing an `LLMAbstraction` instance, always inject the `ModeResolver` together with a concrete `SensitivityClassifier` and the desired `ModeEstimationStrategy`.  This guarantees that the resolver has the context it needs to make accurate predictions.
+1. **Always obtain ModeResolver through the singleton** – Call `ModeResolverSingleton.getInstance()` rather than constructing a new resolver.  This ensures a consistent view of provider modes and avoids accidental duplication of state.  
 
-2. **Register Modes Early** – Populate the `ModeRegistry` during application bootstrap (e.g., in a `registerModes()` function).  Each mode should implement the common interface expected by the registry; failing to register a mode will cause the resolver to throw at runtime when it attempts to fetch an unknown mode.
+2. **Do not modify `providers.json` at runtime** – The design assumes a static configuration that is read each time a mode is resolved.  If dynamic updates are required, the ProviderRegistry must be refreshed first; otherwise the resolver may return stale mode data.  
 
-3. **Prefer Async Calls** – All public methods on `ModeResolver` that trigger a mode change are async.  Callers must `await` these methods to ensure that the underlying `mode-updates.ts` operations (network calls, warm‑up, etc.) have completed before issuing further LLM requests.
+3. **Extend resolution logic via a new strategy** – When a new mode‑determination rule is needed (e.g., feature‑flag driven), implement a new class that adheres to the same interface as `ModeResolverStrategy` and replace the existing strategy in the singleton’s construction block.  No other component needs to change.  
 
-4. **Leverage the Estimation Strategy** – If a new heuristic is needed (e.g., based on cost or latency), implement a new class adhering to the `ModeEstimationStrategy` interface and bind it in the DI container.  No changes to `ModeResolver` are required, thanks to the strategy pattern.
+4. **Treat `ModeConfiguration` as immutable** – The object returned by the strategy should not be altered after creation.  If downstream code needs to adapt the configuration, create a new instance rather than mutating the original.  
 
-5. **Maintain Type Safety** – Because the codebase relies heavily on TypeScript’s type system, keep the mode identifiers and provider types in sync with their definitions in the registry and provider manager.  Adding a new mode should involve updating the union type that represents valid mode names, preventing accidental misuse.
+5. **Coordinate with ProviderRegistry for registration changes** – If a provider’s mode is altered, ensure the ProviderRegistry reloads the updated `providers.json` before any subsequent mode resolution calls.  This prevents mismatches between the registry’s view and the resolver’s output.  
 
-Following these practices ensures that the ModeResolver remains predictable, testable, and easy to extend as new modes or estimation algorithms are introduced.
+6. **Thread safety** – Although the observations do not detail synchronization, the singleton pattern typically requires thread‑safe lazy initialization.  Verify that `ModeResolverSingleton` uses a synchronized block or the “initialization‑on‑demand holder” idiom to avoid race conditions in a multi‑threaded environment.
 
 ---
 
 ### Summary of Architectural Insights  
 
-1. **Architectural patterns identified**  
-   * Registry Pattern (`ModeRegistryManager`)  
-   * Strategy Pattern (`ModeEstimationStrategy`)  
-   * Dependency Injection (DI) across parent, sibling, and child components  
-   * Asynchronous programming with `async/await` for non‑blocking updates  
+| Architectural pattern | Where it appears | Rationale / trade‑off |
+|-----------------------|------------------|-----------------------|
+| **Strategy** | `ModeResolverStrategy.java` | Enables pluggable mode‑resolution algorithms; adds a level of indirection but keeps the resolver flexible. |
+| **Singleton** | `ModeResolverSingleton.java` | Guarantees a single source of truth for mode data; simplifies consumption but introduces global state that must be carefully managed for testability. |
+| **Dependency on ProviderRegistry** | `ProviderRegistry.java` (used by ModeResolver) | Centralises provider data, avoiding duplication; however, any latency in ProviderRegistry lookup propagates to mode resolution. |
+| **Configuration‑driven design** | `providers.json` | Allows non‑code changes to affect runtime behaviour; requires disciplined configuration management. |
 
-2. **Design decisions and trade‑offs**  
-   * **Registry + Strategy** separates mode data from selection logic, improving extensibility at the cost of an extra indirection layer.  
-   * **DI** centralizes configuration and enables easy swapping of classifiers or strategies, but requires a well‑maintained container setup.  
-   * **Async updates** guarantee responsiveness but introduce complexity around error handling and ordering of mode switches.  
+**Design decisions** focus on separation of concerns (resolution vs. registration), configurability, and ease of extension.  The main trade‑off is the reliance on a global singleton, which can hinder unit testing unless the design provides a way to inject a mock resolver.  
 
-3. **System structure insights**  
-   * A clear hierarchy: `LLMAbstraction` → `ModeResolver` → (`ModeRegistryManager`, `ModeEstimationStrategy`, `ModeSwitchingMechanism`).  
-   * Sibling components share common patterns (registry, async, DI), reinforcing a uniform architectural language.  
+**System structure insights** show a clear hierarchy: LLMAbstraction → ModeResolver (singleton + strategy) → ProviderRegistry → providers.json.  Siblings operate independently but converge on the same provider data, promoting a cohesive yet loosely coupled ecosystem.  
 
-4. **Scalability considerations**  
-   * Adding new modes or estimation algorithms does not affect existing resolver code, supporting horizontal growth.  
-   * Asynchronous mode updates allow the system to handle many concurrent provider switches without blocking the main request flow.  
+**Scalability considerations** – Because mode resolution is a lightweight lookup (JSON read + map lookup) and the singleton caches no heavy state, the component scales horizontally with minimal overhead.  If the provider catalogue grows dramatically, the only scalability impact would be the time to read and parse `providers.json`, which can be mitigated by caching the parsed representation inside ProviderRegistry.  
 
-5. **Maintainability assessment**  
-   * Strong TypeScript typing and isolated responsibilities make the codebase easy to navigate and refactor.  
-   * Centralized registries and strategy interfaces reduce duplication and provide single points of change, lowering the risk of regression when extending functionality.
+**Maintainability assessment** – The use of well‑known patterns (strategy, singleton) and a clear separation between configuration, registration, and resolution makes the codebase easy to understand and modify.  Adding new modes or resolution rules does not ripple through other components.  The primary maintenance risk lies in the global singleton; introducing a dependency‑injection façade around the singleton would improve testability and future‑proof the design.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- Key patterns observed in the LLMAbstraction component include dependency injection, used to set the mode resolver, budget tracker, and sensitivity classifier, and the strategy pattern, applied in the provider registry to manage the different LLM providers. The component's architecture is also characterized by the use of asynchronous programming, promises, and async/await syntax to handle the inherently asynchronous nature of LLM operations. Furthermore, the code utilizes TypeScript, benefiting from its type system to ensure better code maintainability and scalability.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component serves as a high-level facade for interacting with various LLM providers, such as Anthropic, OpenAI, and Groq, enabling provider-agnostic model calls, tier-based routing, and mock mode for testing. Its architecture involves a combination of interfaces, classes, and modules that work together to manage LLM operations, including mode resolution, provider registration, and completion requests. The component utilizes design patterns like dependency injection, singleton, and factory to ensure flexibility, scalability, and maintainability.
 
 ### Children
-- [ModeRegistryManager](./ModeRegistryManager.md) -- The mode-registry.ts file is expected to contain the ModeRegistry class, which defines the mode management interface and strategy registration mechanisms.
-- [ModeEstimationStrategy](./ModeEstimationStrategy.md) -- The ModeEstimationStrategy is expected to be implemented as a separate module or class, possibly within the mode-registry.ts file or a dedicated strategy file.
-- [ModeSwitchingMechanism](./ModeSwitchingMechanism.md) -- The ModeSwitchingMechanism is anticipated to be tightly coupled with the ModeRegistryManager, as it relies on the registry to determine the active mode and retrieve the associated strategy.
+- [ModeConfiguration](./ModeConfiguration.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
+- [ProviderRegistry](./ProviderRegistry.md) -- The ProviderRegistry is responsible for managing the registration of LLM providers, which includes storing their configurations and modes.
+- [ModeResolverStrategy](./ModeResolverStrategy.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
 
 ### Siblings
-- [LLMProviderManager](./LLMProviderManager.md) -- LLMProviderManager uses a provider registry to manage the different LLM providers, as seen in the provider-registry.ts file
-- [BudgetTracker](./BudgetTracker.md) -- BudgetTracker uses a budgeting algorithm to track and manage the budget, as seen in the budgeting-algorithm.ts file
-- [SensitivityClassifier](./SensitivityClassifier.md) -- SensitivityClassifier uses a classification algorithm to classify input prompts, as seen in the classification-algorithm.ts file
-- [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses a registry-based approach to manage the different LLM providers, as seen in the provider-registry.ts file
+- [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses a factory pattern in ProviderFactory.java to create instances of different provider classes based on their configurations in providers.json
+- [CompletionRequestHandler](./CompletionRequestHandler.md) -- CompletionRequestHandler uses a pipeline pattern in CompletionRequestPipeline.java to process completion requests, including validation, routing, and response handling
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 3 observations*
