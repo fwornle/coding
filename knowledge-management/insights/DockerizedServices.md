@@ -2,102 +2,189 @@
 
 **Type:** Component
 
-In terms of specific implementation details, the component features a range of classes and functions that facilitate its operations. For instance, the LLMService class in lib/llm/llm-service.ts serves as a high-level facade for all LLM operations, handling mode routing, caching, and circuit breaking. Similarly, the startServiceWithRetry function in lib/service-starter.js enables robust service startup with retry logic and timeout protection. These elements collectively contribute to the component's overall architecture and functionality.
+The DockerizedServices component serves as the Docker containerization layer for various coding services, including semantic analysis, constraint monitoring, and code-graph-rag, along with supporting databases. Its architecture involves a multi-agent system, utilizing a range of classes and functions to manage the different services and their interactions. The component is built around a high-level facade for interacting with LLM providers, implementing circuit breaking, caching, and budget checks to ensure efficient and controlled operation.
 
 ## What It Is  
 
-DockerizedServices is the **runtime‑deployment component** that packages the various back‑end agents of the Coding project into Docker containers and supplies the plumbing required to start, monitor, and communicate with those services. The implementation lives primarily in the **`scripts/`** folder – e.g. `scripts/api‑service.js` and `scripts/dashboard‑service.js` – which wrap the constraint‑monitoring API server and the Global Service Coordinator dashboard respectively. Internally the component is built around a small set of reusable libraries found under `lib/`, notably `lib/llm/llm‑service.ts`, `lib/service‑starter.js`, and supporting utilities such as `isPortListening`. DockerizedServices also owns three child sub‑components – **LLMServiceManager**, **ServiceStarter**, and **LoggingMechanism** – that expose the core capabilities (LLM façade, robust startup, and standardized logging) to the rest of the system.
+The **DockerizedServices** component is the Docker‑containerization layer that hosts the suite of coding‑service micro‑agents (semantic analysis, constraint monitoring, code‑graph‑RAG, etc.) together with the supporting databases.  The core of the component lives in the repository under the paths that appear in the observations:
 
-## Architecture and Design  
+* **`lib/llm/llm-service.ts`** – the high‑level **LLMService** class that acts as a façade for all LLM provider interactions.  
+* **`lib/service-starter.js`** – the **startServiceWithRetry** helper that reliably boots each containerised service.  
+* **`integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`** – utilities **isMockLLMEnabled** and **getLLMMode** that drive the mock‑LLM workflow.  
 
-The architecture follows a **facade‑oriented, retry‑enhanced deployment model**. The `LLMService` class in `lib/llm/llm‑service.ts` acts as a **high‑level façade** for all language‑model interactions, encapsulating mode routing, caching, and circuit‑breaking concerns. This façade is consumed by the child component **LLMServiceManager**, which centralises LLM‑related logic for the Dockerized services.  
-
-Service startup is handled by the **ServiceStarter** child, which relies on the `startServiceWithRetry` function in `lib/service‑starter.js`. This function implements **retry logic with exponential back‑off**, timeout protection, and a guard against endless loops. The complementary `isPortListening` utility validates that a container’s exposed port is ready before the system proceeds, providing a lightweight health‑check.  
-
-The deployment scripts (`scripts/api‑service.js`, `scripts/dashboard‑service.js`) embody a **Docker‑wrapper pattern**: they construct Docker run commands, inject environment variables, and invoke the ServiceStarter logic to ensure each container is launched reliably. The overall design mirrors the sibling component **LLMAbstraction**, which also uses a façade (but for provider‑agnostic LLM calls) and shares patterns such as dependency injection and singleton management. By keeping DockerizedServices focused on container lifecycle while delegating LLM concerns to LLMServiceManager, the component maintains a clear separation of concerns.
-
-## Implementation Details  
-
-* **LLMService (`lib/llm/llm‑service.ts`)** – Exposes a `complete` method that performs full routing logic. It first determines the active LLM mode via `getLLMMode` (found in `integrations/mcp‑server‑semantic‑analysis/src/mock/llm‑mock‑service.ts`), then decides whether to invoke a mock, local, or public LLM backend. The method also integrates cache look‑ups, budget enforcement, and sensitivity checks before issuing the final request. Circuit‑breaking is baked into the service so that repeated failures trigger a fallback path, protecting downstream components.
-
-* **Mode Management (`integrations/mcp‑server‑semantic‑analysis/src/mock/llm‑mock‑service.ts`)** – Provides `getLLMMode` and `setGlobalLLMMode`. `getLLMMode` resolves the mode for a given agent by consulting per‑agent overrides, a global mode setting, and legacy `mockLLM` flags, ensuring backward compatibility. `setGlobalLLMMode` updates a progress file and the legacy flag, guaranteeing that the new mode persists across restarts.
-
-* **Service Startup (`lib/service‑starter.js`)** – The `startServiceWithRetry` function accepts a start callback, a maximum retry count, and back‑off parameters. It repeatedly invokes the callback, awaiting success, while catching transient errors. If the retry limit is hit, the function throws a controlled exception, allowing higher‑level orchestration to degrade gracefully. The helper `isPortListening` opens a temporary socket to the target port and resolves only when the service reports readiness, preventing race conditions between container launch and client connection.
-
-* **Docker Scripts (`scripts/api‑service.js`, `scripts/dashboard‑service.js`)** – These scripts assemble the Docker command line, set environment variables (including the LLM mode), and then call `startServiceWithRetry`. They also pipe logs through the **LoggingMechanism** child, which uses the project‑wide logging framework to produce structured, configurable output.  
-
-* **LoggingMechanism** – While the exact file is not listed, the child component is described as using a logging framework to emit events and errors, providing a unified observability surface across all Dockerized services.
-
-## Integration Points  
-
-DockerizedServices sits at the intersection of three major system layers:
-
-1. **LLMAbstraction** – The `LLMService` façade mirrors the provider‑agnostic LLMAbstraction façade, allowing Dockerized services to request completions without caring about the underlying provider. Mode resolution (`getLLMMode`) draws on configuration data that is also consumed by other agents in the SemanticAnalysis and ConstraintSystem components.
-
-2. **ConstraintSystem & SemanticAnalysis** – The `scripts/api‑service.js` container hosts the constraint‑monitoring API server, which is invoked by the ConstraintSystem to validate code actions. Similarly, the dashboard container (`scripts/dashboard‑service.js`) presents the Global Service Coordinator UI used by SemanticAnalysis agents for coordination.
-
-3. **LiveLoggingSystem** – All logs emitted by the LoggingMechanism flow into the LiveLoggingSystem, which aggregates them for live session inspection. This shared logging pipeline ensures that failures during service startup or LLM calls are visible across the whole platform.
-
-Dependencies are explicit: the Docker scripts import `startServiceWithRetry` and `isPortListening` from `lib/service‑starter.js`; the LLM façade imports `getLLMMode`/`setGlobalLLMMode` from the mock service module; and the child components (LLMServiceManager, ServiceStarter, LoggingMechanism) expose their APIs to sibling components that need to start or query services.
-
-## Usage Guidelines  
-
-* **Start Services via the Provided Scripts** – Developers should invoke `node scripts/api‑service.js` or `node scripts/dashboard‑service.js` rather than running Docker commands manually. The scripts guarantee that `startServiceWithRetry` and `isPortListening` are applied, preventing premature client connections.
-
-* **Configure LLM Mode Consistently** – Use `setGlobalLLMMode` to change the global LLM mode; this updates both the progress file and the legacy `mockLLM` flag, ensuring that all agents—including those in SemanticAnalysis—see the same setting. When per‑agent overrides are needed, modify the configuration that `getLLMMode` reads rather than patching the service code.
-
-* **Respect Retry Limits** – The default retry count and exponential back‑off values in `startServiceWithRetry` are tuned for typical development environments. If a service is expected to take longer to initialise (e.g., heavy model loading), increase the timeout or retry parameters rather than disabling the retry mechanism.
-
-* **Log Through the Central Mechanism** – All custom logging inside DockerizedServices should go through the LoggingMechanism child so that logs are captured by LiveLoggingSystem. Avoid console‑logging directly; instead, use the provided logger’s `info`, `warn`, and `error` methods.
-
-* **Do Not Bypass the Facade** – Direct calls to underlying LLM providers are discouraged. All LLM interactions must pass through `LLMService.complete` to benefit from caching, budget checks, and circuit‑breaking. This also keeps the system compatible with future provider additions managed by LLMAbstraction.
+DockerizedServices therefore provides the runtime environment, the lifecycle manager, and the abstraction layer that lets the rest of the **Coding** parent component (and its siblings such as **LiveLoggingSystem**, **LLMAbstraction**, **Trajectory**, etc.) invoke language‑model operations, query the graph database, and enforce code‑level constraints without needing to know the underlying container or provider details.
 
 ---
 
-### 1. Architectural patterns identified  
-* **Facade pattern** – `LLMService` provides a unified interface for all LLM operations.  
-* **Retry / Exponential Back‑off pattern** – Implemented in `startServiceWithRetry`.  
-* **Circuit Breaker** – Integrated inside `LLMService` to protect downstream calls.  
-* **Docker‑Wrapper / Script‑Orchestrator pattern** – Deployment scripts encapsulate container launch and health‑check logic.  
-* **Strategy‑like mode routing** – `getLLMMode` selects the execution strategy (mock, local, public) based on configuration.
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs  
-* **Centralised LLM façade vs. scattered provider calls** – Improves consistency and allows cross‑cutting concerns (caching, budget) but adds a single point of failure mitigated by the circuit breaker.  
-* **Robust startup with retries** – Guarantees service availability at the cost of longer start‑up times when containers are genuinely slow; exponential back‑off mitigates resource waste.  
-* **Legacy flag handling** – Maintaining the `mockLLM` flag preserves backward compatibility, but introduces extra conditional logic in mode resolution.
+### High‑level architectural approach  
+DockerizedServices follows a **multi‑agent architecture**: each functional area (semantic analysis, constraint monitoring, code‑graph‑RAG) runs in its own Docker container and communicates through well‑defined service interfaces.  The component is organized around a **facade pattern** (`LLMService`) that hides the complexity of provider routing, caching, circuit breaking, and budget enforcement from callers.  Service startup is guarded by a **retry/exponential‑backoff pattern** (`startServiceWithRetry`), ensuring resilience against transient container launch failures.
 
-### 3. System structure insights  
-DockerizedServices is a leaf component under the root **Coding** node, with three children (LLMServiceManager, ServiceStarter, LoggingMechanism) that encapsulate distinct responsibilities. It shares the LLM façade concept with its sibling **LLMAbstraction**, and its health‑check utilities are reusable by other components that need to verify network readiness. The component’s scripts act as the glue that binds the containerised services to the broader platform (ConstraintSystem, SemanticAnalysis, LiveLoggingSystem).
+### Design patterns evident from the code  
 
-### 4. Scalability considerations  
-* **Horizontal scaling** – Because each service runs in its own Docker container, additional instances can be spawned without code changes; the retry logic ensures each instance starts cleanly.  
-* **Cache and budget checks** in `LLMService.complete` limit API usage, supporting large‑scale deployments without overwhelming external LLM providers.  
-* **Circuit breaker** prevents cascading failures when a provider becomes throttled, preserving overall system responsiveness as the number of agents grows.
+| Pattern | Where it appears | Purpose |
+|---------|------------------|---------|
+| **Facade** | `LLMService` (`lib/llm/llm-service.ts`) | Presents a single `complete` entry point that decides between mock, local, and public LLM modes, while applying caching and budget checks. |
+| **Circuit Breaker** | Mentioned in the description of LLMFacade (child of DockerizedServices) | Prevents cascading failures when an LLM provider becomes unavailable, protecting the rest of the system. |
+| **Retry / Exponential Backoff** | `startServiceWithRetry` (`lib/service-starter.js`) | Guarantees robust service start‑up, handling time‑outs and transient errors. |
+| **Caching** | Inside `LLMService.complete` (observed) | Reduces duplicate LLM calls, improving latency and cost control. |
+| **Budget Check** | Inside `LLMService.complete` (observed) | Enforces per‑agent or global token/monetary limits before invoking an LLM. |
+| **Mock Service Switch** | `isMockLLMEnabled` & `getLLMMode` (`integrations/.../llm-mock-service.ts`) | Enables deterministic testing by routing agents to a mock LLM implementation based on Docker‑specific progress files. |
 
-### 5. Maintainability assessment  
-The component is **well‑modularised**: startup logic, LLM façade, and logging are isolated into separate child modules, making unit testing straightforward. File‑level granularity (`lib/llm/llm‑service.ts`, `lib/service‑starter.js`) and explicit naming keep the codebase discoverable. However, the coexistence of modern mode handling and legacy `mockLLM` flags adds conditional branches that may increase cognitive load; a future refactor could deprecate the legacy path once all consumers migrate. Overall, the clear separation of concerns, use of standard patterns, and reliance on shared utilities (e.g., `isPortListening`) support long‑term maintainability.
+### Interaction flow  
+1. An upstream agent (e.g., a **SemanticAnalysis** worker) calls `LLMService.complete`.  
+2. `complete` consults **`isMockLLMEnabled`** and **`getLLMMode`** to decide whether to invoke the **MockLLMService**, a locally hosted LLM, or a public provider.  
+3. Before the actual request, the method checks the **budget** and looks up any **cached** response.  
+4. If the circuit breaker for the chosen provider is open, the call is short‑circuited, and an error or fallback is returned.  
+5. The request is finally dispatched, the response is cached, and accounting is updated.  
+
+Service containers themselves are started via **`startServiceWithRetry`**, which retries with exponential back‑off until a configurable timeout expires.  The **GraphDatabaseService/Adapter** (implied) provides persistence for knowledge graphs generated by the agents, while **ConstraintMonitor** and **DatabaseManager** (child components) enforce code‑level rules and manage database connections respectively.
+
+---
+
+## Implementation Details  
+
+### LLMService (`lib/llm/llm-service.ts`)  
+* **`complete` method** – the primary public API. It implements the full routing logic:  
+  * Reads the mock‑mode flag via `isMockLLMEnabled`.  
+  * Determines the active mode for the calling agent with `getLLMMode`.  
+  * Performs a **budget check** (e.g., token quota) before any external call.  
+  * Looks up a **cache entry**; if present, returns immediately.  
+  * Applies the **circuit‑breaker** state; if the breaker is open, it aborts the request.  
+  * Delegates to the appropriate provider implementation (mock, local, or public).  
+
+* **Caching** – likely a simple in‑memory map or a Redis‑backed store (the observation only mentions “caching,” but the placement inside `complete` confirms it is a cross‑cutting concern).  
+
+* **Circuit‑breaker integration** – the façade holds a reference to a breaker per provider, toggling its state based on recent error rates.  
+
+### Service Starter (`lib/service-starter.js`)  
+* **`startServiceWithRetry`** – wraps Docker container launch commands.  
+  * Accepts a service start function and retry configuration.  
+  * Implements **exponential back‑off** (e.g., delay = base * 2^attempt).  
+  * Enforces a **global timeout** to avoid indefinite hanging.  
+
+### Mock LLM Utilities (`integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts`)  
+* **`isMockLLMEnabled`** – reads a “progress file” that Docker writes to signal whether the mock mode should be active. This ties the mock decision to the container runtime environment, ensuring that test environments automatically switch to deterministic responses.  
+* **`getLLMMode`** – resolves the LLM mode hierarchy:  
+  1. Per‑agent override (explicit configuration).  
+  2. Global mock mode flag.  
+  3. Fallback to `'public'`.  
+
+### Graph Database Interaction  
+Although concrete files are not listed, the observation references **`GraphDatabaseService`** and **`GraphDatabaseAdapter`**. Their role is to abstract persistence of the knowledge graph (nodes/edges representing code entities) and to expose query APIs used by agents such as **SemanticAnalysis** and **ConstraintMonitor**.
+
+### Child Components (DockerizedServices)  
+
+| Child | Core Responsibility | Notable Implementation Hint |
+|-------|----------------------|------------------------------|
+| **ServiceStarter** | Reliable container launch | `startServiceWithRetry` (retry + backoff) |
+| **LLMFacade** | Protects LLM calls with circuit breaker | Uses `CircuitBreaker.pattern` |
+| **MockLLMService** | Generates deterministic mock responses | `MockLLMResponseGenerator.class` |
+| **ConstraintMonitor** | Evaluates code against constraints | `ConstraintEvaluator.class` |
+| **DatabaseManager** | Manages DB connections | `DatabaseConnector.class` |
+
+These children keep the DockerizedServices component modular: each concern (startup, LLM façade, mocking, constraint evaluation, DB access) lives in its own class/file, allowing independent evolution.
+
+---
+
+## Integration Points  
+
+1. **Parent – Coding**: DockerizedServices is a leaf under the **Coding** root, supplying the runtime and service‑level APIs that higher‑level components (e.g., **LiveLoggingSystem** for logging LLM interactions, **LLMAbstraction** for provider plug‑ins) consume.  
+
+2. **Sibling Components**:  
+   * **LiveLoggingSystem** may tap into the **LLMFacade** to record request/response pairs for audit.  
+   * **LLMAbstraction** shares the same façade concept; DockerizedServices implements the concrete provider routing that LLMAbstraction’s abstract interfaces expect.  
+   * **Trajectory** and **SemanticAnalysis** invoke `LLMService.complete` to obtain model completions during their multi‑agent workflows.  
+
+3. **Database Layer**: The **DatabaseManager** and **GraphDatabaseService/Adapter** expose interfaces used by **ConstraintMonitor** (to fetch constraint definitions) and by knowledge‑graph agents that persist extracted entities.  
+
+4. **Mock Infrastructure**: Test harnesses or CI pipelines can set the progress file that `isMockLLMEnabled` reads, thereby swapping the real LLM provider for the **MockLLMService** without code changes.  
+
+5. **External LLM Providers**: Public LLM endpoints are accessed behind the circuit breaker and budget‑check layers, allowing the system to integrate with any provider that conforms to the internal request schema.  
+
+All integration points are defined through explicit function calls (`complete`, `startServiceWithRetry`) and through dependency injection of service instances (e.g., passing a `GraphDatabaseAdapter` to agents). No hidden coupling is observed.
+
+---
+
+## Usage Guidelines  
+
+* **Always invoke LLM operations through `LLMService.complete`** – this guarantees that caching, budget enforcement, and circuit‑breaker logic are applied uniformly. Direct calls to a provider library bypass these safety nets and should be avoided.  
+
+* **Configure mock mode via the Docker progress file** when running unit or integration tests. Verify that `isMockLLMEnabled` returns `true` before expecting deterministic responses.  
+
+* **Respect the retry policy**: when launching a new service, call `startServiceWithRetry` rather than invoking Docker commands directly. Adjust the exponential back‑off parameters only after profiling start‑up latency in the target environment.  
+
+* **Monitor circuit‑breaker state**: the LLMFacade exposes metrics (open/closed counts). If a breaker stays open for extended periods, investigate provider health or adjust the error‑threshold configuration.  
+
+* **Budget limits are enforced per‑agent**; ensure that each agent’s configuration includes realistic token or cost caps. If an agent frequently hits the budget, either raise its quota or optimise prompt size.  
+
+* **Database interactions should go through `DatabaseManager`**; this centralises connection pooling and error handling. Direct driver usage can lead to connection leaks.  
+
+* **When extending the system** (e.g., adding a new LLM provider or a new agent), implement the provider as a plug‑in that conforms to the `LLMService` routing interface, and register it with the façade. The existing retry, caching, and circuit‑breaker mechanisms will automatically apply.  
+
+---
+
+### Architectural patterns identified  
+
+1. Facade (`LLMService`)  
+2. Circuit Breaker (LLMFacade)  
+3. Retry with Exponential Backoff (`startServiceWithRetry`)  
+4. Caching (inside `LLMService.complete`)  
+5. Budget/Quota Checking (inside `LLMService.complete`)  
+6. Mock Service Switch (via `isMockLLMEnabled` / `getLLMMode`)  
+
+### Design decisions and trade‑offs  
+
+* **Facade vs. Direct Provider Calls** – Centralising LLM logic simplifies budgeting, caching, and failure handling but adds a single point of indirection that must remain performant.  
+* **Retry on Service Startup** – Improves reliability in noisy Docker environments; however, excessive retries can mask underlying container image issues.  
+* **Circuit Breaker** – Prevents cascading failures but may temporarily block legitimate traffic if thresholds are set too aggressively.  
+* **Mock Mode via Docker Progress File** – Enables deterministic testing without code changes, but couples test configuration to the container runtime filesystem.  
+* **Caching** – Reduces cost and latency, yet stale cache entries could lead to outdated model outputs if not invalidated appropriately.  
+
+### System structure insights  
+
+DockerizedServices sits under the **Coding** root and orchestrates a collection of child services (ServiceStarter, LLMFacade, MockLLMService, ConstraintMonitor, DatabaseManager).  Each child encapsulates a distinct cross‑cutting concern, allowing the multi‑agent siblings (SemanticAnalysis, Trajectory, etc.) to focus on domain logic while delegating infrastructure responsibilities upward.  The component’s internal graph‑database abstraction provides a shared persistence layer for knowledge extracted by agents.
+
+### Scalability considerations  
+
+* **Horizontal scaling** is natural: each agent runs in its own container and can be replicated behind a load balancer; the façade’s caching and circuit‑breaker logic remain effective across instances if a distributed cache (e.g., Redis) is used.  
+* **Retry/back‑off** protects against temporary spikes in container start failures, but large‑scale deployments should monitor back‑off delays to avoid cascading start‑up latency.  
+* **Budget enforcement** scales with the number of agents, as each agent’s quota is checked independently, preventing a single noisy agent from exhausting global resources.  
+* **Mock mode** is lightweight and scales trivially, making it suitable for CI pipelines that spin up many parallel test containers.  
+
+### Maintainability assessment  
+
+The component exhibits **high modularity**: responsibilities are cleanly separated into façade, starter, mock, constraint, and database modules.  The use of well‑known patterns (Facade, Circuit Breaker, Retry) makes the codebase approachable for developers familiar with resilient service design.  Because routing, caching, and budget logic are centralized in `LLMService.complete`, updates to these concerns propagate automatically, reducing duplication.  Potential maintenance challenges include:
+
+* **Coupling to Docker‑specific progress files** for mock mode – any change to the file layout requires updates in `isMockLLMEnabled`.  
+* **Single‑point caching implementation** – if the cache backend needs to change (e.g., from in‑memory to distributed), the `complete` method must be refactored carefully.  
+
+Overall, DockerizedServices provides a robust, pattern‑driven foundation that balances operational resilience with clear separation of concerns, positioning it well for future extensions and large‑scale deployments.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, inclu; LLMAbstraction: The LLMAbstraction component serves as a high-level facade for interacting with various LLM providers, such as Anthropic, OpenAI, and Groq, enabling p; DockerizedServices: In terms of specific implementation details, the component features a range of classes and functions that facilitate its operations. For instance, the; Trajectory: The Trajectory component is a complex system managing project milestones, GSD workflow, phase planning, and implementation task tracking. It employs v; KnowledgeManagement: The KnowledgeManagement component is responsible for managing the knowledge graph, including entity persistence, graph database interactions, and inte; CodingPatterns: The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the pro; ConstraintSystem: The ConstraintSystem component is a constraint monitoring and enforcement system that validates code actions and file operations against configured ru; SemanticAnalysis: The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entitie.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, inclu; LLMAbstraction: The component's architecture is designed to be highly modular and extensible, with a range of interfaces and abstract classes that enable easy integra; DockerizedServices: The DockerizedServices component serves as the Docker containerization layer for various coding services, including semantic analysis, constraint moni; Trajectory: Key patterns in this component include the use of a multi-agent architecture, with the SpecstoryAdapter class acting as a facade for interacting with ; KnowledgeManagement: The KnowledgeManagement component plays a vital role in the overall system, providing a centralized repository of knowledge that can be leveraged by v; CodingPatterns: The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the pro; ConstraintSystem: The ConstraintSystem component plays a critical role in maintaining the integrity and consistency of the codebase, and its architecture and patterns r; SemanticAnalysis: The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entitie.
 
 ### Children
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager utilizes the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, and circuit breaking.
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter uses the startServiceWithRetry function in lib/service-starter.js to enable robust service startup with retry logic and timeout protection.
-- [LoggingMechanism](./LoggingMechanism.md) -- LoggingMechanism uses a logging framework to log events and errors, providing a standardized and configurable logging mechanism.
+- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter utilizes a retry mechanism with exponential backoff in ServiceStarter.py, handling transient service start failures
+- [LLMFacade](./LLMFacade.md) -- LLMFacade uses CircuitBreaker.pattern to prevent cascading failures when interacting with LLM providers, protecting the system from overload
+- [MockLLMService](./MockLLMService.md) -- MockLLMService uses MockLLMResponseGenerator.class to generate mock LLM responses, simulating real LLM behavior
+- [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses ConstraintEvaluator.class to evaluate code against defined constraints, detecting violations
+- [DatabaseManager](./DatabaseManager.md) -- DatabaseManager uses DatabaseConnector.class to connect to databases, handling database interactions
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, including Claude Code conversations. Its architecture involves multiple sub-components, including transcript adapters, log converters, and ontology classification agents. Key patterns in this component include the use of graph database adapters for persistence, work-stealing concurrency for efficient processing, and heuristic-based classification for ontology metadata attachment.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component serves as a high-level facade for interacting with various LLM providers, such as Anthropic, OpenAI, and Groq, enabling provider-agnostic model calls, tier-based routing, and mock mode for testing. Its architecture involves a combination of interfaces, classes, and modules that work together to manage LLM operations, including mode resolution, provider registration, and completion requests. The component utilizes design patterns like dependency injection, singleton, and factory to ensure flexibility, scalability, and maintainability.
-- [Trajectory](./Trajectory.md) -- The Trajectory component is a complex system managing project milestones, GSD workflow, phase planning, and implementation task tracking. It employs various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive planning infrastructure. The component's architecture involves multiple connection methods, including HTTP API, Inter-Process Communication (IPC), and file watch directory, to interact with the Specstory extension. The SpecstoryAdapter class plays a central role in this component, providing methods for initialization, logging conversations, and connecting to the Specstory extension via different methods.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, including entity persistence, graph database interactions, and intelligent routing for database access. It utilizes various technologies such as Graphology, LevelDB, and VKB API to provide a comprehensive knowledge management system. The component's architecture is designed to support multiple agents, including CodeGraphAgent and PersistenceAgent, which work together to analyze code, extract concepts, and store entities in the graph database.
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the project. This component serves as a catch-all for entities that do not fit into other specific components. Its architecture is designed to promote consistency and efficiency in coding practices, ensuring that the project adheres to established standards and guidelines. Key patterns in this component include the use of intelligent routing, graph database adapters, and work-stealing concurrency, which contribute to its overall structure and functionality.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component is a constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build its architecture. The system's key patterns include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient data processing. The component also employs a multi-agent system that processes git history and LSL sessions to detect staleness and validate entity content.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, including Claude Code and Copilot. It features a modular architecture with multiple sub-components, including transcript adapters, log converters, and database adapters. The system utilizes a range of technologies, such as Graphology, LevelDB, and JSON-Lines, to store and process log data. The component's architecture is designed to support multi-agent interactions, with a focus on flexibility, scalability, and performance.
+- [LLMAbstraction](./LLMAbstraction.md) -- The component's architecture is designed to be highly modular and extensible, with a range of interfaces and abstract classes that enable easy integration of new providers and services. The use of dependency injection and inversion of control patterns further enhances the component's flexibility and maintainability, making it an essential part of the larger Coding project ecosystem.
+- [Trajectory](./Trajectory.md) -- Key patterns in this component include the use of a multi-agent architecture, with the SpecstoryAdapter class acting as a facade for interacting with the Specstory extension. The component also employs a range of classes and functions to manage the connection and logging processes.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component plays a vital role in the overall system, providing a centralized repository of knowledge that can be leveraged by various tools and agents. Its ability to integrate with multiple systems and technologies makes it a key enabler of the system's functionality. The component's use of advanced technologies, such as Graphology and LevelDB, ensures that it can handle complex knowledge management tasks efficiently and effectively.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the project. It serves as a catch-all for entities not fitting other components, providing a foundation for maintainable and efficient code. The component's architecture is not explicitly defined in the provided codebase, but it is likely to involve a range of classes and functions that implement various design patterns and coding conventions.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component plays a critical role in maintaining the integrity and consistency of the codebase, and its architecture and patterns reflect a deep understanding of the complexities and challenges of large-scale software development. Its use of multiple agents, flexible persistence mechanisms, and optimized concurrency models enables it to operate efficiently and effectively, even in the face of complex and dynamic constraint validation requirements.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
 
 
 ---
 
-*Generated from 8 observations*
+*Generated from 7 observations*

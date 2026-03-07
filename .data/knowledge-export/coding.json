@@ -53,14 +53,14 @@
       "name": "Coding",
       "entityType": "Project",
       "observations": [
-        "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, inclu; LLMAbstraction: The LLMAbstraction component serves as a high-level facade for interacting with various LLM providers, such as Anthropic, OpenAI, and Groq, enabling p; DockerizedServices: In terms of specific implementation details, the component features a range of classes and functions that facilitate its operations. For instance, the; Trajectory: The Trajectory component is a complex system managing project milestones, GSD workflow, phase planning, and implementation task tracking. It employs v; KnowledgeManagement: The KnowledgeManagement component is responsible for managing the knowledge graph, including entity persistence, graph database interactions, and inte; CodingPatterns: The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the pro; ConstraintSystem: The ConstraintSystem component is a constraint monitoring and enforcement system that validates code actions and file operations against configured ru; SemanticAnalysis: The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entitie.",
+        "Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, inclu; LLMAbstraction: The component's architecture is designed to be highly modular and extensible, with a range of interfaces and abstract classes that enable easy integra; DockerizedServices: The DockerizedServices component serves as the Docker containerization layer for various coding services, including semantic analysis, constraint moni; Trajectory: Key patterns in this component include the use of a multi-agent architecture, with the SpecstoryAdapter class acting as a facade for interacting with ; KnowledgeManagement: The KnowledgeManagement component plays a vital role in the overall system, providing a centralized repository of knowledge that can be leveraged by v; CodingPatterns: The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the pro; ConstraintSystem: The ConstraintSystem component plays a critical role in maintaining the integrity and consistency of the codebase, and its architecture and patterns r; SemanticAnalysis: The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entitie.",
         "Project contains 8 L1 components: LiveLoggingSystem, LLMAbstraction, DockerizedServices, Trajectory, KnowledgeManagement, CodingPatterns, ConstraintSystem, SemanticAnalysis"
       ],
       "significance": 0.5,
       "source": "manual",
       "metadata": {
         "created_at": "2025-11-30T06:14:08.575Z",
-        "last_updated": "2026-03-07T06:29:44.641Z"
+        "last_updated": "2026-03-07T09:01:29.408Z"
       },
       "problem": {},
       "solution": {},
@@ -479,19 +479,19 @@
       "name": "LiveLoggingSystem",
       "entityType": "Component",
       "observations": [
-        "The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, including Claude Code conversations. Its architecture involves multiple sub-components, including transcript adapters, log converters, and ontology classification agents. Key patterns in this component include the use of graph database adapters for persistence, work-stealing concurrency for efficient processing, and heuristic-based classification for ontology metadata attachment.",
-        "Utilizes the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system with metadata attachment",
-        "Employs the LSLConfigValidator (scripts/validate-lsl-config.js) for comprehensive validation, repair, and optimization of LSL system configuration",
-        "Leverages the logging module (integrations/mcp-server-semantic-analysis/src/logging.ts) for async log buffering and non-blocking file I/O to prevent event loop blocking",
-        "Implements the TranscriptAdapter (lib/agent-api/transcript-api.js) abstract base class for agent-specific transcript adapters with methods for reading and converting transcripts",
-        "Uses the LSLConverter (lib/agent-api/transcripts/lsl-converter.js) class for converting between agent-specific transcript formats and the unified LSL format",
-        "Employs the SemanticAnalyzer (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for semantic analysis of observations",
-        "Follows the pattern of using a caching mechanism (e.g., in the OntologyConfigManager) for improving performance by reducing the number of database queries"
+        "The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, including Claude Code and Copilot. It features a modular architecture with multiple sub-components, including transcript adapters, log converters, and database adapters. The system utilizes a range of technologies, such as Graphology, LevelDB, and JSON-Lines, to store and process log data. The component's architecture is designed to support multi-agent interactions, with a focus on flexibility, scalability, and performance.",
+        "Utilizes the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system",
+        "Employs the LSLConfigValidator (scripts/validate-lsl-config.js) for validating and optimizing LSL system configuration",
+        "Leverages the logging.ts module (integrations/mcp-server-semantic-analysis/src/logging.ts) for async log buffering and file writing",
+        "Features the TranscriptAdapter abstract class (lib/agent-api/transcript-api.js) for unified transcript processing and conversion",
+        "Uses the LSLConverter class (lib/agent-api/transcripts/lsl-converter.js) for converting between agent-specific transcript formats and the unified LSL format",
+        "Incorporates the GraphDatabaseAdapter for Graphology+LevelDB persistence with automatic JSON export sync",
+        "Implements work-stealing concurrency via shared atomic index counter in runWithConcurrency"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.699Z",
-        "last_updated": "2026-03-07T06:29:44.450Z"
+        "last_updated": "2026-03-07T09:01:32.531Z"
       },
       "id": "mc4flkgp5ipmm"
     },
@@ -499,19 +499,19 @@
       "name": "LLMAbstraction",
       "entityType": "Component",
       "observations": [
-        "The LLMAbstraction component serves as a high-level facade for interacting with various LLM providers, such as Anthropic, OpenAI, and Groq, enabling provider-agnostic model calls, tier-based routing, and mock mode for testing. Its architecture involves a combination of interfaces, classes, and modules that work together to manage LLM operations, including mode resolution, provider registration, and completion requests. The component utilizes design patterns like dependency injection, singleton, and factory to ensure flexibility, scalability, and maintainability.",
-        "Utilizes the LLMService class (lib/llm/llm-service.ts) as the single public entry point for all LLM operations, handling mode routing, caching, and circuit breaking.",
-        "Employs the ProviderRegistry class (lib/llm/provider-registry.js) to manage the registration and initialization of LLM providers, such as AnthropicProvider (lib/llm/providers/anthropic-provider.ts) and DMRProvider (lib/llm/providers/dmr-provider.ts).",
-        "Leverages the DMRProvider class (lib/llm/providers/dmr-provider.ts) for local LLM inference via Docker Desktop's Model Runner, supporting per-agent model overrides from DMR config.",
-        "Implements the complete method in LLMService (lib/llm/llm-service.ts) to handle full routing logic, including mock mode, local mode, and public mode with cache, budget, and sensitivity checks.",
-        "Uses the initializeDMRClient function (integrations/mcp-server-semantic-analysis/src/providers/dmr-provider.ts) to load DMR configuration from a YAML file and initialize the DMR client.",
-        "Employs the getLLMMode function (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) to determine the LLM mode for a specific agent, considering per-agent overrides and global mode.",
-        "Utilizes the LLMCache class (lib/llm/cache.js) to cache LLM responses and improve performance."
+        "The component's architecture is designed to be highly modular and extensible, with a range of interfaces and abstract classes that enable easy integration of new providers and services. The use of dependency injection and inversion of control patterns further enhances the component's flexibility and maintainability, making it an essential part of the larger Coding project ecosystem.",
+        "Uses LLMService (lib/llm/llm-service.ts) as the primary entry point for LLM operations, handling mode routing, caching, and circuit breaking",
+        "Employs a provider-agnostic model with tier-based routing, as seen in the DMRProvider (lib/llm/providers/dmr-provider.ts) class",
+        "Utilizes a mock service (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) for testing purposes, enabling mock LLM responses",
+        "Features a comprehensive logging infrastructure, including the use of log (integrations/mcp-server-semantic-analysis/src/logging.js) for logging events and errors",
+        "Leverages a range of providers, including Anthropic (lib/llm/providers/anthropic-provider.ts), OpenAI, and Groq, to provide a unified interface for LLM interactions",
+        "Implements a multi-agent system for processing git history and LSL sessions, as seen in the GitHistoryAgent and VibeHistoryAgent classes",
+        "Employs a hierarchical classification model with upper and lower ontology definitions for entity classification, as seen in the OntologyClassifier class"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.707Z",
-        "last_updated": "2026-03-07T06:29:50.892Z"
+        "last_updated": "2026-03-07T09:01:36.412Z"
       },
       "id": "mc4flkgs99eop"
     },
@@ -519,19 +519,18 @@
       "name": "DockerizedServices",
       "entityType": "Component",
       "observations": [
-        "In terms of specific implementation details, the component features a range of classes and functions that facilitate its operations. For instance, the LLMService class in lib/llm/llm-service.ts serves as a high-level facade for all LLM operations, handling mode routing, caching, and circuit breaking. Similarly, the startServiceWithRetry function in lib/service-starter.js enables robust service startup with retry logic and timeout protection. These elements collectively contribute to the component's overall architecture and functionality.",
-        "Utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for all LLM operations, incorporating mode routing, caching, and circuit breaking for efficient and reliable service management.",
-        "Employs the startServiceWithRetry function (lib/service-starter.js) for robust service startup, featuring retry logic, timeout protection, and exponential backoff to prevent endless loops and ensure graceful degradation.",
-        "Leverages the isPortListening function (lib/service-starter.js) to verify if a port is listening, ensuring that services are properly initialized and accessible before proceeding with further operations.",
-        "Incorporates the Dockerized approach for service deployment, as seen in scripts/api-service.js and scripts/dashboard-service.js, which wrap the constraint monitoring API server and dashboard for the Global Service Coordinator, respectively.",
-        "Features the getLLMMode function (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) to determine the LLM mode for a specific agent, considering per-agent overrides, global mode, and legacy mockLLM flags for backward compatibility.",
-        "Uses the setGlobalLLMMode function (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) to set the global LLM mode, updating the progress file and legacy mockLLM flag as necessary to maintain consistency across the system.",
-        "Employs the complete function (lib/llm/llm-service.ts) as the main completion method with full routing logic, determining the LLM mode, handling mock and local modes, and performing public mode completion with cache, budget, and sensitivity checks."
+        "The DockerizedServices component serves as the Docker containerization layer for various coding services, including semantic analysis, constraint monitoring, and code-graph-rag, along with supporting databases. Its architecture involves a multi-agent system, utilizing a range of classes and functions to manage the different services and their interactions. The component is built around a high-level facade for interacting with LLM providers, implementing circuit breaking, caching, and budget checks to ensure efficient and controlled operation.",
+        "Utilizes the LLMService class (lib/llm/llm-service.ts) as a high-level facade for interacting with various LLM providers, handling mode routing, caching, and circuit breaking.",
+        "Employs the startServiceWithRetry function (lib/service-starter.js) for robust service startup, featuring retry logic, timeout protection, and exponential backoff.",
+        "Leverages the GraphDatabaseService and GraphDatabaseAdapter (not explicitly shown but implied through context) for managing graph database interactions, potentially including persistence and query operations.",
+        "The isMockLLMEnabled function (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) checks if LLM mock mode is enabled by reading the progress file, handling Docker environment specifics.",
+        "The getLLMMode function (integrations/mcp-server-semantic-analysis/src/mock/llm-mock-service.ts) determines the LLM mode for a specific agent, prioritizing per-agent overrides, global mode, and then defaulting to 'public' if necessary.",
+        "The complete method in LLMService (lib/llm/llm-service.ts) is the main entry point for LLM operations, incorporating full routing logic, including mock, local, and public modes, along with caching and budget checks."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.711Z",
-        "last_updated": "2026-03-07T06:29:49.994Z"
+        "last_updated": "2026-03-07T09:01:39.795Z"
       },
       "id": "mc4flkg22cvl1q"
     },
@@ -539,19 +538,19 @@
       "name": "Trajectory",
       "entityType": "Component",
       "observations": [
-        "The Trajectory component is a complex system managing project milestones, GSD workflow, phase planning, and implementation task tracking. It employs various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive planning infrastructure. The component's architecture involves multiple connection methods, including HTTP API, Inter-Process Communication (IPC), and file watch directory, to interact with the Specstory extension. The SpecstoryAdapter class plays a central role in this component, providing methods for initialization, logging conversations, and connecting to the Specstory extension via different methods.",
-        "Uses SpecstoryAdapter (lib/integrations/specstory-adapter.js) for connecting to the Specstory extension via HTTP API, IPC, or file watch directory",
-        "Implements connection retry mechanism in connectViaHTTP() (lib/integrations/specstory-adapter.js:104) for handling failed connections",
-        "Employs logging mechanism in logConversation() (lib/integrations/specstory-adapter.js:63) for tracking conversations via Specstory",
-        "Utilizes file system operations in connectViaFileWatch() (lib/integrations/specstory-adapter.js:173) for writing log files to a watched directory",
-        "Leverages HTTP request helper method httpRequest() (lib/integrations/specstory-adapter.js:246) for making HTTP requests to the Specstory extension",
-        "Follows a specific pattern for logging conversations, including formatting log entries and handling errors in logConversation() (lib/integrations/specstory-adapter.js:63)",
-        "Handles IPC connections in connectViaIPC() (lib/integrations/specstory-adapter.js:141) using net.createConnection() and promise-based resolution"
+        "Key patterns in this component include the use of a multi-agent architecture, with the SpecstoryAdapter class acting as a facade for interacting with the Specstory extension. The component also employs a range of classes and functions to manage the connection and logging processes.",
+        "Uses SpecstoryAdapter (lib/integrations/specstory-adapter.js) for connecting with the Specstory extension via HTTP, IPC, or file watch methods",
+        "Employs a logger (createLogger from logging/Logger.js) to handle errors and warnings during the connection and logging processes",
+        "Features a logConversation method (SpecstoryAdapter class) to format and log conversation entries via Specstory",
+        "Utilizes a range of connection methods, including connectViaHTTP, connectViaIPC, and connectViaFileWatch (SpecstoryAdapter class)",
+        "Implements a multi-agent architecture, with the SpecstoryAdapter class acting as a facade for interacting with the Specstory extension",
+        "Uses a session ID (SpecstoryAdapter class) to track and manage conversation entries",
+        "Employs a file watch directory (connectViaFileWatch method) as a fallback connection method"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.715Z",
-        "last_updated": "2026-03-07T06:29:57.318Z"
+        "last_updated": "2026-03-07T09:01:41.337Z"
       },
       "id": "mc4flkga1xqjr"
     },
@@ -559,19 +558,19 @@
       "name": "KnowledgeManagement",
       "entityType": "Component",
       "observations": [
-        "The KnowledgeManagement component is responsible for managing the knowledge graph, including entity persistence, graph database interactions, and intelligent routing for database access. It utilizes various technologies such as Graphology, LevelDB, and VKB API to provide a comprehensive knowledge management system. The component's architecture is designed to support multiple agents, including CodeGraphAgent and PersistenceAgent, which work together to analyze code, extract concepts, and store entities in the graph database.",
+        "The KnowledgeManagement component plays a vital role in the overall system, providing a centralized repository of knowledge that can be leveraged by various tools and agents. Its ability to integrate with multiple systems and technologies makes it a key enabler of the system's functionality. The component's use of advanced technologies, such as Graphology and LevelDB, ensures that it can handle complex knowledge management tasks efficiently and effectively.",
         "Uses GraphDatabaseAdapter (storage/graph-database-adapter.ts) for Graphology+LevelDB persistence with automatic JSON export sync",
-        "Employs intelligent routing for database access, using VKB API when available and direct database access otherwise, as seen in GraphDatabaseAdapter's initialize method",
-        "Utilizes the CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) for AST-based code knowledge graph construction and semantic code search capabilities",
-        "Implements the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts) for entity persistence, ontology classification, and content validation",
-        "Leverages the UKBTraceReport (integrations/mcp-server-semantic-analysis/src/utils/ukb-trace-report.ts) for generating detailed trace reports of workflow runs, capturing data flow, concept extraction, and ontology classification",
-        "Employs a work-stealing concurrency approach via shared atomic index counter in the PersistenceAgent's execute method",
-        "Uses a caching mechanism, ClassificationCacheEntry, to avoid redundant LLM calls in the PersistenceAgent"
+        "Employs CodeGraphAgent (src/agents/code-graph-agent.ts) for AST-based code knowledge graph construction and semantic code search capabilities",
+        "Utilizes PersistenceAgent (src/agents/persistence-agent.ts) for entity persistence, graph database storage, and ontology classification",
+        "Leverages VKB API for intelligent querying and entity classification, enabling the component to provide insightful and relevant information to users",
+        "Implements a modular design, with each agent responsible for a specific aspect of knowledge management, enabling the component to scale and adapt to changing requirements",
+        "Uses LevelDB for storing and retrieving knowledge graph data, providing efficient and scalable data management",
+        "Employs Graphology for knowledge graph construction and querying, enabling the component to handle complex knowledge management tasks"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.720Z",
-        "last_updated": "2026-03-07T06:29:57.369Z"
+        "last_updated": "2026-03-07T09:01:45.740Z"
       },
       "id": "mc4flkg17znsjl"
     },
@@ -579,18 +578,17 @@
       "name": "ManualLearning",
       "entityType": "SubComponent",
       "observations": [
-        "ManualLearning uses the VKB API to validate manually created entities in the EntityValidator class",
-        "The ObservationEditor class in ManualLearning utilizes a CRUD-based interface to manage hand-crafted observations",
-        "ManualLearning's EntityAuthor class implements the IEntityManager interface to ensure consistency with other entity management components",
-        "The manual_learning directory contains a entity_templates subdirectory with pre-defined entity templates for manual creation",
-        "The ManualLearning sub-component relies on the OntologyClassification sub-component for entity validation and classification",
-        "The EntityValidator class in ManualLearning uses a set of predefined rules in the validation_rules.json file to validate manually created entities",
-        "ManualLearning's ObservationEditor class uses a caching mechanism to improve performance when retrieving observations"
+        "ManualLearning uses the EntityEditor class in the entity_editor.py file to handle manual edits and updates to entities.",
+        "The ManualLearning module relies on the PersistenceAgent to store and retrieve manually curated entities from the knowledge graph.",
+        "The ManualLearning component utilizes the VKB API to provide intelligent querying capabilities for manually created knowledge.",
+        "ManualLearning handles entity typing using the OntologyClassification module, ensuring consistency in entity metadata.",
+        "The ManualLearning module uses the Graphology library to construct and update the knowledge graph with manually created entities.",
+        "ManualLearning integrates with the CodeKnowledgeGraphConstruction module to incorporate manually created code knowledge into the overall knowledge graph."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.726Z",
-        "last_updated": "2026-03-07T06:31:01.650Z"
+        "last_updated": "2026-03-07T09:02:56.579Z"
       },
       "id": "mc4flkg3msrows"
     },
@@ -598,18 +596,17 @@
       "name": "OnlineLearning",
       "entityType": "SubComponent",
       "observations": [
-        "OnlineLearning uses the LevelDB database to store extracted knowledge in the KnowledgeExtractor class",
-        "The CodeAnalyzer class in OnlineLearning utilizes an AST-based approach to analyze code and extract concepts",
-        "OnlineLearning's GitHistoryAnalyzer class implements the IAnalyzer interface to ensure consistency with other analysis components",
-        "The online_learning directory contains a data_sources subdirectory with configuration files for different data sources",
-        "The OnlineLearning sub-component relies on the EntityPersistence sub-component for storing extracted knowledge",
-        "The KnowledgeExtractor class in OnlineLearning uses a pipeline-based approach to extract knowledge from multiple sources",
-        "OnlineLearning's CodeAnalyzer class uses a caching mechanism to improve performance when analyzing code"
+        "OnlineLearning uses the BatchAnalysisPipeline class in the batch_analysis.py file to extract knowledge from git history and LSL sessions.",
+        "The OnlineLearning module relies on the CodeAnalysis module to extract knowledge from code analysis.",
+        "OnlineLearning utilizes the GraphDatabaseStorage module to store and retrieve extracted knowledge from the knowledge graph.",
+        "OnlineLearning integrates with the IntelligentQuerying module to provide intelligent querying capabilities for machine-generated knowledge.",
+        "The OnlineLearning module uses the LevelDB database to store and retrieve extracted knowledge.",
+        "OnlineLearning handles entity typing using the OntologyClassification module, ensuring consistency in entity metadata."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.731Z",
-        "last_updated": "2026-03-07T06:31:06.168Z"
+        "last_updated": "2026-03-07T09:02:59.659Z"
       },
       "id": "mc4flkg1aeu1jj"
     },
@@ -617,19 +614,19 @@
       "name": "CodingPatterns",
       "entityType": "Component",
       "observations": [
-        "The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the project. This component serves as a catch-all for entities that do not fit into other specific components. Its architecture is designed to promote consistency and efficiency in coding practices, ensuring that the project adheres to established standards and guidelines. Key patterns in this component include the use of intelligent routing, graph database adapters, and work-stealing concurrency, which contribute to its overall structure and functionality.",
-        "The project utilizes a GraphDatabaseAdapter for graph database persistence, as seen in the storage/graph-database-adapter.ts file, allowing for automatic JSON export sync.",
-        "Wave agents follow a specific pattern that includes constructor initialization, ensuring LLM initialization, and execution, as observed in the wave-controller.ts file.",
-        "The implementation of work-stealing concurrency via a shared atomic index counter in the runWithConcurrency() function of wave-controller.ts enhances parallel processing efficiency.",
-        "The use of a caching mechanism in database-adapter.js by the DatabaseAdapter improves performance by reducing the need for repeated database queries.",
-        "The ErrorHandler class provides a centralized error handling mechanism, as indicated by its presence and role within the application's architecture.",
-        "The project employs the Factory pattern in the EntityAuthoringService class to handle entity creation, promoting flexibility and extensibility in entity management.",
-        "The OntologyClassifier utilizes a hierarchical ontology structure to classify entities, leveraging the UpperOntology for categorization and relationship establishment."
+        "The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the project. It serves as a catch-all for entities not fitting other components, providing a foundation for maintainable and efficient code. The component's architecture is not explicitly defined in the provided codebase, but it is likely to involve a range of classes and functions that implement various design patterns and coding conventions.",
+        "The KnowledgeManagement component (config/knowledge-management.json) is responsible for managing the knowledge graph, which includes entity relationships and coding patterns.",
+        "The OnlineLearning component uses the LevelDB database (integrations/code-graph-rag/assets/) to store extracted knowledge in the KnowledgeExtractor class.",
+        "The ManualLearning component uses the VKB API (integrations/copi/src/) to validate manually created entities in the EntityValidator class.",
+        "The PipelineCoordinator (integrations/mcp-constraint-monitor/src/) uses a DAG-based execution model with topological sort in pipeline-configuration.",
+        "The InsightGenerator (integrations/mcp-server-semantic-analysis/src/) uses a rule-based system to generate insights from entity relationships.",
+        "The OntologyClassifier (integrations/mcp-server-semantic-analysis/src/) uses a hierarchical classification model with upper and lower ontology definitions.",
+        "The GraphDatabaseService (integrations/code-graph-rag/config/) is used for graph database operations, including data storage and retrieval."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.736Z",
-        "last_updated": "2026-03-07T06:30:03.856Z"
+        "last_updated": "2026-03-07T09:01:46.868Z"
       },
       "id": "mc4flkg30u7wy5"
     },
@@ -637,19 +634,19 @@
       "name": "ConstraintSystem",
       "entityType": "Component",
       "observations": [
-        "The ConstraintSystem component is a constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build its architecture. The system's key patterns include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient data processing. The component also employs a multi-agent system that processes git history and LSL sessions to detect staleness and validate entity content.",
-        "Uses ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for entity content validation with file path and command extraction patterns",
-        "Employs HookConfigLoader (lib/agent-api/hooks/hook-config.js) for loading and merging hook configurations from multiple sources",
-        "Utilizes ViolationCaptureService (scripts/violation-capture-service.js) for capturing constraint violations from tool interactions and storing them for dashboard display",
-        "Leverages UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) for central orchestration of agent-agnostic hooks",
-        "Implements useWorkflowDefinitions (integrations/system-health-dashboard/src/components/workflow/hooks.ts) for getting workflow definitions from Redux with fallback to constants",
-        "Follows a pattern of using GraphDatabaseAdapter for graph database persistence and SemanticAnalyzer for entity content analysis",
-        "Uses a combination of GitHistoryAgent and VibeHistoryAgent for detecting staleness and validating entity content"
+        "The ConstraintSystem component plays a critical role in maintaining the integrity and consistency of the codebase, and its architecture and patterns reflect a deep understanding of the complexities and challenges of large-scale software development. Its use of multiple agents, flexible persistence mechanisms, and optimized concurrency models enables it to operate efficiently and effectively, even in the face of complex and dynamic constraint validation requirements.",
+        "The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) uses a range of patterns, including filePathPatterns and commandPatterns, to extract references from entity content and verify their existence in the codebase.",
+        "The ViolationCaptureService (scripts/violation-capture-service.js) employs a range of technologies, including JSONL and LevelDB, to capture and persist constraint violations, and provides a range of features, including session tracking and statistics calculation.",
+        "The UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) utilizes a unified hook configuration, loaded from ~/.coding-tools/hooks.json and .coding/hooks.json, to dispatch hook events to registered handlers, and provides a range of features, including handler registration and unregistration.",
+        "The system uses a range of concurrency models, including work-stealing concurrency, to optimize its operations and improve performance, as seen in the runWithConcurrency() function (wave-controller.ts:489).",
+        "The GraphDatabaseAdapter (storage/graph-database-adapter.js) provides a flexible persistence mechanism, supporting automatic JSON export sync and LevelDB storage, to ensure the integrity and consistency of the codebase.",
+        "The ContentValidationAgent utilizes a range of technologies, including Git and LevelDB, to verify the existence of references in the codebase, and provides a range of features, including refresh reports and actionable recommendations.",
+        "The system incorporates a range of tools and technologies, such as the HookConfigLoader (lib/agent-api/hooks/hook-config.js), to load and merge hook configurations from multiple sources."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.741Z",
-        "last_updated": "2026-03-07T06:30:04.154Z"
+        "last_updated": "2026-03-07T09:01:52.743Z"
       },
       "id": "mc4flkg12nbo98"
     },
@@ -657,19 +654,19 @@
       "name": "SemanticAnalysis",
       "entityType": "Component",
       "observations": [
-        "The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.",
+        "The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.",
         "Uses OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system",
-        "Employs SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts) for comprehensive semantic analysis of code and conversation data",
-        "Utilizes CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) for constructing a knowledge graph of code entities and their relationships",
-        "Leverages ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for validating entity content and detecting staleness",
-        "Follows the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) pattern for standardizing agent implementation and execution",
-        "Uses GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database persistence and automatic JSON export sync",
-        "Implements work-stealing concurrency via shared atomic index counter in runWithConcurrency() for efficient processing"
+        "Employs SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts) for comprehensive semantic analysis of git and vibe data",
+        "Utilizes CodeGraphAgent (integrations/mcp-server-semantic-analysis/src/agents/code-graph-agent.ts) for AST-based code knowledge graph construction and semantic code search",
+        "Leverages ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) for validating entity content accuracy and detecting staleness",
+        "Follows the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) pattern for standardized agent execution and response handling",
+        "Implements lazy LLM initialization through the ensureLLMInitialized() method in SemanticAnalysisAgent",
+        "Uses a modular architecture with multiple agents, each with its own specific responsibilities and interfaces"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.746Z",
-        "last_updated": "2026-03-07T06:30:10.818Z"
+        "last_updated": "2026-03-07T09:01:55.148Z"
       },
       "id": "mc4flkg1jyy23i"
     },
@@ -677,17 +674,17 @@
       "name": "Pipeline",
       "entityType": "SubComponent",
       "observations": [
-        "PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.json steps, each step declaring explicit depends_on edges",
-        "ObservationGenerator.mapEntityToObservation() pre-populates entity metadata fields (entityType, metadata.observationClass) to prevent redundant computation",
-        "KGOperator.runWithConcurrency() implements work-stealing via shared nextIndex counter, allowing idle workers to pull tasks immediately",
-        "DeduplicationAgent.removeDuplicates() utilizes a Bloom filter to efficiently eliminate duplicate entities",
-        "PersistenceAgent.persistEntity() uses a graph database adapter to store entities and their relationships",
-        "PipelineAgent.handlePipelineFailure() implements retry logic with exponential backoff to handle transient failures"
+        "PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges",
+        "ObservationGenerator.mapEntityToKG() pre-populates entity metadata fields (entityType, metadata.kgClass) to prevent redundant LLM re-classification",
+        "PersistenceAgent.persistEntity() uses a transactional approach to ensure data consistency across the pipeline",
+        "KGOperator.applyDeduplication() implements a deduplication strategy based on entity identifiers and metadata",
+        "PipelineCoordinator.runPipeline() orchestrates the execution of pipeline steps, handling errors and retries",
+        "PipelineConfiguration.yaml defines the pipeline workflow, including step dependencies and execution order"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.750Z",
-        "last_updated": "2026-03-07T06:32:01.212Z"
+        "last_updated": "2026-03-07T09:03:47.175Z"
       },
       "id": "mc4flkg53173y"
     },
@@ -695,16 +692,17 @@
       "name": "Ontology",
       "entityType": "SubComponent",
       "observations": [
-        "OntologyClassifier uses a hierarchical classification model with upper and lower ontology definitions in ontology-definitions.json",
-        "EntityTypeResolver.resolveEntityType() utilizes a machine learning model to predict entity types based on context",
-        "ValidationAgent.validateEntity() checks entity metadata fields (entityType, metadata.ontologyClass) against ontology definitions",
-        "OntologyManager.loadOntology() loads ontology definitions from a graph database using a graph database adapter",
-        "OntologyUpdater.updateOntology() implements incremental updates to the ontology using a diff-based approach"
+        "OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml",
+        "EntityTypeResolver.resolveEntityType() implements a resolution strategy based on entity metadata and ontology definitions",
+        "OntologyValidator.validateOntology() checks for consistency and validity of ontology definitions",
+        "OntologyConfiguration.yaml defines the ontology structure, including entity types and relationships",
+        "OntologyManager.loadOntology() loads and initializes the ontology from configuration files",
+        "OntologyUtils.getOntologyClass() provides a utility function for retrieving ontology classes"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.753Z",
-        "last_updated": "2026-03-07T06:32:05.072Z"
+        "last_updated": "2026-03-07T09:03:51.710Z"
       },
       "id": "mc4flkgti3r81"
     },
@@ -712,15 +710,17 @@
       "name": "Insights",
       "entityType": "SubComponent",
       "observations": [
-        "InsightGenerator.generateInsights() uses a rule-based system to generate insights from entity relationships",
-        "PatternExtractor.extractPatterns() utilizes a graph mining algorithm to extract patterns from entity relationships",
-        "KnowledgeReportAuthor.authorReport() generates a knowledge report based on insights and patterns",
-        "InsightValidator.validateInsights() checks insights against a set of predefined validation rules"
+        "InsightGenerator.generateInsights() uses a pattern-based approach to generate insights from knowledge entities",
+        "PatternCatalogExtractor.extractPatterns() implements a strategy for extracting patterns from knowledge entities",
+        "KnowledgeReportAuthor.authorReport() generates a report based on insights and patterns",
+        "InsightConfiguration.yaml defines the insight generation workflow, including pattern definitions and report templates",
+        "InsightManager.loadInsight() loads and initializes insights from configuration files",
+        "InsightUtils.getInsightClass() provides a utility function for retrieving insight classes"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-04T06:50:00.757Z",
-        "last_updated": "2026-03-07T06:32:06.537Z"
+        "last_updated": "2026-03-07T09:03:52.385Z"
       },
       "id": "mc4flkg1oy27et"
     },
@@ -2390,29 +2390,18 @@
       "name": "GraphDatabaseManager",
       "entityType": "SubComponent",
       "observations": [
-        "GraphDatabaseManager uses the GraphDBClient class in graph_db_client.py to interact with the graph database.",
-        "The GraphDBQueryModule in graph_db_query_module.py handles queries to the graph database.",
-        "GraphDatabaseManager utilizes the KnowledgeGraphUpdater class in knowledge_graph_updater.py to update the knowledge graph.",
-        "The GraphDatabaseManagerModule in graph_database_manager_module.py serves as the entry point for graph database management functionality.",
-        "GraphDatabaseManager integrates with the EntityPersistenceManager to store and retrieve entities.",
-        "The GraphDBStorageService in graph_db_storage_service.py handles storage of knowledge graphs in the graph database.",
-        "The GraphDBQueryService in graph_db_query_service.py handles queries to the knowledge graphs.",
-        "GraphDatabaseManager uses the GraphDatabaseAdapter class in graph-database-adapter.py to interact with the graph database",
-        "The GraphDatabaseManager class in graph-database-manager.py handles graph database persistence and optimization",
-        "GraphDatabaseManager's JSON export sync is performed using the JsonExporter class in json-exporter.js",
-        "The GraphDatabaseAdapter class in graph-database-adapter.py uses a modular architecture, with separate modules for graph database interaction and persistence",
-        "The GraphDatabaseManager class in graph-database-manager.py employs a caching mechanism to improve performance",
-        "The GraphDatabaseManagerComponent in graph-database-manager-component.js coordinates the interaction between graph database management and optimization",
-        "The json-exporter.js file uses a rule-based system to validate JSON export",
-        "GraphDatabaseManager.storeEntities() persists entities to the graph database, using a set of predefined storage rules, defined in storage-rules.json",
-        "GraphDatabaseManager.queryEntities() retrieves entities from the graph database, using a set of predefined query rules, defined in query-rules.json",
-        "GraphDatabaseManager.optimizeDatabase() optimizes the graph database for performance, using a set of predefined optimization rules, defined in optimization-rules.json",
-        "GraphDatabaseManager.monitorDatabase() tracks key metrics, such as database size and query performance, and stores them in a time-series database for later analysis"
+        "GraphDatabaseManager uses a graph database library with a custom schema defined in schema.graphql, providing a flexible data model for storing constraint-related data",
+        "GraphDatabaseManager implements data persistence using a transactional approach, ensuring data consistency and integrity",
+        "The GraphDatabaseManager's query API is designed to support efficient data retrieval, utilizing indexing and caching to optimize query performance",
+        "GraphDatabaseManager integrates with the ConstraintValidator to provide relevant data for validation, utilizing the query API to retrieve data",
+        "GraphDatabaseManager supports data backup and restoration through a separate backup module, ensuring data durability and recoverability",
+        "The GraphDatabaseManager's data model is designed to support scalability and flexibility, allowing for easy adaptation to changing data storage needs",
+        "GraphDatabaseManager's query API is exposed through a RESTful interface, providing a standardized interface for data access"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T06:32:27.446Z",
-        "last_updated": "2026-03-07T06:13:05.257Z"
+        "last_updated": "2026-03-07T09:03:31.194Z"
       },
       "id": "mc4flkgt0jsf8"
     },
@@ -2469,18 +2458,18 @@
       "name": "DesignPatterns",
       "entityType": "SubComponent",
       "observations": [
-        "SingletonPattern.java uses a double-checked locking mechanism to ensure thread safety in getInstance() method",
-        "FactoryPattern.java utilizes a registry-based approach for creating instances of different classes, as seen in the factory-methods.yaml configuration file",
-        "ObserverPattern.java implements a publish-subscribe model using the ObserverInterface and SubjectInterface, as demonstrated in the observer-pattern-example.txt file",
-        "AdapterPattern.java provides a wrapper class to adapt third-party libraries, such as the graph database adapter in graph-database-adapter.jar",
-        "TemplateMethodPattern.java defines a template method to provide a skeleton for an algorithm, as seen in the template-method-pattern-example.py file",
-        "StrategyPattern.java encapsulates a family of algorithms, making them interchangeable, as demonstrated in the strategy-pattern-example.java file",
-        "DecoratorPattern.java dynamically adds additional responsibilities to an object, as seen in the decorator-pattern-example.java file"
+        "The Singleton pattern is implemented in the SingletonClass.cs file, which ensures a single instance of the class is created throughout the application.",
+        "The Factory pattern is used in the FactoryMethod.cs file, which provides a way to create objects without specifying the exact class of object that will be created.",
+        "The Observer pattern is used in the Observer.cs file, which allows objects to be notified of changes to other objects without having a tight coupling between them.",
+        "The Strategy pattern is implemented in the Strategy.cs file, which defines a family of algorithms, encapsulates each one, and makes them interchangeable.",
+        "The Template Method pattern is used in the TemplateMethod.cs file, which provides a way to define an algorithm's skeleton in a method, deferring the implementation of some steps to subclasses.",
+        "The Adapter pattern is implemented in the Adapter.cs file, which allows two incompatible objects to work together by converting the interface of one object into an interface expected by the clients.",
+        "The Composite pattern is used in the Composite.cs file, which allows clients to treat individual objects and compositions of objects uniformly."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T06:32:27.566Z",
-        "last_updated": "2026-03-07T06:31:29.670Z"
+        "last_updated": "2026-03-07T09:03:17.994Z"
       },
       "id": "mc4flkg5gxjj3"
     },
@@ -2488,25 +2477,18 @@
       "name": "CodingConventions",
       "entityType": "SubComponent",
       "observations": [
-        "The CodeFormatter class in code-formatter.py enforces consistent coding conventions, such as indentation and naming conventions.",
-        "The CodeAnalyzer class in code-analyzer.py checks for adherence to coding standards, such as cyclomatic complexity and code duplication.",
-        "The CodingConventions module in coding-conventions.py defines the coding standards and conventions used in the project.",
-        "The CodeInspector class in code-inspector.py uses the Visitor pattern to inspect the code and enforce coding conventions.",
-        "The CodeGenerator class in code-generator.py uses the Template Method pattern to generate code that adheres to the coding conventions.",
-        "The CodingStandards class in coding-standards.py defines the coding standards and conventions used in the project.",
-        "The CodeReviewer class in code-reviewer.py uses the Observer pattern to review the code and provide feedback on coding conventions.",
-        "The CodeFormatter class uses a set of predefined rules to format code according to the project's coding conventions.",
-        "The NamingConventionChecker class checks code for adherence to the project's naming conventions.",
-        "The CodeAnalyzer class analyzes code for compliance with the project's coding standards.",
-        "The CodeStyleGuide class provides a set of guidelines for coding style and best practices.",
-        "The CodeReviewTool class assists in reviewing code for adherence to coding conventions and best practices.",
-        "The CodeGenerator class generates code that adheres to the project's coding conventions.",
-        "The CodeFormatterConfig class provides configuration options for the code formatter."
+        "The CodingConventions.cs file provides guidelines for coding conventions, such as naming, commenting, and formatting.",
+        "The CodeAnalyzer.cs file analyzes the code to ensure it adheres to the coding conventions and best practices.",
+        "The CodeFormatter.cs file formats the code to ensure it is consistent and easy to read.",
+        "The CommentGenerator.cs file generates comments for the code to ensure it is well-documented.",
+        "The NamingConventions.cs file provides guidelines for naming classes, methods, and variables.",
+        "The CodeSmellsDetector.cs file detects code smells, such as duplicated code or long methods, and provides suggestions for improvement.",
+        "The BestPractices.cs file provides guidelines for best practices, such as testing and error handling."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T06:32:27.570Z",
-        "last_updated": "2026-03-07T06:13:05.190Z"
+        "last_updated": "2026-03-07T09:03:19.959Z"
       },
       "id": "mc4flkg39bj1s8"
     },
@@ -2658,14 +2640,17 @@
       "name": "GraphDatabaseAdapter",
       "entityType": "SubComponent",
       "observations": [
-        "GraphDatabaseAdapter.connectToDatabase() connects to a graph database using a database connection protocol",
-        "GraphDatabaseAdapter.queryDatabase() queries the graph database to retrieve entity relationships",
-        "GraphDatabaseAdapter.updateDatabase() updates the graph database with new entity relationships"
+        "GraphDatabaseAdapter.persistEntity() persists the entity to the graph database",
+        "GraphDatabaseAdapter.queryEntity() queries the entity from the graph database",
+        "GraphDatabaseConfiguration.yaml defines the graph database configuration, including connection and schema definitions",
+        "GraphDatabaseAdapterManager.loadAdapter() loads and initializes the adapter from configuration files",
+        "GraphDatabaseAdapterUtils.getEntity() provides a utility function for retrieving entities",
+        "GraphDatabaseAdapterLogger.logDatabase() logs database operations and errors"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T06:32:27.635Z",
-        "last_updated": "2026-03-07T06:32:21.161Z"
+        "last_updated": "2026-03-07T09:04:07.867Z"
       },
       "id": "mc4flkg1v7dxl2"
     },
@@ -3059,14 +3044,14 @@
       "name": "ProviderRegistry",
       "entityType": "Detail",
       "observations": [
-        "The ProviderRegistry is responsible for managing the registration of LLM providers, which includes storing their configurations and modes.",
-        "The ModeResolver uses the ProviderRegistry to retrieve the provider configurations and determine the operating mode based on the provider configuration in providers.json.",
-        "The ProviderRegistry provides a way to retrieve the provider configurations and modes, which are used by the ModeConfiguration to determine the operating mode."
+        "The presence of a provider-registry.yaml file implies a configurable and modular approach to managing LLM providers, as seen in the hierarchy context.",
+        "The LLMProviderManager sub-component is likely responsible for parsing and utilizing the provider-registry.yaml file, although direct code evidence is not available.",
+        "The use of a registry suggests a decoupling of LLM provider implementation from the rest of the system, allowing for easier addition or removal of providers."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T06:49:29.111Z",
-        "last_updated": "2026-03-07T06:33:16.368Z"
+        "last_updated": "2026-03-07T09:04:15.901Z"
       },
       "id": "mc4flkg22autg2"
     },
@@ -3407,16 +3392,18 @@
       "name": "ConnectionManager",
       "entityType": "SubComponent",
       "observations": [
-        "ConnectionManager uses the SpecstoryAdapter class as its main entry point for connection management, as seen in the lib/integrations/specstory-adapter.js file.",
-        "The ConnectionManager utilizes a logger to handle logging and errors, providing a clear audit trail for connection attempts and failures.",
-        "The connection manager implements multiple connection attempts and fallbacks in case of failures, ensuring a robust and fault-tolerant connection mechanism.",
-        "ConnectionManager leverages the extension API to track and manage conversations and logs effectively, using a session ID to identify and manage conversations.",
-        "The ConnectionManager is designed to be flexible, allowing for different connection methods to be used depending on the specific requirements of the Specstory extension."
+        "ConnectionManager uses the SpecstoryAdapter class as a facade for interacting with the Specstory extension, encapsulating the connection logic in the adapter class",
+        "The ConnectionManager class employs a range of functions to manage the connection process, including establishing and closing connections",
+        "ConnectionManager utilizes a multi-agent architecture, allowing for multiple connections to be managed simultaneously",
+        "The ConnectionManager class has a dependency on the Specstory extension, requiring the extension to be installed and configured properly",
+        "ConnectionManager handles errors and exceptions that occur during the connection process, providing logging and error handling mechanisms",
+        "The ConnectionManager class is responsible for managing the connection state, including connected, disconnected, and connecting states",
+        "ConnectionManager provides a interface for other components to interact with the Specstory extension, abstracting away the underlying connection logic"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T06:49:29.194Z",
-        "last_updated": "2026-03-06T18:42:22.527Z"
+        "last_updated": "2026-03-07T09:02:50.323Z"
       },
       "id": "mc4flkg2bjzjn5"
     },
@@ -4079,37 +4066,20 @@
     },
     {
       "name": "TestingGuidelines",
-      "entityType": "Detail",
+      "entityType": "SubComponent",
       "observations": [
-        {
-          "type": "insight",
-          "content": "The TestingGuidelines are outlined in the BestPractices.md document, which provides a comprehensive guide for developers to follow.",
-          "date": "2026-03-06T06:49:29.360Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The CodingPatterns component has a dedicated section on testing, which includes code examples and templates for common testing scenarios.",
-          "date": "2026-03-06T06:49:29.360Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The project's testing framework is based on industry-standard tools and libraries, such as JUnit and Mockito, which are widely adopted and well-documented.",
-          "date": "2026-03-06T06:49:29.360Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "The TestingGuidelines.cs file provides guidelines for testing the system, including unit testing, integration testing, and acceptance testing.",
+        "The UnitTesting.cs file provides guidelines for unit testing, including the use of testing frameworks and test-driven development.",
+        "The IntegrationTesting.cs file provides guidelines for integration testing, including the use of testing frameworks and continuous integration.",
+        "The AcceptanceTesting.cs file provides guidelines for acceptance testing, including the use of testing frameworks and continuous integration.",
+        "The TestDrivenDevelopment.cs file provides guidelines for test-driven development, including the use of testing frameworks and continuous integration.",
+        "The ContinuousIntegration.cs file provides guidelines for continuous integration, including the use of build servers and testing frameworks.",
+        "The TestingFrameworks.cs file provides guidelines for testing frameworks, including the use of unit testing and integration testing frameworks."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T06:49:29.368Z",
-        "last_updated": "2026-03-06T06:49:29.368Z"
+        "last_updated": "2026-03-07T09:03:24.530Z"
       },
       "id": "mc4flkg1dclx8z"
     },
@@ -5039,67 +5009,17 @@
       "name": "TranscriptProcessingModule",
       "entityType": "SubComponent",
       "observations": [
-        {
-          "type": "insight",
-          "content": "TranscriptProcessor uses a factory pattern in `transcript_processor_factory.py` to create format-specific processors, such as `JsonTranscriptProcessor` and `XmlTranscriptProcessor`.",
-          "date": "2026-03-06T08:24:54.517Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `TranscriptConverter` class in `transcript_converter.py` applies transformations to the transcript data, including timestamp normalization and entity extraction, using the `TransformationPipeline` in `transformation_pipeline.py`.",
-          "date": "2026-03-06T08:24:54.517Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `FormatValidator` in `format_validator.py` checks the validity of the input transcript formats, ensuring compatibility with the LSL format, and logs any errors using the `LoggingAndErrorTrackingModule`.",
-          "date": "2026-03-06T08:24:54.517Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `TranscriptProcessingModule` uses a caching mechanism, implemented in `transcript_cache.py`, to store frequently accessed transcripts and reduce processing time.",
-          "date": "2026-03-06T08:24:54.517Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `TranscriptProcessor` class utilizes a queue-based system, defined in `transcript_queue.py`, to handle concurrent processing of transcripts, ensuring efficient use of system resources.",
-          "date": "2026-03-06T08:24:54.517Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `LSLFormatConverter` in `lsl_format_converter.py` is responsible for converting the processed transcripts into the unified LSL format, using the `LSLFormatSpecification` in `lsl_format_specification.py`.",
-          "date": "2026-03-06T08:24:54.517Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `TranscriptProcessingModule` integrates with the `OntologyClassificationModule` to classify entities in the transcripts, using the `EntityClassifier` in `entity_classifier.py`.",
-          "date": "2026-03-06T08:24:54.517Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "TranscriptProcessingModule uses a modular architecture with separate classes for each agent, such as ClaudeCodeTranscriptProcessor and CopilotTranscriptProcessor, to handle transcript processing",
+        "The module's TranscriptConverter class implements a factory pattern to create converter instances based on the agent type, as defined in the transcript-converters.yaml configuration file",
+        "The LogDataProcessor class in TranscriptProcessingModule utilizes a thread pool executor to parallelize transcript processing, with a configurable number of threads defined in the module's configuration",
+        "TranscriptProcessingModule's ErrorHandlingMechanism class catches and logs exceptions during transcript processing, with error codes and messages defined in the error-codes.json file",
+        "The module's TranscriptNormalizer class applies a set of predefined normalization rules to the processed transcripts, as specified in the normalization-rules.json file",
+        "The TranscriptProcessingModule's IntegrationTest class uses a test-driven development approach to verify the correctness of transcript processing, with test cases defined in the transcript-processing-tests.json file"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T08:24:54.523Z",
-        "last_updated": "2026-03-06T08:24:54.523Z"
+        "last_updated": "2026-03-07T09:01:57.593Z"
       },
       "id": "mc4flkg5ivpm51"
     },
@@ -5175,67 +5095,17 @@
       "name": "ConfigurationValidationModule",
       "entityType": "SubComponent",
       "observations": [
-        {
-          "type": "insight",
-          "content": "The `ConfigurationValidator` uses a configuration specification, defined in `configuration_specification.py`, to validate the system configuration, including logging and error tracking settings.",
-          "date": "2026-03-06T08:24:54.519Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `ConfigurationOptimizer` in `configuration_optimizer.py` optimizes the system configuration, using the `OptimizationPolicy` in `optimization_policy.py` to determine the optimization strategy.",
-          "date": "2026-03-06T08:24:54.519Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `ConfigurationValidationModule` uses a caching mechanism, implemented in `configuration_cache.py`, to store frequently accessed configuration information, reducing the load on the system.",
-          "date": "2026-03-06T08:24:54.519Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `ConfigurationValidator` class utilizes a queue-based system, defined in `configuration_queue.py`, to handle concurrent configuration validation, ensuring efficient use of system resources.",
-          "date": "2026-03-06T08:24:54.519Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `ConfigurationValidationModule` integrates with the `LoggingAndErrorTrackingModule` to log any configuration errors, using the `Logger` class in `logger.py`.",
-          "date": "2026-03-06T08:24:54.519Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `ConfigurationValidator` provides a validation API, defined in `validation_api.py`, for other components to use, ensuring consistent configuration validation behavior throughout the system.",
-          "date": "2026-03-06T08:24:54.519Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The `ConfigurationOptimizer` uses a set of predefined optimization rules, defined in `optimization_rules.py`, to optimize the system configuration, including log level and error tracking settings.",
-          "date": "2026-03-06T08:24:54.519Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "ConfigurationValidationModule's ConfigurationLoader class loads and parses the system configuration from JSON files, with support for multiple configuration formats, as specified in the configuration-formats.json file",
+        "The module's ValidationRules class defines and applies validation rules to the system configuration, with validation rules defined in the validation-rules.json file",
+        "ConfigurationValidationModule's OptimizationMechanism class optimizes the system configuration for performance and efficiency, with optimization rules defined in the optimization-rules.json file",
+        "The module's ConfigurationUpdater class updates the system configuration based on changes to the validation and optimization results, with update schedules defined in the configuration-update-schedules.json file",
+        "ConfigurationValidationModule's ConfigurationBrowser class provides a user interface for browsing and exploring the system configuration, with support for multiple visualization formats, as specified in the configuration-visualization-formats.json file",
+        "The module's ConfigurationExporter class exports the system configuration to various formats, such as JSON and XML, with export options defined in the configuration-export-options.json file"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T08:24:54.532Z",
-        "last_updated": "2026-03-06T08:24:54.532Z"
+        "last_updated": "2026-03-07T09:02:06.091Z"
       },
       "id": "mc4flkg1ms9o79"
     },
@@ -6261,66 +6131,18 @@
       "name": "HookManager",
       "entityType": "SubComponent",
       "observations": [
-        {
-          "type": "insight",
-          "content": "HookManager uses a publish-subscribe pattern in the Hooks.js file to manage event registrations and dispatches",
-          "date": "2026-03-06T08:24:54.692Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The registerHook() function in the HookManager class allows handlers to register for specific events",
-          "date": "2026-03-06T08:24:54.692Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "HookManager implements a thread-safe event dispatch mechanism using the EventDispatcher class",
-          "date": "2026-03-06T08:24:54.692Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The Hooks.js file declares explicit event dependencies, allowing for modular and reusable event handling logic",
-          "date": "2026-03-06T08:24:54.692Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "HookManager utilizes a caching mechanism using the CacheManager class to store frequently accessed event registrations",
-          "date": "2026-03-06T08:24:54.692Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The unregisterHook() function in the HookManager class allows handlers to unregister from specific events",
-          "date": "2026-03-06T08:24:54.692Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        "HookManager uses the HookConfigLoader module to load hook configurations from the constraints.yaml file",
-        "The HookManager class implements the IHooksManager interface, which declares the registerHook and executeHook methods",
-        "HookManager utilizes the LoggingModule to log hook registration and execution results",
-        "HookManager uses a dictionary to store registered hooks, allowing for efficient lookup and execution",
-        "HookManager supports multiple hook types, including pre-commit and post-commit hooks",
-        "HookManager uses a validation mechanism to ensure that hooks are properly configured and registered",
-        "HookManager provides a API for other components to register and execute hooks"
+        "HookManager uses an event-driven architecture with a custom event model defined in events.json, providing a flexible framework for handling hook events",
+        "HookManager integrates with the ConstraintValidator to dispatch validation-related hook events, utilizing the event model to notify registered handlers",
+        "The HookManager's handler registration module utilizes a registry-based approach, allowing handlers to register and unregister dynamically",
+        "HookManager supports event filtering and prioritization through a separate filtering module, allowing for flexible event handling",
+        "HookManager's event model is designed to support scalability and flexibility, allowing for easy adaptation to changing event handling needs",
+        "The HookManager's API is exposed through a RESTful interface, providing a standardized interface for event handling",
+        "HookManager supports event logging through integration with a logging library, providing auditable event records"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T08:24:54.756Z",
-        "last_updated": "2026-03-06T17:43:14.432Z"
+        "last_updated": "2026-03-07T09:03:35.587Z"
       },
       "id": "mc4flkg254gvsa"
     },
@@ -6446,68 +6268,16 @@
     },
     {
       "name": "PersistenceAgent",
-      "entityType": "SubComponent",
+      "entityType": "Detail",
       "observations": [
-        {
-          "type": "insight",
-          "content": "PersistenceAgent uses a metadata-based approach in the PersistenceAgent.js file to pre-populate ontology metadata fields",
-          "date": "2026-03-06T08:24:54.698Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The prePopulateMetadata() function in the PersistenceAgent class dispatches events to registered handlers via the HookManager",
-          "date": "2026-03-06T08:24:54.698Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "PersistenceAgent integrates with the GraphDatabaseAdapter to store entity data in the graph database",
-          "date": "2026-03-06T08:24:54.698Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The PersistenceAgent.js file declares explicit metadata dependencies, allowing for modular and reusable metadata logic",
-          "date": "2026-03-06T08:24:54.698Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "PersistenceAgent implements a caching mechanism using the CacheManager class to store frequently accessed metadata",
-          "date": "2026-03-06T08:24:54.698Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The preventRedundantClassification() function in the PersistenceAgent class utilizes a retry mechanism with exponential backoff to handle transient classification failures",
-          "date": "2026-03-06T08:24:54.698Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        "PersistenceAgent uses the PersistenceManager class in persistence-manager.py to handle entity and observation persistence",
-        "The PersistenceAgent class in persistence-agent.py handles persistence of entities and observations",
-        "PersistenceAgent's persistence is performed using the PersistenceSystem",
-        "The PersistenceManager class in persistence-manager.py uses a modular architecture, with separate modules for entity and observation persistence",
-        "The PersistenceAgent class in persistence-agent.py employs a caching mechanism to improve performance",
-        "The PersistenceAgentComponent in persistence-agent-component.js coordinates the interaction between entity and observation persistence",
-        "The persistence-manager.py file uses a rule-based system to validate persistence"
+        "The PersistenceAgent class is used in the EntityPersistence sub-component to store and retrieve entities from the knowledge graph, as mentioned in the parent context.",
+        "The EntityPersistence sub-component relies on the PersistenceAgent class for its core functionality, indicating a strong dependency between the two.",
+        "The lack of source files limits the ability to provide more specific observations about the PersistenceAgent class, but its importance in the EntityPersistence sub-component is clear from the parent context."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T08:24:54.766Z",
-        "last_updated": "2026-03-07T06:13:04.927Z"
+        "last_updated": "2026-03-07T09:04:31.104Z"
       },
       "id": "mc4flkg1c5le4m"
     },
@@ -11332,18 +11102,17 @@
       "name": "OntologyClassification",
       "entityType": "SubComponent",
       "observations": [
-        "OntologyClassification uses the VKB API to manage ontology classification and entity validation in the OntologyClassifier class",
-        "The EntityValidator class in OntologyClassification utilizes a set of predefined rules to validate entities",
-        "OntologyClassification's OntologyClassifier class implements the IOntologyClassifier interface to ensure consistency with other ontology classification components",
-        "The ontology_classification directory contains a classification_config subdirectory with configuration files for classification",
-        "The OntologyClassification sub-component relies on the EntityPersistence sub-component for storing and retrieving entities",
-        "The OntologyClassifier class in OntologyClassification uses a hierarchical approach to classify entities into an ontology",
-        "OntologyClassification's EntityValidator class uses a caching mechanism to improve performance when validating entities"
+        "OntologyClassification uses the PersistenceAgent class in the persistence_agent.py file to handle ontology classification and entity typing.",
+        "The OntologyClassification module relies on the EntityPersistence module to store and retrieve entities from the knowledge graph.",
+        "OntologyClassification utilizes the Graphology library to construct and update the knowledge graph.",
+        "OntologyClassification handles entity typing using the PersistenceAgent, ensuring consistency in entity metadata.",
+        "The OntologyClassification module uses the LevelDB database to store and retrieve entity data.",
+        "OntologyClassification integrates with the ManualLearning module to provide ontology classification and entity typing for manually created knowledge."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T17:45:31.736Z",
-        "last_updated": "2026-03-07T06:31:16.823Z"
+        "last_updated": "2026-03-07T09:03:10.299Z"
       },
       "id": "mc4flkg3ahlx1"
     },
@@ -11891,14 +11660,14 @@
       "name": "RetryMechanism",
       "entityType": "Detail",
       "observations": [
-        "The startServiceWithRetry function in lib/service-starter.js implements the retry logic, utilizing a combination of exponential backoff and timeout protection to handle service startup failures.",
-        "The retry mechanism is designed to cap at a maximum number of retries, after which it falls back to an alternative startup strategy, as defined in the lib/service-starter.js module.",
-        "The exponential backoff strategy is implemented using a formula that increases the delay between retries, as seen in the calculation of the retryDelay variable in lib/service-starter.js."
+        "The ServiceStarter sub-component utilizes a retry mechanism with exponential backoff, as mentioned in the parent context, to handle transient service start failures.",
+        "Although the exact implementation details are not available, the parent context suggests that the retry mechanism is a key aspect of the ServiceStarter's functionality.",
+        "The use of exponential backoff in the retry mechanism implies a design decision to balance between retrying failed services and avoiding overwhelming the system with repeated attempts."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T17:45:31.937Z",
-        "last_updated": "2026-03-07T06:33:38.420Z"
+        "last_updated": "2026-03-07T09:04:18.914Z"
       },
       "id": "mc4flkg31t0dov"
     },
@@ -12601,35 +12370,14 @@
       "name": "GraphDatabaseStorage",
       "entityType": "Detail",
       "observations": [
-        {
-          "type": "insight",
-          "content": "GraphDatabaseInterface in graph-database-interface.py defines methods for creating, updating, and deleting nodes and relationships in the graph database.",
-          "date": "2026-03-06T17:45:32.543Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The KnowledgeGraphDatabase sub-component relies on GraphDatabaseStorage to persist knowledge entities, ensuring data consistency and integrity.",
-          "date": "2026-03-06T17:45:32.543Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "GraphDatabaseStorage likely employs a data serialization mechanism to convert knowledge entities into a format compatible with the graph database.",
-          "date": "2026-03-06T17:45:32.543Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "The KnowledgeGraphManager uses the GraphDatabaseStorage module to store and retrieve knowledge graph data, as implied by the parent context.",
+        "The GraphDatabaseStorage module is likely responsible for managing the graph database, including creating and deleting nodes and edges, as well as querying the graph for specific data.",
+        "The GraphDatabaseStorage module, implemented in graph-database-storage.ts, utilizes the GraphDB class to handle storage and retrieval of knowledge graph data, providing methods such as storeGraph and queryGraph for the KnowledgeGraphManager."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T17:45:32.585Z",
-        "last_updated": "2026-03-06T17:45:32.585Z"
+        "last_updated": "2026-03-07T09:04:36.615Z"
       },
       "id": "mc4flkg1j2is8i"
     },
@@ -14216,59 +13964,17 @@
       "name": "LLMProviderManager",
       "entityType": "SubComponent",
       "observations": [
-        {
-          "type": "insight",
-          "content": "LLMProviderManager uses a provider registry to manage the different LLM providers, as seen in the provider-registry.ts file",
-          "date": "2026-03-06T17:59:20.362Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The manager applies the strategy pattern in the provider-registry.ts file to handle provider-specific logic",
-          "date": "2026-03-06T17:59:20.362Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The LLMProviderManager class in llm-provider-manager.ts utilizes dependency injection to set the mode resolver",
-          "date": "2026-03-06T17:59:20.362Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The LLMProviderManager interacts with the BudgetTracker to ensure cost constraints are respected, as seen in the budget-tracker.ts file",
-          "date": "2026-03-06T17:59:20.362Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The manager handles asynchronous provider interactions using async/await syntax, as seen in the provider-interactions.ts file",
-          "date": "2026-03-06T17:59:20.362Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The provider-registry.ts file utilizes TypeScript's type system to ensure better code maintainability and scalability",
-          "date": "2026-03-06T17:59:20.362Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "LLMProviderManager uses a provider registry to store and manage available LLM providers, as seen in the provider-registry.yaml file.",
+        "The LLMProviderManager class implements a dependency injection pattern, allowing for flexible and modular provider integration.",
+        "The prioritization of LLM providers is based on a weighted scoring system, as defined in the provider-prioritization.js module.",
+        "The LLMProviderManager handles provider registration and deregistration through the ProviderRegistry interface, as specified in the provider-registry.ts file.",
+        "The manager uses a caching mechanism to improve performance, as implemented in the cache-provider.js module.",
+        "The LLMProviderManager logs provider-related events and errors using the LLMLogger class, as seen in the logger.ts file."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T17:59:20.374Z",
-        "last_updated": "2026-03-06T17:59:20.374Z"
+        "last_updated": "2026-03-07T09:02:15.610Z"
       },
       "id": "mc4flkg365g8vj"
     },
@@ -15680,18 +15386,18 @@
       "name": "SpecstoryAdapter",
       "entityType": "SubComponent",
       "observations": [
-        "SpecstoryAdapter utilizes the SpecstoryConnectionManager to establish connections to the Specstory extension, providing methods for initialization and logging conversations.",
-        "The SpecstoryAdapter employs a modular architecture, allowing for easy addition or removal of connection methods, such as HTTP API or IPC.",
-        "The SpecstoryAdapter handles errors and exceptions that occur during connection establishment, ensuring robustness and reliability.",
-        "The SpecstoryAdapter uses a configuration file, such as config.json, to store connection settings and preferences.",
-        "The SpecstoryAdapter provides a unified interface for interacting with the Specstory extension, regardless of the underlying connection method or protocol.",
-        "The SpecstoryAdapter supports multiple connection protocols, including HTTP and IPC, allowing for flexibility and adaptability.",
-        "The SpecstoryAdapter includes logging mechanisms to track connection events and errors, facilitating debugging and troubleshooting."
+        "SpecstoryAdapter uses a range of classes and functions to interact with the Specstory extension, including connection establishment and data transfer",
+        "The SpecstoryAdapter class employs a multi-agent architecture, allowing for multiple connections to be managed simultaneously",
+        "SpecstoryAdapter utilizes a logging mechanism to log errors and exceptions, providing a record of the interactions",
+        "The SpecstoryAdapter class has a dependency on the Specstory extension, requiring the extension to be installed and configured properly",
+        "SpecstoryAdapter handles errors and exceptions that occur during the interaction process, providing logging and error handling mechanisms",
+        "The SpecstoryAdapter class is responsible for managing the interaction settings and parameters, including connection settings and data transfer settings",
+        "SpecstoryAdapter provides a interface for other components to interact with the Specstory extension, abstracting away the underlying interaction logic"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T18:04:22.740Z",
-        "last_updated": "2026-03-07T06:30:54.431Z"
+        "last_updated": "2026-03-07T09:02:54.531Z"
       },
       "id": "mc4flkg1qsac51"
     },
@@ -15807,35 +15513,14 @@
       "name": "BatchAnalysisPipeline",
       "entityType": "Detail",
       "observations": [
-        {
-          "type": "insight",
-          "content": "The OnlineLearningController.java file utilizes the BatchAnalysisPipeline class to integrate with the batch analysis pipeline, demonstrating the sub-component's reliance on this custom class.",
-          "date": "2026-03-06T18:04:22.735Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The BatchAnalysisPipeline class is likely responsible for managing the batch analysis process, including data ingestion, processing, and output, although the exact implementation details are not available.",
-          "date": "2026-03-06T18:04:22.735Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The use of a custom BatchAnalysisPipeline class suggests a notable architectural decision to prioritize flexibility and customizability in the batch analysis process, allowing for tailored integration with the OnlineLearning sub-component.",
-          "date": "2026-03-06T18:04:22.735Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "The BatchAnalysisPipeline utilizes the batch_analysis.py file, which is not provided, but based on the parent context, it is assumed to extract knowledge from git history and LSL sessions.",
+        "The lack of source files limits the ability to provide more specific observations about the BatchAnalysisPipeline's architecture or behavior.",
+        "Given the context, the BatchAnalysisPipeline appears to be a crucial aspect of the OnlineLearning sub-component, focusing on knowledge extraction from specific sources."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T18:04:22.756Z",
-        "last_updated": "2026-03-06T18:04:22.756Z"
+        "last_updated": "2026-03-07T09:04:29.141Z"
       },
       "id": "mc4flkg3aemt60"
     },
@@ -17327,18 +17012,17 @@
       "name": "ServiceStarter",
       "entityType": "SubComponent",
       "observations": [
-        "ServiceStarter uses the startServiceWithRetry function in lib/service-starter.js to enable robust service startup with retry logic and timeout protection.",
-        "The startServiceWithRetry function implements a retry mechanism with exponential backoff, ensuring that services are started reliably even in the presence of failures.",
-        "ServiceStarter integrates with the LLMServiceManager component to ensure that LLM services are started and running correctly.",
-        "The lib/service-starter.js file provides a central location for service startup logic, making it easier to manage and maintain.",
-        "ServiceStarter uses a timeout mechanism to prevent services from hanging indefinitely, ensuring that the system remains responsive.",
-        "The startServiceWithRetry function in lib/service-starter.js provides a flexible interface for service startup, allowing for easy modification or extension of the startup logic.",
-        "ServiceStarter monitors the health of the services, detecting and responding to failures or performance degradation."
+        "ServiceStarter utilizes a retry mechanism with exponential backoff in ServiceStarter.py, handling transient service start failures",
+        "ServiceStarter.startService() checks for service health using ServiceHealthChecker.class, ensuring services are fully initialized before returning",
+        "ServiceStarter.config.json stores service startup configurations, including retry counts and timeout intervals",
+        "ServiceStarter logs service start events using LoggingAgent.logServiceStart(), providing visibility into service initialization",
+        "ServiceStarter.supports service dependency management through DependencyGraph.class, ensuring services start in the correct order",
+        "ServiceStarter handles service startup exceptions using StartupExceptionHandler.class, preventing cascading failures"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T18:34:42.398Z",
-        "last_updated": "2026-03-07T06:30:43.197Z"
+        "last_updated": "2026-03-07T09:02:33.956Z"
       },
       "id": "mc4flkgamnr9i"
     },
@@ -18275,35 +17959,14 @@
       "name": "CircuitBreakerPattern",
       "entityType": "Detail",
       "observations": [
-        {
-          "type": "insight",
-          "content": "The CircuitBreakerPattern would be implemented in the lib/llm/llm-service.ts file, where the ProviderRegistry is defined, to detect and prevent cascading failures",
-          "date": "2026-03-06T18:39:50.520Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The pattern would define a threshold value, such as the number of consecutive failures, to determine when to trip the circuit breaker and prevent further requests to the failing provider",
-          "date": "2026-03-06T18:39:50.520Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The pattern would need to implement a reset mechanism, such as a timer, to reset the circuit breaker after a certain period of time, allowing the provider to recover and accept new requests",
-          "date": "2026-03-06T18:39:50.520Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "The LLMFacade sub-component uses the CircuitBreaker.pattern to prevent cascading failures when interacting with LLM providers, as mentioned in the parent context.",
+        "The CircuitBreaker pattern is a common design pattern used in distributed systems to prevent cascading failures, and its implementation in LLMFacade is consistent with this pattern.",
+        "The use of CircuitBreaker.pattern in LLMFacade suggests that the system is designed to handle failures and exceptions in a robust and resilient manner."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T18:39:50.548Z",
-        "last_updated": "2026-03-06T18:39:50.548Z"
+        "last_updated": "2026-03-07T09:04:20.435Z"
       },
       "id": "mc4flkg2izetv"
     },
@@ -20234,14 +19897,14 @@
       "name": "OntologyLoader",
       "entityType": "Detail",
       "observations": [
-        "OntologyManager.loadOntology() in the parent context suggests the existence of a dedicated loader, which is likely implemented as a separate module or class to encapsulate the loading logic.",
-        "The use of a graph database adapter implies a design decision to abstract the underlying database interactions, allowing for potential switching between different graph databases if needed.",
-        "The loading process may involve parsing and transforming the ontology data into a suitable format for the application, possibly utilizing specific parsing libraries or frameworks."
+        "The OntologyLoader loads ontology definitions from JSON files, as specified in the ontology-formats.json file, to support multiple ontology formats.",
+        "The OntologyLoader's functionality is critical in the context of the LiveLoggingSystem, as it enables the system to work with diverse ontology formats.",
+        "The OntologyLoader's behavior is a key aspect of the OntologyManagementModule, as it directly impacts the quality and accuracy of the log data processing."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-06T18:39:51.572Z",
-        "last_updated": "2026-03-07T06:36:53.346Z"
+        "last_updated": "2026-03-07T09:04:11.548Z"
       },
       "id": "mc4flkg6j81pa"
     },
@@ -21277,43 +20940,17 @@
       "name": "KnowledgeGraphManager",
       "entityType": "SubComponent",
       "observations": [
-        {
-          "type": "insight",
-          "content": "KnowledgeGraphManager.createEntity() creates a new entity in the knowledge graph, using a set of predefined creation rules, defined in creation-rules.json",
-          "date": "2026-03-07T06:13:05.120Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "KnowledgeGraphManager.createRelationship() creates a new relationship between entities in the knowledge graph, using a set of predefined relationship creation rules, defined in relationship-creation-rules.json",
-          "date": "2026-03-07T06:13:05.120Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "KnowledgeGraphManager.traverseGraph() traverses the knowledge graph, using a set of predefined traversal rules, defined in traversal-rules.json",
-          "date": "2026-03-07T06:13:05.120Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "KnowledgeGraphManager.monitorGraph() tracks key metrics, such as entity count and relationship density, and stores them in a time-series database for later analysis",
-          "date": "2026-03-07T06:13:05.120Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "KnowledgeGraphManager uses the GraphDatabaseStorage module to handle storage and retrieval of knowledge graph data.",
+        "The KnowledgeGraphManager module relies on the EntityPersistence module to handle storage and retrieval of entities.",
+        "KnowledgeGraphManager utilizes the Graphology library to construct and update the knowledge graph.",
+        "KnowledgeGraphManager handles entity typing using the OntologyClassification module, ensuring consistency in entity metadata.",
+        "The KnowledgeGraphManager module uses the PersistenceAgent to store and retrieve entities from the knowledge graph.",
+        "KnowledgeGraphManager integrates with the ManualLearning and OnlineLearning modules to manage the overall knowledge graph."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T06:13:05.186Z",
-        "last_updated": "2026-03-07T06:13:05.186Z"
+        "last_updated": "2026-03-07T09:03:14.901Z"
       },
       "id": "mc4flkg10z0vel"
     },
@@ -21984,67 +21621,17 @@
       "name": "EntityPersistence",
       "entityType": "SubComponent",
       "observations": [
-        {
-          "type": "insight",
-          "content": "EntityPersistence uses the Graphology library to interact with the graph database in the GraphDatabaseConnector class",
-          "date": "2026-03-07T06:29:16.274Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The EntityPersister class in EntityPersistence utilizes a transaction-based approach to ensure data consistency",
-          "date": "2026-03-07T06:29:16.274Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "EntityPersistence's GraphDatabaseConnector class implements the IGraphDatabase interface to ensure consistency with other graph database components",
-          "date": "2026-03-07T06:29:16.274Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The entity_persistence directory contains a database_config subdirectory with configuration files for the graph database",
-          "date": "2026-03-07T06:29:16.274Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The EntityPersistence sub-component relies on the GraphDatabaseInteraction sub-component for managing graph database interactions",
-          "date": "2026-03-07T06:29:16.274Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The EntityPersister class in EntityPersistence uses a batching mechanism to improve performance when persisting entities",
-          "date": "2026-03-07T06:29:16.274Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "EntityPersistence's GraphDatabaseConnector class uses a connection pooling mechanism to improve performance when interacting with the graph database",
-          "date": "2026-03-07T06:29:16.274Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "EntityPersistence uses the PersistenceAgent class in the persistence_agent.py file to store and retrieve entities from the knowledge graph.",
+        "The EntityPersistence module relies on the GraphDatabaseStorage module to handle storage and retrieval of entity data.",
+        "EntityPersistence utilizes the LevelDB database to store and retrieve entity data.",
+        "EntityPersistence handles entity typing using the OntologyClassification module, ensuring consistency in entity metadata.",
+        "The EntityPersistence module uses the Graphology library to construct and update the knowledge graph with entity data.",
+        "EntityPersistence integrates with the ManualLearning module to store and retrieve manually curated entities."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T06:29:16.280Z",
-        "last_updated": "2026-03-07T06:29:16.280Z"
+        "last_updated": "2026-03-07T09:03:01.242Z"
       },
       "id": "mc4flkgcmhgtg"
     },
@@ -22912,35 +22499,17 @@
       "name": "CodeKnowledgeGraph",
       "entityType": "SubComponent",
       "observations": [
-        {
-          "type": "insight",
-          "content": "KnowledgeGraphConstructor.constructGraph() constructs a knowledge graph from code entities and relationships",
-          "date": "2026-03-07T06:29:16.386Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "GraphMaintainer.maintainGraph() maintains the knowledge graph by updating entity relationships",
-          "date": "2026-03-07T06:29:16.386Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "GraphQueryAgent.queryGraph() queries the knowledge graph to retrieve entity relationships",
-          "date": "2026-03-07T06:29:16.386Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph",
+        "CodeEntityMapper.mapCodeEntity() maps code entities to knowledge graph nodes",
+        "CodeKnowledgeGraphQuery.queryGraph() implements a query interface for the code knowledge graph",
+        "CodeKnowledgeGraphConfiguration.yaml defines the graph structure, including node and edge definitions",
+        "CodeKnowledgeGraphManager.loadGraph() loads and initializes the graph from configuration files",
+        "CodeKnowledgeGraphUtils.getNodeClass() provides a utility function for retrieving node classes"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T06:29:16.407Z",
-        "last_updated": "2026-03-07T06:29:16.407Z"
+        "last_updated": "2026-03-07T09:03:56.846Z"
       },
       "id": "mc4flkg2k4k89p"
     },
@@ -24257,16 +23826,19 @@
     },
     {
       "name": "EntityValidator",
-      "entityType": "Detail",
+      "entityType": "SubComponent",
       "observations": [
-        "The EntityValidator would logically be part of the OntologyClassifier class, given the classification and validation are closely related processes within the OntologyClassification sub-component",
-        "The predefined rules for entity validation could be defined in a separate configuration or module, allowing for easier modification and extension of validation criteria without altering the core validation logic",
-        "The use of EntityValidator suggests a design pattern where validation is decoupled from the classification process, enabling more flexibility in handling different types of entities and validation rules"
+        "EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions",
+        "EntityValidator.checkConsistency() checks for consistency across entity relationships and dependencies",
+        "EntityValidatorConfiguration.yaml defines the validation workflow, including rules and definitions",
+        "EntityValidatorManager.loadValidator() loads and initializes the validator from configuration files",
+        "EntityValidatorUtils.getValidationResult() provides a utility function for retrieving validation results",
+        "EntityValidatorLogger.logValidation() logs validation results and errors"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T06:29:36.957Z",
-        "last_updated": "2026-03-07T06:34:56.804Z"
+        "last_updated": "2026-03-07T09:03:56.899Z"
       },
       "id": "mc4flkgpfupv5"
     },
@@ -24433,35 +24005,14 @@
       "name": "AstParser",
       "entityType": "Detail",
       "observations": [
-        {
-          "type": "insight",
-          "content": "The CodeAnalyzer class in CodeAnalysis uses the AST-based approach to analyze code, as indicated by the presence of the AstParser in its implementation.",
-          "date": "2026-03-07T06:29:37.033Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The ASTParsing process is a crucial step in the CodeAnalysis sub-component, allowing for the extraction of concepts and relationships from the code.",
-          "date": "2026-03-07T06:29:37.033Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The use of an AST-based approach in CodeAnalysis enables the CodeAnalyzer class to efficiently traverse and analyze the code structure.",
-          "date": "2026-03-07T06:29:37.033Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "The CodeKnowledgeGraphBuilder uses AST parsing to construct the graph, as hinted by the parent context of SemanticAnalysis and the mention of CodeKnowledgeGraphBuilder.buildGraph()",
+        "The use of Memgraph suggests a graph-based storage and querying system, which would rely on the parsed AST to populate the graph",
+        "The AST parsing is likely done using a library or module specifically designed for this purpose, given the complexity of parsing code syntax and semantics"
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T06:29:37.056Z",
-        "last_updated": "2026-03-07T06:29:37.056Z"
+        "last_updated": "2026-03-07T09:04:42.772Z"
       },
       "id": "mc4flkg2aphexr"
     },
@@ -24623,42 +24174,6 @@
         "last_updated": "2026-03-07T06:29:37.130Z"
       },
       "id": "mc4flkg4fubp9k"
-    },
-    {
-      "name": "VkbApiAgentGateway",
-      "entityType": "Detail",
-      "observations": [
-        {
-          "type": "insight",
-          "content": "The VkbApiAgentGateway would encapsulate the VKB API's agent-related functionality, providing a simplified interface for the AgentLifecycleManager and AgentRegistryHandler to perform operations.",
-          "date": "2026-03-07T06:29:37.047Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The VkbApiAgentGateway would need to handle API request and response serialization, deserialization, and error handling, potentially using libraries or frameworks to simplify the process.",
-          "date": "2026-03-07T06:29:37.047Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The VkbApiAgentGateway would require configuration and potentially authentication mechanisms to connect to the VKB API, such as API keys or tokens.",
-          "date": "2026-03-07T06:29:37.047Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2026-03-07T06:29:37.135Z",
-        "last_updated": "2026-03-07T06:29:37.135Z"
-      },
-      "id": "mc4flkg1tfgq18"
     },
     {
       "name": "WorkflowScheduling",
@@ -24988,35 +24503,14 @@
       "name": "DagBasedExecutionModel",
       "entityType": "Detail",
       "observations": [
-        {
-          "type": "insight",
-          "content": "The GraphBasedExecution (GraphBasedExecution.java:15) class implements the DAG-based execution model, allowing developers to define complex task dependencies and execute them efficiently",
-          "date": "2026-03-07T06:29:37.181Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The use of a graph-based execution model enables the system to efficiently manage task dependencies and execute tasks in the correct order",
-          "date": "2026-03-07T06:29:37.181Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        },
-        {
-          "type": "insight",
-          "content": "The DagBasedExecutionModel is designed to work in conjunction with the WorkStealingAlgorithm, providing a comprehensive solution for concurrent task execution and management",
-          "date": "2026-03-07T06:29:37.181Z",
-          "metadata": {
-            "source": "workflow_persist"
-          }
-        }
+        "The pipeline-configuration.yaml file defines the steps and their dependencies, which are used to construct the DAG.",
+        "The topological sort algorithm is used to order the steps in the pipeline, ensuring that steps with dependencies are executed after their dependencies have been met.",
+        "The DAG-based execution model allows for parallel execution of steps, improving the overall performance and efficiency of the pipeline."
       ],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T06:29:37.250Z",
-        "last_updated": "2026-03-07T06:29:37.250Z"
+        "last_updated": "2026-03-07T09:04:41.029Z"
       },
       "id": "mc4flkg31xoau"
     },
@@ -26040,15 +25534,11 @@
     {
       "name": "EntityRelationshipUpdater",
       "entityType": "Detail",
-      "observations": [
-        "The DatabaseUpdateEngine suggested by the parent analysis likely interacts with the EntityRelationshipUpdater to perform updates to the graph database.",
-        "The EntityRelationshipUpdater may employ transactional semantics to ensure atomicity and consistency of updates, preventing data corruption or inconsistencies.",
-        "Validation of entity relationships prior to updating the database would be a crucial aspect of the EntityRelationshipUpdater's behavior, preventing invalid or inconsistent data from being written to the database."
-      ],
+      "observations": [],
       "source": "manual",
       "metadata": {
         "created_at": "2026-03-07T06:29:37.690Z",
-        "last_updated": "2026-03-07T06:37:31.907Z"
+        "last_updated": "2026-03-07T07:42:20.020Z"
       },
       "id": "mc4flkg18mbzhq"
     },
@@ -26267,6 +25757,1803 @@
         "last_updated": "2026-03-07T06:29:37.733Z"
       },
       "id": "mc4flkgxq9wkl"
+    },
+    {
+      "name": "LogStorageModule",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "LogStorageModule's GraphologyDatabase class uses a graph-based data structure to store log data, with nodes and edges defined in the graph-schema.json file",
+          "date": "2026-03-07T09:01:10.555Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's LevelDBStore class implements a key-value store to store log data, with a configurable compression algorithm defined in the level-db-configuration.json file",
+          "date": "2026-03-07T09:01:10.555Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "LogStorageModule's QueryOptimizer class applies query optimization techniques to improve log data retrieval performance, with optimization rules defined in the query-optimization-rules.json file",
+          "date": "2026-03-07T09:01:10.555Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's DataRetrievalMechanism class provides a unified interface for retrieving log data, with support for multiple query languages, as specified in the query-languages.json file",
+          "date": "2026-03-07T09:01:10.555Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "LogStorageModule's StorageMonitor class monitors storage usage and alerts when thresholds are exceeded, with alert thresholds defined in the storage-thresholds.json file",
+          "date": "2026-03-07T09:01:10.555Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's BackupAndRestore class provides a mechanism for backing up and restoring log data, with backup schedules defined in the backup-schedules.json file",
+          "date": "2026-03-07T09:01:10.555Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.561Z",
+        "last_updated": "2026-03-07T09:01:10.561Z"
+      },
+      "id": "mc4flkgokpeyr"
+    },
+    {
+      "name": "OntologyManagementModule",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "OntologyManagementModule's OntologyLoader class loads and parses ontology definitions from JSON files, with support for multiple ontology formats, as specified in the ontology-formats.json file",
+          "date": "2026-03-07T09:01:10.556Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's EntityClassifier class applies ontology-based classification to log data, with classification rules defined in the entity-classification-rules.json file",
+          "date": "2026-03-07T09:01:10.556Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "OntologyManagementModule's ValidationMechanism class validates log data against the loaded ontology, with validation rules defined in the validation-rules.json file",
+          "date": "2026-03-07T09:01:10.556Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's OntologyUpdater class updates the ontology definitions based on changes to the log data, with update schedules defined in the ontology-update-schedules.json file",
+          "date": "2026-03-07T09:01:10.556Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "OntologyManagementModule's OntologyBrowser class provides a user interface for browsing and exploring the ontology, with support for multiple visualization formats, as specified in the ontology-visualization-formats.json file",
+          "date": "2026-03-07T09:01:10.556Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's OntologyExporter class exports the ontology definitions to various formats, such as JSON and XML, with export options defined in the ontology-export-options.json file",
+          "date": "2026-03-07T09:01:10.556Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.564Z",
+        "last_updated": "2026-03-07T09:01:10.564Z"
+      },
+      "id": "mc4flkgyifaa"
+    },
+    {
+      "name": "ConcurrencyManagementModule",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ConcurrencyManagementModule's ThreadManager class manages a pool of threads for parallelizing log processing and storage, with thread pool configuration defined in the thread-pool-configuration.json file",
+          "date": "2026-03-07T09:01:10.557Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's TaskQueue class implements a queue-based mechanism for scheduling and executing tasks, with task queue configuration defined in the task-queue-configuration.json file",
+          "date": "2026-03-07T09:01:10.557Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConcurrencyManagementModule's LockManager class provides a locking mechanism for synchronizing access to shared resources, with lock configuration defined in the lock-configuration.json file",
+          "date": "2026-03-07T09:01:10.557Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's Semaphore class implements a semaphore-based mechanism for controlling concurrency, with semaphore configuration defined in the semaphore-configuration.json file",
+          "date": "2026-03-07T09:01:10.557Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConcurrencyManagementModule's Monitor class monitors concurrency and parallelism metrics, such as thread utilization and task queue length, with monitoring configuration defined in the monitoring-configuration.json file",
+          "date": "2026-03-07T09:01:10.557Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's TuningMechanism class provides a mechanism for tuning concurrency and parallelism parameters, such as thread pool size and task queue capacity, with tuning configuration defined in the tuning-configuration.json file",
+          "date": "2026-03-07T09:01:10.557Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.569Z",
+        "last_updated": "2026-03-07T09:01:10.569Z"
+      },
+      "id": "mc4flkg7iczs9q"
+    },
+    {
+      "name": "AgentIntegrationModule",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "AgentIntegrationModule's AgentFactory class creates and configures agent instances, with agent configuration defined in the agent-configuration.json file",
+          "date": "2026-03-07T09:01:10.559Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's AgentCommunicator class provides a communication mechanism for interacting with agents, with communication protocols defined in the communication-protocols.json file",
+          "date": "2026-03-07T09:01:10.559Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "AgentIntegrationModule's AgentMonitor class monitors agent activity and logs agent-related events, with monitoring configuration defined in the monitoring-configuration.json file",
+          "date": "2026-03-07T09:01:10.559Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's AgentController class controls and coordinates agent behavior, with control configuration defined in the control-configuration.json file",
+          "date": "2026-03-07T09:01:10.559Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "AgentIntegrationModule's AgentErrorHandler class handles and logs agent-related errors, with error handling configuration defined in the error-handling-configuration.json file",
+          "date": "2026-03-07T09:01:10.559Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The module's AgentUpdater class updates agent software and configuration, with update schedules defined in the agent-update-schedules.json file",
+          "date": "2026-03-07T09:01:10.559Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.571Z",
+        "last_updated": "2026-03-07T09:01:10.571Z"
+      },
+      "id": "mc4flkg2thog6z"
+    },
+    {
+      "name": "LLMModeResolver",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The LLMModeResolver class uses a configuration file (mode-config.json) to determine the current LLM mode.",
+          "date": "2026-03-07T09:01:10.561Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The resolver implements a context-aware pattern, taking into account the current environment and user preferences.",
+          "date": "2026-03-07T09:01:10.561Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMModeResolver uses a state machine to manage mode transitions, as defined in the mode-transitions.ts file.",
+          "date": "2026-03-07T09:01:10.561Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The resolver logs mode-related events and errors using the LLMLogger class, as seen in the logger.ts file.",
+          "date": "2026-03-07T09:01:10.561Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMModeResolver provides a callback mechanism for notifying listeners of mode changes, as implemented in the mode-listener.js module.",
+          "date": "2026-03-07T09:01:10.561Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The resolver uses a caching mechanism to improve performance, as implemented in the cache-mode.js module.",
+          "date": "2026-03-07T09:01:10.561Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.575Z",
+        "last_updated": "2026-03-07T09:01:10.575Z"
+      },
+      "id": "mc4flkg1ktv5ca"
+    },
+    {
+      "name": "LLMCachingLayer",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The LLMCachingLayer class uses a caching library (cache-lib.js) to store and retrieve LLM responses.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The caching layer implements a time-to-live (TTL) mechanism to ensure cache freshness, as defined in the cache-ttl.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMCachingLayer uses a cache invalidation mechanism to handle changes to underlying data, as implemented in the cache-invalidation.js module.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The caching layer logs cache-related events and errors using the LLMLogger class, as seen in the logger.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMCachingLayer provides a callback mechanism for notifying listeners of cache hits and misses, as implemented in the cache-listener.js module.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The caching layer uses a caching strategy to determine which responses to cache, as defined in the cache-strategy.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.577Z",
+        "last_updated": "2026-03-07T09:01:10.577Z"
+      },
+      "id": "mc4flkg19tnynz"
+    },
+    {
+      "name": "LLMLogger",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The LLMLogger class uses a logging library (logger-lib.js) to log LLM-related events and errors.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The logger implements a logging level mechanism to control the verbosity of log output, as defined in the log-level.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMLogger uses a log formatting mechanism to standardize log output, as implemented in the log-formatter.js module.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The logger logs events and errors to a log file (llm.log) and/or a logging console, as configured in the log-config.json file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMLogger provides a logging API for other components to log LLM-related events and errors, as defined in the logger-api.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The logger uses a logging strategy to determine which events and errors to log, as defined in the log-strategy.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.581Z",
+        "last_updated": "2026-03-07T09:01:10.581Z"
+      },
+      "id": "mc4flkgl75sjh"
+    },
+    {
+      "name": "LLMProviderRegistry",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The LLMProviderRegistry class uses a registry file (providers.json) to store and manage available LLM providers.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The registry implements a provider registration mechanism, allowing new providers to be added dynamically, as defined in the provider-registration.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMProviderRegistry uses a provider validation mechanism to ensure that registered providers are valid and functional, as implemented in the provider-validation.js module.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The registry logs provider registration and validation events using the LLMLogger class, as seen in the logger.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMProviderRegistry provides a provider discovery mechanism, allowing other components to discover available providers, as defined in the provider-discovery.ts file.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The registry uses a caching mechanism to improve performance, as implemented in the cache-providers.js module.",
+          "date": "2026-03-07T09:01:10.562Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.587Z",
+        "last_updated": "2026-03-07T09:01:10.587Z"
+      },
+      "id": "mc4flkgqaysat"
+    },
+    {
+      "name": "LLMConfigManager",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The LLMConfigManager class uses a configuration file (llm-config.json) to store and manage LLM configuration settings.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The config manager implements a configuration loading mechanism, allowing configuration settings to be loaded dynamically, as defined in the config-loading.ts file.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMConfigManager uses a configuration validation mechanism to ensure that configuration settings are valid and consistent, as implemented in the config-validation.js module.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The config manager logs configuration-related events and errors using the LLMLogger class, as seen in the logger.ts file.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMConfigManager provides a configuration API for other components to access and update LLM configuration settings, as defined in the config-api.ts file.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The config manager uses a caching mechanism to improve performance, as implemented in the cache-config.js module.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.591Z",
+        "last_updated": "2026-03-07T09:01:10.591Z"
+      },
+      "id": "mc4flkg1nkbiv2"
+    },
+    {
+      "name": "LLMHealthChecker",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The LLMHealthChecker class uses a health checking mechanism to monitor the status of LLM components, as defined in the health-checking.ts file.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The health checker implements a notification mechanism, alerting administrators and operators of component failures or issues, as implemented in the notification.js module.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMHealthChecker uses a logging mechanism to log health checking events and errors, as seen in the logger.ts file.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The health checker provides a health checking API for other components to access and update health checking settings, as defined in the health-api.ts file.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The LLMHealthChecker uses a scheduling mechanism to schedule health checks at regular intervals, as implemented in the scheduling.js module.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The health checker uses a caching mechanism to improve performance, as implemented in the cache-health.js module.",
+          "date": "2026-03-07T09:01:10.563Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.595Z",
+        "last_updated": "2026-03-07T09:01:10.595Z"
+      },
+      "id": "mc4flkg3ptqqz8"
+    },
+    {
+      "name": "LLMFacade",
+      "entityType": "SubComponent",
+      "observations": [
+        "LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider",
+        "LLMFacade.runLLM() executes the LLM model with the given input and parameters",
+        "LLMFacadeConfiguration.yaml defines the LLM configuration, including provider and model definitions",
+        "LLMFacadeManager.loadFacade() loads and initializes the facade from configuration files",
+        "LLMFacadeUtils.getLLMResult() provides a utility function for retrieving LLM results",
+        "LLMFacadeLogger.logLLM() logs LLM execution and errors"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.600Z",
+        "last_updated": "2026-03-07T09:04:02.618Z"
+      },
+      "id": "mc4flkgi549fr"
+    },
+    {
+      "name": "MockLLMService",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "MockLLMService uses MockLLMResponseGenerator.class to generate mock LLM responses, simulating real LLM behavior",
+          "date": "2026-03-07T09:01:10.565Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MockLLMService supports multiple mock LLM scenarios through ScenarioConfig.json, allowing for flexible testing",
+          "date": "2026-03-07T09:01:10.565Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MockLLMService logs mock LLM interactions using LoggingAgent.logMockLLMInteraction(), providing visibility into testing",
+          "date": "2026-03-07T09:01:10.565Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MockLLMService handles mock LLM errors using MockErrorHandler.class, preventing errors from propagating to the application",
+          "date": "2026-03-07T09:01:10.565Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MockLLMService can be configured using MockLLMService.config.json, allowing for customization of mock LLM behavior",
+          "date": "2026-03-07T09:01:10.565Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MockLLMService integrates with testing frameworks through TestAdapter.class, enabling seamless testing",
+          "date": "2026-03-07T09:01:10.565Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.603Z",
+        "last_updated": "2026-03-07T09:01:10.603Z"
+      },
+      "id": "mc4flkg1l491gu"
+    },
+    {
+      "name": "ConstraintMonitor",
+      "entityType": "SubComponent",
+      "observations": [
+        "ConstraintMonitor uses an event-driven architecture with a custom event model defined in events.json, providing a flexible framework for handling constraint-related events",
+        "ConstraintMonitor integrates with the HookManager to dispatch constraint-related events, utilizing the event model to notify registered handlers",
+        "The ConstraintMonitor's event handling module utilizes a registry-based approach, allowing handlers to register and unregister dynamically",
+        "ConstraintMonitor supports event filtering and prioritization through a separate filtering module, allowing for flexible event handling",
+        "ConstraintMonitor's event model is designed to support scalability and flexibility, allowing for easy adaptation to changing event handling needs",
+        "The ConstraintMonitor's API is exposed through a RESTful interface, providing a standardized interface for event handling",
+        "ConstraintMonitor supports event logging through integration with a logging library, providing auditable event records"
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.607Z",
+        "last_updated": "2026-03-07T09:03:45.646Z"
+      },
+      "id": "mc4flkgvailib"
+    },
+    {
+      "name": "DatabaseManager",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "DatabaseManager uses DatabaseConnector.class to connect to databases, handling database interactions",
+          "date": "2026-03-07T09:01:10.566Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DatabaseManager supports multiple database types through DatabaseFactory.class, allowing for flexible database selection",
+          "date": "2026-03-07T09:01:10.566Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DatabaseManager logs database interactions using LoggingAgent.logDatabaseInteraction(), providing visibility into database usage",
+          "date": "2026-03-07T09:01:10.566Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DatabaseManager handles database errors using DatabaseErrorHandler.class, preventing errors from propagating to the application",
+          "date": "2026-03-07T09:01:10.566Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DatabaseManager can be configured using DatabaseManager.config.json, allowing for customization of database behavior",
+          "date": "2026-03-07T09:01:10.566Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "DatabaseManager integrates with data access layers through DataAccessAdapter.class, enabling seamless data access",
+          "date": "2026-03-07T09:01:10.566Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.611Z",
+        "last_updated": "2026-03-07T09:01:10.611Z"
+      },
+      "id": "mc4flkgc754lu"
+    },
+    {
+      "name": "ConversationFormatter",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ConversationFormatter uses a range of classes and functions to format the conversation entries, including text processing and data transformation",
+          "date": "2026-03-07T09:01:10.571Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ConversationFormatter class employs a template-based approach to formatting the conversation entries, allowing for customizable templates",
+          "date": "2026-03-07T09:01:10.571Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConversationFormatter utilizes a logging mechanism to log the formatted conversation entries, providing a record of the conversations",
+          "date": "2026-03-07T09:01:10.571Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ConversationFormatter class has a dependency on the Specstory extension, requiring the extension to be installed and configured properly",
+          "date": "2026-03-07T09:01:10.571Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConversationFormatter handles errors and exceptions that occur during the formatting process, providing logging and error handling mechanisms",
+          "date": "2026-03-07T09:01:10.571Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ConversationFormatter class is responsible for managing the formatting settings and parameters, including template selection and customization",
+          "date": "2026-03-07T09:01:10.571Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConversationFormatter provides a interface for other components to interact with the Specstory extension, abstracting away the underlying formatting logic",
+          "date": "2026-03-07T09:01:10.571Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.614Z",
+        "last_updated": "2026-03-07T09:01:10.614Z"
+      },
+      "id": "mc4flkg2t3rr15"
+    },
+    {
+      "name": "IntelligentQuerying",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "IntelligentQuerying uses the VKB API to provide intelligent querying capabilities for the knowledge graph.",
+          "date": "2026-03-07T09:01:10.689Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The IntelligentQuerying module relies on the Graphology library to construct and update the knowledge graph.",
+          "date": "2026-03-07T09:01:10.689Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "IntelligentQuerying utilizes the EntityPersistence module to store and retrieve entities from the knowledge graph.",
+          "date": "2026-03-07T09:01:10.689Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "IntelligentQuerying handles entity typing using the OntologyClassification module, ensuring consistency in entity metadata.",
+          "date": "2026-03-07T09:01:10.689Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The IntelligentQuerying module uses the PersistenceAgent to store and retrieve entities from the knowledge graph.",
+          "date": "2026-03-07T09:01:10.689Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "IntelligentQuerying integrates with the ManualLearning module to provide intelligent querying capabilities for manually created knowledge.",
+          "date": "2026-03-07T09:01:10.689Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.695Z",
+        "last_updated": "2026-03-07T09:01:10.695Z"
+      },
+      "id": "mc4flkg4r9inpt"
+    },
+    {
+      "name": "CodeKnowledgeGraphConstruction",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "CodeKnowledgeGraphConstruction uses the CodeGraphAgent class in the code_graph_agent.py file to construct the code knowledge graph.",
+          "date": "2026-03-07T09:01:10.690Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The CodeKnowledgeGraphConstruction module relies on the EntityPersistence module to store and retrieve entities from the knowledge graph.",
+          "date": "2026-03-07T09:01:10.690Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "CodeKnowledgeGraphConstruction utilizes the Graphology library to construct and update the knowledge graph.",
+          "date": "2026-03-07T09:01:10.690Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "CodeKnowledgeGraphConstruction handles entity typing using the OntologyClassification module, ensuring consistency in entity metadata.",
+          "date": "2026-03-07T09:01:10.690Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The CodeKnowledgeGraphConstruction module uses the LevelDB database to store and retrieve entity data.",
+          "date": "2026-03-07T09:01:10.690Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "CodeKnowledgeGraphConstruction integrates with the OnlineLearning module to construct the code knowledge graph from machine-generated knowledge.",
+          "date": "2026-03-07T09:01:10.690Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.697Z",
+        "last_updated": "2026-03-07T09:01:10.697Z"
+      },
+      "id": "mc4flkg4ziqi4u"
+    },
+    {
+      "name": "ArchitectureGuidelines",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The ArchitectureGuidelines.cs file provides guidelines for overall system architecture, including layering and separation of concerns.",
+          "date": "2026-03-07T09:01:10.693Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The Layering.cs file provides guidelines for layering the system, including the presentation, business, and data access layers.",
+          "date": "2026-03-07T09:01:10.693Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The SeparationOfConcerns.cs file provides guidelines for separating concerns, including the single responsibility principle and the open/closed principle.",
+          "date": "2026-03-07T09:01:10.693Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The DependencyInjection.cs file provides guidelines for dependency injection, including the use of interfaces and containers.",
+          "date": "2026-03-07T09:01:10.693Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The Scalability.cs file provides guidelines for scalability, including the use of load balancing and caching.",
+          "date": "2026-03-07T09:01:10.693Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The Maintainability.cs file provides guidelines for maintainability, including the use of logging and monitoring.",
+          "date": "2026-03-07T09:01:10.693Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The Efficiency.cs file provides guidelines for efficiency, including the use of optimization techniques and caching.",
+          "date": "2026-03-07T09:01:10.693Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.699Z",
+        "last_updated": "2026-03-07T09:01:10.699Z"
+      },
+      "id": "mc4flkg2c0e08a"
+    },
+    {
+      "name": "ErrorHandlingGuidelines",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The ErrorHandlingGuidelines.cs file provides guidelines for error handling, including exception handling, logging, and error reporting.",
+          "date": "2026-03-07T09:01:10.694Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ExceptionHandling.cs file provides guidelines for exception handling, including the use of try-catch blocks and exception types.",
+          "date": "2026-03-07T09:01:10.694Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The Logging.cs file provides guidelines for logging, including the use of log levels and log messages.",
+          "date": "2026-03-07T09:01:10.694Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ErrorReporting.cs file provides guidelines for error reporting, including the use of error codes and error messages.",
+          "date": "2026-03-07T09:01:10.694Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ErrorHandlingMechanisms.cs file provides guidelines for error handling mechanisms, including the use of retry mechanisms and fallback strategies.",
+          "date": "2026-03-07T09:01:10.694Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ErrorHandlingBestPractices.cs file provides guidelines for error handling best practices, including the use of error handling frameworks and tools.",
+          "date": "2026-03-07T09:01:10.694Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ErrorHandlingTools.cs file provides guidelines for error handling tools, including the use of debuggers and logging tools.",
+          "date": "2026-03-07T09:01:10.694Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.701Z",
+        "last_updated": "2026-03-07T09:01:10.701Z"
+      },
+      "id": "mc4flkg1jsczow"
+    },
+    {
+      "name": "ConstraintValidator",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ConstraintValidator uses a rule-based system with explicit validation steps defined in validation-rules.json, each step declaring a specific validation function",
+          "date": "2026-03-07T09:01:10.696Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Validation functions are implemented in ValidatorFunctions.js, with each function corresponding to a specific rule type",
+          "date": "2026-03-07T09:01:10.696Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConstraintValidator integrates with the GraphDatabaseManager to retrieve relevant data for validation, utilizing the GraphDatabaseManager's query API",
+          "date": "2026-03-07T09:01:10.696Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Validation results are stored in the ViolationCaptureManager for further analysis and reporting, with ConstraintValidator providing detailed validation metadata",
+          "date": "2026-03-07T09:01:10.696Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConstraintValidator supports dynamic rule updates through the HookManager, allowing for flexible and adaptive validation logic",
+          "date": "2026-03-07T09:01:10.696Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ContentValidationManager is used in conjunction with ConstraintValidator to verify reference existence and provide actionable recommendations",
+          "date": "2026-03-07T09:01:10.696Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConstraintValidator's validation logic is optimized for performance, utilizing caching and concurrency control to minimize validation overhead",
+          "date": "2026-03-07T09:01:10.696Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.716Z",
+        "last_updated": "2026-03-07T09:01:10.716Z"
+      },
+      "id": "mc4flkghi9bu3"
+    },
+    {
+      "name": "ViolationCaptureManager",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ViolationCaptureManager uses a time-series database to store violation data, with a custom data model defined in violation-model.json",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ViolationCaptureManager integrates with the ConstraintValidator to receive validation results and store them in the time-series database",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ViolationCaptureManager's statistics calculation module utilizes a statistical library to calculate violation metrics, such as mean and standard deviation",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ViolationCaptureManager supports data filtering and aggregation through a separate filtering module, allowing for flexible data analysis",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ViolationCaptureManager's data model is designed to support scalability and flexibility, allowing for easy adaptation to changing data storage needs",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ViolationCaptureManager's API is exposed through a RESTful interface, providing a standardized interface for data access",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ViolationCaptureManager supports data visualization through integration with a visualization library, providing interactive dashboards for data exploration",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.720Z",
+        "last_updated": "2026-03-07T09:01:10.720Z"
+      },
+      "id": "mc4flkgo3zb3g"
+    },
+    {
+      "name": "ContentValidationManager",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ContentValidationManager uses a reference-based approach with a custom reference model defined in references.json, providing a flexible framework for reference validation",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ContentValidationManager integrates with the ConstraintValidator to validate reference existence, utilizing the reference model to verify reference integrity",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ContentValidationManager's refresh report module utilizes a reporting library to generate detailed reports, including actionable recommendations",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ContentValidationManager supports reference filtering and prioritization through a separate filtering module, allowing for flexible reference handling",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ContentValidationManager's reference model is designed to support scalability and flexibility, allowing for easy adaptation to changing reference validation needs",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ContentValidationManager's API is exposed through a RESTful interface, providing a standardized interface for reference validation",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ContentValidationManager supports reference logging through integration with a logging library, providing auditable reference records",
+          "date": "2026-03-07T09:01:10.699Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.723Z",
+        "last_updated": "2026-03-07T09:01:10.723Z"
+      },
+      "id": "mc4flkgbtkgo5"
+    },
+    {
+      "name": "ConstraintAgent",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "ConstraintAgent uses a data-driven approach with a custom data model defined in constraint-model.json, providing a flexible framework for managing constraint-related data",
+          "date": "2026-03-07T09:01:10.700Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConstraintAgent integrates with the GraphDatabaseManager to store and retrieve constraint-related data, utilizing the graph database's query API",
+          "date": "2026-03-07T09:01:10.700Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ConstraintAgent's validation module utilizes the ConstraintValidator to validate constraint-related data, ensuring data integrity and consistency",
+          "date": "2026-03-07T09:01:10.700Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConstraintAgent supports data filtering and aggregation through a separate filtering module, allowing for flexible data analysis",
+          "date": "2026-03-07T09:01:10.700Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConstraintAgent's data model is designed to support scalability and flexibility, allowing for easy adaptation to changing data storage needs",
+          "date": "2026-03-07T09:01:10.700Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ConstraintAgent's API is exposed through a RESTful interface, providing a standardized interface for constraint management",
+          "date": "2026-03-07T09:01:10.700Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "ConstraintAgent supports data logging through integration with a logging library, providing auditable data records",
+          "date": "2026-03-07T09:01:10.700Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.726Z",
+        "last_updated": "2026-03-07T09:01:10.726Z"
+      },
+      "id": "mc4flkg3mbg8o"
+    },
+    {
+      "name": "WorkflowOrchestrator",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters",
+          "date": "2026-03-07T09:01:10.815Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "WorkflowOrchestrator.getTask() retrieves the task instance based on configuration and workflow definition",
+          "date": "2026-03-07T09:01:10.815Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "WorkflowConfiguration.yaml defines the workflow structure, including task and dependency definitions",
+          "date": "2026-03-07T09:01:10.815Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "WorkflowOrchestratorManager.loadOrchestrator() loads and initializes the orchestrator from configuration files",
+          "date": "2026-03-07T09:01:10.815Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "WorkflowOrchestratorUtils.getWorkflowResult() provides a utility function for retrieving workflow results",
+          "date": "2026-03-07T09:01:10.815Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "WorkflowOrchestratorLogger.logWorkflow() logs workflow execution and errors",
+          "date": "2026-03-07T09:01:10.815Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.820Z",
+        "last_updated": "2026-03-07T09:01:10.820Z"
+      },
+      "id": "mc4flkgo3s73r"
+    },
+    {
+      "name": "MemgraphAdapter",
+      "entityType": "SubComponent",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph",
+          "date": "2026-03-07T09:01:10.816Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MemgraphAdapter.queryCodeEntity() queries the code entity from Memgraph",
+          "date": "2026-03-07T09:01:10.816Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MemgraphConfiguration.yaml defines the Memgraph configuration, including connection and schema definitions",
+          "date": "2026-03-07T09:01:10.816Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MemgraphAdapterManager.loadAdapter() loads and initializes the adapter from configuration files",
+          "date": "2026-03-07T09:01:10.816Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MemgraphAdapterUtils.getCodeEntity() provides a utility function for retrieving code entities",
+          "date": "2026-03-07T09:01:10.816Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "MemgraphAdapterLogger.logMemgraph() logs Memgraph operations and errors",
+          "date": "2026-03-07T09:01:10.816Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:10.823Z",
+        "last_updated": "2026-03-07T09:01:10.823Z"
+      },
+      "id": "mc4flkgb8ly22"
+    },
+    {
+      "name": "GraphologyDatabase",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The graph-schema.json file defines the structure of the graph-based data store, including nodes and edges, which are used by the GraphologyDatabase class to store and retrieve log data.",
+          "date": "2026-03-07T09:01:23.916Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The use of a graph-based data structure in GraphologyDatabase allows for efficient querying and analysis of log data, making it a key component of the LogStorageModule.",
+          "date": "2026-03-07T09:01:23.916Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The GraphologyDatabase class is a core part of the LogStorageModule, and its graph-based data structure is used to store and manage log data, as described in the parent context.",
+          "date": "2026-03-07T09:01:23.916Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:23.923Z",
+        "last_updated": "2026-03-07T09:01:23.923Z"
+      },
+      "id": "mc4flkg21nan"
+    },
+    {
+      "name": "HealthChecker",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The HealthChecker is defined in the health-checking.ts file, which suggests a dedicated mechanism for monitoring LLM component health.",
+          "date": "2026-03-07T09:01:23.917Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The HealthChecker's behavior is likely influenced by the parent component LLMAbstraction, which provides context for the health checking mechanism.",
+          "date": "2026-03-07T09:01:23.917Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The absence of source files limits the ability to provide more specific observations about the HealthChecker's implementation details.",
+          "date": "2026-03-07T09:01:23.917Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:23.926Z",
+        "last_updated": "2026-03-07T09:01:23.926Z"
+      },
+      "id": "mc4flkgwvdenb"
+    },
+    {
+      "name": "MockLLMResponseGenerator",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The MockLLMResponseGenerator is mentioned in the parent context as a key component of the MockLLMService, indicating its importance in the overall architecture.",
+          "date": "2026-03-07T09:01:23.920Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The lack of source files suggests that the MockLLMResponseGenerator is a critical aspect of the MockLLMService, and its implementation details are not publicly available.",
+          "date": "2026-03-07T09:01:23.920Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The parent context implies that the MockLLMResponseGenerator is used to simulate real LLM behavior, which suggests that it may be using algorithms or patterns to generate realistic mock data.",
+          "date": "2026-03-07T09:01:23.920Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:23.931Z",
+        "last_updated": "2026-03-07T09:01:23.931Z"
+      },
+      "id": "mc4flkgikche9"
+    },
+    {
+      "name": "DatabaseConnector",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The DatabaseConnector is used by the DatabaseManager to connect to databases, as mentioned in the parent context.",
+          "date": "2026-03-07T09:01:23.921Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The DatabaseManager uses the DatabaseConnector.class to handle database interactions, indicating a tight coupling between the two components.",
+          "date": "2026-03-07T09:01:23.921Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The lack of source files prevents further observations, but the parent context suggests a significant role for the DatabaseConnector in the DatabaseManager's functionality.",
+          "date": "2026-03-07T09:01:23.921Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:23.935Z",
+        "last_updated": "2026-03-07T09:01:23.935Z"
+      },
+      "id": "mc4flkgthk36"
+    },
+    {
+      "name": "ConnectionHandler",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "Based on the parent context, ConnectionHandler is inferred to be responsible for connection establishment, although no direct code evidence is available.",
+          "date": "2026-03-07T09:01:23.921Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The Trajectory component's interaction with the Specstory extension implies a need for a connection management mechanism, which ConnectionHandler is likely to fulfill.",
+          "date": "2026-03-07T09:01:23.921Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "Given the lack of source files, the specifics of ConnectionHandler's implementation and behavior can only be speculated based on its name and the context provided.",
+          "date": "2026-03-07T09:01:23.921Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:23.942Z",
+        "last_updated": "2026-03-07T09:01:23.942Z"
+      },
+      "id": "mc4flkg2dwsw44"
+    },
+    {
+      "name": "EntityEditor",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The EntityEditor class is used in the ManualLearning sub-component to handle manual edits and updates to entities, as indicated by the parent context.",
+          "date": "2026-03-07T09:01:23.922Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The entity_editor.py file is referenced by the parent context as the location of the EntityEditor class, implying its importance in the sub-component's functionality.",
+          "date": "2026-03-07T09:01:23.922Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The EntityEditor's implementation details are not directly available due to the lack of source files, but its role in entity management is highlighted through the parent context.",
+          "date": "2026-03-07T09:01:23.922Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:23.950Z",
+        "last_updated": "2026-03-07T09:01:23.950Z"
+      },
+      "id": "mc4flkg7zl5qo"
+    },
+    {
+      "name": "VKBQueryEngine",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The VKBQueryEngine is mentioned in the parent context as a suggested detail node, indicating its importance in the IntelligentQuerying sub-component.",
+          "date": "2026-03-07T09:01:23.926Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The IntelligentQuerying sub-component uses the VKB API to provide intelligent querying capabilities, suggesting a strong connection to the VKBQueryEngine.",
+          "date": "2026-03-07T09:01:23.926Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The lack of source files limits the ability to provide more specific observations, but the VKBQueryEngine's role in the IntelligentQuerying sub-component is clearly implied by the parent context.",
+          "date": "2026-03-07T09:01:23.926Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:23.967Z",
+        "last_updated": "2026-03-07T09:01:23.967Z"
+      },
+      "id": "mc4flkg2hpcpj7"
+    },
+    {
+      "name": "CodeGraphAgent",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The CodeGraphAgent class is defined in the code_graph_agent.py file, which suggests that it plays a central role in the code knowledge graph construction process.",
+          "date": "2026-03-07T09:01:23.926Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The use of the CodeGraphAgent class implies a modular design, where the graph construction logic is separated from other components of the system.",
+          "date": "2026-03-07T09:01:23.926Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The CodeKnowledgeGraphConstruction sub-component relies on the CodeGraphAgent class, indicating a dependency between the two and highlighting the importance of the agent in the graph construction process.",
+          "date": "2026-03-07T09:01:23.926Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:23.973Z",
+        "last_updated": "2026-03-07T09:01:23.973Z"
+      },
+      "id": "mc4flkgj19s90"
+    },
+    {
+      "name": "TimeSeriesDatabaseIntegration",
+      "entityType": "Detail",
+      "observations": [
+        {
+          "type": "insight",
+          "content": "The custom data model for storing violation data is defined in violation-model.json, which suggests a structured approach to data storage and querying.",
+          "date": "2026-03-07T09:01:23.996Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The use of a time-series database implies an expectation of high-volume, high-velocity data ingestion and querying capabilities, which may influence the design of the ViolationCaptureManager's data processing pipeline.",
+          "date": "2026-03-07T09:01:23.996Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        },
+        {
+          "type": "insight",
+          "content": "The ViolationCaptureManager's reliance on a time-series database may require additional configuration or integration points, such as database connection settings or data serialization mechanisms, to ensure seamless data exchange.",
+          "date": "2026-03-07T09:01:23.996Z",
+          "metadata": {
+            "source": "workflow_persist"
+          }
+        }
+      ],
+      "source": "manual",
+      "metadata": {
+        "created_at": "2026-03-07T09:01:24.014Z",
+        "last_updated": "2026-03-07T09:01:24.014Z"
+      },
+      "id": "mc4flkg4u9erv"
     }
   ],
   "relations": [
@@ -30777,12 +32064,6 @@
       "metadata": {}
     },
     {
-      "from": "AgentManagement",
-      "to": "VkbApiAgentGateway",
-      "relationType": "contains",
-      "metadata": {}
-    },
-    {
       "from": "WorkflowManagement",
       "to": "WorkflowExecution",
       "relationType": "contains",
@@ -31135,14 +32416,296 @@
       "to": "EntityRelationshipUpdater",
       "relationType": "contains",
       "metadata": {}
+    },
+    {
+      "from": "LiveLoggingSystem",
+      "to": "LogStorageModule",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LiveLoggingSystem",
+      "to": "OntologyManagementModule",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LiveLoggingSystem",
+      "to": "ConcurrencyManagementModule",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LiveLoggingSystem",
+      "to": "AgentIntegrationModule",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "LLMModeResolver",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "LLMCachingLayer",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "LLMLogger",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "LLMProviderRegistry",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "LLMConfigManager",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMAbstraction",
+      "to": "LLMHealthChecker",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DockerizedServices",
+      "to": "LLMFacade",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DockerizedServices",
+      "to": "MockLLMService",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DockerizedServices",
+      "to": "ConstraintMonitor",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DockerizedServices",
+      "to": "DatabaseManager",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Trajectory",
+      "to": "ConversationFormatter",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "GraphDatabaseStorage",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "IntelligentQuerying",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "CodeKnowledgeGraphConstruction",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeManagement",
+      "to": "KnowledgeGraphManager",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "ArchitectureGuidelines",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "TestingGuidelines",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodingPatterns",
+      "to": "ErrorHandlingGuidelines",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ConstraintSystem",
+      "to": "ConstraintValidator",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ConstraintSystem",
+      "to": "ViolationCaptureManager",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ConstraintSystem",
+      "to": "ContentValidationManager",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ConstraintSystem",
+      "to": "ConstraintAgent",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ConstraintSystem",
+      "to": "ConstraintMonitor",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "EntityValidator",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "LLMFacade",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "WorkflowOrchestrator",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SemanticAnalysis",
+      "to": "MemgraphAdapter",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LogStorageModule",
+      "to": "GraphologyDatabase",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "OntologyManagementModule",
+      "to": "OntologyLoader",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMProviderManager",
+      "to": "ProviderRegistry",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMHealthChecker",
+      "to": "HealthChecker",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "LLMFacade",
+      "to": "CircuitBreakerPattern",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "MockLLMService",
+      "to": "MockLLMResponseGenerator",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "DatabaseManager",
+      "to": "DatabaseConnector",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "SpecstoryAdapter",
+      "to": "ConnectionHandler",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ManualLearning",
+      "to": "EntityEditor",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "EntityPersistence",
+      "to": "PersistenceAgent",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "IntelligentQuerying",
+      "to": "VKBQueryEngine",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodeKnowledgeGraphConstruction",
+      "to": "CodeGraphAgent",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "KnowledgeGraphManager",
+      "to": "GraphDatabaseStorage",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "ViolationCaptureManager",
+      "to": "TimeSeriesDatabaseIntegration",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "Pipeline",
+      "to": "DagBasedExecutionModel",
+      "relationType": "contains",
+      "metadata": {}
+    },
+    {
+      "from": "CodeKnowledgeGraph",
+      "to": "AstParser",
+      "relationType": "contains",
+      "metadata": {}
     }
   ],
   "metadata": {
     "version": "1.0.0",
     "team": "coding",
-    "exported_at": "2026-03-07T06:37:36.927Z",
-    "total_entities": 692,
-    "total_relations": 811,
+    "exported_at": "2026-03-07T09:04:47.815Z",
+    "total_entities": 725,
+    "total_relations": 857,
     "description": "Coding project infrastructure and patterns"
   }
 }

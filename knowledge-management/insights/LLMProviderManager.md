@@ -2,144 +2,106 @@
 
 **Type:** SubComponent
 
-The LLMProviderManager interacts with the BudgetTracker to ensure cost constraints are respected, as seen in the budget-tracker.ts file
+The LLMProviderManager handles provider registration and deregistration through the ProviderRegistry interface, as specified in the provider-registry.ts file.
 
 ## What It Is  
 
-The **LLMProviderManager** lives in the `src/llm-provider-manager.ts` file (referred to as *llm‑provider-manager.ts* in the observations). It is a sub‑component of the larger **LLMAbstraction** component and acts as the orchestrator for all Large‑Language‑Model (LLM) providers that the system can use. Internally it delegates registration, lookup, and lifecycle handling to a **ProviderRegistryManager** that is implemented in `src/provider-registry.ts`. The manager also collaborates with a **ModeResolverStrategy** (injected at construction time) and a **ProviderLifecycleManager** to initialise and activate providers. In addition, every request that passes through the manager is checked against a **BudgetTracker** (implemented in `src/budget-tracker.ts`) to guarantee that the operation stays within the configured cost limits. All of these interactions are performed with asynchronous code (`async/await`) as shown in `src/provider‑interactions.ts`.
-
----
+The **LLMProviderManager** is the central orchestration component that lives inside the *LLMAbstraction* sub‑system. Its concrete implementation is spread across several source files that together enable dynamic handling of Large Language Model (LLM) providers. The manager’s configuration is anchored in **`provider-registry.yaml`**, which enumerates the providers that can be loaded at runtime. Core logic resides in the TypeScript class **`LLMProviderManager`** (defined in the same module that imports `provider-registry.ts`), while supporting concerns such as prioritisation, caching and logging are delegated to dedicated modules: **`provider‑prioritization.js`**, **`cache‑provider.js`**, and **`logger.ts`** respectively. By virtue of being a child of **LLMAbstraction**, the manager inherits the broader architectural goals of modularity and extensibility that the parent component promotes.
 
 ## Architecture and Design  
 
-The design of **LLMProviderManager** is deliberately modular and leans on a handful of well‑known patterns that are explicitly visible in the source:
+The design of **LLMProviderManager** is explicitly **dependency‑injection (DI)**‑oriented. The manager receives an implementation of the **`ProviderRegistry`** interface (exposed in `provider-registry.ts`) through its constructor or a setter method, allowing callers to supply any registry that conforms to the contract. This DI approach decouples the manager from a concrete registry implementation and mirrors the inversion‑of‑control (IoC) philosophy already present in its parent **LLMAbstraction**.  
 
-1. **Registry‑based approach** – The `provider‑registry.ts` file defines a **ProviderRegistryManager** that maintains a map of provider identifiers to concrete provider implementations. This registry abstracts away the concrete class names of the LLM providers and offers a uniform lookup API for the manager.
+Provider selection follows a **weighted scoring system** defined in **`provider‑prioritization.js`**. Each registered provider is assigned a weight (e.g., based on latency, cost, or reliability) and the manager computes a score at request time to decide which provider should handle a given LLM call. This scoring logic is isolated from the manager’s core responsibilities, reinforcing the **single‑responsibility principle**.  
 
-2. **Strategy pattern** – The same `provider‑registry.ts` file applies a strategy pattern to encapsulate provider‑specific logic (e.g., how a request is built for OpenAI vs. Anthropic). Each provider registers its own strategy object, and the manager invokes the appropriate strategy at runtime based on the selected provider.
+Performance optimisation is achieved through a **caching layer** (`cache‑provider.js`). The manager invokes this cache before delegating work to an external provider, storing responses keyed by request signatures. This cache is shared with the sibling component **LLMCachingLayer**, which also uses the same underlying library (`cache‑lib.js`).  
 
-3. **Dependency injection** – The constructor of **LLMProviderManager** (in *llm‑provider-manager.ts*) receives a **ModeResolverStrategy** instance (and, by extension, the **BudgetTracker**) rather than constructing them internally. This makes the manager agnostic to the concrete mode‑resolution algorithm and enables testability.
+Observability is handled by the **`LLMLogger`** class (`logger.ts`). All provider‑related events—registration, deregistration, selection, errors—are emitted through this logger, aligning with the logging strategy used by the sibling **LLMLogger** component.  
 
-4. **Asynchronous programming** – All provider calls are wrapped in `async` functions and awaited in `provider‑interactions.ts`. This reflects the inherently network‑bound nature of LLM APIs and ensures that the manager can coordinate multiple concurrent requests without blocking the event loop.
-
-5. **TypeScript type safety** – Throughout `provider‑registry.ts` and the surrounding files, TypeScript interfaces and generics are used to describe the shape of provider contracts, strategy objects, and configuration payloads. This type information is the primary guard against runtime mismatches and supports future scaling to additional providers.
-
-The **LLMProviderManager** therefore sits at the intersection of several sibling components—**BudgetTracker**, **SensitivityClassifier**, **ModeResolver**, and **ProviderRegistry**—all of which share the same architectural emphasis on registries, strategies, and dependency injection. Its child components (**ProviderRegistryManager**, **ModeResolverStrategy**, **ProviderLifecycleManager**) each specialise a slice of the overall workflow: registration/retrieval, mode resolution, and lifecycle hooks respectively.
-
----
+Overall, the architecture can be visualised as a **modular, plug‑in style** system where **LLMProviderManager** sits at the centre, coordinating registration (via `ProviderRegistry`), selection (via `provider‑prioritization.js`), caching (`cache‑provider.js`), and logging (`logger.ts`). The parent **LLMAbstraction** supplies the overarching DI container, while siblings provide complementary services such as mode resolution (**LLMModeResolver**) and health checking (**LLMHealthChecker**).
 
 ## Implementation Details  
 
-### Core Class – `LLMProviderManager`  
-The class defined in *llm‑provider-manager.ts* holds three primary collaborators:
+1. **Provider Registry** – The file **`provider‑registry.yaml`** contains a declarative list of provider descriptors (name, endpoint, capabilities). At startup, the **`ProviderRegistry`** class (implemented in `provider-registry.ts`) parses this YAML file and builds an in‑memory map of provider objects. The registry exposes `register(provider)` and `deregister(providerId)` methods, which the manager calls when adding or removing providers at runtime.  
 
-* `providerRegistry: ProviderRegistryManager` – injected or instantiated from `provider‑registry.ts`. It exposes methods such as `registerProvider(id, providerInstance)` and `getProvider(id)`.
-* `modeResolver: ModeResolverStrategy` – supplied via the constructor, allowing the manager to decide which operational mode (e.g., *chat*, *completion*, *embedding*) should be used for a given request.
-* `budgetTracker: BudgetTracker` – imported from `budget‑tracker.ts` and consulted before each outbound request.
+2. **Dependency Injection** – The constructor of **`LLMProviderManager`** accepts a `ProviderRegistry` instance, a `CacheProvider` (from `cache‑provider.js`), and a `LLMLogger`. This enables test harnesses to inject mocks, and production code to supply the real implementations defined in sibling modules.  
 
-A typical request flow looks like this (simplified):
+3. **Weighted Prioritisation** – The module **`provider‑prioritization.js`** exports a function `computeScore(provider, requestContext)` that returns a numeric weight. The manager iterates over the registry’s providers, invokes `computeScore` for each, and selects the provider with the highest score. The scoring algorithm is configurable; for example, the YAML may include static weight values that the JS module reads and combines with dynamic metrics (e.g., recent latency).  
 
-```ts
-async generate(prompt: string, providerId: string) {
-  // 1. Verify budget
-  await this.budgetTracker.ensureWithinBudget(providerId, prompt);
+4. **Caching** – `cache‑provider.js` implements a simple key‑value store (potentially backed by `cache‑lib.js`). The manager builds a cache key from the LLM request payload and checks the cache before invoking the selected provider. If a cache hit occurs, the manager returns the cached response immediately, bypassing network latency. Cache invalidation policies (TTL, manual purge) are encapsulated within the cache provider, keeping the manager’s logic clean.  
 
-  // 2. Resolve mode (strategy)
-  const mode = this.modeResolver.resolve(prompt);
+5. **Logging** – All registry mutations (`register`, `deregister`) and provider selection events are wrapped with calls to `LLMLogger.info` or `LLMLogger.error` as defined in `logger.ts`. This centralised logging ensures that operational teams can trace provider lifecycle events across the system, and aligns with the logging strategy used by the sibling **LLMLogger** component.  
 
-  // 3. Retrieve provider and its strategy
-  const provider = this.providerRegistry.getProvider(providerId);
-  const strategy = this.providerRegistry.getStrategy(providerId);
-
-  // 4. Build request via strategy
-  const requestPayload = strategy.buildRequest(prompt, mode);
-
-  // 5. Perform async interaction
-  const response = await provider.send(requestPayload);
-
-  // 6. Post‑process and update budget
-  this.budgetTracker.recordSpend(providerId, response.usage);
-  return response;
-}
-```
-
-All asynchronous steps (budget checks, provider `send`, and any post‑processing) are implemented with `async/await` in `provider‑interactions.ts`, ensuring clear error propagation and cancellation handling.
-
-### Provider Registry – `provider‑registry.ts`  
-The registry file defines an interface `ProviderStrategy` that each concrete LLM provider implements. The strategy object encapsulates provider‑specific request construction, response parsing, and error mapping. The registry itself stores two maps:
-
-* `providers: Map<string, LLMProvider>` – the concrete provider instances that know how to communicate over HTTP or SDK.
-* `strategies: Map<string, ProviderStrategy>` – the per‑provider strategy objects.
-
-Because the file leverages TypeScript’s type system, the registry can enforce that every registered provider supplies a matching strategy, preventing mismatched configurations at compile time.
-
-### Budget Enforcement – `budget‑tracker.ts`  
-The **BudgetTracker** maintains a running total of spend per provider and offers `ensureWithinBudget` and `recordSpend` methods. The budgeting algorithm lives in `budgeting-algorithm.ts`, but from the manager’s perspective it is a black‑box service that throws an error if a request would exceed the allocated budget.
-
-### Mode Resolution – `mode‑registry.ts` (via `ModeResolverStrategy`)  
-Although the concrete implementation is not shown, the observations note that **ModeResolver** uses a mode registry. The **ModeResolverStrategy** injected into the manager likely follows a factory‑like approach to produce the appropriate mode based on input characteristics (e.g., length, presence of system prompts).
-
-### Provider Lifecycle – `ProviderLifecycleManager`  
-While the source file is not listed, the hierarchy mentions that this child component “invokes initialization and activation methods of registered providers, potentially using a template method pattern.” In practice, the manager would call `provider.initialize()` during system start‑up and `provider.activate()` before the first request, ensuring each provider is ready (e.g., API keys loaded, health‑checked).
-
----
+6. **Error Handling** – When a provider fails (e.g., network timeout), the manager catches the exception, logs it via `LLMLogger.error`, optionally falls back to the next‑best provider based on the scoring system, and propagates a standardized error object to callers.  
 
 ## Integration Points  
 
-**LLMProviderManager** is tightly coupled to the following entities:
+- **Parent – LLMAbstraction**: The manager is instantiated by the parent component’s DI container, which supplies the concrete `ProviderRegistry`, `CacheProvider`, and `LLMLogger`. This relationship means any configuration changes made at the abstraction level (e.g., swapping the DI container) automatically affect the manager.  
 
-* **LLMAbstraction** – As the parent component, LLMAbstraction creates and wires the manager together with its siblings. It supplies the concrete `ModeResolverStrategy`, `BudgetTracker`, and `SensitivityClassifier` instances via dependency injection.
-* **BudgetTracker** – Directly imported from `budget‑tracker.ts`. The manager calls `ensureWithinBudget` before any provider call and `recordSpend` after a successful response.
-* **ProviderRegistry** – Implemented by `ProviderRegistryManager` in `provider‑registry.ts`. All provider lookup and strategy selection flow through this registry.
-* **ModeResolver** – The manager receives a `ModeResolverStrategy` that is likely built from the `mode‑registry.ts` sibling. This strategy decides the operational mode for each request.
-* **SensitivityClassifier** – Although not directly invoked in the observations, the parent component’s DI suggests that the manager could forward the prompt to the classifier before budgeting, ensuring that sensitive content is handled appropriately.
+- **Sibling – LLMProviderRegistry**: While both components deal with provider data, **LLMProviderRegistry** focuses on persisting the registry to `providers.json`. The manager’s `ProviderRegistry` implementation can delegate persistence to this sibling, ensuring a single source of truth for provider metadata.  
 
-External callers (e.g., higher‑level application services) interact with the manager through its public async methods (`generate`, `embed`, etc.). The manager’s public API hides the complexity of provider registration, budgeting, and mode resolution, presenting a clean contract to the rest of the system.
+- **Sibling – LLMCachingLayer**: The manager’s caching mechanism (`cache‑provider.js`) reuses the same caching library (`cache‑lib.js`) as the LLMCachingLayer, enabling shared cache policies and potentially a unified cache namespace.  
 
----
+- **Sibling – LLMLogger**: Logging calls made by the manager flow through the same `LLMLogger` class used by other components, providing a consistent log format and destination.  
+
+- **Sibling – LLMModeResolver & LLMHealthChecker**: The manager may query **LLMModeResolver** to respect the current operational mode (e.g., “fallback‑only”) and may rely on **LLMHealthChecker** to pre‑filter unhealthy providers before scoring them.  
+
+- **Child – ProviderRegistry**: The child component encapsulates the YAML‑driven configuration (`provider‑registry.yaml`). Any changes to provider definitions are reflected immediately in the manager’s runtime view, supporting hot‑reload scenarios.  
 
 ## Usage Guidelines  
 
-1. **Register providers early** – During application bootstrap, invoke `providerRegistry.registerProvider(id, providerInstance)` and `providerRegistry.registerStrategy(id, strategyInstance)`. Because the registry enforces type safety, any mismatch will be caught at compile time.
+Developers should treat **LLMProviderManager** as the sole entry point for all provider‑related interactions. When adding a new LLM provider, update `provider‑registry.yaml` and invoke `ProviderRegistry.register(newProvider)`; the manager will automatically incorporate the new entry on the next scoring cycle. Avoid direct manipulation of internal provider maps—use the registry’s public API to maintain consistency and trigger appropriate logging.  
 
-2. **Inject a concrete ModeResolverStrategy** – When constructing `LLMProviderManager`, supply a mode‑resolver that aligns with the modes supported by the registered providers. Avoid creating ad‑hoc resolvers inside the manager; keep the resolution logic external for testability.
+When configuring prioritisation, adjust the weight definitions in `provider‑prioritization.js` rather than hard‑coding scores in business logic. This keeps scoring logic centralized and makes it easier to experiment with different heuristics.  
 
-3. **Respect budgeting** – Always let the manager handle budget checks. Do not call provider APIs directly; bypassing `BudgetTracker` will lead to uncontrolled spend. If a request is expected to be large, consider pre‑checking the estimated cost via `budgetTracker.estimateCost`.
+Cache keys must be deterministic; use the same serialization strategy employed by `cache‑provider.js` to prevent cache misses. If a use‑case requires bypassing the cache (e.g., real‑time debugging), expose a flag on the manager’s request method that forces a fresh provider call.  
 
-4. **Handle async errors** – Since provider interactions are asynchronous, wrap calls to the manager in `try / catch` blocks. Provider‑specific errors are normalised by the strategy objects, but network failures and budget violations will surface as rejected promises.
+All errors from providers should be allowed to propagate through the manager’s error‑handling pathway so that `LLMLogger` records them uniformly. Consumers of the manager should handle the standardized error objects rather than provider‑specific exceptions.  
 
-5. **Extend with new providers via the registry** – To add a new LLM service, implement the `LLMProvider` interface, create a matching `ProviderStrategy`, and register both in `provider‑registry.ts`. No changes to `LLMProviderManager` are required, illustrating the open/closed nature of the design.
+Finally, respect the DI contract: when unit‑testing components that depend on the manager, inject mock implementations of `ProviderRegistry`, `CacheProvider`, and `LLMLogger`. This keeps tests fast and deterministic while still exercising the manager’s decision‑making logic.  
 
 ---
 
-### Summary of Key Insights  
+### Architectural Patterns Identified  
+1. **Dependency Injection / Inversion of Control** – Manager receives registry, cache, and logger via constructor.  
+2. **Plug‑in / Registry Pattern** – `ProviderRegistry` maintains a dynamic list of provider implementations defined in a YAML file.  
+3. **Strategy / Scoring Pattern** – Weighted prioritisation logic encapsulated in `provider‑prioritization.js`.  
+4. **Cache‑Aside Pattern** – Manager checks cache before invoking external providers.  
+5. **Observer‑like Logging** – Centralised logging through `LLMLogger` for all provider events.  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Architectural patterns identified** | Registry pattern (`ProviderRegistryManager`), Strategy pattern (per‑provider logic), Dependency injection (mode resolver, budget tracker), Asynchronous programming (`async/await`), TypeScript type safety |
-| **Design decisions and trade‑offs** | Centralising provider logic in a registry simplifies addition of new providers (open/closed) but introduces a single point of lookup that must be kept in sync with strategies. Using DI improves testability at the cost of slightly more wiring code. Async/await yields clear flow but requires careful error handling. |
-| **System structure insights** | `LLMProviderManager` sits under `LLMAbstraction` and collaborates with sibling components (`BudgetTracker`, `SensitivityClassifier`, `ModeResolver`, `ProviderRegistry`). Its children (`ProviderRegistryManager`, `ModeResolverStrategy`, `ProviderLifecycleManager`) each encapsulate a distinct concern, promoting separation of concerns. |
-| **Scalability considerations** | The registry can grow to accommodate many providers without altering the manager. TypeScript generics ensure compile‑time safety as the provider set expands. Asynchronous handling permits high concurrency, though the budget tracker may become a bottleneck if it performs synchronous I/O; ensuring it is non‑blocking is essential for scaling. |
-| **Maintainability assessment** | Strong typing and explicit patterns make the codebase approachable for new engineers. The clear separation between registration, strategy, mode resolution, and budgeting reduces the likelihood of cross‑concern bugs. The primary maintenance surface is the `provider‑registry.ts` file; keeping provider‑strategy pairs consistent is crucial. |
+### Design Decisions and Trade‑offs  
+- **DI vs. Service Locator** – Choosing DI makes the manager highly testable and promotes loose coupling, at the cost of slightly more boilerplate during instantiation.  
+- **YAML‑driven Registry** – Human‑readable configuration simplifies provider onboarding but requires parsing at startup and may introduce latency if the file is large.  
+- **Weighted Scoring** – Provides flexible provider selection but adds computational overhead on each request; the trade‑off is justified by the ability to optimise cost vs. performance dynamically.  
+- **Cache‑Aside** – Improves latency for repeat queries but introduces cache‑staleness risk; TTL policies in `cache‑provider.js` mitigate this.  
 
-By adhering to the documented patterns and integration points, developers can extend the LLM ecosystem safely, keep cost under control, and maintain a clean, type‑safe codebase.
+### System Structure Insights  
+The system follows a **layered modular hierarchy**: the top‑level **LLMAbstraction** supplies DI and shared utilities; **LLMProviderManager** sits in the middle, coordinating child **ProviderRegistry** and sibling services (caching, logging, health checking). All provider‑related data flows through the manager, ensuring a single point of control and observability.  
+
+### Scalability Considerations  
+- **Provider Count** – Because scoring iterates over every registered provider, the algorithm scales linearly; for very large provider sets, consider batching or pre‑filtering via health checks.  
+- **Cache Sharding** – The cache implementation can be swapped for a distributed store (e.g., Redis) without changing manager code, supporting horizontal scaling.  
+- **Configuration Hot‑Reload** – YAML‑based registry enables adding/removing providers without redeploying, aiding operational scalability.  
+
+### Maintainability Assessment  
+The clear separation of concerns (registry, prioritisation, caching, logging) results in high maintainability. Each concern lives in its own file, making isolated changes straightforward. Dependency injection further eases refactoring and testing. The only potential maintenance hotspot is the scoring logic; as business rules evolve, developers must keep `provider‑prioritization.js` well‑documented to avoid inadvertent regressions. Overall, the architecture promotes readability, testability, and extensibility, aligning well with the modular goals of the parent **LLMAbstraction** component.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- Key patterns observed in the LLMAbstraction component include dependency injection, used to set the mode resolver, budget tracker, and sensitivity classifier, and the strategy pattern, applied in the provider registry to manage the different LLM providers. The component's architecture is also characterized by the use of asynchronous programming, promises, and async/await syntax to handle the inherently asynchronous nature of LLM operations. Furthermore, the code utilizes TypeScript, benefiting from its type system to ensure better code maintainability and scalability.
+- [LLMAbstraction](./LLMAbstraction.md) -- The component's architecture is designed to be highly modular and extensible, with a range of interfaces and abstract classes that enable easy integration of new providers and services. The use of dependency injection and inversion of control patterns further enhances the component's flexibility and maintainability, making it an essential part of the larger Coding project ecosystem.
 
 ### Children
-- [ProviderRegistryManager](./ProviderRegistryManager.md) -- The provider-registry.ts file is expected to contain the implementation of the ProviderRegistryManager, which would define the interface for provider registration and retrieval.
-- [ModeResolverStrategy](./ModeResolverStrategy.md) -- The ModeResolverStrategy would be implemented as a separate module or class, potentially utilizing a factory pattern to create instances of different mode resolver implementations.
-- [ProviderLifecycleManager](./ProviderLifecycleManager.md) -- The ProviderLifecycleManager would be responsible for invoking the initialization and activation methods of registered providers, potentially using a template method pattern to standardize the lifecycle hooks.
+- [ProviderRegistry](./ProviderRegistry.md) -- The presence of a provider-registry.yaml file implies a configurable and modular approach to managing LLM providers, as seen in the hierarchy context.
 
 ### Siblings
-- [BudgetTracker](./BudgetTracker.md) -- BudgetTracker uses a budgeting algorithm to track and manage the budget, as seen in the budgeting-algorithm.ts file
-- [SensitivityClassifier](./SensitivityClassifier.md) -- SensitivityClassifier uses a classification algorithm to classify input prompts, as seen in the classification-algorithm.ts file
-- [ModeResolver](./ModeResolver.md) -- ModeResolver uses a mode registry to manage the different modes, as seen in the mode-registry.ts file
-- [ProviderRegistry](./ProviderRegistry.md) -- ProviderRegistry uses a registry-based approach to manage the different LLM providers, as seen in the provider-registry.ts file
+- [LLMModeResolver](./LLMModeResolver.md) -- The LLMModeResolver class uses a configuration file (mode-config.json) to determine the current LLM mode.
+- [LLMCachingLayer](./LLMCachingLayer.md) -- The LLMCachingLayer class uses a caching library (cache-lib.js) to store and retrieve LLM responses.
+- [LLMLogger](./LLMLogger.md) -- The LLMLogger class uses a logging library (logger-lib.js) to log LLM-related events and errors.
+- [LLMProviderRegistry](./LLMProviderRegistry.md) -- The LLMProviderRegistry class uses a registry file (providers.json) to store and manage available LLM providers.
+- [LLMConfigManager](./LLMConfigManager.md) -- The LLMConfigManager class uses a configuration file (llm-config.json) to store and manage LLM configuration settings.
+- [LLMHealthChecker](./LLMHealthChecker.md) -- The LLMHealthChecker class uses a health checking mechanism to monitor the status of LLM components, as defined in the health-checking.ts file.
 
 
 ---

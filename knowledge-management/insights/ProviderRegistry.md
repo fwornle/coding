@@ -2,108 +2,95 @@
 
 **Type:** Detail
 
-The ModeResolver uses the ProviderRegistry to retrieve the provider configurations and determine the operating mode based on the provider configuration in providers.json.
+The LLMProviderManager sub-component is likely responsible for parsing and utilizing the provider-registry.yaml file, although direct code evidence is not available.
 
 ## What It Is  
 
-The **ProviderRegistry** is the central component that orchestrates the registration and lifecycle of Large‑Language‑Model (LLM) providers. It lives in the same module that houses the LLM abstraction layer (see *LLMAbstraction*), and its primary responsibilities are to store provider configurations, expose those configurations together with the resolved operating **Mode**, and to delegate creation and lifecycle management to its child collaborators. The registry is referenced directly by the **ModeResolver** (the parent component) and indirectly by sibling components such as **ModeConfiguration** and **ModeResolverStrategy**. Although the source snapshot does not list a concrete file path for the registry itself, its children are implemented in clearly named files—*ProviderFactory.java*, *ProviderConfiguration.java* (the presumed implementation of **ProviderConfigurationManager**), and *ProviderInstanceManager.java* (the presumed implementation of **ProviderInstanceLifecycleManager**).  
+The **ProviderRegistry** lives at the heart of the LLM integration layer and is materialised by the file **`provider-registry.yaml`**.  This YAML document is the concrete artefact that enumerates every Large‑Language‑Model (LLM) provider the system knows about, together with the configuration required to instantiate each one (e.g., API keys, endpoint URLs, model identifiers).  The registry is not a stand‑alone class in the source tree; rather, it is a data‑driven contract that the **`LLMProviderManager`** reads at start‑up.  Because the registry is externalised, adding, removing, or re‑configuring a provider does not require a code change – only an edit to the YAML file.
 
-In practice, the ProviderRegistry acts as the single source of truth for all provider‑specific settings that are defined in the external *providers.json* file. When the **ModeResolver** needs to decide which operating mode to run (e.g., “single‑provider”, “fallback”, “ensemble”), it queries the ProviderRegistry for the current configuration set. The registry therefore bridges static configuration data and the dynamic provider instances that the rest of the system consumes.
+In the hierarchy, **ProviderRegistry** is a child of **`LLMProviderManager`** (the parent component).  The manager treats the registry as its source of truth for “available providers”, and any downstream consumer that needs to invoke an LLM looks up the appropriate provider through the manager‑exposed API.  No other sibling components are mentioned in the observations, but the pattern suggests that any other registries (e.g., a `prompt‑registry.yaml`) would be peers, all consumed by the same manager.
 
 ---
 
 ## Architecture and Design  
 
-The architecture surrounding ProviderRegistry follows a **composition‑based modular design**. The registry composes three distinct collaborators:
+The presence of a dedicated **`provider-registry.yaml`** signals a **configuration‑driven registry pattern**.  Rather than hard‑coding provider classes, the system decouples *what* providers exist from *how* they are used.  This yields a **separation‑of‑concerns** design: the **`LLMProviderManager`** is responsible for parsing the YAML, validating its schema, and exposing a lookup service, while the concrete provider implementations remain isolated and interchangeable.
 
-1. **ProviderFactory** – responsible for translating a raw provider configuration into a concrete provider instance.  
-2. **ProviderConfigurationManager** – encapsulates the storage, retrieval, and possibly validation of configuration objects (implemented in *ProviderConfiguration.java*).  
-3. **ProviderInstanceLifecycleManager** – governs the start‑up, shutdown, and health‑checking of provider instances (implemented in *ProviderInstanceManager.java*).
+From the observations we can infer the following interactions:
 
-This composition isolates concerns: configuration handling, object creation, and lifecycle management are each encapsulated behind a well‑named interface. The **ModeResolver** (the parent) uses the registry to obtain configurations, while the **ModeResolverStrategy** (a sibling) applies a **Strategy pattern**—explicitly mentioned in the observations—to decide the operating mode based on those configurations. The strategy implementation lives in *ModeResolverStrategy.java* and receives the provider data from ProviderRegistry, illustrating a clear **data‑flow direction**: *providers.json* → ProviderConfigurationManager → ProviderRegistry → ModeResolver → ModeResolverStrategy.
+1. **`LLMProviderManager` → ProviderRegistry** – At initialization, the manager reads the YAML, builds an in‑memory map (e.g., `providerName → ProviderConfig`), and possibly instantiates lightweight provider descriptors.
+2. **Consumer → `LLMProviderManager`** – Any component that needs to call an LLM asks the manager for a provider by name; the manager returns a handle that knows how to talk to the underlying service.
+3. **Provider Implementation ↔ Registry Data** – The actual provider classes read the configuration supplied by the manager (API keys, endpoints) but do not touch the YAML directly.
 
-Because the registry does not directly implement any strategy itself, the overall design adheres to the **Single Responsibility Principle**: ProviderRegistry’s sole duty is to act as a façade over its three child managers. The use of a strategy for mode resolution further decouples the decision logic from the configuration storage, making it straightforward to introduce new mode‑resolution strategies without touching the registry.
+Because the design relies on a static file, the system follows a **declarative configuration** approach rather than a dynamic discovery mechanism (e.g., service‑locator or plugin loader).  This keeps the runtime footprint small and makes the registry easy to version‑control alongside the codebase.
 
 ---
 
 ## Implementation Details  
 
-Although the snapshot reports “0 code symbols found,” the observations provide enough concrete identifiers to outline the implementation skeleton:
+The only concrete artefact mentioned is **`provider-registry.yaml`**.  While the source code that parses it is not shown, the observation that **`LLMProviderManager`** “likely” handles the parsing allows us to outline the expected mechanics:
 
-* **ProviderRegistry** – a class (presumably `ProviderRegistry.java`) exposing methods such as `getProviderConfigurations()` and `getProviderModes()`. These methods pull data from **ProviderConfigurationManager** and possibly combine it with mode‑specific metadata supplied by **ProviderFactory**.
+* **YAML Structure** – The file probably defines a top‑level list or map where each entry contains keys such as `name`, `type` (e.g., `openai`, `anthropic`), `api_key`, `endpoint`, and any provider‑specific flags.  
+* **Parsing Logic** – Inside `LLMProviderManager` a loader function (e.g., `loadProviderRegistry()` ) reads the file using a YAML parser, validates required fields, and constructs a dictionary (`Map<String, ProviderConfig>`).  
+* **Provider Instantiation** – The manager may lazily instantiate concrete provider objects (e.g., `OpenAIProvider`, `ClaudeProvider`) the first time they are requested, passing the parsed configuration to their constructors.  This lazy strategy prevents unnecessary network setup for unused providers.  
+* **Error Handling** – Because the registry is external, the manager must guard against malformed YAML, missing credentials, or unsupported provider types, surfacing clear diagnostic messages to the developer.
 
-* **ProviderFactory** – defined in *ProviderFactory.java*. It offers a `createProvider(ProviderConfiguration config)` method that inspects the `type` field of the configuration and returns a concrete implementation of the provider interface (e.g., OpenAIProvider, AnthropicProvider). The factory abstracts away the conditional logic required to instantiate different provider classes.
-
-* **ProviderConfigurationManager** – hinted to be implemented in *ProviderConfiguration.java*. This manager likely reads the *providers.json* file, parses each entry into a `ProviderConfiguration` POJO, and caches the results for fast lookup. It may also expose mutation APIs for dynamic registration or updates.
-
-* **ProviderInstanceLifecycleManager** – hinted to be implemented in *ProviderInstanceManager.java*. This component tracks the lifecycle of each provider instance created by the factory. Typical responsibilities include initializing the provider (e.g., establishing API credentials), handling graceful shutdown, and possibly exposing health‑check hooks.
-
-* **ModeResolver** – the parent component that calls `ProviderRegistry.getProviderConfigurations()` and forwards the result to **ModeResolverStrategy**. The strategy implementation in *ModeResolverStrategy.java* examines the configuration (including any mode flags stored alongside each provider) to decide which mode the system should operate under.
-
-The interaction sequence during start‑up can be imagined as:
-
-1. **ProviderConfigurationManager** loads *providers.json* → produces a map of `ProviderConfiguration` objects.  
-2. **ProviderRegistry** aggregates these configurations and makes them available via accessor methods.  
-3. **ModeResolver** requests the aggregated data → passes it to **ModeResolverStrategy**.  
-4. **ModeResolverStrategy** selects a mode (e.g., “fallback”) and informs the rest of the system.  
-5. **ProviderFactory** is later invoked (on demand) to materialize concrete provider instances, which are handed to **ProviderInstanceLifecycleManager** for lifecycle handling.
+No other classes or functions are named, so the implementation is inferred to be straightforward: a single responsibility manager that owns the registry data and provides a thin façade for the rest of the system.
 
 ---
 
 ## Integration Points  
 
-The ProviderRegistry sits at a nexus of several integration pathways:
+**ProviderRegistry** integrates primarily through the **`LLMProviderManager`**, which acts as the gateway for any component that wishes to invoke an LLM.  The flow is:
 
-* **ModeResolver** – Direct consumer; it invokes the registry to fetch configuration and mode information. The relationship is tightly coupled: the resolver cannot function without the registry’s data.  
-* **ModeConfiguration** and **ModeResolverStrategy** – Sibling components that share the same configuration source. While they do not call the registry directly, they rely on the same underlying *providers.json* data that the registry exposes.  
-* **LLMAbstraction** – Contains the ProviderRegistry, meaning any higher‑level LLM abstraction (e.g., a unified `LLMClient`) will indirectly depend on the registry for provider resolution.  
-* **ProviderFactory**, **ProviderConfigurationManager**, **ProviderInstanceLifecycleManager** – Children that the registry composes. Their public interfaces constitute the registry’s internal contract; changes to these interfaces ripple upward to any component that uses the registry (most notably ModeResolver).  
-* **External configuration file** – *providers.json* is the external artifact that drives the whole flow. Any tooling that updates this file must respect the schema expected by **ProviderConfigurationManager**.
+1. **Startup** – The application boots, `LLMProviderManager` loads `provider-registry.yaml`, and populates its internal catalogue.  
+2. **Runtime Lookup** – A higher‑level service (e.g., a chat orchestrator, a summarisation pipeline) calls `LLMProviderManager.getProvider("openai-gpt4")`. The manager returns an object that implements a common **LLMProvider** interface, abstracting away provider‑specific details.  
+3. **Provider Execution** – The returned provider uses the configuration it received from the manager to perform HTTP calls, streaming, or batch inference.  
 
-Because the registry only exposes read‑only accessor methods (as inferred from the observations), external modules treat it as an immutable source of truth after initialization, reducing the risk of accidental state mutation.
+Because the registry is a static file, external systems can modify it without recompiling the code, provided they respect the expected schema.  The only direct dependency is the YAML parser library used by `LLMProviderManager`; all other components remain agnostic of the registry’s storage format.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Do not bypass the registry** – All code that needs provider configuration or mode information should retrieve it via `ProviderRegistry` rather than reading *providers.json* directly. This guarantees that the same validated configuration is used throughout the system.  
-
-2. **Prefer the factory for instance creation** – When a concrete provider is required, call `ProviderFactory.createProvider(configuration)` rather than instantiating provider classes manually. This ensures the correct provider type is selected based on the configuration’s `type` field and that any future factory‑level concerns (e.g., caching, instrumentation) are respected.  
-
-3. **Respect lifecycle boundaries** – After obtaining a provider instance, hand it to `ProviderInstanceLifecycleManager` for start‑up and shutdown. Do not manage the provider’s resources manually, as the lifecycle manager may implement pooling, health checks, or graceful termination logic.  
-
-4. **Configuration updates are centralized** – If the system needs to add or modify a provider at runtime, interact with **ProviderConfigurationManager** (e.g., via a `registerProvider(ProviderConfiguration)` method) rather than editing the JSON file on disk. This keeps the in‑memory cache coherent and avoids race conditions.  
-
-5. **Mode resolution should stay within the strategy** – When introducing new operating modes, extend **ModeResolverStrategy** rather than altering ProviderRegistry. The registry’s contract remains stable, while the strategy encapsulates the decision logic.
+* **Keep the YAML in source control** – Since `provider-registry.yaml` is the single source of truth for provider definitions, version it alongside the code to track changes and enable reproducible environments.  
+* **Validate before deployment** – Run the manager’s validation routine (or a CI lint step) to ensure every entry has the required fields and that credentials are present and correctly scoped.  
+* **Prefer descriptive names** – Use clear, unique identifiers for each provider entry; these names become the keys that downstream services will request.  
+* **Avoid hard‑coding provider names** – Always retrieve a provider through `LLMProviderManager` rather than importing a concrete class; this preserves the decoupling that the registry provides.  
+* **Update the registry for new providers** – To add a new LLM, simply append a new block to `provider-registry.yaml` and, if necessary, implement a matching provider class that conforms to the common interface. No changes to `LLMProviderManager` are required unless a new provider type introduces novel configuration semantics.
 
 ---
 
-### Summary of Requested Items  
+### 1. Architectural patterns identified  
+* **Configuration‑driven registry pattern** – external YAML file defines available providers.  
+* **Separation of concerns** – `LLMProviderManager` handles registry parsing; provider implementations handle API interaction.  
+* **Facade/Lazy‑initialisation** – manager exposes a simple lookup façade and lazily creates provider instances.
 
-| Item | Insight (grounded in observations) |
-|------|------------------------------------|
-| **Architectural patterns identified** | Composition of three child managers inside ProviderRegistry; **Strategy pattern** used by *ModeResolverStrategy* for mode determination. |
-| **Design decisions and trade‑offs** | Separation of concerns (configuration, factory, lifecycle) improves modularity but introduces an extra indirection layer; the registry acts as a façade, simplifying consumer code at the cost of a modest runtime lookup overhead. |
-| **System structure insights** | ProviderRegistry is the hub between the LLM abstraction layer and the mode‑resolution subsystem, exposing configuration and mode data while delegating creation and lifecycle to dedicated collaborators. |
-| **Scalability considerations** | Because configurations are loaded once and cached, adding more providers has minimal impact on lookup performance. Factory‑based creation allows lazy instantiation, so only needed providers consume resources. Lifecycle manager can be extended to support pooling if provider instances become numerous. |
-| **Maintainability assessment** | High maintainability: clear responsibility boundaries, explicit interfaces, and a strategy‑based mode resolver make it straightforward to add new provider types or new operating modes without touching existing code. The only maintenance burden is keeping the three child managers’ contracts in sync with any registry API changes. |
+### 2. Design decisions and trade‑offs  
+* **Static file vs. dynamic discovery** – using a YAML file simplifies deployment and versioning but requires a restart or reload to pick up changes.  
+* **Decoupling of provider implementations** – makes adding/removing providers low‑risk, at the cost of an extra indirection layer (lookup through the manager).  
+* **Single source of truth** – centralises configuration, improving consistency, but creates a single point of failure if the file is malformed.
 
-All statements above are directly derived from the supplied observations and the explicitly named files/classes. No ungrounded patterns or speculative implementations have been introduced.
+### 3. System structure insights  
+* **Parent–child relationship** – `LLMProviderManager` (parent) owns the `ProviderRegistry` (child).  
+* **Potential siblings** – other registries (e.g., prompt‑registry) would follow the same pattern, all coordinated by the manager.  
+* **Provider implementations** – act as leaf nodes that consume configuration supplied by the registry via the manager.
+
+### 4. Scalability considerations  
+* **Horizontal scaling** – because the registry is read‑only after start‑up, multiple instances of `LLMProviderManager` can share the same YAML without contention.  
+* **Adding many providers** – the in‑memory map scales linearly; for very large numbers of providers, consider lazy loading or sharding the registry file.  
+* **Runtime reconfiguration** – not currently supported; scaling to dynamic updates would require a watch‑based reload mechanism.
+
+### 5. Maintainability assessment  
+* **High maintainability** – the clear separation between configuration (YAML) and code (manager + providers) means most changes are data‑driven.  
+* **Risk of configuration drift** – reliance on a single YAML file necessitates strict validation and documentation to avoid mismatches.  
+* **Extensibility** – adding a new provider only requires a new YAML entry and a matching provider class, keeping the codebase clean and modular.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ModeResolver](./ModeResolver.md) -- ModeResolver uses a strategy pattern in ModeResolverStrategy.java to resolve the operating mode based on the provider configuration in providers.json
-
-### Children
-- [ProviderFactory](./ProviderFactory.md) -- ProviderFactory in ProviderFactory.java defines the createProvider method, which takes a provider configuration as input and returns a provider instance based on the configuration type
-- [ProviderConfigurationManager](./ProviderConfigurationManager.md) -- The ProviderConfigurationManager is likely implemented in a separate module or class, such as ProviderConfiguration.java, which defines the configuration settings for each provider
-- [ProviderInstanceLifecycleManager](./ProviderInstanceLifecycleManager.md) -- The ProviderInstanceLifecycleManager is likely implemented in a separate module or class, such as ProviderInstanceManager.java, which defines the lifecycle methods for provider instances
-
-### Siblings
-- [ModeConfiguration](./ModeConfiguration.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
-- [ModeResolverStrategy](./ModeResolverStrategy.md) -- The ModeResolverStrategy.java file implements a strategy pattern to resolve the operating mode based on the provider configuration, which is managed by the ModeConfiguration.
+- [LLMProviderManager](./LLMProviderManager.md) -- LLMProviderManager uses a provider registry to store and manage available LLM providers, as seen in the provider-registry.yaml file.
 
 
 ---

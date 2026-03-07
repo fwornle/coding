@@ -2,89 +2,75 @@
 
 **Type:** Detail
 
-OntologyManager.loadOntology() in the parent context suggests the existence of a dedicated loader, which is likely implemented as a separate module or class to encapsulate the loading logic.
+The OntologyLoader's behavior is a key aspect of the OntologyManagementModule, as it directly impacts the quality and accuracy of the log data processing.
 
 ## What It Is  
 
-`OntologyLoader` is the concrete implementation that carries out the work hinted at by the call `OntologyManager.loadOntology()` in the **OntologyManagement** component.  It lives inside the *OntologyManagement* module (the parent component) and is the dedicated class or module whose sole responsibility is to retrieve ontology definitions from a graph database, parse them, and transform the raw data into the in‑memory structures used by the rest of the system.  The loader is therefore the bridge between the persistent graph store (accessed through a **graph‑database adapter**) and the higher‑level services such as **EntityClassifier** and **ValidationRulesEngine** that consume the loaded ontology.
+The **OntologyLoader** is the component responsible for bringing ontology definitions into the system. It reads a set of JSON files whose locations and format descriptors are enumerated in the **`ontology‑formats.json`** configuration file. By doing so, it enables the **LiveLoggingSystem** to understand and work with a variety of ontology formats, ensuring that log data can be interpreted correctly regardless of the source schema. The loader lives inside the **OntologyManagementModule** – the parent module that groups all ontology‑related capabilities – and is the only class mentioned that directly performs the parsing and registration of ontologies.
 
 ## Architecture and Design  
 
-The design that emerges from the observations is a classic *layered* architecture with a clear separation of concerns:
+The design that emerges from the observations is a **configuration‑driven loading architecture**. The existence of a dedicated **`ontology‑formats.json`** file indicates that the set of supported formats is externalised rather than hard‑coded. This approach aligns with a **Strategy‑like** arrangement: each entry in the JSON can be thought of as describing a concrete “format strategy” that the loader will apply when parsing the corresponding ontology file. Because the loader lives inside **OntologyManagementModule**, it is tightly coupled to the module’s responsibility for managing ontology lifecycle, but it remains loosely coupled to the concrete format implementations thanks to the JSON‑driven indirection.
 
-1. **Adapter Layer** – The presence of a *graph database adapter* indicates an **Adapter pattern** that isolates the loader from any particular graph‑DB implementation (e.g., Neo4j, JanusGraph).  By programming to an abstract adapter interface, `OntologyLoader` can request ontology data without hard‑coding driver‑specific APIs, which makes swapping the underlying store a low‑risk change.
-
-2. **Loader Layer** – `OntologyLoader` itself acts as a **Facade** for the loading process.  It hides the complexity of fetching, parsing, and transforming the ontology, exposing a simple public method (most likely `load()` or a variant) that `OntologyManager.loadOntology()` invokes.  This encapsulation keeps the rest of the system agnostic to the details of how an ontology is materialised.
-
-3. **Domain Layer** – Once the loader has produced the in‑memory representation, downstream components such as **EntityClassifier** (which relies on a tree‑like classification model) and **ValidationRulesEngine** (which applies rule‑based validation) can operate on a stable, well‑defined model.  The shared domain model is the glue that ties the sibling components together.
-
-The overall interaction can be visualised as:  
-
-`OntologyManager.loadOntology()` → **OntologyLoader** → *Graph‑DB Adapter* → raw ontology data → parsing/transform → domain model → **EntityClassifier** & **ValidationRulesEngine**.
+Interaction is straightforward: the **LiveLoggingSystem** invokes the OntologyLoader (through the OntologyManagementModule) during start‑up or when a new ontology is introduced. The loader consults **`ontology‑formats.json`**, discovers which JSON files to read, parses them, and registers the resulting ontology objects back into the management module. No other components are mentioned, so the current architecture appears to be a **single‑direction, pull‑based** flow – the loader pulls configuration, parses, and pushes results upstream.
 
 ## Implementation Details  
 
-Although no concrete code symbols were listed, the observations give us enough to infer the key pieces:
+Although the source code itself is not listed, the observations give us a clear picture of the key artefacts:
 
-* **Class / Module:** `OntologyLoader` (likely a class named exactly that, residing in the same package as `OntologyManager`).  
-* **Entry Point:** The loader is invoked indirectly via `OntologyManager.loadOntology()`.  Inside that method the manager probably creates (or receives) an instance of `OntologyLoader` and calls a method such as `load()` or `execute()`.  
-* **Graph‑Database Adapter:** The loader does not talk to the database directly.  It calls methods on an injected adapter interface (e.g., `GraphDbAdapter.fetchOntologyGraph()`).  This adapter abstracts connection handling, query execution, and result mapping.  
-* **Parsing & Transformation:** After the raw graph data is returned, the loader runs a parsing routine.  The routine may use a dedicated ontology‑parsing library (e.g., OWLAPI, RDF4J) or a custom transformer that walks the graph, extracts classes, properties, and relationships, and builds the internal representation (likely a set of POJOs or data‑classes that model concepts, hierarchies, and axioms).  
-* **Error Handling & Validation:** Because the loader feeds downstream components, it probably performs basic validation (e.g., ensuring required root concepts exist) and surfaces any structural problems as exceptions that `OntologyManager.loadOntology()` can catch and report.
+1. **`ontology‑formats.json`** – a manifest that maps ontology identifiers to the paths of their definition files and possibly to format‑specific metadata (e.g., version, schema location).  
+2. **OntologyLoader class** – housed inside **OntologyManagementModule**, it contains the logic that reads the JSON manifest, iterates over each entry, loads the associated ontology definition file (also JSON), and translates it into internal ontology objects.  
+3. **Parsing routine** – because the definitions are JSON, the loader most likely uses a JSON parser (e.g., Jackson, Gson) to deserialize the files into domain models. The routine must handle multiple ontology schemas, which is why the loader needs to be aware of the format information supplied by the manifest.
+
+The loader’s responsibilities are therefore limited to **discovery (via the manifest)**, **deserialization**, and **registration**. Any validation, error handling, or transformation logic would be encapsulated within the same class or delegated to helper utilities that are not explicitly mentioned.
 
 ## Integration Points  
 
-`OntologyLoader` sits at a pivotal integration nexus:
+The primary integration surface is the **OntologyManagementModule** itself. The module exposes the OntologyLoader to the rest of the system, most notably the **LiveLoggingSystem**, which depends on the loaded ontologies to interpret log entries. The flow can be summarised as:
 
-* **Upstream:** It is called by **OntologyManagement** via `OntologyManager.loadOntology()`.  The manager may orchestrate additional steps such as caching or version tracking around the loader’s output.  
-* **Downstream:** The loaded ontology model is consumed by **EntityClassifier**, which traverses the classification hierarchy to resolve entity types, and by **ValidationRulesEngine**, which uses the ontology’s constraints to drive rule evaluation.  Both siblings therefore depend on the stability and completeness of the model produced by the loader.  
-* **External Dependency:** The **graph‑database adapter** is the only external system contact point.  The adapter’s contract (methods for fetching nodes/edges, transaction handling, etc.) defines the loader’s expectations and is the place where any change of database technology would be isolated.  
+- **LiveLoggingSystem → OntologyManagementModule → OntologyLoader** (initialisation request)  
+- **OntologyLoader → `ontology‑formats.json`** (configuration read)  
+- **OntologyLoader → Individual ontology JSON files** (definition load)  
+- **OntologyLoader → OntologyManagementModule** (register parsed ontologies)  
+
+No external services, databases, or messaging queues are referenced, implying that the loader operates entirely in‑process and relies on file‑system resources for its inputs.
 
 ## Usage Guidelines  
 
-1. **Never bypass the loader.**  All code that needs ontology information should obtain it through `OntologyManager.loadOntology()` (or a higher‑level service that delegates to it).  Directly querying the graph database would break the abstraction and risk inconsistencies.  
-
-2. **Treat the loader as a singleton per application lifecycle.**  Because loading can be expensive (graph traversal, parsing), the typical pattern is to load once at startup and keep the resulting model immutable for the rest of the run‑time.  If hot‑reloading is required, the manager should provide a controlled refresh method that re‑invokes the loader safely.  
-
-3. **Provide a concrete adapter implementation.**  When configuring the system, ensure that a concrete class implementing the graph‑database adapter interface is registered (e.g., via dependency injection).  The loader will not function without this binding.  
-
-4. **Validate after load.**  After `OntologyManager.loadOntology()` returns, run any domain‑specific sanity checks (e.g., required root concepts, non‑circular hierarchies) before enabling the **EntityClassifier** or **ValidationRulesEngine**.  
-
-5. **Log and surface errors clearly.**  Because the loader interacts with external storage and performs transformation, any failure should be logged with enough context (graph query, parsing step) and propagated as a well‑defined exception type that the manager can handle.
+1. **Keep `ontology‑formats.json` up to date** – Whenever a new ontology format is added, an entry must be added to this manifest. The loader will not discover files automatically; it follows the explicit mapping.  
+2. **Validate JSON definitions before deployment** – Because the loader assumes well‑formed JSON, malformed ontology files will cause parsing failures that can halt the LiveLoggingSystem start‑up. A pre‑deployment validation step is advisable.  
+3. **Do not modify the loader’s internal parsing logic unless a new format requires it** – The loader is designed to be format‑agnostic, driven by the manifest. Extending support for a new schema should be achievable by adding the appropriate entry rather than changing code.  
+4. **Place ontology definition files in a location accessible at runtime** – The paths referenced in `ontology‑formats.json` must be reachable by the process executing the loader; relative paths should be resolved against a known base directory (e.g., the module’s resources folder).  
 
 ---
 
-### Architectural patterns identified
-* **Adapter pattern** – graph‑database adapter abstracts the persistence layer.  
-* **Facade pattern** – `OntologyLoader` provides a simple façade for the complex loading workflow.  
-* **Layered architecture** – separation into persistence (adapter), service (loader), and domain (model used by classifier & validator).
+### 1. Architectural patterns identified  
+- **Configuration‑driven loading** (manifest‑based discovery)  
+- Implicit **Strategy** pattern for handling multiple ontology formats via JSON descriptors  
 
-### Design decisions and trade‑offs
-* **Abstraction of the DB** gives flexibility to switch graph stores but adds an extra indirection layer that must be maintained.  
-* **Dedicated loader** isolates parsing logic, improving maintainability, at the cost of an additional class/module to coordinate.  
-* **Potential eager loading** (load at startup) reduces runtime latency but increases startup time and memory usage; a lazy‑load option would trade latency for on‑demand cost.
+### 2. Design decisions and trade‑offs  
+- **Externalising format definitions** (via `ontology‑formats.json`) improves extensibility but adds a runtime dependency on correct manifest maintenance.  
+- **Single‑module responsibility** (OntologyLoader inside OntologyManagementModule) simplifies the call graph but couples loading tightly to the management module, limiting reuse in unrelated contexts.  
 
-### System structure insights
-* `OntologyLoader` is a child of **OntologyManagement** and a sibling to **EntityClassifier** and **ValidationRulesEngine**, all of which share the same domain model produced by the loader.  
-* The loader’s output is the single source of truth for ontology‑driven behaviour across the system.
+### 3. System structure insights  
+- The system follows a **hierarchical module structure**: `LiveLoggingSystem` → `OntologyManagementModule` → `OntologyLoader`.  
+- All ontology‑related artefacts (manifest, definitions, loader) reside under the same module, reinforcing cohesion around ontology handling.  
 
-### Scalability considerations
-* Because the loader pulls the entire ontology graph into memory, very large ontologies could stress memory; strategies such as streaming parsing or partial loading could be introduced without changing the adapter interface.  
-* The adapter layer permits scaling the underlying graph database (clustering, sharding) transparently to the loader.
+### 4. Scalability considerations  
+- Adding new ontology formats scales linearly: each new format only requires an entry in the JSON manifest.  
+- Since loading is performed synchronously at start‑up (as implied), very large numbers of ontologies could increase start‑up latency; a future optimisation could be lazy or parallel loading.  
 
-### Maintainability assessment
-* High maintainability: clear separation of concerns, well‑defined interfaces, and limited coupling to external technology.  
-* The main maintenance burden lies in the **graph‑database adapter** (must stay in sync with driver changes) and any custom parsing logic (must evolve with ontology language versions).  Adding new graph‑DB implementations or extending the ontology format can be done by implementing the adapter interface and adjusting the parser, leaving the rest of the system untouched.
+### 5. Maintainability assessment  
+- **High maintainability** due to the declarative manifest: developers can add or retire ontologies without touching code.  
+- The lack of visible abstraction layers (e.g., separate parser factories) means that any format‑specific quirks will eventually require code changes, which could erode the current simplicity if many exotic formats are introduced.  
+
+Overall, the **OntologyLoader** embodies a clean, configuration‑first approach that serves the immediate needs of the LiveLoggingSystem while remaining straightforward to extend and maintain.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [OntologyManagement](./OntologyManagement.md) -- OntologyManager.loadOntology() loads ontology definitions from a graph database using a graph database adapter
-
-### Siblings
-- [EntityClassifier](./EntityClassifier.md) -- The hierarchical classification model implies a tree-like structure, where entities are classified based on their relationships and properties defined in the ontology, potentially using techniques like recursive traversal or depth-first search.
-- [ValidationRulesEngine](./ValidationRulesEngine.md) -- The ValidationRulesEngine likely utilizes a rules-based system, where validation rules are defined and stored in a configurable manner, allowing for easy modification or extension of the rules without altering the underlying code.
+- [OntologyManagementModule](./OntologyManagementModule.md) -- OntologyManagementModule's OntologyLoader class loads and parses ontology definitions from JSON files, with support for multiple ontology formats, as specified in the ontology-formats.json file
 
 
 ---

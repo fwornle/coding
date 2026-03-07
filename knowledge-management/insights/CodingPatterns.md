@@ -2,224 +2,123 @@
 
 **Type:** Component
 
-The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the project. This component serves as a catch-all for entities that do not fit into other specific components. Its architecture is designed to promote consistency and efficiency in coding practices, ensuring that the project adheres to established standards and guidelines. Key patterns in this component include the use of intelligent routing, graph database adapters, and work-stealing concurrency, which contribute to its overall structure and functionality.
+The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the project. It serves as a catch-all for entities not fitting other components, providing a foundation for maintainable and efficient code. The component's architecture is not explicitly defined in the provided codebase, but it is likely to involve a range of classes and functions that implement various design patterns and coding conventions.
 
 ## What It Is  
 
-The **CodingPatterns** component lives at the top‑level of the *Coding* knowledge hierarchy and is realized through a collection of source files spread across the repository.  The most concrete artefacts mentioned in the observations are:
-
-* `storage/graph-database-adapter.ts` – the GraphDatabaseAdapter that enables automatic JSON‑export synchronization.  
-* `wave-controller.ts` – the entry point for **Wave agents**, showing the constructor‑based LLM initialization and the `runWithConcurrency()` function that implements work‑stealing concurrency.  
-* `database-adapter.js` – a generic DatabaseAdapter that adds a caching layer to reduce repeated queries.  
-* `ErrorHandler` (class name only, location not specified) – a centralized error‑handling utility.  
-* `EntityAuthoringService` – a service that follows the **Factory** pattern for creating domain entities.  
-* `OntologyClassifier` – a classifier that leverages a hierarchical **UpperOntology** to place entities into the correct conceptual bucket.
-
-Together these files embody the “catch‑all” nature of the component: any reusable programming wisdom, design‑pattern guidance, best‑practice rule‑set, or coding convention that does not belong to a more specialized child component (e.g., *DesignPatterns*, *GraphDatabaseManagement*, *ConcurrencyAndParallelism*, *CodingStandards*, *ProjectStructure*) is housed here.  The component therefore acts as a repository of reusable abstractions that promote consistency across the entire project.
+The **CodingPatterns** component lives at the top‑level of the *Coding* knowledge hierarchy and is the logical home for reusable programming wisdom that does not belong to any other specialized component.  All of the concrete artefacts that embody this wisdom are stored inside the **CodingPatterns** directory (e.g. `DesignPatterns/SingletonClass.cs`, `CodingConventions/CodingConventions.cs`, `ArchitectureGuidelines/ArchitectureGuidelines.cs`, `TestingGuidelines/TestingGuidelines.cs`, `ErrorHandlingGuidelines/ErrorHandlingGuidelines.cs`).  The component is referenced by the sibling **KnowledgeManagement** component (via `config/knowledge-management.json`) so that the knowledge graph can capture relationships such as *“CodingPatterns contains DesignPatterns”* or *“CodingPatterns contains TestingGuidelines”*.  In practice, CodingPatterns supplies the baseline set of design‑pattern implementations, coding‑style rules, architectural recommendations, testing strategies and error‑handling policies that are consumed by every other component in the project – from the **LiveLoggingSystem** that must follow the error‑handling guidelines, to the **SemanticAnalysis** agents that rely on the coding conventions when generating structured knowledge.
 
 ---
 
 ## Architecture and Design  
 
-### Core Architectural Approach  
+Although the component does not expose a dedicated runtime architecture, the files that live inside it reveal a **catalog‑style** design that groups related guidance into sub‑components.  The only explicit **design pattern** observed is the **Singleton** implementation in `DesignPatterns/SingletonClass.cs`, which guarantees a single, globally accessible instance of a utility class (for example a central repository of pattern definitions).  This choice aligns with the need for a *single source of truth* for pattern metadata across the whole system.
 
-CodingPatterns is organized around **modular, cross‑cutting concerns**.  Rather than a monolithic library, each concern is encapsulated in its own module (e.g., graph persistence, concurrency, caching, error handling) and exposed through well‑defined interfaces.  This mirrors the architecture of sibling components such as **KnowledgeManagement** (which also uses graph‑database adapters) and **LLMAbstraction** (which relies on factories and dependency injection).  The design emphasizes **separation of concerns** while still allowing the component to be a single source of truth for coding standards.
+The broader system uses a **rule‑based** approach for insight generation (`integrations/mcp-server-semantic-analysis/src/InsightGenerator`) and a **DAG‑based** pipeline execution model (`integrations/mcp-constraint-monitor/src/`).  CodingPatterns supplies the *rule definitions* (e.g., “All classes must follow the naming convention defined in CodingConventions.cs”) and the *pattern‑level nodes* that the DAG can reference when orchestrating validation or transformation pipelines.  The hierarchical classification performed by `OntologyClassifier` also consumes the ontology definitions that live under **CodingPatterns**, treating the component’s children (DesignPatterns, CodingConventions, etc.) as lower‑ontology terms beneath a higher‑level “Coding” ontology.
 
-### Design Patterns in Use  
-
-| Observation | Pattern | Where It Appears |
-|-------------|---------|------------------|
-| `EntityAuthoringService` creates entities via a configurable creator | **Factory** | `EntityAuthoringService` class |
-| `OntologyClassifier` uses a hierarchical ontology for classification | **Hierarchical Classification** (domain‑specific pattern) | `OntologyClassifier` with `UpperOntology` |
-| Shared atomic index counter in `runWithConcurrency()` | **Work‑Stealing Concurrency** (algorithmic pattern) | `wave-controller.ts` → `runWithConcurrency()` |
-| Centralized error handling via `ErrorHandler` | **Facade / Centralized Handler** | `ErrorHandler` class |
-| Caching wrapper around database calls | **Cache‑Aside** (caching pattern) | `database-adapter.js` |
-| Graph persistence through `GraphDatabaseAdapter` | **Adapter** (graph‑database adapter) | `storage/graph-database-adapter.ts` |
-| Intelligent routing of requests (mentioned in description) | **Router / Strategy** (routing logic) | Conceptual, not tied to a single file |
-
-The child component **DesignPatterns** contributes a concrete **Singleton** implementation (`SingletonPattern.java`) that may be reused by CodingPatterns for global services such as the `ErrorHandler`.
-
-### Interaction Model  
-
-* **Intelligent Routing** – Requests that need a particular service (e.g., a persistence operation) are routed through a lightweight router that selects the appropriate adapter (graph, relational, in‑memory).  This mirrors the routing logic in **LiveLoggingSystem**, which also uses graph adapters for log persistence.  
-* **Work‑Stealing Executor** – The `runWithConcurrency()` function distributes tasks across a pool of workers, each stealing work from a shared atomic index when idle.  This is the same algorithmic family as the `WorkStealingExecutor` class found under the child component **ConcurrencyAndParallelism**.  
-* **Caching Layer** – `DatabaseAdapter` decorates lower‑level adapters with an in‑process cache, reducing latency for repeated reads.  This pattern is shared with **DockerizedServices**, where service factories cache LLM client instances.  
-
-Overall, the architecture is **layered**: high‑level utilities (routing, factories) sit above concrete adapters (graph, cache) which in turn sit above the underlying persistence mechanisms.
+Because the component is primarily static knowledge, its architecture is intentionally **low‑coupling / high‑cohesion**: each child (DesignPatterns, CodingConventions, …) is a self‑contained module that can be imported independently, while the parent **CodingPatterns** acts as a façade that aggregates them for discovery by the knowledge‑graph services (`GraphDatabaseService` in `integrations/code-graph-rag/config/`).
 
 ---
 
 ## Implementation Details  
 
-### GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)  
+* **SingletonClass.cs** – Implements the classic Singleton pattern (`private static readonly SingletonClass _instance = new();` with a private constructor and a public `Instance` accessor).  This class is used by the knowledge‑graph loading routines to cache the set of pattern definitions, avoiding repeated file I/O when the **InsightGenerator** evaluates rule conditions.
 
-The adapter implements a thin wrapper around the chosen graph database (likely Neo4j or a custom Graphology store).  Its primary responsibilities are:
+* **CodingConventions.cs** – Contains a collection of constant strings and helper methods that codify naming, commenting, and formatting standards.  The file is referenced by static analysis tools in the **SemanticAnalysis** component; for example, the `EntityValidator` in `integrations/copi/src/` reads these conventions to validate manually created entities.
 
-1. **Connection Management** – It holds a pool of connections (as described in the sibling *GraphDatabaseManagement* child component) and exposes `connect()` / `disconnect()` methods.  
-2. **Automatic JSON Export Sync** – On each write transaction, the adapter serializes the affected sub‑graph to JSON and pushes it to a sync service, ensuring an up‑to‑date external representation.  
+* **ArchitectureGuidelines.cs** – Provides high‑level architectural rules (layering, separation of concerns) expressed as simple data structures (e.g., `readonly string[] AllowedDependencies = { "Domain", "Application", "Infrastructure" };`).  The **PipelineCoordinator** uses these structures when building its DAG to ensure that no pipeline step violates the prescribed layering.
 
-### Wave Controller (`wave-controller.ts`)  
+* **TestingGuidelines.cs** – Enumerates required test scopes (unit, integration, acceptance) and includes helper methods for generating test scaffolding.  The **LiveLoggingSystem** and **SemanticAnalysis** agents invoke these helpers when auto‑generating test stubs for newly extracted entities.
 
-The controller follows a **constructor‑initialization pattern**:
+* **ErrorHandlingGuidelines.cs** – Defines a taxonomy of exception types and a standard logging wrapper.  The wrapper is employed by every service that writes to the **LiveLoggingSystem**, guaranteeing consistent error reporting and facilitating downstream analysis by the **InsightGenerator**.
 
-```ts
-class WaveController {
-  constructor(private llm: LLMProvider) {
-    this.ensureLLMInitialized();
-  }
-  private ensureLLMInitialized() { … }
-}
-```
-
-The critical method `runWithConcurrency(tasks: Task[])` creates a shared `AtomicInteger` counter.  Workers repeatedly:
-
-```ts
-while (true) {
-  const idx = atomicCounter.getAndIncrement();
-  if (idx >= tasks.length) break;
-  await tasks[idx]();
-}
-```
-
-This implements **work‑stealing** without a dedicated thread‑pool library, keeping the implementation lightweight and portable.
-
-### DatabaseAdapter (`database-adapter.js`)  
-
-The adapter adds a **cache‑aside** mechanism:
-
-```js
-class DatabaseAdapter {
-  async get(key) {
-    if (this.cache.has(key)) return this.cache.get(key);
-    const result = await this.rawAdapter.get(key);
-    this.cache.set(key, result);
-    return result;
-  }
-}
-```
-
-The cache is an in‑memory `Map` with optional TTL logic (not explicitly mentioned but typical for such adapters).  This reduces round‑trip latency for frequent reads, a design echoed in **DockerizedServices** where LLM responses are cached.
-
-### ErrorHandler  
-
-Although the file location is not provided, the `ErrorHandler` class centralizes exception capture, logging, and optional retry logic.  It likely exposes a static `handle(error: Error, context?: any)` method that integrates with the **LiveLoggingSystem** to record error events in the knowledge graph.
-
-### EntityAuthoringService (Factory)  
-
-The service abstracts entity creation:
-
-```ts
-class EntityAuthoringService {
-  createEntity(type: string, payload: any): BaseEntity {
-    switch (type) {
-      case 'User': return new UserEntity(payload);
-      case 'Project': return new ProjectEntity(payload);
-      …
-    }
-  }
-}
-```
-
-By encapsulating the `new` operator, the service enables future extensions (e.g., injecting proxies, validation) without touching calling code.
-
-### OntologyClassifier  
-
-The classifier traverses the **UpperOntology** hierarchy to assign a semantic label to a newly created entity.  The process resembles:
-
-```ts
-class OntologyClassifier {
-  classify(entity) {
-    const path = UpperOntology.findPath(entity.type);
-    entity.setOntologyPath(path);
-  }
-}
-```
-
-This hierarchical classification underpins the **KnowledgeManagement** component’s ability to query entities by conceptual relationships.
+All of the above files are pure‑C# libraries with no external runtime dependencies; they are compiled into the **CodingPatterns** assembly and loaded by other components through standard .NET assembly references.
 
 ---
 
 ## Integration Points  
 
-1. **KnowledgeManagement** – The `GraphDatabaseAdapter` is the same technology used by KnowledgeManagement’s persistence agents (e.g., `CodeGraphAgent`).  Both components share the graph schema defined by the UpperOntology.  
-2. **LiveLoggingSystem** – Uses intelligent routing and work‑stealing patterns identical to those in CodingPatterns, demonstrating a cross‑component consistency in concurrency handling.  
-3. **LLMAbstraction** – The `WaveController`’s LLM initialization mirrors the provider‑registration flow in LLMAbstraction, allowing a Wave agent to reuse the same LLM client factories.  
-4. **DockerizedServices** – The caching strategy in `DatabaseAdapter` is conceptually similar to the LLM response cache in `LLMService`.  Both rely on in‑process caches to improve latency.  
-5. **ConstraintSystem** – When constraints are evaluated, they may invoke the `ErrorHandler` to surface violations, ensuring a uniform error‑reporting pipeline.  
-6. **ProjectStructure & CodingStandards** – The child components provide concrete style guides (naming, package layout) that developers are expected to follow when adding new utilities to CodingPatterns, guaranteeing that new code adheres to the same structural conventions.
+1. **KnowledgeManagement** – The JSON configuration at `config/knowledge-management.json` registers the *CodingPatterns* ontology nodes so that the central knowledge graph can store relationships such as “DesignPatterns implements Singleton” or “TestingGuidelines applies to all services”.  The graph database service (`integrations/code-graph-rag/config/GraphDatabaseService`) persists these relationships for later retrieval.
 
-All these integration points are mediated through **well‑defined interfaces** (e.g., `IGraphAdapter`, `IEntityFactory`, `IErrorReporter`) that are implied by the observed class responsibilities, even if the explicit TypeScript interfaces are not listed.
+2. **OnlineLearning** – When the `KnowledgeExtractor` (in `integrations/code-graph-rag/assets/`) parses source code, it matches discovered constructs against the pattern definitions supplied by **CodingPatterns** (e.g., recognizing a Singleton implementation).  Matched entities are stored in LevelDB and later fed back into the knowledge graph.
+
+3. **ManualLearning** – The `EntityValidator` in `integrations/copi/src/` calls the static helpers in `CodingConventions.cs` and `ErrorHandlingGuidelines.cs` to validate manually authored entities against the established conventions.
+
+4. **PipelineCoordinator** – The DAG builder (`integrations/mcp-constraint-monitor/src/`) reads the architectural rules from `ArchitectureGuidelines.cs` to enforce correct dependency ordering when constructing pipeline stages.
+
+5. **InsightGenerator & OntologyClassifier** – Both services import the rule sets defined in **CodingPatterns** to generate semantic insights (`InsightGenerator`) and to classify entities into the upper‑ and lower‑ontology hierarchy (`OntologyClassifier`).
+
+These integration points illustrate that **CodingPatterns** is a *pure data/knowledge* component rather than an active runtime service; its value is realized through consumption by the surrounding agents and services.
 
 ---
 
 ## Usage Guidelines  
 
-* **Leverage the Factory** – Whenever a new domain entity is required, call `EntityAuthoringService.createEntity()` instead of using `new` directly.  This preserves flexibility for future enhancements such as dependency injection or validation.  
-* **Persist via the GraphDatabaseAdapter** – All graph‑related writes should go through `storage/graph-database-adapter.ts`.  This guarantees that the automatic JSON export remains in sync and that connection pooling is respected.  
-* **Prefer Cached Reads** – Use `DatabaseAdapter` for read‑heavy operations.  Do not bypass the cache unless you need the freshest data (e.g., after a bulk mutation).  
-* **Run Parallel Workloads with `runWithConcurrency()`** – For CPU‑bound or I/O‑bound batch tasks, feed an array of async functions to this method.  The built‑in work‑stealing algorithm will maximize CPU utilization without requiring a custom thread‑pool.  
-* **Handle Errors Centrally** – Wrap potentially failing code in `try … catch` blocks that forward the exception to `ErrorHandler.handle()`.  This ensures consistent logging and optional retry behavior across the system.  
-* **Classify Entities Early** – After creating an entity, invoke `OntologyClassifier.classify(entity)` so that the UpperOntology relationships are established immediately, enabling downstream agents (e.g., KnowledgeManagement) to index the entity correctly.  
-* **Observe CodingStandards & ProjectStructure** – Follow the conventions defined in the child components (`CodingStandards.java`, `ProjectStructure.java`).  This includes naming conventions, file placement, and module boundaries, which keep the component maintainable and discoverable.
+* **Consume, don’t duplicate** – When building a new service, import the relevant child module (e.g., `using CodingPatterns.CodingConventions;`) rather than copying the constants locally.  This guarantees that any future change to the conventions propagates automatically.
+
+* **Singleton access** – Retrieve the shared pattern catalogue via `SingletonClass.Instance`.  Do not instantiate `SingletonClass` directly; doing so defeats the global‑cache purpose and can lead to divergent pattern views across pipelines.
+
+* **Rule compliance** – Before committing new code, run the static validation step provided by the **ManualLearning** `EntityValidator`.  It will surface violations of naming, formatting, and error‑handling guidelines defined in **CodingPatterns**.
+
+* **Extending the catalogue** – If a new design pattern or convention is needed, add a new file under the appropriate child folder and update `config/knowledge-management.json` so that the knowledge graph can index the addition.  Avoid modifying existing files directly; instead, version them as part of the component’s release cycle.
+
+* **Testing alignment** – Use the helper methods in `TestingGuidelines.cs` to generate test scaffolds that respect the project’s unit/integration/acceptance testing strategy.  This ensures that downstream agents (e.g., **LiveLoggingSystem**) can rely on a consistent test artefact layout.
 
 ---
 
-### Summary Deliverables  
+### Architectural patterns identified  
 
-**1. Architectural patterns identified**  
-- Adapter (GraphDatabaseAdapter)  
-- Factory (EntityAuthoringService)  
-- Work‑Stealing Concurrency (runWithConcurrency, WorkStealingExecutor)  
-- Cache‑Aside (DatabaseAdapter)  
-- Centralized Error Handling (ErrorHandler)  
-- Intelligent Routing / Strategy (request router)  
-- Hierarchical Ontology Classification (OntologyClassifier + UpperOntology)  
-- Singleton (from child DesignPatterns)  
+* **Singleton** – implemented in `DesignPatterns/SingletonClass.cs`.  
+* **Rule‑based validation** – employed by `InsightGenerator` and `EntityValidator`.  
+* **DAG‑based pipeline orchestration** – used by `PipelineCoordinator`.  
+* **Hierarchical ontology classification** – provided by `OntologyClassifier`.  
 
-**2. Design decisions and trade‑offs**  
-- **Work‑stealing vs. fixed thread pool** – Chosen for dynamic load balancing without pre‑defining task sizes; trade‑off is slightly higher coordination overhead.  
-- **Cache‑aside** – Improves read latency but introduces potential staleness; the system mitigates this by invalidating cache on writes via the adapter.  
-- **Factory over direct construction** – Increases indirection but yields extensibility and testability.  
-- **Adapter abstraction for graph DB** – Decouples business logic from a specific graph implementation, at the cost of an extra abstraction layer.  
+### Design decisions and trade‑offs  
 
-**3. System structure insights**  
-- CodingPatterns sits at the nexus of cross‑cutting concerns, feeding reusable utilities to siblings (LiveLoggingSystem, LLMAbstraction, KnowledgeManagement).  
-- Child components specialize the generic guidance into concrete artifacts (SingletonPattern, WorkStealingExecutor, CodingStandards).  
-- The component’s modules are loosely coupled through interfaces, enabling independent evolution of persistence, concurrency, and classification logic.  
+* **Centralised knowledge vs. distributed duplication** – By keeping all pattern definitions in a single component, the system avoids inconsistency but introduces a single point of read‑only dependency.  The trade‑off favors maintainability over runtime flexibility.  
+* **Static, compile‑time libraries** – CodingPatterns is compiled into an assembly, which yields fast load times and type safety, but limits dynamic updates without a redeployment of dependent services.  
+* **Explicit Singleton for caching** – Guarantees a single in‑memory catalogue, reducing I/O to LevelDB, at the cost of potential contention in highly concurrent scenarios (though the catalogue is read‑only after initial load, so contention is minimal).  
 
-**4. Scalability considerations**  
-- Work‑stealing concurrency scales with the number of available CPU cores, making batch processing of Wave tasks horizontally scalable.  
-- GraphDatabaseAdapter’s connection pool supports concurrent persistence operations, preventing bottlenecks under high write load.  
-- The cache‑aside layer reduces pressure on the underlying graph DB, allowing the system to handle read‑heavy workloads with minimal latency.  
+### System structure insights  
 
-**5. Maintainability assessment**  
-- Centralized patterns (Factory, Adapter, ErrorHandler) provide single points of change, simplifying updates.  
-- Clear separation of concerns and adherence to sibling‑component conventions (e.g., routing, caching) reduce cognitive load for new contributors.  
-- The presence of explicit child components (DesignPatterns, CodingStandards, etc.) offers well‑documented reference implementations, further aiding maintainability.  
+* **Parent‑child hierarchy** – CodingPatterns sits under the root **Coding** component and aggregates five child modules, each encapsulating a distinct knowledge domain.  
+* **Sibling relationships** – All sibling components (LiveLoggingSystem, LLMAbstraction, DockerizedServices, etc.) reference CodingPatterns indirectly via the knowledge graph, ensuring a shared semantic foundation.  
+* **Cross‑component consumption** – The KnowledgeManagement, OnlineLearning, ManualLearning, PipelineCoordinator, InsightGenerator, OntologyClassifier, and GraphDatabaseService modules all pull data from CodingPatterns, making it a hub of static knowledge.  
 
-By grounding every insight in the observed file paths, class names, and documented behaviours, this document delivers a reliable, actionable view of the **CodingPatterns** component and its role within the broader project architecture.
+### Scalability considerations  
+
+* Because the component is read‑only after startup, scaling horizontally (multiple service instances) does not increase load on CodingPatterns; each instance holds its own cached copy of the Singleton catalogue.  
+* If the catalogue grows dramatically (e.g., thousands of pattern definitions), the initial load time of `SingletonClass` could become a bottleneck.  A possible mitigation—still grounded in the current design—would be to lazy‑load pattern definitions on demand rather than eagerly loading all at startup.  
+
+### Maintainability assessment  
+
+* **High cohesion** – Each child module focuses on a single concern (design patterns, conventions, architecture, testing, error handling), making the codebase easy to navigate and modify.  
+* **Low coupling** – Dependencies are one‑directional (consumers import the component; the component does not depend on runtime services), reducing the risk of cascading changes.  
+* **Versioning discipline** – Since many other components rely on the definitions, any change must be coordinated through the knowledge‑graph configuration (`knowledge-management.json`) and communicated to downstream teams, which adds procedural overhead but preserves system stability.  
+
+Overall, **CodingPatterns** provides a well‑structured, low‑overhead repository of reusable programming knowledge that underpins the entire *Coding* project while remaining straightforward to extend and maintain.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, inclu; LLMAbstraction: The LLMAbstraction component serves as a high-level facade for interacting with various LLM providers, such as Anthropic, OpenAI, and Groq, enabling p; DockerizedServices: In terms of specific implementation details, the component features a range of classes and functions that facilitate its operations. For instance, the; Trajectory: The Trajectory component is a complex system managing project milestones, GSD workflow, phase planning, and implementation task tracking. It employs v; KnowledgeManagement: The KnowledgeManagement component is responsible for managing the knowledge graph, including entity persistence, graph database interactions, and inte; CodingPatterns: The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the pro; ConstraintSystem: The ConstraintSystem component is a constraint monitoring and enforcement system that validates code actions and file operations against configured ru; SemanticAnalysis: The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entitie.
+- [Coding](./Coding.md) -- Root node of the coding project knowledge hierarchy, encompassing all development infrastructure knowledge. The project consists of 8 major components: LiveLoggingSystem: The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, inclu; LLMAbstraction: The component's architecture is designed to be highly modular and extensible, with a range of interfaces and abstract classes that enable easy integra; DockerizedServices: The DockerizedServices component serves as the Docker containerization layer for various coding services, including semantic analysis, constraint moni; Trajectory: Key patterns in this component include the use of a multi-agent architecture, with the SpecstoryAdapter class acting as a facade for interacting with ; KnowledgeManagement: The KnowledgeManagement component plays a vital role in the overall system, providing a centralized repository of knowledge that can be leveraged by v; CodingPatterns: The CodingPatterns component encompasses general programming wisdom, design patterns, best practices, and coding conventions applicable across the pro; ConstraintSystem: The ConstraintSystem component plays a critical role in maintaining the integrity and consistency of the codebase, and its architecture and patterns r; SemanticAnalysis: The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entitie.
 
 ### Children
-- [DesignPatterns](./DesignPatterns.md) -- SingletonPattern.java uses a double-checked locking mechanism to ensure thread safety in getInstance() method
-- [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseAdapter.java uses a connection pool to manage graph database connections, as configured in graph-database-adapter.properties
-- [ConcurrencyAndParallelism](./ConcurrencyAndParallelism.md) -- WorkStealingExecutor.java implements a work-stealing algorithm for concurrent task execution, as seen in the work-stealing-example.java file
-- [CodingStandards](./CodingStandards.md) -- CodingStandards.java provides a set of guidelines for coding, such as naming conventions and code formatting, as seen in the coding-standards-example.java file
-- [ProjectStructure](./ProjectStructure.md) -- ProjectStructure.java provides a set of guidelines for project structure, such as package organization and directory layout, as seen in the project-structure-example.java file
+- [DesignPatterns](./DesignPatterns.md) -- The Singleton pattern is implemented in the SingletonClass.cs file, which ensures a single instance of the class is created throughout the application.
+- [CodingConventions](./CodingConventions.md) -- The CodingConventions.cs file provides guidelines for coding conventions, such as naming, commenting, and formatting.
+- [ArchitectureGuidelines](./ArchitectureGuidelines.md) -- The ArchitectureGuidelines.cs file provides guidelines for overall system architecture, including layering and separation of concerns.
+- [TestingGuidelines](./TestingGuidelines.md) -- The TestingGuidelines.cs file provides guidelines for testing the system, including unit testing, integration testing, and acceptance testing.
+- [ErrorHandlingGuidelines](./ErrorHandlingGuidelines.md) -- The ErrorHandlingGuidelines.cs file provides guidelines for error handling, including exception handling, logging, and error reporting.
 
 ### Siblings
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, including Claude Code conversations. Its architecture involves multiple sub-components, including transcript adapters, log converters, and ontology classification agents. Key patterns in this component include the use of graph database adapters for persistence, work-stealing concurrency for efficient processing, and heuristic-based classification for ontology metadata attachment.
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component serves as a high-level facade for interacting with various LLM providers, such as Anthropic, OpenAI, and Groq, enabling provider-agnostic model calls, tier-based routing, and mock mode for testing. Its architecture involves a combination of interfaces, classes, and modules that work together to manage LLM operations, including mode resolution, provider registration, and completion requests. The component utilizes design patterns like dependency injection, singleton, and factory to ensure flexibility, scalability, and maintainability.
-- [DockerizedServices](./DockerizedServices.md) -- In terms of specific implementation details, the component features a range of classes and functions that facilitate its operations. For instance, the LLMService class in lib/llm/llm-service.ts serves as a high-level facade for all LLM operations, handling mode routing, caching, and circuit breaking. Similarly, the startServiceWithRetry function in lib/service-starter.js enables robust service startup with retry logic and timeout protection. These elements collectively contribute to the component's overall architecture and functionality.
-- [Trajectory](./Trajectory.md) -- The Trajectory component is a complex system managing project milestones, GSD workflow, phase planning, and implementation task tracking. It employs various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive planning infrastructure. The component's architecture involves multiple connection methods, including HTTP API, Inter-Process Communication (IPC), and file watch directory, to interact with the Specstory extension. The SpecstoryAdapter class plays a central role in this component, providing methods for initialization, logging conversations, and connecting to the Specstory extension via different methods.
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, including entity persistence, graph database interactions, and intelligent routing for database access. It utilizes various technologies such as Graphology, LevelDB, and VKB API to provide a comprehensive knowledge management system. The component's architecture is designed to support multiple agents, including CodeGraphAgent and PersistenceAgent, which work together to analyze code, extract concepts, and store entities in the graph database.
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component is a constraint monitoring and enforcement system that validates code actions and file operations against configured rules during Claude Code sessions. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build its architecture. The system's key patterns include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient data processing. The component also employs a multi-agent system that processes git history and LSL sessions to detect staleness and validate entity content.
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component is a comprehensive logging infrastructure designed to capture and process live session logs from various agents, including Claude Code and Copilot. It features a modular architecture with multiple sub-components, including transcript adapters, log converters, and database adapters. The system utilizes a range of technologies, such as Graphology, LevelDB, and JSON-Lines, to store and process log data. The component's architecture is designed to support multi-agent interactions, with a focus on flexibility, scalability, and performance.
+- [LLMAbstraction](./LLMAbstraction.md) -- The component's architecture is designed to be highly modular and extensible, with a range of interfaces and abstract classes that enable easy integration of new providers and services. The use of dependency injection and inversion of control patterns further enhances the component's flexibility and maintainability, making it an essential part of the larger Coding project ecosystem.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component serves as the Docker containerization layer for various coding services, including semantic analysis, constraint monitoring, and code-graph-rag, along with supporting databases. Its architecture involves a multi-agent system, utilizing a range of classes and functions to manage the different services and their interactions. The component is built around a high-level facade for interacting with LLM providers, implementing circuit breaking, caching, and budget checks to ensure efficient and controlled operation.
+- [Trajectory](./Trajectory.md) -- Key patterns in this component include the use of a multi-agent architecture, with the SpecstoryAdapter class acting as a facade for interacting with the Specstory extension. The component also employs a range of classes and functions to manage the connection and logging processes.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component plays a vital role in the overall system, providing a centralized repository of knowledge that can be leveraged by various tools and agents. Its ability to integrate with multiple systems and technologies makes it a key enabler of the system's functionality. The component's use of advanced technologies, such as Graphology and LevelDB, ensures that it can handle complex knowledge management tasks efficiently and effectively.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component plays a critical role in maintaining the integrity and consistency of the codebase, and its architecture and patterns reflect a deep understanding of the complexities and challenges of large-scale software development. Its use of multiple agents, flexible persistence mechanisms, and optimized concurrency models enables it to operate efficiently and effectively, even in the face of complex and dynamic constraint validation requirements.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
 
 
 ---

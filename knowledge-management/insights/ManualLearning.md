@@ -2,164 +2,128 @@
 
 **Type:** SubComponent
 
-The EntityValidator class in ManualLearning uses a set of predefined rules in the validation_rules.json file to validate manually created entities
+ManualLearning integrates with the CodeKnowledgeGraphConstruction module to incorporate manually created code knowledge into the overall knowledge graph.
 
 ## What It Is  
 
-ManualLearning is a **sub‑component** of the larger **KnowledgeManagement** system that enables human curators to create, edit, and validate entities and observations that feed the knowledge graph. The core of the implementation lives under the `manual_learning/` directory. Inside this folder you will find an `entity_templates/` sub‑directory that houses ready‑made JSON/YAML templates used when manually constructing new entities, and a `validation_rules.json` file that drives the rule‑based checks performed by the `EntityValidator` class. The primary public classes exposed by the sub‑component are:
-
-* `EntityValidator` – validates manually authored entities against the VKB API and the local rule set.  
-* `EntityAuthor` – implements the `IEntityManager` interface to provide a consistent API for creating, updating, and deleting entities.  
-* `ObservationEditor` – offers a CRUD‑style UI/logic layer for hand‑crafted observations and employs an internal caching mechanism to speed up repeated reads.  
-
-Together these pieces give curators a controlled, reproducible workflow for injecting high‑quality, manually curated knowledge into the graph.
+ManualLearning is a **sub‑component** of the larger **KnowledgeManagement** component. Its concrete implementation lives in the `entity_editor.py` file where the `EntityEditor` class resides, and it orchestrates a suite of existing modules to enable human‑driven curation of the knowledge graph. When a user edits or creates an entity, ManualLearning routes the request through `EntityEditor`, persists the change with the shared `PersistenceAgent` (defined in `persistence_agent.py`), validates and types the entity via the **OntologyClassification** module, and finally injects the new or updated node into the graph using the **Graphology** library. In addition, ManualLearning can enrich the curated knowledge by invoking the **CodeKnowledgeGraphConstruction** module for code‑specific entities and by leveraging the **VKB API** (also used by the sibling **IntelligentQuerying** component) to provide smart query support for the manually created content.
 
 ---
 
 ## Architecture and Design  
 
-### Modular Sub‑Component within KnowledgeManagement  
-ManualLearning is deliberately isolated as a **module** under the parent `KnowledgeManagement` component. This mirrors the sibling components (e.g., `OnlineLearning`, `EntityPersistence`, `OntologyClassification`) that each own a focused responsibility. The design follows a **separation‑of‑concerns** principle: ManualLearning focuses exclusively on human‑in‑the‑loop entity creation, while validation and classification are delegated to the sibling `OntologyClassification` component via its public API.
+The architecture that emerges from the observations is a **modular, component‑centric design** in which each responsibility is encapsulated in a dedicated library or class. ManualLearning does not implement low‑level persistence, ontology handling, or graph manipulation itself; instead, it **acts as a façade/mediator** that coordinates the following collaborators:
 
-### Interface‑Based Consistency  
-`EntityAuthor` implements the `IEntityManager` interface, a contract shared across other entity‑management modules (such as those in `EntityPersistence`). By conforming to a common interface, ManualLearning can be swapped or extended without breaking callers that rely on `IEntityManager` methods like `createEntity`, `updateEntity`, and `deleteEntity`. This reflects an **interface segregation** design decision that keeps each module’s public surface minimal and purpose‑specific.
+1. **EntityEditor (`entity_editor.py`)** – the UI‑oriented entry point for manual edits.  
+2. **PersistenceAgent (`persistence_agent.py`)** – the shared persistence layer also used by the sibling **EntityPersistence** and **OntologyClassification** components.  
+3. **VKB API** – the external intelligent‑query service, the same service consumed by **IntelligentQuerying**.  
+4. **OntologyClassification** – provides entity typing and ensures metadata consistency.  
+5. **Graphology** – the graph‑construction library that underpins the knowledge‑graph data structures.  
+6. **CodeKnowledgeGraphConstruction** – a specialist module that translates code artifacts into graph entities.
 
-### CRUD‑Style Observation Management  
-`ObservationEditor` presents a classic **CRUD** pattern for observations: create, read, update, delete. The class abstracts persistence details behind its methods, allowing the UI or downstream agents to manipulate observations without knowing the underlying storage mechanism. This aligns with the **Repository** style often seen in the sibling `EntityPersistence` component, reinforcing a consistent data‑access idiom across the codebase.
+The **dependency graph** is therefore shallow: ManualLearning imports the `EntityEditor` class directly, while the other collaborators are accessed through their public interfaces (e.g., `PersistenceAgent.save_entity()`, `OntologyClassification.classify()`). This reflects a **separation‑of‑concerns** pattern that keeps manual‑learning logic independent of storage, ontology, or graph details. The reuse of `PersistenceAgent` across multiple siblings demonstrates intentional **shared service** design, reducing duplication and guaranteeing a single source of truth for entity storage.
 
-### Rule‑Based Validation with External API  
-`EntityValidator` combines two sources of truth: a static `validation_rules.json` file that defines local constraints, and the external **VKB API** that provides canonical ontology checks. The validator first applies the JSON‑defined rules (e.g., required fields, value ranges) and then invokes VKB endpoints to confirm that the entity conforms to the global ontology. This two‑layer approach implements a **defense‑in‑depth** validation strategy, reducing reliance on a single source of truth.
-
-### Caching for Observation Reads  
-To avoid repeated expensive fetches (potentially involving VKB calls or disk I/O), `ObservationEditor` incorporates an internal caching layer. While the exact cache implementation is not detailed, the presence of a caching mechanism indicates a **performance‑optimization** pattern akin to the **Cache‑Aside** strategy: reads first check the cache, and on a miss the data is retrieved and then stored for subsequent accesses.
+Because ManualLearning sits under the **KnowledgeManagement** parent, it inherits the parent’s overall responsibilities for centralizing knowledge. The sibling components (OnlineLearning, GraphDatabaseStorage, etc.) each provide complementary capabilities—online extraction, low‑level storage, etc.—and ManualLearning consumes their public APIs rather than coupling to internal implementations. This yields a **plug‑and‑play** style where new knowledge‑curation workflows could be added without reshaping the core graph or persistence layers.
 
 ---
 
 ## Implementation Details  
 
-### File Structure  
-```
-manual_learning/
-│
-├─ entity_templates/          # Pre‑defined JSON/YAML templates for manual entity creation
-│   └─ <template files>
-│
-├─ validation_rules.json     # JSON document describing rule set for EntityValidator
-│
-├─ EntityValidator.py        # Class that validates entities using VKB API + local rules
-│
-├─ EntityAuthor.py           # Implements IEntityManager, provides create/update/delete
-│
-└─ ObservationEditor.py      # CRUD interface for observations with an internal cache
-```
+* **EntityEditor (`entity_editor.py`)** – The only concrete file mentioned. The class likely exposes methods such as `edit_entity()`, `create_entity()`, and `apply_changes()`. These methods accept raw user input, perform validation, and then delegate to downstream services. Because ManualLearning “contains” EntityEditor, the sub‑component’s public API is essentially the editor’s methods.
 
-### EntityValidator  
-* **Inputs:** a manually created entity instance (usually produced from a template in `entity_templates/`).  
-* **Process:**  
-  1. Load `validation_rules.json` (parsed once, likely at class initialization).  
-  2. Apply each rule to the entity – checks include mandatory attributes, type constraints, and cross‑field consistency.  
-  3. If the local checks pass, the validator issues a request to the **VKB API** (the same API used by `OntologyClassification`) to confirm that the entity’s type, relationships, and identifiers exist in the central ontology.  
-* **Outputs:** a validation result object (success/failure) and a collection of error messages.  
+* **PersistenceAgent** – Although the source file is not listed in the observations, its class name appears in both ManualLearning and its siblings **EntityPersistence** and **OntologyClassification**. ManualLearning calls the agent to **store** newly curated entities (`PersistenceAgent.save_entity(entity)`) and to **retrieve** existing ones for editing (`PersistenceAgent.load_entity(id)`). The shared usage ensures that all components read and write to the same underlying storage (LevelDB, as noted in the sibling **GraphDatabaseStorage**).
 
-Because the validator directly contacts the VKB service, it is a **boundary component** that bridges ManualLearning with the broader knowledge ecosystem.
+* **VKB API Integration** – ManualLearning leverages the same VKB API used by **IntelligentQuerying**. After an entity is edited, ManualLearning may invoke a query like `vkb.query_intent(entity_text)` to enrich the entity with inferred relationships or to surface similar entities for the curator’s review.
 
-### EntityAuthor (IEntityManager)  
-Implements the methods defined by `IEntityManager`:
+* **OntologyClassification** – The module supplies a function (e.g., `OntologyClassification.classify(entity)`) that assigns a type label and validates that the entity’s metadata conforms to the system’s ontology. ManualLearning calls this before persisting, guaranteeing that manually curated data does not violate the global schema.
 
-* `createEntity(templateId, overrides)` – loads a template from `entity_templates/`, merges any curator‑provided overrides, runs the `EntityValidator`, and on success forwards the entity to the persistence layer (via `EntityPersistence` sibling).  
-* `updateEntity(entityId, changes)` – fetches the existing entity, applies changes, re‑validates, and persists.  
-* `deleteEntity(entityId)` – invokes the appropriate delete routine in the persistence sibling, ensuring any dependent observations are also cleaned up.
+* **Graphology** – This third‑party library is the engine for constructing and updating the knowledge graph. ManualLearning passes the fully typed entity to Graphology’s API (`graph.add_node(entity)`) and may also invoke edge‑creation helpers to link the new node to existing structures.
 
-By delegating persistence to a sibling component, `EntityAuthor` stays lightweight and focused on **authoring logic**.
+* **CodeKnowledgeGraphConstruction** – When a manually created entity represents code (e.g., a function or class), ManualLearning forwards the raw code artifact to this module (`CodeKGConstruction.ingest(code_blob)`). The module translates the code into graph nodes/edges that are then merged into the main graph via Graphology.
 
-### ObservationEditor  
-Provides the following CRUD methods:
-
-* `createObservation(data)` – stores a new observation, populates the cache entry.  
-* `readObservation(id)` – checks the internal cache first; on miss, retrieves the observation (likely via a repository in `ObservationManagement`) and caches it.  
-* `updateObservation(id, data)` – updates the underlying store and refreshes the cache.  
-* `deleteObservation(id)` – removes the observation from the store and evicts it from the cache.
-
-The caching mechanism is transparent to callers, giving a performance boost for frequent read‑heavy workflows (e.g., UI panels that repeatedly display the same observation while a curator edits related entities).
-
-### Interaction with OntologyClassification  
-ManualLearning does **not** implement its own ontology logic; instead, it relies on the sibling `OntologyClassification` component. When `EntityValidator` calls the VKB API, the underlying service is the same one used by `OntologyClassifier`. This shared dependency reduces duplication and ensures that manual entities are classified using the same taxonomy as automatically extracted ones.
+The overall flow can be summarized as: **User Input → EntityEditor → OntologyClassification → PersistenceAgent ↔ Graphology → (optional) CodeKnowledgeGraphConstruction → VKB enrichment**. Each step is isolated, making the pipeline easy to test and replace.
 
 ---
 
 ## Integration Points  
 
-1. **Parent – KnowledgeManagement**  
-   * ManualLearning is registered under the `KnowledgeManagement` umbrella, meaning its services are discoverable via the same dependency injection or service registry used by other sub‑components.  
-   * Any global configuration (e.g., VKB API credentials, cache policies) defined at the KnowledgeManagement level propagates down to ManualLearning.
+ManualLearning’s integration surface is defined by the **public interfaces** of its collaborators:
 
-2. **Sibling – OntologyClassification**  
-   * Validation of entities (`EntityValidator`) calls the VKB API, which is the same endpoint used by `OntologyClassifier`. This creates a tight coupling on the ontology service contract; any change to the VKB API version must be coordinated across both components.
+| Integration Target | Interface / Class | Role in ManualLearning |
+|--------------------|-------------------|------------------------|
+| **EntityEditor** | `EntityEditor` (entity_editor.py) | Captures manual edit actions and provides a clean API for the sub‑component |
+| **PersistenceAgent** | `PersistenceAgent` (persistence_agent.py) | Persists curated entities and retrieves them for further edits |
+| **VKB API** | `vkb_client` (exposed by IntelligentQuerying) | Supplies intelligent query results and intent detection for manual entries |
+| **OntologyClassification** | `OntologyClassification` module | Enforces ontology compliance and assigns type metadata |
+| **Graphology** | Graphology library functions (`add_node`, `add_edge`, etc.) | Materializes entities in the knowledge graph |
+| **CodeKnowledgeGraphConstruction** | `CodeKnowledgeGraphConstruction` module | Transforms code artifacts into graph representations |
+| **Parent – KnowledgeManagement** | Component aggregation API | ManualLearning registers its curated entities with the parent’s central repository |
+| **Sibling – EntityPersistence** | Shared `PersistenceAgent` | Guarantees consistent storage semantics across manual and automated pipelines |
+| **Sibling – GraphDatabaseStorage** | LevelDB backend (via GraphDatabaseStorage) | Underlying storage engine that ultimately holds the graph data persisted by PersistenceAgent |
 
-3. **Sibling – EntityPersistence**  
-   * After successful validation, `EntityAuthor` forwards entities to `EntityPersistence` (via the `GraphDatabaseConnector` in that sibling) for storage in the graph database. The interface between them is likely a simple DTO or a domain model object.
-
-4. **Child Components**  
-   * `EntityValidator`, `EntityAuthoring`, and `ObservationManagement` are exposed as child modules within ManualLearning. External callers (e.g., UI layers, workflow orchestrators) interact with these children rather than with ManualLearning directly.
-
-5. **External – VKB API**  
-   * Both validation and classification depend on the external VKB service. Network latency, rate limits, and authentication handling are therefore cross‑cutting concerns for ManualLearning.
-
-6. **Caching Layer**  
-   * The internal cache of `ObservationEditor` may be backed by an in‑process LRU store or a shared cache (e.g., Redis) if configured at the KnowledgeManagement level. The cache’s eviction policy influences how fresh observation data appears to users.
+All interactions are **unidirectional** from ManualLearning to the collaborators, except for the shared `PersistenceAgent`, which may emit events that other siblings (e.g., **OnlineLearning**) can listen to for incremental learning. The design therefore encourages loose coupling while still enabling rich cross‑component behavior.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always validate before persisting.** Curators must invoke `EntityValidator` (implicitly through `EntityAuthor.createEntity` or `updateEntity`) to guarantee that both local rules and the global ontology are satisfied. Skipping validation can corrupt the knowledge graph.  
+1. **Always route manual edits through `EntityEditor`.** Direct manipulation of graph nodes bypasses validation and ontology checks, risking schema corruption.  
+2. **Invoke `OntologyClassification` before persisting.** The classification step guarantees that every entity conforms to the global ontology, which is critical for downstream query correctness.  
+3. **Persist via `PersistenceAgent` only after Graphology has successfully added the node.** This order ensures that the persisted state reflects the actual graph structure.  
+4. **When curating code entities, call `CodeKnowledgeGraphConstruction` first** to obtain a fully‑linked code sub‑graph; then merge the result into the main graph with Graphology.  
+5. **Leverage the VKB API for enrichment, but treat its responses as advisory.** Manual curators should review any suggested relationships before committing them.  
+6. **Do not duplicate persistence logic.** Reuse the shared `PersistenceAgent` rather than implementing custom storage in ManualLearning; this keeps the system’s data consistency guarantees intact.  
+7. **Respect the parent‑child contract:** ManualLearning should expose a clean method (e.g., `register_entity(entity)`) that KnowledgeManagement can call to incorporate the curated entity into the global repository.
 
-* **Leverage entity templates.** When creating a new entity, start from a file in `manual_learning/entity_templates/`. Templates encode the minimal required structure and reduce the chance of rule violations. Use the `overrides` argument to customize fields rather than editing the template directly.  
-
-* **Respect the cache semantics.** `ObservationEditor` caches read observations; if an observation is modified outside the editor (e.g., via a batch import), explicitly call `ObservationEditor.evictCache(id)` or refresh the observation to avoid stale data.  
-
-* **Handle VKB API failures gracefully.** Because validation reaches out to an external service, wrap calls in retry logic and surface meaningful error messages to the curator UI. Consider fallback to “offline validation” using only `validation_rules.json` if the VKB service is temporarily unavailable, but flag the entity for later re‑validation.  
-
-* **Do not bypass the IEntityManager contract.** Directly manipulating the underlying persistence layer (e.g., calling GraphDatabaseConnector) from ManualLearning code circumvents the consistency checks performed by `EntityAuthor`. All entity lifecycle operations should go through the `IEntityManager` methods.  
-
-* **Version control of templates and rules.** Both `entity_templates/` and `validation_rules.json` should be stored in source control. Any change to a template or rule set must be reviewed, as it can affect all downstream manual entities.  
-
-* **Testing strategy.** Unit tests should mock the VKB API and verify that `EntityValidator` correctly applies the JSON rules. Integration tests should spin up a test instance of the VKB service (or a stub) to confirm end‑to‑end validation and classification.  
+Following these conventions keeps ManualLearning aligned with the broader KnowledgeManagement ecosystem and minimizes integration friction.
 
 ---
 
-### Summary of Requested Deliverables  
+### Architectural patterns identified  
+* **Facade / Mediator** – ManualLearning provides a single entry point that coordinates several specialized services.  
+* **Separation of Concerns** – Editing, persistence, ontology handling, graph construction, and external querying are each isolated in their own module.  
+* **Shared Service** – `PersistenceAgent` is a common service reused across multiple sibling components.  
 
-| Item | Observation‑Based Insight |
-|------|---------------------------|
-| **Architectural patterns identified** | Interface segregation (`IEntityManager`), CRUD/Repository pattern (`ObservationEditor`), Rule‑based validation with external service (defense‑in‑depth), Cache‑Aside performance pattern, Modular sub‑component isolation within a parent component. |
-| **Design decisions and trade‑offs** | *Decision*: Separate manual authoring from automated pipelines → *Trade‑off*: Requires explicit validation step and extra API calls. <br> *Decision*: Use shared VKB API for both validation and classification → *Trade‑off*: Tight coupling to external service; any downtime impacts manual workflows. <br> *Decision*: Cache observations locally → *Trade‑off*: Potential stale reads; must manage cache invalidation. |
-| **System structure insights** | ManualLearning sits under `KnowledgeManagement`, shares the VKB API with `OntologyClassification`, and forwards persisted entities to `EntityPersistence`. Its children (`EntityValidator`, `EntityAuthoring`, `ObservationManagement`) expose focused responsibilities, mirroring the sibling components’ specialization. |
-| **Scalability considerations** | Validation latency scales with VKB API performance; batching or async validation could be added if manual throughput grows. The observation cache can be expanded to a distributed cache if multiple curator instances run concurrently. Template and rule files are static; large numbers of templates may need indexing for quick lookup. |
-| **Maintainability assessment** | High maintainability thanks to clear interface boundaries (`IEntityManager`) and isolated rule files (`validation_rules.json`). The reliance on external VKB API introduces a single point of failure, but centralizing ontology logic there also reduces duplicated code. Adding new validation rules is a matter of editing JSON, while extending authoring capabilities only requires conforming to `IEntityManager`. Overall, the module’s modular layout and explicit contracts support easy evolution. |
+### Design decisions and trade‑offs  
+* **Reuse vs. Duplication:** Choosing a shared `PersistenceAgent` reduces code duplication and ensures a single source of truth, at the cost of tighter coupling between ManualLearning and other components that also depend on it.  
+* **Explicit Validation Layer:** Placing ontology classification before persistence adds an extra step that improves data quality but introduces latency for each manual edit.  
+* **Optional Code‑KG Integration:** By delegating code‑specific processing to `CodeKnowledgeGraphConstruction`, ManualLearning stays lightweight; however, it must handle the additional failure modes that arise from code parsing.  
+
+### System structure insights  
+* ManualLearning sits one level below **KnowledgeManagement** and above **EntityEditor**, forming a clear vertical hierarchy.  
+* Its horizontal relationships with siblings (OnlineLearning, EntityPersistence, etc.) are defined by shared libraries (`PersistenceAgent`, VKB API) rather than direct calls, indicating a loosely coupled ecosystem.  
+
+### Scalability considerations  
+* **Edit Throughput:** Manual edits are human‑driven, so the load is naturally bounded, but the component should still be thread‑safe because `PersistenceAgent` and Graphology may be accessed concurrently by other automated pipelines.  
+* **Graph Growth:** Since Graphology and LevelDB (via GraphDatabaseStorage) handle the underlying graph, ManualLearning’s scalability largely depends on those layers; the component itself adds negligible overhead.  
+* **External API Calls:** VKB queries introduce network latency; caching query results or batching enrichments can mitigate performance impacts as the number of curated entities rises.  
+
+### Maintainability assessment  
+* **High maintainability** stems from the clear modular boundaries: any change to the editing UI stays within `EntityEditor`, while storage changes are confined to `PersistenceAgent`.  
+* **Shared dependencies** (e.g., `PersistenceAgent`) require coordinated versioning; a breaking change in the agent could ripple across ManualLearning and its siblings.  
+* **Documentation focus:** Because ManualLearning orchestrates many external modules, comprehensive interface contracts (method signatures, expected return types) are essential to prevent integration bugs.  
+
+Overall, ManualLearning exemplifies a well‑structured, extensible sub‑component that leverages existing infrastructure while providing a focused, human‑centric knowledge‑curation workflow.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, including entity persistence, graph database interactions, and intelligent routing for database access. It utilizes various technologies such as Graphology, LevelDB, and VKB API to provide a comprehensive knowledge management system. The component's architecture is designed to support multiple agents, including CodeGraphAgent and PersistenceAgent, which work together to analyze code, extract concepts, and store entities in the graph database.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component plays a vital role in the overall system, providing a centralized repository of knowledge that can be leveraged by various tools and agents. Its ability to integrate with multiple systems and technologies makes it a key enabler of the system's functionality. The component's use of advanced technologies, such as Graphology and LevelDB, ensures that it can handle complex knowledge management tasks efficiently and effectively.
 
 ### Children
-- [EntityValidator](./EntityValidator.md) -- The EntityValidator class utilizes the VKB API to validate entities, as seen in the EntityValidator class of the ManualLearning sub-component
-- [EntityAuthoring](./EntityAuthoring.md) -- The EntityAuthoring module is a key component of the ManualLearning sub-component, enabling curators to create and edit entities
-- [ObservationManagement](./ObservationManagement.md) -- The ObservationManagement module is a crucial part of the ManualLearning sub-component, allowing for the management of observations
+- [EntityEditor](./EntityEditor.md) -- The EntityEditor class is used in the ManualLearning sub-component to handle manual edits and updates to entities, as indicated by the parent context.
 
 ### Siblings
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the LevelDB database to store extracted knowledge in the KnowledgeExtractor class
-- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses the Graphology library to interact with the graph database in the GraphDatabaseConnector class
-- [GraphDatabaseInteraction](./GraphDatabaseInteraction.md) -- GraphDatabaseInteraction uses the VKB API to manage graph database interactions in the GraphDatabaseRouter class
-- [CodeAnalysis](./CodeAnalysis.md) -- CodeAnalysis uses the AST-based approach to analyze code and extract concepts in the CodeAnalyzer class
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification uses the VKB API to manage ontology classification and entity validation in the OntologyClassifier class
-- [TraceReporting](./TraceReporting.md) -- TraceReporting uses the VKB API to generate trace reports in the TraceReporter class
-- [AgentManagement](./AgentManagement.md) -- AgentManagement uses the VKB API to manage agents in the AgentManager class
-- [WorkflowManagement](./WorkflowManagement.md) -- WorkflowManagement uses the VKB API to manage workflows in the WorkflowManager class
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the BatchAnalysisPipeline class in the batch_analysis.py file to extract knowledge from git history and LSL sessions.
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses the PersistenceAgent class in the persistence_agent.py file to store and retrieve entities from the knowledge graph.
+- [GraphDatabaseStorage](./GraphDatabaseStorage.md) -- GraphDatabaseStorage uses the LevelDB database to store and retrieve knowledge graph data.
+- [IntelligentQuerying](./IntelligentQuerying.md) -- IntelligentQuerying uses the VKB API to provide intelligent querying capabilities for the knowledge graph.
+- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification uses the PersistenceAgent class in the persistence_agent.py file to handle ontology classification and entity typing.
+- [CodeKnowledgeGraphConstruction](./CodeKnowledgeGraphConstruction.md) -- CodeKnowledgeGraphConstruction uses the CodeGraphAgent class in the code_graph_agent.py file to construct the code knowledge graph.
+- [KnowledgeGraphManager](./KnowledgeGraphManager.md) -- KnowledgeGraphManager uses the GraphDatabaseStorage module to handle storage and retrieval of knowledge graph data.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

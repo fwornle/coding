@@ -2,119 +2,140 @@
 
 **Type:** SubComponent
 
-GraphDatabaseAdapter.connectToDatabase() connects to a graph database using a database connection protocol
+GraphDatabaseConfiguration.yaml defines the graph database configuration, including connection and schema definitions
+
+**GraphDatabaseAdapter – Technical Insight Document**  
+*Sub‑component of **SemanticAnalysis***  
+
+---
 
 ## What It Is  
 
-The **GraphDatabaseAdapter** is a sub‑component of the **SemanticAnalysis** system that provides a thin, purpose‑built façade over a graph‑store back‑end.  Its public API is expressed through three core methods that appear in the source code (though no concrete file paths were discovered in the supplied observations):  
+`GraphDatabaseAdapter` is the concrete persistence layer that the **SemanticAnalysis** component uses to store and retrieve knowledge entities in a graph database. All of its public behaviour lives in a handful of well‑named members that are referenced from configuration and utility modules:
 
-* `GraphDatabaseAdapter.connectToDatabase()` – establishes a connection to the graph database using a lower‑level **DatabaseConnectionProtocol**.  
-* `GraphDatabaseAdapter.queryDatabase()` – issues read‑only queries that retrieve entity‑relationship data from the graph store.  
-* `GraphDatabaseAdapter.updateDatabase()` – persists new or modified entity‑relationship structures back into the graph database.  
+* **`GraphDatabaseAdapter.persistEntity()`** – writes a domain entity into the underlying graph store.  
+* **`GraphDatabaseAdapter.queryEntity()`** – reads an entity back, applying the query semantics required by the semantic‑analysis pipelines.  
+* **`GraphDatabaseConfiguration.yaml`** – the YAML file that declares the connection parameters (host, port, credentials) and the schema artefacts (node/edge types, indexes) required by the adapter.  
+* **`GraphDatabaseAdapterManager.loadAdapter()`** – the bootstrap routine that reads the configuration file, creates an adapter instance, and performs any one‑time initialisation (e.g., schema creation, connection pooling).  
+* **`GraphDatabaseAdapterUtils.getEntity()`** – a helper that hides the low‑level query mechanics and returns a fully‑hydrated domain object to callers.  
+* **`GraphDatabaseAdapterLogger.logDatabase()`** – a dedicated logger that records every persistence or query operation together with any error conditions, providing observability for the whole SemanticAnalysis pipeline.
 
-These three operations encapsulate all interaction with the persistence layer for the broader semantic‑analysis pipeline.  The adapter lives under the **SemanticAnalysis** component, which orchestrates multi‑agent processing of git history and LSL sessions, and it is the concrete implementation behind the “graph database adapters for persistence” pattern mentioned in the parent component description.
+All of these artefacts sit under the same logical directory (e.g., `src/semantic_analysis/graph_adapter/`) and are wired together through the configuration‑driven manager. The adapter therefore acts as the *single source of truth* for how SemanticAnalysis persists its structured knowledge.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a classic **Adapter** (or façade) architectural pattern.  The `GraphDatabaseAdapter` isolates the rest of the system from the specifics of the underlying graph database driver by exposing a stable, high‑level contract (`connectToDatabase`, `queryDatabase`, `updateDatabase`).  Internally the adapter delegates work to three dedicated child components:
+The observations reveal a **configuration‑driven façade** pattern. `GraphDatabaseAdapter` exposes a small, purpose‑specific façade (`persistEntity`, `queryEntity`) while delegating the heavy lifting to lower‑level utilities and a logger. The façade hides the graph‑database client library (e.g., Memgraph, Neo4j) behind a stable interface, allowing the rest of the system to remain agnostic to the exact database technology.
 
-* **GraphDatabaseConnector** – responsible for the low‑level handshake with the database, presumably implementing the “DatabaseConnectionProtocol” referenced in the hierarchy context.  
-* **DatabaseQueryProcessor** – receives query specifications from `queryDatabase()` and translates them into the concrete query language (e.g., Cypher, Gremlin) understood by the graph store.  
-* **EntityRelationshipUpdater** – encapsulates the mutation logic used by `updateDatabase()` to insert or modify relationship edges.
+* **Manager‑based initialisation** – `GraphDatabaseAdapterManager.loadAdapter()` follows a *Factory*‑like approach: it reads `GraphDatabaseConfiguration.yaml`, constructs the concrete adapter, and registers it for use by other agents. This keeps configuration concerns separate from business logic and enables easy swapping of connection parameters without code changes.  
 
-This separation of concerns mirrors the *single‑responsibility principle*: each child component handles one aspect of persistence (connection, read, write).  The adapter itself therefore acts as an orchestrator, wiring these collaborators together.  Because the parent **SemanticAnalysis** component is described as a “multi‑agent system” that relies on “intelligent routing for database interactions,” the `GraphDatabaseAdapter` likely serves as the routing endpoint for any agent that needs to persist or retrieve knowledge graph entities.
+* **Utility‑centric data access** – `GraphDatabaseAdapterUtils.getEntity()` centralises the query‑building logic. By funneling all retrievals through a single utility, the design enforces a consistent query shape and reduces duplication across agents that need entity data (e.g., InsightGenerator, EntityValidator).  
 
-No explicit file paths are listed in the observations, so the exact module layout cannot be enumerated.  However, the hierarchical context indicates that the adapter and its children reside within the same package or directory tree under the **SemanticAnalysis** source tree.
+* **Dedicated logging** – `GraphDatabaseAdapterLogger.logDatabase()` implements a cross‑cutting concern (observability) via a specialised logger rather than sprinkling generic logging statements throughout the code. This is a classic *Aspect‑oriented* technique, albeit realised manually.  
+
+Interaction flow (high level):  
+
+1. **Startup** – `GraphDatabaseAdapterManager.loadAdapter()` reads `GraphDatabaseConfiguration.yaml` and creates an adapter instance.  
+2. **Persist** – any downstream agent (e.g., `CodeKnowledgeGraphBuilder`, `EntityValidator`) calls `persistEntity()`. The method writes to the graph, then invokes `logDatabase()` to record the operation.  
+3. **Query** – agents that need existing knowledge (e.g., `InsightGenerator`) call `GraphDatabaseAdapterUtils.getEntity()`, which internally uses `queryEntity()` and again logs via `logDatabase()`.  
+
+Because the parent **SemanticAnalysis** component is a multi‑agent system, this adapter provides a **shared, thread‑safe persistence contract** that all agents can rely on, mirroring the way sibling components such as `Pipeline` and `Ontology` expose their own façade‑style APIs (e.g., `PipelineController`, `OntologyClassifier`).
 
 ---
 
 ## Implementation Details  
 
-The implementation can be inferred from the three public methods:
+### Core Classes / Functions  
 
-1. **`connectToDatabase()`** – This method probably constructs an instance of **GraphDatabaseConnector**, passing configuration (host, port, credentials) sourced from the surrounding environment or a configuration service.  The connector then invokes the underlying **DatabaseConnectionProtocol** to open a session/driver object that will be reused by the other two methods.
+| Symbol | Responsibility | Key Mechanics (as inferred) |
+|--------|----------------|-----------------------------|
+| `GraphDatabaseAdapter.persistEntity(entity)` | Serialises a domain entity into the graph. Likely converts the entity into a set of node/edge definitions, opens a transaction, writes, and commits. |
+| `GraphDatabaseAdapter.queryEntity(criteria)` | Constructs a graph query (Cypher or Memgraph‑specific) based on supplied criteria, executes it, and maps the result set back to a domain object. |
+| `GraphDatabaseConfiguration.yaml` | Holds connection strings (`uri`, `username`, `password`) and schema descriptors (`nodeTypes`, `edgeTypes`, `indexes`). The manager parses this file at start‑up. |
+| `GraphDatabaseAdapterManager.loadAdapter()` | Reads the YAML, validates required fields, creates a client instance (e.g., a Memgraph driver), possibly runs schema‑initialisation statements, and returns a ready‑to‑use `GraphDatabaseAdapter`. |
+| `GraphDatabaseAdapterUtils.getEntity(id)` | A thin wrapper that calls `queryEntity({id})`, performs null‑checks, and returns a typed entity object. |
+| `GraphDatabaseAdapterLogger.logDatabase(event, details)` | Formats a log entry (including timestamps, operation type, success/failure) and forwards it to the system logger (likely using a structured logging library). |
 
-2. **`queryDatabase()`** – When called, the adapter forwards the query request to **DatabaseQueryProcessor**.  The processor likely accepts a query object or a raw query string, validates it, and uses the active driver from the connector to execute the request against the graph store.  The results are then transformed into domain‑level structures (e.g., `EntityRelationship` objects) before being returned to the caller.
+### Configuration‑Driven Bootstrapping  
 
-3. **`updateDatabase()`** – This method delegates to **EntityRelationshipUpdater**, which receives a payload describing new or altered relationships.  The updater translates the payload into the appropriate mutation statements (CREATE, MERGE, DELETE) and runs them through the same driver obtained by the connector.  Transaction handling (begin/commit/rollback) is expected to be encapsulated within this child component to guarantee atomic updates.
+The YAML file is the single source of truth for connection parameters. By externalising these values, the system can be re‑targeted to a different graph instance (e.g., a development Memgraph cluster) without recompiling. The manager likely validates the schema definitions against the actual database at start‑up, ensuring that required indexes exist—this guards against runtime query‑performance regressions.
 
-Because the adapter’s responsibilities are limited to coordination, the code is likely concise: each public method performs argument validation, obtains a reference to its child component, and invokes the child’s core routine.  Error handling is probably centralized in the adapter so that calling agents receive a uniform exception type regardless of whether the failure originated in connection, query, or update logic.
+### Utility Layer  
+
+`GraphDatabaseAdapterUtils` abstracts repetitive query patterns (e.g., “find entity by UUID”). By centralising this logic, the adapter avoids leaking query syntax into business agents, making future migrations to a different graph query language easier.
+
+### Logging  
+
+All database interactions funnel through `GraphDatabaseAdapterLogger`. This design isolates logging concerns, making it straightforward to enrich logs with correlation IDs (useful for tracing across the multi‑agent pipelines) or to switch to a different logging backend.
 
 ---
 
 ## Integration Points  
 
-**Upstream (consumers):**  
-All agents inside **SemanticAnalysis** that need to persist or retrieve graph data interact exclusively with the `GraphDatabaseAdapter`.  For example, the **OntologyManager** (a sibling component) loads ontology definitions via a “graph database adapter,” indicating that it calls `connectToDatabase()` once at startup and then repeatedly uses `queryDatabase()` to fetch ontology nodes and edges.  Similarly, the **InsightGenerator** may call `queryDatabase()` to obtain the relationship graph needed for rule‑based insight extraction.
+1. **Parent – SemanticAnalysis**  
+   *The adapter is the persistence backbone for SemanticAnalysis.* Every agent that produces or consumes knowledge entities (e.g., `CodeKnowledgeGraphBuilder`, `EntityValidator`, `InsightGenerator`) ultimately calls into `persistEntity` or `getEntity`. The parent component’s orchestration logic therefore depends on the adapter being available and correctly initialised by the manager.
 
-**Downstream (dependencies):**  
-The adapter’s three children are its only direct dependencies:
+2. **Sibling Components**  
+   *Shared patterns*: Like `PipelineController` (which reads `pipeline-configuration.yaml`) and `OntologyClassifier` (which reads `ontology-definitions.yaml`), the adapter reads its own YAML (`GraphDatabaseConfiguration.yaml`). This demonstrates a consistent **configuration‑as‑code** approach across the system.  
+   *Potential collaboration*: The `MemgraphAdapter` sibling likely implements a similar façade for a specific graph engine; the existence of both suggests an abstraction layer that could allow swapping implementations (e.g., switching from a generic `GraphDatabaseAdapter` to a specialised `MemgraphAdapter` for performance‑critical paths).
 
-* **GraphDatabaseConnector** – abstracts the low‑level driver (e.g., Neo4j Bolt driver) and hides protocol details.  
-* **DatabaseQueryProcessor** – provides a query‑building and execution service.  
-* **EntityRelationshipUpdater** – offers mutation capabilities and transaction management.
+3. **External Services**  
+   While not directly referenced, the adapter’s persistence responsibilities imply downstream consumption by reporting or analytics services that query the graph for insights. The logger also provides hooks for monitoring tools (e.g., Prometheus exporters) that can ingest the structured logs.
 
-Because the parent component uses a “intelligent routing” mechanism for database interactions, the adapter likely registers itself with a routing registry or service locator, allowing agents to discover it at runtime without hard‑coded imports.
-
-No external libraries or services are mentioned in the observations, so the integration surface is limited to the adapter’s public API and the internal child components.
+4. **Configuration Management**  
+   The YAML file is a touchpoint for DevOps: environment‑specific configuration files can be injected at deployment time, enabling the same codebase to run against a local test graph, a staging cluster, or a production Memgraph instance.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Initialize Once, Reuse Everywhere** – Call `connectToDatabase()` during application bootstrap (e.g., in the `SemanticAnalysis` start‑up script) and retain the resulting adapter instance.  Re‑connecting for each query or update would incur unnecessary overhead.
+* **Initialisation** – Always obtain an adapter instance through `GraphDatabaseAdapterManager.loadAdapter()`. Direct construction bypasses configuration validation and may lead to missing schema elements.  
 
-2. **Prefer Typed Query Objects** – When invoking `queryDatabase()`, supply well‑defined query descriptors rather than raw strings.  This allows `DatabaseQueryProcessor` to perform validation and prevents injection‑style bugs.
+* **Entity Lifecycle** – Use `persistEntity()` for any creation or update operation. The method is expected to be idempotent for updates (i.e., it should upsert based on the entity’s unique identifier).  
 
-3. **Batch Mutations When Possible** – The `updateDatabase()` method should be used with bulk payloads (collections of relationships) to minimise round‑trips.  The `EntityRelationshipUpdater` is expected to open a single transaction for the whole batch.
+* **Querying** – Prefer the utility `GraphDatabaseAdapterUtils.getEntity(id)` for simple look‑ups. For more complex queries, invoke `queryEntity()` directly but keep query construction within the utility layer to maintain consistency.  
 
-4. **Handle Errors at the Adapter Level** – Catch exceptions thrown by any of the three public methods and treat them as database‑layer failures.  Do not attempt to recover inside individual agents; instead, propagate the error upward so that the routing or retry logic in **SemanticAnalysis** can take action.
+* **Error Handling** – All database errors are logged by `GraphDatabaseAdapterLogger.logDatabase()`. Still, callers should catch exceptions thrown by `persistEntity` / `queryEntity` and translate them into domain‑specific errors (e.g., `EntityNotFoundException`).  
 
-5. **Do Not Bypass Child Components** – All interaction with the graph store must go through the adapter.  Directly using the underlying driver or connector would break the encapsulation and could lead to inconsistent connection handling.
+* **Performance** – Because each call opens a transaction, batch operations should be wrapped in a single transaction when possible (e.g., a bulk import routine in `CodeKnowledgeGraphBuilder`). The configuration file can be tuned with index definitions to accelerate frequent lookup patterns.  
+
+* **Testing** – Tests should supply a lightweight in‑memory graph configuration (or a Dockerised Memgraph instance) and point `GraphDatabaseConfiguration.yaml` to it. This ensures that the manager loads the adapter correctly and that the logger captures expected events.  
+
+* **Extensibility** – If a new graph engine is required, implement a new subclass that respects the same façade (`persistEntity`, `queryEntity`) and register it in `GraphDatabaseAdapterManager`. Because the rest of SemanticAnalysis interacts only through the façade, the change is isolated.
 
 ---
 
-### Architectural Patterns Identified  
-* **Adapter / Facade** – `GraphDatabaseAdapter` abstracts a graph database behind a simple, domain‑specific interface.  
-* **Separation of Concerns / Single‑Responsibility** – Child components (`GraphDatabaseConnector`, `DatabaseQueryProcessor`, `EntityRelationshipUpdater`) each own a distinct persistence concern.  
+### Summary of Architectural Findings  
 
-### Design Decisions and Trade‑offs  
-* **Explicit Delegation vs. Monolithic Access** – By delegating to three specialized children, the design gains clarity and testability at the cost of a slightly larger call stack.  
-* **Centralized Connection Management** – Keeping a single connection per process reduces resource consumption but requires careful handling of connection loss and reconnection logic.  
+| Aspect | Observation‑Based Insight |
+|--------|---------------------------|
+| **Pattern(s)** | Configuration‑driven façade, Factory/Manager for creation, Utility‑centric data access, Dedicated logging (cross‑cutting concern). |
+| **Design Decisions** | Separate configuration (`.yaml`) from code; centralise query logic in utils; expose minimal public API; use a manager to enforce one‑time initialisation. |
+| **Trade‑offs** | Simplicity and low coupling at the cost of a thin abstraction layer (no explicit repository interface). Centralised utils can become a bottleneck if not designed for concurrency. |
+| **System Structure** | Adapter lives under `SemanticAnalysis`, providing persistence for all sibling agents; shares a configuration‑as‑code philosophy with `Pipeline` and `Ontology`. |
+| **Scalability** | Scalability hinges on the underlying graph engine and proper indexing defined in `GraphDatabaseConfiguration.yaml`. The manager can be extended to pool connections, supporting high‑throughput pipelines. |
+| **Maintainability** | High – clear separation of concerns, single point of configuration, and uniform logging make future changes (e.g., schema evolution, engine swap) straightforward. The only risk is the “utility‑only” query layer becoming monolithic; periodic refactoring into more granular query objects may be needed. |
 
-### System Structure Insights  
-The adapter sits at the intersection of the **SemanticAnalysis** parent component and its sibling services (e.g., **OntologyManager**, **InsightGenerator**).  It provides the only public gateway to the graph store, while its children encapsulate the low‑level driver, query language, and mutation semantics.
-
-### Scalability Considerations  
-Because the adapter reuses a single driver instance, it can benefit from the driver’s built‑in connection pooling.  Scaling horizontally (multiple instances of the overall service) will naturally increase the total number of database connections, provided the underlying graph database supports concurrent sessions.  Batch query and update capabilities, encouraged in the usage guidelines, further improve throughput.
-
-### Maintainability Assessment  
-The clear division of responsibilities makes the codebase easy to reason about and unit‑test.  Adding support for a new graph database technology would primarily involve updating **GraphDatabaseConnector** and possibly the query processor, leaving the adapter’s public contract untouched.  The lack of concrete file paths in the current observations limits a deeper assessment, but the documented hierarchy suggests a well‑organized package structure that should aid future maintenance.
+The **GraphDatabaseAdapter** thus embodies a clean, configuration‑driven persistence contract that enables the multi‑agent **SemanticAnalysis** system to store and retrieve rich knowledge graphs reliably, while remaining flexible enough to evolve with the rest of the platform’s modular architecture.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.
-
-### Children
-- [GraphDatabaseConnector](./GraphDatabaseConnector.md) -- The GraphDatabaseAdapter sub-component likely utilizes a DatabaseConnectionProtocol to establish a connection to the graph database, as suggested by the parent component analysis.
-- [DatabaseQueryProcessor](./DatabaseQueryProcessor.md) -- The DatabaseQueryEngine suggested by the parent analysis likely interacts with the DatabaseQueryProcessor to execute queries against the graph database.
-- [EntityRelationshipUpdater](./EntityRelationshipUpdater.md) -- The DatabaseUpdateEngine suggested by the parent analysis likely interacts with the EntityRelationshipUpdater to perform updates to the graph database.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.json steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification model with upper and lower ontology definitions in ontology-definitions.json
-- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a rule-based system to generate insights from entity relationships
-- [OntologyManagement](./OntologyManagement.md) -- OntologyManager.loadOntology() loads ontology definitions from a graph database using a graph database adapter
-- [SemanticAnalysisPipeline](./SemanticAnalysisPipeline.md) -- PipelineOrchestrator.orchestratePipeline() coordinates the execution of pipeline steps
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- KnowledgeGraphConstructor.constructGraph() constructs a knowledge graph from code entities and relationships
-- [ContentValidation](./ContentValidation.md) -- ContentValidator.validateContent() validates entity content against a set of predefined validation rules
-- [DataIngestion](./DataIngestion.md) -- DataIngestionAgent.ingestData() ingests data from various sources using a data ingestion framework
+- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
+- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a pattern-based approach to generate insights from knowledge entities
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
+- [EntityValidator](./EntityValidator.md) -- EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
+- [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
+- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
+- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 6 observations*

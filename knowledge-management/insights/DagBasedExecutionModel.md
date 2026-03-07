@@ -2,105 +2,75 @@
 
 **Type:** Detail
 
-The GraphBasedExecution (GraphBasedExecution.java:15) class implements the DAG-based execution model, allowing developers to define complex task dependencies and execute them efficiently
+The topological sort algorithm is used to order the steps in the pipeline, ensuring that steps with dependencies are executed after their dependencies have been met.
 
 ## What It Is  
 
-`DagBasedExecutionModel` lives inside the **ConcurrencyAndParallelism** package (the parent component) and is realized by the class **GraphBasedExecution** defined in *GraphBasedExecution.java* (line 15). This class implements a **directed‑acyclic‑graph (DAG)‑based execution model**, allowing developers to declare tasks together with explicit dependency edges. At runtime the model walks the DAG, guaranteeing that a task is scheduled only after all of its predecessor tasks have completed. The model is deliberately paired with the **WorkStealingAlgorithm** – specifically the `WorkStealingExecutor` implementation found in *WorkStealingExecutor.java* – to provide a complete solution for concurrent execution of the DAG‑structured workload.
+The **DagBasedExecutionModel** lives at the heart of the pipeline execution stack and is materialised through the **`pipeline-configuration.yaml`** file. This YAML document enumerates every step of a pipeline together with an explicit **`depends_on`** list that describes the directed edges of the execution graph. When the **`PipelineController`** is instantiated, it reads this configuration, builds an in‑memory directed‑acyclic graph (DAG), and then applies a **topological sort** to produce a linearised ordering that respects all declared dependencies. Because the underlying structure is a DAG, the model can identify groups of steps that have no mutual dependencies and schedule them for parallel execution, thereby improving overall throughput.
+
+In practice, the **DagBasedExecutionModel** is not a separate class file but a conceptual execution engine embedded inside the pipeline runtime. Its behaviour is driven entirely by the declarative specification found in **`pipeline-configuration.yaml`**, making the model both data‑driven and highly configurable without code changes. The model’s primary responsibility is to guarantee that every step runs **after** all of its `depends_on` ancestors have completed, while also exploiting concurrency where the graph permits.
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a **layered composition** in which the DAG execution layer sits on top of a generic work‑stealing runtime. The `GraphBasedExecution` class is the entry point for the DAG layer; it does **not** embed its own thread‑management logic but instead delegates actual task dispatch to the `WorkStealingExecutor`. This separation of concerns is evident from the observation that *DagBasedExecutionModel is designed to work in conjunction with the WorkStealingAlgorithm*.  
+The architecture follows a **declarative DAG‑driven execution pattern**. The **`PipelineController`** acts as the orchestrator: it parses **`pipeline-configuration.yaml`**, constructs a directed graph where nodes represent pipeline steps and edges represent the `depends_on` relationships, and then invokes a **topological sort algorithm** to derive a safe execution order. This algorithm is the classic depth‑first or Kahn’s algorithm implementation that ensures no step is scheduled before its prerequisites.
 
-The **parent–child relationship** is explicit: `ConcurrencyAndParallelism` aggregates the DAG model together with its sibling components – `WorkStealingAlgorithm` and `ParallelTaskManagement`. All three share the same executor implementation (`WorkStealingExecutor`) for task submission and result retrieval, which promotes a **uniform execution contract** across the concurrency toolbox.  
+Parallelism is introduced implicitly by the DAG: after the topological sort, the controller can group together steps that share the same “layer” (i.e., have no inter‑dependencies) and dispatch them to worker threads or processes. This design avoids an explicit “parallel executor” component; instead, parallelism emerges from the graph topology itself. The only explicit design pattern visible from the observations is the **configuration‑driven orchestration** pattern, where runtime behaviour is dictated by external YAML rather than hard‑coded logic.
 
-Because a DAG is a natural representation of dependency graphs, the design implicitly adopts a **graph‑oriented data structure** (nodes = tasks, edges = dependencies). The execution engine traverses this structure in a topological order, scheduling ready nodes to the work‑stealing pool. No additional architectural patterns such as “micro‑services” or “event‑driven” are introduced in the provided observations, so the design stays within the classic **graph‑driven scheduling** paradigm combined with a **work‑stealing scheduler**.
+Interaction between components is straightforward: the **`PipelineController`** reads the configuration, builds the graph, runs the sort, and then hands off each step (or batch of parallel steps) to the underlying execution engine (e.g., a step runner). Because the model is purely based on the DAG, any new step can be added simply by appending a node in **`pipeline-configuration.yaml`** with appropriate `depends_on` edges, without touching the controller code.
 
 ---
 
 ## Implementation Details  
 
-* **GraphBasedExecution (GraphBasedExecution.java:15)** – This class encapsulates the DAG logic. It likely exposes an API for:
-  * Adding tasks (vertices) and defining dependency edges.
-  * Validating that the graph remains acyclic (a prerequisite for deterministic execution).
-  * Initiating execution by handing off ready tasks to the work‑stealing runtime.
+1. **Configuration Parsing** – The entry point is the **`pipeline-configuration.yaml`** file located in the pipeline’s root directory. This file contains a list of step definitions, each with a unique identifier and a `depends_on` array that enumerates the identifiers of prerequisite steps. The parser materialises these definitions into a collection of **Step** objects (the exact class name is not specified in the observations, but the concept is clear).
 
-* **WorkStealingExecutor (WorkStealingExecutor.java:10 & :20)** – Implements the classic work‑stealing algorithm. Threads maintain local deques of tasks; when a thread’s deque empties, it “steals” work from another thread’s deque. The executor also provides the **submission** (`submit(task)`) and **result retrieval** (`getResult()`) methods referenced in the sibling component *ParallelTaskManagement*.  
+2. **Graph Construction** – Using the parsed step objects, the controller constructs an in‑memory DAG. Each step becomes a node; for every identifier listed in a step’s `depends_on`, a directed edge is added from the prerequisite node to the current node. The graph is validated to ensure it remains acyclic; any cycle detection would raise a configuration error before execution proceeds.
 
-* **Interaction Flow** – When `GraphBasedExecution` starts, it performs a topological sort (or an incremental readiness check) to identify tasks with no unmet dependencies. Those tasks are submitted to `WorkStealingExecutor`. As each task finishes, the executor notifies the DAG layer, which then marks dependent tasks as ready and submits them. This feedback loop continues until the graph is fully drained.
+3. **Topological Sort** – The controller invokes a **topological sort algorithm** (commonly Kahn’s algorithm) on the DAG. This algorithm repeatedly selects nodes with zero incoming edges, emits them into an ordered list, and removes their outgoing edges, guaranteeing that each emitted step has all its dependencies satisfied. The resulting list is the canonical execution sequence.
 
-* **Concurrency Coordination** – The model does not attempt to lock the entire graph; instead, it relies on the thread‑safe queues inside `WorkStealingExecutor`. The DAG layer only needs to atomically update the readiness state of dependent nodes, which can be achieved with lightweight concurrency primitives (e.g., `AtomicInteger` counters for pending predecessors).
+4. **Parallel Execution Planning** – After sorting, the controller analyses the sorted list to identify contiguous groups of steps that have no inter‑dependencies (i.e., they were all eligible at the same iteration of the sort). These groups are scheduled concurrently. The exact mechanism (thread pool, async tasks, external job scheduler) is not detailed in the observations, but the design leverages the DAG’s inherent parallelism.
+
+5. **Step Execution** – Each step, once scheduled, is handed to the underlying step executor. The executor is responsible for the actual work (e.g., data transformation, model training). The DagBasedExecutionModel does not dictate the internals of the step; it only guarantees ordering and concurrency constraints.
 
 ---
 
 ## Integration Points  
 
-* **Parent – ConcurrencyAndParallelism** – The package groups together all concurrency primitives. `DagBasedExecutionModel` is one of the core offerings, alongside `WorkStealingAlgorithm` and `ParallelTaskManagement`. Any component that needs coordinated parallelism can import the parent package and choose the appropriate model.
+The **DagBasedExecutionModel** is tightly coupled with the **`Pipeline`** component, specifically the **`PipelineController`**, which acts as the bridge between configuration and execution. The controller reads **`pipeline-configuration.yaml`**, builds the DAG, and orchestrates step execution, making it the primary integration surface. Downstream, the model hands off each step to the **step runner** (not named in the observations) that performs the actual business logic. Upstream, any tool that generates or modifies **`pipeline-configuration.yaml`**—such as CI pipelines, UI editors, or automated workflow generators—directly influences the DAG structure and therefore the execution behaviour.
 
-* **Sibling – WorkStealingAlgorithm** – The `WorkStealingExecutor` is the concrete runtime that both the DAG model and the generic parallel‑task manager rely on. Because they share the same executor, tasks originating from different APIs can intermix in the same thread pool, enabling heterogeneous workloads.
-
-* **Sibling – ParallelTaskManagement** – This sibling offers higher‑level utilities (e.g., batch submission, future handling). While it does not directly manipulate the DAG, it can submit individual tasks that may later become nodes in a DAG if a developer builds a composite workflow.
-
-* **External Example – work‑stealing‑example.java** – Demonstrates how to instantiate `WorkStealingExecutor` and submit tasks. Developers can reuse the same pattern when constructing a DAG: first build the graph with `GraphBasedExecution`, then invoke the same `submit` method that the example uses.
+Because the model is configuration‑driven, external systems can influence execution simply by altering the YAML file. This creates a clear contract: the only required interface is the YAML schema (step identifiers and `depends_on` arrays). No code‑level API is exposed, which simplifies integration but also means that validation and error handling must be robust within the controller.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Define a Proper DAG** – Ensure that the task graph you construct is acyclic. Adding a circular dependency will either be rejected during validation or cause a deadlock at runtime. Use the API exposed by `GraphBasedExecution` to add vertices and edges explicitly.
+1. **Declare Explicit Dependencies** – Every step in **`pipeline-configuration.yaml`** should list all direct prerequisites in its `depends_on` field. Omitting a required dependency can lead to race conditions, while over‑specifying dependencies can unnecessarily serialize the pipeline and reduce parallelism.
 
-2. **Leverage Work‑Stealing for Scalability** – Because the DAG model delegates execution to `WorkStealingExecutor`, you gain automatic load balancing across available processor cores. No additional thread‑pool configuration is required beyond what the executor already provides.
+2. **Maintain Acyclic Structure** – The DAG must remain acyclic. Introducing circular dependencies will cause the topological sort to fail and the pipeline to abort during validation. Use tooling or linting scripts to detect cycles early.
 
-3. **Prefer Incremental Submission** – Rather than submitting the entire graph at once, let `GraphBasedExecution` handle task readiness. Submit only the initial set of independent tasks; the model will continue to feed the executor as dependencies are satisfied.
+3. **Leverage Parallelism** – To maximise performance, design the pipeline so that independent steps are placed in separate branches of the DAG. The controller will automatically schedule these branches in parallel, exploiting available CPU cores or distributed resources.
 
-4. **Combine with ParallelTaskManagement When Needed** – If you have a mixture of independent tasks and a DAG‑structured workflow, you can use the parallel‑task utilities to submit the independent work while the DAG runs concurrently. Since both share the same executor, resources are pooled efficiently.
+4. **Version Control the YAML** – Since the execution model is entirely driven by **`pipeline-configuration.yaml`**, treat this file as part of the source code. Changes to step ordering or dependencies should be reviewed and tested to avoid unintended execution order changes.
 
-5. **Monitor Completion via Futures or Callbacks** – The executor returns results through the same mechanisms used in the sibling `ParallelTaskManagement`. Capture these futures if you need to aggregate results after the DAG finishes.
+5. **Monitor Execution Order** – When debugging, inspect the order produced by the topological sort (often logged by the controller). This helps verify that the declared dependencies are being honoured and that parallel groups are formed as expected.
 
 ---
 
-### Architectural Patterns Identified  
+### Summary of Insights  
 
-* **Graph‑Driven Scheduling** – The core of `DagBasedExecutionModel` is a DAG that drives task ordering.  
-* **Work‑Stealing Scheduler** – Provided by `WorkStealingExecutor`, enabling dynamic load balancing.  
-* **Layered Composition** – Separation of DAG orchestration from low‑level thread management.
-
-### Design Decisions and Trade‑offs  
-
-* **Separation of DAG Logic from Scheduling** – Keeps the DAG layer simple and reusable, but introduces a runtime dependency on the work‑stealing executor.  
-* **Use of a Single Executor for Multiple Concurrency Primitives** – Improves resource utilization, yet may cause contention if a very large DAG and many independent tasks compete for the same pool.  
-* **Acyclic Requirement** – Guarantees deterministic execution order; however, it restricts use cases that would benefit from cyclic workflows (e.g., iterative algorithms).
-
-### System Structure Insights  
-
-* The **ConcurrencyAndParallelism** package acts as a hub, exposing three sibling components that all converge on `WorkStealingExecutor`.  
-* `DagBasedExecutionModel` is the only component that introduces a **graph data structure**, making it the unique provider of dependency‑aware execution.  
-* `ParallelTaskManagement` and `WorkStealingAlgorithm` share the same low‑level API, allowing developers to mix and match patterns without changing executor configuration.
-
-### Scalability Considerations  
-
-* **Horizontal Scalability** – Work‑stealing inherently scales with the number of worker threads, which can be tuned to match the number of CPU cores.  
-* **Graph Size** – The model can handle very large DAGs because only ready nodes are materialized in the executor’s queues; the rest remain in the lightweight graph representation.  
-* **Contention** – As the number of concurrent DAGs grows, the single executor may become a bottleneck; partitioning work across multiple executor instances could mitigate this.
-
-### Maintainability Assessment  
-
-* **Clear Separation of Concerns** – By isolating DAG orchestration from thread management, each module can evolve independently, simplifying testing and future refactoring.  
-* **Limited Code Surface** – Observations show only a handful of key classes (`GraphBasedExecution`, `WorkStealingExecutor`), which reduces the maintenance burden.  
-* **Dependency Visibility** – The explicit coupling to `WorkStealingExecutor` is transparent, making it easy for developers to locate the runtime implementation when debugging.  
-* **Potential for Extension** – Adding alternative schedulers (e.g., a fixed‑thread‑pool) would require only a new executor implementation that respects the same submission contract, preserving the DAG layer’s stability.
+1. **Architectural patterns identified** – Declarative DAG‑driven orchestration, configuration‑driven execution, implicit parallelism via topological sorting.  
+2. **Design decisions and trade‑offs** – Using a YAML‑defined DAG makes the pipeline highly configurable and easy to extend, but it places the burden of correct dependency declaration on the author and requires cycle detection logic. Parallelism is gained without a dedicated scheduler, at the cost of potentially complex dependency graphs.  
+3. **System structure insights** – The **`PipelineController`** is the sole orchestrator, converting static configuration into a runtime graph, applying a deterministic topological sort, and delegating actual work to step executors. The model’s simplicity stems from a single source of truth (the YAML file).  
+4. **Scalability considerations** – Because independent steps are automatically grouped for concurrent execution, the model scales with the number of CPU cores or distributed workers available. The primary scalability bottleneck is the size of the DAG and the overhead of graph construction and sorting, both of which are linear in the number of steps and edges.  
+5. **Maintainability assessment** – High maintainability: adding or re‑ordering steps requires only YAML edits, no code changes. However, maintainability depends on clear documentation of each step’s purpose and its dependencies, and on tooling to validate the DAG’s acyclicity and correctness.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConcurrencyAndParallelism](./ConcurrencyAndParallelism.md) -- WorkStealingExecutor.java implements a work-stealing algorithm for concurrent task execution, as seen in the work-stealing-example.java file
-
-### Siblings
-- [WorkStealingAlgorithm](./WorkStealingAlgorithm.md) -- WorkStealingExecutor (WorkStealingExecutor.java:10) implements the work-stealing algorithm, allowing threads to steal tasks from other threads when their own task queue is empty
-- [ParallelTaskManagement](./ParallelTaskManagement.md) -- The WorkStealingExecutor (WorkStealingExecutor.java:20) provides methods for submitting tasks and retrieving results, allowing developers to manage parallel tasks with ease
+- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
 
 
 ---

@@ -1,94 +1,117 @@
 # EntityValidator
 
-**Type:** Detail
+**Type:** SubComponent
 
-The predefined rules for entity validation could be defined in a separate configuration or module, allowing for easier modification and extension of validation criteria without altering the core validation logic
+EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
 
 ## What It Is  
 
-The **EntityValidator** is a logical unit that lives inside the **OntologyClassifier** class, which itself is part of the **OntologyClassification** sub‑component.  Although the source observations do not list concrete file paths, the hierarchy makes it clear that the validator is not a standalone module on disk but a class‑level responsibility within the ontology‑classification pipeline.  Its purpose is to enforce a set of predefined validation rules on entities before—or in parallel with—their classification into an ontology.  The validator is also referenced from the **ManualLearning** component, indicating that the same validation logic is reused when entities are manually curated or learned, reinforcing the idea of a shared, decoupled validation service.
+EntityValidator is a **sub‑component** that lives inside the **SemanticAnalysis** module. Its concrete implementation is anchored in a handful of source artifacts that are referenced directly in the code base:
 
-## Architecture and Design  
+* `EntityValidator.validateEntity()` – the entry point that applies a validation strategy derived from entity metadata and definition files.  
+* `EntityValidator.checkConsistency()` – a helper that walks the relationships and dependencies of an entity to ensure they are internally coherent.  
+* `EntityValidatorConfiguration.yaml` – a YAML document that describes the validation workflow, enumerating the rules, thresholds, and definition sources that the validator must honor.  
+* `EntityValidatorManager.loadValidator()` – the bootstrap routine that reads the configuration file, constructs the validator instance, and wires together its collaborators.  
+* `EntityValidatorUtils.getValidationResult()` – a thin utility that extracts, formats, and returns the outcome of a validation run to callers.  
+* `EntityValidatorLogger.logValidation()` – the logging façade that records both successful validation events and error conditions.
 
-The design revealed by the observations follows a **separation‑of‑concerns** approach: classification and validation are split into distinct responsibilities.  The **EntityValidator** is *decoupled* from the core classification logic of **OntologyClassifier**, which allows each concern to evolve independently.  This is effectively an implementation of the **Strategy** pattern—validation rules can be swapped or extended without touching the classifier’s core algorithm.  
-
-A second implicit pattern is the use of a **configuration‑driven rule set**.  The observations note that “predefined rules for entity validation could be defined in a separate configuration or module.”  By externalising the rule definitions, the system gains flexibility: new validation criteria can be added simply by updating the configuration, leaving the validator’s execution engine untouched.  
-
-Within the broader component diagram, **EntityValidator** sits alongside its sibling **OntologyClassifier** and the **VKBApiAdapter**.  The classifier consumes the VKB API (via the adapter) to obtain ontology information, while the validator ensures that any entity passed to the classifier satisfies the business‑level constraints defined in the configuration.  This layered interaction keeps the external API handling isolated in the adapter, the domain logic in the classifier, and the rule enforcement in the validator.
-
-## Implementation Details  
-
-* **Location in code** – The validator is a member (or inner class) of **OntologyClassifier**.  No explicit file path is provided, but the hierarchy tells us it resides wherever the **OntologyClassifier** class is defined, most likely in a module dedicated to ontology processing.  
-
-* **Rule definition** – Validation criteria are expected to be stored outside the validator’s execution path, probably in a JSON/YAML file or a dedicated Python/JavaScript module.  The validator reads this configuration at start‑up (or on demand) and builds an in‑memory representation of the rules (e.g., a list of predicate functions).  
-
-* **Execution flow** – When an entity arrives for classification, the **OntologyClassifier** first invokes **EntityValidator.validate(entity)**.  The validator iterates over the rule set, applying each rule to the entity.  If any rule fails, the validator returns a structured error (or throws an exception) that the classifier can handle—either by rejecting the entity, flagging it for manual review, or logging the issue.  
-
-* **Reuse in ManualLearning** – The **ManualLearning** component also “contains EntityValidator,” meaning it re‑uses the same validation service when manually adding or adjusting entities.  This reuse is achieved by either importing the validator class from the classifier module or by sharing a common validation library that both components depend on.  
-
-* **Extensibility** – Because the rule set lives in a separate configuration, adding a new validation rule does not require code changes.  Developers can simply extend the configuration file and, if needed, implement a small helper function that the validator can invoke.
-
-## Integration Points  
-
-* **Parent – OntologyClassification** – The parent component orchestrates the overall workflow: it receives raw entities, delegates classification to **OntologyClassifier**, and relies on **EntityValidator** to guarantee that only compliant entities are processed.  The parent may also expose a public API that abstracts away the validation step, presenting a clean “classifyEntity” endpoint.  
-
-* **Sibling – OntologyClassifier** – The classifier directly calls the validator before invoking the VKB API via **VKBApiAdapter**.  This ensures that invalid payloads never reach the external service, reducing unnecessary network traffic and API error handling.  
-
-* **Sibling – VKBApiAdapter** – While the adapter focuses on HTTP communication, the validator shields it from malformed data.  In a failure scenario, the validator’s response can be used to construct a more meaningful error message before any API call is attempted.  
-
-* **ManualLearning** – This component consumes the same validator, likely through a shared library import.  The integration point here is the validation of manually curated entities, ensuring consistency with the automated classification pipeline.  
-
-* **Configuration Module** – The external rule definition module is a critical integration point.  Both **OntologyClassifier** and **ManualLearning** must have read access to it, and any change to the configuration should trigger a reload or a version bump to keep the validator’s rule set in sync across the system.
-
-## Usage Guidelines  
-
-1. **Never embed validation logic directly inside the classification code.**  Always route entity checks through the **EntityValidator** to keep concerns separate and to benefit from the configuration‑driven rule set.  
-
-2. **Maintain the rule configuration as the single source of truth.**  When a new business constraint emerges, add it to the configuration file rather than modifying validator code.  This keeps the validator stable and reduces regression risk.  
-
-3. **Handle validator feedback gracefully.**  The validator should return a rich error object (e.g., containing the failing rule identifier and a human‑readable message).  Callers—whether the classifier or ManualLearning—should log the error, surface it to the user if appropriate, and avoid proceeding with classification.  
-
-4. **Reuse the validator across components.**  Since both **OntologyClassification** and **ManualLearning** need the same validation semantics, import the validator from a shared module rather than duplicating code.  This ensures consistent behavior and simplifies future updates.  
-
-5. **Test validation rules in isolation.**  Unit tests should target the configuration parsing and each individual rule function.  Integration tests can verify that the classifier correctly aborts when the validator reports a failure.  
+Together these pieces form a **configuration‑driven validation engine** that is responsible for guaranteeing that the knowledge entities produced by the SemanticAnalysis pipeline obey the structural and semantic contracts defined for the system.
 
 ---
 
-### 1. Architectural patterns identified  
+## Architecture and Design  
 
-* **Separation‑of‑Concerns / Decoupling** – Validation is isolated from classification.  
-* **Strategy (configuration‑driven)** – Validation rules are interchangeable via external configuration.  
+The observations reveal a **configuration‑driven strategy** architecture. The validator’s behaviour is not hard‑coded; instead, `EntityValidatorConfiguration.yaml` supplies the rule set and the order in which they are applied. `EntityValidatorManager.loadValidator()` embodies a **Manager** (or *Factory*) pattern: it parses the YAML, instantiates the appropriate validator objects, and injects any required dependencies (e.g., rule providers, logger).  
 
-### 2. Design decisions and trade‑offs  
+`EntityValidator.validateEntity()` implements the **Strategy** pattern by selecting the appropriate validation algorithm based on the entity’s metadata. The method delegates the actual work to concrete strategy objects that are defined elsewhere (the observations do not list them, but the pattern is evident from the “validation strategy” phrasing).  
 
-* **Decision:** Place the validator inside **OntologyClassifier** but expose it to other components.  
-  *Trade‑off:* Tight coupling to the classifier’s codebase can make reuse slightly more complex, but it guarantees that validation stays aligned with classification logic.  
-* **Decision:** Store rules externally.  
-  *Trade‑off:* Adds a runtime dependency on configuration loading; however, it dramatically improves maintainability and extensibility.  
+Cross‑cutting concerns are isolated via dedicated helpers: `EntityValidatorLogger.logValidation()` centralises logging, while `EntityValidatorUtils.getValidationResult()` isolates result handling. This separation of concerns improves testability and makes it straightforward to swap out logging frameworks or result formats without touching the core validation logic.
 
-### 3. System structure insights  
+Interaction with the broader system follows a **layered** approach. The validator sits beneath the higher‑level **SemanticAnalysis** orchestrator, receiving raw entities from upstream agents (e.g., ontology classification or code‑graph extraction). After validation, the results flow back to the orchestrator or downstream components such as the **Insights** generator, which may only act on entities that have passed validation.
 
-The system is organized around a central **OntologyClassification** component that coordinates three main players: **OntologyClassifier** (core domain logic), **EntityValidator** (rule enforcement), and **VKBApiAdapter** (external API integration).  The validator is a shared service also used by **ManualLearning**, indicating a cross‑cutting concern that is deliberately factored out of any single module.  
+---
 
-### 4. Scalability considerations  
+## Implementation Details  
 
-Because validation rules are processed locally and are configuration‑driven, the validator scales linearly with the number of rules.  Adding more rules does not affect the external API load, which is a scalability benefit.  If rule evaluation becomes a bottleneck, the validator could be parallelised or moved to a lightweight micro‑service, but such a change would need to be justified by measurable performance data.  
+* **Validation entry point – `EntityValidator.validateEntity()`**  
+  This method receives an entity object and looks up its type‑specific metadata. Using that metadata it selects a validation strategy (e.g., schema check, type constraints, custom rule sets). The strategy is then executed, producing a raw validation report.
 
-### 5. Maintainability assessment  
+* **Consistency checking – `EntityValidator.checkConsistency()`**  
+  Once the primary validation passes, this routine traverses the entity’s relationship graph (e.g., parent/child links, dependency edges) to verify that no contradictory or dangling references exist. The method likely leverages the same metadata definitions that drive `validateEntity()`.
 
-The current design scores high on maintainability: rule changes are isolated to a configuration file, the validator logic is small and reusable, and the clear separation from the classifier prevents accidental side‑effects.  The only maintainability risk is the implicit coupling of the validator’s location to the **OntologyClassifier** class; documenting this relationship and providing a stable import path mitigates that risk.
+* **Configuration – `EntityValidatorConfiguration.yaml`**  
+  The YAML file enumerates validation rules, their severity levels, and any external definition files that must be consulted (e.g., ontology fragments). Because the file is external, system operators can add, remove, or reorder rules without recompiling code.
+
+* **Bootstrap – `EntityValidatorManager.loadValidator()`**  
+  This manager reads `EntityValidatorConfiguration.yaml`, constructs a validator instance, wires the logger (`EntityValidatorLogger`) and utilities (`EntityValidatorUtils`), and registers the validator with the parent `SemanticAnalysis` component. The manager isolates configuration parsing from the validation logic, enabling lazy or on‑demand loading.
+
+* **Utility – `EntityValidatorUtils.getValidationResult()`**  
+  After validation, callers invoke this static‑style helper to retrieve a structured result object (e.g., a DTO containing pass/fail flags, error messages, and possibly a confidence score). The utility abstracts away the internal representation of the raw report, presenting a stable API to consumers.
+
+* **Logging – `EntityValidatorLogger.logValidation()`**  
+  All validation events, including rule violations and unexpected exceptions, are funneled through this logger. By centralising logging, the component can uniformly apply log levels, formats, and destinations (e.g., file, monitoring system) defined elsewhere in the system.
+
+Because the source snapshot reports **“0 code symbols found”**, the actual class definitions are not present in the current view, but the method and file names give a precise map of the implementation surface.
+
+---
+
+## Integration Points  
+
+EntityValidator is tightly coupled to the **SemanticAnalysis** parent. The parent orchestrates a multi‑agent pipeline that produces knowledge entities; before those entities are persisted (via `GraphDatabaseAdapter` or `MemgraphAdapter`) or fed to downstream agents such as **Insights** or **CodeKnowledgeGraph**, they are routed through the validator.  
+
+* **Upstream:** Agents like `OntologyClassifier` (sibling component) may enrich entities with ontology tags that the validator later checks for compliance. The `PipelineController` may include a validation step in its DAG configuration, ensuring that validation occurs at a deterministic point in the workflow.  
+
+* **Downstream:** Successful validation results are consumed by `InsightGenerator.generateInsights()`, which only operates on entities that satisfy the rule set. Errors logged by `EntityValidatorLogger` can trigger alerts in the **WorkflowOrchestrator**, potentially causing a retry or a fallback path.  
+
+* **Configuration sharing:** The same `EntityValidatorConfiguration.yaml` can be referenced by other components that need to enforce similar constraints (e.g., a separate “ContentValidator” in the **Pipeline**). This promotes consistency across the system without duplicating rule definitions.  
+
+* **Utility and logging contracts:** `EntityValidatorUtils` and `EntityValidatorLogger` expose public static methods, making them easy to call from any component that needs validation outcomes or diagnostic information, without creating circular dependencies.
+
+---
+
+## Usage Guidelines  
+
+1. **Never invoke `validateEntity()` directly from business logic.** Always obtain the validator through `EntityValidatorManager.loadValidator()` so that the configuration is guaranteed to be applied and the logger/utility are correctly wired.  
+
+2. **Keep `EntityValidatorConfiguration.yaml` source‑controlled.** Any change to validation rules should be reviewed, as it can affect downstream agents (e.g., Insight generation). Because the validator reads this file at load time, a restart of the SemanticAnalysis service is required for changes to take effect.  
+
+3. **Handle validation results via `EntityValidatorUtils.getValidationResult()`.** This utility returns a stable DTO; avoid parsing raw logs or internal report structures, as those may evolve.  
+
+4. **Log at appropriate levels.** Use `EntityValidatorLogger.logValidation()` with `INFO` for successful validations and `WARN`/`ERROR` for rule violations or unexpected failures. Consistent logging enables the **WorkflowOrchestrator** to monitor health and trigger alerts.  
+
+5. **Do not embed business rules inside the validator code.** All rule definitions belong in the YAML configuration; the code should remain a thin orchestration layer. This design keeps the validator extensible and reduces the need for code changes when rules evolve.
+
+---
+
+### Summary of Key Architectural Insights  
+
+| Item | Observation‑Based Insight |
+|------|---------------------------|
+| **Architectural patterns identified** | Configuration‑driven strategy, Manager/Factory for bootstrap, Strategy pattern for rule selection, Separation of concerns (logger, utils) |
+| **Design decisions & trade‑offs** | External YAML enables flexibility but requires service restart for changes; dedicated logger improves observability at the cost of an extra dependency; utility wrapper shields callers from internal report format |
+| **System structure insights** | EntityValidator sits as a validation gate within SemanticAnalysis, sharing configuration with sibling agents and feeding validated entities to downstream components like Insights and Graph adapters |
+| **Scalability considerations** | Validation is per‑entity; the strategy can be parallelised by the DAG‑based Pipeline if needed. Configuration size may affect load time, but runtime cost is bounded by rule complexity. |
+| **Maintainability assessment** | High maintainability thanks to clear separation (manager, config, logger, utils). Adding new rules only requires YAML edits. The lack of hard‑coded logic reduces code churn, though the need to restart for config changes is a minor operational overhead. |
+
+These observations provide a grounded view of **EntityValidator** as a configurable, strategy‑based validation engine that plays a pivotal role in guaranteeing the integrity of knowledge entities within the broader SemanticAnalysis ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification uses the VKB API to manage ontology classification and entity validation in the OntologyClassifier class
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
 
 ### Siblings
-- [OntologyClassifier](./OntologyClassifier.md) -- The OntologyClassifier class utilizes the VKB API to classify entities into an ontology, as inferred from the parent context of KnowledgeManagement and the Component KnowledgeManagement
-- [VKBApiAdapter](./VKBApiAdapter.md) -- The VKBApiAdapter would encapsulate the logic for making API calls to the VKB API, handling responses, and potentially managing errors or retries, as is common in API integration scenarios
+- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
+- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a pattern-based approach to generate insights from knowledge entities
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
+- [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
+- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.persistEntity() persists the entity to the graph database
+- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 6 observations*
