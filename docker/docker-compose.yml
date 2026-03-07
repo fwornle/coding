@@ -72,6 +72,8 @@ services:
       - ${CODING_REPO:-.}/integrations/mcp-server-semantic-analysis/config:/coding/integrations/mcp-server-semantic-analysis/config:rw
       # Dashboard build (live-mounted for development)
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/dist:/coding/integrations/system-health-dashboard/dist:ro
+      # VKB visualizer build (live-mounted for development)
+      - ${CODING_REPO:-.}/integrations/memory-visualizer/dist:/coding/integrations/memory-visualizer/dist:ro
     networks:
       - coding-network
     # Allow container to reach host services (DMR/llama.cpp)
