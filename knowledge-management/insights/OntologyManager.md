@@ -1,157 +1,104 @@
 # OntologyManager
 
-**Type:** SubComponent
+**Type:** GraphDatabase
 
-OntologyManager utilizes the KnowledgeGraphUpdater class in knowledge_graph_updater.py to update the knowledge graph with ontology information.
+OntologyManager is responsible for handling ontology classification, including loading ontology definitions and performing entity classification, as described in the KnowledgeManagement component's description.
 
 ## What It Is  
 
-**OntologyManager** is the sub‑component responsible for the full life‑cycle of the ontology within the *KnowledgeManagement* domain. Its implementation lives in a set of clearly‑named Python modules under the repository root:
+**OntologyManager** is the core logic component that lives inside the *KnowledgeManagement* domain.  The most plausible implementation file, based on the observations, is **`ontology-manager.ts`** (the naming follows the convention used by sibling components such as `entity-persistence.ts` and `graph-database-manager.ts`).  Its responsibility is to load ontology definitions, keep them in sync with the underlying graph store, and perform entity‑classification operations against those ontologies.  To achieve this, OntologyManager does **not** talk to the storage layer directly; instead it re‑uses the **`GraphDatabaseAdapter`** located at **`storage/graph-database-adapter.ts`**.  The adapter supplies the low‑level Graphology + LevelDB interaction and the automatic JSON‑export synchronization that the whole KnowledgeManagement suite relies on.
 
-* `ontology_manager_module.py` – the public entry point (`OntologyManagerModule`).  
-* `ontology_updater.py` – contains `OntologyUpdater`, the engine that applies incremental changes to the ontology.  
-* `ontology_validator.py` – defines `OntologyValidator`, which checks the ontology for logical consistency and accuracy.  
-* `ontology_storage_service.py` – provides `OntologyStorageService`, the abstraction that persists the ontology.  
-* `ontology_validation_service.py` – offers `OntologyValidationService`, a higher‑level service that orchestrates validation work.  
-* `knowledge_graph_updater.py` – hosts `KnowledgeGraphUpdater`, the bridge that propagates ontology changes into the underlying graph database.
-
-Together these files form a cohesive, **modular ontology management stack** that sits inside the parent component *KnowledgeManagement*. The stack is deliberately split into focused services (update, validation, storage) and a façade (`OntologyManagerModule`) that external callers use to trigger ontology‑related workflows.
+The component therefore sits at the intersection of *knowledge representation* (the ontology definitions) and *graph persistence* (the graph database).  It is a child of the **KnowledgeManagement** component and works alongside siblings such as **EntityPersistence**, **GraphDatabaseManager**, **ManualLearning**, and **OnlineLearning**, all of which also depend on the same `GraphDatabaseAdapter` for storage concerns.
 
 ---
 
 ## Architecture and Design  
 
-The observed structure reveals three explicit architectural patterns:
+The design that emerges from the observations is a **layered, adapter‑centric architecture**.  The lowest layer is the **graph‑storage stack** – Graphology (the in‑memory graph library) backed by LevelDB for durability.  The **`GraphDatabaseAdapter`** (in `storage/graph-database-adapter.ts`) is the sole gateway to that stack.  It encapsulates the details of opening the LevelDB instance, wiring Graphology, and exposing a **JSON‑export sync** capability.  The adapter also implements an **`initialize`** method that performs *intelligent routing*: when a VKB (Virtual Knowledge Base) API endpoint is reachable it proxies calls through that service; otherwise it falls back to direct local access.  This routing logic is a concrete example of the **Adapter pattern** combined with a **Strategy‑like routing decision**.
 
-1. **Modular Ontology Design** – The presence of distinct child components (`OntologyUpdaterModule`, `OntologyMaintenancePattern`, `ModularOntologyDesign`) and the separation of updater, validator, and storage into their own modules demonstrate a modular architecture. Each concern can be developed, tested, and replaced independently, which aligns with the *ModularOntologyDesign* description.
+Ontologically‑focused logic lives in **OntologyManager**.  Rather than embed database calls, OntologyManager **delegates** all persistence concerns to the adapter (or, optionally, to the higher‑level **EntityPersistence** sub‑component).  This delegation creates a **Facade** for the rest of the KnowledgeManagement domain: callers of OntologyManager need only request “load ontology” or “classify entity” without caring whether the underlying data comes from a remote VKB service or a local LevelDB file.  The component also shares the **initialization contract** of the adapter, meaning it can be started in the same bootstrap sequence as its siblings (ManualLearning, OnlineLearning, etc.).
 
-2. **Centralized Maintenance (OntologyMaintenancePattern)** – All ontology mutations flow through a single class, `OntologyUpdater` (in `ontology_updater.py`). This establishes a *centralized* maintenance point, simplifying version control, audit logging, and conflict resolution. The pattern is reinforced by the `OntologyManager`‑level entry point (`OntologyManagerModule`) that routes all external requests to this updater.
-
-3. **Service‑Layer Facade** – `OntologyStorageService` and `OntologyValidationService` act as thin service layers that encapsulate persistence and validation logic respectively. They hide the underlying implementation details (e.g., file system, graph DB) from callers and expose a clean API. The façade (`OntologyManagerModule`) aggregates these services, presenting a single, coherent interface to the rest of the system.
-
-Interaction flow (as inferred from the file names and relationships):
-
-* A client calls a method on `OntologyManagerModule`.  
-* The module delegates to `OntologyUpdater` for change calculation.  
-* Before committing, `OntologyValidator` (or the higher‑level `OntologyValidationService`) checks the proposed changes.  
-* Validated changes are persisted via `OntologyStorageService`.  
-* Finally, `KnowledgeGraphUpdater` pushes the new ontology state into the graph store managed by the sibling component **GraphDatabaseManager** (which uses `GraphDBClient`).
-
-This layered interaction isolates side‑effects (storage, graph updates) from pure business logic (validation, update calculation), fostering testability and clear responsibility boundaries.
+The sibling components (ManualLearning, OnlineLearning, CodeKnowledgeGraphBuilder, DataImporter, QueryEngine) all **reuse the same adapter**, which guarantees consistent data format, transaction semantics, and JSON export behavior across the entire KnowledgeManagement subsystem.  This uniformity is a deliberate architectural decision to avoid “multiple ways of talking to the graph” and to keep the system’s data‑flow predictable.
 
 ---
 
 ## Implementation Details  
 
-### Core Classes  
+1. **`storage/graph-database-adapter.ts`** – The adapter class exposes at least two public members that OntologyManager relies on:  
+   * **`initialize()`** – Called during system start‑up; it detects the presence of a VKB API and decides whether to route queries through that service or to use the local LevelDB instance directly.  The method also sets up the automatic JSON export synchronization, which periodically writes the in‑memory Graphology graph to a JSON file for backup or external consumption.  
+   * **Graphology‑LevelDB bindings** – Internally the adapter creates a Graphology instance, registers LevelDB as the persistence backend, and provides CRUD‑style methods (e.g., `addNode`, `addEdge`, `findNode`) that higher‑level components call.
 
-| File | Class | Responsibility |
-|------|-------|----------------|
-| `ontology_manager_module.py` | `OntologyManagerModule` | Public entry point; orchestrates update, validation, and persistence workflows. |
-| `ontology_updater.py` | `OntologyUpdater` | Computes diffs, applies additions/removals to the in‑memory ontology model. |
-| `ontology_validator.py` | `OntologyValidator` | Runs consistency checks (e.g., circular hierarchy detection, datatype conformity). |
-| `ontology_storage_service.py` | `OntologyStorageService` | Abstracts read/write of the ontology (could be JSON, RDF, or a custom format). |
-| `ontology_validation_service.py` | `OntologyValidationService` | Provides a higher‑level API that may combine multiple validator passes and produce human‑readable reports. |
-| `knowledge_graph_updater.py` | `KnowledgeGraphUpdater` | Translates ontology changes into graph‑database mutation commands, invoking the sibling **GraphDatabaseManager**. |
+2. **`ontology-manager.ts`** (presumed location) – This file contains the concrete class **`OntologyManager`**.  Its key responsibilities are:  
+   * **Ontology loading** – Reads ontology definition files (likely JSON or Turtle) and inserts the concepts, relationships, and classification rules into the graph via the adapter’s node/edge APIs.  
+   * **Entity classification** – When an entity is presented (perhaps from the **EntityPersistence** layer), OntologyManager traverses the graph to locate matching ontology nodes, applying the classification logic defined in the ontology schema.  The traversal is performed using Graphology’s query utilities, which the adapter exposes.  
+   * **Synchronization hooks** – Because the adapter already runs a JSON export, OntologyManager may register listeners to trigger a re‑export whenever the ontology graph changes (e.g., after a new ontology version is loaded).
 
-### Workflow Example  
+3. **Interaction with **EntityPersistence** and **GraphDatabaseManager** –  
+   * **EntityPersistence** provides higher‑level CRUD for domain entities (e.g., source‑code symbols, learning artifacts).  OntologyManager may request persisted entities from this sub‑component, classify them, and then write back classification results.  
+   * **GraphDatabaseManager** is a sibling that orchestrates broader database lifecycle concerns (e.g., backup/restore, connection pooling).  OntologyManager can invoke its public methods when it needs to ensure the graph is in a consistent state before performing a bulk classification run.
 
-1. **Request** – An external component (e.g., a UI tool) invokes `OntologyManagerModule.update_ontology(change_set)`.  
-2. **Update Calculation** – `OntologyUpdater.apply_changes(change_set)` produces a tentative ontology model.  
-3. **Validation** – `OntologyValidationService.validate(updated_model)` internally calls `OntologyValidator.validate(updated_model)`. If any rule fails, an exception bubbles back to the caller.  
-4. **Persistence** – On success, `OntologyStorageService.save(updated_model)` writes the canonical representation to durable storage (file system, object store, etc.).  
-5. **Graph Propagation** – `KnowledgeGraphUpdater.sync_to_graph(updated_model)` uses the sibling **GraphDatabaseManager** (via its `GraphDBClient`) to reflect the new ontology in the graph database.
-
-### Supporting Patterns  
-
-* **Facade Pattern** – `OntologyManagerModule` hides the multi‑step process behind a simple API.  
-* **Strategy‑like Separation** – Validation and storage are each encapsulated behind service classes, allowing alternative implementations (e.g., a different validator or a cloud‑based storage backend) without touching the core updater.  
-
-No code symbols were listed in the observations, but the file‑level granularity is sufficient to infer the responsibilities and the interaction contracts among the classes.
+All of these interactions are mediated through **method calls**; no direct file‑system or network code appears in OntologyManager itself, keeping its responsibilities narrowly focused on knowledge logic.
 
 ---
 
 ## Integration Points  
 
-1. **GraphDatabaseManager (Sibling)** – `KnowledgeGraphUpdater` directly calls into the sibling’s `GraphDBClient` to push ontology changes. This coupling is intentional: the ontology is the schema for the graph, so any change must be reflected in the graph store.  
+* **Parent – KnowledgeManagement** – OntologyManager is instantiated by the KnowledgeManagement bootstrap routine.  During that phase the `GraphDatabaseAdapter.initialize()` method is called first, establishing the routing decision (VKB vs. local).  Once the adapter is ready, OntologyManager is constructed with a reference to the adapter (or to EntityPersistence, which already holds the adapter).  
 
-2. **KnowledgeManagement (Parent)** – As a child of *KnowledgeManagement*, OntologyManager inherits the parent’s “intelligent routing” for database interactions. While the observations do not detail the routing code, it is reasonable to assume that `OntologyStorageService` can switch between API‑based storage or direct file access based on the parent’s routing configuration.  
+* **Siblings – EntityPersistence, GraphDatabaseManager** – OntologyManager consumes the **entity‑persistence API** to fetch raw entities that need classification.  It may also invoke **GraphDatabaseManager** methods for tasks such as flushing pending writes before a bulk classification job or triggering a manual JSON export.  
 
-3. **Other Siblings** – Components such as **ManualLearning** or **OnlineLearning** may consume the ontology for entity authoring or knowledge extraction. They rely on the ontology being up‑to‑date, which is guaranteed by the centralized update flow of OntologyManager.  
+* **External – VKB API** – When the VKB service is reachable, the `initialize` routing logic in the adapter transparently forwards all graph operations (including those originated by OntologyManager) to the remote API.  This means OntologyManager does not need to contain any conditional network code; the adapter abstracts that away.  
 
-4. **Child Modules** – The child entities (`OntologyUpdaterModule`, `OntologyMaintenancePattern`, `ModularOntologyDesign`) are not separate runtime artifacts but conceptual design artifacts that describe how the updater, maintenance strategy, and modularity are realized within the files listed above.  
+* **Data Flow** – The typical flow is:  
+  1. **Load ontology** → OntologyManager parses definition → calls adapter to create graph nodes/edges.  
+  2. **Classify entity** → OntologyManager requests entity from EntityPersistence → traverses graph via adapter → writes classification result back via EntityPersistence.  
+  3. **Export** → Adapter’s automatic JSON sync writes the updated graph to disk; optionally OntologyManager can trigger an immediate export after a major ontology update.
 
-5. **External Services** – Though not explicitly mentioned, the service layer design (storage and validation services) leaves room for plugging in external validation engines (e.g., SHACL validators) or remote storage back‑ends without altering the core updater logic.
+These integration points ensure that OntologyManager remains a thin knowledge‑logic layer while leveraging the robust storage and routing capabilities already provided by the rest of the KnowledgeManagement subsystem.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always go through the façade.** Direct instantiation of `OntologyUpdater`, `OntologyValidator`, or the storage service is discouraged. Use `OntologyManagerModule` methods to ensure the full validation‑persist‑sync pipeline is executed.  
+1. **Instantiate after adapter initialization** – Always create or activate OntologyManager **after** `GraphDatabaseAdapter.initialize()` has completed.  This guarantees that the routing (VKB vs. local) is settled and that the JSON export thread is running.  
 
-* **Validate before persisting.** Although `OntologyManagerModule` performs validation automatically, custom scripts that bypass the façade must explicitly invoke `OntologyValidationService` prior to calling `OntologyStorageService.save`.  
+2. **Prefer the adapter’s API over direct graph manipulation** – Even though OntologyManager could technically import Graphology directly, doing so would bypass the routing logic and the automatic export mechanism.  All node/edge creation, deletion, or queries should go through the adapter (or through EntityPersistence, which itself delegates to the adapter).  
 
-* **Prefer incremental change sets.** `OntologyUpdater` is optimized for applying diffs rather than re‑loading the entire ontology. Supplying a minimal `change_set` improves performance and reduces the risk of merge conflicts.  
+3. **Version ontology definitions carefully** – Loading a new ontology overwrites or augments the existing graph structure.  Because the adapter continuously syncs the graph to JSON, any breaking change will be reflected in the exported file.  Follow a “load‑then‑validate‑then‑activate” pattern: load the ontology, run a quick sanity‑check (e.g., ensure required root concepts exist), and only then mark the ontology as active for classification.  
 
-* **Handle exceptions at the module level.** Validation failures raise domain‑specific exceptions (e.g., `OntologyValidationError`). Catch these at the caller level to provide user‑friendly feedback or to trigger rollback logic.  
+4. **Leverage the automatic JSON export** – The JSON export is not just a backup; downstream tools (e.g., visualization dashboards, external analytics pipelines) may consume it.  Do not disable the export unless you have a compelling reason, and be aware that frequent ontology updates will generate more export activity, which could affect I/O performance on constrained environments.  
 
-* **Respect the graph sync contract.** After a successful update, allow `KnowledgeGraphUpdater` to complete before performing downstream operations that assume the graph reflects the new ontology. If you need to batch multiple updates, consider using a transaction‑style wrapper provided by `OntologyManagerModule` (if available).  
-
-* **Leverage configuration from KnowledgeManagement.** If the parent component’s routing mode is switched (API vs. direct), the storage service will automatically honor the new mode; no code changes in OntologyManager are required.
+5. **Handle VKB unavailability gracefully** – The routing logic inside `initialize` already falls back to local LevelDB when the VKB API is unreachable.  However, developers should still be prepared for transient network failures during runtime; catching adapter‑level errors and possibly retrying or switching to a local fallback is advisable.  
 
 ---
 
-### Architectural patterns identified  
+### Summary of Architectural Insights  
 
-* **Modular Ontology Design** – clear separation of updater, validator, storage, and graph sync modules.  
-* **Ontology Maintenance Pattern** – a centralized updater (`OntologyUpdater`) that acts as the single point of mutation.  
-* **Service‑Layer Facade** – `OntologyManagerModule` hides the multi‑step workflow behind a simple public API.  
+| Aspect | Insight (grounded in observations) |
+|--------|-------------------------------------|
+| **Architectural pattern** | Adapter pattern (GraphDatabaseAdapter) + Facade (OntologyManager) + Strategy‑like routing in `initialize`. |
+| **Design decisions** | Centralize all graph storage behind a single adapter to guarantee consistent JSON export and routing; keep ontology logic separate from persistence; reuse EntityPersistence for entity CRUD. |
+| **Trade‑offs** | Tight coupling to Graphology + LevelDB limits swapping the storage engine; reliance on VKB API introduces a network dependency but is mitigated by fallback. |
+| **System structure** | KnowledgeManagement → OntologyManager (child) ↔ GraphDatabaseAdapter (shared) ↔ EntityPersistence / GraphDatabaseManager (siblings). |
+| **Scalability** | Graphology + LevelDB scales well for moderate‑size knowledge graphs; automatic JSON export may become a bottleneck for very large graphs; routing allows off‑loading to a remote VKB service when needed. |
+| **Maintainability** | Clear separation of concerns (ontology logic vs. storage) and a single adapter reduce duplicated code; however, any change to the adapter’s contract propagates to all siblings, so versioning must be managed carefully. |
 
-### Design decisions and trade‑offs  
-
-* **Centralized vs. Distributed Updates** – Centralization simplifies consistency and auditability but can become a bottleneck under heavy concurrent change loads. The modular split mitigates this by allowing future parallelism (e.g., sharded updaters).  
-* **Explicit Validation Service** – Adding a dedicated validation service improves reliability but introduces an extra processing step; the trade‑off is acceptable for data‑integrity‑critical domains.  
-* **Graph Synchronization Coupling** – Tight coupling with **GraphDatabaseManager** ensures immediate schema consistency but ties ontology release cadence to graph availability.  
-
-### System structure insights  
-
-* OntologyManager lives one level beneath *KnowledgeManagement* and collaborates with sibling components that either produce knowledge (ManualLearning, OnlineLearning) or consume it (GraphDatabaseManager).  
-* Child concepts (`OntologyUpdaterModule`, etc.) are realized concretely by the files listed, confirming that the design intent is reflected in the codebase.  
-
-### Scalability considerations  
-
-* The modular layout allows each service (update, validation, storage) to be horizontally scaled independently—e.g., running multiple validator workers behind a queue.  
-* Bottlenecks are most likely at the persistence layer (`OntologyStorageService`) and the graph sync step; employing asynchronous batch updates or leveraging the parent’s intelligent routing can alleviate pressure.  
-
-### Maintainability assessment  
-
-* **High cohesion** – each module has a single, well‑defined responsibility.  
-* **Low coupling** – interaction occurs through clear interfaces (service classes, façade), making it straightforward to replace or mock components in tests.  
-* **Clear naming** – file and class names directly reflect their purpose, reducing cognitive load for new developers.  
-* **Extensibility** – the service‑layer pattern and the modular design allow new validation rules or storage back‑ends to be added with minimal impact on existing code.
-
-Overall, OntologyManager exhibits a disciplined, modular architecture that balances consistency, extensibility, and operational clarity, fitting cleanly into the broader *KnowledgeManagement* ecosystem.
+These observations paint a picture of a deliberately modular knowledge‑management subsystem where **OntologyManager** serves as the specialist that applies ontological rules, while all storage, routing, and export responsibilities are centralized in the **GraphDatabaseAdapter** and shared sibling components.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- Key patterns in this component include the use of intelligent routing for database interactions, with the ability to switch between API and direct access modes. Additionally, the component utilizes a classification cache to avoid redundant LLM calls and implements data loss tracking to monitor data flow through the system.
-
-### Children
-- [OntologyUpdaterModule](./OntologyUpdaterModule.md) -- The OntologyUpdater class in ontology_updater.py updates the ontology, indicating a modular design for ontology management.
-- [OntologyMaintenancePattern](./OntologyMaintenancePattern.md) -- The OntologyManager's use of the OntologyUpdater class suggests a centralized approach to ontology maintenance, where updates are managed through a single interface.
-- [ModularOntologyDesign](./ModularOntologyDesign.md) -- The presence of the OntologyManager sub-component and its dependency on the OntologyUpdater class demonstrate a modular approach to ontology management, allowing for the addition or removal of functionality as needed.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's utilization of the GraphDatabaseAdapter in storage/graph-database-adapter.ts enables seamless interaction with the Graphology+LevelDB database, facilitating automatic JSON export synchronization. This design choice allows for efficient data storage and retrieval, as evidenced by the adapter's initialize method, which implements intelligent routing for database access. By leveraging the VKB API when available and direct access otherwise, the component optimizes database interactions, as seen in the GraphDatabaseAdapter's initialize method.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the EntityAuthoringTool class in entity_authoring_tool.py to create and edit entities manually.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the GitHistoryAnalyzer class in git_history_analyzer.py to extract knowledge from git history.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDBClient class in graph_db_client.py to interact with the graph database.
-- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the EntityClassifier class in entity_classifier.py to classify entities.
-- [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator uses the WorkflowRunner class in workflow_runner.py to run workflows and capture data flow.
-- [ClassificationCacheManager](./ClassificationCacheManager.md) -- ClassificationCacheManager uses the ClassificationCache class in classification_cache.py to store and retrieve classification results.
-- [DataLossTracker](./DataLossTracker.md) -- DataLossTracker uses the DataFlowMonitor class in data_flow_monitor.py to monitor data flow and track data loss.
-- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager uses the WorkflowRunner class in workflow_runner.py to run workflows.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis, as described in the KnowledgeManagement component's description.
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
+- [CodeKnowledgeGraphBuilder](./CodeKnowledgeGraphBuilder.md) -- CodeKnowledgeGraphBuilder uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
+- [DataImporter](./DataImporter.md) -- DataImporter uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
+- [QueryEngine](./QueryEngine.md) -- QueryEngine uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to interact with the Graphology+LevelDB database, enabling automatic JSON export synchronization.
 
 
 ---

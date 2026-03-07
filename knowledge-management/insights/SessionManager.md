@@ -2,116 +2,117 @@
 
 **Type:** SubComponent
 
-The SessionManager is designed to be flexible, allowing for different session management mechanisms to be used depending on the specific requirements of the Specstory extension.
+The SessionFactory class (lib/agent-api/session-api.js) uses a builder pattern to create new session objects, allowing for easy addition of new session properties.
 
 ## What It Is  
 
-The **SessionManager** is a sub‑component that lives inside the **Trajectory** system and is implemented in the same source tree as the Specstory integration – the primary code file being `lib/integrations/specstory-adapter.js`. Within that file the `SpecstoryAdapter` class creates and owns an instance of `SessionManager`. The manager’s core responsibility is to generate, retain, and expose a **session‑ID** that uniquely identifies a conversation thread between the host application and the Specstory extension. In addition to ID handling, SessionManager couples tightly with the component‑wide **logger** (also instantiated in `specstory-adapter.js`) to emit structured audit events and to surface any errors that arise during session lifecycle operations.  
-
-SessionManager is deliberately **flexible**: it does not hard‑code a single storage or generation strategy. Instead, it delegates ID creation to a child component called **SessionIdGenerator** and persistence to a **SessionStore**. This composition enables the surrounding Trajectory system – and its sibling components such as `ConnectionManager`, `SpecstoryApiClient`, `ConversationLogger`, and `RetryManager` – to rely on a consistent session contract while swapping out the underlying mechanism when requirements change (e.g., moving from an in‑memory store to Redis).
-
----
+`SessionManager` is a **SubComponent** that lives in the **agent‑API layer** of the product, concretely within `lib/agent-api/session-api.js`.  All of its core responsibilities—creating, updating, retrieving and caching session objects—are coordinated from this file.  The manager does not implement the low‑level details itself; instead it delegates to a set of specialised collaborators that also reside in `session-api.js`: `SessionFactory`, `SessionUpdater`, `SessionRepository` and `SessionCache`.  In the overall system hierarchy, `SessionManager` is a child of the top‑level **LiveLoggingSystem** component, which supplies the surrounding execution environment (async logging, non‑blocking I/O) described in `integrations/mcp-server-semantic-analysis/src/logging.ts`.  Its own child is the `SessionFactory` class, while its siblings—`TranscriptProcessor`, `LoggingManager` and `TranscriptAdapter`—share a similar “delegation‑to‑specialised‑helper” style of design.
 
 ## Architecture and Design  
 
-The observations point to a **composition‑based architecture**. SessionManager aggregates two distinct responsibilities: ID generation and state persistence. By housing `SessionIdGenerator` and `SessionStore` as child components, SessionManager follows the **Single Responsibility Principle** – it orchestrates session flow but does not embed the low‑level details of how IDs are created or where session data lives.  
+The observations reveal a **layered, pattern‑rich architecture** built around clear separation of concerns.  `SessionManager` orchestrates four well‑defined collaborators, each embodying a classic design pattern that was deliberately chosen to keep the manager thin and focused on workflow logic.  
 
-The design also exhibits a **pluggable/strategy‑like pattern**. The wording “allowing for different session management mechanisms to be used depending on the specific requirements of the Specstory extension” implies that SessionManager can be supplied with interchangeable implementations of its children. For example, a UUID‑based generator (as hinted by the “likely utilizes a UUID generation algorithm”) can be swapped for a deterministic counter if needed, and the store can shift from an in‑process map to an external cache such as Redis.  
+* **Builder pattern** – `SessionFactory` (found in `lib/agent-api/session-api.js`) constructs new session objects.  By exposing a fluent or step‑wise builder interface, the factory makes it trivial to add new session properties without touching the manager’s creation code.  
 
-Interaction flow is evident from the hierarchy: `Trajectory` → `SessionManager` → (`SessionIdGenerator`, `SessionStore`). The parent **Trajectory** component uses SessionManager to tag every conversation logged by `ConversationLogger` and every request sent through `SpecstoryApiClient`. Sibling components share the same logger instance, ensuring a unified audit trail. The `RetryManager` may invoke SessionManager when a retry needs a fresh session ID, while `ConnectionManager` relies on the same session context to maintain continuity across connection attempts.
+* **Command pattern** – `SessionUpdater` (same file) encapsulates each possible mutation as a command object.  The manager simply hands a command to the updater, which executes it against the target session.  This design enables the system to introduce new update operations (e.g., “extend expiration”, “attach metadata”) by adding new command classes rather than expanding a monolithic update method.  
 
----
+* **Repository pattern** – `SessionRepository` abstracts persistence behind a unified API.  Whether the underlying store is a relational database, a NoSQL cache, or a hybrid, the manager interacts with a single `retrieve` interface, shielding it from storage‑specific details.  
+
+* **Caching layer** – `SessionCache` (also in `session-api.js`) sits in front of the repository, storing recently accessed sessions in memory.  This reduces round‑trips to the database and mirrors the caching strategy used by the sibling `TranscriptAdapter` (see `lib/agent-api/transcript-api.js`).  
+
+The overall flow is straightforward: a request to create a session is handed to `SessionFactory`; updates travel through `SessionUpdater`; reads first consult `SessionCache` and fall back to `SessionRepository` when a cache miss occurs.  The manager’s role is therefore orchestration, not implementation, which aligns with the **single‑responsibility principle** and makes the component easy to test in isolation.
 
 ## Implementation Details  
 
-* **Location & Ownership** – All session‑related code resides in `lib/integrations/specstory-adapter.js`. The `SpecstoryAdapter` class constructs a `SessionManager` instance during its initialization sequence, passing in the shared logger.  
+All collaborators are defined in the same module (`lib/agent-api/session-api.js`), which keeps the public surface area small and encourages co‑location of related code.  
 
-* **Session ID Lifecycle** – SessionManager exposes methods (as inferred from “provides methods for managing session IDs and tracking conversations”) such as `createSession()`, `getSessionId()`, and `resetSession()`. Internally, `createSession()` delegates to `SessionIdGenerator`, which the observations describe as likely using a UUID algorithm (common in Node.js via libraries like `uuid`). The generated ID is then handed to `SessionStore` for persistence.  
+* **SessionFactory** – Exposes a builder interface (e.g., `new SessionFactory().withUserId(id).withStartTime(ts).build()`).  Each builder step records a property in an internal mutable structure; the final `build()` call produces an immutable session object that the manager can hand off to downstream components.  
 
-* **Logging & Error Handling** – Every public method of SessionManager wraps its core logic in try/catch blocks that funnel exceptions to the logger. This mirrors the broader logging strategy employed by `ConversationLogger` and `SpecstoryAdapter`, providing a consistent audit trail across the whole Trajectory integration.  
+* **SessionUpdater** – Implements a `execute(command, session)` method.  Commands are lightweight objects that encapsulate the mutation logic (for example, `SetStatusCommand`, `AddTagCommand`).  The updater validates the command, applies the change to the session instance, and typically persists the result via the repository.  
 
-* **SessionStore** – Although concrete implementation details are not present, the observation that it “would likely employ a data storage solution such as a database or a cache layer (e.g., Redis)” indicates that SessionStore abstracts the persistence mechanism behind a simple interface (`saveSession(id, data)`, `loadSession(id)`). This abstraction permits the system to scale from a lightweight in‑memory map during development to a distributed cache in production without altering SessionManager’s contract.  
+* **SessionRepository** – Provides methods such as `findById(id)` and `save(session)`.  Internally it may use an ORM or direct query builder, but the manager never sees those details.  The repository also emits domain events (e.g., “sessionUpdated”) that other parts of the system—such as the LiveLoggingSystem’s logging pipeline—can subscribe to.  
 
-* **Flexibility Hooks** – Because SessionManager does not embed any hard‑coded storage or generation logic, its constructor probably accepts optional parameters or configuration objects that let callers inject alternative `SessionIdGenerator` or `SessionStore` instances. This design enables the Trajectory component to tailor session handling to the environment (e.g., CI pipelines vs. long‑running daemon).  
+* **SessionCache** – Implements a simple in‑memory map keyed by session identifier.  On a read request, `SessionManager` first checks `SessionCache.get(id)`.  If the entry is absent, it calls `SessionRepository.findById(id)`, stores the result in the cache, and returns it.  Cache invalidation occurs automatically on successful updates: after `SessionUpdater` persists a change, `SessionCache.set(id, updatedSession)` replaces the stale entry.  
 
----
+Because all of these classes live together, the module can expose a single `SessionManager` class that wires them up in its constructor, e.g.:
+
+```js
+class SessionManager {
+  constructor() {
+    this.factory   = new SessionFactory();
+    this.updater   = new SessionUpdater();
+    this.repo      = new SessionRepository();
+    this.cache     = new SessionCache();
+  }
+  // create, update, retrieve methods delegate to the above
+}
+```
+
+No additional symbols were discovered in the provided source list, confirming that the manager’s public API is intentionally minimal.
 
 ## Integration Points  
 
-1. **Parent – Trajectory** – Trajectory treats SessionManager as the authoritative source of the current session identifier. Whenever a new milestone or workflow step is recorded, Trajectory queries SessionManager for the active ID and includes it in logs and API payloads.  
+`SessionManager` sits at the intersection of several system boundaries.  Its primary dependencies are the four collaborators described above, all of which are imported from the same `session-api.js` module.  Upstream, the **LiveLoggingSystem** component owns the manager; the logging subsystem (implemented in `integrations/mcp-server-semantic-analysis/src/logging.ts`) supplies asynchronous, non‑blocking logging for any actions the manager performs (e.g., “session created”, “session updated”).  This mirrors the logging approach used by the sibling `LoggingManager`.  
 
-2. **Siblings** –  
-   * `ConnectionManager` uses the same `SpecstoryAdapter` entry point; when a connection is (re)established it asks SessionManager for a fresh ID to avoid cross‑talk between sessions.  
-   * `SpecstoryApiClient` embeds the session ID into every request sent to the Specstory extension, ensuring the remote side can correlate messages.  
-   * `ConversationLogger` logs each conversation entry together with the session ID supplied by SessionManager, achieving end‑to‑end traceability.  
-   * `RetryManager` may trigger a session reset after a series of failed attempts, calling SessionManager’s reset method before the next retry cycle.  
+Laterally, the manager shares a caching philosophy with the **TranscriptAdapter** (also under `lib/agent-api/transcript-api.js`).  Both components use an in‑memory cache to reduce database pressure, indicating a system‑wide decision to favour read‑through caching for high‑throughput entities.  The **TranscriptProcessor** consumes the `TranscriptAdapter` in a similar “retrieve‑then‑process” pattern, suggesting that any component needing session data can rely on the manager’s cache‑first semantics without re‑implementing its own caching layer.  
 
-3. **Children** –  
-   * `SessionIdGenerator` is the sole producer of unique identifiers. Its pluggable nature means developers can replace the default UUID generator with a custom algorithm without touching SessionManager.  
-   * `SessionStore` abstracts persistence. In a test harness it could be a simple JavaScript object; in production it could be a Redis client, a file‑based store, or a relational database.  
-
-4. **External Dependencies** – The only explicit external dependency noted is the **logger**, which is shared across the whole Specstory integration stack. No other libraries (e.g., HTTP clients, IPC modules) are directly tied to SessionManager, reinforcing its role as a lightweight orchestration layer.
-
----
+Downstream, any consumer that requires a session (e.g., analytics pipelines, user‑facing APIs) will call `SessionManager.getSession(id)` and receive a fully populated object, oblivious to whether the data came from cache or repository.  Because the repository abstracts persistence, swapping the underlying storage (e.g., moving from a single‑node DB to a distributed store) would not affect these consumers.
 
 ## Usage Guidelines  
 
-* **Instantiate via SpecstoryAdapter** – Developers should not create SessionManager directly; instead, obtain it from the `SpecstoryAdapter` instance that is already wired with the shared logger and configuration.  
+1. **Create through the factory** – When a new session is needed, invoke `SessionManager.createSession(builderCallback)` (or the equivalent method that internally uses `SessionFactory`).  Populate all required properties via the builder before calling `build()`.  This guarantees that any future session fields can be added without changing the creation call site.  
 
-* **Never mutate the session ID manually** – All changes to the identifier must go through the provided `createSession` / `resetSession` methods. This guarantees that the ID is both generated by the designated `SessionIdGenerator` and persisted by `SessionStore`.  
+2. **Mutate via commands** – To change a session, construct an appropriate command object (e.g., `new SetStatusCommand('active')`) and pass it to `SessionManager.updateSession(id, command)`.  Do not modify the session object directly; the command pattern centralises validation and persistence logic.  
 
-* **Leverage the logger** – When extending SessionManager (e.g., adding custom error handling), continue to pipe messages through the injected logger. Consistent logging is essential for the audit trail that `ConversationLogger` and other components rely upon.  
+3. **Read through the cache** – Always retrieve sessions with `SessionManager.getSession(id)`.  The manager will automatically consult `SessionCache` first, falling back to `SessionRepository` on a miss.  Avoid calling the repository directly; doing so would bypass cache invalidation and could lead to stale reads.  
 
-* **Choose appropriate storage** – For short‑lived CLI runs, the default in‑memory store is sufficient. For long‑running services or distributed deployments, inject a Redis‑backed `SessionStore` to avoid loss of session state on process restart.  
+4. **Respect async logging** – Because the parent `LiveLoggingSystem` uses non‑blocking logging, any long‑running operation inside the manager (e.g., a database write) should be logged asynchronously to avoid slowing the request path.  Follow the same pattern used by `LoggingManager`.  
 
-* **Respect the pluggable contract** – If a new ID generation strategy is needed (e.g., deterministic IDs for replay testing), implement a class that matches the `SessionIdGenerator` interface and pass it to SessionManager during construction. This keeps the rest of the system unchanged.  
+5. **Handle cache invalidation** – After a successful update, the manager will refresh the cached entry.  If you implement custom commands, ensure they invoke the manager’s `invalidateCache(id)` routine (or rely on the built‑in updater) so that subsequent reads see the latest state.  
+
+Following these conventions keeps the system’s performance characteristics predictable and its codebase maintainable.
 
 ---
 
-### Architectural Patterns Identified  
+### 1. Architectural patterns identified  
+* **Builder pattern** – `SessionFactory` for constructing session objects.  
+* **Command pattern** – `SessionUpdater` encapsulates update operations.  
+* **Repository pattern** – `SessionRepository` abstracts persistence.  
+* **Caching layer** – `SessionCache` implements a read‑through cache.
 
-1. **Composition over inheritance** – SessionManager composes `SessionIdGenerator` and `SessionStore`.  
-2. **Strategy‑like pluggability** – Different generators or stores can be swapped at runtime.  
-3. **Facade** – SessionManager provides a simplified API for session handling to the broader Trajectory system.  
+### 2. Design decisions and trade‑offs  
+* **Extensibility vs. simplicity** – Builders and commands allow new session fields or update actions without touching `SessionManager`, at the cost of additional classes and indirection.  
+* **Abstraction vs. performance** – The repository hides storage details, enabling future DB swaps, while the cache mitigates the performance penalty of that abstraction.  
+* **Consistency vs. latency** – Cache‑first reads improve latency but require careful invalidation after writes to avoid stale data.
 
-### Design Decisions & Trade‑offs  
+### 3. System structure insights  
+* `LiveLoggingSystem` → **contains** `SessionManager`.  
+* `SessionManager` → **contains** `SessionFactory`, `SessionUpdater`, `SessionRepository`, `SessionCache`.  
+* Sibling components (`TranscriptProcessor`, `LoggingManager`, `TranscriptAdapter`) follow a comparable pattern of delegating to specialised helpers and employing caching/logging strategies, indicating a consistent architectural language across the subsystem.
 
-* **Separation of concerns** – By delegating ID creation and persistence, the codebase stays modular, but it introduces extra indirection that developers must understand.  
-* **Flexibility vs. simplicity** – The pluggable design supports varied environments (in‑memory vs. Redis) at the cost of needing configuration plumbing.  
-* **Centralized logging** – Using a shared logger ensures uniform audit trails, though it couples SessionManager’s error handling to the logger’s availability.  
+### 4. Scalability considerations  
+* **Cache scalability** – In‑memory `SessionCache` reduces database load, allowing the system to handle a higher volume of session reads.  Scaling the cache (e.g., moving to a distributed cache) would further improve horizontal scalability.  
+* **Command extensibility** – New update commands can be added without affecting existing traffic, supporting feature growth.  
+* **Repository abstraction** – Switching to a more scalable datastore (sharded DB, cloud‑native store) can be done behind the repository interface without touching the manager or its callers.
 
-### System Structure Insights  
-
-* **Hierarchical nesting** – `Trajectory → SessionManager → (SessionIdGenerator, SessionStore)` defines a clear ownership chain.  
-* **Sibling collaboration** – SessionManager’s output (the session ID) is a common input for `ConnectionManager`, `SpecstoryApiClient`, `ConversationLogger`, and `RetryManager`.  
-
-### Scalability Considerations  
-
-* **Stateless ID generation** – UUID‑based `SessionIdGenerator` scales horizontally without coordination.  
-* **Pluggable store** – Switching to a distributed cache (Redis) allows the system to handle a large number of concurrent sessions without memory pressure on a single node.  
-* **Logging overhead** – Because every session operation logs to the shared logger, log volume may increase under heavy load; log aggregation solutions should be considered.  
-
-### Maintainability Assessment  
-
-The clear separation of responsibilities and the use of well‑named child components make the SessionManager codebase **highly maintainable**. Adding new generation algorithms or persistence back‑ends requires only implementing the respective interface, leaving the rest of the system untouched. The reliance on a single logger simplifies troubleshooting, but developers must ensure the logger remains correctly configured across environments to avoid silent failures. Overall, the design balances extensibility with straightforward understandability, supporting both rapid iteration and long‑term stability.
+### 5. Maintainability assessment  
+The explicit use of well‑known patterns (builder, command, repository) yields high **modularity** and **testability**: each collaborator can be unit‑tested in isolation, and mocks can replace them in manager tests.  The trade‑off is a modest increase in code surface area, which is mitigated by co‑locating all session‑related classes in a single module (`session-api.js`).  Consistent caching and logging approaches shared with sibling components further reduce cognitive load for developers moving between subsystems.  Overall, the design promotes maintainable evolution while providing clear extension points.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component is a complex system that manages project milestones, GSD workflow, phase planning, and implementation task tracking. Its architecture involves utilizing various connection methods to integrate with the Specstory extension, including HTTP, IPC, and file watch. The component is implemented in the lib/integrations/specstory-adapter.js file and uses a logger to handle logging and errors. The SpecstoryAdapter class is the main entry point for this component, providing methods to initialize the connection, log conversations, and connect via different methods. The component's design allows for flexibility and fault tolerance, with multiple connection attempts and fallbacks in case of failures. The use of a session ID and extension API enables the component to track and manage conversations and logs effectively.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes async logging and non-blocking file I/O, as seen in the logging.ts file (integrations/mcp-server-semantic-analysis/src/logging.ts), to improve performance by preventing the system from waiting for logging operations to complete before proceeding with other tasks. This design decision allows the system to handle a high volume of logging requests without significant performance degradation. Furthermore, the use of caching mechanisms in the TranscriptAdapter (lib/agent-api/transcript-api.js) optimizes transcript retrieval and conversion, reducing the load on the system and improving overall efficiency.
 
 ### Children
-- [SessionIdGenerator](./SessionIdGenerator.md) -- The SessionIdGenerator likely utilizes a UUID (Universally Unique Identifier) generation algorithm to ensure uniqueness, similar to those found in libraries such as uuid-js in Node.js projects.
-- [SessionStore](./SessionStore.md) -- The SessionStore would likely employ a data storage solution such as a database or a cache layer (e.g., Redis) to store session information, considering the need for both persistence and rapid access.
+- [SessionFactory](./SessionFactory.md) -- The SessionFactory is mentioned in the parent context as a class used by the SessionManager to create new session objects.
 
 ### Siblings
-- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class as its main entry point for connection management, as seen in the lib/integrations/specstory-adapter.js file.
-- [SpecstoryApiClient](./SpecstoryApiClient.md) -- SpecstoryApiClient uses the extension API to interact with the Specstory extension, as defined in the lib/integrations/specstory-adapter.js file.
-- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the logger to handle logging and errors, providing a clear audit trail for conversations and logs.
-- [RetryManager](./RetryManager.md) -- RetryManager uses a retry mechanism to retry connections in case of failures, as implemented in the lib/integrations/specstory-adapter.js file.
+- [TranscriptProcessor](./TranscriptProcessor.md) -- TranscriptProcessor uses the TranscriptAdapter (lib/agent-api/transcript-api.js) to cache and retrieve transcripts, optimizing transcript handling.
+- [LoggingManager](./LoggingManager.md) -- LoggingManager uses async logging (integrations/mcp-server-semantic-analysis/src/logging.ts) to prevent the system from waiting for logging operations to complete before proceeding with other tasks.
+- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter uses the TranscriptConverter class (lib/agent-api/transcript-api.js) to convert transcripts between different formats.
 
 
 ---
 
-*Generated from 5 observations*
+*Generated from 7 observations*

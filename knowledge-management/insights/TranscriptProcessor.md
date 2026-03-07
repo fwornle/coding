@@ -2,121 +2,129 @@
 
 **Type:** SubComponent
 
-The TranscriptProcessor module uses a configuration file, transcript-processor-config.json, to store settings and parameters for transcript processing.
+The TranscriptConverter class (lib/agent-api/transcript-api.js) uses a factory pattern to create transcript converters based on the transcript format, allowing for easy addition of new formats.
 
 ## What It Is  
 
-The **TranscriptProcessor** is a sub‑component that lives inside the *LiveLoggingSystem* package. Its concrete implementation can be found in the source tree alongside the files **transcript‑adapter.py**, **queue.py**, **ontology‑classification‑agent.py**, **transcript‑processor‑config.json**, **logging.py**, **database‑connection.py**, and **retry.py**. The class `TranscriptProcessor` orchestrates the end‑to‑end handling of raw transcripts: it receives a transcript payload, uses **TranscriptAdapter** to normalise the data, hands the normalised record to a queued work‑item, classifies the content via **OntologyClassificationAgent**, and finally persists the enriched transcript through the database connection defined in **database‑connection.py**. All operational parameters (e.g., queue size, retry limits, classification thresholds) are externalised in **transcript‑processor‑config.json**, allowing the component to be re‑configured without code changes.  
-
-## Architecture and Design  
-
-The design of **TranscriptProcessor** is deliberately *modular* and *pipeline‑oriented*. The most visible architectural pattern is a **queue‑based processing pipeline**: incoming transcripts are wrapped as tasks and placed onto a queue managed by the `queue.py` module. Workers dequeue items, apply a deterministic sequence of steps (adaptation → classification → storage), and acknowledge completion. This decouples the producer (the part of *LiveLoggingSystem* that captures live logs) from the consumer (the classification and storage logic), smoothing bursts of incoming data and providing back‑pressure control.  
-
-A complementary **retry mechanism** is provided by **retry.py**. When a task fails—whether due to a transient database error, a malformed transcript, or a classification exception—the retry wrapper automatically re‑queues the task according to the policy defined in the JSON config. This adds resilience without scattering retry logic throughout the codebase.  
-
-The component also follows a **configuration‑driven** approach. All tunable values (queue capacity, retry count, logging levels, database connection strings) are stored in **transcript‑processor‑config.json** and read at start‑up, ensuring that environment‑specific behaviour can be altered without recompiling.  
-
-Finally, **cross‑cutting concerns** such as observability and persistence are handled by dedicated modules: `logging.py` supplies structured logs for every processing stage, while `database-connection.py` encapsulates the DB client, exposing a clean API for the **TranscriptStorage** child component. The **OntologyClassificationAgent** (shared with the sibling **ClassificationEngine**) is injected into the processor, reinforcing *dependency inversion* and allowing the same classification logic to be reused across the system.
-
-## Implementation Details  
-
-The heart of the sub‑component is the `TranscriptProcessor` class (defined in the main **transcript‑processor** module). Its constructor reads **transcript‑processor-config.json**, instantiates a `Queue` object from **queue.py**, and wires up the following collaborators:
-
-* **TranscriptAdapter** (`transcript‑adapter.py`) – Provides the method `adapt(raw_transcript) → unified_transcript`. This class defines the canonical schema used throughout *LiveLoggingSystem* and is also referenced by the child **TranscriptConverter**.  
-
-* **OntologyClassificationAgent** (`ontology‑classification‑agent.py`) – Exposes `classify(unified_transcript) → classification_result`. The same agent is used by the sibling **ClassificationEngine**, guaranteeing consistent ontology‑based tagging across the platform.  
-
-* **DatabaseConnection** (`database‑connection.py`) – Supplies `save(processed_transcript)`. The underlying schema is described in **transcript‑storage.sql**, which the child **TranscriptStorage** relies on for table creation and migrations.  
-
-* **RetryHandler** (`retry.py`) – Wraps the processing function with `@retry(max_attempts, backoff)`. When an exception bubbles up from any stage, the handler re‑queues the task up to the configured limit.  
-
-* **Logger** (`logging.py`) – All major events (task enqueued, adaptation success, classification outcome, DB write, retry attempt, final failure) are logged with contextual metadata (transcript ID, timestamps, error codes).  
-
-The processing flow is roughly:
-
-1. **Enqueue** – The parent *LiveLoggingSystem* pushes a raw transcript onto the queue via `TranscriptProcessor.enqueue(raw)`.  
-2. **Worker Loop** – A background worker fetches the next task, invokes the retry‑decorated `process(task)`.  
-3. **Adaptation** – `TranscriptAdapter.adapt` normalises the raw payload.  
-4. **Classification** – `OntologyClassificationAgent.classify` tags observations according to the shared ontology.  
-5. **Persistence** – `DatabaseConnection.save` writes the enriched transcript; the child **TranscriptStorage** may perform additional post‑processing (e.g., indexing).  
-6. **Acknowledgement** – On success the task is marked complete; on failure the retry handler decides whether to re‑queue or drop the item.  
-
-The child components (**TranscriptConverter**, **TranscriptClassifier**, **TranscriptStorage**) are thin wrappers around the core adapters and agents, exposing higher‑level APIs to the rest of *LiveLoggingSystem* while keeping the processor’s internal workflow isolated.
-
-## Integration Points  
-
-**TranscriptProcessor** sits at the intersection of several system boundaries:
-
-* **Parent – LiveLoggingSystem** – The parent captures live session logs and forwards raw transcripts to the processor via the `enqueue` method. The parent also supplies the configuration file path, ensuring that the processor respects system‑wide settings.  
-
-* **Siblings – LoggingManager, ClassificationEngine, OntologyManager, LSLConfigValidator** –  
-  * The **LoggingManager** shares the same `logging.py` module, guaranteeing uniform log formatting across components.  
-  * The **ClassificationEngine** re‑uses the **OntologyClassificationAgent**, meaning any updates to the ontology or classification rules automatically propagate to the processor.  
-  * The **OntologyManager** provides the underlying ontology entities that the agent consults, establishing a data‑flow link from ontology definition to transcript tagging.  
-  * The **LSLConfigValidator** validates the JSON configuration before the processor starts, preventing misconfiguration at runtime.  
-
-* **Children – TranscriptConverter, TranscriptClassifier, TranscriptStorage** – These expose simplified interfaces (`convert`, `classify`, `store`) for other modules that may need to invoke a single step without running the full pipeline. They directly depend on the same adapter, agent, and DB connection classes used by the processor, reinforcing code reuse.  
-
-* **External Services** – The database connection defined in **database‑connection.py** may point to a relational store (as hinted by **transcript‑storage.sql**). Any change in the DB driver or schema will affect both the processor and the **TranscriptStorage** child.  
-
-## Usage Guidelines  
-
-1. **Configuration First** – Always validate **transcript‑processor‑config.json** with the **LSLConfigValidator** before starting the system. Mis‑typed queue sizes or retry limits can cause deadlocks or unbounded retries.  
-
-2. **Enqueue Correctly** – Call `TranscriptProcessor.enqueue(raw_transcript)` with a payload that matches the expectations of **TranscriptAdapter** (e.g., JSON with required fields). The adapter is the single source of truth for the unified schema; feeding malformed data will trigger retries and eventually be dropped.  
-
-3. **Monitor Logs** – The `logging.py` integration emits structured entries for each stage. Set the logging level to `INFO` for normal operation and `DEBUG` when troubleshooting adaptation or classification failures.  
-
-4. **Handle Back‑Pressure** – The queue is bounded (size defined in the config). If the system is under heavy load, producers should respect `QueueFull` exceptions and optionally apply exponential back‑off before retrying the enqueue operation.  
-
-5. **Graceful Shutdown** – On service termination, drain the queue first to allow in‑flight tasks to complete. The retry handler will continue to respect its max‑attempt policy during shutdown, ensuring no partial writes.  
-
-6. **Reuse Shared Agents** – When extending classification logic, modify **OntologyClassificationAgent** rather than creating a new classifier. This keeps the behavior consistent with the sibling **ClassificationEngine** and the rest of the platform.  
+**TranscriptProcessor** is a sub‑component that lives inside the **LiveLoggingSystem** package. All of its source code is found in the file **`lib/agent-api/transcript-api.js`**. Its primary responsibility is to orchestrate the flow of transcript data: retrieving raw transcripts, applying caching, converting the content into the required format, and finally delivering the result to callers. It does this by delegating to a set of tightly‑coupled collaborators – `TranscriptAdapter`, `TranscriptRepository`, `TranscriptCache`, and `TranscriptConverter` – each of which lives in the same module. Because the parent component, **LiveLoggingSystem**, already employs async logging and non‑blocking I/O, TranscriptProcessor is designed to be lightweight and non‑blocking as well, relying on caching to minimise expensive I/O or network calls when fetching transcripts.
 
 ---
 
-### Architectural patterns identified  
-* Queue‑based processing pipeline (producer‑consumer)  
-* Retry wrapper for fault tolerance  
-* Configuration‑driven behaviour (external JSON)  
-* Separation of concerns via dedicated modules (adapter, classifier, storage, logging)  
+## Architecture and Design  
 
-### Design decisions and trade‑offs  
-* **Decoupling via queue** improves scalability and smooths spikes but adds latency for real‑time use cases.  
-* **Centralised retry** reduces duplicated error‑handling code but can mask underlying systematic failures if the max‑retry count is set too high.  
-* **Shared OntologyClassificationAgent** promotes consistency across siblings but creates a tight coupling; changes to the agent affect multiple components simultaneously.  
+The design of **TranscriptProcessor** is centred around *composition* of specialised helpers rather than monolithic logic. Three explicit design patterns surface from the observations:
 
-### System structure insights  
-* **TranscriptProcessor** is the orchestrator within *LiveLoggingSystem*, delegating to three child components that each encapsulate a single responsibility (conversion, classification, storage).  
-* Sibling components share cross‑cutting utilities (logging, config validation), indicating a common infrastructure layer.  
+1. **Factory Pattern** – Implemented inside `TranscriptConverter`. The converter class contains a factory that selects and instantiates the appropriate concrete converter based on the transcript’s source format. This makes adding support for a new format a matter of plugging in a new concrete converter without touching the processor logic.
 
-### Scalability considerations  
-* The bounded queue can be horizontally scaled by running multiple worker processes that share the same queue backend (e.g., Redis or in‑process `queue.Queue`).  
-* Database write throughput may become a bottleneck; consider batching or async DB drivers if transcript volume grows.  
-* Retry back‑off parameters should be tuned to avoid overwhelming downstream services during outage periods.  
+2. **Decorator Pattern** – Used by `TranscriptRepository`. The repository provides a core interface for fetching transcripts from any source, and decorators are layered on top to add **caching** and **logging** behaviour. This keeps the retrieval logic pure while still giving the system cross‑cutting concerns (cache hit/miss metrics, audit trails) without code duplication.
 
-### Maintainability assessment  
-* Clear module boundaries and single‑responsibility children make the codebase approachable.  
-* Externalising settings in **transcript‑processor‑config.json** simplifies environment‑specific tweaks.  
-* Reuse of shared agents and logging utilities reduces duplication but requires coordinated versioning; a change in the ontology model must be communicated across all dependent siblings.  
-* The lack of explicit type hints or interface definitions in the observations suggests potential for future refactoring toward more explicit contracts, which would further improve testability and maintainability.
+3. **Caching Mechanism** – Both `TranscriptAdapter` and `TranscriptCache` maintain in‑memory stores of frequently accessed transcripts. While not a formal “pattern” name in the observations, the repeated mention of caching indicates a deliberate performance optimisation strategy that aligns with the parent LiveLoggingSystem’s goal of high‑throughput, low‑latency processing.
+
+Interaction flow (as inferred from the file paths):
+
+- `TranscriptProcessor` calls **`TranscriptRepository.get()`** to obtain a raw transcript.  
+- The repository’s decorator stack first checks **`TranscriptCache`**; on a miss it forwards the request to the underlying source (e.g., a database or external service).  
+- Once retrieved, the processor hands the raw data to **`TranscriptConverter.createConverter(format)`**, which returns a concrete converter that normalises the transcript into the system’s canonical representation.  
+- The processed transcript is optionally stored back into **`TranscriptCache`** via **`TranscriptAdapter`**, allowing subsequent calls to hit the cache directly.
+
+The architecture is deliberately *layered*: the processor focuses on orchestration, the repository on data access, the cache on performance, and the converter on format handling. This separation of concerns simplifies testing and future extension.
+
+---
+
+## Implementation Details  
+
+### Core Classes  
+
+| Class / Module | File Path | Primary Role |
+|----------------|-----------|--------------|
+| **TranscriptProcessor** | `lib/agent-api/transcript-api.js` | Coordinates transcript retrieval, caching, and conversion. |
+| **TranscriptAdapter** | `lib/agent-api/transcript-api.js` | Provides a façade that couples the cache (`TranscriptCache`) with the repository, exposing a simplified API for the processor. |
+| **TranscriptRepository** | `lib/agent-api/transcript-api.js` | Abstracts the source of transcripts; decorated with caching and logging. |
+| **TranscriptCache** | `lib/agent-api/transcript-api.js` | In‑memory store (likely a Map or LRU cache) that holds recently accessed transcripts. |
+| **TranscriptConverter** | `lib/agent-api/transcript-api.js` | Factory that produces concrete converters based on format strings (e.g., `JSONConverter`, `XMLConverter`). |
+
+### Mechanics  
+
+1. **Caching** – Both `TranscriptAdapter` and `TranscriptRepository` reference `TranscriptCache`. When `TranscriptProcessor` requests a transcript, the cache is consulted first. On a hit, the cached payload is returned immediately, bypassing any I/O. On a miss, the request propagates down to the underlying source and the result is written back into the cache for future use.
+
+2. **Decorator Stack** – The repository is wrapped by two decorators:
+   - **LoggingDecorator** (implied by “logging functionality”) records each fetch attempt, including timestamps, cache‑hit/miss status, and possibly error conditions.
+   - **CachingDecorator** (the cache itself) intercepts calls to avoid duplicate fetches. The ordering (logging then caching, or vice‑versa) is not explicitly stated, but both concerns are orthogonal and can be composed in any order without affecting core retrieval logic.
+
+3. **Factory‑Based Conversion** – `TranscriptConverter` exposes a static method (e.g., `createConverter(format)`) that examines the supplied format identifier and returns an instance of a format‑specific converter class. Each concrete converter implements a common interface such as `convert(rawTranscript): CanonicalTranscript`. This design isolates format‑specific parsing rules and makes the addition of new formats a plug‑in activity.
+
+4. **Adapter Role** – `TranscriptAdapter` acts as the public façade for the processor. It hides the internal repository‑cache‑converter wiring, exposing methods like `getProcessedTranscript(id, format)` that internally orchestrate the cache lookup, repository fetch, conversion, and cache write‑back.
+
+Because the observations do not list individual functions, the above description abstracts the typical method names that would logically exist given the patterns (e.g., `fetch`, `store`, `convert`, `createConverter`). All of these live within the same JavaScript module, which keeps the component tightly scoped while still enabling clear separation through class boundaries.
+
+---
+
+## Integration Points  
+
+- **Parent – LiveLoggingSystem**: The processor is a child of the LiveLoggingSystem component. LiveLoggingSystem already implements async logging and non‑blocking file I/O (see `integrations/mcp-server-semantic-analysis/src/logging.ts`). TranscriptProcessor inherits this environment, meaning its own logging (performed by the repository decorator) is expected to be asynchronous and non‑blocking, preserving the overall system’s high‑throughput characteristics.
+
+- **Sibling – LoggingManager**: Both LoggingManager and TranscriptProcessor rely on the same async logging infrastructure. While LoggingManager focuses on generic log events, TranscriptProcessor’s repository decorator contributes transcript‑specific logs (e.g., cache hits). This shared logging backbone ensures consistent observability across the subsystem.
+
+- **Sibling – SessionManager**: SessionManager creates sessions via `SessionFactory` (`lib/agent-api/session-api.js`). Although not directly coupled, both SessionManager and TranscriptProcessor are likely invoked during a user interaction flow: a session is created, and then transcript data is fetched/processed for that session. Their coexistence under LiveLoggingSystem suggests coordinated lifecycle management.
+
+- **Sibling – TranscriptAdapter**: The sibling named TranscriptAdapter is actually the same module that TranscriptProcessor uses to interact with caching and conversion. This close relationship underscores that the adapter is the primary integration surface for any other component needing transcript data (e.g., a downstream analytics service).
+
+- **External Sources**: The repository may pull transcripts from databases, external APIs, or file stores. The decorator pattern abstracts these sources, allowing the processor to remain agnostic of where the raw data originates.
+
+All dependencies are internal to the `lib/agent-api` tree, meaning the component does not import third‑party services directly; instead, it composes its own helpers, which simplifies versioning and testing.
+
+---
+
+## Usage Guidelines  
+
+1. **Prefer the Adapter API** – Callers should interact with `TranscriptAdapter` (or the higher‑level `TranscriptProcessor` façade) rather than reaching directly into the repository or cache. This guarantees that caching, logging, and conversion are applied consistently.
+
+2. **Specify the Desired Format Explicitly** – When invoking the processor, always pass the target transcript format. The factory inside `TranscriptConverter` will select the correct converter; omitting the format may default to a generic or error‑prone path.
+
+3. **Leverage Cache Warm‑up** – If a batch of transcripts is known to be needed (e.g., during a session start), pre‑populate `TranscriptCache` via the adapter. This reduces latency for the first user‑visible request.
+
+4. **Observe Async Boundaries** – Because LiveLoggingSystem’s logging is async, any method that triggers logging (repository fetches) returns a promise. Ensure callers `await` the processor’s async methods to avoid race conditions.
+
+5. **Extend Formats via the Factory** – To add a new transcript format, create a new concrete converter class implementing the expected `convert` interface and register it inside the `TranscriptConverter` factory map. No changes to the processor or repository are required.
+
+6. **Do Not Bypass Decorators** – Avoid direct calls to the underlying data source; doing so would skip caching and logging, defeating the design’s performance and observability goals.
+
+---
+
+### Summary Deliverables  
+
+1. **Architectural patterns identified**  
+   - Factory Pattern (inside `TranscriptConverter`)  
+   - Decorator Pattern (applied to `TranscriptRepository` for caching & logging)  
+   - Explicit Caching Strategy (via `TranscriptCache` and `TranscriptAdapter`)
+
+2. **Design decisions and trade‑offs**  
+   - **Separation of concerns**: orchestration vs. data access vs. format handling improves testability but adds a few indirection layers.  
+   - **In‑memory caching**: drastically reduces I/O latency; however, it introduces cache‑coherency considerations and memory pressure in long‑running processes.  
+   - **Factory‑based conversion**: simplifies adding new formats but requires careful versioning of the factory map to avoid breaking existing callers.
+
+3. **System structure insights**  
+   - TranscriptProcessor sits one level below LiveLoggingSystem, sharing async logging infrastructure with sibling components.  
+   - All transcript‑related helpers are co‑located in `lib/agent-api/transcript-api.js`, promoting discoverability but also creating a relatively large module that may need refactoring as the feature set grows.
+
+4. **Scalability considerations**  
+   - The cache layer enables horizontal scaling of read‑heavy workloads; however, in a multi‑process or distributed deployment, the cache would need to be externalised (e.g., Redis) to maintain consistency.  
+   - The decorator pattern allows additional cross‑cutting concerns (e.g., metrics, security) to be added without altering core retrieval logic, supporting future scaling of observability.
+
+5. **Maintainability assessment**  
+   - High maintainability thanks to clear boundaries: changes to transcript formats only affect the factory and concrete converters; changes to data sources only affect the repository implementation.  
+   - Potential risk: the single‑file concentration (`transcript-api.js`) could become a maintenance bottleneck if the number of formats, decorators, or caching strategies expands. Refactoring into sub‑modules (e.g., `cache/`, `converter/`, `repository/`) would preserve the current architecture while improving code‑base navigation.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component is designed to capture and process live session logging data from various agents, including Claude Code conversations. It handles session windowing, file routing, classification layers, and transcript capture. The system's architecture involves multiple modules and classes, such as the OntologyClassificationAgent, LSLConfigValidator, and TranscriptAdapter, which work together to classify observations, validate configurations, and convert transcripts into a unified format.
-
-### Children
-- [TranscriptConverter](./TranscriptConverter.md) -- The TranscriptAdapter class in transcript-adapter.py defines the unified format for transcripts, which is used by the TranscriptConverter.
-- [TranscriptClassifier](./TranscriptClassifier.md) -- The classification process in the TranscriptClassifier involves applying predefined rules and patterns to identify key observations in the transcripts.
-- [TranscriptStorage](./TranscriptStorage.md) -- The TranscriptStorage uses a database schema defined in the transcript-storage.sql file to store processed transcripts, which includes fields for transcript metadata and classified observations.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes async logging and non-blocking file I/O, as seen in the logging.ts file (integrations/mcp-server-semantic-analysis/src/logging.ts), to improve performance by preventing the system from waiting for logging operations to complete before proceeding with other tasks. This design decision allows the system to handle a high volume of logging requests without significant performance degradation. Furthermore, the use of caching mechanisms in the TranscriptAdapter (lib/agent-api/transcript-api.js) optimizes transcript retrieval and conversion, reducing the load on the system and improving overall efficiency.
 
 ### Siblings
-- [LoggingManager](./LoggingManager.md) -- LoggingManager uses the LSLConfigValidator class to validate logging configurations, as defined in the lsl-config-validator.py file.
-- [ClassificationEngine](./ClassificationEngine.md) -- ClassificationEngine uses the OntologyClassificationAgent class to classify observations, as defined in the ontology-classification-agent.py file.
-- [OntologyManager](./OntologyManager.md) -- OntologyManager uses the OntologyEntity class to represent ontology entities, as defined in the ontology-entity.py file.
-- [LSLConfigValidator](./LSLConfigValidator.md) -- LSLConfigValidator uses the LSLConfig class to represent the LSL configuration, as defined in the lsl-config.py file.
+- [LoggingManager](./LoggingManager.md) -- LoggingManager uses async logging (integrations/mcp-server-semantic-analysis/src/logging.ts) to prevent the system from waiting for logging operations to complete before proceeding with other tasks.
+- [SessionManager](./SessionManager.md) -- SessionManager creates new sessions, using the SessionFactory class (lib/agent-api/session-api.js) to create new session objects.
+- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter uses the TranscriptConverter class (lib/agent-api/transcript-api.js) to convert transcripts between different formats.
 
 
 ---

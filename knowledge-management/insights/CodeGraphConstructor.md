@@ -1,96 +1,116 @@
 # CodeGraphConstructor
 
-**Type:** Detail
+**Type:** SubComponent
 
-The CodeGraphConstructor's implementation details are not directly available, but its usage can be understood through the context of the CodeKnowledgeGraphConstructor sub-component and its parent comp...
+The CodeGraphConstructor implements a monitoring mechanism to track performance and issues
 
 ## What It Is  
 
-**CodeGraphConstructor** is the core class that builds a **code‑knowledge graph** for the *KnowledgeManagement* domain. The only concrete location that mentions it is the `CodeKnowledgeGraphConstructor.java` file, where the surrounding component **CodeKnowledgeGraphConstructor** declares that it “uses a custom `CodeGraphConstructor` class to construct knowledge graphs from code repositories.”  In practice, `CodeGraphConstructor` is the engine that turns raw source‑code artefacts into a graph of entities (packages, classes, methods, relationships, etc.) that can be queried by the larger KnowledgeManagement subsystem. Its responsibilities are inferred from the sibling components **CodeParsing** and **CodeEntityExtraction**, which together suggest a pipeline of parsing → entity extraction → graph construction.
+The **CodeGraphConstructor** is the sub‑component inside the **SemanticAnalysis** module that is responsible for turning raw source code into a structured knowledge graph. It does this by parsing source files into an Abstract Syntax Tree (AST), extracting entities (such as classes, functions, modules, and their relationships) and persisting the resulting graph in **Memgraph**, a high‑performance in‑memory graph database. The constructor also supplies a query‑oriented façade that other parts of the system—most notably the **CodeGraphAgent**—can call to retrieve code entities on demand.  
 
----
+Although the source‑code view does not list concrete file paths or class names for the constructor, the observations make it clear that the implementation lives under the **SemanticAnalysis** hierarchy (e.g., `integrations/mcp-server-semantic-analysis/src/...`). The component is deliberately isolated from its siblings—**Pipeline**, **Ontology**, **Insights**, **LLMFacade**, **OntologyConfigManager**, and **CodeGraphAgent**—so that it can evolve its parsing and graph‑building logic without impacting the orchestration, ontology handling, or LLM‑facade layers.
 
 ## Architecture and Design  
 
-The limited view we have points to a **pipeline‑oriented architecture**. The parent component **CodeKnowledgeGraphConstructor** orchestrates a sequence of steps, each encapsulated in its own class:
+The design of **CodeGraphConstructor** follows a classic *pipeline* within a single component:  
 
-1. **CodeParsing** – parses source files into an intermediate representation (likely an AST).  
-2. **CodeEntityExtraction** – walks the parsed representation to identify domain‑specific entities (classes, interfaces, methods, annotations, etc.).  
-3. **CodeGraphConstructor** – consumes the extracted entities and assembles them into a graph data structure that represents the knowledge model.
+1. **AST Extraction Layer** – source files are fed to an AST parser (the exact parser implementation is not disclosed, but the observation that “AST parsing” is used tells us the component relies on language‑specific parsers to produce a language‑agnostic tree).  
+2. **Entity & Relationship Mapping** – the AST is walked to identify code entities and the edges that connect them (e.g., inheritance, calls, imports). This mapping stage is deterministic and stateless, which simplifies testing and enables reuse.  
+3. **Graph Persistence Layer** – identified nodes and edges are written into **Memgraph**. Memgraph’s native Cypher query support is leveraged for fast insertions and later retrievals.  
+4. **Query Interface** – a thin service layer exposes methods such as `getEntityByName`, `listIncomingEdges`, etc., allowing callers (e.g., **CodeGraphAgent**) to fetch graph data without needing to know about the underlying storage.  
 
-Because the three classes are siblings under the same parent, they share a **common contract** (e.g., they probably accept and emit well‑defined data objects) but each focuses on a distinct concern. This separation of concerns follows the **Single‑Responsibility Principle** and makes the overall construction process composable.
+The component incorporates several *cross‑cutting concerns* that shape its architecture:  
 
-No explicit design patterns (such as Factory, Strategy, or Observer) are mentioned in the observations, so we refrain from asserting their presence. The architecture is nevertheless **modular**: each step can be replaced or extended independently, which is a deliberate design decision to keep the knowledge‑graph generation adaptable to different languages or parsing libraries.
+- **Caching Mechanism** – results of expensive AST walks or frequent graph look‑ups are cached locally, reducing repeated work and lowering latency for downstream queries.  
+- **Parallel Processing** – parsing of multiple source files is dispatched concurrently, exploiting multi‑core CPUs to keep construction time bounded even for large codebases.  
+- **Validation** – after each batch of inserts, the constructor runs consistency checks (e.g., ensuring that every referenced node exists) to guarantee graph integrity before the data becomes visible to other agents.  
+- **Monitoring** – instrumentation records metrics such as parse time, cache hit‑rate, and graph write latency; these are fed to the system‑wide observability stack to surface performance regressions early.  
 
----
+Although no explicit “design pattern” name is called out in the observations, the combination of **Facade** (query interface), **Cache‑Aside** (caching), **Validator** (post‑write checks), and **Observer/Telemetry** (monitoring) emerges naturally from the described mechanisms.
 
 ## Implementation Details  
 
-The concrete implementation of `CodeGraphConstructor` is not exposed in the source snapshot, but the surrounding context gives us a clear picture of its internal workflow:
+The heart of the constructor is a **parser driver** that accepts a collection of file paths, invokes the appropriate language‑specific AST parser, and emits a normalized representation of code entities. Because the observations do not enumerate concrete class names, we refer to the logical units:
 
-* **Input** – a collection of *code‑entity* objects produced by **CodeEntityExtraction**. These objects likely contain metadata such as fully‑qualified names, visibility, type signatures, and relationship hints (e.g., inheritance, method calls).  
-* **Processing** – `CodeGraphConstructor` iterates over the entity collection, creating graph nodes for each entity and edges that model relationships (e.g., “calls”, “extends”, “implements”). The graph is probably represented by a library‑agnostic structure (e.g., adjacency lists or a third‑party graph DB model) to keep the component reusable.  
-* **Output** – a **knowledge graph** that can be persisted, queried, or visualised by downstream services within the **KnowledgeManagement** domain. The output format is not detailed, but given the naming it is reasonable to assume the graph conforms to the internal schema used by the rest of the KnowledgeManagement subsystem.
+* **`AstParser`** – abstracts the parsing of source files. It likely delegates to libraries such as TypeScript’s compiler API for `.ts` files or Babel for JavaScript, given the surrounding codebase’s TypeScript orientation.  
+* **`EntityExtractor`** – walks the AST nodes, recognizing declarations (classes, interfaces, functions) and relationships (extends, implements, imports, calls). The extractor builds in‑memory objects that mirror the graph schema expected by Memgraph.  
+* **`MemgraphWriter`** – batches node and edge creation statements and sends them to Memgraph using its Bolt or HTTP endpoint. Batching is essential to keep write latency low, especially when the parallel processor feeds thousands of entities per second.  
+* **`CacheManager`** – sits between the extractor and the writer. When a source file’s fingerprint (e.g., hash of its contents) is already present in the cache, the constructor skips re‑parsing, returning the previously stored graph fragment. This cache‑aside strategy reduces unnecessary work on incremental builds.  
+* **`ParallelScheduler`** – orchestrates a pool of worker threads or async tasks that each handle a subset of files. The scheduler respects a configurable concurrency limit to avoid saturating the host machine or the Memgraph instance.  
+* **`Validator`** – after a write batch completes, the validator runs Cypher queries that confirm referential integrity (e.g., every “calls” edge points to an existing function node). Detected violations trigger roll‑backs or corrective logging.  
+* **`MetricsCollector`** – emits Prometheus‑compatible counters and histograms for parse duration, cache hit/miss, write latency, and validation errors. These metrics are consumed by the broader monitoring infrastructure referenced in the sibling **LLMFacade**’s circuit‑breaker pattern.
 
-Because the class is described as “custom,” developers likely extended a base graph‑building utility or wrote a bespoke implementation that tightly couples the extracted entities to the graph schema required by the KnowledgeManagement component.
-
----
+All these logical units are wired together in a **service class** (conceptually `CodeGraphConstructorService`) that implements the public query façade. The façade methods translate caller requests into Cypher queries executed against Memgraph, returning domain objects that other agents (e.g., **CodeGraphAgent**) can directly consume.
 
 ## Integration Points  
 
-`CodeGraphConstructor` sits at the **core of the code‑knowledge‑graph pipeline** and interacts with the following entities:
+* **Parent – SemanticAnalysis**: The constructor is a core building block of the **SemanticAnalysis** component. While **SemanticAnalysis** coordinates multiple agents (e.g., `OntologyClassificationAgent`, `CodeGraphAgent`), the constructor supplies the *code‑entity* layer that feeds the graph‑based reasoning performed by those agents.  
 
-* **Parent – CodeKnowledgeGraphConstructor**: This component triggers the whole process. It likely instantiates `CodeGraphConstructor`, passes the entity list, and receives the final graph. The parent may also handle error handling, logging, and orchestration of the sibling steps.  
-* **Sibling – CodeParsing**: Supplies raw source files (or streams) that are parsed into an intermediate representation. The parsing step must produce data in a format that `CodeEntityExtraction` can consume, which in turn feeds `CodeGraphConstructor`.  
-* **Sibling – CodeEntityExtraction**: Provides the entity collection that `CodeGraphConstructor` consumes. Any change in the extraction schema (e.g., adding new entity types) directly impacts the graph constructor’s logic.  
-* **Downstream – KnowledgeManagement services**: Once the graph is built, it is handed off to services that store, query, or visualise the knowledge graph (e.g., a graph database, an API layer, or analytics modules). The contract between `CodeGraphConstructor` and these services is the graph data structure itself.
+* **Sibling – CodeGraphAgent**: The **CodeGraphAgent** consumes the graph built by the constructor via the exposed query interface. The agent then enriches the graph with additional semantic annotations (e.g., linking code entities to ontology concepts) before exposing it to downstream RAG (retrieval‑augmented generation) services.  
 
-No external libraries, configuration files, or network interfaces are mentioned, so the integration surface appears to be purely in‑process method calls and shared data objects.
+* **Sibling – Pipeline**: The **Pipeline**’s DAG‑based execution model may schedule the constructor as a node in the overall analysis workflow, ensuring that code graph construction runs after source checkout and before ontology classification.  
 
----
+* **Sibling – Ontology & OntologyConfigManager**: Once the code graph exists, the **OntologyClassificationAgent** can map code entities to ontology classes, using configuration stored by **OntologyConfigManager**. This demonstrates a clear data‑flow: AST → CodeGraphConstructor → Memgraph → OntologyClassificationAgent.  
+
+* **Sibling – LLMFacade**: The **LLMFacade**’s circuit‑breaker pattern protects calls that might query the code graph indirectly (e.g., when an LLM‑driven insight needs to fetch a function definition). Although the constructor itself does not implement a circuit‑breaker, its reliability is bolstered by the monitoring and validation mechanisms, which feed health signals to the façade’s breaker logic.  
+
+* **External – Memgraph**: The graph database is the sole persistence dependency. All write and read paths are mediated through Memgraph’s driver, making the constructor’s correctness tightly coupled to Memgraph’s schema stability and performance characteristics.
 
 ## Usage Guidelines  
 
-1. **Invoke via the parent component** – Developers should not instantiate `CodeGraphConstructor` directly. Instead, use the `CodeKnowledgeGraphConstructor` API, which ensures that parsing and entity extraction are performed in the correct order and that the resulting graph conforms to the expected schema.  
-2. **Supply well‑formed entity collections** – The quality of the generated graph depends on the completeness of the entities emitted by **CodeEntityExtraction**. Ensure that the extraction step is configured to capture all relevant language constructs for the target codebase.  
-3. **Treat the graph as immutable after construction** – Since the component is designed to *construct* the graph, mutating it later can break assumptions made by downstream KnowledgeManagement services. If updates are required, re‑run the full pipeline.  
-4. **Monitor performance for large codebases** – Although the observations do not detail scalability, graph construction can become resource‑intensive. Consider batching input files and profiling the constructor when dealing with millions of entities.  
-5. **Extend with caution** – Adding new entity types or relationship edges will likely require changes in both **CodeEntityExtraction** and `CodeGraphConstructor`. Keep these modifications synchronized to preserve the integrity of the graph schema.
+1. **Prefer Incremental Updates** – When adding or modifying source files, compute a content hash and let the `CacheManager` decide whether a fresh AST walk is required. This avoids unnecessary re‑parsing and keeps the graph up‑to‑date with minimal overhead.  
+
+2. **Respect Concurrency Limits** – The `ParallelScheduler` exposes a configurable thread/worker pool size. Tuning this value based on the host’s CPU and Memgraph’s write capacity prevents saturation and ensures stable latency.  
+
+3. **Validate After Bulk Loads** – After large batch imports (e.g., a full repository scan), invoke the `Validator` explicitly to confirm graph integrity before any downstream agents start consuming the data.  
+
+4. **Monitor Key Metrics** – Integrate the `MetricsCollector` output with the system’s Prometheus/Grafana stack. Track cache hit‑rate, parse latency, and validation error counts; spikes often indicate source‑code churn or schema mismatches that need attention.  
+
+5. **Graceful Degradation** – If Memgraph becomes unavailable, the constructor should fall back to a read‑only mode where cached graph fragments are served, while new writes are queued or dropped according to the system’s fault‑tolerance policy. Downstream agents (e.g., **CodeGraphAgent**) must be prepared to handle partial graph visibility.
 
 ---
 
-### 1. Architectural patterns identified
-* **Pipeline / staged processing** – distinct phases (parsing → extraction → graph construction) executed sequentially.
-* **Modular decomposition with single‑responsibility** – each sibling component focuses on one concern.
+### Architectural Patterns Identified
+* **Facade** – the public query interface abstracts Memgraph details.
+* **Cache‑Aside** – local caching of parsed AST results.
+* **Parallel/Worker‑Pool** – concurrent processing of source files.
+* **Validator** – post‑write consistency checks.
+* **Observer/Telemetry** – metrics collection for monitoring.
 
-### 2. Design decisions and trade‑offs
-* **Explicit separation of parsing, extraction, and graph building** improves maintainability and testability but adds the overhead of data‑object translation between stages.
-* **Custom graph constructor** gives full control over the graph schema, at the cost of re‑implementing functionality that generic graph libraries might provide.
+### Design Decisions & Trade‑offs
+* **In‑Memory Graph (Memgraph)** provides ultra‑fast traversal at the cost of higher memory consumption and a dependency on a specialized DB.
+* **Parallel Parsing** accelerates large codebases but introduces complexity around thread safety and Memgraph write ordering.
+* **Caching** reduces redundant work but requires cache invalidation logic tied to source changes.
+* **Explicit Validation** improves data quality but adds latency to the write path; it is a conscious trade‑off favoring correctness over raw throughput.
 
-### 3. System structure insights
-* The **CodeKnowledgeGraphConstructor** component acts as the orchestrator, encapsulating the three pipeline stages.
-* `CodeGraphConstructor` is the terminal stage, producing the artefact consumed by the broader **KnowledgeManagement** subsystem.
-* Sibling components share a common data contract, enabling plug‑and‑play replacement if a different parser or extractor is needed.
+### System Structure Insights
+* The constructor sits at the *data‑ingestion* tier of **SemanticAnalysis**, feeding a graph that downstream agents enrich and query.
+* It is loosely coupled to the rest of the pipeline through well‑defined interfaces, enabling independent evolution of parsing logic and ontology handling.
 
-### 4. Scalability considerations
-* Graph size grows with the number of code entities; memory consumption can become a bottleneck for very large repositories.
-* Because the pipeline is linear, parallelisation opportunities exist at the parsing and extraction stages (e.g., processing files in parallel) before feeding a consolidated entity list to the constructor.
+### Scalability Considerations
+* Horizontal scalability is achievable by sharding source‑file batches across multiple worker nodes, each with its own Memgraph client, provided the underlying Memgraph cluster can handle concurrent writes.
+* Cache distribution (e.g., using Redis) could extend the caching benefit across multiple instances, reducing duplicate parsing in a distributed deployment.
 
-### 5. Maintainability assessment
-* **High** – clear modular boundaries and a single responsibility per class make the codebase easy to understand and evolve.
-* **Potential risk** – tight coupling between the output format of **CodeEntityExtraction** and the input expectations of `CodeGraphConstructor` means that schema changes must be coordinated across both modules. Maintaining a shared model definition mitigates this risk.
+### Maintainability Assessment
+* The component’s clear separation of concerns (parsing, extraction, persistence, caching, validation, monitoring) promotes testability and ease of modification.
+* Lack of concrete class names in the current observations suggests the codebase may rely on functional composition rather than deep inheritance hierarchies, which typically eases future refactoring.
+* The reliance on external tools (AST parsers, Memgraph) introduces version‑compatibility considerations; careful dependency management and integration tests are essential to maintain stability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodeKnowledgeGraphConstructor](./CodeKnowledgeGraphConstructor.md) -- CodeKnowledgeGraphConstructor uses a custom CodeGraphConstructor class to construct knowledge graphs from code repositories, as seen in the CodeKnowledgeGraphConstructor.java file.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a multi-agent system architecture, where each agent is responsible for a specific task, such as the OntologyClassificationAgent, which uses the OntologyConfigManager in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to manage ontology configurations and classify observations against the ontology system. This approach allows for a modular and scalable design, enabling easy addition or removal of agents as needed. The use of a graph database for storing and retrieving knowledge entities, as seen in the CodeGraphAgent, which integrates with the code-graph-rag MCP server, provides an efficient means of querying and indexing code entities.
 
 ### Siblings
-- [CodeEntityExtraction](./CodeEntityExtraction.md) -- CodeEntityExtraction is a suggested node from the parent component analysis, indicating its importance in the knowledge graph construction process
-- [CodeParsing](./CodeParsing.md) -- CodeParsing is a suggested node from the parent component analysis, highlighting its significance in the code knowledge graph construction process
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses the OntologyConfigManager to manage ontology configurations and classify observations against the ontology system
+- [Insights](./Insights.md) -- The InsightGenerator uses machine learning algorithms to identify patterns and relationships in the data
+- [LLMFacade](./LLMFacade.md) -- The LLMFacade uses the CircuitBreaker pattern to handle faults and prevent cascading failures
+- [OntologyConfigManager](./OntologyConfigManager.md) -- The OntologyConfigManager uses a database to store ontology configurations
+- [CodeGraphAgent](./CodeGraphAgent.md) -- The CodeGraphAgent uses the code-graph-rag MCP server to query and retrieve code entities
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

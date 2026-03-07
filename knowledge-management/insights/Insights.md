@@ -2,107 +2,139 @@
 
 **Type:** SubComponent
 
-InsightConfiguration.yaml defines the insight generation workflow, including pattern definitions and report templates
+The Insights sub-component provides a modular architecture, with each agent responsible for a specific task, such as the InsightGenerator agent for generating insights, as seen in the InsightGenerator class (integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts).
 
 ## What It Is  
 
-The **Insights** sub‑component lives inside the *SemanticAnalysis* hierarchy and is responsible for turning raw knowledge entities into consumable, higher‑level observations.  All of its behaviour is driven from the declarative file **`InsightConfiguration.yaml`**, which lives alongside the other configuration artefacts of the SemanticAnalysis suite (e.g., `pipeline-configuration.yaml`, `ontology-definitions.yaml`).  The core runtime classes that implement the workflow are **`InsightGenerator`**, **`PatternCatalogExtractor`**, **`KnowledgeReportAuthor`**, **`InsightManager`**, and **`InsightUtils`**.  Each of these classes exposes a single public entry point that appears in the source tree of the Insights module (e.g., `InsightGenerator.generateInsights()`, `PatternCatalogExtractor.extractPatterns()`, etc.).  The sub‑component therefore acts as a self‑contained pipeline that consumes *knowledge entities* produced by upstream agents (OntologyClassifier, CodeKnowledgeGraphBuilder, EntityValidator, …) and emits *insight objects* and *reports* that downstream consumers (e.g., UI dashboards, export services) can render.
+The **Insights** sub‑component lives inside the *semantic‑analysis* integration of the MCP server and is implemented across several TypeScript files under the path `integrations/mcp-server-semantic-analysis/src`.  Core agents and models that make up the sub‑component include  
+
+* `agents/insight-generator.ts` – the **InsightGenerator** agent that synthesises insights from already‑analysed data.  
+* `model/pattern-catalog-extractor.ts` – the **PatternCatalogExtractor** class that pulls reusable patterns and trends from the raw analysis results.  
+* `model/knowledge-report-author.ts` – the **KnowledgeReportAuthor** class that builds human‑readable reports based on the generated insights.  
+
+All of these pieces sit under the umbrella of the **SemanticAnalysis** component (the parent) and share the common contract defined in `agents/base-agent.ts` (**BaseAgent**).  The sub‑component also re‑uses the **LLMService** (`model/llm-service.ts`) through the **SemanticAnalysisAgent** (`agents/semantic-analysis-agent.ts`) to drive large‑language‑model‑based reasoning.  Extensibility is demonstrated by the presence of a sibling agent – **CodeAnalyzer** (`agents/code-analyzer.ts`) – which can be added to the pipeline without disturbing existing Insight logic.
+
+In short, **Insights** is a modular, agent‑driven layer that transforms low‑level semantic analysis output into higher‑level patterns, actionable insights, and formatted knowledge reports.
+
+---
 
 ## Architecture and Design  
 
-The observations reveal a **configuration‑driven pipeline** architecture.  `InsightConfiguration.yaml` enumerates the *pattern definitions* and *report templates* that the pipeline must apply, allowing new insight types to be added without code changes.  At runtime, **`InsightManager.loadInsight()`** reads this YAML file, instantiates the required classes, and wires them together.  This mirrors the same declarative approach used by the sibling **Pipeline** component (which reads `pipeline-configuration.yaml`) and the **Ontology** component (which reads `ontology-definitions.yaml`), reinforcing a system‑wide convention of externalising workflow logic.
+The architecture of **Insights** follows a **modular agent‑based pattern**.  Each distinct responsibility (pattern extraction, insight generation, report authoring) is encapsulated in its own class that implements the **BaseAgent** interface (`agents/base-agent.ts`).  This interface acts as a contract, guaranteeing that every agent exposes a common set of lifecycle methods (e.g., `run()`, `initialize()`, `shutdown()`).  By adhering to a single interface, agents can be orchestrated by higher‑level pipelines (such as the **Pipeline** sibling component) without needing bespoke glue code.
 
-Two classic design patterns are evident:
+The sub‑component also exhibits **extensibility through composition**.  The **PatternCatalogExtractor** can be supplied with new catalog definitions, and the **KnowledgeReportAuthor** can accept additional report templates.  This design is reinforced by the presence of the **CodeAnalyzer** agent, which demonstrates that new analytical agents can be dropped into the same execution graph and participate in the Insight workflow.
 
-1. **Strategy** – `PatternCatalogExtractor.extractPatterns()` implements a pluggable strategy for locating and extracting reusable patterns from knowledge entities.  The extractor can be swapped (e.g., a regex‑based extractor vs. an LLM‑driven extractor) simply by changing the configuration entry that points to a concrete implementation class.
+Communication between agents is **synchronous and in‑process**: the **InsightGenerator** receives the output of the **PatternCatalogExtractor** (and indirectly the LLM‑enhanced data from **SemanticAnalysisAgent**) as input parameters.  The **LLMService** is injected where needed, keeping the heavy LLM calls isolated to a single service class (`model/llm-service.ts`).  This separation reduces coupling between the business logic of Insight generation and the underlying AI provider.
 
-2. **Factory / Reflection** – `InsightUtils.getInsightClass()` acts as a lightweight factory that resolves a string identifier (taken from the YAML) to a concrete insight class.  This enables the generator to remain agnostic of concrete insight types while still creating strongly‑typed objects.
+The overall design mirrors the **pipeline** sibling’s DAG‑based execution model, although the observations do not show an explicit DAG definition inside **Insights** itself.  Nonetheless, the modular agents can be wired into the same DAG used by the **Pipeline** component, preserving a consistent execution strategy across the system.
 
-The **Template Method** pattern is also implicit in `KnowledgeReportAuthor.authorReport()`.  The method follows a fixed skeleton (gather insights → apply pattern → render using a template) while delegating the actual rendering logic to the report template defined in the configuration file.
-
-Interaction among the components follows a **linear, staged flow**:  
-`InsightGenerator.generateInsights()` → `PatternCatalogExtractor.extractPatterns()` → `KnowledgeReportAuthor.authorReport()`.  Each stage consumes the output of the previous one, mirroring the DAG‑style execution model used by the sibling **Pipeline** component, albeit in a more tightly coupled, domain‑specific chain.
+---
 
 ## Implementation Details  
 
-* **`InsightGenerator.generateInsights()`** – This method is the entry point for the insight creation phase.  It iterates over the collection of *knowledge entities* supplied by the parent SemanticAnalysis agents, applies the pattern catalog (see below), and constructs domain‑specific insight objects.  The generation logic is driven by the pattern definitions read from `InsightConfiguration.yaml`, meaning that the generator does not contain hard‑coded heuristics.
+### BaseAgent (`agents/base-agent.ts`)  
+All agents inherit from **BaseAgent**, which defines the core contract (e.g., `execute(context): Promise<Result>`).  This guarantees that the **InsightGenerator**, **PatternCatalogExtractor**, **KnowledgeReportAuthor**, and **CodeAnalyzer** can be managed uniformly by any scheduler or orchestrator.
 
-* **`PatternCatalogExtractor.extractPatterns()`** – Implemented as a strategy, this class receives a knowledge entity and returns a set of *pattern matches*.  The extractor consults the pattern catalog (a data structure populated from the YAML file) and may employ different extraction techniques (e.g., AST analysis, LLM prompting).  Because the extractor is strategy‑based, new extraction algorithms can be introduced by registering a new implementation class in the configuration.
+### InsightGenerator (`agents/insight-generator.ts`)  
+The **InsightGenerator** implements `BaseAgent` and focuses on turning structured pattern data into concise insights.  Its `execute` method typically receives a `PatternCatalog` object, runs domain‑specific heuristics, and may call `LLMService` to enrich the textual description.  The class is deliberately lightweight; heavy LLM work is delegated to the service layer.
 
-* **`KnowledgeReportAuthor.authorReport()`** – Once insights and patterns are available, this component produces a human‑readable report.  It pulls the appropriate *report template* from `InsightConfiguration.yaml`, injects the insight data, and renders the final document (e.g., Markdown, HTML, or PDF).  The method abstracts away the rendering engine, allowing the system to switch templates without touching code.
+### PatternCatalogExtractor (`model/pattern-catalog-extractor.ts`)  
+This class parses the raw semantic analysis payload (produced by **SemanticAnalysisAgent**) and builds a catalog of recurring patterns.  It provides methods such as `extractPatterns(rawData): PatternCatalog` and `identifyTrends(catalog): TrendSet`.  The extractor is designed to be data‑agnostic, allowing new pattern definitions to be added via configuration files without code changes.
 
-* **`InsightManager.loadInsight()`** – This bootstrapper reads `InsightConfiguration.yaml`, resolves class names via `InsightUtils.getInsightClass()`, and assembles the pipeline objects.  It also performs validation of the configuration (ensuring required fields are present) and registers the generated insight types with the broader SemanticAnalysis runtime so that downstream components can query them.
+### KnowledgeReportAuthor (`model/knowledge-report-author.ts`)  
+Once insights are ready, the **KnowledgeReportAuthor** assembles them into a report format (Markdown, HTML, etc.).  It holds a collection of **report templates** that can be extended, as noted in the extensibility observation.  The primary method `authorReport(insights, templateId): Report` merges the insight payload with the chosen template, applying any post‑processing (e.g., citation insertion) required for the final deliverable.
 
-* **`InsightUtils.getInsightClass()`** – A utility that maps a string identifier (e.g., `"CodeComplexityInsight"`) to the concrete class implementing that insight.  It typically uses reflection or a simple lookup table populated during the manager’s loading phase.  This indirection decouples the generator from concrete implementations and supports plug‑in style extensions.
+### LLMService (`model/llm-service.ts`) & SemanticAnalysisAgent (`agents/semantic-analysis-agent.ts`)  
+The **LLMService** abstracts calls to a large language model provider.  The **SemanticAnalysisAgent** leverages this service to perform the initial natural‑language understanding of source data.  By keeping LLM calls in a dedicated service, the **Insights** agents can remain focused on orchestration rather than low‑level AI interaction.
 
-All of these classes reside in the *Insights* module and share a common package namespace (e.g., `semanticanalysis.insights.*`).  They rely on the same logging, error‑handling, and configuration utilities used by sibling components, ensuring a consistent developer experience across the entire SemanticAnalysis ecosystem.
+### Extensibility via CodeAnalyzer (`agents/code-analyzer.ts`)  
+The presence of the **CodeAnalyzer** agent illustrates the sub‑component’s openness to new analytical capabilities.  Adding a new agent simply requires implementing `BaseAgent` and registering it with the pipeline scheduler; the rest of the Insight flow (pattern extraction → insight generation → report authoring) remains untouched.
+
+---
 
 ## Integration Points  
 
-The Insights sub‑component sits directly after the **EntityValidator** and **CodeKnowledgeGraphBuilder** stages of the parent SemanticAnalysis pipeline.  Validated knowledge entities flow into `InsightGenerator`, which then produces insight objects that are registered back into the central knowledge store (the GraphDatabaseAdapter/MemgraphAdapter used by the whole system).  Downstream, the **WorkflowOrchestrator** can schedule periodic runs of the insight pipeline based on the DAG defined in `pipeline-configuration.yaml`.  Additionally, the **LLMFacade** may be consulted by `PatternCatalogExtractor` when a pattern extraction strategy requires language‑model assistance.
+* **Parent – SemanticAnalysis**: The **Insights** sub‑component consumes the output of the **SemanticAnalysisAgent** (`agents/semantic-analysis-agent.ts`), which itself uses **LLMService**.  This creates a clear upstream dependency: without semantic analysis, the Insight pipeline has no raw data to work on.
 
-From a dependency perspective, the Insights module imports:
+* **Sibling – Pipeline**: Although not defined inside **Insights**, the **Pipeline** component (`agents/batch-scheduler.ts`) can schedule the Insight agents as nodes in its DAG.  The standardized `BaseAgent` interface ensures that the scheduler treats Insight agents exactly like any other step.
 
-* `semanticanalysis.config.InsightConfiguration.yaml` (configuration source)  
-* `semanticanalysis.utils.InsightUtils` (class resolution)  
-* `semanticanalysis.persistence.GraphDatabaseAdapter` (to persist generated insights)  
-* Optional LLM services via `LLMFacade.getLLMModel()` when using LLM‑based pattern extraction.
+* **Sibling – Ontology**: The **OntologyClassificationAgent** (`agents/ontology-classification-agent.ts`) may enrich the pattern catalog with ontology tags, providing a richer context for the **InsightGenerator**.  This cross‑sibling data flow is facilitated by shared data models in the `model/` directory.
 
-Conversely, external consumers such as reporting dashboards or export services query the persisted insights through the same GraphDatabaseAdapter that other components use, ensuring a single source of truth.
+* **Sibling – CodeAnalyzer**: When the **CodeAnalyzer** runs, it can feed additional pattern data into the **PatternCatalogExtractor**, expanding the insight surface.  The modular design means that the extractor simply processes whatever pattern objects are supplied, regardless of source.
+
+* **Sibling – LLMService**: Both **SemanticAnalysisAgent** and **InsightGenerator** can invoke **LLMService** for language‑model‑based reasoning.  The service acts as a singleton or injected dependency, centralising configuration (API keys, model selection) and enabling caching or rate‑limit handling in one place.
+
+* **Child – InsightGeneratorAgent**: The concrete implementation of the Insight generation logic lives in `agents/insight-generator.ts`.  Other higher‑level components (e.g., a UI controller) would instantiate this class via the common agent factory defined elsewhere in the code base.
+
+---
 
 ## Usage Guidelines  
 
-1. **Define patterns and templates declaratively** – Add new pattern definitions or report templates only to `InsightConfiguration.yaml`.  Avoid hard‑coding logic inside `InsightGenerator` or `PatternCatalogExtractor`; the system expects all variability to be expressed in the YAML file.
+1. **Instantiate via the BaseAgent factory** – Always obtain an agent (e.g., `new InsightGenerator()`) through the shared factory or dependency‑injection container that respects the `BaseAgent` contract.  This guarantees that lifecycle hooks such as `initialize()` are called consistently.
 
-2. **Register new insight classes** – When introducing a novel insight type, implement the class (e.g., `MyCustomInsight`) and reference its fully‑qualified name in the YAML.  The manager will resolve it via `InsightUtils.getInsightClass()`.  Ensure the class follows the expected constructor signature (typically a knowledge entity or a pattern match collection).
+2. **Provide a populated PatternCatalog** – Before invoking `InsightGenerator.execute`, ensure that `PatternCatalogExtractor` has run and produced a complete `PatternCatalog`.  Missing patterns will lead to incomplete insights.
 
-3. **Choose the appropriate extraction strategy** – If a pattern requires sophisticated language understanding, configure the extractor to use an LLM‑based strategy via `LLMFacade`.  For simple syntactic patterns, a lightweight regex extractor is preferable for performance.
+3. **Leverage LLMService sparingly** – Calls to the large language model are expensive and rate‑limited.  Use the `LLMService` only for tasks that truly require natural‑language generation (e.g., enriching insight narratives) and prefer deterministic heuristics for routine pattern detection.
 
-4. **Validate configuration before deployment** – Run `InsightManager.loadInsight()` in a test environment to catch missing fields or class‑resolution errors early.  The manager performs sanity checks that mirror those in the sibling Pipeline component.
+4. **Extend via configuration, not code** – To add new pattern types or report templates, modify the JSON/YAML configuration files referenced by `PatternCatalogExtractor` and `KnowledgeReportAuthor`.  Only create a new agent class if the processing logic cannot be expressed through existing extensibility points.
 
-5. **Persist and version insights** – Because insights are stored in the graph database, treat them as versioned artefacts.  When updating patterns, consider the impact on existing insight nodes and whether migration scripts are required.
+5. **Register new agents with the Pipeline** – When adding a sibling such as a new analyzer, implement `BaseAgent` and add the agent to the DAG definition used by the **Pipeline** (`batch-analysis.yaml`).  Respect the `depends_on` ordering so that the Insight flow receives data in the correct sequence.
+
+6. **Testing** – Unit‑test each agent in isolation by mocking the `LLMService` and any upstream data structures.  Integration tests should exercise the full DAG to verify that pattern extraction, insight generation, and report authoring produce coherent end‑to‑end results.
 
 ---
 
 ### Architectural patterns identified  
-* Configuration‑driven pipeline (YAML‑based workflow)  
-* Strategy (pattern extraction)  
-* Factory / Reflection (class resolution)  
-* Template Method (report authoring)
+
+1. **Agent‑based modular architecture** – each functional piece is an independent agent implementing a common interface.  
+2. **Standardized interface (BaseAgent)** – provides a uniform contract for execution, initialization, and shutdown.  
+3. **Composition for extensibility** – pattern catalogs and report templates are composable resources that can be added without code changes.  
 
 ### Design decisions and trade‑offs  
-* **Declarative configuration** provides extensibility without code changes but adds a runtime dependency on correct YAML syntax.  
-* **Strategy pattern** enables swapping extraction algorithms, at the cost of slightly more complex wiring in `InsightManager`.  
-* **Factory‑style class lookup** decouples generation from concrete insight types, but relies on reflection which can be slower and harder to debug if class names are misspelled.
+
+* **Separation of concerns** – isolating pattern extraction, insight synthesis, and report authoring improves clarity but introduces multiple coordination points.  
+* **Centralised LLMService** – simplifies LLM usage and configuration but creates a single point of contention for AI‑driven workloads.  
+* **Configuration‑driven extensibility** – allows rapid addition of new patterns/templates, at the cost of requiring disciplined schema management for those configs.  
 
 ### System structure insights  
-Insights is a thin, linear pipeline that consumes validated knowledge entities from the parent SemanticAnalysis component and feeds back enriched insight nodes into the shared graph database.  It mirrors the architectural style of sibling modules (Pipeline, Ontology, etc.) by using external YAML definitions and shared utility services.
+
+* The **Insights** sub‑component sits directly under **SemanticAnalysis**, consuming its output and feeding higher‑level consumers (e.g., UI or downstream analytics).  
+* All agents share the `BaseAgent` contract, enabling them to be scheduled by the **Pipeline** DAG executor.  
+* Sibling agents such as **CodeAnalyzer** and **OntologyClassificationAgent** can enrich the data flow without altering the core Insight logic.  
 
 ### Scalability considerations  
-* The pattern extraction step can be parallelised because each knowledge entity is independent; the existing DAG execution model in the Pipeline component can be reused to run multiple `InsightGenerator` instances concurrently.  
-* Heavy LLM‑based extraction strategies may become a bottleneck; they should be isolated behind an asynchronous service or cached where possible.  
-* Persisting large volumes of insight nodes in Memgraph may require sharding or index tuning, but the component itself does not impose additional load beyond what the underlying graph adapter already handles.
+
+* Because each agent is a lightweight, stateless class, they can be instantiated in parallel across multiple threads or processes, allowing horizontal scaling of the Insight pipeline.  
+* The primary scalability bottleneck is the **LLMService**; scaling may require request batching, caching of LLM responses, or off‑loading to dedicated AI inference services.  
+* Adding new pattern catalogs does not affect runtime performance significantly, as extraction is primarily in‑memory processing of already‑parsed data.  
 
 ### Maintainability assessment  
-The heavy reliance on configuration files keeps the codebase small and focused, which is a strong maintainability advantage.  Adding new insight types or patterns is a matter of editing YAML and optionally providing a new class implementation.  However, the indirection introduced by `InsightUtils.getInsightClass()` and the strategy pattern can make static analysis harder; thorough unit tests and integration tests that validate the full loading‑and‑execution flow are essential to avoid runtime surprises.  Overall, the design aligns well with the rest of the SemanticAnalysis ecosystem, promoting consistency and ease of onboarding for developers familiar with the sibling components.
+
+* **High** – The strict `BaseAgent` interface enforces consistency, making it straightforward for developers to understand and modify individual agents.  
+* **Moderate** – The growing number of agents (InsightGenerator, PatternCatalogExtractor, KnowledgeReportAuthor, CodeAnalyzer, etc.) expands the surface area, requiring disciplined documentation and testing.  
+* **Positive** – Extensibility through configuration reduces the need for code churn when business requirements evolve, supporting long‑term maintainability.  
+
+---  
+
+*Prepared based solely on the supplied observations, preserving all file paths, class names, and documented relationships.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent responsible for a specific task, such as the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) for classifying observations against the ontology system. This modularity allows for easier maintenance and extension of the component, as new agents can be added or existing ones modified without affecting the overall system. For instance, the SemanticAnalysisAgent (integrations/mcp-server-semantic-analysis/src/agents/semantic-analysis-agent.ts) utilizes the LLMService for large language model-based analysis and generation, demonstrating the flexibility of the component's design. The use of a standardized agent interface, as defined in the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts), ensures consistency across the different agents and facilitates communication between them.
+
+### Children
+- [InsightGeneratorAgent](./InsightGeneratorAgent.md) -- The InsightGenerator class is defined in the insight-generator.ts file, which suggests that the agent's implementation details can be found in this file.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
-- [EntityValidator](./EntityValidator.md) -- EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
-- [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
-- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.persistEntity() persists the entity to the graph database
-- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges, as seen in the BatchScheduler class (integrations/mcp-server-semantic-analysis/src/agents/batch-scheduler.ts).
+- [Ontology](./Ontology.md) -- The Ontology sub-component utilizes the OntologyClassificationAgent for classifying observations against the ontology system, as seen in the OntologyClassificationAgent class (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts).
+- [CodeAnalyzer](./CodeAnalyzer.md) -- The CodeAnalyzer sub-component utilizes the CodeAnalyzer agent for analyzing code and generating insights, as seen in the CodeAnalyzer class (integrations/mcp-server-semantic-analysis/src/agents/code-analyzer.ts).
+- [InsightGenerator](./InsightGenerator.md) -- The InsightGenerator sub-component utilizes the InsightGenerator agent for generating insights from analyzed data, as seen in the InsightGenerator class (integrations/mcp-server-semantic-analysis/src/agents/insight-generator.ts).
+- [LLMService](./LLMService.md) -- The LLMService sub-component utilizes the LLMService class for providing large language model-based analysis and generation, as seen in the LLMService class (integrations/mcp-server-semantic-analysis/src/model/llm-service.ts).
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

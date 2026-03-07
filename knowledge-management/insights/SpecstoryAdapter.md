@@ -2,103 +2,111 @@
 
 **Type:** SubComponent
 
-The SpecstoryAdapter class is responsible for managing the interaction settings and parameters, including connection settings and data transfer settings
+The sub-component provides a unified interface for connecting to the Specstory extension, decoupling the connection logic from the underlying implementation details.
 
-## What It Is  
-
-The **SpecstoryAdapter** is a *SubComponent* that lives inside the **Trajectory** component.  It is the concrete bridge between the core system and the external **Specstory** extension.  All interaction with the extension—establishing connections, configuring transfer parameters, and moving data—passes through this adapter, which presents a clean, purpose‑built interface for the rest of the system.  Although the source repository does not expose explicit file‑system locations (the observations report “0 code symbols found” and no concrete paths), the class name **SpecstoryAdapter** and its relationship to **Trajectory**, **ConnectionManager**, **ConversationFormatter**, and its child **ConnectionHandler** are the canonical identifiers that locate it within the codebase.
-
-## Architecture and Design  
-
-The design of **SpecstoryAdapter** is anchored in two architectural concepts that appear directly in the observations:
-
-1. **Multi‑agent architecture** – The adapter is described as “employing a multi‑agent architecture, allowing for multiple connections to be managed simultaneously.”  This indicates that the component can instantiate and coordinate several independent agents (or logical workers) that each maintain a distinct connection to the Specstory extension.  The agents operate in parallel, enabling the system to handle concurrent data‑transfer streams without a single point of bottleneck.
-
-2. **Facade / Adapter pattern** – Both the parent‑level description and the sibling **ConnectionManager** note that **SpecstoryAdapter** “acts as a facade for interacting with the Specstory extension.”  By exposing a narrow, well‑defined API, the adapter shields callers from the intricacies of the extension’s protocol, authentication, and error handling.  The façade also centralises cross‑cutting concerns such as logging and exception management.
-
-Interaction among components follows a clear hierarchy: **Trajectory** owns the **SpecstoryAdapter**, which in turn owns a **ConnectionHandler** child responsible for the low‑level socket or API handshake.  Sibling components such as **ConnectionManager** reuse the adapter’s façade to encapsulate their own connection logic, while **ConversationFormatter** remains orthogonal, focusing on data transformation after the adapter has delivered raw payloads.
-
-## Implementation Details  
-
-The observable implementation surface consists of the following named entities:
-
-| Entity | Role (as described) |
-|--------|--------------------|
-| **SpecstoryAdapter** | Central façade; orchestrates multi‑agent connection management, logging, error handling, and exposure of a public interface. |
-| **ConnectionHandler** (child) | Inferred to perform the actual connection establishment and low‑level I/O with the Specstory extension. |
-| **Trajectory** (parent) | Contains the adapter; likely coordinates higher‑level workflow that depends on successful Specstory interactions. |
-| **ConnectionManager** (sibling) | Uses the adapter as a façade, suggesting that it delegates any direct extension calls to the adapter. |
-| **ConversationFormatter** (sibling) | Unrelated to the adapter’s connection concerns; formats conversation entries after data is retrieved. |
-
-*Multi‑agent coordination*: The adapter likely maintains an internal registry (e.g., a map of agent identifiers to connection objects) and spawns new agents on demand when a client requests an additional Specstory session.  Each agent would own a **ConnectionHandler** instance, ensuring that connection lifecycles are isolated.
-
-*Logging and error handling*: The adapter “utilizes a logging mechanism to log errors and exceptions,” implying a dedicated logger (perhaps a standard library logger or a custom wrapper) that records every failure point.  Errors encountered in **ConnectionHandler** are propagated upward, where the adapter decorates them with context before logging and re‑throwing or translating them into a uniform error type for callers.
-
-*Configuration management*: The adapter “manages the interaction settings and parameters, including connection settings and data transfer settings.”  This suggests an internal configuration object (e.g., `SpecstoryConfig`) that aggregates values such as endpoint URLs, authentication tokens, timeout thresholds, and payload size limits.  The configuration is probably supplied by **Trajectory** or read from a central configuration store at adapter initialization.
-
-*Dependency on the Specstory extension*: The adapter “has a dependency on the Specstory extension, requiring the extension to be installed and configured properly.”  Consequently, the adapter likely performs runtime checks (e.g., verifying the presence of required binaries or libraries) before attempting any connection, and it surfaces clear diagnostic messages when the extension is missing or mis‑configured.
-
-## Integration Points  
-
-**SpecstoryAdapter** sits at a convergence point between three layers of the system:
-
-1. **Upstream callers** – Any component that needs Specstory functionality (e.g., **ConnectionManager**) invokes the adapter’s public methods.  Because the adapter abstracts the extension, callers do not need to import Specstory‑specific libraries themselves.
-
-2. **Downstream extension** – The adapter directly talks to the external Specstory extension via the **ConnectionHandler**.  This is the only place where the codebase depends on the external binary or SDK, keeping the rest of the system free from that dependency.
-
-3. **Configuration and logging services** – The adapter pulls configuration values from the broader application context (likely via **Trajectory**) and writes to a shared logging facility, ensuring that all Specstory‑related events are captured in a unified log stream.
-
-Because the sibling **ConnectionManager** “uses the SpecstoryAdapter class as a façade for interacting with the Specstory extension,” it is reasonable to infer that **ConnectionManager** does not implement its own connection logic but rather delegates to the adapter’s multi‑agent API.  Likewise, **ConversationFormatter** operates downstream of the adapter, consuming the data that the adapter has fetched and transformed.
-
-## Usage Guidelines  
-
-* **Initialize once, reuse** – Create a single **SpecstoryAdapter** instance at application start (typically within **Trajectory**) and reuse it for all Specstory interactions.  Re‑instantiating the adapter would duplicate the multi‑agent infrastructure and could lead to resource contention.
-
-* **Configure before first use** – Supply the required connection and data‑transfer settings early, preferably via a configuration object passed to the adapter’s constructor or an explicit `initialize()` method.  Missing or malformed configuration will cause the adapter to abort connection attempts and emit clear log messages.
-
-* **Handle adapter‑level errors** – All exceptions raised by the adapter are already logged, but callers should still catch the adapter’s public error types to implement retry or fallback logic.  Because the adapter aggregates low‑level errors, the exception hierarchy is likely flatter and easier to reason about.
-
-* **Respect the multi‑agent limits** – While the adapter can manage multiple concurrent connections, each agent consumes system resources (threads, sockets, memory).  Developers should monitor the number of active agents and avoid spawning more than necessary; consider pooling or reusing agents for repeated operations.
-
-* **Do not bypass the façade** – Directly invoking the Specstory extension from any component other than **SpecstoryAdapter** defeats the purpose of the façade and introduces hidden dependencies.  All external calls must be routed through the adapter to guarantee consistent logging, error handling, and configuration usage.
+**SpecstoryAdapter – Technical Insight Document**  
 
 ---
 
-### Architectural patterns identified
-1. **Multi‑agent architecture** – concurrent agents for parallel Specstory connections.  
-2. **Facade / Adapter pattern** – **SpecstoryAdapter** presents a simplified, unified API while hiding the extension’s complexity.  
+### What It Is  
 
-### Design decisions and trade‑offs
-* **Centralised façade** reduces duplication but creates a single point of responsibility; any change to the extension’s protocol is isolated to the adapter.  
-* **Multi‑agent concurrency** improves throughput but increases resource consumption; the system must balance the number of agents against available CPU/memory.  
-* **Explicit logging and error handling** enhance observability and debuggability at the cost of added boilerplate in each interaction path.  
+`SpecstoryAdapter` lives in **`lib/integrations/specstory-adapter.js`** and is the concrete sub‑component that mediates every interaction between the rest of the code base and the external **Specstory** extension.  It does not expose raw networking or IPC primitives; instead it offers a **single, unified interface** (e.g., a `connect()` method) that callers invoke without needing to know whether the underlying transport will be HTTP, inter‑process communication (IPC), or a file‑watch mechanism.  The adapter is deliberately **modular** – a collection of small, self‑contained “adapter” objects each implements one connection strategy.  These adapters are **prioritized** so that, at runtime, the most appropriate one is automatically chosen.  Callers receive the outcome through a **callback mechanism** that reports success or failure, allowing higher‑level components (such as `Trajectory` or `ConnectionManager`) to focus on their core responsibilities while delegating all connection concerns to `SpecstoryAdapter`.
 
-### System structure insights
-* **Trajectory → SpecstoryAdapter → ConnectionHandler** forms a clear vertical stack: high‑level orchestration → façade → low‑level I/O.  
-* **Sibling components** (ConnectionManager, ConversationFormatter) illustrate a separation of concerns: ConnectionManager delegates to the adapter, while ConversationFormatter focuses on post‑retrieval processing.  
+---
 
-### Scalability considerations
-* The multi‑agent model scales horizontally with the number of concurrent Specstory sessions; scaling limits are bound by OS socket/thread limits and the capacity of the external Specstory service.  
-* Adding a connection‑pool or agent‑reuse strategy could mitigate resource pressure as the number of simultaneous sessions grows.  
+### Architecture and Design  
 
-### Maintainability assessment
-* **High** – The façade isolates external‑dependency changes, and the child **ConnectionHandler** encapsulates low‑level protocol details, making each layer independently testable.  
-* **Moderate** – Managing many agents introduces complexity in lifecycle handling (creation, teardown, error recovery); a well‑documented agent‑registry API is essential to keep this manageable.  
+The architecture of `SpecstoryAdapter` is anchored in two well‑known patterns that are explicitly reflected in the observations:
 
-Overall, **SpecstoryAdapter** provides a disciplined, well‑encapsulated gateway to the Specstory extension, leveraging a multi‑agent approach for concurrency while keeping the rest of the codebase clean through a façade abstraction.
+1. **Strategy / Adapter pattern** – each concrete connection method (HTTP, IPC, file‑watch) is encapsulated in its own adapter object that implements a common interface.  The `SpecstoryAdapter` class holds a registry of these strategies and selects one at runtime.  This decouples the *what* (connect to Specstory) from the *how* (the transport mechanism).
+
+2. **Prioritized selection (a lightweight Chain‑of‑Responsibility)** – adapters are ordered by suitability.  When a connection request arrives, the adapter list is traversed in priority order until one reports that it can operate in the current environment.  This guarantees that the “most suitable” method is used without the caller having to encode the decision logic.
+
+The component sits **directly beneath the `Trajectory` parent** (which is described as “flexibility and fault tolerance” oriented) and shares its modular philosophy with sibling components such as `ConnectionManager`, `FallbackHandler`, and `HttpRequestHelper`.  All of these siblings rely on the same unified interface, which reduces duplication and enforces a consistent error‑handling contract across the integration layer.
+
+---
+
+### Implementation Details  
+
+Although the source contains no explicit symbols, the hierarchy context mentions a concrete function **`connectViaHTTP`** inside `specstory-adapter.js`.  This function demonstrates the retry logic that `SpecstoryAdapter` applies when the HTTP strategy is selected, illustrating two key implementation concerns:
+
+* **Retry / resilience logic** – transient network failures are handled by automatically re‑issuing the request a configurable number of times before bubbling the error through the callback.  This mirrors the broader “fault‑tolerant” stance of the `Trajectory` component.
+
+* **Callback contract** – every connection attempt ultimately invokes a caller‑supplied callback with either a success payload (e.g., a live channel object) or an error descriptor.  The callback is the sole outward‑facing signal, keeping the rest of the system free from polling or promise‑chaining complexities.
+
+The modular adapter set is likely represented as an internal map or array, each entry exposing at least two methods: `canConnect()` (used for prioritization) and `connect(callback)`.  Adding a new adapter simply means registering a new object that satisfies this contract; removing one is a matter of deleting the registration entry.  Because the adapters are **self‑contained**, they can each contain their own low‑level details (e.g., `http.request` for HTTP, `net.Socket` for IPC, or `fs.watch` for file‑watch) without leaking those details to the rest of the code base.
+
+---
+
+### Integration Points  
+
+* **Parent – `Trajectory`** – `Trajectory` imports `SpecstoryAdapter` from `lib/integrations/specstory-adapter.js` and delegates all Specstory‑related connectivity to it.  The parent benefits from the adapter’s ability to switch transports transparently, which is crucial for the “flexibility and fault tolerance” goals described for `Trajectory`.
+
+* **Sibling – `ConnectionManager`** – directly uses the same adapter to open connections via HTTP, IPC, or file‑watch.  Because both `Trajectory` and `ConnectionManager` rely on the same unified interface, they share the same retry and callback semantics, simplifying error propagation throughout the system.
+
+* **Sibling – `FallbackHandler`** – consumes the adapter’s callback notifications.  When a failure is reported, `FallbackHandler` can invoke its own strategies (e.g., retry, switch to a lower‑priority adapter) or trigger a higher‑level fallback path.  The existence of a prioritized adapter list makes this hand‑off straightforward.
+
+* **Sibling – `HttpRequestHelper`** – supplies the HTTP request templates that `connectViaHTTP` ultimately uses.  This separation of concerns lets `SpecstoryAdapter` focus on *when* to send a request, while `HttpRequestHelper` focuses on *how* the request is shaped.
+
+* **Data flow** – The only public entry point is the unified interface (most likely a `connect(options, callback)` method).  Internally, the adapter selects the appropriate strategy, executes its `connect` routine, and finally invokes the caller’s callback with the result.  No other components need to know about the underlying transport details.
+
+---
+
+### Usage Guidelines  
+
+1. **Always use the unified interface** – Callers should never instantiate or invoke the low‑level adapters directly.  Import `SpecstoryAdapter` from `lib/integrations/specstory-adapter.js` and call its `connect` (or similar) method, supplying a callback that handles both success and error cases.
+
+2. **Provide a robust callback** – Because the adapter reports outcomes asynchronously, the callback must be idempotent and prepared for repeated invocations (e.g., when the HTTP retry logic triggers multiple attempts).  Logging and metrics collection are recommended inside the callback to surface transient failures.
+
+3. **Leverage the prioritization** – Do not attempt to force a particular transport unless you have a compelling reason; the adapter’s built‑in priority ordering will automatically select the most suitable method for the current environment.  If you need to influence the order, adjust the registration sequence in `specstory-adapter.js`.
+
+4. **Extend via registration** – To add a new connection method (for example, a WebSocket‑based channel), create a new adapter object that implements `canConnect` and `connect`, then register it in the adapter list.  No changes to callers or to `Trajectory` are required.
+
+5. **Coordinate with `FallbackHandler`** – When implementing custom error‑handling logic, respect the callback contract and let `FallbackHandler` decide whether to retry, switch adapters, or abort.  Avoid swallowing errors inside the callback; propagate them upward so the fallback system can act.
+
+---
+
+## Consolidated Answers  
+
+1. **Architectural patterns identified**  
+   * Strategy / Adapter pattern – distinct connection adapters implementing a common interface.  
+   * Prioritized selection (lightweight Chain‑of‑Responsibility) – adapters ordered by suitability and tried sequentially.  
+
+2. **Design decisions and trade‑offs**  
+   * **Modular adapters** – high extensibility (easy to add/remove adapters) vs. a slight runtime overhead for priority scanning.  
+   * **Unified callback** – simplifies caller code and centralises error handling, but places responsibility on developers to write correct asynchronous callbacks.  
+   * **Prioritization** – ensures optimal transport selection automatically; however, the priority order must be carefully maintained to avoid unintentionally preferring a less reliable method.  
+
+3. **System structure insights**  
+   * `SpecstoryAdapter` sits directly under the `Trajectory` component and is a shared integration point for several siblings (`ConnectionManager`, `FallbackHandler`, `HttpRequestHelper`).  
+   * The adapter’s internal registry of strategy objects forms a thin “integration layer” that isolates the rest of the system from transport specifics.  
+   * `connectViaHTTP` exemplifies the concrete implementation of one strategy, including retry logic that is mirrored (or can be mirrored) in other adapters.  
+
+4. **Scalability considerations**  
+   * Adding new adapters scales linearly – each new transport is a self‑contained module, leaving the core unchanged.  
+   * Prioritized selection remains efficient for a modest number of adapters (the typical set is three: HTTP, IPC, file‑watch). If the list grows dramatically, a lookup table or capability‑based selection could be introduced.  
+   * Callback‑driven design supports high concurrency because the adapter does not block; each connection attempt runs independently.  
+
+5. **Maintainability assessment**  
+   * **High maintainability** – separation of concerns (adapter logic vs. business logic), clear registration point, and a single public API reduce the surface area for bugs.  
+   * **Potential risk** – the callback contract must be consistently honoured; changes to the callback signature would ripple through all callers. Documentation of the callback shape is therefore critical.  
+   * The modular nature also aids testing: each adapter can be unit‑tested in isolation, and the unified interface can be integration‑tested with mock adapters.  
+
+---  
+
+*End of document.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- Key patterns in this component include the use of a multi-agent architecture, with the SpecstoryAdapter class acting as a facade for interacting with the Specstory extension. The component also employs a range of classes and functions to manage the connection and logging processes.
-
-### Children
-- [ConnectionHandler](./ConnectionHandler.md) -- Based on the parent context, ConnectionHandler is inferred to be responsible for connection establishment, although no direct code evidence is available.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is designed with flexibility and fault tolerance in mind, as evident from its ability to adapt to different connection methods such as HTTP, IPC, and file watch. This is achieved through the use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js, which provides a unified interface for connecting to the Specstory extension. The connectViaHTTP function in specstory-adapter.js demonstrates this flexibility by implementing a connection retry mechanism to handle transient connection issues.
 
 ### Siblings
-- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class as a facade for interacting with the Specstory extension, encapsulating the connection logic in the adapter class
-- [ConversationFormatter](./ConversationFormatter.md) -- ConversationFormatter uses a range of classes and functions to format the conversation entries, including text processing and data transformation
+- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension via HTTP, IPC, or file watch.
+- [DataFormatter](./DataFormatter.md) -- DataFormatter uses a set of predefined templates to format data for submission to the Specstory extension.
+- [FallbackHandler](./FallbackHandler.md) -- FallbackHandler uses a set of predefined fallback strategies to handle connection failures, including retrying the connection or switching to a different connection method.
+- [HttpRequestHelper](./HttpRequestHelper.md) -- HttpRequestHelper uses a set of predefined HTTP request templates to simplify the request process.
 
 
 ---
