@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
-status: completed
-stopped_at: Phase 10 context gathered
-last_updated: "2026-03-07T13:21:15.657Z"
-last_activity: 2026-03-07 -- Completed 09-03 Insight Enrichment and E2E Verification
+status: executing
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-03-07T13:52:18.228Z"
+last_activity: 2026-03-07 -- Completed 10-02 KG Operator Logic
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 95
+  total_plans: 6
+  completed_plans: 5
+  percent: 88
 ---
 
 # Project State
@@ -21,29 +21,31 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Wave-based multi-agent pipeline producing self-sufficient hierarchical knowledge
-**Current focus:** Phase 9 complete -- ready for Phase 10 (KG Operations)
+**Current focus:** Phase 10 in progress -- KG operator logic complete, wiring next
 
 ## Current Position
 
-Phase: 9 of 12 (Agent Pipeline Integration) -- COMPLETE
-Plan: 3 of 3 (all complete)
-Status: Phase Complete
-Last activity: 2026-03-07 -- Completed 09-03 Insight Enrichment and E2E Verification
+Phase: 10 of 12 (KG Operations Restoration) -- IN PROGRESS
+Plan: 2 of 3 (10-01 and 10-02 complete)
+Status: Executing
+Last activity: 2026-03-07 -- Completed 10-02 KG Operator Logic
 
-Progress: [██████████] 95%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (v2.1)
+- Total plans completed: 5 (v2.1)
 - Average duration: 3min
-- Total execution time: 9min
+- Total execution time: 13min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 09    | 01   | 2min     | 2     | 3     |
 | 09    | 02   | 3min     | 2     | 4     |
 | 09    | 03   | 4min     | 2     | 3     |
+| 10    | 01   | 2min     | 2     | 3     |
+| 10    | 02   | 2min     | 2     | 1     |
 
 ## Accumulated Context
 
@@ -62,11 +64,17 @@ Progress: [██████████] 95%
 - [09-02]: Per-entity ontology classification via classifyEntity() replaces batch classifyWaveEntities()
 - [Phase 09]: Analysis artifacts passed as enriched observation strings to InsightGenerationAgent -- no interface change needed
 - [Phase 09]: All entity levels (L0-L3) get PlantUML diagrams -- overrides Phase 6 L3 text-only
+- [10-02]: Two-pass dedup: exact parentId::name match first, then cosine > 0.9 semantic merge
+- [10-02]: Edge prediction compares within-run entities, skips same-L1-branch pairs
+- [10-02]: mergeEntities() preserves incoming hierarchy fields via null-coalesce
+- [Phase 10]: Used spawn instead of execFile for stdin piping to Python subprocess
+- [Phase 10]: Graceful fallback returns empty arrays on embedding failure rather than throwing
+- [Phase 10]: Batch all entities in one subprocess call per locked decision
 
 ### Critical Pitfalls
 
 - **processEntity() hierarchy mapping**: Must extend -- fields silently dropped without it
-- **Dedup collapse**: mergeEntities() overwrites parentId with undefined -- needs null-coalesce fix (Phase 10)
+- **Dedup collapse**: FIXED in 10-02 -- mergeEntities() now uses null-coalesce for parentId/level/hierarchyPath
 - **LevelDB/JSON sync**: Must use GraphDatabaseAdapter, not GraphDatabaseService
 - **Docker rebuild**: Pipeline changes require submodule build + Docker rebuild
 - **Wave agents use own LLM calls**: Not routed through SemanticAnalyzer -- no trace data (Phase 9 fixes this)
@@ -78,6 +86,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T13:21:15.645Z
-Stopped at: Phase 10 context gathered
-Resume with: `/gsd:execute-phase 10` (Phase 10 next)
+Last session: 2026-03-07T13:52:15.101Z
+Stopped at: Completed 10-01-PLAN.md
+Resume with: `/gsd:execute-phase 10` (Plan 10-03 next)

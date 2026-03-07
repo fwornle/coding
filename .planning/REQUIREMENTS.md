@@ -42,12 +42,12 @@ Requirements for Wave Pipeline Quality Restoration. Each maps to roadmap phases.
 
 ### KG Operations
 
-- [ ] **KGOP-01**: Conversion operator (conv) enabled in wave persistence
+- [x] **KGOP-01**: Conversion operator (conv) enabled in wave persistence
 - [ ] **KGOP-02**: Aggregation operator (aggr) enabled in wave persistence
-- [ ] **KGOP-03**: Embedding operator (embed) enabled in wave persistence
-- [ ] **KGOP-04**: Dedup operator enabled with fuzzy name matching
-- [ ] **KGOP-05**: Prediction operator (pred) enabled in wave persistence
-- [ ] **KGOP-06**: Merge operator enabled with null-coalesce fix for parentId
+- [x] **KGOP-03**: Embedding operator (embed) enabled in wave persistence
+- [x] **KGOP-04**: Dedup operator enabled with fuzzy name matching
+- [x] **KGOP-05**: Prediction operator (pred) enabled in wave persistence
+- [x] **KGOP-06**: Merge operator enabled with null-coalesce fix for parentId
 
 ### Content Quality
 
@@ -123,12 +123,12 @@ Which phases cover which requirements.
 | AGNT-03 | Phase 9 | Complete |
 | AGNT-04 | Phase 9 | Complete |
 | AGNT-05 | Phase 9 | Complete |
-| KGOP-01 | Phase 10 | Pending |
+| KGOP-01 | Phase 10 | Complete |
 | KGOP-02 | Phase 10 | Pending |
-| KGOP-03 | Phase 10 | Pending |
-| KGOP-04 | Phase 10 | Pending |
-| KGOP-05 | Phase 10 | Pending |
-| KGOP-06 | Phase 10 | Pending |
+| KGOP-03 | Phase 10 | Complete |
+| KGOP-04 | Phase 10 | Complete |
+| KGOP-05 | Phase 10 | Complete |
+| KGOP-06 | Phase 10 | Complete |
 | QUAL-06 | Phase 11 | Pending |
 | QUAL-07 | Phase 11 | Pending |
 | QUAL-08 | Phase 11 | Pending |
