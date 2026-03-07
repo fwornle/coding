@@ -43,7 +43,7 @@ Requirements for Wave Pipeline Quality Restoration. Each maps to roadmap phases.
 ### KG Operations
 
 - [x] **KGOP-01**: Conversion operator (conv) enabled in wave persistence
-- [ ] **KGOP-02**: Aggregation operator (aggr) enabled in wave persistence
+- [x] **KGOP-02**: Aggregation operator (aggr) enabled in wave persistence
 - [x] **KGOP-03**: Embedding operator (embed) enabled in wave persistence
 - [x] **KGOP-04**: Dedup operator enabled with fuzzy name matching
 - [x] **KGOP-05**: Prediction operator (pred) enabled in wave persistence
@@ -124,7 +124,7 @@ Which phases cover which requirements.
 | AGNT-04 | Phase 9 | Complete |
 | AGNT-05 | Phase 9 | Complete |
 | KGOP-01 | Phase 10 | Complete |
-| KGOP-02 | Phase 10 | Pending |
+| KGOP-02 | Phase 10 | Complete |
 | KGOP-03 | Phase 10 | Complete |
 | KGOP-04 | Phase 10 | Complete |
 | KGOP-05 | Phase 10 | Complete |
