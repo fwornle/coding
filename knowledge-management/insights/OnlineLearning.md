@@ -2,128 +2,174 @@
 
 **Type:** SubComponent
 
-The EntityExtractionService in entity_extraction_service.py extracts entities from various sources and integrates them into the knowledge graph.
+OnlineLearning's GitHistoryAnalyzer class implements the IAnalyzer interface to ensure consistency with other analysis components
 
 ## What It Is  
 
-OnlineLearning is the **online‑learning sub‑component** of the larger **KnowledgeManagement** system. Its entry point lives in `online_learning_module.py` as the **`OnlineLearningModule`** class, which orchestrates the extraction of new knowledge from a variety of runtime artefacts and pushes the results into the shared knowledge graph.  
+OnlineLearning is a **SubComponent** that lives under the *KnowledgeManagement* parent component. Its source code is rooted in the `online_learning/` directory; within this folder a `data_sources/` sub‑directory holds configuration files that describe the various external feeds (e.g., repository URLs, API endpoints) from which knowledge is harvested. The core of the sub‑component is a trio of classes – **KnowledgeExtractor**, **CodeAnalyzer**, and **GitHistoryAnalyzer** – each responsible for turning raw inputs into structured concepts that are later persisted by the sibling **EntityPersistence** component.  
 
-The module brings together three primary extractors – **`GitHistoryAnalyzer`** (`git_history_analyzer.py`), **`LSLSessionAnalyzer`** (`lsl_session_analyzer.py`), and **`CodeAnalysisModule`** (`code_analysis_module.py`) – each responsible for a distinct source of knowledge (git commit history, Lab Streaming Layer sessions, and static code respectively). The extracted artefacts are then handed to **`KnowledgeGraphUpdater`** (`knowledge_graph_updater.py`) which writes the new triples into the graph managed by the sibling **`GraphDatabaseManager`** component.  Entity‑level enrichment is performed by **`EntityExtractionService`** (`entity_extraction_service.py`), ensuring that newly discovered concepts become first‑class nodes in the graph.
-
-In short, OnlineLearning is a pipeline that continuously harvests, normalises, and persists knowledge, keeping the KnowledgeManagement graph fresh without manual intervention.
+The **KnowledgeExtractor** class writes the extracted concepts into a LevelDB key‑value store, while the **CodeAnalyzer** parses source code using an abstract‑syntax‑tree (AST) engine and applies a caching layer to avoid re‑processing unchanged files. The **GitHistoryAnalyzer** implements the shared `IAnalyzer` interface, guaranteeing a consistent contract with the rest of the analysis pipeline. Together these pieces form a pipeline that ingests, transforms, and hands off knowledge to the broader KnowledgeManagement ecosystem.
 
 ---
 
 ## Architecture and Design  
 
-The architecture follows a **modular pipeline** style: each source of knowledge is encapsulated in its own *analyzer* class, and a dedicated *updater* writes the results to the graph. This reflects a **separation‑of‑concerns** design that mirrors the sibling components in the same tier (e.g., ManualLearning uses an authoring tool, while OnlineLearning uses analyzers).  
+The observations reveal a **pipeline‑oriented architecture** within OnlineLearning. The flow can be described as:
 
-The observed modules implement a **builder‑updater pattern**: `GitHistoryAnalyzer`, `LSLSessionAnalyzer`, and `CodeAnalysisModule` act as *builders* of domain knowledge, while `KnowledgeGraphUpdater` consumes those built artefacts and persists them. The pipeline is coordinated by `OnlineLearningModule`, which functions as a lightweight **orchestrator** (no explicit workflow engine is mentioned, but the orchestrator role is clear from the observations).  
+1. **Data source configuration** (files in `online_learning/data_sources/`) →  
+2. **Extractor stage** (`KnowledgeExtractor`) that normalises inputs from many origins and stores intermediate results in LevelDB →  
+3. **Analysis stage** (`CodeAnalyzer` and `GitHistoryAnalyzer`) that consume the normalised data, apply domain‑specific analysis, and emit refined concepts.
 
-Interaction with the persistent store is abstracted through the sibling **`GraphDatabaseManager`**, which itself hides the details of the underlying graph database behind the `GraphDBClient` (as described in the sibling description). This mirrors the **intelligent routing** pattern noted for the parent component: OnlineLearning can call the manager in either API mode or direct client mode without needing to know which path is taken.  
+The **pipeline pattern** is evident in the way KnowledgeExtractor “uses a pipeline‑based approach to extract knowledge from multiple sources.” This design isolates source‑specific handling (e.g., Git history, raw code files) from downstream analysis, making it straightforward to add new source adapters without touching the analysis logic.
 
-Finally, the presence of `EntityExtractionService` indicates a **service‑oriented** approach for entity enrichment, allowing the pipeline to plug in additional extraction logic without altering the core analyzers.
+A second, explicit pattern is the **interface‑based contract** realised by `IAnalyzer`. `GitHistoryAnalyzer` “implements the IAnalyzer interface to ensure consistency with other analysis components,” which means any future analyzer (e.g., a future **DocumentationAnalyzer**) can be swapped in as long as it respects the same method signatures. This promotes **pluggability** and **low coupling** between the analysis layer and the rest of the system.
+
+The **caching mechanism** employed by `CodeAnalyzer` is a performance‑oriented design decision. By memoising AST results for unchanged files, the component reduces redundant computation, a classic **cache‑aside** strategy that improves throughput when the code base is large or when incremental analyses are frequent.
+
+Finally, the sub‑component **relies on the EntityPersistence sibling** for final storage of extracted knowledge. While KnowledgeExtractor persists intermediate artefacts in LevelDB, the ultimate graph‑oriented representation is handled by EntityPersistence (which itself uses Graphology). This separation of concerns—*temporary key‑value storage* vs. *graph persistence*—allows each sibling to specialise in its own storage technology.
 
 ---
 
 ## Implementation Details  
 
-### Core Orchestrator – `OnlineLearningModule` (`online_learning_module.py`)  
-`OnlineLearningModule` is the façade exposed to the rest of the system. It instantiates each analyzer, runs them (typically on a schedule or in response to events), collects the returned knowledge objects, and forwards them to the updater. The module also injects the `GraphDatabaseManager` dependency so that the updater can obtain a database session.
+### KnowledgeExtractor  
+- **Location**: `online_learning/knowledge_extractor.py` (implied by the class name and sub‑component).  
+- **Database**: LevelDB is the backing store (“uses the LevelDB database to store extracted knowledge”). LevelDB provides fast, ordered key‑value access, ideal for temporary or incremental storage before the data is transformed into graph entities.  
+- **Pipeline**: The class orchestrates a series of *source adapters* that read configuration files from `online_learning/data_sources/`. Each adapter normalises its input into a common “knowledge blob” that the extractor writes to LevelDB. The pipeline design allows new adapters to be added by registering them in a central registry inside the extractor.
 
-### Knowledge Extractors  
+### CodeAnalyzer  
+- **Location**: `online_learning/code_analyzer.py`.  
+- **AST‑based analysis**: The class “utilizes an AST‑based approach to analyze code and extract concepts,” meaning it parses source files into syntax trees, walks the trees, and identifies constructs such as classes, functions, and dependency imports.  
+- **Caching**: A local cache (likely an in‑memory dictionary or on‑disk hash store) records the hash of each file together with its generated AST. On subsequent runs, if the file hash matches the cached entry, the analyzer reuses the stored AST, bypassing the expensive parsing step. This cache‑aside pattern reduces CPU load and speeds up incremental analyses.
 
-| Analyzer | File | Key Responsibility |
-|----------|------|--------------------|
-| **`GitHistoryAnalyzer`** | `git_history_analyzer.py` | Walks the repository commit log, parses commit messages, diff metadata, and file‑level changes to produce *knowledge statements* such as “function X was refactored in commit Y”. |
-| **`LSLSessionAnalyzer`** | `lsl_session_analyzer.py` | Consumes LSL session logs, identifies patterns (e.g., sensor streams, timing relationships) and emits temporal knowledge that can be linked to code artefacts. |
-| **`CodeAnalysisModule`** | `code_analysis_module.py` | Performs static analysis (AST traversal, dependency graph building) and extracts domain concepts like classes, APIs, and design patterns via methods such as `getCodeKnowledge` and `extractCodeInsights`. |
+### GitHistoryAnalyzer  
+- **Location**: `online_learning/git_history_analyzer.py`.  
+- **Interface**: Implements `IAnalyzer`, guaranteeing that it provides the same entry points (`analyze()`, `getResults()`, etc.) as other analyzers. This makes the component interchangeable within the broader analysis pipeline.  
+- **Responsibility**: Traverses Git commit history, extracts commit messages, file change metadata, and possibly code diffs. The extracted artefacts are fed downstream to the KnowledgeExtractor or directly to EntityPersistence for graph insertion.
 
-Each analyzer returns a **structured knowledge payload** (likely a collection of triples or a domain‑specific DTO). The payload format is not explicitly described, but the fact that `KnowledgeGraphUpdater` can consume it implies a common schema.
-
-### Graph Persistence – `KnowledgeGraphUpdater` (`knowledge_graph_updater.py`)  
-`KnowledgeGraphUpdater` receives the payloads, transforms them into graph‑compatible triples, and uses the injected `GraphDatabaseManager` to persist them. The updater likely implements **idempotent upserts** to avoid duplicate nodes, a design decision that aligns with the parent component’s “classification cache” pattern for avoiding redundant operations.
-
-### Entity Enrichment – `EntityExtractionService` (`entity_extraction_service.py`)  
-After raw knowledge is stored, `EntityExtractionService` scans the newly added data, extracts entities (e.g., technical terms, domain concepts) and creates or updates corresponding nodes in the graph. This service is a bridge between raw artefacts and the higher‑level ontology managed by the sibling **OntologyManager**.
-
-### Supporting Infrastructure  
-
-* **`GraphDatabaseManager`** – Provides the graph database session, abstracting direct driver calls (`GraphDBClient` in `graph_db_client.py`).  
-* **Parent Context – KnowledgeManagement** – Supplies cross‑cutting concerns such as intelligent routing (API vs. direct DB access) and data‑loss tracking, which OnlineLearning inherits automatically.
+### Interaction with EntityPersistence  
+OnlineLearning does **not** write directly to the graph database. Instead, after the pipeline finishes, the extracted knowledge is handed off to the sibling **EntityPersistence** component, which uses the Graphology library to map key‑value entries into graph vertices and edges. This hand‑off is likely performed via a well‑defined API or shared data contract, keeping the two sub‑components loosely coupled.
 
 ---
 
 ## Integration Points  
 
-1. **Graph Database** – All knowledge ultimately flows through `GraphDatabaseManager`. OnlineLearning does not interact with the database directly; it relies on the manager’s public API, benefitting from the parent’s routing flexibility.  
+1. **Parent – KnowledgeManagement**  
+   - KnowledgeManagement orchestrates multiple agents (e.g., CodeGraphAgent, PersistenceAgent). OnlineLearning supplies the *knowledge extraction* and *code analysis* capabilities that feed the graph‑building agents. The LevelDB store used by KnowledgeExtractor is mentioned in the parent’s description, indicating that the parent component expects this temporary store to be present.
 
-2. **Entity Extraction Service** – `EntityExtractionService` is invoked after `KnowledgeGraphUpdater` commits new triples. This coupling ensures that every piece of extracted knowledge is enriched with entity metadata before it is exposed to downstream consumers (e.g., OntologyManager or WorkflowManager).  
+2. **Sibling – EntityPersistence**  
+   - EntityPersistence consumes the LevelDB entries produced by KnowledgeExtractor and converts them into graph entities via Graphology. This dependency is explicit: “OnlineLearning sub‑component relies on the EntityPersistence sub‑component for storing extracted knowledge.”
 
-3. **Sibling Components** –  
-   * **ManualLearning** shares the same knowledge graph but writes via the `EntityAuthoringTool`. The two pipelines therefore converge on the same persistence layer, guaranteeing a unified view of both manually authored and automatically learned knowledge.  
-   * **ClassificationCacheManager** – While not directly referenced, the cache pattern likely influences OnlineLearning’s updater to check for existing classifications before creating new ones, reducing redundant LLM calls.  
+3. **Sibling – CodeAnalysis**  
+   - The CodeAnalysis sibling also uses an AST‑based approach (as noted in the sibling description). OnlineLearning’s `CodeAnalyzer` mirrors this behaviour, suggesting a shared design language across siblings and potential reuse of utility libraries for AST parsing.
 
-4. **Parent Services** – The **intelligent routing** and **data loss tracking** mechanisms defined in KnowledgeManagement are automatically applied to OnlineLearning’s database interactions, giving the sub‑component built‑in resilience and observability without extra code.
+4. **Interface – IAnalyzer**  
+   - Implemented by `GitHistoryAnalyzer`, the `IAnalyzer` interface is a contract shared across analysis components. Any future analyzer added under OnlineLearning or a sibling must conform to this interface, ensuring consistent invocation patterns from the orchestration layer.
+
+5. **Configuration – data_sources/**  
+   - The `online_learning/data_sources/` directory provides declarative configuration (e.g., JSON/YAML) that tells the KnowledgeExtractor which repositories, APIs, or file systems to poll. This makes the pipeline data‑source agnostic and easily extensible without code changes.
 
 ---
 
 ## Usage Guidelines  
 
-* **Instantiate via the orchestrator** – Developers should interact with OnlineLearning through `OnlineLearningModule`. Direct use of the individual analyzers is discouraged because the orchestrator handles dependency injection, scheduling, and error aggregation.  
+1. **Add a New Data Source**  
+   - Place a configuration file (JSON/YAML) inside `online_learning/data_sources/`. The file must follow the schema expected by KnowledgeExtractor (e.g., `type`, `endpoint`, `auth`). No code changes are required; the extractor will automatically discover the new source on the next run.
 
-* **Configure the GraphDatabaseManager** – Ensure that the manager is set to the desired access mode (API vs. direct) before starting the online‑learning pipeline; this choice propagates to all persistence calls.  
+2. **Extend Analysis with a New Analyzer**  
+   - Create a class that implements the `IAnalyzer` interface (e.g., `class MyAnalyzer(IAnalyzer): …`). Register the class in the analysis pipeline configuration (often a list in `online_learning/analysis_pipeline.py`). Because the pipeline expects the interface, the new analyzer will be invoked alongside `GitHistoryAnalyzer` and `CodeAnalyzer`.
 
-* **Respect idempotency** – When extending an analyzer, return knowledge objects that can be uniquely identified (e.g., using commit SHA for Git history) so that `KnowledgeGraphUpdater` can safely upsert without creating duplicates.  
+3. **Cache Management**  
+   - The `CodeAnalyzer` cache is keyed by file hash. When large refactorings occur, developers may want to invalidate the cache manually (e.g., by deleting the cache directory) to avoid stale ASTs. The component provides a `clearCache()` helper for this purpose.
 
-* **Leverage EntityExtractionService** – If a new domain‑specific entity type is introduced, register its extraction rules with `EntityExtractionService` rather than modifying the updater. This keeps entity logic isolated and aligns with the system’s service‑oriented design.  
+4. **Persisted Knowledge Flow**  
+   - After running the extraction pipeline, verify that LevelDB contains the expected keys (use the `leveldb` CLI or a small utility script). Then trigger the EntityPersistence sync (usually via a message on the internal bus or a direct API call) to move data into the graph database.
 
-* **Monitor through DataLossTracker** – The parent’s data‑loss tracking is automatically engaged; however, developers should emit appropriate telemetry (e.g., number of extracted triples) from each analyzer to make the tracking meaningful.
+5. **Testing and CI**  
+   - Unit tests should mock LevelDB and the AST parser to keep test runs fast. Integration tests can spin up an in‑memory LevelDB instance and a temporary Git repository to validate the full pipeline. Ensure that any new source adapters are covered by tests that exercise both successful and failure scenarios (e.g., missing credentials).
 
 ---
 
-### 1. Architectural patterns identified  
-* **Modular pipeline / separation‑of‑concerns** – distinct analyzer modules feeding a central updater.  
-* **Builder‑Updater (or Producer‑Consumer)** – analyzers build knowledge, updater persists it.  
-* **Service‑Oriented component** – `EntityExtractionService` operates as a downstream enrichment service.  
-* **Intelligent routing** (inherited from KnowledgeManagement) for database access.  
+## Architectural Patterns Identified  
 
-### 2. Design decisions and trade‑offs  
-* **Fine‑grained analyzers** give clear ownership of source‑specific logic but increase the number of classes to maintain.  
-* **Centralised updater** simplifies persistence logic and enforces consistent graph schema, at the cost of a single point of failure (mitigated by the parent’s data‑loss tracking).  
-* **Dependency injection via `OnlineLearningModule`** improves testability but requires careful configuration of the sibling `GraphDatabaseManager`.  
+| Pattern | Where Observed | Rationale |
+|---------|----------------|-----------|
+| **Pipeline** | `KnowledgeExtractor` “uses a pipeline‑based approach” | Sequential processing of multiple data sources, normalisation, and hand‑off to analysis stages. |
+| **Interface‑Based Contract** | `GitHistoryAnalyzer` implements `IAnalyzer` | Guarantees consistent API across analyzers, enabling pluggability. |
+| **Cache‑Aside** | `CodeAnalyzer` “uses a caching mechanism” | Stores AST results externally and retrieves them on demand to improve performance. |
+| **Separation of Concerns (Temp Store vs. Graph Store)** | KnowledgeExtractor → LevelDB; EntityPersistence → Graphology | Distinct responsibilities for transient vs. persistent storage, reducing coupling. |
 
-### 3. System structure insights  
-OnlineLearning sits one level below the **KnowledgeManagement** parent, exposing three child components (GitHistoryAnalyzer, CodeKnowledgeExtractor, KnowledgeGraphBuilder). It shares the same persistence backbone as its siblings, enabling a unified knowledge graph that blends manual and automated inputs.  
+---
 
-### 4. Scalability considerations  
-* **Horizontal scaling** can be achieved by running multiple instances of `OnlineLearningModule` with partitioned sources (e.g., each instance processes a subset of repositories).  
-* The **updater’s idempotent upserts** help avoid contention on the graph database when many instances write concurrently.  
-* Adding new analyzers is straightforward – they plug into the orchestrator without touching the persistence layer.  
+## Design Decisions and Trade‑offs  
 
-### 5. Maintainability assessment  
-The clear module boundaries (analyzers, updater, extraction service) promote **high cohesion** and **low coupling**, making the codebase easy to extend. Reuse of shared infrastructure (GraphDatabaseManager, classification cache) reduces duplication. The main maintenance burden lies in keeping the knowledge extraction heuristics up‑to‑date with evolving source formats (e.g., new LSL session schemas), but the isolated analyzer design mitigates ripple effects across the system.
+1. **LevelDB for Intermediate Storage**  
+   - *Decision*: Use a lightweight key‑value store for fast writes during extraction.  
+   - *Trade‑off*: LevelDB offers high write throughput but lacks built‑in query capabilities; downstream components must translate keys into graph entities, adding a conversion step.
+
+2. **AST‑Based Code Analysis with Caching**  
+   - *Decision*: Parse code into ASTs for accurate concept extraction and cache results.  
+   - *Trade‑off*: AST parsing is CPU‑intensive; caching mitigates this but introduces cache invalidation complexity, especially after large refactors.
+
+3. **Interface `IAnalyzer`**  
+   - *Decision*: Enforce a common contract for all analyzers.  
+   - *Trade‑off*: Slightly higher upfront effort for each new analyzer (must adhere to the interface), but gains long‑term consistency and easier orchestration.
+
+4. **Configuration‑Driven Data Sources**  
+   - *Decision*: Keep source definitions external in `data_sources/`.  
+   - *Trade‑off*: Requires strict schema validation; mis‑configured files can cause runtime failures, so validation logic is essential.
+
+---
+
+## System Structure Insights  
+
+- **Hierarchical Placement**: OnlineLearning sits one level below KnowledgeManagement, acting as the *knowledge ingestion* engine that feeds the graph‑oriented persistence layer.  
+- **Sibling Symmetry**: It shares AST‑based analysis with the **CodeAnalysis** sibling and relies on the **EntityPersistence** sibling for final storage, illustrating a clear division: *extract → analyze → persist*.  
+- **Child Components**: The three child classes (KnowledgeExtractor, CodeAnalysisModule/CodeAnalyzer, GitHistoryAnalyzer) each encapsulate a distinct stage of the ingestion pipeline, enabling independent evolution.  
+
+---
+
+## Scalability Considerations  
+
+- **Horizontal Scaling of Extraction**: Because each data source is processed independently in the pipeline, additional worker processes can be spawned to handle more sources concurrently, provided LevelDB is accessed in a thread‑safe manner (LevelDB supports concurrent reads but single‑writer semantics).  
+- **Cache Size Management**: The AST cache grows with the number of source files. In large monorepos, developers should monitor memory usage and consider persisting the cache to disk or employing an LRU eviction policy.  
+- **Git History Volume**: Analyzing deep Git histories can become I/O‑bound. Incremental analysis (processing only new commits) mitigates this; the `IAnalyzer` contract can be extended to accept a *last‑processed commit* marker.  
+- **LevelDB Limits**: LevelDB scales well up to tens of gigabytes; beyond that, sharding or moving to a more scalable KV store would be required. The design already separates temporary storage from the permanent graph, making such a migration less disruptive.
+
+---
+
+## Maintainability Assessment  
+
+The architecture’s **modular pipeline** and **interface‑driven analyzers** promote high maintainability. Adding new data sources or analyzers does not require changes to existing classes, reducing regression risk. The explicit configuration directory (`online_learning/data_sources/`) isolates environment‑specific details from code, simplifying deployments across dev/test/prod environments.  
+
+Potential maintenance challenges include:
+
+- **Cache Invalidation** – Developers must understand when the AST cache becomes stale; providing clear utilities (`clearCache()`) and documentation mitigates this risk.  
+- **LevelDB Lifecycle** – Since LevelDB is a file‑based store, backup, rotation, and corruption handling need operational procedures.  
+- **Interface Evolution** – If `IAnalyzer` evolves (e.g., new methods are added), all existing analyzers must be updated simultaneously, which could be a coordination point.  
+
+Overall, the design choices—pipeline processing, interface contracts, and clear separation between temporary and permanent storage—create a system that is **extensible**, **testable**, and **reasonably performant**, aligning well with the broader KnowledgeManagement ecosystem.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- Key patterns in this component include the use of intelligent routing for database interactions, with the ability to switch between API and direct access modes. Additionally, the component utilizes a classification cache to avoid redundant LLM calls and implements data loss tracking to monitor data flow through the system.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component is responsible for managing the knowledge graph, including entity persistence, graph database interactions, and intelligent routing for database access. It utilizes various technologies such as Graphology, LevelDB, and VKB API to provide a comprehensive knowledge management system. The component's architecture is designed to support multiple agents, including CodeGraphAgent and PersistenceAgent, which work together to analyze code, extract concepts, and store entities in the graph database.
 
 ### Children
-- [GitHistoryAnalyzer](./GitHistoryAnalyzer.md) -- GitHistoryAnalyzer uses the git_history_analyzer.py module to extract knowledge from git history, specifically the GitHistoryAnalyzer class
-- [CodeKnowledgeExtractor](./CodeKnowledgeExtractor.md) -- The CodeKnowledgeExtractor uses code analysis to extract knowledge, specifically using methods such as getCodeKnowledge and extractCodeInsights
-- [KnowledgeGraphBuilder](./KnowledgeGraphBuilder.md) -- The KnowledgeGraphBuilder uses the extracted knowledge from the GitHistoryAnalyzer and CodeKnowledgeExtractor to build a knowledge graph
+- [KnowledgeExtractor](./KnowledgeExtractor.md) -- The KnowledgeExtractor class uses the LevelDB database to store extracted knowledge, as seen in the parent context of the KnowledgeManagement component.
+- [CodeAnalysisModule](./CodeAnalysisModule.md) -- The CodeAnalysisModule is likely to be implemented as a separate module or class, given its distinct behavior and responsibility within the OnlineLearning sub-component.
+- [GitHistoryAnalyzer](./GitHistoryAnalyzer.md) -- The GitHistoryAnalyzer is likely to be implemented as a separate class or function, given its specific responsibility and behavior within the OnlineLearning sub-component.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the EntityAuthoringTool class in entity_authoring_tool.py to create and edit entities manually.
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDBClient class in graph_db_client.py to interact with the graph database.
-- [EntityPersistenceManager](./EntityPersistenceManager.md) -- EntityPersistenceManager uses the EntityClassifier class in entity_classifier.py to classify entities.
-- [TraceReportGenerator](./TraceReportGenerator.md) -- TraceReportGenerator uses the WorkflowRunner class in workflow_runner.py to run workflows and capture data flow.
-- [ClassificationCacheManager](./ClassificationCacheManager.md) -- ClassificationCacheManager uses the ClassificationCache class in classification_cache.py to store and retrieve classification results.
-- [DataLossTracker](./DataLossTracker.md) -- DataLossTracker uses the DataFlowMonitor class in data_flow_monitor.py to monitor data flow and track data loss.
-- [OntologyManager](./OntologyManager.md) -- OntologyManager uses the OntologyUpdater class in ontology_updater.py to update the ontology.
-- [WorkflowManager](./WorkflowManager.md) -- WorkflowManager uses the WorkflowRunner class in workflow_runner.py to run workflows.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the VKB API to validate manually created entities in the EntityValidator class
+- [EntityPersistence](./EntityPersistence.md) -- EntityPersistence uses the Graphology library to interact with the graph database in the GraphDatabaseConnector class
+- [GraphDatabaseInteraction](./GraphDatabaseInteraction.md) -- GraphDatabaseInteraction uses the VKB API to manage graph database interactions in the GraphDatabaseRouter class
+- [CodeAnalysis](./CodeAnalysis.md) -- CodeAnalysis uses the AST-based approach to analyze code and extract concepts in the CodeAnalyzer class
+- [OntologyClassification](./OntologyClassification.md) -- OntologyClassification uses the VKB API to manage ontology classification and entity validation in the OntologyClassifier class
+- [TraceReporting](./TraceReporting.md) -- TraceReporting uses the VKB API to generate trace reports in the TraceReporter class
+- [AgentManagement](./AgentManagement.md) -- AgentManagement uses the VKB API to manage agents in the AgentManager class
+- [WorkflowManagement](./WorkflowManagement.md) -- WorkflowManagement uses the VKB API to manage workflows in the WorkflowManager class
 
 
 ---

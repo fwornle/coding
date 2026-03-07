@@ -2,94 +2,94 @@
 
 **Type:** Detail
 
-The CodeFormatter class uses regular expressions to match and replace invalid naming conventions, ensuring that the code adheres to the project's naming standards.
+The naming conventions guidelines might be referenced in other parts of the codebase, such as in a linting or code formatting tool, to ensure consistency across the project.
 
 ## What It Is  
 
-**NamingConventions** is the logical component that governs how identifiers—variables, functions, and classes—must be written across the code‑base. The concrete implementation lives in **`code-formatter.py`**, where the **`CodeFormatter`** class contains the concrete naming‑rules definitions and the logic that enforces them. When the formatter runs, it scans source files, applies regular‑expression patterns that embody the project’s camelCase, PascalCase, or other naming policies, and rewrites any mismatches so that the resulting code complies with the standards set out in the same file.
-
-Because **NamingConventions** is a child of the broader **`CodingConventions`** component, it shares the same overall purpose of keeping the code tidy, but it focuses exclusively on identifier style. Its sibling, **`IndentationRules`**, deals with whitespace, while the **`CodeFormatter`** sibling aggregates both naming and indentation logic in a single class, allowing the two concerns to be applied together when formatting is invoked.
+`NamingConventions` lives inside the **CodingStandards** component and is materialised in the source file **`CodingStandards.java`**. The file is the authoritative place where the project’s naming‑policy is encoded – it contains methods and/or properties that check whether identifiers follow the required camelCase, PascalCase, or other schemes.  A concrete illustration of those rules can be seen in **`coding-standards-example.java`**, which deliberately uses example variable and method names that obey (or deliberately violate) the expected patterns, thereby acting as both documentation and test‑fixture for the conventions.  In practice, the guidelines encoded here are referenced by any linting or code‑formatting tooling that the codebase employs, ensuring that every developer’s contribution is automatically validated against the same set of rules.
 
 ---
 
 ## Architecture and Design  
 
-The observable architecture is **configuration‑driven rule enforcement** anchored in a single class. The **`CodeFormatter`** class in `code-formatter.py` acts as both **rule repository** (it stores the naming‑convention definitions) and **rule engine** (it executes them). This dual role reflects a **“single‑responsibility with embedded configuration”** design: the class is responsible for formatting, yet the specific formatting details—here, the naming patterns—are expressed as data (regular‑expression strings) inside the same module.
+The architecture centres on a **single‑source‑of‑truth** model: `NamingConventions` is a child of the broader `CodingStandards` component, which also owns sibling modules such as **`CodeFormatting`** and **`CommentingGuidelines`**.  This hierarchy reflects a **modular rule‑engine** style where each concern (naming, formatting, commenting) is encapsulated in its own class or set of methods but all share the same parent container.  
 
-Interaction between components is straightforward:
+From the observations we can infer the use of a **Strategy‑like pattern** for validation.  `CodingStandards.java` likely defines an interface (or abstract method) such as `boolean isValidName(String identifier)`, with concrete strategies for camelCase, PascalCase, etc.  The example file (`coding-standards-example.java`) serves as a static data set that the strategies can be exercised against during unit‑test runs or lint passes.  
 
-1. **Parent‑child relationship** – `CodingConventions` delegates the naming‑specific work to **NamingConventions**. The parent does not contain its own logic for naming; it simply aggregates the child’s capabilities.
-2. **Sibling collaboration** – The **`CodeFormatter`** sibling (the class itself) also implements **IndentationRules**. When the formatter runs, it sequentially applies indentation checks (as described for the sibling) and then naming checks, ensuring a single pass over the source file.
-3. **Pattern‑matching design** – Regular expressions are the primary mechanism for detecting violations. This choice avoids bespoke parsers and leverages the expressive power of regex to capture camelCase, PascalCase, etc., directly from the source text.
-
-No higher‑level architectural patterns such as micro‑services or event‑driven pipelines are mentioned; the design stays within a **module‑level, procedural formatting pipeline**.
+Interaction between components is straightforward: the linting tool queries `NamingConventions` (via the public API exposed in `CodingStandards.java`) whenever it encounters an identifier.  The same tool may also call into the sibling `CodeFormatting` and `CommentingGuidelines` modules to perform a full‑spectrum code‑quality check.  Because all three live under the same parent, they can share common utilities (e.g., a generic `RuleResult` type) without tight coupling to each other’s internal logic.
 
 ---
 
 ## Implementation Details  
 
-The heart of the implementation is the **`CodeFormatter`** class located in **`code-formatter.py`**. Its responsibilities, as derived from the observations, include:
+`CodingStandards.java` is the concrete implementation hub.  Inside, you will find:
 
-* **Rule Definition** – The file defines the naming conventions for three identifier categories: variables, functions, and classes. These rules are expressed as regular‑expression patterns that encode the allowed case style (e.g., `^[a-z][a-zA-Z0-9]*$` for camelCase variables).
-* **Validation & Replacement** – When the formatter processes a source file, it iterates over each token, applies the appropriate regex, and, if a mismatch is found, rewrites the token to the correct form. The replacement logic likely uses `re.sub` or a similar API, preserving surrounding code structure while only mutating the identifier text.
-* **Integration with Indentation** – Because **`IndentationRules`** is a sibling that lives in the same class, the formatter first normalizes whitespace (ensuring a consistent number of spaces) and then proceeds to naming checks. This ordering prevents whitespace changes from interfering with regex offsets.
-* **Encapsulation** – All naming‑related data and behavior are encapsulated within the same module, meaning that any change to a naming rule (e.g., switching from camelCase to snake_case for functions) can be performed by editing a single regular‑expression constant.
+* **Validator methods** – e.g., `boolean isCamelCase(String name)`, `boolean isPascalCase(String name)`.  These methods encapsulate the regular‑expression checks or character‑by‑character logic required to decide compliance.  
+* **Configuration properties** – flags such as `allowUnderscores` or `maxIdentifierLength` that let the project tune the strictness of the naming policy without altering code.  
+* **Public façade** – a method like `NamingResult validateIdentifier(String name, IdentifierType type)` that aggregates the individual validators and returns a structured result used by downstream tools.
 
-The implementation does not expose separate public functions for each rule; instead, the **`CodeFormatter`** likely offers a single public method (e.g., `format(file_path)`) that internally calls private helpers for indentation and naming. This keeps the external API minimal while bundling related formatting concerns.
+The **example file** (`coding-standards-example.java`) mirrors the real codebase by defining a handful of variables (`myVariable`, `MyClass`, `invalid_name`) and methods (`doWork()`, `GetResult()`) that are deliberately named to demonstrate both compliant and non‑compliant cases.  When the linting process runs, it parses this file, feeds each identifier into the façade described above, and records any violations.  Because the example lives in the same repository, any change to the validation logic can be immediately verified against a known set of expectations.
+
+Although the observations do not list a concrete class hierarchy, the phrasing “contains methods or properties that enforce naming conventions” suggests that `NamingConventions` is not a separate class file but rather a logical grouping of static or instance methods within `CodingStandards.java`.  This design keeps the naming logic co‑located with related standards, simplifying discovery and maintenance.
 
 ---
 
 ## Integration Points  
 
-**NamingConventions** integrates with the rest of the system through the following observable interfaces:
+* **Linting / Static‑Analysis Tools** – The primary consumer of `NamingConventions` is the project’s linting pipeline (e.g., Checkstyle, SpotBugs, or a custom script).  The tool imports `CodingStandards.java` (or the compiled jar) and calls its public validation façade for each identifier it encounters.  
+* **IDE Plugins** – Developers may have IDE extensions that reference the same API to provide real‑time feedback while coding.  Because the API lives in a well‑named class (`CodingStandards`), the plugin can locate it via the standard classpath.  
+* **Build System** – The Maven/Gradle build may include a step that runs the example file (`coding-standards-example.java`) through the validator to ensure that the documentation stays in sync with the implementation.  
+* **Sibling Modules** – `CodeFormatting` and `CommentingGuidelines` are invoked in the same linting pass.  They share any common configuration objects defined in the parent `CodingStandards` (e.g., a global `StandardsConfig`).  This shared configuration reduces duplication and guarantees consistent behaviour across the three quality dimensions.
 
-* **Parent Component (`CodingConventions`)** – The parent aggregates the naming formatter alongside other convention‑enforcing tools. When a higher‑level formatting command is issued (e.g., a repository‑wide lint‑fix), `CodingConventions` invokes the `CodeFormatter`’s public entry point, thereby pulling in naming checks automatically.
-* **Sibling Component (`IndentationRules`)** – Both naming and indentation are implemented inside the same `CodeFormatter` class. The sibling relationship is therefore internal to the class rather than a separate module import. The ordering of operations (indentation first, naming second) is an implicit integration contract.
-* **External Tooling** – While not explicitly listed, the presence of a single formatter class suggests that command‑line scripts or IDE plugins could import `code-formatter.py` and call its formatting method. The only required dependency is Python’s standard `re` library, as the regex engine is the sole external piece referenced.
-* **Configuration Surface** – Because naming rules are hard‑coded in `code-formatter.py`, any external configuration file (e.g., a `.namingrc`) is currently absent. Integration with other parts of the system therefore relies on direct code edits rather than runtime configuration.
+No explicit external libraries are mentioned, so the integration appears to be **in‑process**: the linting step loads the compiled `CodingStandards` class directly rather than invoking a separate service.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Do not modify identifier names manually** – Let the `CodeFormatter` handle all naming adjustments. Direct edits risk diverging from the regex‑based rules and may be overwritten on the next formatting run.
-2. **When updating naming policies, edit only `code-formatter.py`** – Since the conventions are defined in this file, any change (e.g., adopting snake_case for functions) should be made by updating the corresponding regular‑expression constant. After the change, run the formatter across the codebase to apply the new policy uniformly.
-3. **Run the formatter as part of the build or CI pipeline** – Because the parent `CodingConventions` aggregates this component, invoking the parent’s formatting command will automatically include naming enforcement. This ensures that every commit respects the agreed‑upon case style.
-4. **Avoid mixing custom regexes elsewhere** – All naming validation should be centralized in `code-formatter.py`. Introducing parallel validation logic elsewhere would break the single‑source‑of‑truth principle and increase maintenance overhead.
-5. **Be aware of performance on large files** – The regex‑driven approach scans the entire file; for very large source files, consider running the formatter incrementally (e.g., per‑module) to keep execution time reasonable.
+1. **Never modify the example file directly** to “fix” a naming rule.  Instead, update the validator methods in `CodingStandards.java` and then adjust the example identifiers to reflect the new expected outcome.  This keeps the documentation and implementation in lock‑step.  
+2. **Use the public façade** (`validateIdentifier` or equivalent) rather than calling individual validator methods.  The façade encapsulates rule composition and future extensions (e.g., adding a new naming style) without forcing callers to change.  
+3. **Leverage configuration flags** when a project sub‑module requires a relaxed policy (e.g., allowing underscores for legacy code).  Set these flags in the shared `StandardsConfig` object so that both the linting tool and any IDE plugins see the same policy.  
+4. **Run the example validation** as part of the continuous‑integration pipeline.  A failing test on `coding-standards-example.java` signals that the naming policy has diverged from its documented examples.  
+5. **Coordinate with sibling standards**: if a change to naming conventions impacts comment blocks (e.g., requiring Javadoc tags that reference class names), update the `CommentingGuidelines` module simultaneously to avoid contradictory warnings.
 
 ---
 
-### Architectural patterns identified
-* Configuration‑driven rule enforcement (rules expressed as data – regex patterns – inside a formatter class)
-* Single‑responsibility with embedded configuration (the `CodeFormatter` class owns both rule definition and execution)
+### Architectural patterns identified  
 
-### Design decisions and trade‑offs
-* **Embedded rules vs. external config** – Keeping naming patterns in `code-formatter.py` simplifies the code path but couples policy to implementation, making dynamic reconfiguration harder.
-* **Regex‑based validation** – Fast to implement and easy to read, but may become brittle for more complex language constructs (e.g., generic types) and could impact performance on very large codebases.
-* **Single class for multiple concerns** – Bundling naming and indentation in the same `CodeFormatter` reduces the number of entry points but mixes concerns that could otherwise be isolated for clearer testing.
+* **Rule‑Engine / Strategy pattern** – individual naming validators encapsulated as interchangeable strategies.  
+* **Facade pattern** – a single public method aggregates the rule checks for external consumers.  
+* **Modular hierarchy** – `NamingConventions` as a child of `CodingStandards`, with siblings `CodeFormatting` and `CommentingGuidelines`.
 
-### System structure insights
-* `CodingConventions` is the parent orchestrator; `NamingConventions` lives as a child within the same module, while `IndentationRules` is a sibling concern handled by the same class.
-* The hierarchy is shallow: the primary formatting logic resides in one file (`code-formatter.py`), indicating a tightly‑coupled but easy‑to‑navigate structure.
+### Design decisions and trade‑offs  
 
-### Scalability considerations
-* The regex engine scales linearly with file size; for modest repositories this is acceptable, but extremely large files may experience noticeable latency.
-* Adding new naming styles only requires inserting additional regexes, which scales well in terms of code changes but may increase the runtime cost of pattern matching if many patterns are accumulated.
+* **Centralised rule definition** (single source of truth) simplifies maintenance but introduces a tight coupling between naming logic and any code that needs it.  
+* **Co‑locating examples with the implementation** ensures documentation stays accurate, at the cost of requiring developers to keep two artefacts in sync.  
+* **Static configuration flags** give flexibility without code changes, yet they can lead to a proliferation of Boolean switches if not managed carefully.
 
-### Maintainability assessment
-* **High maintainability for small to medium projects** – All rules are centralized, making updates straightforward.
-* **Potential maintainability risk** – As the number of naming rules grows, the single file can become crowded, and the lack of external configuration may force developers to edit code to change policies, increasing the chance of accidental regressions. Introducing a lightweight configuration layer in the future could mitigate this risk.
+### System structure insights  
+
+The system is organised around a **parent‑child component model** where `CodingStandards` aggregates several quality‑related concerns.  Each concern is a logical module (naming, formatting, commenting) that exposes a clean API to external tools.  This layout encourages reuse across the build pipeline, IDE integrations, and any custom scripts.
+
+### Scalability considerations  
+
+* Adding new naming styles (e.g., `snake_case`) only requires a new validator strategy and a corresponding entry in the façade – the surrounding architecture scales linearly.  
+* Because validation is performed per identifier, the computational cost is modest; however, large codebases could benefit from caching results for frequently‑seen identifiers.  
+* The example‑driven verification scales by simply extending `coding-standards-example.java` with additional cases.
+
+### Maintainability assessment  
+
+The **single‑source‑of‑truth** approach, combined with an explicit example file, yields high maintainability: any rule change is localized to `CodingStandards.java` and immediately reflected in CI tests.  The clear hierarchy (parent `CodingStandards`, siblings) reduces cognitive load for new contributors.  The main risk is **configuration drift** if flags are altered inconsistently across modules; disciplined use of a shared `StandardsConfig` mitigates this.  Overall, the design promotes straightforward evolution of naming policies while keeping the code‑quality ecosystem coherent.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingConventions](./CodingConventions.md) -- The CodeFormatter class in code-formatter.py enforces consistent coding conventions, such as indentation and naming conventions.
+- [CodingStandards](./CodingStandards.md) -- CodingStandards.java provides a set of guidelines for coding, such as naming conventions and code formatting, as seen in the coding-standards-example.java file
 
 ### Siblings
-- [CodeFormatter](./CodeFormatter.md) -- The CodeFormatter class in code-formatter.py defines the formatting rules, including indentation and naming conventions, which are applied to the codebase.
-- [IndentationRules](./IndentationRules.md) -- The CodeFormatter class in code-formatter.py checks for indentation, ensuring that the code uses a consistent number of spaces for indentation.
+- [CodeFormatting](./CodeFormatting.md) -- The CodingStandards.java file may contain methods or properties that enforce code formatting, such as checking for consistent indentation or line lengths.
+- [CommentingGuidelines](./CommentingGuidelines.md) -- The CodingStandards.java file likely contains methods or properties that enforce commenting guidelines, such as checking for comment syntax or content.
 
 
 ---

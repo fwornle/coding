@@ -2,154 +2,127 @@
 
 **Type:** SubComponent
 
-The OntologyManager class in ontology-manager.py employs the Command pattern to manage the ontology, including loading and updating.
+ValidationAgent.validateEntity() checks entity metadata fields (entityType, metadata.ontologyClass) against ontology definitions
 
 ## What It Is  
 
-OntologyManagement is a focused sub‑component that encapsulates the full life‑cycle of an ontology within the **CodingPatterns** family.  All of its concrete responsibilities live in a set of tightly‑named modules under the project root:
+OntologyManagement is a **sub‑component** of the larger **SemanticAnalysis** system. Its primary responsibility is to keep the domain‑wide ontology in sync with the graph‑database‑backed knowledge store and to provide services that classify and validate entities against that ontology. The concrete entry points that have been observed are the classes **OntologyManager**, **OntologyClassifier**, **ValidationAgent**, and **OntologyUpdater**, each exposing a single, well‑named method that embodies a distinct lifecycle step:
 
-| File | Primary Class | Pattern |
-|------|---------------|---------|
-| `ontology-loader.py` | **OntologyLoader** | Singleton |
-| `ontology-manager.py` | **OntologyManager** | Command |
-| `ontology-validator.py` | **OntologyValidator** | Strategy |
-| `ontology-updater.py` | **OntologyUpdater** | Template Method |
-| `ontology-analyzer.py` | **OntologyAnalyzer** | Visitor |
-| `ontology-indexer.py` | **OntologyIndexer** | Observer |
-| `ontology-exporter.py` | **OntologyExporter** | Lazy Initialization |
+* `OntologyManager.loadOntology()` – pulls the current ontology definitions from the graph database through the shared **GraphDatabaseAdapter**.  
+* `OntologyClassifier.classifyEntity()` – runs a hierarchical classification model to assign an ontology class to a raw entity.  
+* `ValidationAgent.validateEntity()` – checks the entity’s `entityType` and `metadata.ontologyClass` fields against the loaded ontology definitions.  
+* `OntologyUpdater.updateOntology()` – applies incremental, diff‑based changes to the stored ontology without re‑loading the whole model.
 
-Together these classes provide a **complete pipeline**: loading a single shared ontology instance, issuing high‑level commands to mutate it, validating changes with interchangeable strategies, applying systematic update steps, traversing the structure for analysis, reacting to changes for indexing, and finally exporting the result only when required.  Because the sub‑component lives under **CodingPatterns**, it inherits the broader architectural ethos of the parent—namely the use of graph‑database adapters, work‑stealing concurrency, and lazy‑initialised large language models.  OntologyManagement therefore mirrors the same emphasis on **controlled resource use** and **pluggable behaviour** that appears in sibling components such as **DesignPatterns** (which also showcases a Singleton loader) and **GraphDatabaseManagement** (which relies on the Repository pattern).
+These four capabilities are bundled under the logical container **OntologyManagement**, which in turn hosts three child modules: **OntologyLoader**, **EntityClassifier**, and **ValidationRulesEngine**. The component lives inside the **SemanticAnalysis** multi‑agent architecture, where each agent (e.g., classification, validation) can invoke the services provided by OntologyManagement as part of its processing pipeline.
 
 ---
 
 ## Architecture and Design  
 
-The observed implementation is a **pattern‑rich, modular architecture** that deliberately separates concerns while keeping the overall flow linear and predictable.  
+The observations reveal a **layered, responsibility‑segregated architecture** built around clear service boundaries:
 
-1. **Singleton (OntologyLoader)** – Guarantees a single, globally accessible ontology graph.  This eliminates the risk of divergent in‑memory copies and aligns with the parent’s lazy‑initialisation of large language models, ensuring that heavyweight resources are instantiated only once.  
+1. **Data‑Access Layer** – `OntologyManager.loadOntology()` uses a **graph‑database adapter** (the same adapter referenced by sibling components such as *GraphDatabaseAdapter*) to retrieve ontology definitions. This isolates persistence concerns from the rest of the sub‑component.  
 
-2. **Command (OntologyManager)** – Encapsulates user‑level actions (e.g., *LoadOntology*, *UpdateOntology*, *ExportOntology*) as command objects.  This decouples request issuance from execution, enabling future extensions such as undo/redo or asynchronous command queues without touching the loader or validator.  
+2. **Classification Layer** – `OntologyClassifier.classifyEntity()` implements a **hierarchical classification model**. The model’s tree‑like structure mirrors the ontology’s upper and lower definitions (as described for the sibling *Ontology* component). The classifier therefore performs recursive traversal or depth‑first search over the ontology graph to locate the most specific class for a given entity.  
 
-3. **Strategy (OntologyValidator)** – Supplies interchangeable validation algorithms (schema validation, consistency checks, custom business rules).  The manager can swap strategies at runtime, which supports the **EntityAuthoringService** in the parent that may demand different validation policies for manual versus automated entity creation.  
+3. **Validation Layer** – `ValidationAgent.validateEntity()` operates as a **rules‑engine** that cross‑checks entity metadata (`entityType`, `metadata.ontologyClass`) against the current ontology snapshot. The presence of a dedicated **ValidationRulesEngine** child suggests that validation rules are externalised (e.g., JSON or YAML) and can be extended without code changes.  
 
-4. **Template Method (OntologyUpdater)** – Defines the skeleton of an update operation (pre‑process → apply changes → post‑process) while allowing subclasses to specialise the concrete steps.  This pattern gives a stable update contract while permitting optimisation (e.g., batch updates vs. incremental diffs).  
+4. **Update Layer** – `OntologyUpdater.updateOntology()` follows a **diff‑based incremental update** strategy. Instead of re‑importing the entire ontology, it computes a delta (additions, deletions, modifications) and applies only those changes to the graph database. This reduces write amplification and keeps the system responsive during ontology evolution.
 
-5. **Visitor (OntologyAnalyzer)** – Traverses the ontology graph without embedding analysis logic in the data structures themselves.  New analysis visitors (coverage, impact, semantic similarity) can be added without modifying the core ontology model, echoing the **NaturalLanguageProcessing** sibling’s use of the Pipeline pattern for extensible processing stages.  
-
-6. **Observer (OntologyIndexer)** – Listens to events emitted by the manager or updater (e.g., *NodeAdded*, *RelationRemoved*) and maintains auxiliary indexes that accelerate query performance.  This mirrors the **GraphDatabaseManagement** sibling’s Repository pattern, where observers keep cached views in sync with the underlying store.  
-
-7. **Lazy Initialization (OntologyExporter)** – Defers the potentially expensive serialization and I/O work until an explicit export request arrives.  This design choice reduces start‑up latency and aligns with the parent’s lazy initialisation of large language models, reinforcing a consistent “pay‑only‑when‑used” philosophy across the codebase.
-
-Interaction flows are straightforward: the **OntologyManager** receives a command, asks the **OntologyLoader** for the singleton instance, optionally runs an **OntologyValidator** strategy, then delegates to an **OntologyUpdater** (template) which fires change events observed by **OntologyIndexer**.  When a consumer finally calls **OntologyExporter**, the exporter lazily materialises the current state.  No circular dependencies are introduced; each component communicates through well‑defined interfaces (e.g., `load()`, `execute()`, `validate()`, `update()`, `accept(visitor)`, `notify(event)`, `export()`).
+Interaction among these layers is **synchronous and in‑process**: a typical workflow is  
+`loadOntology → classifyEntity → validateEntity → (if needed) updateOntology`.  
+Because the parent **SemanticAnalysis** component orchestrates multiple agents, the OntologyManagement services are invoked by agents that respect the same intelligent routing and work‑stealing concurrency patterns used throughout the parent system.
 
 ---
 
 ## Implementation Details  
 
-### OntologyLoader (`ontology-loader.py`)  
-Implemented as a classic thread‑safe Singleton: a private class variable holds the sole instance, the constructor is hidden, and a static `get_instance()` method returns the shared object.  The loader reads the ontology source (likely a graph file or remote store) once and caches the in‑memory representation, which is then handed to every downstream component.
+### OntologyLoader (`OntologyManager.loadOntology`)  
+* **Responsibility** – Retrieve the complete ontology graph from the persistence store.  
+* **Mechanism** – Calls into the **GraphDatabaseAdapter** (shared across the system) to execute a read query that returns nodes and relationships representing ontology classes, properties, and hierarchical links. The result is materialised into an in‑memory structure (likely a map of class IDs to definition objects) that downstream components can query efficiently.  
 
-### OntologyManager (`ontology-manager.py`)  
-Acts as the **invoker** in the Command pattern.  It defines a `execute(command: OntologyCommand)` method where each concrete command implements a `run(loader, validator, updater, exporter)` interface.  By keeping the command objects lightweight, the manager can queue them, log them, or dispatch them to a work‑stealing thread pool—an approach already present in the parent’s concurrency model.
+### EntityClassifier (`OntologyClassifier.classifyEntity`)  
+* **Responsibility** – Assign an incoming entity to the most appropriate ontology class.  
+* **Mechanism** – Uses a **hierarchical classification model**. The model is built from the ontology definitions loaded earlier; each node in the hierarchy contains criteria (property constraints, type hints). Classification proceeds by traversing from the root toward leaves, evaluating criteria at each level until a leaf node matches or the best‑fit parent is selected. The implementation may employ recursive DFS or an iterative stack, both of which are natural given the tree‑like ontology shape.  
 
-### OntologyValidator (`ontology-validator.py`)  
-Defines an abstract `validate(ontology)` method.  Concrete strategies such as `SchemaValidator`, `ConsistencyValidator`, or custom `BusinessRuleValidator` inherit from it.  The manager injects the desired strategy at runtime, allowing the same update flow to be reused for different validation regimes.
+### ValidationRulesEngine (`ValidationAgent.validateEntity`)  
+* **Responsibility** – Ensure that an entity’s declared type and ontology class are consistent with the current ontology.  
+* **Mechanism** – Pulls validation rules from a configurable source (e.g., `validation-rules.json`). For each entity, it checks:  
+  1. `entityType` exists as a defined type in the ontology.  
+  2. `metadata.ontologyClass` refers to a class that is reachable in the hierarchy and satisfies any additional constraints (required properties, cardinalities).  
+  If any rule fails, the agent returns a validation error that can be consumed by upstream agents (e.g., the *ContentValidation* sibling).  
 
-### OntologyUpdater (`ontology-updater.py`)  
-Provides a `update(ontology, changes)` template method that calls `pre_update()`, `apply_changes()`, and `post_update()`.  Sub‑classes override any of these hooks.  For example, a `BatchOntologyUpdater` might override `apply_changes()` to group writes, while a `StreamingOntologyUpdater` could stream changes directly to the graph database.
+### OntologyUpdater (`OntologyUpdater.updateOntology`)  
+* **Responsibility** – Apply incremental ontology changes safely.  
+* **Mechanism** – Accepts a **diff object** that lists added, removed, or modified ontology elements. The updater translates the diff into a series of graph‑database mutation commands (CREATE, DELETE, MERGE) executed via the same **GraphDatabaseAdapter**. Because only the delta is written, the operation scales well when the ontology grows large. Conflict detection (e.g., concurrent updates) is handled by the underlying graph database’s transaction model, ensuring consistency.  
 
-### OntologyAnalyzer (`ontology-analyzer.py`)  
-Implements the Visitor interface with an `accept(visitor)` method on the ontology graph nodes.  Visitors such as `DepthVisitor`, `CycleDetectionVisitor`, or `SemanticInsightVisitor` encapsulate distinct analysis algorithms.  Because the ontology structure remains unchanged, new visitors can be added without recompiling the core model.
-
-### OntologyIndexer (`ontology-indexer.py`)  
-Registers itself as an observer of the manager’s event bus.  Upon receiving events like `NodeAdded` or `RelationModified`, it updates secondary indexes (e.g., full‑text, property‑based, or graph‑traversal caches).  These indexes are later consulted by query services to achieve sub‑linear lookup times, a design that complements the **GraphDatabaseManagement** sibling’s repository‑level caching.
-
-### OntologyExporter (`ontology-exporter.py`)  
-Holds a private reference to the ontology but postpones serialization until `export(format)` is called.  The lazy initialisation guard checks whether the export artefact already exists; if not, it constructs the representation (RDF, OWL, JSON‑LD, etc.) on demand.  This pattern prevents unnecessary I/O during routine operations and mirrors the parent’s lazy loading of large language models.
+All four classes are encapsulated within the **OntologyManagement** namespace and are referenced by their child modules—**OntologyLoader**, **EntityClassifier**, and **ValidationRulesEngine**—which expose thin facades to the rest of the system. No additional files were listed in the observations, so the concrete file paths remain unspecified; however, the naming conventions (`OntologyManager`, `OntologyClassifier`, etc.) suggest a one‑class‑per‑file layout consistent with the surrounding TypeScript/Node.js codebase.
 
 ---
 
 ## Integration Points  
 
-* **Parent Component – CodingPatterns**: OntologyManagement reuses the parent’s **graph‑database adapters** for persisting changes and benefits from the same **work‑stealing concurrency** utilities that power the manager’s command queue.  The singleton loader also aligns with the parent’s lazy‑initialised LLMs, providing a consistent resource‑lifecycle strategy across the codebase.  
+* **Parent – SemanticAnalysis**: OntologyManagement is invoked by the multi‑agent pipeline defined in *SemanticAnalysis*. Agents such as the *OntologyClassification* agent call `OntologyClassifier.classifyEntity()`, while the *ContentValidation* agent relies on `ValidationAgent.validateEntity()`. The parent’s intelligent routing ensures that each request is directed to the appropriate sub‑component without tight coupling.  
 
-* **Sibling Components**:  
-  * **DesignPatterns** – Shares the Singleton‑based OntologyLoader, reinforcing a common approach to global resources.  
-  * **GraphDatabaseManagement** – The OntologyIndexer’s observer updates are analogous to the Repository’s event‑driven cache invalidation, suggesting that both can be wired to the same underlying event bus.  
-  * **NaturalLanguageProcessing** – The Visitor‑based OntologyAnalyzer mirrors the Pipeline pattern used in NLP, indicating that a combined “Ontology‑NLP pipeline” could be built by chaining an NLP visitor after the ontology visitor.  
-  * **MachineLearningIntegration** – The Strategy‑based OntologyValidator could be extended with ML‑driven validation strategies (e.g., anomaly detection) created via the same Factory used for ML models.  
+* **Sibling – GraphDatabaseAdapter**: Both loading and updating of the ontology use the **GraphDatabaseAdapter**, a shared persistence abstraction also employed by the *CodeKnowledgeGraph* and *Pipeline* components. This promotes a single source of truth for graph operations and simplifies transaction handling across the system.  
 
-* **External Interfaces**: The manager exposes a command API that external services (e.g., REST endpoints, CLI tools) can invoke.  The exporter’s lazy API can be called by reporting modules or batch jobs that need a snapshot.  The observer pattern ensures that any third‑party indexing service can subscribe without altering the core update flow.
+* **Sibling – Ontology (definition source)**: The sibling *Ontology* component supplies the static files (`ontology-definitions.json`) that seed the initial ontology load. When the *OntologyUpdater* processes a diff, it may reference these definition files to validate the shape of the incoming changes.  
+
+* **Sibling – Insights & Pipeline**: After classification, the *InsightGenerator* (Insights sibling) can consume the enriched entity (now annotated with an ontology class) to generate relationship‑based insights. The *PipelineCoordinator* (Pipeline sibling) may schedule the load‑classify‑validate‑update sequence as a DAG step, leveraging the topological‑sort execution model described for the pipeline.  
+
+* **Child Modules**: The three child modules—**OntologyLoader**, **EntityClassifier**, **ValidationRulesEngine**—expose public methods that are directly called by the parent agents. For example, the *SemanticAnalysis* agent that processes a new Git commit will first ask **OntologyLoader** to ensure the latest ontology is in memory, then hand the extracted entity to **EntityClassifier**, and finally pass the result to **ValidationRulesEngine**.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Never instantiate OntologyLoader directly** – always obtain the instance via `OntologyLoader.get_instance()`.  This preserves the singleton contract and avoids duplicate graph copies.  
-2. **Issue all mutations through OntologyManager** – create a concrete command (e.g., `AddEntityCommand`) and pass it to `manager.execute(command)`.  This guarantees that validation, updating, and indexing are automatically triggered.  
-3. **Select an appropriate validation strategy** – for schema‑only checks use `SchemaValidator`; for richer business rules inject `BusinessRuleValidator`.  The manager’s `set_validator()` method lets you swap strategies at runtime without code changes.  
-4. **Extend updates via subclassing OntologyUpdater** – when you need a specialised update flow (batch vs. streaming), subclass and override the relevant hook methods, then register the subclass with the manager.  
-5. **Add analysis capabilities by implementing new Visitor subclasses** – place them in `ontology-analyzer.py` or a dedicated visitor module and invoke `ontology.accept(new_visitor)`.  No changes to the ontology data structures are required.  
-6. **Subscribe to change events only if you need auxiliary indexes** – the default observer (`OntologyIndexer`) is sufficient for most query‑performance scenarios; additional observers should respect the same event schema to remain compatible.  
-7. **Export only when necessary** – call `OntologyExporter.export(format)` after all pending commands have been flushed.  Because the exporter lazily materialises the output, repeated calls with the same format will reuse the cached artefact, saving I/O.  
+1. **Always Load Before Classify or Validate** – Agents must invoke `OntologyManager.loadOntology()` (or the higher‑level **OntologyLoader** façade) at the start of a processing batch. The loader caches the ontology in memory; repeated calls are cheap but ensure the cache is refreshed when an update occurs.  
 
-Following these conventions ensures that the component’s internal contracts remain intact, that resources are used efficiently, and that future extensions can be introduced with minimal friction.
+2. **Prefer Incremental Updates** – When extending or correcting the ontology, construct a diff object and call `OntologyUpdater.updateOntology()`. Avoid re‑importing the entire ontology, as the diff‑based approach reduces load on the graph database and shortens update windows.  
+
+3. **Keep Validation Rules Externalised** – Add or modify validation constraints in the rules configuration file rather than changing code in `ValidationAgent`. This maintains the separation of concerns championed by the **ValidationRulesEngine** child and eases future rule additions.  
+
+4. **Respect Hierarchical Model Limits** – The hierarchical classifier expects the ontology to be a well‑formed tree (or directed acyclic graph). Introducing cycles or ambiguous parentage can cause infinite recursion or mis‑classification. Ensure any ontology changes preserve a clear hierarchy.  
+
+5. **Thread‑Safety via Parent Concurrency Model** – The parent **SemanticAnalysis** component uses work‑stealing concurrency. Calls into OntologyManagement should be stateless or read‑only after the initial load; mutable state (e.g., the in‑memory ontology cache) is protected by the parent’s concurrency primitives. Do not modify the cache directly; always go through `OntologyUpdater`.  
 
 ---
 
-### Summary Deliverables  
+### Summary of Architectural Insights  
 
-1. **Architectural patterns identified**  
-   - Singleton (`OntologyLoader`)  
-   - Command (`OntologyManager`)  
-   - Strategy (`OntologyValidator`)  
-   - Template Method (`OntologyUpdater`)  
-   - Visitor (`OntologyAnalyzer`)  
-   - Observer (`OntologyIndexer`)  
-   - Lazy Initialization (`OntologyExporter`)  
+| Aspect | Observation‑Based Insight |
+|--------|---------------------------|
+| **Architectural patterns** | Layered responsibilities (Data Access → Classification → Validation → Update); **hierarchical classification**; **diff‑based incremental update**; **rules‑engine** validation. |
+| **Design decisions** | Use of a shared **GraphDatabaseAdapter** to abstract persistence; externalised validation rules for extensibility; incremental updates to minimise write load. |
+| **Trade‑offs** | Hierarchical model simplifies classification but requires a strict DAG ontology; diff‑updates reduce latency but add complexity in diff generation and conflict handling. |
+| **System structure** | OntologyManagement sits under **SemanticAnalysis**, contains child modules (**OntologyLoader**, **EntityClassifier**, **ValidationRulesEngine**), and interacts with sibling components via the common graph‑adapter and shared definition files. |
+| **Scalability** | In‑memory caching of ontology definitions plus diff‑based updates enable the component to handle large ontologies and frequent incremental changes without full reloads. |
+| **Maintainability** | Clear separation of concerns, externalised rules, and a single adapter for graph operations make the sub‑component easy to evolve; however, any change to the ontology hierarchy must be carefully validated to avoid breaking the classifier’s traversal logic. |
 
-2. **Design decisions and trade‑offs**  
-   - Centralised singleton reduces memory overhead but introduces a global point of failure; thread‑safe access mitigates concurrency risks.  
-   - Command decouples request from execution, enabling queuing and potential undo, at the cost of additional boilerplate for each operation.  
-   - Strategy provides pluggable validation, increasing flexibility but requiring careful management of strategy lifecycles.  
-   - Template Method gives a stable update skeleton while allowing specialised steps; however, deep inheritance hierarchies can become harder to navigate.  
-   - Visitor separates analysis from data, promoting open‑closed extensibility, but each new visitor must understand the ontology’s internal structure.  
-   - Observer keeps indexes in sync automatically, improving read performance; the downside is the overhead of event dispatch for every mutation.  
-   - Lazy Initialization delays expensive export work, improving responsiveness, yet developers must be aware that the first export may incur noticeable latency.  
-
-3. **System structure insights**  
-   - OntologyManagement is a self‑contained pipeline of seven cooperating classes, each residing in its own module.  
-   - The component sits under the **CodingPatterns** parent, inheriting shared concerns (graph adapters, concurrency primitives, lazy resource handling).  
-   - Sibling components demonstrate a consistent pattern‑driven culture, allowing cross‑component reuse of concepts such as observers, visitors, and factories.  
-
-4. **Scalability considerations**  
-   - The singleton loader can become a bottleneck if the ontology grows beyond memory limits; introducing a distributed cache or sharding would be a future mitigation.  
-   - Command queuing combined with work‑stealing threads enables horizontal scaling of mutation workloads.  
-   - Observer‑driven indexing can be parallelised; however, index update latency must be monitored to avoid stale query results.  
-   - Lazy export ensures that large serialization jobs are only performed when required, preventing unnecessary load on the system during peak operation.  
-
-5. **Maintainability assessment**  
-   - Heavy use of well‑known patterns (Singleton, Command, Strategy, etc.) makes the codebase approachable for developers familiar with classic design principles.  
-   - Clear separation of concerns limits the impact of changes: swapping a validator or adding a new visitor does not ripple through other modules.  
-   - The explicit module‑per‑pattern layout simplifies navigation and encourages isolated unit testing.  
-   - Potential pitfalls include the need for disciplined thread‑safety around the singleton and careful versioning of observer events to avoid breaking downstream indexers.  
-   - Overall, the component exhibits high modularity, extensibility, and alignment with the broader architectural language of the parent **CodingPatterns** ecosystem, positioning it for sustainable evolution.
+These insights are derived directly from the observed class and method signatures and the documented relationships among parent, sibling, and child entities. No assumptions beyond the provided observations have been introduced.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- Key patterns in this component include the use of graph database adapters, work-stealing concurrency, and lazy initialization of large language models. The project also employs a custom OntologyLoader class to load the ontology and a custom EntityAuthoringService class to handle manual entity creation and editing. These patterns and principles contribute to the overall quality and maintainability of the codebase.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.
+
+### Children
+- [OntologyLoader](./OntologyLoader.md) -- OntologyManager.loadOntology() in the parent context suggests the existence of a dedicated loader, which is likely implemented as a separate module or class to encapsulate the loading logic.
+- [EntityClassifier](./EntityClassifier.md) -- The hierarchical classification model implies a tree-like structure, where entities are classified based on their relationships and properties defined in the ontology, potentially using techniques like recursive traversal or depth-first search.
+- [ValidationRulesEngine](./ValidationRulesEngine.md) -- The ValidationRulesEngine likely utilizes a rules-based system, where validation rules are defined and stored in a configurable manner, allowing for easy modification or extension of the rules without altering the underlying code.
 
 ### Siblings
-- [DesignPatterns](./DesignPatterns.md) -- The OntologyLoader class in ontology-loader.py utilizes the Singleton pattern to ensure only one instance is created.
-- [CodingConventions](./CodingConventions.md) -- The CodeFormatter class in code-formatter.py enforces consistent coding conventions, such as indentation and naming conventions.
-- [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- The GraphDatabaseAdapter class in graph-database-adapter.py uses the Repository pattern to abstract the graph database interactions.
-- [NaturalLanguageProcessing](./NaturalLanguageProcessing.md) -- The NaturalLanguageProcessor class in natural-language-processor.py uses the Pipeline pattern to process natural language text.
-- [MachineLearningIntegration](./MachineLearningIntegration.md) -- The MachineLearningModel class in machine-learning-model.py uses the Factory pattern to create instances of different machine learning models.
-- [EntityManagement](./EntityManagement.md) -- The EntityAuthoringService class in entity-authoring-service.py employs the Factory pattern to handle manual entity creation and editing.
+- [Pipeline](./Pipeline.md) -- PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.json steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification model with upper and lower ontology definitions in ontology-definitions.json
+- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a rule-based system to generate insights from entity relationships
+- [SemanticAnalysisPipeline](./SemanticAnalysisPipeline.md) -- PipelineOrchestrator.orchestratePipeline() coordinates the execution of pipeline steps
+- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- KnowledgeGraphConstructor.constructGraph() constructs a knowledge graph from code entities and relationships
+- [ContentValidation](./ContentValidation.md) -- ContentValidator.validateContent() validates entity content against a set of predefined validation rules
+- [DataIngestion](./DataIngestion.md) -- DataIngestionAgent.ingestData() ingests data from various sources using a data ingestion framework
+- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.connectToDatabase() connects to a graph database using a database connection protocol
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 4 observations*

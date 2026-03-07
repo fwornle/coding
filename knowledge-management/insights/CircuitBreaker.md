@@ -2,109 +2,115 @@
 
 **Type:** Detail
 
-The CircuitBreaker (in CircuitBreaker.ts:31) uses a threshold-based approach to detect service failures, triggering a circuit open state when the failure rate exceeds a predefined threshold.
+The CircuitBreaker is designed to be configurable, allowing the timeout and failure thresholds to be adjusted based on the requirements of the application, which is a key consideration in distributed systems.
 
 ## What It Is  
 
-The **CircuitBreaker** lives in the source file `CircuitBreaker.ts` (see the logic around line 31 for the failure‑rate check and line 42 for the open‑state handling). It is a defensive component that monitors calls to an external LLM service and, once the observed failure rate crosses a configurable threshold, moves into an **open** state. In that state the breaker short‑circuits further calls, either routing them to a fallback implementation or returning a controlled error response, thereby protecting the rest of the system from cascading overload. The behaviour of the breaker is driven by a dedicated configuration object defined in `CircuitBreakerConfig.ts`, which exposes tunable values such as the failure‑threshold, timeout periods, and the chosen fallback strategy.
+The **CircuitBreaker** lives inside the LLM service layer and is implemented in **`lib/llm/llm-service.ts`**.  It follows the classic *circuit‑breaker* pattern: the component watches the health of a downstream LLM service, detects when that service stops responding, and then blocks further calls until the service is deemed healthy again.  The implementation couples a **timeout detector** with **failure‑threshold counters** so that a series of un‑responsive calls automatically opens the circuit.  Because the breaker is **configurable**—its timeout duration and the number of tolerated failures can be tuned—it can be adapted to the latency and reliability expectations of any particular deployment of the LLM stack.
 
-The breaker is not a stand‑alone module; it is owned by **LLMServiceManager**, the parent component that orchestrates the lifecycle of LLM services. Within the same package, its siblings **LLMRouter** and **CacheManager** provide request routing and caching, respectively, but the CircuitBreaker is the unique guard that ensures service health before a request reaches the router or cache layers.
+The breaker is not a stand‑alone library; it is instantiated and managed by **`LLMServiceManager`**, which orchestrates mode routing, caching, and fault‑tolerance for the overall LLM subsystem.  Its sibling components—**`ModeManager`** and **`CacheController`**—share the same parent (`LLMServiceManager`) and therefore cooperate with the breaker when deciding whether a request should be routed, cached, or short‑circuited.
 
 ---
 
 ## Architecture and Design  
 
-The implementation follows the classic **Circuit Breaker pattern** as described in the original design literature. The pattern is realized through a simple state machine that toggles between *closed*, *open*, and (implicitly) *half‑open* based on runtime metrics. The observations point to a **threshold‑based detection** (line 31) – the breaker tallies recent request outcomes and, when the failure proportion exceeds the value supplied in `CircuitBreakerConfig.ts`, it transitions to the open state. This design choice favours a deterministic, easily reasoned‑about rule over more complex statistical or machine‑learning approaches.
+The architecture surrounding the CircuitBreaker is a **layered fault‑tolerant service façade**.  At the top sits **`LLMServiceManager`**, responsible for coordinating three cross‑cutting concerns:
 
-Interaction between components is straightforward:
+1. **Mode routing** (delegated to `ModeManager`)  
+2. **Result caching** (handled by `CacheController`)  
+3. **Service health protection** (implemented by the CircuitBreaker in `lib/llm/llm-service.ts`)
 
-* **LLMServiceManager** instantiates a `CircuitBreaker` and injects the configuration from `CircuitBreakerConfig.ts`.  
-* When a request arrives, **LLMRouter** (its sibling) first determines the target LLM service. The router then asks the manager to execute the call. The manager checks the breaker’s state; if the breaker is *closed* the call proceeds, otherwise the manager follows the fallback path described at line 42.  
-* **CacheManager** sits orthogonal to the breaker – it provides an LRU cache for service responses but does not influence the breaker’s state.  
+The breaker itself embodies the **Circuit Breaker pattern**—a well‑known design for protecting distributed calls.  Its primary design decisions are:
 
-The only explicit design pattern beyond the circuit‑breaker itself is the **configuration object pattern**: `CircuitBreakerConfig.ts` isolates all tunable parameters, allowing the rest of the code to remain agnostic of hard‑coded thresholds. No additional architectural styles (e.g., micro‑services, event‑driven) are evident in the supplied observations.
+* **Timeout‑based failure detection** – each outbound request to the LLM service is wrapped with a timer; if the timer expires, the call is counted as a failure.  
+* **Configurable thresholds** – the maximum number of consecutive timeouts before the circuit “opens” and the period the circuit stays open before attempting a “half‑open” probe are both exposed as configuration knobs.  
+
+Interaction flow (as inferred from the observations):
+
+* `LLMServiceManager` receives a request and asks the `CircuitBreaker` (via the LLM service class) whether the circuit is closed.  
+* If closed, the request proceeds to the underlying LLM endpoint; the breaker monitors the response time.  
+* On timeout or repeated failures, the breaker flips to the open state, causing `LLMServiceManager` to short‑circuit the request (often returning a fallback or error).  
+* After a cooldown period, the breaker attempts a trial request (half‑open) to see if the service has recovered, then either closes the circuit or re‑opens it.
+
+Because the breaker is a **shared component** of the service manager, both `ModeManager` and `CacheController` indirectly benefit: they never see a request that would otherwise have hung the process, and cached results are only stored when the circuit is closed, preserving cache integrity.
 
 ---
 
 ## Implementation Details  
 
-### Core Classes and Functions  
+The concrete implementation lives in **`lib/llm/llm-service.ts`**.  Although the source symbols are not listed, the observations allow us to infer the following key elements:
 
-* **CircuitBreaker (CircuitBreaker.ts)** – The class encapsulates the state machine.  
-  * Around **line 31**, the method that records each request outcome computes the current failure rate. If `failureRate > config.failureThreshold`, the breaker flips to the *open* state.  
-  * Around **line 42**, the method that handles an incoming request checks the current state. When *open*, it either forwards the request to a fallback service (as defined in the configuration) or returns a structured error, preventing further pressure on the failing service.
+| Element | Role |
+|---------|------|
+| **CircuitBreaker class / object** | Encapsulates the state machine (Closed → Open → Half‑Open) and holds the configurable parameters (timeout, failure threshold). |
+| **`execute(requestFn)`** (or similar) | Wraps the actual LLM call (`requestFn`) with a timeout guard; increments failure counters on timeout; resets counters on success. |
+| **Configuration interface** | Exposes properties such as `timeoutMs`, `failureThreshold`, and `resetTimeoutMs` so that `LLMServiceManager` can instantiate the breaker with environment‑specific values. |
+| **State flags** (`isOpen`, `failureCount`, `lastFailureTime`) | Used internally to decide whether to allow a request through or to reject it immediately. |
 
-* **CircuitBreakerConfig (CircuitBreakerConfig.ts)** – A plain‑object or class that exposes:
-  * `failureThreshold` – the percentage of failures that trigger the open state.  
-  * `timeout` – the duration the breaker remains open before attempting a transition back to *closed* (or a *half‑open* probe, if implemented).  
-  * `fallbackStrategy` – either a reference to an alternative service implementation or a flag indicating that an error response should be emitted.
+The **timeout mechanism** is implemented by starting a timer when a request is dispatched.  If the timer fires before the LLM service responds, the request is aborted (or its promise is rejected) and the breaker records a failure.  The **failure threshold** is a simple counter; once the count exceeds the configured limit, the breaker transitions to the open state and blocks further calls for a configurable cooldown period (`resetTimeoutMs`).  
 
-### Operational Flow  
-
-1. **Request Entry** – A request reaches **LLMServiceManager**.  
-2. **Routing Decision** – **LLMRouter** selects the target LLM based on its mapping configuration.  
-3. **Breaker Check** – The manager calls `circuitBreaker.isOpen()`.  
-   * If *closed*, the call proceeds to the target service and the result (or error) is fed back into the breaker’s metrics collector.  
-   * If *open*, the manager executes the fallback path defined in `CircuitBreakerConfig` (line 42) and returns that result to the caller.  
-4. **Metrics Update** – After each attempt, the breaker updates its internal counters, allowing the failure‑rate calculation to evolve over time.
-
-Because the observations do not mention a *half‑open* probe, the implementation may either stay open for the full timeout or immediately revert to closed once the timeout expires and a successful call is observed.
+Because the breaker is **configurable**, the surrounding `LLMServiceManager` can pass different values based on deployment context (e.g., a tighter timeout for low‑latency environments or a higher failure threshold for noisy networks).  This flexibility is crucial for distributed systems where network characteristics vary.
 
 ---
 
 ## Integration Points  
 
-* **LLMServiceManager** – The breaker is a child component of the manager. The manager is responsible for constructing the breaker with a `CircuitBreakerConfig` instance and for invoking its state‑check methods before delegating to the router or cache.  
-* **LLMRouter** – While the router does not directly interact with the breaker, it shares the same parent and therefore operates on the same request flow. The router’s mapping configuration determines which service the breaker will protect.  
-* **CacheManager** – The cache is orthogonal but may receive results that have passed through the breaker. If a fallback service is used, its responses can also be cached, meaning the cache indirectly benefits from the breaker’s protection against repeated failures.  
-* **Fallback Services** – Defined in `CircuitBreakerConfig.ts`, these may be alternative LLM implementations or static error generators. The breaker’s open‑state logic (line 42) calls into these fallbacks, making them a direct integration point.  
-* **Configuration Layer** – Any system component that modifies `CircuitBreakerConfig.ts` (e.g., a deployment script or admin UI) influences the breaker's behaviour globally across all LLM services managed by the same `LLMServiceManager`.
+* **Parent – `LLMServiceManager`**: The manager creates and owns the CircuitBreaker instance.  Every call that flows through the manager first checks the breaker’s state, making the breaker the gatekeeper for all LLM interactions.  The manager also supplies the configuration values, likely sourced from environment variables or a central config service.  
+
+* **Sibling – `ModeManager`**: While not directly invoking the breaker, `ModeManager` decides which LLM mode (e.g., chat, completion) should be used.  Its decisions are only acted upon if the breaker reports a closed circuit, ensuring that mode routing never triggers a call to an unhealthy service.  
+
+* **Sibling – `CacheController`**: Caching is performed only when the circuit is closed, preventing stale or erroneous data from being cached during outage periods.  Conversely, when the circuit is open, the cache may be consulted for a fallback response, but the breaker itself does not manage the cache.  
+
+* **External Dependencies**: The breaker relies on the underlying **network/HTTP client** used to talk to the LLM service (e.g., `fetch`, `axios`).  The timeout logic is typically built on top of the client’s abort controller or promise‑race pattern.  No other libraries are mentioned, so we stay within the core runtime.  
+
+* **Configuration Interface**: The only explicit integration surface is the set of parameters (`timeout`, `failureThreshold`) that can be passed from higher‑level configuration files or environment variables into the breaker’s constructor.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Tune the Threshold Carefully** – The `failureThreshold` should reflect realistic service SLAs. Setting it too low will cause frequent opens, unnecessarily diverting traffic to fallbacks; setting it too high may delay protection until the service is already overwhelmed.  
-2. **Select an Appropriate Fallback** – If a graceful degradation path exists (e.g., a cheaper or cached model), configure it in `CircuitBreakerConfig`. Otherwise, configure the breaker to return a clear error so callers can handle the situation explicitly.  
-3. **Monitor Timeout Values** – The `timeout` controls how long the system stays in the open state. A short timeout enables rapid recovery attempts but may cause flapping if the service is still unstable. Align the timeout with the expected recovery time of the protected LLM service.  
-4. **Instrument Metrics** – Although the observations do not show explicit logging, it is advisable to expose the breaker’s state (closed/open) and failure‑rate counters through monitoring dashboards. This visibility aids in capacity planning and incident response.  
-5. **Avoid Direct Calls Bypassing the Manager** – All interactions with the protected LLM services should go through **LLMServiceManager**. Bypassing the manager would circumvent the breaker’s safeguards and could re‑introduce cascading failures.  
+1. **Instantiate via `LLMServiceManager`** – developers should never create a raw CircuitBreaker; always obtain it through the manager to guarantee consistent configuration and state sharing across the LLM subsystem.  
+
+2. **Tune timeouts and thresholds per environment** – production deployments with high latency networks may need longer `timeoutMs` values, while test environments can use aggressive thresholds to surface failures early.  
+
+3. **Do not bypass the breaker** – even if a caller believes a request is critical, sending it directly to the LLM endpoint without consulting the breaker defeats the fault‑tolerance guarantees and can cause cascading failures.  
+
+4. **Observe circuit state for monitoring** – expose the breaker’s current state (`closed`, `open`, `half‑open`) via metrics or logs.  This visibility helps operators understand service health and adjust thresholds if needed.  
+
+5. **Graceful degradation** – when the circuit is open, `LLMServiceManager` should return a meaningful fallback (e.g., an error response or a cached result) rather than propagating a timeout to the caller.  
 
 ---
 
 ### 1. Architectural patterns identified  
-* **Circuit Breaker pattern** – implements a stateful guard that opens on exceeding a failure‑rate threshold.  
-* **Configuration object pattern** – `CircuitBreakerConfig.ts` centralizes tunable parameters (threshold, timeout, fallback).  
+* **Circuit Breaker pattern** – protects downstream LLM calls with timeout‑based failure detection and state transitions.  
+* **Layered service façade** – `LLMServiceManager` composes mode routing, caching, and fault tolerance into a single entry point.  
 
 ### 2. Design decisions and trade‑offs  
-* **Threshold‑based detection** vs. time‑window or statistical models – simplicity and predictability at the cost of potentially slower reaction to bursty failures.  
-* **Fallback strategy choice** – either route to an alternate service (adds resilience) or return an error (simpler but less graceful).  
-* **State granularity** – observations only mention *closed* and *open*; omitting a *half‑open* probe reduces complexity but may prolong downtime.  
+* **Configurable timeout & thresholds** – trade‑off between responsiveness (short timeout) and false‑positive circuit openings (long timeout).  
+* **Centralized management via `LLMServiceManager`** – simplifies configuration but creates a single point of control; any bug in the manager can affect all three concerns (mode, cache, breaker).  
 
 ### 3. System structure insights  
-* The breaker is a child of **LLMServiceManager**, which orchestrates routing (**LLMRouter**) and caching (**CacheManager**).  
-* Siblings share the same request pipeline but have distinct responsibilities: routing decides the target, caching optimizes repeated calls, and the breaker protects the target from overload.  
+* The breaker is a child of `LLMServiceManager` and a sibling concern to `ModeManager` and `CacheController`.  
+* All three siblings rely on the manager’s decision flow, meaning their lifecycles are tightly coupled to the manager’s initialization order.  
 
 ### 4. Scalability considerations  
-* Because the breaker is instantiated per manager, it can scale horizontally with multiple `LLMServiceManager` instances.  
-* The threshold and timeout values can be tuned per service, allowing fine‑grained control as the number of LLM back‑ends grows.  
-* The fallback path must be capable of handling the redirected traffic; otherwise, the open state could shift load to another bottleneck.  
+* Because the breaker’s state is in‑process, it scales with the number of service manager instances; in a horizontally scaled deployment each instance maintains its own circuit state, which is acceptable for per‑instance health isolation.  
+* Configurable thresholds allow the system to tolerate higher load spikes without opening the circuit prematurely.  
 
 ### 5. Maintainability assessment  
-* Centralizing all breaker parameters in `CircuitBreakerConfig.ts` simplifies updates and reduces duplication.  
-* The logic is confined to a few well‑named methods in `CircuitBreaker.ts`, making the state machine easy to read and test.  
-* However, the lack of explicit *half‑open* handling may require future extensions; adding that state later will be straightforward if the code is modular, but it will increase the surface area for bugs.  
-* Clear separation from **LLMRouter** and **CacheManager** means changes to routing or caching policies are unlikely to impact breaker logic, supporting independent evolution of each sibling component.
+* The implementation is confined to a single file (`lib/llm/llm-service.ts`), making it easy to locate and modify.  
+* Exposing configuration via a simple interface encourages reuse and reduces duplication across environments.  
+* However, the lack of explicit unit‑test symbols in the observations suggests a need for dedicated tests around state transitions to ensure future changes do not regress the breaker’s behavior.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses a routing mechanism in its LLMRouter class to direct incoming requests to the appropriate LLM service
+- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager utilizes the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, and circuit breaking.
 
 ### Siblings
-- [LLMRouter](./LLMRouter.md) -- The LLMRouter class (in LLMRouter.ts) utilizes a mapping configuration to determine the target service for each incoming request, allowing for flexible and dynamic routing.
-- [CacheManager](./CacheManager.md) -- The CacheManager (in CacheManager.ts:21) implements a least-recently-used (LRU) eviction policy to ensure that the most frequently accessed services remain in memory.
+- [ModeManager](./ModeManager.md) -- The ModeManager utilizes the LLMService class in lib/llm/llm-service.ts to handle mode routing, caching, and circuit breaking.
+- [CacheController](./CacheController.md) -- The CacheController uses a caching library, such as Redis or Memcached, to store and retrieve cached data, as implied by the parent component analysis.
 
 
 ---

@@ -2,83 +2,108 @@
 
 **Type:** Detail
 
-The CacheManager (in CacheManager.ts:21) implements a least-recently-used (LRU) eviction policy to ensure that the most frequently accessed services remain in memory.
+The caching mechanism may use a time-to-live (TTL) policy, where cached metadata is updated or expired after a certain period
 
 ## What It Is  
 
-The **CacheManager** is a concrete TypeScript class defined in `CacheManager.ts` (see line 21) that provides an in‑memory caching layer for LLM service calls. It implements a **least‑recently‑used (LRU) eviction policy**, ensuring that the most frequently accessed service responses stay resident while older, less‑used entries are evicted when the cache reaches its configured capacity. The cache’s size limit and entry‑expiration rules are externalised in `CacheConfig.ts`, allowing developers to tune the behaviour for different workloads. Within the overall system, the CacheManager lives under the **LLMServiceManager** component, which owns it and coordinates its use alongside sibling components such as **LLMRouter** and **CircuitBreaker**.
+CacheManager is a dedicated caching module that lives inside several higher‑level components of the system – OntologyClassificationComponent, LSLConverterComponent, SemanticAnalysisComponent, AgentIntegrationComponent, and MetadataManagementComponent.  Although the source tree does not expose a concrete file path (the observation list reports **0 code symbols found**), the repeated “contains CacheManager” phrasing tells us that each of those components ships its own instance (or a shared implementation) of a class named **CacheManager**.  Its primary responsibility is to hold metadata that has been derived or fetched by the surrounding component and to enforce a time‑to‑live (TTL) policy so that stale entries are refreshed or evicted automatically.  In addition, the observations hint that CacheManager may expose a **caching hierarchy** – multiple levels (for example, an in‑memory fast tier and a slower, possibly distributed tier) that are selected based on the type of metadata being cached.
 
-## Architecture and Design  
+Because CacheManager sits directly under **MetadataManagementComponent**, it is part of the overall metadata lifecycle managed by the **MetadataManagementFramework** (implemented in `MetadataManagementFramework.java`).  The framework defines how metadata is created, updated, and persisted, while CacheManager supplies the transient storage that speeds up repeated look‑ups.  Sibling components such as **MetadataRepository** (a database‑backed store) provide the durable backing store that CacheManager can fall back to when a cache miss occurs.
 
-The design of CacheManager follows a classic **cache‑as‑a‑service** pattern. By encapsulating the LRU logic inside a dedicated class, the system separates concerns: the routing logic in `LLMRouter.ts` (line 51) focuses on directing requests, while CacheManager concentrates on storage, eviction, and expiry. The interaction between CacheManager and LLMRouter is a **collaborative composition** – LLMRouter queries the cache before invoking downstream LLM services, and writes back successful results to the cache. This reduces redundant network calls and lowers latency for hot request patterns.
-
-The configurability exposed through `CacheConfig.ts` reflects a **strategy‑oriented configuration** approach. Rather than hard‑coding limits, the cache reads its maximum entry count and TTL (time‑to‑live) values at construction time, making the component adaptable to diverse performance requirements (e.g., small caches for low‑memory environments versus large caches for high‑throughput workloads). The LRU algorithm itself is an **internal data‑structure strategy** (typically a doubly‑linked list paired with a hash map) that guarantees O(1) access and eviction operations, though the exact implementation details are not enumerated in the observations.
-
-## Implementation Details  
-
-At its core, CacheManager maintains a map of cache keys to cached payloads together with metadata required for LRU ordering (e.g., a linked list of usage timestamps). When a new entry is added, the manager checks the current count against the **maximum size** defined in `CacheConfig.ts`. If the limit would be exceeded, the least‑recently‑used entry—identified by the tail of the usage list—is removed before the new entry is inserted at the head of the list, marking it as most recently used.
-
-Expiration is handled by attaching a **timestamp** (or deadline) to each cached item when it is stored. On every lookup, CacheManager validates that the current time is still within the configured TTL; stale entries are purged on‑the‑fly, ensuring that callers never receive outdated data. Because the eviction and expiration logic are centralized, the rest of the system (including LLMRouter) can treat the cache as a simple key/value store without needing to manage lifecycle concerns.
-
-The CacheManager is instantiated by **LLMServiceManager**, which likely passes a populated `CacheConfig` object during construction. This dependency injection pattern keeps the cache decoupled from hard‑coded settings and enables unit testing with mock configurations. The manager also exposes a minimal public API—typically `get(key)`, `set(key, value)`, and possibly `clear()`—that LLMRouter consumes at the call site shown in `LLMRouter.ts:51`.
-
-## Integration Points  
-
-- **LLMRouter** (`LLMRouter.ts:51`): Before routing a request to a concrete LLM service, LLMRouter invokes `CacheManager.get(requestHash)`. If a cached response exists and is still valid, LLMRouter returns it immediately, bypassing external service calls. After a successful service response, LLMRouter calls `CacheManager.set(requestHash, response)` to populate the cache for future reuse. This tight coupling is intentional; it centralises request deduplication and reduces overall latency.
-
-- **LLMServiceManager** (parent): Owns the CacheManager instance and is responsible for supplying the `CacheConfig`. It may also expose higher‑level cache‑aware methods that wrap the raw router calls, offering a unified façade for downstream consumers.
-
-- **CircuitBreaker** (`CircuitBreaker.ts:31`): While not directly interacting with the cache, CircuitBreaker shares the same parent (LLMServiceManager) and therefore operates in the same request pipeline. A typical flow would be: LLMRouter checks the cache → if miss, CircuitBreaker evaluates service health → if circuit is closed, the request proceeds; otherwise, the request is rejected early. This sibling relationship ensures that caching and resilience mechanisms complement each other without overlapping responsibilities.
-
-- **CacheConfig.ts**: Provides the configurable parameters (`maxSize`, `ttl`, possibly `evictionInterval`). Any component that wishes to adjust caching behaviour (e.g., during testing or for a particular deployment) edits this file, and the changes propagate automatically to CacheManager via the parent’s injection.
-
-## Usage Guidelines  
-
-1. **Key Generation** – Use a deterministic, collision‑free identifier (such as a hash of the request payload and target service name) when calling `CacheManager.get` and `set`. This guarantees that identical logical requests map to the same cache entry, maximising hit rates.
-
-2. **Respect Expiration** – Do not rely on manual cleanup; let CacheManager purge stale entries on access. If you need proactive eviction (e.g., to free memory ahead of a known load spike), invoke the manager’s `clear()` method or design a background job that calls it, but keep such usage rare to avoid unnecessary cache churn.
-
-3. **Configure Appropriately** – Adjust `CacheConfig.ts` based on observed traffic patterns. A small `maxSize` reduces memory pressure but may increase miss rates; a longer TTL improves hit probability for idempotent calls but risks serving outdated data. Perform load testing to find the sweet spot.
-
-4. **Avoid Storing Sensitive Data** – Since the cache lives in process memory, it is not encrypted. Do not cache personally identifiable information (PII) unless the runtime environment guarantees appropriate isolation.
-
-5. **Testing** – When writing unit tests for components that depend on CacheManager (e.g., LLMRouter), inject a mock `CacheConfig` with a tiny `maxSize` and short TTL to simulate eviction scenarios and verify that fallback logic (such as re‑routing to the service) works correctly.
+In short, CacheManager is the system’s short‑term, TTL‑driven metadata cache, instantiated within each major processing component and coordinated with the broader metadata management framework.
 
 ---
 
-### Architectural Patterns Identified
-- **LRU Cache (Eviction Strategy)**
-- **Configuration‑Driven Strategy** (via `CacheConfig.ts`)
-- **Composition / Collaboration** (CacheManager ↔ LLMRouter)
-- **Dependency Injection** (parent LLMServiceManager supplies config)
+## Architecture and Design  
 
-### Design Decisions and Trade‑offs
-- **In‑process LRU cache** provides fast O(1) lookups but limits scalability to a single node; distributed caching would be required for multi‑instance deployments.
-- **Configurable size/TTL** offers flexibility but adds runtime complexity; developers must tune parameters to avoid excessive eviction or memory bloat.
-- **Coupling with LLMRouter** simplifies request flow but introduces a hard dependency; any change to the cache API may ripple to the router.
+The architecture that emerges from the observations is a **modular component‑centric design**.  Each high‑level component (e.g., OntologyClassificationComponent) owns a CacheManager instance, which suggests a **composition** relationship: the component *has‑a* CacheManager.  This composition isolates caching concerns from the business logic of the component while still allowing the component to control cache configuration (TTL values, hierarchy depth, etc.) directly.
 
-### System Structure Insights
-- CacheManager sits as a child of **LLMServiceManager**, alongside siblings **LLMRouter** and **CircuitBreaker**, forming a cohesive request‑handling pipeline: cache → routing → resilience.
-- The cache is the first line of defence against redundant external calls, while CircuitBreaker provides fault tolerance; together they improve both performance and reliability.
+The only explicit design pattern mentioned is the **TTL‑based expiration** strategy.  By attaching a lifespan to each cached entry, CacheManager can automatically purge or refresh data without external triggers, a classic **Cache‑Aside** approach where the owning component checks the cache first, falls back to the underlying repository (MetadataRepository), and then repopulates the cache.  The hinted “caching hierarchy” points to a **multi‑level cache** pattern, where a fast in‑memory layer (perhaps a `ConcurrentHashMap` or Guava cache) sits above a slower secondary layer (maybe a local disk cache or a distributed store).  The hierarchy enables the component to obtain the best‑possible latency while still providing fallback capacity for larger datasets.
 
-### Scalability Considerations
-- The current design is optimal for single‑process workloads; scaling horizontally would require a shared cache layer (e.g., Redis) or a sharding strategy.
-- LRU eviction remains efficient under high load, but the absolute memory footprint is bounded by `maxSize`, making it predictable for capacity planning.
+Interaction flows are straightforward: a component queries CacheManager; if the entry is present and unexpired, it is returned immediately.  If the entry is missing or its TTL has elapsed, the component retrieves the metadata from the **MetadataRepository** (the sibling persistence layer) or recomputes it, then writes the fresh value back into CacheManager.  Because CacheManager is embedded within each component, there is no cross‑component cache sharing, which simplifies concurrency concerns but also means cache duplication across components.
 
-### Maintainability Assessment
-- Clear separation of concerns (caching vs routing vs circuit breaking) promotes easy maintenance; each component can be updated independently.
-- Centralising configuration in `CacheConfig.ts` simplifies tuning but mandates careful version control to avoid configuration drift across environments.
-- Lack of exposed public symbols in the observations suggests a minimal public API, which reduces surface area for bugs but may limit extensibility; future enhancements should preserve the simple `get/set` contract.
+---
+
+## Implementation Details  
+
+Even though no concrete symbols were listed, the observations give us a clear mental model of the implementation:
+
+1. **Class Structure** – Each component likely declares a field such as `private CacheManager cacheManager;`.  The CacheManager class probably encapsulates a map‑like data structure keyed by a metadata identifier (e.g., transcript ID) and stores a wrapper object that includes the cached value plus a timestamp indicating when it expires.
+
+2. **TTL Mechanics** – When an entry is inserted, CacheManager records the current time plus the configured TTL.  Retrieval logic checks the current time against this expiry timestamp; if the entry is past its deadline, it is treated as a miss and removed.  The TTL value may be supplied by the owning component (allowing different lifetimes for different metadata types) or fall back to a default defined in a configuration file.
+
+3. **Hierarchical Levels** – A two‑tier design is the most plausible:  
+   * **Level 1 (L1)** – an in‑memory cache (e.g., `ConcurrentHashMap` or a library like Caffeine) that offers nanosecond‑scale reads.  
+   * **Level 2 (L2)** – a secondary cache that could be a local file‑based store or a lightweight distributed cache (e.g., Redis) for larger payloads or for sharing across process boundaries.  
+   When a lookup is performed, CacheManager first checks L1; on miss it checks L2; on miss again it delegates to the underlying repository.
+
+4. **Expiration & Refresh** – CacheManager may expose a scheduled cleanup task (e.g., a `ScheduledExecutorService`) that periodically scans the cache and evicts expired entries, reducing memory pressure.  Alternatively, lazy eviction on access is possible, where the entry is removed only when a stale read is attempted.
+
+5. **Configuration Hooks** – Because CacheManager is embedded in multiple components, each component can configure its own cache policy (TTL duration, maximum size, hierarchy enablement) via component‑level configuration files or dependency‑injection parameters.  This flexibility allows, for example, the **SemanticAnalysisComponent** to keep short‑lived caches for rapidly changing linguistic annotations, while the **OntologyClassificationComponent** may retain longer‑lived ontology lookup results.
+
+---
+
+## Integration Points  
+
+CacheManager’s integration surface is defined by the components that own it and the persistent store it falls back to.  The primary integration points are:
+
+* **Parent – MetadataManagementComponent** – CacheManager supplies the fast path for metadata look‑ups that the parent component orchestrates.  When the parent’s workflow requests metadata, it first asks its CacheManager; on miss, the parent may invoke the **MetadataManagementFramework** to recompute or retrieve the data, then push the result back into the cache.
+
+* **Sibling – MetadataRepository** – CacheManager treats the repository as the authoritative source of truth.  The repository (implemented with JDBC/Hibernate) provides CRUD operations on persisted metadata; CacheManager only reads from it on a cache miss and writes back only when the component explicitly updates the cache.
+
+* **Other Siblings – MetadataManagementFramework** – The framework defines the lifecycle hooks (create, update, delete) that components can use to invalidate or refresh cache entries.  For example, after the framework successfully updates a transcript’s metadata, the owning component can call `cacheManager.invalidate(id)` to ensure stale data is not served.
+
+* **External Consumers** – If any component exposes an API (e.g., a REST endpoint) that returns metadata, that endpoint will indirectly depend on CacheManager for performance.  The endpoint’s handler will invoke the component’s CacheManager before delegating to the repository.
+
+Because CacheManager is instantiated per component, there is no direct inter‑component cache sharing; integration is achieved through the common contracts defined by the **MetadataManagementFramework** and the **MetadataRepository**.
+
+---
+
+## Usage Guidelines  
+
+1. **Respect TTL Settings** – When inserting or updating cache entries, always supply the appropriate TTL that matches the volatility of the metadata.  Over‑long TTLs can cause stale data to linger, while overly aggressive TTLs may defeat the purpose of caching.
+
+2. **Prefer Cache‑Aside Access** – Call `cacheManager.get(key)` first; if it returns `null` (or an expired entry), fetch the data from `MetadataRepository` or recompute it, then store the fresh value with `cacheManager.put(key, value, ttl)`.  This pattern keeps the cache consistent with the source of truth.
+
+3. **Invalidate on Mutations** – Whenever a component updates or deletes metadata through the **MetadataManagementFramework**, immediately invalidate the corresponding cache entry (`cacheManager.invalidate(key)`).  This prevents readers from receiving outdated information.
+
+4. **Configure Hierarchy Thoughtfully** – Enable the secondary cache level only when the volume of cached items exceeds the memory budget of the primary in‑memory tier.  For low‑traffic components, a single‑level in‑memory cache may be sufficient and simpler to manage.
+
+5. **Monitor Cache Health** – Expose metrics (hit ratio, eviction count, size) from each CacheManager instance.  Because each component has its own cache, per‑component metrics help identify which parts of the system benefit most from caching and where TTL values may need tuning.
+
+---
+
+### Architectural patterns identified
+* **Composition** – each component *has‑a* CacheManager.  
+* **Cache‑Aside** – components read from the cache first, fall back to the repository, then repopulate.  
+* **TTL‑based expiration** – entries carry a time‑to‑live that governs automatic eviction.  
+* **Multi‑level cache** – hinted hierarchy suggests a fast L1 in‑memory tier plus a slower L2 tier.
+
+### Design decisions and trade‑offs
+* **Per‑component cache** isolates concurrency concerns and allows tailored TTLs, at the cost of duplicated cached data across components.  
+* **TTL policy** offers simplicity and automatic staleness handling but requires careful sizing to balance freshness vs. hit rate.  
+* **Optional hierarchy** provides scalability for large metadata sets, but adds complexity in synchronization and eviction policies between levels.
+
+### System structure insights
+CacheManager sits directly under **MetadataManagementComponent**, collaborating with sibling **MetadataRepository** (persistent store) and **MetadataManagementFramework** (lifecycle manager).  The repeated “contains CacheManager” relationship across five major components shows a deliberate architectural choice to give each processing domain its own caching layer while keeping the overall metadata lifecycle centralized.
+
+### Scalability considerations
+* **Horizontal scaling** – because caches are component‑local, adding more instances of a component automatically adds more cache capacity without coordination.  
+* **Cache size limits** – each CacheManager should enforce a maximum entry count or memory budget to prevent runaway memory usage.  
+* **Secondary tier** – enabling an L2 cache (e.g., Redis) can share cached data across multiple process instances, improving cache hit rates when the same metadata is needed by different components.
+
+### Maintainability assessment
+The design is **highly maintainable**: caching logic is encapsulated within a single class per component, reducing the surface area for bugs.  The clear TTL contract and explicit invalidation points make reasoning about data freshness straightforward.  However, the lack of a shared cache means developers must remember to keep TTLs and invalidation logic consistent across components, which can introduce duplication.  Providing a common abstract base or utility library for CacheManager could mitigate this duplication while preserving the compositional benefits.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMServiceManager](./LLMServiceManager.md) -- LLMServiceManager uses a routing mechanism in its LLMRouter class to direct incoming requests to the appropriate LLM service
+- [MetadataManagementComponent](./MetadataManagementComponent.md) -- MetadataManagementComponent uses a metadata management framework in MetadataManagementFramework.java to manage metadata for transcripts and observations
 
 ### Siblings
-- [LLMRouter](./LLMRouter.md) -- The LLMRouter class (in LLMRouter.ts) utilizes a mapping configuration to determine the target service for each incoming request, allowing for flexible and dynamic routing.
-- [CircuitBreaker](./CircuitBreaker.md) -- The CircuitBreaker (in CircuitBreaker.ts:31) uses a threshold-based approach to detect service failures, triggering a circuit open state when the failure rate exceeds a predefined threshold.
+- [MetadataManagementFramework](./MetadataManagementFramework.md) -- MetadataManagementFramework is implemented in MetadataManagementFramework.java, which defines the metadata management lifecycle
+- [MetadataRepository](./MetadataRepository.md) -- MetadataRepository is likely implemented using a database access library or framework, such as JDBC or Hibernate
 
 
 ---
