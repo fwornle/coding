@@ -8,18 +8,20 @@ An agentic coding environment with a multi-agent UKB analysis pipeline, knowledg
 
 The semantic analysis pipeline must operate as a hierarchical wave-based multi-agent system — not a flat DAG — producing self-sufficient knowledge at every level, with rich observations, detailed insight documents, and proper parent-child structure from stem to leaves.
 
-## Current Milestone: v2.0 Wave-Based Hierarchical Semantic Analysis
+## Current Milestone: v2.1 Wave Pipeline Quality Restoration
 
-**Goal:** Revamp the UKB pipeline from a flat batch DAG into a multi-agent system operating in hierarchical waves. Wave 1 identifies project building blocks with comprehensive summaries. Wave 2 creates sub-nodes for each component with detailed insights (md, puml/png). Wave 3+ adds sub-sub-nodes with increasing detail. Each hierarchy level is self-sufficient and useful on its own.
+**Goal:** Re-integrate the full multi-agent pipeline (semantic analysis, KG operators, content validation, QA, ontology classification, trace reporting) into the wave-based architecture. v2.0 built the hierarchical wave structure but dropped the rich agent pipeline — this milestone restores it.
 
-**Foundation available:** Hierarchy fields in schema (v1.0 Phase 4), 30 entities already organized L0→L3 (migration script), VKB blue gradient (darker at stem, lighter at leaves).
+**Foundation available:** Working wave-controller (3 waves + insight finalization), 691 entities in KG, component manifest, ontology classification agent (partially restored), persistence agent, insight generation agent.
 
-**Key changes from flat DAG:**
-- Pipeline runs in waves (L0→L1→L2→L3), not a single flat pass
-- Each wave spawns agents focused on one hierarchy level
-- Observations are rich and numerous (not one-liner stubs)
-- Every entity gets detailed insight documents (markdown + PlantUML)
-- Sub-nodes reflect actual architecture, not just "Pipeline" / "Insights"
+**Key problems to fix:**
+- Wave agents do lightweight LLM calls — need deep semantic analysis integration
+- KG operators (conv, aggr, embed, dedup, pred, merge) completely skipped
+- Content validation disabled in wave persistence
+- No QA step in wave pipeline
+- Trace modal broken (no LLM counts, no timing, no model info)
+- Ontology classification was auto-assigning hierarchy level as class (partially fixed)
+- Hallucination risk from unbounded L3 suggestions (basic guards added)
 
 ## Requirements
 
@@ -82,4 +84,4 @@ The semantic analysis pipeline must operate as a hierarchical wave-based multi-a
 | Rich observations + insight docs per entity | One-liner observations are insufficient for useful knowledge | — Pending |
 
 ---
-*Last updated: 2026-03-04 after v2.0 milestone restart (wave-based)*
+*Last updated: 2026-03-07 after v2.1 milestone start*

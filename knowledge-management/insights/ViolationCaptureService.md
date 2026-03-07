@@ -2,105 +2,98 @@
 
 **Type:** SubComponent
 
-ViolationCaptureService utilizes a notification mechanism to alert developers and administrators of constraint violations, facilitating prompt correction and improvement
+The sub-component supports customizable violation handling through its configure function in violation-capture-service.ts, allowing users to define custom responses to different types of violations
 
 ## What It Is  
 
-The **ViolationCaptureService** is a sub‑component of the **ConstraintSystem** that is responsible for persisting, protecting, and exposing information about constraint violations.  Although the source repository does not expose concrete file paths or class definitions, the observations make clear that the service implements a **standardized capture interface** (Observation 2) and sits alongside other core modules such as **GraphDatabaseManager**, **ContentValidationAgent**, and **ConcurrencyControlModule** within the same parent component.  Its primary responsibilities are:
+The **ViolationCaptureService** lives in the *violation‑capture‑service.ts* file of the ConstraintSystem repository. It is a dedicated sub‑component whose sole responsibility is to **capture, persist, encrypt, and expose queryable history of constraint violations** that are raised by the surrounding constraint enforcement pipeline.  The service works against the `Violation` interface defined in *violation.ts* and stores the resulting records through the persistence layer in *violation‑persistence.ts*.  Its public API is centred around three high‑level operations:  
 
-* Storing violation records in a durable data store – either a relational database or a NoSQL store (Observation 1).  
-* Encrypting any sensitive violation payloads before persistence (Observation 6).  
-* Providing a query API that callers can use to retrieve and analyse violations (Observation 5).  
-* Issuing notifications to developers and administrators when a new violation is recorded (Observation 3).  
-* Managing concurrent reads and writes to keep the violation data consistent (Observation 4).  
-* Exposing integration hooks so external tools can consume or contribute violation data (Observation 7).  
+1. **captureViolation** – receives a violation payload (type, severity, context) and decides how to react.  
+2. **configure** – lets callers register custom handlers for particular violation categories.  
+3. **query** – provides a read‑only view of the stored violation history for downstream analysis (e.g., by the sibling *StatisticsCalculator*).  
 
-Together these capabilities make the service the “single source of truth” for all constraint‑related errors that arise during the execution of the broader **ConstraintSystem**.
+All data that traverses the service is encrypted in‑flight and at rest, guaranteeing that sensitive violation details cannot be exposed inadvertently.
 
 ---
 
 ## Architecture and Design  
 
-From the observations we can infer a **layered service‑oriented architecture** within the **ConstraintSystem**.  The **ViolationCaptureService** sits in the *persistence / domain* layer, exposing a **capture interface** to upstream components (e.g., the **ContentValidationAgent** that detects a constraint breach) while delegating storage concerns to an underlying database abstraction (Observation 1).  The service also participates in a **notification sub‑system**, likely implemented as a publish‑subscribe or callback mechanism, to alert stakeholders of new violations (Observation 3).  
+The observations point to an **event‑driven architecture** inside *violation‑capture‑service.ts*.  When a constraint check fails, an event is raised that the service consumes via `captureViolation`.  The function treats the event as a *command* that carries metadata (type, severity, context) and routes it to the appropriate handling path.  This routing logic is configurable through the `configure` method, which registers callbacks or strategies for distinct violation types – a classic **Strategy pattern** realized at runtime.  
 
-Concurrency is explicitly addressed: the module “handles concurrent access to the violation data, ensuring data consistency and integrity” (Observation 4).  This suggests the use of **concurrency control primitives** (locks, optimistic versioning, or transactional boundaries) that are compatible with the sibling **ConcurrencyControlModule**, which itself uses a work‑stealing strategy for broader system coordination.  By reusing the same concurrency concepts, the service can safely operate in a highly parallel environment without sacrificing data correctness.  
+Persisting violations is delegated to a separate module, *violation‑persistence.ts*.  By isolating storage concerns, the design follows the **Single Responsibility Principle** and creates a thin **persistence façade** that can swap underlying stores (database, file system) without affecting the capture logic.  The encryption step is performed before the persistence façade is invoked, indicating a **Decorator‑like** step that augments the raw violation object with security guarantees.  
 
-Security is another architectural concern.  The service encrypts violation payloads before they reach the storage layer (Observation 6), indicating a **defense‑in‑depth** approach where confidentiality is enforced at the service boundary rather than relying solely on database‑level encryption.  
+The service also exposes a **query interface** that other components (e.g., *StatisticsCalculator*) can call to retrieve historical data.  This read‑only contract is consistent with the **CQRS (Command Query Responsibility Segregation)** idea: commands (`captureViolation`) mutate state, while queries only read it.  Although the broader system does not explicitly label itself as CQRS, the separation is evident in the code organization.
 
-Finally, the service’s **integration capability** (Observation 7) shows that it is designed with **loose coupling** in mind: external tools can consume violation data via the provided query interface, and perhaps push new violation records through the same capture interface, enabling collaborative problem‑solving across system boundaries.
+Within the parent **ConstraintSystem**, ViolationCaptureService sits alongside peers such as *WorkflowLayoutComputer* and *ContentValidationAgent*.  All three share the same modular philosophy: each sub‑component encapsulates a distinct aspect of constraint enforcement (layout computation, content validation, violation handling) and can be evolved independently.  This modularity is reinforced by the parent’s “clear separation of concerns” description.
 
 ---
 
 ## Implementation Details  
 
-* **Interface Implementation** – The core class, **ViolationCaptureService**, implements a capture interface that defines methods such as `recordViolation(Violation v)` and `queryViolations(Criteria c)`.  This contract guarantees that any consumer (e.g., **ContentValidationAgent**) can invoke the service without needing to know the storage specifics.  
+### Core Types  
+* `Violation` (defined in *violation.ts*) – a typed contract that carries `type`, `severity`, `context`, and any additional metadata required for downstream processing.  
 
-* **Data Store Abstraction** – The service abstracts the underlying persistence mechanism, allowing either a relational DB (SQL) or a NoSQL store (e.g., document‑oriented) to be swapped based on deployment needs (Observation 1).  The abstraction likely includes a repository or DAO layer that translates domain objects into storage‑specific commands.  
+### Capture Path – `captureViolation` (violation‑capture‑service.ts)  
+The function receives a `Violation` instance, inspects its `type` and `severity`, and then looks up a handler in an internal registry populated by `configure`.  If a custom handler exists, it is invoked; otherwise a default response (e.g., logging and persisting) is applied.  The decision matrix is explicitly based on the three attributes highlighted in the observations, ensuring that each violation can be treated uniquely.  
 
-* **Encryption Layer** – Before a violation record is handed off to the repository, the service applies a **data‑encryption mechanism** (Observation 6).  This could be a symmetric cipher (AES) applied to the violation payload, with keys managed by a secure vault or configuration store.  Encryption occurs at the service boundary, ensuring that even if the database is compromised the violation details remain unreadable.  
+### Customization – `configure` (violation‑capture‑service.ts)  
+`configure` accepts a mapping from violation identifiers to handler functions.  This enables clients of the ConstraintSystem to inject domain‑specific logic (such as escalation to an external ticketing system) without modifying the service’s core code.  The registration is stored in a private map, which `captureViolation` consults at runtime.  
 
-* **Notification Mechanism** – Upon successful capture, the service triggers a notification flow (Observation 3).  While the exact implementation is not disclosed, the pattern aligns with an **event‑driven notifier** that publishes a “violation‑created” event to a message broker or directly invokes registered callbacks for developers and administrators.  
+### Encryption Layer  
+Before any persistence call, the service runs the violation payload through an encryption routine (still located in *violation‑capture‑service.ts*).  The encrypted blob is then handed to the persistence façade, guaranteeing that both storage and transmission are protected.  The exact algorithm is not disclosed in the observations, but its placement indicates a **defense‑in‑depth** approach.  
 
-* **Concurrency Handling** – The service is built to be **thread‑safe**.  It likely employs either fine‑grained locking around critical sections (e.g., when updating a violation counter) or leverages the **ConcurrencyControlModule**’s work‑stealing executor to serialize writes while allowing concurrent reads (Observation 4).  This design ensures that simultaneous violation captures do not corrupt the data store.  
+### Persistence – *violation‑persistence.ts*  
+This module abstracts the underlying store.  Its public API likely includes `save(encryptedViolation)` and `fetch(queryParams)`.  Because the observations mention “database or file system,” the implementation probably contains conditional logic or interchangeable adapters, allowing the system to run in environments with different durability requirements.  
 
-* **Query Interface** – For analysis, the service exposes a read‑only API that accepts filtering criteria (date ranges, severity, source component, etc.) and returns a collection of violation DTOs (Observation 5).  The query path probably translates criteria into database queries, taking advantage of indexes that the underlying store provides.  
-
-* **Integration Hooks** – The service’s public API is deliberately generic, enabling other subsystems or external tools to push or pull violation data (Observation 7).  This could be realized through REST endpoints, gRPC services, or in‑process method calls, depending on the overall system’s communication style.
+### Query Mechanism – `query` (violation‑capture‑service.ts)  
+`query` pulls data from the persistence layer, decrypts it, and returns a collection of `Violation` objects.  The sibling *StatisticsCalculator* can consume this output to compute aggregates such as violation frequency, severity distribution, or trend analysis.  The query interface is read‑only, reinforcing the separation between mutation (capture) and observation (query).  
 
 ---
 
 ## Integration Points  
 
-* **Parent – ConstraintSystem** – As a child of **ConstraintSystem**, the service receives violation events from the **ContentValidationAgent**, which validates code actions against constraints.  When a validation failure occurs, the agent calls the capture interface of **ViolationCaptureService** to persist the incident.  
+1. **Parent – ConstraintSystem**  
+   The ConstraintSystem orchestrates the overall constraint enforcement workflow.  When a rule violation is detected (for example, by the *ContentValidationAgent*), the system forwards the event to ViolationCaptureService’s `captureViolation`.  This tight coupling is limited to the well‑defined `Violation` contract, keeping the interaction surface small.  
 
-* **Sibling – GraphDatabaseManager** – While **GraphDatabaseManager** stores the constraint definitions themselves in a graph database (e.g., Neo4j), **ViolationCaptureService** stores the *outcomes* of those constraints.  Both modules may share the same concurrency infrastructure provided by **ConcurrencyControlModule**, ensuring that constraint updates and violation recordings do not interfere with each other.  
+2. **Siblings**  
+   *StatisticsCalculator* consumes the query API to generate reports on violation trends, while *WorkflowLayoutComputer* and *ContentValidationAgent* do not directly interact with ViolationCaptureService but share the same modular design language.  The common use of typed interfaces (e.g., `Violation`) and similar configuration patterns suggests a shared architectural vocabulary across siblings.  
 
-* **Sibling – ConcurrencyControlModule** – The work‑stealing concurrency model used by the sibling module is likely leveraged by **ViolationCaptureService** to schedule capture tasks, especially under high load when many violations are generated concurrently.  
+3. **Persistence Layer**  
+   The service depends on *violation‑persistence.ts* for durable storage.  Because the persistence module abstracts the concrete store, ViolationCaptureService can be deployed in environments ranging from in‑memory testing rigs to production databases, without code changes.  
 
-* **External Tools** – The service’s integration capability (Observation 7) permits downstream analytics platforms, monitoring dashboards, or incident‑response tools to query violation data via the service’s query API.  Conversely, external audit tools could feed pre‑validated violation records back into the service for centralized storage.  
-
-* **Notification Sub‑system** – The notification mechanism may integrate with existing alerting pipelines (email, Slack, PagerDuty) used elsewhere in the system, providing a unified experience for developers and administrators.
+4. **External Consumers**  
+   Any component that needs to react to violations—such as alerting pipelines, audit logs, or compliance dashboards—can register custom handlers via `configure`.  This extension point is the primary way the service integrates with external systems while preserving its core responsibilities.  
 
 ---
 
 ## Usage Guidelines  
 
-1. **Always use the capture interface** – Direct database access bypasses encryption and notification logic.  All callers should invoke the methods defined by the **ViolationCaptureService** interface to guarantee that violations are stored securely and that alerts are emitted.  
-
-2. **Provide complete violation metadata** – To maximize the usefulness of the query API, callers should populate all relevant fields (timestamp, severity, source component, constraint identifier, and any contextual data).  This enables richer analysis and better decision‑making downstream.  
-
-3. **Respect concurrency expectations** – Although the service is thread‑safe, callers should avoid holding long‑running locks while invoking capture methods.  Instead, prepare the violation object first, then call the service in a non‑blocking fashion.  
-
-4. **Handle encryption key rotation** – Since the service encrypts payloads, any operational process that rotates encryption keys must be coordinated with the service’s key‑management component to avoid decryption failures when querying historical violations.  
-
-5. **Leverage the query API for analytics** – When building dashboards or reporting tools, use the provided query interface rather than constructing ad‑hoc database queries.  This ensures that encryption is transparently handled and that future storage‑backend changes remain invisible to consumers.  
-
-6. **Monitor notification delivery** – Because alerts are a core part of the service’s value, downstream notification channels should be monitored for failures (e.g., email bounce, webhook errors).  Retries or dead‑letter handling should be configured at the notification layer, not within the service itself.  
+- **Always define a `Violation` object** that fully populates `type`, `severity`, and `context` before invoking `captureViolation`.  Missing fields may cause the default handler to be used, which might not meet domain‑specific requirements.  
+- **Leverage `configure` early in application startup** to register all needed custom handlers.  Because the registry is consulted at runtime, adding handlers after violations have been captured will not retroactively affect already stored records.  
+- **Prefer the query API for read‑only analysis**; do not attempt to mutate returned violation objects, as they are snapshots of encrypted data that have already been persisted.  Use the query results as input to the sibling *StatisticsCalculator* or other reporting tools.  
+- **Treat the persistence layer as a black box**; if you need to change the underlying storage (e.g., switch from a file system to a relational database), modify *violation‑persistence.ts* only.  The rest of the service will continue to operate unchanged thanks to the façade pattern.  
+- **Maintain encryption keys securely** and rotate them according to your organization’s security policy.  Since encryption is performed inside the service, any compromise of the key material will affect all stored violations.  
 
 ---
 
-### Summary of Architectural Insights  
+### Summary of Requested Items  
 
-| Item | Observation‑Based Insight |
-|------|----------------------------|
-| **Architectural patterns identified** | Layered service architecture; interface‑driven capture contract; concurrency‑safe design (work‑stealing compatible); defense‑in‑depth encryption; event‑driven notification. |
-| **Design decisions and trade‑offs** | Choice of abstracted storage (relational vs. NoSQL) gives flexibility but adds abstraction overhead; encrypt‑before‑store guarantees confidentiality at the cost of added processing; built‑in concurrency control avoids race conditions but may limit raw throughput under extreme contention. |
-| **System structure insights** | **ViolationCaptureService** sits under **ConstraintSystem**, receiving inputs from **ContentValidationAgent** and sharing concurrency mechanisms with **ConcurrencyControlModule**; it complements **GraphDatabaseManager**, which holds constraint definitions. |
-| **Scalability considerations** | Abstract storage enables horizontal scaling (e.g., sharding a NoSQL store).  Concurrency control must be efficient; work‑stealing executor helps distribute load.  Notification fan‑out may become a bottleneck if many violations are generated simultaneously—consider asynchronous queues. |
-| **Maintainability assessment** | Clear interface separation isolates business logic from persistence and encryption details, easing future refactoring.  Centralized encryption and notification logic reduces duplication.  Lack of concrete code symbols in the current view limits deeper static analysis, but the documented responsibilities and interactions suggest a well‑encapsulated module that can evolve independently of its siblings. |
-
-These insights are derived directly from the provided observations and the contextual hierarchy of the **ConstraintSystem** component. No assumptions beyond the stated facts have been introduced.
+1. **Architectural patterns identified** – Event‑driven processing, Strategy (runtime handler registration), Single Responsibility (persistence façade), Decorator‑style encryption, CQRS‑like separation of command and query.  
+2. **Design decisions and trade‑offs** – Decoupling capture from persistence enables flexible storage choices; configurable handlers give extensibility at the cost of runtime lookup overhead; encryption adds security but introduces key‑management complexity.  
+3. **System structure insights** – ViolationCaptureService sits as a leaf sub‑component under ConstraintSystem, interacting with sibling modules via shared contracts (`Violation`) and providing a query surface for analytics (used by StatisticsCalculator).  
+4. **Scalability considerations** – Because capture is event‑driven and persistence is abstracted, the service can scale horizontally by adding more instances behind a load balancer; the encryption step is stateless, allowing parallel processing.  Bottlenecks may appear in the persistence backend, so choosing a scalable store (e.g., a clustered DB) is advisable.  
+5. **Maintainability assessment** – High maintainability: clear separation of concerns, small public API, and isolated persistence.  The configuration mechanism centralizes custom logic, reducing code duplication.  The primary maintenance risk lies in the encryption subsystem and ensuring that key rotation does not disrupt ongoing capture operations.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- Key patterns in the ConstraintSystem component include the use of a graph database for storing and querying constraints, the implementation of a content validation agent for validating code actions, and the use of a violation capture service for capturing and storing violations. The system also employs concurrency control mechanisms, such as work-stealing concurrency, to ensure efficient execution and prevent conflicts.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component utilizes a modular design, with sub-components such as the ContentValidationAgent and the ViolationCaptureService, each responsible for a specific aspect of constraint enforcement. For instance, the ContentValidationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts, uses filePathPatterns and commandPatterns to extract references from entity content, demonstrating a clear separation of concerns. This modular approach allows for easier maintenance and updates, as each sub-component can be modified or extended independently without affecting the overall system.
 
 ### Siblings
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses a graph database like Neo4j to store constraints, allowing for efficient querying and retrieval of constraint data
-- [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses a validation framework like Apache Commons Validator to validate code actions against the defined constraints
-- [ConcurrencyControlModule](./ConcurrencyControlModule.md) -- ConcurrencyControlModule uses a concurrency control mechanism like work-stealing concurrency to manage concurrent access to shared resources
+- [WorkflowLayoutComputer](./WorkflowLayoutComputer.md) -- WorkflowLayoutComputer uses a graph-based data structure in workflow-layout-computer.ts to model workflow dependencies and compute layouts
+- [StatisticsCalculator](./StatisticsCalculator.md) -- StatisticsCalculator uses a data aggregation approach in statistics-calculator.ts to compute statistics from violation history
+- [ContentValidationAgent](./ContentValidationAgent.md) -- ContentValidationAgent uses a rules-based approach in content-validation-agent.ts to validate entity content against predefined constraints
 
 
 ---

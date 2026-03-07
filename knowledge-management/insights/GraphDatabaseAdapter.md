@@ -2,140 +2,162 @@
 
 **Type:** SubComponent
 
-GraphDatabaseConfiguration.yaml defines the graph database configuration, including connection and schema definitions
-
-**GraphDatabaseAdapter – Technical Insight Document**  
-*Sub‑component of **SemanticAnalysis***  
-
----
+GraphDatabaseAdapter uses a modular architecture, with separate modules for node creation, reading, updating, and caching, as seen in the graphdb-adapter.ts file.
 
 ## What It Is  
 
-`GraphDatabaseAdapter` is the concrete persistence layer that the **SemanticAnalysis** component uses to store and retrieve knowledge entities in a graph database. All of its public behaviour lives in a handful of well‑named members that are referenced from configuration and utility modules:
-
-* **`GraphDatabaseAdapter.persistEntity()`** – writes a domain entity into the underlying graph store.  
-* **`GraphDatabaseAdapter.queryEntity()`** – reads an entity back, applying the query semantics required by the semantic‑analysis pipelines.  
-* **`GraphDatabaseConfiguration.yaml`** – the YAML file that declares the connection parameters (host, port, credentials) and the schema artefacts (node/edge types, indexes) required by the adapter.  
-* **`GraphDatabaseAdapterManager.loadAdapter()`** – the bootstrap routine that reads the configuration file, creates an adapter instance, and performs any one‑time initialisation (e.g., schema creation, connection pooling).  
-* **`GraphDatabaseAdapterUtils.getEntity()`** – a helper that hides the low‑level query mechanics and returns a fully‑hydrated domain object to callers.  
-* **`GraphDatabaseAdapterLogger.logDatabase()`** – a dedicated logger that records every persistence or query operation together with any error conditions, providing observability for the whole SemanticAnalysis pipeline.
-
-All of these artefacts sit under the same logical directory (e.g., `src/semantic_analysis/graph_adapter/`) and are wired together through the configuration‑driven manager. The adapter therefore acts as the *single source of truth* for how SemanticAnalysis persists its structured knowledge.
+The **GraphDatabaseAdapter** is a concrete sub‑component that lives in the file **`graphdb-adapter.ts`**.  It is the primary gateway the system uses to persist and retrieve graph‑structured data.  The adapter exposes the classic CRUD surface – `createNode`, `readNode`, `updateNode` and `deleteNode` – each implemented directly in *graphdb‑adapter.ts*.  Supporting concerns such as result‑caching and error handling are delegated to dedicated modules: **`graphdb-cache.ts`** (caching layer) and **`graphdb-logger.ts`** (logging helper).  The adapter is owned by the **ConstraintSystem** component, and is consumed by sibling modules (e.g., **ValidationModule**, **HookManagementSystem**, **ViolationPersistenceModule**) to store validation results, hook configurations, and constraint violations respectively.  Internally it also composes a child component, **GraphNodeCreator**, which encapsulates the low‑level node‑creation logic invoked by the adapter’s `createNode` method.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a **configuration‑driven façade** pattern. `GraphDatabaseAdapter` exposes a small, purpose‑specific façade (`persistEntity`, `queryEntity`) while delegating the heavy lifting to lower‑level utilities and a logger. The façade hides the graph‑database client library (e.g., Memgraph, Neo4j) behind a stable interface, allowing the rest of the system to remain agnostic to the exact database technology.
+### Modular Architecture  
+Observations repeatedly call out a **modular architecture**: the adapter’s responsibilities are split across clearly named files.  The core CRUD operations reside in *graphdb‑adapter.ts*, the caching logic in *graphdb‑cache.ts*, and error logging in *graphdb‑logger.ts*.  This separation of concerns reduces coupling and makes each module independently testable.  
 
-* **Manager‑based initialisation** – `GraphDatabaseAdapterManager.loadAdapter()` follows a *Factory*‑like approach: it reads `GraphDatabaseConfiguration.yaml`, constructs the concrete adapter, and registers it for use by other agents. This keeps configuration concerns separate from business logic and enables easy swapping of connection parameters without code changes.  
+### Adapter / Repository Pattern  
+The component’s name—**GraphDatabaseAdapter**—and its role as the sole interface to the underlying graph store strongly suggest an **Adapter** (or Repository) pattern.  Callers such as **ValidationModule** invoke high‑level methods (`createConstraintValidationResult`, `createHookConfiguration`, etc.) without needing to know the specifics of the graph database API.  The adapter translates those domain‑level intents into concrete node operations (`createNode`, `readNode`, …).  
 
-* **Utility‑centric data access** – `GraphDatabaseAdapterUtils.getEntity()` centralises the query‑building logic. By funneling all retrievals through a single utility, the design enforces a consistent query shape and reduces duplication across agents that need entity data (e.g., InsightGenerator, EntityValidator).  
+### Caching Layer as a Decorator  
+The presence of **`graphdb-cache.ts`** indicates a **caching decorator** around the raw database calls.  The adapter checks the cache before issuing a query, thereby “reduce[ing] redundant database queries.”  This design improves read performance while keeping cache logic isolated from the CRUD implementation.  
 
-* **Dedicated logging** – `GraphDatabaseAdapterLogger.logDatabase()` implements a cross‑cutting concern (observability) via a specialised logger rather than sprinkling generic logging statements throughout the code. This is a classic *Aspect‑oriented* technique, albeit realised manually.  
+### Centralised Error Logging  
+All database‑related errors are funneled through the `logError` function in **`graphdb-logger.ts`**.  By consolidating error handling, the system ensures consistent observability and simplifies debugging across the entire persistence stack.  
 
-Interaction flow (high level):  
-
-1. **Startup** – `GraphDatabaseAdapterManager.loadAdapter()` reads `GraphDatabaseConfiguration.yaml` and creates an adapter instance.  
-2. **Persist** – any downstream agent (e.g., `CodeKnowledgeGraphBuilder`, `EntityValidator`) calls `persistEntity()`. The method writes to the graph, then invokes `logDatabase()` to record the operation.  
-3. **Query** – agents that need existing knowledge (e.g., `InsightGenerator`) call `GraphDatabaseAdapterUtils.getEntity()`, which internally uses `queryEntity()` and again logs via `logDatabase()`.  
-
-Because the parent **SemanticAnalysis** component is a multi‑agent system, this adapter provides a **shared, thread‑safe persistence contract** that all agents can rely on, mirroring the way sibling components such as `Pipeline` and `Ontology` expose their own façade‑style APIs (e.g., `PipelineController`, `OntologyClassifier`).
+### Hierarchical Relationships  
+- **Parent**: *ConstraintSystem* depends on the adapter for persisting validation outcomes, entity refresh data, and hook configurations.  
+- **Siblings**: *ValidationModule*, *HookManagementSystem*, and *ViolationPersistenceModule* all invoke the adapter’s CRUD methods for their respective domain objects, sharing the same underlying persistence contract.  
+- **Child**: *GraphNodeCreator* implements the low‑level `createNode` operation that the adapter delegates to, encapsulating any graph‑specific node‑construction nuances.
 
 ---
 
 ## Implementation Details  
 
-### Core Classes / Functions  
+### Core CRUD API (`graphdb-adapter.ts`)  
+- **`createNode`** – Constructs a new graph node using the **GraphNodeCreator** child component.  The method is invoked by higher‑level domain helpers such as `createConstraintValidationResult`.  
+- **`readNode`** – Retrieves a node by its identifier, first consulting the cache (via **`graphdb-cache.ts`**) and falling back to a direct database query if the entry is missing.  
+- **`updateNode`** – Applies modifications to an existing node, then invalidates or updates the cached entry to keep the cache coherent.  
+- **`deleteNode`** – Removes a node from the graph store and purges any related cache entry.  
 
-| Symbol | Responsibility | Key Mechanics (as inferred) |
-|--------|----------------|-----------------------------|
-| `GraphDatabaseAdapter.persistEntity(entity)` | Serialises a domain entity into the graph. Likely converts the entity into a set of node/edge definitions, opens a transaction, writes, and commits. |
-| `GraphDatabaseAdapter.queryEntity(criteria)` | Constructs a graph query (Cypher or Memgraph‑specific) based on supplied criteria, executes it, and maps the result set back to a domain object. |
-| `GraphDatabaseConfiguration.yaml` | Holds connection strings (`uri`, `username`, `password`) and schema descriptors (`nodeTypes`, `edgeTypes`, `indexes`). The manager parses this file at start‑up. |
-| `GraphDatabaseAdapterManager.loadAdapter()` | Reads the YAML, validates required fields, creates a client instance (e.g., a Memgraph driver), possibly runs schema‑initialisation statements, and returns a ready‑to‑use `GraphDatabaseAdapter`. |
-| `GraphDatabaseAdapterUtils.getEntity(id)` | A thin wrapper that calls `queryEntity({id})`, performs null‑checks, and returns a typed entity object. |
-| `GraphDatabaseAdapterLogger.logDatabase(event, details)` | Formats a log entry (including timestamps, operation type, success/failure) and forwards it to the system logger (likely using a structured logging library). |
+Each of these methods wraps its core logic in a try/catch block that forwards any exception to **`logError`** from *graphdb‑logger.ts*, ensuring that operational failures are captured centrally.
 
-### Configuration‑Driven Bootstrapping  
+### Caching (`graphdb-cache.ts`)  
+The cache module exports functions that the adapter calls before and after database interactions.  Typical flow:
+1. **Read Path** – `readNode` queries the cache (`getFromCache(key)`). If a hit occurs, the node is returned immediately.  
+2. **Write Path** – After `createNode` or `updateNode`, the adapter invokes `storeInCache(key, node)` to keep the cache fresh.  
+3. **Invalidation** – `deleteNode` triggers `removeFromCache(key)` to avoid stale references.
 
-The YAML file is the single source of truth for connection parameters. By externalising these values, the system can be re‑targeted to a different graph instance (e.g., a development Memgraph cluster) without recompiling. The manager likely validates the schema definitions against the actual database at start‑up, ensuring that required indexes exist—this guards against runtime query‑performance regressions.
+The cache is deliberately isolated; no direct database calls appear in this file, preserving a clean separation between storage and performance optimisation.
 
-### Utility Layer  
+### Logging (`graphdb-logger.ts`)  
+The `logError(error: Error, context: string)` helper formats and records database‑related exceptions.  All CRUD methods delegate to this function whenever an operation throws, guaranteeing a uniform error‑reporting format across the component.
 
-`GraphDatabaseAdapterUtils` abstracts repetitive query patterns (e.g., “find entity by UUID”). By centralising this logic, the adapter avoids leaking query syntax into business agents, making future migrations to a different graph query language easier.
-
-### Logging  
-
-All database interactions funnel through `GraphDatabaseAdapterLogger`. This design isolates logging concerns, making it straightforward to enrich logs with correlation IDs (useful for tracing across the multi‑agent pipelines) or to switch to a different logging backend.
+### Child Component – GraphNodeCreator  
+Although the source file for **GraphNodeCreator** is not listed, the observations confirm that the adapter “contains GraphNodeCreator” and that `createNode` leverages it.  This suggests a thin wrapper around the graph driver that knows how to translate a domain payload into the driver‑specific node schema.
 
 ---
 
 ## Integration Points  
 
-1. **Parent – SemanticAnalysis**  
-   *The adapter is the persistence backbone for SemanticAnalysis.* Every agent that produces or consumes knowledge entities (e.g., `CodeKnowledgeGraphBuilder`, `EntityValidator`, `InsightGenerator`) ultimately calls into `persistEntity` or `getEntity`. The parent component’s orchestration logic therefore depends on the adapter being available and correctly initialised by the manager.
+1. **ConstraintSystem (Parent)** – The parent component calls the adapter’s domain‑specific helpers (e.g., `createConstraintValidationResult`) which internally map to the generic CRUD methods.  This relationship makes the graph store the persistence backbone for constraint validation data.  
 
-2. **Sibling Components**  
-   *Shared patterns*: Like `PipelineController` (which reads `pipeline-configuration.yaml`) and `OntologyClassifier` (which reads `ontology-definitions.yaml`), the adapter reads its own YAML (`GraphDatabaseConfiguration.yaml`). This demonstrates a consistent **configuration‑as‑code** approach across the system.  
-   *Potential collaboration*: The `MemgraphAdapter` sibling likely implements a similar façade for a specific graph engine; the existence of both suggests an abstraction layer that could allow swapping implementations (e.g., switching from a generic `GraphDatabaseAdapter` to a specialised `MemgraphAdapter` for performance‑critical paths).
+2. **Sibling Modules** –  
+   - **ValidationModule** uses `createConstraintValidationResult` to persist validation outcomes.  
+   - **HookManagementSystem** calls `createHookConfiguration` for hook metadata.  
+   - **ViolationPersistenceModule** invokes `createConstraintViolation` for violation records.  
+   All three rely on the same adapter instance, ensuring a consistent data model and shared caching behaviour.  
 
-3. **External Services**  
-   While not directly referenced, the adapter’s persistence responsibilities imply downstream consumption by reporting or analytics services that query the graph for insights. The logger also provides hooks for monitoring tools (e.g., Prometheus exporters) that can ingest the structured logs.
+3. **Cache Layer** – External callers are unaware of the cache; they interact solely with the adapter’s public API.  The cache therefore acts as an internal optimisation that does not affect integration contracts.  
 
-4. **Configuration Management**  
-   The YAML file is a touchpoint for DevOps: environment‑specific configuration files can be injected at deployment time, enabling the same codebase to run against a local test graph, a staging cluster, or a production Memgraph instance.
+4. **Logging Infrastructure** – Errors emitted by the adapter flow through `logError`, which may be wired to a broader observability stack (e.g., centralized logging service).  This makes the adapter a first‑class citizen in the system’s monitoring pipeline.  
+
+5. **Graph Database Driver** – Although not directly mentioned, the adapter must depend on a low‑level driver (e.g., Neo4j, JanusGraph).  The driver is abstracted behind **GraphNodeCreator** and the CRUD methods, allowing the rest of the system to remain driver‑agnostic.
 
 ---
 
 ## Usage Guidelines  
 
-* **Initialisation** – Always obtain an adapter instance through `GraphDatabaseAdapterManager.loadAdapter()`. Direct construction bypasses configuration validation and may lead to missing schema elements.  
+- **Prefer the High‑Level Domain Helpers** – Callers should use methods such as `createConstraintValidationResult`, `createHookConfiguration`, or `createConstraintViolation` rather than invoking the generic `createNode` directly.  This preserves the semantic mapping between domain concepts and graph entities.  
 
-* **Entity Lifecycle** – Use `persistEntity()` for any creation or update operation. The method is expected to be idempotent for updates (i.e., it should upsert based on the entity’s unique identifier).  
+- **Do Not Bypass the Cache** – All read operations should go through the adapter’s `readNode`.  Direct driver calls would circumvent the cache and could lead to stale data or unnecessary load on the database.  
 
-* **Querying** – Prefer the utility `GraphDatabaseAdapterUtils.getEntity(id)` for simple look‑ups. For more complex queries, invoke `queryEntity()` directly but keep query construction within the utility layer to maintain consistency.  
+- **Handle Errors Gracefully** – Since every CRUD method logs errors via `logError`, callers can focus on business‑level error handling (e.g., retry policies) without duplicating logging logic.  
 
-* **Error Handling** – All database errors are logged by `GraphDatabaseAdapterLogger.logDatabase()`. Still, callers should catch exceptions thrown by `persistEntity` / `queryEntity` and translate them into domain‑specific errors (e.g., `EntityNotFoundException`).  
+- **Cache Invalidation Awareness** – When performing bulk updates or deletions, ensure that related cache entries are explicitly cleared if the adapter does not automatically cover those paths.  
 
-* **Performance** – Because each call opens a transaction, batch operations should be wrapped in a single transaction when possible (e.g., a bulk import routine in `CodeKnowledgeGraphBuilder`). The configuration file can be tuned with index definitions to accelerate frequent lookup patterns.  
-
-* **Testing** – Tests should supply a lightweight in‑memory graph configuration (or a Dockerised Memgraph instance) and point `GraphDatabaseConfiguration.yaml` to it. This ensures that the manager loads the adapter correctly and that the logger captures expected events.  
-
-* **Extensibility** – If a new graph engine is required, implement a new subclass that respects the same façade (`persistEntity`, `queryEntity`) and register it in `GraphDatabaseAdapterManager`. Because the rest of SemanticAnalysis interacts only through the façade, the change is isolated.
+- **Testing Strategy** – Unit tests should mock the cache and logger modules to verify that the adapter correctly delegates to them.  Integration tests can target the full stack (adapter → driver) to confirm that node creation, retrieval, and deletion behave as expected.
 
 ---
 
-### Summary of Architectural Findings  
+## Architectural Patterns Identified  
 
-| Aspect | Observation‑Based Insight |
-|--------|---------------------------|
-| **Pattern(s)** | Configuration‑driven façade, Factory/Manager for creation, Utility‑centric data access, Dedicated logging (cross‑cutting concern). |
-| **Design Decisions** | Separate configuration (`.yaml`) from code; centralise query logic in utils; expose minimal public API; use a manager to enforce one‑time initialisation. |
-| **Trade‑offs** | Simplicity and low coupling at the cost of a thin abstraction layer (no explicit repository interface). Centralised utils can become a bottleneck if not designed for concurrency. |
-| **System Structure** | Adapter lives under `SemanticAnalysis`, providing persistence for all sibling agents; shares a configuration‑as‑code philosophy with `Pipeline` and `Ontology`. |
-| **Scalability** | Scalability hinges on the underlying graph engine and proper indexing defined in `GraphDatabaseConfiguration.yaml`. The manager can be extended to pool connections, supporting high‑throughput pipelines. |
-| **Maintainability** | High – clear separation of concerns, single point of configuration, and uniform logging make future changes (e.g., schema evolution, engine swap) straightforward. The only risk is the “utility‑only” query layer becoming monolithic; periodic refactoring into more granular query objects may be needed. |
+| Pattern | Evidence |
+|---------|----------|
+| **Adapter / Repository** | The component is named *GraphDatabaseAdapter* and provides a unified CRUD façade over a graph DB. |
+| **Modular Separation** | Distinct files for CRUD (`graphdb-adapter.ts`), caching (`graphdb-cache.ts`), and logging (`graphdb-logger.ts`). |
+| **Caching Decorator** | `graphdb-cache.ts` is consulted before DB queries to “reduce redundant database queries.” |
+| **Centralised Logging** | All errors routed through `logError` in `graphdb-logger.ts`. |
+| **Composition (Child Component)** | Adapter *contains* **GraphNodeCreator**, which implements the low‑level `createNode`. |
 
-The **GraphDatabaseAdapter** thus embodies a clean, configuration‑driven persistence contract that enables the multi‑agent **SemanticAnalysis** system to store and retrieve rich knowledge graphs reliably, while remaining flexible enough to evolve with the rest of the platform’s modular architecture.
+---
+
+## Design Decisions and Trade‑offs  
+
+1. **Separation of Concerns vs. Call‑Stack Overhead** – By extracting caching and logging into separate modules, the design gains testability and maintainability, but each CRUD call now traverses additional function layers, introducing minimal runtime overhead.  
+
+2. **Cache‑First Read Strategy** – Prioritising cache hits dramatically reduces read latency and DB load, yet it imposes the responsibility of cache coherence (e.g., invalidation on updates/deletes).  
+
+3. **Single Adapter Instance for Multiple Domains** – Sharing one adapter across ValidationModule, HookManagementSystem, and ViolationPersistenceModule simplifies configuration and ensures consistent data handling, but it also creates a single point of contention if the adapter becomes a bottleneck under heavy load.  
+
+4. **Error Logging Centralisation** – Consolidating error handling in `logError` guarantees uniform observability, but it means that callers cannot customise logging granularity without extending the logger.  
+
+5. **Explicit Child Component (GraphNodeCreator)** – Delegating node creation to a dedicated child isolates graph‑driver specifics, enabling potential driver swaps, at the cost of an extra indirection layer.
+
+---
+
+## System Structure Insights  
+
+- **Hierarchical Placement** – The adapter sits one level below **ConstraintSystem** and serves as a shared persistence service for several sibling modules, forming a hub‑spoke pattern within the constraint‑validation slice of the system.  
+
+- **Module Boundaries** – The three‑file boundary (`graphdb-adapter.ts`, `graphdb-cache.ts`, `graphdb-logger.ts`) defines clear vertical slices: business‑logic façade, performance optimisation, and operational visibility.  
+
+- **Dependency Flow** – Callers → Adapter (CRUD) → Cache (optional) → GraphNodeCreator → Graph DB driver.  Errors bubble back through `logError`.  
+
+- **Extensibility Point** – New domain entities (e.g., additional constraint‑related artefacts) can be added by extending the adapter with new high‑level helper methods that reuse the existing CRUD primitives.
+
+---
+
+## Scalability Considerations  
+
+- **Read‑Heavy Workloads** – The caching layer is explicitly designed to “reduce redundant database queries,” making the adapter well‑suited for scenarios with frequent node reads.  
+
+- **Write Contention** – Since updates and deletions must also manage cache invalidation, high write throughput could increase the synchronization burden between cache and DB.  Scaling write paths may require sharding the underlying graph store or introducing write‑through cache strategies.  
+
+- **Horizontal Scaling of the Adapter** – Because the adapter is stateless aside from its reliance on the external cache, multiple instances can be deployed behind a load balancer without coordination, provided the cache itself is a shared, thread‑safe store (e.g., Redis).  
+
+- **Potential Bottleneck** – All sibling modules funnel through the same adapter instance; if a single instance becomes saturated, scaling out the adapter service will mitigate the risk.
+
+---
+
+## Maintainability Assessment  
+
+The clear modularisation and explicit naming (e.g., `createNode`, `graphdb-cache.ts`) make the codebase approachable for new developers.  The separation of caching and logging concerns reduces the cognitive load when modifying CRUD logic.  However, the reliance on an internal child component (**GraphNodeCreator**) means that any change to the underlying graph driver may require updates in both the creator and the adapter, slightly increasing the maintenance surface.  Overall, the design favours **high maintainability** due to its single‑responsibility modules, centralized error handling, and straightforward CRUD interface.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component utilizes a GraphDatabaseAdapter for persistence, which is a crucial aspect of its architecture. This adapter is responsible for storing and retrieving constraint validation results, entity refresh results, and hook configurations. The GraphDatabaseAdapter is implemented in the graphdb-adapter.ts file, which provides methods for creating, reading, updating, and deleting data in the graph database. For instance, the createConstraintValidationResult method in this file creates a new node in the graph database to store the result of a constraint validation. The use of a graph database allows for efficient querying and retrieval of complex relationships between entities, which is essential for the ConstraintSystem component.
+
+### Children
+- [GraphNodeCreator](./GraphNodeCreator.md) -- The createNode method is used to create a new node in the graph database, as seen in the context of the GraphDatabaseAdapter sub-component.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
-- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a pattern-based approach to generate insights from knowledge entities
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
-- [EntityValidator](./EntityValidator.md) -- EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
-- [LLMFacade](./LLMFacade.md) -- LLMFacade.getLLMModel() retrieves the LLM model instance based on configuration and provider
-- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
-- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
+- [ValidationModule](./ValidationModule.md) -- ValidationModule uses the createConstraintValidationResult method in graphdb-adapter.ts to store validation results in the graph database.
+- [HookManagementSystem](./HookManagementSystem.md) -- HookManagementSystem uses the createHookConfiguration method in graphdb-adapter.ts to store hook configurations in the graph database.
+- [ViolationPersistenceModule](./ViolationPersistenceModule.md) -- ViolationPersistenceModule uses the createConstraintViolation method in graphdb-adapter.ts to store constraint violations in the graph database.
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*

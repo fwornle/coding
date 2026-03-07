@@ -2,81 +2,87 @@
 
 **Type:** Detail
 
-To handle different types of errors, the ErrorHandler might use a strategy pattern, with various error handling strategies defined in separate classes, such as ConnectionErrorStrategy or TimeoutErrorS...
+The error handling module's implementation details are not available, but its import suggests a deliberate design decision to separate error handling concerns
 
 ## What It Is  
 
-The **ErrorHandler** lives in its own dedicated module – `error‑handler.ts`.  By isolating the error‑handling logic in a single file the codebase keeps a clean separation of concerns and makes the component reusable across the system.  The class is instantiated and owned by the **ErrorHandlingMechanism** component (the parent), which in turn is used by higher‑level modules such as **SpecstoryConnector**.  Within the hierarchy, **ErrorHandler** sits beside its siblings **RetryManager** and **ErrorLoggingMechanism**, each of which focuses on a complementary aspect of resilience.  The primary responsibility of **ErrorHandler** is to receive an error object, decide which concrete handling strategy applies, and delegate the work to that strategy while funneling diagnostic information into the central logging facility.
-
-## Architecture and Design  
-
-The design of **ErrorHandler** follows a classic **Strategy pattern**.  The observations explicitly mention “various error handling strategies defined in separate classes, such as `ConnectionErrorStrategy` or `TimeoutErrorStrategy`.”  Each strategy implements a common interface (implicitly defined, e.g., `IErrorStrategy`) that encapsulates the algorithm for dealing with a particular error type.  The **ErrorHandler** holds a registry or map of error‑type identifiers to strategy instances and selects the appropriate one at runtime.  This approach gives the system open‑closed extensibility: new error categories can be added by creating a new strategy class without touching the core **ErrorHandler** logic.
-
-Modularity is reinforced by the placement of **ErrorHandler** in `error‑handler.ts` and its reliance on a separate logging component (`logger.ts`).  The logger is injected or referenced by the handler, ensuring that every strategy can emit structured log entries without each strategy re‑implementing logging concerns.  The sibling **ErrorLoggingMechanism** also uses a logging library (`log4js.ts`), illustrating a shared logging contract across the error‑handling slice of the architecture.  **RetryManager**, the other sibling, brings its own policy abstraction (`retry‑policy.ts`) to manage retry semantics, but both siblings converge on the same parent **ErrorHandlingMechanism**, which orchestrates the overall resilience workflow.
-
-## Implementation Details  
-
-At the heart of `error‑handler.ts` sits the `ErrorHandler` class.  Its constructor typically receives two dependencies: a `Logger` instance from `logger.ts` and a collection of strategy objects (`ConnectionErrorStrategy`, `TimeoutErrorStrategy`, …).  The class exposes a public method such as `handle(error: Error): void`.  Inside this method the handler:
-
-1. **Classifies** the incoming error – often by inspecting error codes, names, or custom properties.
-2. **Selects** the matching strategy from its internal registry (`Map<string, IErrorStrategy>`).
-3. **Delegates** the handling by invoking `strategy.process(error)`.
-4. **Logs** the outcome using the injected `Logger`, ensuring a consistent audit trail.
-
-Each concrete strategy (`ConnectionErrorStrategy`, `TimeoutErrorStrategy`) implements the `process` method, encapsulating logic such as resource cleanup, circuit‑breaker activation, or user‑notification triggers.  Because the strategies are isolated classes, they can be unit‑tested in isolation and swapped out at configuration time (e.g., via a DI container or a simple factory).  The `Logger` class in `logger.ts` likely provides methods like `error(message: string, meta?: any)` that **ErrorHandler** calls before and after strategy execution, guaranteeing that both the raw exception and the handling decision are recorded.
-
-## Integration Points  
-
-**ErrorHandler** is tightly coupled to three external concerns:
-
-* **Logging** – Through the `Logger` class (`logger.ts`).  All error messages, stack traces, and strategy results flow through this logger, which may itself be configured by the **ErrorLoggingMechanism** sibling that uses `log4js.ts` for formatting and persistence.
-* **ErrorHandlingMechanism** – The parent component aggregates **ErrorHandler** together with **RetryManager** and **ErrorLoggingMechanism**.  It may invoke `ErrorHandler.handle` as part of a larger error‑processing pipeline, possibly after a retry attempt fails.
-* **SpecstoryConnector** – As a consumer, the connector catches low‑level exceptions from external services and forwards them to the **ErrorHandler**.  This creates a clear contract: the connector does not need to know the specifics of each error type; it simply delegates to the handler.
-
-The sibling **RetryManager** interacts indirectly; for example, after a retry policy exhausts its attempts, it may call `ErrorHandler.handle` to perform final cleanup.  Conversely, a strategy like `ConnectionErrorStrategy` could decide to trigger a retry by invoking a method on **RetryManager**, illustrating a bidirectional collaboration mediated by the parent **ErrorHandlingMechanism**.
-
-## Usage Guidelines  
-
-Developers should treat **ErrorHandler** as the single entry point for all domain‑level error processing.  When adding a new error type, create a new strategy class (e.g., `AuthenticationErrorStrategy`) that implements the shared strategy interface and register it with the handler’s strategy map—do not modify the `handle` method itself.  Always pass a fully‑configured `Logger` instance to the handler; this ensures that log output remains consistent with the system‑wide logging configuration managed by **ErrorLoggingMechanism**.
-
-When integrating with **SpecstoryConnector** or any other consumer, wrap external calls in try/catch blocks and forward caught exceptions to `errorHandler.handle(error)`.  Avoid swallowing errors or logging them directly in the consumer; let the central handler decide the appropriate response and logging level.  For testing, mock the `Logger` and individual strategies to verify that the handler correctly routes errors and records logs without performing real I/O.
+`ErrorHandler` lives in the dedicated source file **`lib/error-handler.js`**.  It is not defined inline within the consuming component; instead it is imported as a separate module wherever error‑handling capabilities are required.  Within the current codebase the only observable consumer of this module is the **`ErrorManager`** component, which treats `ErrorHandler` as a child sub‑component that “contains” the error‑handling logic.  The explicit import statement signals a clear architectural intent: error‑handling concerns are isolated from the rest of the application logic and are encapsulated behind a single, reusable module.
 
 ---
 
-### 1. Architectural patterns identified
-* **Strategy pattern** – concrete error‑handling strategies (`ConnectionErrorStrategy`, `TimeoutErrorStrategy`) encapsulate variant behavior.
-* **Modular separation** – distinct modules (`error‑handler.ts`, `logger.ts`, `retry‑policy.ts`, `log4js.ts`) keep concerns isolated.
-* **Dependency injection / composition** – `ErrorHandler` receives `Logger` and strategy instances rather than instantiating them internally.
+## Architecture and Design  
 
-### 2. Design decisions and trade‑offs
-* **Separate module for reusability** – promotes reuse across connectors but adds an extra import layer.
-* **Strategy registry** – enables extensibility without modifying core logic; however, it introduces runtime lookup overhead and requires careful maintenance of the registry.
-* **Central logging via Logger** – guarantees consistent diagnostics; the trade‑off is a tighter coupling to the logging subsystem, mitigated by using an interface.
+The observations reveal a **modular separation of concerns** pattern.  By placing the error‑handling code in `lib/error-handler.js` and importing it where needed, the system enforces a *single‑responsibility* boundary: `ErrorHandler` is responsible only for catching, formatting, and possibly logging errors, while `ErrorManager` orchestrates when and how that functionality is invoked.  This design mirrors a lightweight *facade* relationship—`ErrorManager` acts as the façade that exposes a higher‑level API to the rest of the system, delegating the low‑level mechanics to the `ErrorHandler` module.
 
-### 3. System structure insights
-* **Parent‑child relationship** – `ErrorHandlingMechanism` aggregates **ErrorHandler**, **RetryManager**, and **ErrorLoggingMechanism**, forming a cohesive resilience layer.
-* **Sibling collaboration** – **RetryManager** (using `retry‑policy.ts`) and **ErrorLoggingMechanism** (using `log4js.ts`) share the same parent and coordinate through it, ensuring that retries, logging, and error handling are orchestrated consistently.
-* **Consumer linkage** – `SpecstoryConnector` contains **ErrorHandler**, indicating that external service adapters delegate all error work to this centralized component.
+Interaction between the two components is straightforward: `ErrorManager` imports the module (`import ErrorHandler from 'lib/error-handler.js'` or a CommonJS equivalent) and then calls its exported functions or methods whenever an exception needs to be processed.  No additional indirection layers are evident, suggesting a **direct dependency** model rather than a more complex event‑driven or service‑oriented approach.  Because the implementation details of `ErrorHandler` are hidden behind its public interface, `ErrorManager` can remain agnostic about the internal mechanics, which supports future replacement or extension of the error‑handling strategy without touching the manager’s code.
 
-### 4. Scalability considerations
-* Adding new error categories scales linearly: each new strategy is a self‑contained class, leaving the core handler untouched.
-* The strategy map can be populated from configuration files or a DI container, allowing the system to adapt to a growing set of error types without code changes.
-* Logging volume may increase with more granular strategies; configuring log rotation in `log4js.ts` becomes essential for high‑throughput environments.
+---
 
-### 5. Maintainability assessment
-* **High maintainability** – clear separation of concerns, explicit interfaces, and the open‑closed nature of the strategy pattern simplify updates and testing.
-* **Potential risk** – the registry of strategies must be kept in sync with the error classification logic; a centralized test suite covering registration and handling paths mitigates this risk.
-* Documentation and naming consistency (e.g., `ConnectionErrorStrategy`) aid discoverability, while the modular file layout (`error‑handler.ts`, `logger.ts`) makes the codebase approachable for new developers.
+## Implementation Details  
+
+The only concrete artifact we have is the import path **`lib/error-handler.js`**.  While the internal code is not disclosed, the naming convention (`ErrorHandler`) and its placement in a `lib/` folder imply a utility‑style module that likely exports one or more functions such as `handle(error)`, `log(error)`, or `format(error)`.  `ErrorManager`—the parent component—presumably instantiates or references this module at construction time, storing the reference in a private field (e.g., `this.errorHandler = new ErrorHandler()` or `const errorHandler = require('lib/error-handler')`).  When an operational failure occurs, `ErrorManager` forwards the error object to the handler:  
+
+```js
+try {
+   // business logic
+} catch (err) {
+   this.errorHandler.handle(err);
+}
+```
+
+Because the module is imported rather than inlined, the system can benefit from Node’s module caching: the `ErrorHandler` code is evaluated once and then reused across all `ErrorManager` instances, reducing memory overhead.  The separation also enables isolated unit testing of `ErrorHandler` by mocking its public API and verifying that `ErrorManager` correctly delegates error processing.
+
+---
+
+## Integration Points  
+
+`ErrorHandler` integrates primarily with its **parent**, `ErrorManager`.  The import statement in `ErrorManager` constitutes the sole explicit dependency, establishing a compile‑time contract: any change to the exported interface of `lib/error-handler.js` will immediately surface as a build‑time error in `ErrorManager`.  No sibling components are mentioned, but any other module that requires consistent error processing could also import `lib/error-handler.js`, reusing the same logic and ensuring uniform error semantics across the codebase.
+
+From a broader system perspective, `ErrorHandler` may internally depend on lower‑level utilities such as a logging library, configuration providers, or external monitoring services.  Although those dependencies are not listed in the observations, the modular placement in `lib/` suggests that they are encapsulated within the error‑handler module, keeping the integration surface with `ErrorManager` minimal and well‑defined.
+
+---
+
+## Usage Guidelines  
+
+1. **Import Directly from `lib/error-handler.js`** – All consumers, including `ErrorManager`, should import the module using the canonical path to guarantee they receive the same instance and behavior.  
+2. **Treat as a Black Box** – Call only the documented public functions (e.g., `handle`, `log`).  Avoid reaching into internal helpers, as those may change without notice.  
+3. **Do Not Duplicate Logic** – Centralize any new error‑processing rules within `ErrorHandler`.  If a new error scenario arises, extend the module rather than adding ad‑hoc handling code in `ErrorManager` or elsewhere.  
+4. **Unit Test Independently** – Because `ErrorHandler` is a standalone module, write focused unit tests that validate its response to various error objects.  When testing `ErrorManager`, mock the handler to assert proper delegation.  
+5. **Maintain Consistent Error Contracts** – Ensure that the shape of error objects passed to `ErrorHandler` matches the expectations defined in its API (e.g., presence of `message`, `stack`, custom codes).  This prevents runtime mismatches and preserves the reliability of the error‑handling pipeline.
+
+---
+
+### Architectural Patterns Identified  
+
+- **Modular Separation of Concerns** – Error handling is isolated in its own module (`lib/error-handler.js`).  
+- **Facade (via ErrorManager)** – `ErrorManager` provides a higher‑level interface while delegating the core work to `ErrorHandler`.  
+- **Direct Dependency** – `ErrorManager` imports `ErrorHandler` directly, establishing a compile‑time contract.
+
+### Design Decisions and Trade‑offs  
+
+- **Decision:** Locate error‑handling code in a dedicated library file.  
+  **Trade‑off:** Improves reuse and testability but introduces an extra import indirection that developers must remember.  
+- **Decision:** Let `ErrorManager` own the handler instance.  
+  **Trade‑off:** Simplifies usage within the manager but couples the manager’s lifecycle to the handler’s implementation; swapping the handler requires changes only in the manager’s import.  
+
+### System Structure Insights  
+
+- The system follows a **hierarchical component model**: `ErrorManager` (parent) → `ErrorHandler` (child).  
+- No sibling components are described, but the architecture readily supports additional utilities under the same `lib/` namespace, encouraging a clean, flat module layout.  
+
+### Scalability Considerations  
+
+Because `ErrorHandler` is a single module, scaling its capabilities (e.g., adding asynchronous logging, integrating with distributed tracing) can be done centrally without touching each consumer.  The module’s isolation also means that scaling the rest of the application (e.g., spawning more `ErrorManager` instances) does not increase the memory footprint of the error‑handling logic beyond Node’s module cache.  
+
+### Maintainability Assessment  
+
+The clear separation between `ErrorManager` and `ErrorHandler` enhances maintainability: developers can modify error‑handling policies in one place, and all dependent components automatically benefit.  The explicit import path serves as documentation of the dependency, reducing hidden coupling.  However, the lack of visible implementation details means that any future changes to the handler’s API must be communicated clearly to avoid breaking the parent component.  Overall, the design promotes a maintainable codebase provided that the module’s public contract is kept stable and well‑documented.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- ErrorHandlingMechanism implements error handling mechanisms to handle connection errors and exceptions, ensuring the system remains stable and functional.
-
-### Siblings
-- [RetryManager](./RetryManager.md) -- The RetryManager would likely use a retry policy, such as the RetryPolicy interface in retry-policy.ts, to define the retry strategy and configure the number of attempts and wait time.
-- [ErrorLoggingMechanism](./ErrorLoggingMechanism.md) -- The ErrorLoggingMechanism would likely use a logging library, such as log4js in log4js.ts, to configure the logging level, format, and storage.
+- [ErrorManager](./ErrorManager.md) -- ErrorManager utilizes a error handling module (lib/error-handler.js) to catch and handle errors
 
 
 ---

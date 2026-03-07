@@ -2,117 +2,127 @@
 
 **Type:** SubComponent
 
-SpecstoryConnector uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension via multiple methods, including HTTP, IPC, and file watch.
+SpecstoryConnector uses the SpecstoryAdapter class (lib/integrations/specstory-adapter.js) to provide methods such as connectViaHTTP, connectViaIPC, and connectViaFileWatch for establishing connections
 
 ## What It Is  
 
-The **SpecstoryConnector** is a sub‑component that lives inside the **Trajectory** component and is responsible for establishing and managing communication with the external **Specstory** extension. All of the concrete wiring to the extension is performed through the **SpecstoryAdapter** class located at `lib/integrations/specstory-adapter.js`. The connector can reach the extension by three different transport mechanisms – HTTP, inter‑process communication (IPC), and a file‑watch based channel – and it does so asynchronously so that multiple requests can be processed in parallel. In addition to connection handling, the connector logs every attempt, captures any errors, and cooperates with the sibling **ConversationLogger** to push conversation entries into Specstory. Its internal structure is broken out into three child objects: **ConnectionManager**, **ErrorHandler**, and **SpecstoryConnectorAdapter**, each of which encapsulates a distinct responsibility of the overall lifecycle (establishment, maintenance, termination).
+**SpecstoryConnector** is a sub‑component that lives inside the **Trajectory** component and is responsible for establishing and maintaining a link to the external *Specstory* extension. All of its core logic resides in the **SpecstoryAdapter** class located at `lib/integrations/specstory-adapter.js`. The adapter exposes three concrete connection entry points – `connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch` – each targeting a different integration scenario (HTTP ports, Node IPC channels, or file‑system watching). A configuration object defined around line 50 of the same file holds the connection settings (ports, IPC channel names, file paths, retry policies, etc.). The connector also collaborates with the **ErrorManager** module to surface disconnection and runtime errors, and it leverages the **ConnectionMonitor** sibling to detect lost links and trigger reconnection attempts.
 
 ---
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is a **layered, responsibility‑segregated design**. At the outermost layer, **SpecstoryConnector** presents a unified façade to the rest of the system (e.g., to **Trajectory**, **ConversationLogger**, **ProjectMilestoneManager**, and **GSDWorkflowManager**). Inside, the **SpecstoryConnectorAdapter** acts as an *adapter* around the third‑party **SpecstoryAdapter** (the concrete class in `lib/integrations/specstory-adapter.js`). This adapter abstracts away the details of the three possible transport methods, giving the connector a single, stable interface for “connect”, “send”, and “disconnect” operations.
+The design of **SpecstoryConnector** follows a **factory‑style abstraction**. The `SpecstoryAdapter` class implements a factory pattern that decides, based on the supplied configuration, which concrete connector instance to create – HTTP, IPC, or file‑watch. This decision point centralises the creation logic and shields the rest of the system from the details of each transport.  
 
-Below the adapter, the **ConnectionManager** owns the logic that selects and invokes the appropriate transport (HTTP, IPC, or file watch). Although the source does not name a formal “Strategy” pattern, the presence of multiple interchangeable connection methods and the manager’s role in delegating to the correct one is effectively a strategy‑like arrangement.  
+Within the broader **Trajectory** hierarchy, the connector is a child of the parent component and works alongside sibling services such as **ConversationLogger**, **ErrorManager**, and **ConnectionMonitor**. The sibling relationship is functional: while **ConversationLogger** records the exchange of messages, **ErrorManager** provides a unified error‑handling façade, and **ConnectionMonitor** supplies a heartbeat that the connector subscribes to for detecting disconnections.  
 
-Error handling is centralized in the **ErrorHandler**, which is tightly coupled with the **ConnectionManager**. Whenever the manager encounters a failure – be it a network timeout on an HTTP request, a broken IPC pipe, or a missing file for the watch‑based channel – the error is propagated to the **ErrorHandler**. This component records the failure via the connector’s logging facilities and ensures that the system remains stable, preventing uncaught exceptions from bubbling up to the parent **Trajectory** component.
+The adapter’s three `connectVia*` methods each encapsulate a distinct integration technique:
 
-The design emphasizes **asynchronous, non‑blocking operations**. By using async calls for all three transport mechanisms, the connector can handle concurrent requests without stalling the main event loop, which is crucial for a planning system like **Trajectory** that may need to log many conversation entries in rapid succession.
+* **HTTP** – uses standard Node HTTP client calls on the “common extension ports” (see `connectViaHTTP` at `lib/integrations/specstory-adapter.js:123`).  
+* **IPC** – employs the built‑in `node:ipc` module to open a bidirectional channel with the Specstory process.  
+* **FileWatch** – monitors a designated file for changes, allowing a loosely coupled “drop‑file” style handshake.
+
+Error handling is delegated to **ErrorManager**, ensuring that any exception raised inside a connection method is captured, logged, and transformed into a consistent error object for the rest of the system. The reconnection capability is built into the connector: after a disconnection event (detected by **ConnectionMonitor**), the connector re‑invokes the appropriate factory method to re‑establish the link.
 
 ---
 
 ## Implementation Details  
 
-1. **SpecstoryAdapter (`lib/integrations/specstory-adapter.js`)** – This is the low‑level integration point with the Specstory extension. It implements three concrete connection methods:
-   * **HTTP** – likely a REST client that posts payloads to a Specstory endpoint.  
-   * **IPC** – a socket or message‑bus interface used when the extension runs in the same host process.  
-   * **File watch** – a directory or file monitor that writes data to a location the extension reads from.
+### Core Class – `SpecstoryAdapter` (`lib/integrations/specstory-adapter.js`)  
+* **Configuration Object (≈ line 50)** – stores keys such as `method` (`'http' | 'ipc' | 'fileWatch'`), `port`, `ipcChannel`, `watchPath`, and retry policies. The object is read by the factory logic to decide which `connectVia*` routine to execute.  
 
-2. **SpecstoryConnectorAdapter** – Wraps the **SpecstoryAdapter**, exposing a clean API such as `connect()`, `send(entry)`, and `disconnect()`. By encapsulating the adapter, any future change to the underlying library (e.g., a new version of Specstory) can be isolated to this layer without rippling through the rest of the code base.
+* **Factory Logic** – the constructor or a static `create()` method examines the `method` field and returns an instance that has the appropriate `connect` function bound. This isolates the transport‑specific code from callers.  
 
-3. **ConnectionManager** – Consumes the adapter and decides which transport to use based on runtime environment detection (e.g., “if IPC endpoint is reachable, use IPC; otherwise fall back to HTTP”). It also maintains connection state (open, reconnecting, closed) and orchestrates graceful termination when the connector is shut down.
+* **`connectViaHTTP` (line 123)** – builds an HTTP request targeting the Specstory extension’s listening port. It sets up listeners for `response`, `error`, and `close` events, forwarding any network‑level failures to **ErrorManager**.  
 
-4. **ErrorHandler** – Subscribes to events emitted by the **ConnectionManager** (such as `error`, `timeout`, `disconnect`). It logs detailed diagnostics (including stack traces and connection parameters) and may trigger retry logic or fallback to an alternative transport, ensuring that transient failures do not halt the logging pipeline.
+* **`connectViaIPC`** – creates an IPC socket via `node:ipc`, registers `message`, `error`, and `disconnect` callbacks, and pipes incoming Specstory messages into the Trajectory pipeline.  
 
-5. **Logging Mechanism** – Throughout the connector, each attempt to establish a connection, send data, or close a channel is recorded. This logging is shared with the sibling **ConversationLogger**, which relies on the same **SpecstoryAdapter** to push conversation entries. The logs thus serve both debugging (identifying why a particular entry failed) and operational monitoring (tracking overall health of the Specstory integration).
+* **`connectViaFileWatch`** – leverages `fs.watch` (or a higher‑level wrapper) to watch a predefined file. When the file changes, the adapter reads the payload and treats it as a message from Specstory.  
 
-6. **Lifecycle Management** – The connector’s public API likely includes `initialize()`, `shutdown()`, and possibly `reset()`. These methods orchestrate the start‑up sequence (instantiate the adapter, select transport, open the channel), runtime operation (asynchronous send calls), and teardown (cleanly close sockets, stop file watchers, release HTTP resources).
+* **Reconnection Logic** – after a disconnection is reported (either by an error event or by **ConnectionMonitor**’s heartbeat timeout), the adapter invokes its own factory method again, preserving the original configuration so that the same transport is re‑used unless the configuration is altered.  
+
+### Supporting Modules  
+* **ErrorManager** (`lib/error-handler.js`) – provides `handle(error, context)` which the adapter calls whenever a transport throws. This centralises logging, error classification, and potential user notifications.  
+* **ConnectionMonitor** (`lib/heartbeat.js`) – emits a `heartbeatLost` event that **SpecstoryConnector** subscribes to; the event triggers the reconnection flow.  
+
+### Child Component – `SpecstoryAdapterFactory`  
+Although not a separate file, the factory responsibilities are encapsulated within the `SpecstoryAdapter` class itself, and the hierarchy notes this as a child component. It isolates the instantiation details from the parent **Trajectory**, allowing Trajectory to request a connector without caring about the underlying transport.
 
 ---
 
 ## Integration Points  
 
-* **Parent – Trajectory**: The **Trajectory** component contains the **SpecstoryConnector** and depends on it for persisting conversation logs, milestone updates, and workflow events to Specstory. Trajectory’s own initialization routine will invoke the connector’s `initialize()` method, and its shutdown sequence will call `shutdown()`.  
+1. **Parent – Trajectory** – Trajectory owns an instance of **SpecstoryConnector** and calls into its public API (e.g., `initialize()` or `connect()`). Trajectory passes the configuration object that lives in `lib/integrations/specstory-adapter.js`.  
 
-* **Siblings**:  
-  * **ConversationLogger** – Directly consumes the same **SpecstoryAdapter** to log conversation entries. Because both components share the adapter, they benefit from a consistent connection configuration and error handling.  
-  * **ErrorHandlingMechanism** – Provides a system‑wide policy for error propagation; the **SpecstoryConnector**’s **ErrorHandler** aligns with this policy, ensuring that connection‑related exceptions are treated uniformly across the application.  
-  * **ProjectMilestoneManager** and **GSDWorkflowManager** – Both use the **SpecstoryAdapter** to push milestone and workflow data. They rely on the connector’s flexible transport selection to operate in environments where, for instance, IPC may be unavailable but HTTP remains reachable.
+2. **Sibling – ErrorManager** – All connection‑related exceptions flow through `ErrorManager.handle()`. This ensures a consistent error reporting surface across the system, including the other siblings such as **ConversationLogger**.  
 
-* **Children** – The three internal objects (ConnectionManager, ErrorHandler, SpecstoryConnectorAdapter) are not exposed outside the connector; they interact only through the connector’s façade. This encapsulation limits the surface area for external code and makes the connector replaceable as a whole if a different integration strategy is needed.
+3. **Sibling – ConnectionMonitor** – The monitor’s heartbeat signals are consumed by the connector to detect silent disconnections. The monitor itself may be configured by Trajectory to adjust timeout thresholds.  
 
-* **External Dependency** – The only external library reference is the **Specstory** extension itself, accessed via the three transport methods. No other third‑party modules are mentioned, indicating a relatively low dependency footprint.
+4. **Sibling – ConversationLogger** – While not directly invoked by the connector, any messages received via the chosen transport are typically logged by **ConversationLogger** for audit and debugging purposes.  
+
+5. **External – Specstory Extension** – The ultimate endpoint of the connection. Depending on the chosen method, the connector either opens an HTTP client to the extension’s port, creates an IPC channel, or watches a file that the extension updates.  
+
+All interactions are mediated through well‑defined JavaScript objects and event emitters, keeping the coupling loose and the contracts explicit.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Initialize Early** – Call the connector’s `initialize()` method as part of the **Trajectory** startup sequence. This ensures that the appropriate transport (HTTP, IPC, or file watch) is selected before any logging or milestone updates occur.  
+* **Select the appropriate transport** – When configuring **SpecstoryConnector**, set the `method` field to `'http'`, `'ipc'`, or `'fileWatch'` based on the deployment environment. HTTP is preferred for network‑visible setups; IPC offers the lowest latency when both processes run on the same host; file‑watch is a fallback for environments where direct sockets are prohibited.  
 
-2. **Prefer Asynchronous Calls** – All interaction with the connector should be performed with `await` or promise‑based syntax. Synchronous wrappers are not provided and would block the event loop, defeating the design’s concurrency goals.  
+* **Provide complete configuration** – Ensure that the configuration object includes all required keys for the chosen method (e.g., `port` for HTTP, `ipcChannel` for IPC, `watchPath` for file watch). Missing fields will cause the factory to throw an error that will be caught by **ErrorManager**.  
 
-3. **Handle Returned Errors** – Although the internal **ErrorHandler** logs and contains most failures, the public API may still reject promises on fatal errors (e.g., inability to open any transport). Callers should implement `try/catch` or `.catch()` to surface these conditions to higher‑level recovery logic.  
+* **Handle errors centrally** – Do not wrap the connector’s calls in ad‑hoc `try/catch` blocks; instead rely on **ErrorManager** to surface errors. Subscribe to the connector’s `error` events if you need to react locally, but always forward the error to the manager.  
 
-4. **Do Not Bypass the Adapter** – Directly importing `lib/integrations/specstory-adapter.js` from other components is discouraged. All external code should go through **SpecstoryConnector** (or its sibling **ConversationLogger**) to keep connection selection and error handling centralized.  
+* **Respect reconnection semantics** – The connector automatically attempts to reconnect after a disconnection. If custom back‑off logic is required, adjust the retry settings in the configuration object; avoid manually calling `connectVia*` after a failure, as that bypasses the built‑in state machine.  
 
-5. **Graceful Shutdown** – On application exit, invoke `shutdown()` to allow the **ConnectionManager** to close sockets, stop file watchers, and release HTTP resources. Skipping this step can leave dangling file handles or open network connections.  
+* **Log communication** – Pair the connector with **ConversationLogger** to capture inbound and outbound messages. This aids troubleshooting, especially when using the file‑watch method where message ordering can be ambiguous.  
 
-6. **Environment Detection** – When deploying to a new environment, verify which transport methods are available (e.g., IPC may require a local Specstory process). The connector will automatically fallback, but explicit configuration (via environment variables or a config file) can be used to force a preferred method for performance or security reasons.
+* **Testing** – When unit‑testing **SpecstoryConnector**, mock the underlying transport modules (`node:http`, `node:ipc`, `fs.watch`) and verify that the factory creates the correct connector instance based on the configuration. Also assert that any thrown errors are passed to **ErrorManager**.
 
 ---
 
 ### Architectural patterns identified  
-* **Adapter pattern** – embodied by **SpecstoryConnectorAdapter** wrapping the third‑party **SpecstoryAdapter**.  
-* **Facade (layered façade)** – the **SpecstoryConnector** itself presents a simple public interface while delegating to internal managers.  
-* **Strategy‑like transport selection** – the **ConnectionManager** chooses among HTTP, IPC, and file‑watch mechanisms at runtime.
+
+1. **Factory Pattern** – Implemented by `SpecstoryAdapter` to produce concrete connector instances based on the `method` configuration.  
+2. **Strategy‑like separation** – Each transport (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`) encapsulates a distinct algorithm for communication, allowing the system to swap strategies at runtime.  
+3. **Observer/Event‑Driven** – The connector listens to `heartbeatLost` events from **ConnectionMonitor** and emits its own `error` and `connected` events, enabling loose coupling with other components.  
 
 ### Design decisions and trade‑offs  
-* **Asynchronous, non‑blocking I/O** improves throughput but requires callers to adopt async/await patterns.  
-* **Multiple transport options** increase robustness across environments but add complexity to the **ConnectionManager** and to testing (each transport path must be exercised).  
-* **Centralized error handling** via **ErrorHandler** simplifies stability guarantees, yet tight coupling to the **ConnectionManager** means changes to connection logic may necessitate updates to error handling rules.
+
+* **Flexibility vs. Complexity** – Supporting three transport mechanisms gives Trajectory maximal deployment flexibility but introduces branching logic and additional testing surface.  
+* **Centralised error handling** – Delegating all exceptions to **ErrorManager** simplifies consumer code but makes the connector heavily dependent on that module’s contract.  
+* **Reconnection built‑in** – Automatic reconnection improves resilience but may mask underlying systemic issues if back‑off policies are not tuned.  
 
 ### System structure insights  
-* The **SpecstoryConnector** sits in a clear hierarchy: **Trajectory** → **SpecstoryConnector** → (Adapter, ConnectionManager, ErrorHandler).  
-* Sibling components share the same low‑level adapter, promoting reuse and consistent logging semantics.  
-* Child components are highly cohesive: each addresses a single concern (connection selection, error processing, or API unification).
+
+* The hierarchy is cleanly layered: **Trajectory** (parent) orchestrates high‑level flow; **SpecstoryConnector** (child) handles the integration specifics; **SpecstoryAdapterFactory** (sub‑child) isolates creation logic; siblings provide cross‑cutting concerns (logging, error handling, heartbeat).  
+* All transport code resides in a single file (`lib/integrations/specstory-adapter.js`), which aids discoverability but could become a maintenance hotspot as more transports are added.  
 
 ### Scalability considerations  
-* Because connections are asynchronous and can be multiplexed, the connector can handle a high volume of concurrent log entries without saturating the event loop.  
-* The file‑watch transport may become a bottleneck on high‑throughput systems; in such cases, preferring HTTP or IPC is advisable.  
-* Adding additional transport methods in the future would involve extending the **ConnectionManager** without altering the public façade, supporting horizontal scalability.
+
+* Adding new transport methods (e.g., WebSocket) only requires extending the factory and implementing a new `connectVia*` function, preserving the existing API.  
+* The configuration‑driven approach allows bulk deployment of many connector instances with different settings without code changes.  
+* However, each active connector maintains its own event listeners and possibly open sockets; in a high‑concurrency scenario, careful resource management (e.g., limiting simultaneous IPC channels) will be needed.  
 
 ### Maintainability assessment  
-* The clear separation of concerns (adapter, manager, error handler) makes the codebase approachable for new developers.  
-* Centralizing all Specstory interaction behind the **SpecstoryConnector** reduces duplication across siblings, lowering the maintenance surface.  
-* However, the reliance on runtime detection of transport availability introduces conditional logic that must be kept in sync with environment changes; comprehensive unit and integration tests for each transport path are essential to preserve reliability.
+
+* **Positive factors** – Clear separation of concerns (factory, transport implementations, error handling) and reliance on standard Node modules make the codebase approachable. The use of a single configuration object reduces duplication.  
+* **Potential risks** – Consolidating all transport logic in one file can lead to a “God file” if additional transports are added without refactoring. The implicit strategy pattern is not formally abstracted, so future contributors must understand the naming convention (`connectVia*`). Regular code reviews and possibly extracting each transport into its own module would improve long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component is an AI trajectory and planning system that manages project milestones, GSD workflow, phase planning, and implementation task tracking. It utilizes a SpecstoryAdapter class (lib/integrations/specstory-adapter.js) to connect to the Specstory extension via multiple methods, including HTTP, IPC, and file watch. The adapter enables logging of conversation entries and other data to Specstory. The component's architecture involves a flexible connection mechanism, allowing it to adapt to different environments and extension availability. Key patterns include the use of asynchronous connections, error handling, and logging mechanisms. The Trajectory component plays a crucial role in maintaining project milestones and workflow, ensuring that tasks are properly tracked and implemented. Its ability to connect to Specstory enables seamless logging and tracking of conversation entries, making it an essential tool for project management.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's architecture is designed with flexibility in mind, allowing it to connect to the Specstory extension via multiple methods including HTTP, IPC, or file watch. This is evident in the SpecstoryAdapter class (lib/integrations/specstory-adapter.js), which provides methods such as connectViaHTTP, connectViaIPC, and connectViaFileWatch for establishing connections. For instance, the connectViaHTTP method (lib/integrations/specstory-adapter.js:123) enables connection to the Specstory extension via HTTP on common extension ports, demonstrating the component's ability to adapt to different integration scenarios.
 
 ### Children
-- [ConnectionManager](./ConnectionManager.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is utilized by the ConnectionManager to handle different connection methods, such as HTTP and IPC.
-- [ErrorHandler](./ErrorHandler.md) -- The ErrorHandler is tightly coupled with the ConnectionManager to catch and handle connection-related errors, providing a robust error-handling mechanism.
-- [SpecstoryConnectorAdapter](./SpecstoryConnectorAdapter.md) -- The SpecstoryConnectorAdapter is responsible for encapsulating the SpecstoryAdapter class, providing a unified interface for connection management and error handling.
+- [SpecstoryAdapterFactory](./SpecstoryAdapterFactory.md) -- The SpecstoryAdapter class (lib/integrations/specstory-adapter.js) is used by the SpecstoryConnector to provide connection methods.
 
 ### Siblings
-- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to log conversation entries to Specstory.
-- [ErrorHandlingMechanism](./ErrorHandlingMechanism.md) -- ErrorHandlingMechanism implements error handling mechanisms to handle connection errors and exceptions, ensuring the system remains stable and functional.
-- [ProjectMilestoneManager](./ProjectMilestoneManager.md) -- ProjectMilestoneManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension and manage project milestones.
-- [GSDWorkflowManager](./GSDWorkflowManager.md) -- GSDWorkflowManager uses the SpecstoryAdapter class in lib/integrations/specstory-adapter.js to connect to the Specstory extension and manage the GSD workflow.
+- [ConversationLogger](./ConversationLogger.md) -- ConversationLogger utilizes a logging module (lib/logging/logger.js) to write conversation logs to a file or database
+- [ErrorManager](./ErrorManager.md) -- ErrorManager utilizes a error handling module (lib/error-handler.js) to catch and handle errors
+- [ConnectionMonitor](./ConnectionMonitor.md) -- ConnectionMonitor utilizes a heartbeat mechanism (lib/heartbeat.js) to detect disconnections
 
 
 ---

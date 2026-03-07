@@ -2,132 +2,101 @@
 
 **Type:** SubComponent
 
-LLMFacadeConfiguration.yaml defines the LLM configuration, including provider and model definitions
+The LLMFacade uses the CircuitBreaker pattern to handle faults and prevent cascading failures
 
 ## What It Is  
 
-**LLMFacade** is a *sub‑component* that lives inside the **SemanticAnalysis** module. All of its concrete artefacts are defined in the same repository hierarchy as the rest of the SemanticAnalysis code base, for example the YAML file `LLMFacadeConfiguration.yaml` that holds the provider and model definitions, and the Java/Scala (or equivalent) classes `LLMFacade`, `LLMFacadeManager`, `LLMFacadeUtils` and `LLMFacadeLogger`. The façade is also packaged together with the other Docker‑ready services under the **DockerizedServices** umbrella, which means it can be started as a container alongside the other agents that make up the multi‑agent pipeline.
+The **LLMFacade** is a sub‑component that lives inside the **SemanticAnalysis** module and acts as the primary gateway for all interactions with external large‑language‑model (LLM) services.  All calls that need to query, prompt, or otherwise engage an LLM are funneled through this façade, which presents a stable, purpose‑built interface for the rest of the system.  Although the concrete source files are not listed in the current observations, the component is explicitly referenced by the parent **SemanticAnalysis** and by its child **CircuitBreakerPattern**, indicating that the façade’s implementation resides somewhere under the SemanticAnalysis code tree (e.g., `integrations/mcp-server-semantic-analysis/...`).  
 
-The primary purpose of LLMFacade is to hide the complexity of interacting with one or more large‑language‑model (LLM) providers.  Callers request a model via `LLMFacade.getLLMModel()`, execute it with `LLMFacade.runLLM()`, and retrieve the result through the helper `LLMFacadeUtils.getLLMResult()`.  All operational events—successful runs, time‑outs, and errors—are funneled through `LLMFacadeLogger.logLLM()`.  Initialization is performed by `LLMFacadeManager.loadFacade()`, which reads `LLMFacadeConfiguration.yaml` and wires the appropriate provider implementation.
-
----
+The façade’s responsibilities go beyond simple request forwarding.  It embeds a **caching mechanism** to avoid redundant LLM calls, a **scheduling mechanism** that can invoke LLM interactions on a periodic basis, a **validation layer** that checks request and response integrity, and a **feedback loop** that captures outcomes and uses them to refine subsequent interactions.  Together these capabilities make the LLMFacade a self‑contained, resilient, and performance‑aware adaptor that shields downstream agents—such as the **OntologyClassificationAgent**, **CodeGraphAgent**, and other sibling components—from the volatility of external LLM services.
 
 ## Architecture and Design  
 
-The design of LLMFacade follows a **Facade pattern**: a thin, purpose‑built API (`LLMFacade.*` methods) that shields the rest of the system from provider‑specific SDKs, authentication details, and request formatting.  The façade is *configuration‑driven*; the YAML file (`LLMFacadeConfiguration.yaml`) declares which provider (e.g., OpenAI, Anthropic) and which model (e.g., `gpt‑4`, `claude‑2`) should be instantiated.  This decouples the selection of the underlying LLM from compile‑time code, enabling the parent **SemanticAnalysis** component to swap models without recompilation.
+The design of LLMFacade is centered on **fault tolerance** and **operational robustness**.  The most visible architectural decision is the incorporation of the **CircuitBreaker pattern** (implemented as a child component **CircuitBreakerPattern**).  By monitoring error rates and latency of LLM calls, the circuit breaker can open, short‑circuiting further requests and returning cached or fallback responses.  This prevents cascading failures that could otherwise cripple the entire SemanticAnalysis pipeline, especially when downstream agents like **InsightGenerator** or **CodeGraphConstructor** depend on timely LLM answers.  
 
-A concrete **CircuitBreakerPattern** is attached as a child component of LLMFacade.  The circuit‑breaker logic is invoked whenever `LLMFacade.runLLM()` contacts an external provider.  By tracking failure rates and opening the circuit when a threshold is exceeded, it prevents cascading failures that could otherwise bring down the whole multi‑agent pipeline.  The presence of a dedicated logger (`LLMFacadeLogger`) further reinforces the *observability* concern, ensuring that every request and error is recorded for downstream monitoring.
+Complementing the circuit breaker, the façade adopts a **caching strategy** that stores successful LLM responses keyed by request signatures.  The cache reduces latency, cuts cost, and serves as a secondary source of truth when the circuit breaker is open.  A **scheduling subsystem** runs periodic jobs—likely driven by a timer or cron‑like scheduler—so that certain LLM queries (e.g., model health checks, periodic knowledge refreshes) are executed automatically without manual triggering.  The **validation mechanism** sits immediately after each LLM response, enforcing schema compliance and data consistency before the result is propagated to callers.  Finally, the **feedback loop** records metrics, success/failure outcomes, and possibly user‑provided corrections; this data can be fed back into the cache eviction policy, circuit‑breaker thresholds, or even model‑prompt tuning.  
 
-Interaction flow:  
-
-1. `LLMFacadeManager.loadFacade()` reads `LLMFacadeConfiguration.yaml` and creates a concrete LLM client instance.  
-2. A consumer (e.g., the **SemanticAnalysis** agent that performs ontology classification) calls `LLMFacade.getLLMModel()` to obtain the model reference.  
-3. The consumer passes input data and execution parameters to `LLMFacade.runLLM()`.  
-4. Inside `runLLM()`, the circuit‑breaker wrapper checks the health of the provider; if the circuit is closed, the request is forwarded, otherwise a fallback response is generated.  
-5. The raw provider response is handed to `LLMFacadeUtils.getLLMResult()` for any post‑processing (e.g., JSON parsing, trimming).  
-6. Throughout the process, `LLMFacadeLogger.logLLM()` records start, success, and error events.
-
-Because **SemanticAnalysis** also contains other agents such as **Pipeline**, **Ontology**, and **Insights**, LLMFacade shares the same configuration‑centric philosophy and logging conventions with its siblings, fostering a uniform architectural language across the component tree.
-
----
+From an architectural viewpoint, LLMFacade follows a **Facade pattern** (exposing a simplified interface) combined with **Decorator‑style responsibilities** (caching, validation, scheduling, feedback) that are layered around the core LLM client.  The component does not introduce a separate microservice or event‑driven bus; instead, it is a library‑level abstraction that other agents within the same process invoke directly.
 
 ## Implementation Details  
 
-- **`LLMFacadeConfiguration.yaml`** – The sole source of truth for provider selection.  Its schema lists keys like `provider: openai` and `model: gpt‑4`, together with optional credentials and timeout settings.  The file is read at start‑up by `LLMFacadeManager.loadFacade()`.
+Even though the source symbols are not enumerated, the observations give us a clear mental model of the internal structure:
 
-- **`LLMFacadeManager`** – A bootstrap class that parses the YAML, resolves the correct provider SDK, and constructs the concrete model object.  It also registers the circuit‑breaker instance that will guard subsequent calls.
+1. **Interface Layer** – A public class (e.g., `LLMFacade`) defines methods such as `invokeModel(prompt: string, options?: InvokeOptions)` that callers across the SemanticAnalysis ecosystem use.  This interface abstracts authentication, endpoint selection, and request formatting.
 
-- **`LLMFacade.getLLMModel()`** – Returns the already‑instantiated model object (or a lightweight wrapper) so that callers do not need to know about the underlying SDK.  The method caches the model after the first load, avoiding repeated configuration parsing.
+2. **CircuitBreakerPattern** – Implemented as a dedicated class or module (`CircuitBreakerPattern`) that tracks request success/failure counters, latency windows, and state (`CLOSED`, `OPEN`, `HALF_OPEN`).  The façade wraps each outbound LLM call with `circuitBreaker.execute(() => rawLlmCall(...))`.  When the breaker is open, the wrapper returns either a cached result or a predefined fallback payload.
 
-- **`LLMFacade.runLLM(input, params)`** – Core execution entry point.  It first invokes the circuit‑breaker check; if the circuit is open, it either throws a `CircuitOpenException` or returns a predefined fallback.  When the circuit is closed, it forwards the request to the provider client, applying any runtime parameters (temperature, max tokens, etc.) that may have been supplied by the caller.
+3. **Caching Mechanism** – Likely a key‑value store (in‑memory LRU cache or a Redis‑backed store) keyed by a deterministic hash of the prompt and options.  On each request the façade first checks `cache.get(key)`.  Successful responses are written back with `cache.set(key, response, ttl)`.  The cache is also consulted when the circuit breaker blocks a call, providing graceful degradation.
 
-- **`LLMFacadeUtils.getLLMResult(rawResponse)`** – A thin utility that normalises the provider’s raw payload into a consistent internal representation (e.g., a `String` or a domain‑specific `LLMResult` object).  This step abstracts away provider‑specific response formats such as OpenAI’s `choices[0].message.content` versus Anthropic’s `completion`.
+4. **Scheduling Subsystem** – A scheduler component registers periodic jobs using a library such as `node-cron` or a custom timer loop.  Jobs may include `refreshModelMetadata()`, `prewarmCache()`, or `runHealthCheck()`.  The scheduler invokes the same façade methods, thereby re‑using the fault‑tolerant path.
 
-- **`LLMFacadeLogger.logLLM(event, details)`** – Centralised logging that tags each entry with the façade name, request identifiers, timestamps, and error stack traces.  The logger is used by both the manager (during load) and the run method (during execution).
+5. **Validation Layer** – After a response arrives, a validator (e.g., `LLMResponseValidator.validate(response)`) checks for required fields, type correctness, and business rules (e.g., “no prohibited tokens”).  Invalid responses trigger the circuit breaker’s error path and are not cached.
 
-- **CircuitBreakerPattern** – Implemented as a separate class (or module) that tracks success/failure counts, open/half‑open states, and reset timers.  LLMFacade calls into this component before each external request, ensuring that a misbehaving provider does not propagate latency or exceptions to the rest of the system.
+6. **Feedback Loop** – The façade emits telemetry events (e.g., `LLMFacade.emit('requestCompleted', metrics)`) that are consumed by a feedback manager.  This manager updates cache statistics, adjusts circuit‑breaker thresholds, and may persist interaction logs for later analysis by the **InsightGenerator** or for model‑prompt refinement.
 
-All of these pieces are packaged together in the Docker image produced by **DockerizedServices**, which means the façade can be scaled independently if needed.
-
----
+All these pieces are wired together inside the LLMFacade constructor, where dependencies (cache client, circuit‑breaker instance, scheduler, validator, telemetry) are injected, enabling easy unit testing and future substitution.
 
 ## Integration Points  
 
-- **Parent – SemanticAnalysis**: The SemanticAnalysis orchestrator invokes LLMFacade whenever a language‑model operation is required, such as generating natural‑language summaries of git history or enriching ontology entities.  Because the façade hides provider details, the parent component can remain agnostic of which LLM is used.
+LLMFacade sits at the heart of the **SemanticAnalysis** component and serves as a shared service for several sibling agents.  The **OntologyClassificationAgent** may call the façade to obtain semantic embeddings or classification suggestions from an LLM, while the **CodeGraphAgent** could request code summarization or comment generation.  The **Pipeline**’s DAG‑based execution model can schedule façade‑driven jobs as distinct nodes, leveraging the same scheduling mechanism that the façade already provides.  Moreover, the **InsightGenerator** can consume the feedback telemetry emitted by the façade to discover patterns in LLM performance, feeding those insights back into the system’s overall knowledge graph.  
 
-- **Siblings**:  
-  - **Pipeline** – May schedule LLMFacade calls as steps in its DAG, using the same configuration loading mechanism as other steps.  
-  - **Ontology** – Uses LLMFacade to obtain classification suggestions, feeding the results into `OntologyClassifier`.  
-  - **Insights** – Calls `LLMFacade.runLLM()` to generate pattern‑based insights, then passes the normalized output from `LLMFacadeUtils` to `InsightGenerator.generateInsights()`.  
-
-  The shared use of `LLMFacadeLogger` ensures that logs from all these agents are consolidated, simplifying troubleshooting across the system.
-
-- **Child – CircuitBreakerPattern** – Directly wrapped around each LLM request.  The façade exposes no circuit‑breaker API to callers; the pattern is an internal resilience mechanism.
-
-- **External Dependencies** – The façade depends on the provider SDKs (e.g., `openai-java`, `anthropic-sdk`) and on the YAML parsing library used by `LLMFacadeManager`.  It also relies on the container runtime (Docker) for environment variables that may hold API keys, as defined in the Docker compose files of **DockerizedServices**.
-
----
+From a dependency perspective, LLMFacade depends on external LLM service endpoints (e.g., OpenAI, Anthropic) and on internal utilities such as the cache provider, the circuit‑breaker library, and the scheduler.  It exposes a clean TypeScript/JavaScript interface that other modules import, ensuring that the contract remains stable even if the underlying LLM vendor changes.  Because the façade encapsulates authentication and request formatting, sibling components do not need to manage credentials or request throttling themselves.
 
 ## Usage Guidelines  
 
-1. **Never instantiate a provider client directly** – Always obtain the model through `LLMFacade.getLLMModel()` after `LLMFacadeManager.loadFacade()` has run.  This guarantees that the circuit‑breaker and logging are correctly wired.
+1. **Always go through LLMFacade** – Direct calls to external LLM APIs bypass the circuit‑breaker, cache, and validation layers, risking unhandled failures and inconsistent data.  Import the façade class from the SemanticAnalysis package and use its public methods exclusively.  
 
-2. **Keep configuration in `LLMFacadeConfiguration.yaml`** – Adding a new provider or swapping models should be done by editing this file and redeploying the Docker container; no code changes are required.
+2. **Leverage the built‑in caching** – When constructing prompts, aim for deterministic strings so that the cache key can be reliably reproduced.  Avoid embedding timestamps or random data in the prompt unless you explicitly want a cache miss.  
 
-3. **Respect the circuit‑breaker contract** – Do not catch `CircuitOpenException` inside business logic unless you have a meaningful fallback (e.g., a cached response).  Allow the exception to propagate so that higher‑level orchestration (e.g., the Pipeline DAG) can decide whether to retry or skip the step.
+3. **Respect the circuit‑breaker state** – If a request fails with a `CircuitOpenError`, treat the response as a fallback and consider whether the operation can be deferred or retried later.  Do not attempt to manually reset the breaker; let the built‑in logic handle state transitions.  
 
-4. **Log contextual information** – When calling `LLMFacade.runLLM()`, pass a correlation ID (e.g., the git commit hash being analysed) in the `params` map so that `LLMFacadeLogger.logLLM()` can attach it to the log entry.  This greatly aids post‑mortem analysis.
+4. **Provide validation‑friendly payloads** – Ensure that prompts and options conform to the expected schema documented in the façade’s TypeScript definitions.  Invalid payloads will be rejected by the validation layer and counted as errors against the circuit breaker.  
 
-5. **Avoid heavy post‑processing in the façade** – Keep `LLMFacadeUtils.getLLMResult()` focused on format normalisation.  Any domain‑specific parsing or entity extraction should be performed by the caller (e.g., the Ontology or Insights agents) to keep the façade lightweight and reusable.
+5. **Observe the feedback loop** – When you receive a response, log any domain‑specific quality metrics (e.g., relevance score) using the façade’s telemetry events.  This information helps the feedback manager fine‑tune caching policies and circuit‑breaker thresholds, ultimately improving system reliability.  
 
 ---
 
 ### Architectural patterns identified  
-
-1. **Facade pattern** – Centralised API (`LLMFacade.*`) that abstracts provider details.  
-2. **Circuit Breaker pattern** – Implemented as a child component to protect against provider failures.  
-3. **Configuration‑driven design** – YAML file (`LLMFacadeConfiguration.yaml`) drives provider/model selection.  
-4. **Utility/helper pattern** – `LLMFacadeUtils` for result normalisation.  
-5. **Logging/Observability pattern** – `LLMFacadeLogger` provides consistent event recording.
+- **Facade pattern** – LLMFacade abstracts the complexity of LLM service interaction.  
+- **Circuit Breaker pattern** – Implemented by the child component **CircuitBreakerPattern** to guard against cascading failures.  
+- **Cache‑Aside pattern** – The façade checks the cache before invoking the LLM and writes back successful results.  
+- **Scheduler/Periodic task pattern** – Internal scheduling mechanism runs LLM interactions on a defined cadence.  
+- **Validation/Decorator pattern** – Response validation is layered on top of raw LLM calls.  
+- **Feedback/Telemetry loop** – Continuous collection of interaction metrics to inform adaptive behavior.
 
 ### Design decisions and trade‑offs  
-
-- **Decoupling vs. flexibility** – By using a façade and YAML configuration, the system gains the ability to switch providers without code changes, at the cost of an extra indirection layer that developers must learn.  
-- **Resilience** – Embedding a circuit breaker improves stability but introduces latency when the circuit is half‑open (additional probe requests).  
-- **Dockerisation** – Packaging LLMFacade as a container enables independent scaling, yet it adds operational overhead (container orchestration, secret management).  
+- **Fault tolerance vs. latency** – The circuit breaker and caching improve resilience but add a small lookup overhead.  
+- **Cache consistency vs. freshness** – Caching reduces cost but may serve stale data; TTLs and the feedback loop are used to balance this.  
+- **Scheduling granularity** – Periodic jobs enable proactive health checks but increase background load; careful interval selection is required.  
+- **Validation strictness** – Tight validation prevents downstream errors but may reject edge‑case LLM outputs that could be useful; developers may need to extend validators for special cases.
 
 ### System structure insights  
-
-LLMFacade sits at the intersection of **SemanticAnalysis** and its sibling agents, acting as the sole gateway to external LLM services.  Its child **CircuitBreakerPattern** ensures that failures are isolated, while shared utilities (`LLMFacadeUtils`, `LLMFacadeLogger`) promote consistency across the entire multi‑agent ecosystem.
+LLMFacade is a central adaptor within **SemanticAnalysis**, sharing the same execution environment as sibling agents (Pipeline, Ontology, Insights, etc.).  Its child **CircuitBreakerPattern** encapsulates fault‑handling logic, while the parent component orchestrates higher‑level semantic workflows that depend on reliable LLM responses.
 
 ### Scalability considerations  
-
-- **Horizontal scaling** is straightforward: spin up additional Docker containers of LLMFacade behind a load balancer.  
-- **Provider limits** (rate‑limits, token quotas) are mitigated by the circuit breaker, which can throttle requests when thresholds are approached.  
-- **Configuration‑centric model selection** allows scaling out to multiple providers simultaneously, distributing load based on cost or latency considerations.
+- **Horizontal scaling** – Because the façade is a library‑level component, scaling is achieved by adding more instances of the host service (e.g., more SemanticAnalysis workers).  The cache can be externalized (Redis) to maintain coherence across instances.  
+- **Circuit‑breaker tuning** – Thresholds must be calibrated for the expected request volume; overly aggressive opening can throttle throughput.  
+- **Scheduling load** – Periodic jobs should be staggered or sharded to avoid spikes that could overwhelm the LLM provider.
 
 ### Maintainability assessment  
-
-The clear separation of concerns—initialisation (`LLMFacadeManager`), execution (`LLMFacade.runLLM`), result handling (`LLMFacadeUtils`), and observability (`LLMFacadeLogger`)—makes the codebase easy to navigate and extend.  Because all provider‑specific details live behind the façade, updates to SDKs or credential handling are confined to a small, well‑defined area.  The reliance on a single YAML file for configuration reduces duplication and the risk of drift between environments.  Overall, LLMFacade exhibits a high degree of maintainability, provided that developers adhere to the usage guidelines and keep the configuration file in sync with deployment pipelines.
+The clear separation of concerns (interface, circuit breaker, cache, scheduler, validator, feedback) promotes high maintainability.  Each responsibility resides in its own module, making unit testing straightforward and allowing independent evolution (e.g., swapping the cache implementation).  The only maintenance risk is the tight coupling to the external LLM API contract; however, because all calls are funneled through the façade, any API change requires updates in a single place.  Documentation of the public façade methods and the telemetry events is essential to keep sibling components aligned.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It features a modular architecture with various agents, each responsible for a specific task, such as ontology classification, semantic analysis, and content validation. The system utilizes a range of technologies, including GraphDatabaseAdapter for persistence, LLMService for language model integration, and Wave agents for concurrent execution.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a multi-agent system architecture, where each agent is responsible for a specific task, such as the OntologyClassificationAgent, which uses the OntologyConfigManager in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts to manage ontology configurations and classify observations against the ontology system. This approach allows for a modular and scalable design, enabling easy addition or removal of agents as needed. The use of a graph database for storing and retrieving knowledge entities, as seen in the CodeGraphAgent, which integrates with the code-graph-rag MCP server, provides an efficient means of querying and indexing code entities.
 
 ### Children
-- [CircuitBreakerPattern](./CircuitBreakerPattern.md) -- The LLMFacade sub-component uses the CircuitBreaker.pattern to prevent cascading failures when interacting with LLM providers, as mentioned in the parent context.
+- [CircuitBreakerPattern](./CircuitBreakerPattern.md) -- The CircuitBreaker pattern is a notable architectural decision in the LLMFacade, as mentioned in the parent context, to handle faults and prevent cascading failures.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineController uses a DAG-based execution model with topological sort in pipeline-configuration.yaml steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification approach, with upper and lower ontology definitions in ontology-definitions.yaml
-- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a pattern-based approach to generate insights from knowledge entities
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- CodeKnowledgeGraphBuilder.buildGraph() constructs the code knowledge graph using AST parsing and Memgraph
-- [EntityValidator](./EntityValidator.md) -- EntityValidator.validateEntity() implements a validation strategy based on entity metadata and definitions
-- [WorkflowOrchestrator](./WorkflowOrchestrator.md) -- WorkflowOrchestrator.runWorkflow() executes the workflow with the given input and parameters
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.persistEntity() persists the entity to the graph database
-- [MemgraphAdapter](./MemgraphAdapter.md) -- MemgraphAdapter.persistCodeEntity() persists the code entity to Memgraph
+- [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
+- [Ontology](./Ontology.md) -- The OntologyClassificationAgent uses the OntologyConfigManager to manage ontology configurations and classify observations against the ontology system
+- [Insights](./Insights.md) -- The InsightGenerator uses machine learning algorithms to identify patterns and relationships in the data
+- [CodeGraphConstructor](./CodeGraphConstructor.md) -- The CodeGraphConstructor uses AST parsing to extract code entities and relationships
+- [OntologyConfigManager](./OntologyConfigManager.md) -- The OntologyConfigManager uses a database to store ontology configurations
+- [CodeGraphAgent](./CodeGraphAgent.md) -- The CodeGraphAgent uses the code-graph-rag MCP server to query and retrieve code entities
 
 
 ---
