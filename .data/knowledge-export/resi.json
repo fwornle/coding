@@ -29,57 +29,9 @@
         "last_updated": "2025-11-17T20:48:45.922Z"
       },
       "id": "mc4flkg1qr4h9s"
-    },
-    {
-      "name": "StreamProcessingPattern",
-      "entityType": "Pattern",
-      "observations": [
-        "Handle high-volume streaming data with back-pressure and flow control",
-        "Implement windowing strategies for time-based aggregations",
-        "Use reactive streams for memory-efficient processing",
-        "Essential for real-time analytics and data normalization systems"
-      ],
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-11-17T20:48:45.922Z",
-        "last_updated": "2025-11-17T20:48:45.922Z"
-      },
-      "id": "mc4flkg48yz7n"
-    },
-    {
-      "name": "SchemaEvolutionPattern",
-      "entityType": "Pattern",
-      "observations": [
-        "Handle schema changes in streaming data without service disruption",
-        "Implement backward/forward compatibility strategies",
-        "Use schema registry for centralized schema management",
-        "Graceful degradation when encountering unknown fields",
-        "Critical feature for long-running data processing systems"
-      ],
-      "significance": 7,
-      "source": "manual",
-      "metadata": {
-        "created_at": "2025-06-20T19:15:00.000Z",
-        "last_updated": "2025-11-17T22:25:00.000Z"
-      },
-      "problem": {},
-      "solution": {},
-      "id": "mc4flkg3t9jzpm"
     }
   ],
   "relations": [
-    {
-      "from": "StreamProcessingPattern",
-      "to": "Normalisa",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
-    {
-      "from": "SchemaEvolutionPattern",
-      "to": "Normalisa",
-      "relationType": "implemented_in",
-      "metadata": {}
-    },
     {
       "from": "CollectiveKnowledge",
       "to": "Normalisa",
@@ -90,9 +42,9 @@
   "metadata": {
     "version": "1.0.0",
     "team": "resi",
-    "exported_at": "2026-03-04T06:16:11.782Z",
-    "total_entities": 4,
-    "total_relations": 3,
+    "exported_at": "2026-03-07T07:21:36.041Z",
+    "total_entities": 2,
+    "total_relations": 1,
     "description": "Resi project patterns"
   }
 }
