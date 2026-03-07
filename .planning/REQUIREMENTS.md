@@ -34,11 +34,11 @@ Requirements for Wave Pipeline Quality Restoration. Each maps to roadmap phases.
 
 ### Agent Integration
 
-- [ ] **AGNT-01**: Wave agent LLM calls route through SemanticAnalyzer for deep, multi-observation analysis
-- [ ] **AGNT-02**: Semantic analysis agent integrated into wave pipeline (all 3 waves)
+- [x] **AGNT-01**: Wave agent LLM calls route through SemanticAnalyzer for deep, multi-observation analysis
+- [x] **AGNT-02**: Semantic analysis agent integrated into wave pipeline (all 3 waves)
 - [x] **AGNT-03**: Persistence agent restored in wave persistence path
 - [ ] **AGNT-04**: Insight generation agent produces detailed insight documents per entity
-- [ ] **AGNT-05**: Ontology classification agent fully integrated into wave pipeline
+- [x] **AGNT-05**: Ontology classification agent fully integrated into wave pipeline
 
 ### KG Operations
 
@@ -118,11 +118,11 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AGNT-01 | Phase 9 | Pending |
-| AGNT-02 | Phase 9 | Pending |
+| AGNT-01 | Phase 9 | Complete |
+| AGNT-02 | Phase 9 | Complete |
 | AGNT-03 | Phase 9 | Complete |
 | AGNT-04 | Phase 9 | Pending |
-| AGNT-05 | Phase 9 | Pending |
+| AGNT-05 | Phase 9 | Complete |
 | KGOP-01 | Phase 10 | Pending |
 | KGOP-02 | Phase 10 | Pending |
 | KGOP-03 | Phase 10 | Pending |
