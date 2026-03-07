@@ -161,18 +161,6 @@ export class ProviderRegistry {
       }
     }
 
-    // 4. Append local providers as fallback (if not already in chain)
-    const localProviders = this.getLocalProviders();
-    for (const local of localProviders) {
-      if (!chain.find(c => c.provider.name === local.name)) {
-        const models = local.getModels();
-        const model = models[tier] || models.standard || Object.values(models)[0];
-        if (model) {
-          chain.push({ provider: local, model });
-        }
-      }
-    }
-
     return chain;
   }
 
