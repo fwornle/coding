@@ -218,7 +218,6 @@ constraints:
   - Write
   suggestion: 'Rename to kebab-case: my-feature-docs.md instead of MyFeatureDocs.md or ALL-CAPS-FILE.md'
   whitelist:
-  # Fixed: Use **/ prefix for proper glob matching on full paths
   - '**/README.md'
   - '**/CHANGELOG.md'
   - '**/CLAUDE.md'
@@ -226,16 +225,9 @@ constraints:
   - '**/INSTALL*.md'
   - CLAUDE.md
   # GSD planning files use uppercase by convention
-  - '**/.planning/**/ROADMAP.md'
-  - '**/.planning/**/STATE.md'
-  - '**/.planning/**/PROJECT.md'
-  - '**/.planning/**/REQUIREMENTS.md'
-  - '**/.planning/**/*-CONTEXT.md'
-  - '**/.planning/**/*-RESEARCH.md'
-  - '**/.planning/**/*-PLAN*.md'
-  - '**/.planning/**/*-VERIFICATION.md'
-  - '**/.planning/**/*-VALIDATION.md'
-  - '**/.planning/**/SUMMARY.md'
+  # Need both patterns: *.md for direct files, **/*.md for subdirectories
+  - '**/.planning/*.md'
+  - '**/.planning/**/*.md'
 - id: update-main-readme
   group: documentation
   pattern: (?i)readme.*(?:update|modify|change).*(?:structure|format|content)
@@ -262,6 +254,9 @@ constraints:
   whitelist:
   - CHANGELOG.md
   - RELEASE*.md
+  - '**/.planning/*.md'
+  - '**/.planning/**/*.md'
+  - '**/MILESTONES.md'
 - id: no-ascii-art-in-docs
   group: documentation
   pattern: '[┌┐└┘│─├┤┬┴┼▲▼◄►]'
