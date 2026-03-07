@@ -55,7 +55,9 @@ export class UKBDatabaseWriter {
       embeddingId: null, // Will be set if embeddings are generated
       metadata: {
         significance: entity.significance,
-        originalMetadata: entity.metadata || {}
+        originalMetadata: entity.metadata || {},
+        // Hoist ontology to top-level metadata for direct access by VKB viewer
+        ...(entity.metadata?.ontology ? { ontology: entity.metadata.ontology } : {})
       }
     };
 
