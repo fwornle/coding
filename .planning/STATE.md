@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: -- Wave Pipeline Quality Restoration
 status: executing
-stopped_at: Completed 10-04-PLAN.md
-last_updated: "2026-03-08T07:08:21.394Z"
-last_activity: 2026-03-08 -- Completed 10-04 Gap Closure (field persistence + ontology preservation)
+stopped_at: Completed 10-05-PLAN.md
+last_updated: "2026-03-08T07:33:47Z"
+last_activity: 2026-03-08 -- Completed 10-05 Operator Field Persistence in persistence-agent
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 8
+  completed_plans: 8
   percent: 96
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Wave-based multi-agent pipeline producing self-sufficient hierarchical knowledge
-**Current focus:** Phase 10 complete -- all KG operators wired, gaps closed, fields preserved
+**Current focus:** Phase 10 complete -- all KG operators wired, gaps closed, fields persisted through all storage paths
 
 ## Current Position
 
 Phase: 10 of 12 (KG Operations Restoration) -- COMPLETE
-Plan: 4 of 4 (all complete)
+Plan: 5 of 5 (all complete)
 Status: Executing
-Last activity: 2026-03-08 -- Completed 10-04 Gap Closure (field persistence + ontology preservation)
+Last activity: 2026-03-08 -- Completed 10-05 Operator Field Persistence in persistence-agent
 
 Progress: [██████████] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7 (v2.1)
+- Total plans completed: 8 (v2.1)
 - Average duration: 4min
-- Total execution time: 31min
+- Total execution time: 33min
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -48,6 +48,7 @@ Progress: [██████████] 96%
 | 10    | 02   | 2min     | 2     | 1     |
 | 10    | 03   | 15min    | 2     | 3     |
 | 10    | 04   | 3min     | 2     | 1     |
+| 10    | 05   | 2min     | 2     | 1     |
 
 ## Accumulated Context
 
@@ -76,6 +77,9 @@ Progress: [██████████] 96%
 - [10-03]: Operator message-to-step-name mapping in updateProgress for correct progress tracking
 - [10-04]: Ontology map keyed by entity name -- operators preserve names even when creating new objects
 - [10-04]: 50ms SSE broadcast delay per operator step (300ms total) for dashboard visibility
+- [10-05]: Added typed optional fields to SharedMemoryEntity rather than relying solely on (as any) casts
+- [10-05]: Unified UPDATE path handles enriched field propagation regardless of new observations
+- [10-05]: Used queryEntities + storeEntity pattern for non-destructive field updates on existing entities
 
 ### Critical Pitfalls
 
@@ -85,7 +89,7 @@ Progress: [██████████] 96%
 - **Docker rebuild**: Pipeline changes require submodule build + Docker rebuild
 - **Wave agents use own LLM calls**: Not routed through SemanticAnalyzer -- no trace data (Phase 9 fixes this)
 - **KG operators never called**: FIXED in 10-03 -- all 6 operators wired between wave3_persist and wave4_insights
-- **Operator fields stripped on re-persist**: FIXED in 10-04 -- embedding/role/enrichedContext now mapped through mapEntityToSharedMemory and persistEntities
+- **Operator fields stripped on re-persist**: FIXED in 10-04/10-05 -- embedding/role/enrichedContext mapped through wave-controller and all persistence-agent storage paths
 
 ### Blockers/Concerns
 
@@ -93,6 +97,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-08T07:07:45Z
-Stopped at: Completed 10-04-PLAN.md
+Last session: 2026-03-08T07:33:47Z
+Stopped at: Completed 10-05-PLAN.md
 Resume with: `/gsd:execute-phase 11` (Phase 11 next)

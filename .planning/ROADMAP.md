@@ -70,7 +70,7 @@ Plans:
   2. Running the pipeline twice on the same codebase does not create duplicate entities -- dedup operator with fuzzy name matching merges them
   3. The merge operator preserves parentId during entity merging (no null-coalesce overwrites that break hierarchy)
   4. Aggregation and prediction operators produce derived metadata (e.g., importance scores, relationship predictions) visible on entities
-**Plans:** 5 plans
+**Plans:** 5/5 plans complete
 
 Plans:
 - [ ] 10-01-PLAN.md -- Embedding infrastructure: Python script, batch generateEmbeddings(), mergeEntities hierarchy fix
@@ -108,6 +108,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 9. Agent Pipeline Integration | v2.1 | 0/3 | Planning complete | - |
-| 10. KG Operations Restoration | 4/5 | Gap closure   | 2026-03-08 | - |
+| 10. KG Operations Restoration | 5/5 | Complete   | 2026-03-08 | - |
 | 11. Content Quality Gate | v2.1 | 0/? | Not started | - |
 | 12. Pipeline Observability | v2.1 | 0/? | Not started | - |
