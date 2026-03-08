@@ -2,141 +2,97 @@
 
 **Type:** SubComponent
 
-The HookConfigurationManager likely implements a configuration loading mechanism, such as a config loader module, to load hook configurations from files or databases.
+HookConfigurationManager utilizes the HookConfigLoader (lib/agent-api/hooks/hook-config.js) to load hook configurations from multiple sources, providing a unified and comprehensive configuration management mechanism.
 
 ## What It Is  
 
-`HookConfigurationManager` is a **sub‑component** that lives inside the **ConstraintSystem** package.  Its implementation is not exposed in the current source snapshot, but the observations make clear that it works hand‑in‑hand with the **UnifiedHookManager** located at  
-
-```
-lib/agent-api/hooks/hook-manager.js
-```  
-
-to load, merge, validate and cache the hook configuration that drives the whole hook‑dispatch pipeline.  The manager is responsible for reading a declarative configuration file – most likely `hook-config.yaml` – turning that YAML into an in‑memory representation, applying a set of validation rules, and then handing the resulting configuration over to the `UnifiedHookManager`.  In addition, it logs the lifecycle events (load, merge, validation success/failure) and keeps a short‑lived cache so that repeated look‑ups do not re‑read the file system or database.
-
-Because `ConstraintSystem` contains `HookConfigurationManager`, the manager is a core piece that enables the higher‑level constraint‑monitoring and violation‑capture modules to register their own hook handlers through the shared `UnifiedHookManager` without needing to know where the configuration originated.
-
----
+**HookConfigurationManager** is a sub‑component that lives inside the **ConstraintSystem** package. Its implementation is spread across the hook‑related source tree, most notably the loader at `lib/agent-api/hooks/hook-config.js` and the manager that orchestrates lifecycle events at `lib/agent-api/hooks/hook-manager.js`. The manager’s primary responsibility is to gather hook definitions from the **HookConfigLoader**, merge them into a single, coherent configuration, store that result in a centralized repository, and expose a clean‑looking interface for the rest of the constraint stack (e.g., **ConstraintEnforcer**) to query. By sitting between the raw configuration sources and the **UnifiedHookManager**, it acts as the “single source of truth” for hook metadata within the **ConstraintSystem**.
 
 ## Architecture and Design  
 
-The design follows a **modular configuration‑centric architecture**.  The `HookConfigurationManager` encapsulates all concerns around *how* hook definitions are obtained, while the `UnifiedHookManager` encapsulates *how* those definitions are used at runtime.  This separation of concerns is evident from the observation that the manager *“uses the UnifiedHookManager … to load and merge hook configurations.”*  
+The architecture around **HookConfigurationManager** is deliberately layered. At the bottom, **HookConfigLoader** reads raw hook definitions from a variety of origins (files, remote services, defaults). Above that, **HookConfigurationManager** applies a **merge strategy** that consolidates these disparate fragments into a unified view. This merged view is then cached in a **centralized repository** – a design that resembles the Repository pattern, even though the term is not explicitly used in the code.  
 
-The manager likely follows a **pipeline pattern**:  
+Interaction is driven by composition: the manager does not inherit from the loader but **delegates** loading to it, then hands the merged result to the **UnifiedHookManager** (`lib/agent-api/hooks/hook-manager.js`). The **UnifiedHookManager** is responsible for the lifecycle of individual hooks (initialisation, activation, teardown), while **HookConfigurationManager** supplies the definitive configuration at the right moments. This separation of concerns mirrors a classic **separation‑of‑concerns** architecture, where configuration handling, lifecycle orchestration, and constraint enforcement are each isolated in their own module.
 
-1. **Loading** – a dedicated config‑loader module reads `hook-config.yaml` (or a database source).  
-2. **Merging** – if multiple configuration fragments exist (e.g., environment‑specific overrides), they are combined into a single canonical representation.  
-3. **Validation** – a validation module checks the merged result against a schema or rule set, guaranteeing that only well‑formed hook definitions reach the runtime.  
-4. **Caching** – a cache module stores the validated configuration for fast subsequent retrieval, reducing I/O overhead.  
-
-All of these steps are orchestrated by `HookConfigurationManager` and are logged via a logger module, providing observability.  The manager therefore acts as a **facade** that presents a clean, validated configuration to the rest of the system while hiding the underlying complexity of loading, merging, and caching.
-
-Interaction with sibling components is indirect but crucial: both `ConstraintMonitor` and `ViolationCaptureModule` register their event handlers **through** the `UnifiedHookManager`.  Because the `UnifiedHookManager` receives its configuration from `HookConfigurationManager`, any change to the hook definitions instantly propagates to those siblings without them needing to reload or re‑configure themselves.
-
----
+Sibling components illustrate the same design language. **ConstraintEnforcer** also depends on the **UnifiedHookManager** for hook orchestration, meaning both siblings share a common hook‑execution backbone while each focuses on its own domain (constraint logic vs. content validation). The parent **ConstraintSystem** therefore provides a cohesive ecosystem where configuration, enforcement, and validation are loosely coupled but tightly coordinated through shared managers.
 
 ## Implementation Details  
 
-Although no concrete symbols were discovered, the observations let us infer the internal structure:
+* **HookConfigLoader (`lib/agent-api/hooks/hook-config.js`)** – This module encapsulates the logic for locating and reading hook definitions. It may read from static JSON/YAML files, environment‑provided snippets, or remote configuration services. The loader abstracts those details behind a simple API (e.g., `loadAll()`), allowing callers to remain agnostic of the source.
 
-| Concern | Likely Artifact | Role |
-|---------|----------------|------|
-| **Configuration Loading** | *config‑loader* (e.g., `loadHookConfig()` in a dedicated module) | Reads `hook-config.yaml` from the filesystem or a DB, parses YAML into a JavaScript object. |
-| **Merging** | *merge‑config* utility (e.g., `mergeConfigs(base, overlay)`) | Combines base configuration with environment‑specific or user‑provided overrides, preserving precedence rules. |
-| **Validation** | *validation module* (e.g., `validateHookConfig(schema, config)`) | Executes schema validation (perhaps using a library like AJV) and emits detailed errors if the configuration is malformed. |
-| **Caching** | *cache module* (e.g., an in‑memory `Map` keyed by a version hash) | Stores the final, validated configuration; invalidates the entry when the source file changes (watcher or timestamp check). |
-| **Logging** | *logger* (e.g., `logger.info('Hook config loaded')`) | Emits lifecycle events, including successes, validation failures, and cache hits/misses. |
-| **Integration with UnifiedHookManager** | Call to `UnifiedHookManager.loadConfig(validatedConfig)` | Hands the clean configuration to the central hub, which then creates the internal `Map` of event → handler lists. |
+* **Merge Strategy** – Once the loader returns a collection of raw configurations, **HookConfigurationManager** applies a deterministic merge algorithm. The strategy ensures that later sources can override earlier ones while preserving required fields, thereby guaranteeing a *consistent and accurate* final configuration. The merge is performed in‑memory and the result is stored in a **centralized repository** object that other components can query.
 
-The manager probably exposes a small public API such as:
+* **Centralized Repository** – Although the concrete class name is not listed, the observations describe a repository that “stores loaded configurations in a centralized repository, facilitating easy access and management.” This repository likely exposes methods such as `getHookConfig(id)` or `listAllHooks()`, enabling read‑only access for downstream consumers.
 
-```js
-class HookConfigurationManager {
-  async init() { /* load → merge → validate → cache → pass to UnifiedHookManager */ }
-  getConfig() { /* return cached, validated config */ }
-  reload() { /* force re‑load, useful for hot‑reload scenarios */ }
-}
-```
+* **Interface for Constraint Enforcers** – The manager publishes an API surface that **ConstraintEnforcer** consumes. Typical methods would include `fetchConfigurationForConstraint(constraintId)` or `getAllEnabledHooks()`. By exposing only the data needed for enforcement, the manager shields constraint logic from configuration‑loading intricacies.
 
-The `init` method would be invoked during the startup of `ConstraintSystem`, ensuring that by the time `ConstraintMonitor` or `ViolationCaptureModule` register their handlers, the `UnifiedHookManager` already knows the complete hook topology.
+* **Interaction with UnifiedHookManager (`lib/agent-api/hooks/hook-manager.js`)** – After merging, **HookConfigurationManager** hands the final configuration to **UnifiedHookManager**, which then creates, registers, and later disposes of hook instances. This hand‑off ensures that hook lifecycles are correctly aligned with system start‑up and shutdown sequences.
 
----
+* **Extensibility** – The design explicitly supports “easy extension and modification of hook configurations.” Adding a new source merely requires extending **HookConfigLoader** (e.g., a new `loadFromDatabase()` method) and registering it in the merge pipeline. No changes are required in the manager or the unified hook orchestrator, illustrating a plug‑in‑friendly approach.
 
 ## Integration Points  
 
-1. **Parent – ConstraintSystem**  
-   - `ConstraintSystem` creates and owns an instance of `HookConfigurationManager`.  
-   - During system bootstrap, `ConstraintSystem` calls the manager’s initialization routine, establishing the hook configuration before any constraint‑monitoring logic runs.
+1. **Parent – ConstraintSystem** – The **ConstraintSystem** aggregates the configuration manager, the unified hook manager, and the constraint enforcer. It likely bootstraps the loading process during system start‑up, ensuring that hook configurations are ready before any constraints are evaluated.
 
-2. **Sibling – UnifiedHookManager**  
-   - The manager *uses* `UnifiedHookManager` (found at `lib/agent-api/hooks/hook-manager.js`) to inject the final configuration.  
-   - `UnifiedHookManager` maintains a `Map` of event names to handler arrays; the manager’s output directly populates this map.
+2. **Sibling – ConstraintEnforcer** – This component pulls hook definitions from **HookConfigurationManager** to decide which constraints to apply and how. The shared dependency on **UnifiedHookManager** means both siblings benefit from a single point of hook lifecycle control.
 
-3. **Sibling – ConstraintMonitor & ViolationCaptureModule**  
-   - Both modules register their own handlers via the `UnifiedHookManager`.  
-   - Because the manager supplies the configuration, any changes to hook definitions instantly affect the events these siblings listen to, without additional coupling.
+3. **Sibling – ContentValidationModule** – While it does not directly interact with hook configurations, it shares the broader architectural theme of delegating specialized responsibilities to dedicated agents (e.g., `ContentValidationAgent`). This parallel reinforces the system’s modularity.
 
-4. **External – Config Loader / Validation / Cache / Logger**  
-   - The manager depends on a config‑loader to read `hook-config.yaml`.  
-   - It relies on a validation module to enforce schema correctness.  
-   - A caching layer (likely an in‑memory store) reduces repeated I/O.  
-   - A logger records each stage, enabling operators to troubleshoot configuration problems.
+4. **External – HookConfigLoader** – The loader is a pure‑function‑style utility that can be swapped or extended without impacting the manager. Its path (`lib/agent-api/hooks/hook-config.js`) makes it a clear integration point for any future configuration source.
 
-These integration points illustrate a **clear dependency direction**: `ConstraintSystem → HookConfigurationManager → UnifiedHookManager → (ConstraintMonitor, ViolationCaptureModule)`.  The manager is thus the *gateway* for all hook‑related configuration data.
-
----
+5. **External – UnifiedHookManager** – The manager’s output is consumed by the unified hook orchestrator (`lib/agent-api/hooks/hook-manager.js`). This orchestrator then registers hooks with the runtime, making the configuration manager an upstream supplier in the hook execution pipeline.
 
 ## Usage Guidelines  
 
-1. **Initialize Early** – Call `HookConfigurationManager.init()` as part of the `ConstraintSystem` startup sequence before any component attempts to register handlers with `UnifiedHookManager`.  This guarantees that the hook map is fully populated.
+* **Initialize Early** – Invoke the configuration loading sequence as part of the **ConstraintSystem** start‑up routine. Doing so guarantees that all downstream components (e.g., **ConstraintEnforcer**) see a fully merged configuration before any constraint checks occur.
 
-2. **Treat the Config as Immutable** – Once the manager has validated and cached the configuration, avoid mutating the returned object.  If a change is required (e.g., during a feature‑toggle rollout), invoke `HookConfigurationManager.reload()` so the manager can re‑run the load‑merge‑validate pipeline and update the `UnifiedHookManager` atomically.
+* **Treat the Repository as Read‑Only** – After the initial merge, the centralized repository should be considered immutable for the duration of the process. If dynamic reconfiguration is required, the pattern is to reload via **HookConfigLoader**, re‑merge, and replace the repository atomically.
 
-3. **Leverage the Cache** – The manager’s cache is transparent to callers; however, developers should be aware that rapid successive calls to `getConfig()` will hit the cache, while a manual reload will invalidate it.  Do not bypass the manager to read `hook-config.yaml` directly, as you would miss validation and merging logic.
+* **Add New Sources via HookConfigLoader** – When a new configuration source (e.g., a feature‑flag service) is needed, extend **HookConfigLoader** with a dedicated loader function and register it in the merge order. Do not modify the merge logic itself unless a new conflict‑resolution rule is required.
 
-4. **Log Appropriately** – Use the provided logger (or the system‑wide logger) to emit context‑rich messages when custom validation rules are added or when configuration reloads are triggered.  This aids observability and aligns with the manager’s own logging behavior.
+* **Do Not Bypass UnifiedHookManager** – All hook lifecycle actions (creation, activation, cleanup) must flow through **UnifiedHookManager**. Directly instantiating hooks from the configuration manager would break the lifecycle contract and could lead to resource leaks.
 
-5. **Validate Custom Extensions** – If a new hook type is introduced, extend the validation schema used by `HookConfigurationManager`.  Do not rely on ad‑hoc checks elsewhere; centralizing validation ensures consistency across all consumers.
+* **Version Compatibility** – If hook definitions evolve (new fields, deprecations), update the merge strategy to handle backward compatibility. The manager’s central role makes it the ideal place for such version‑translation logic.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural Patterns Identified
+* **Repository‑style centralized storage** for merged hook configurations.  
+* **Delegation/composition** – HookConfigurationManager delegates loading to HookConfigLoader and lifecycle to UnifiedHookManager.  
+* **Merge/Strategy pattern** – A deterministic merge algorithm consolidates multiple configuration sources.  
+* **Layered architecture** – Distinct layers for loading, merging, storing, and orchestrating hooks.
 
-* **Facade** – `HookConfigurationManager` presents a simple API while hiding loading, merging, validation, and caching complexities.  
-* **Pipeline / Chain of Responsibility** – The sequential steps (load → merge → validate → cache) form a processing pipeline.  
-* **Modular Configuration** – Configuration is externalized (`hook-config.yaml`) and consumed via a dedicated loader, supporting environment‑specific overrides.  
-* **Cache‑Aside** – The manager caches the validated configuration and serves it on demand, refreshing only on explicit reloads or source changes.
+### Design Decisions and Trade‑offs
+* **Centralized repository** simplifies access but introduces a single point of truth that must be kept immutable to avoid race conditions.  
+* **Merge strategy** provides flexibility to combine heterogeneous sources, yet the ordering of sources becomes a critical configuration that must be documented.  
+* **Loose coupling via interfaces** (manager → enforcer, manager → unified manager) enhances testability and extensibility, at the cost of additional indirection.  
+* **Extensibility focus** means new sources can be added without touching core logic, but it also requires disciplined versioning of the merge contract.
 
-### Design Decisions & Trade‑offs  
+### System Structure Insights
+* The **ConstraintSystem** acts as the umbrella component, orchestrating configuration, enforcement, and validation.  
+* **HookConfigurationManager** sits directly beneath the system, acting as the bridge between raw configuration data and the hook execution engine.  
+* Sibling components share the same underlying hook infrastructure, reinforcing a common runtime model while maintaining domain‑specific responsibilities.
 
-* **Centralized Validation** – Guarantees that all consumers see only correct configurations, at the cost of a single point of failure if validation logic is buggy.  
-* **In‑Memory Caching** – Improves performance and reduces I/O, but limits scalability across multiple process instances unless a shared cache is introduced.  
-* **YAML Config File** – Human‑readable and easy to edit, but requires a parser and schema enforcement to avoid runtime errors.  
+### Scalability Considerations
+* Because merging occurs in memory, the current design scales well for a moderate number of hook definitions. For very large configurations, the merge algorithm may need to be streamed or parallelised.  
+* Centralized storage is efficient for read‑heavy workloads (e.g., many constraint checks) but could become a bottleneck if frequent re‑loads are required; caching strategies or versioned snapshots could mitigate this.
 
-### System Structure Insights  
+### Maintainability Assessment
+* **High maintainability**: clear separation of loading, merging, storing, and orchestration reduces the cognitive load for developers.  
+* Extending the system is straightforward—add a loader, adjust merge order, and the rest of the pipeline automatically incorporates the new data.  
+* The reliance on a single repository demands disciplined change management; automated tests around merge outcomes and repository immutability are essential to prevent regressions.  
 
-`HookConfigurationManager` sits directly under `ConstraintSystem` and feeds the `UnifiedHookManager`.  Its responsibilities are orthogonal to the event‑handling logic of the `UnifiedHookManager` and to the business logic of `ConstraintMonitor` and `ViolationCaptureModule`.  This clear layering supports independent evolution of configuration handling versus event processing.
-
-### Scalability Considerations  
-
-* **Cache Size** – Since the hook configuration is typically modest, a simple in‑memory cache suffices for a single‑process deployment.  For horizontally scaled deployments, the cache would need to be externalized (e.g., Redis) to keep all instances consistent.  
-* **Hot Reload** – Providing a `reload` API enables zero‑downtime updates to hook definitions, which is essential for large, continuously‑running agents.  
-* **Lazy Loading** – If the configuration file becomes large, the manager could adopt lazy loading of individual hook sections, though the current observations do not indicate such a need.
-
-### Maintainability Assessment  
-
-The clear separation between configuration handling (`HookConfigurationManager`) and event dispatch (`UnifiedHookManager`) enhances maintainability.  Adding new validation rules or supporting additional config sources (e.g., a database) can be done inside the manager without touching the hook‑dispatch core.  The reliance on well‑named modules (loader, validator, cache, logger) further isolates concerns, making unit testing straightforward.  The main maintenance risk lies in the coupling to the concrete file path `hook-config.yaml`; any change to the location or format must be reflected in the loader module and documented accordingly.
+Overall, **HookConfigurationManager** embodies a well‑structured, extensible configuration hub that cleanly isolates concerns while providing the necessary hooks (pun intended) for the broader **ConstraintSystem** to enforce policies reliably.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's architecture is designed with flexibility and customizability in mind, utilizing a modular design that allows for easy extension and modification. This is evident in the use of the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js), which provides a central hub for hook management, handling hook event dispatch, handler registration, and configuration loading. The UnifiedHookManager uses a Map to store handlers for each event, allowing for efficient registration and retrieval of handlers. For example, the registerHandler function in hook-manager.js takes in an event name and a handler function, and stores them in the handlers Map for later retrieval.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component's architecture is characterized by a mix of event-driven and request-response patterns, with the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) playing a central role in hook orchestration. This is evident in the way it handles hook configurations loaded by the HookConfigLoader (lib/agent-api/hooks/hook-config.js), which merges configurations from multiple sources. The ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) is then used to validate entity content and detect staleness, leveraging the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions and data synchronization.
 
 ### Siblings
-- [ConstraintMonitor](./ConstraintMonitor.md) -- ConstraintMonitor uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to register handlers for constraint violation events.
-- [ViolationCaptureModule](./ViolationCaptureModule.md) -- ViolationCaptureModule uses the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to register handlers for constraint violation events.
-- [UnifiedHookManager](./UnifiedHookManager.md) -- UnifiedHookManager uses a Map to store handlers for each event, allowing for efficient registration and retrieval of handlers.
+- [ConstraintEnforcer](./ConstraintEnforcer.md) -- ConstraintEnforcer utilizes the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) to manage hook configurations loaded by the HookConfigLoader (lib/agent-api/hooks/hook-config.js), enabling flexible constraint enforcement.
+- [ContentValidationModule](./ContentValidationModule.md) -- ContentValidationModule utilizes the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) to validate entity content and detect staleness, providing a robust content validation mechanism.
 
 
 ---

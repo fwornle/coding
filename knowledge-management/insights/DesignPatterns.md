@@ -2,108 +2,128 @@
 
 **Type:** SubComponent
 
-The GraphDatabaseAdapter class in storage/graph-database-adapter.ts provides a layer of abstraction between the DesignPatterns sub-component and the graph database, promoting loose coupling and testability.
+The DesignPatterns sub-component follows the Model-View-Controller (MVC) pattern, separating concerns into model, view, and controller components
 
 ## What It Is  
 
-The **DesignPatterns** sub‑component lives inside the larger **CodingPatterns** component and its core runtime logic is centred on the `GraphDatabaseAdapter` class located at `storage/graph-database-adapter.ts`. This adapter is the sole gateway through which DesignPatterns interacts with the underlying graph database, providing a thin, purpose‑built API for creating nodes, establishing relationships, and executing arbitrary queries. By confining all persistence concerns to this single file, the sub‑component achieves a clear separation between domain‑level pattern logic and low‑level data‑access details.
+The **DesignPatterns** sub‑component lives inside the **CodingPatterns** component and is responsible for managing the catalogue of software design patterns. All persistence operations are delegated to the **GraphDatabaseAdapter** that resides in `storage/graph-database-adapter.ts`. When a new design pattern is created, the sub‑component calls `GraphDatabaseAdapter.storePattern`; when the catalogue needs to be displayed or analysed, it invokes `GraphDatabaseAdapter.retrievePatterns`.  
 
-The adapter is instantiated as a **Singleton**—the `getInstance` static method guarantees that every part of DesignPatterns (and any sibling component that also relies on the same adapter, such as **ArchitectureGuidelines**) receives the exact same adapter instance. This eliminates duplicated connections, reduces resource contention, and simplifies lifecycle management. In practice, developers working on DesignPatterns call the high‑level factory‑style methods `createNode`, `createRelationship`, and `query` to materialise pattern‑related entities inside the graph store.
+DesignPatterns is organised according to the **Model‑View‑Controller (MVC)** style: a model that represents the pattern data, a view that renders the pattern information to the user, and a controller that orchestrates user actions and database calls. The sub‑component also contains a child component, **DesignPatternCategorizer**, which leverages the same storage API to persist categorisation metadata for each pattern.  
 
-Because DesignPatterns is a child of **CodingPatterns**, it inherits the broader architectural intent of the parent: a modular library of reusable software‑design concepts that can be persisted, queried, and visualised through a graph model. The sibling components—**CodingConventions**, **ArchitectureGuidelines**, and **TestingFramework**—share the same overall repository but each addresses a distinct concern; only **ArchitectureGuidelines** also re‑uses the `GraphDatabaseAdapter`, illustrating a deliberate reuse of the abstraction across the ecosystem.
+Within the broader **CodingPatterns** ecosystem, DesignPatterns shares the same storage contract with its siblings—**CodingConventions**, **BestPractices**, **AntiPatterns**, and **CodeAnalysis**—all of which also use `storePattern` to write their respective artefacts to the graph database. This common contract enforces a uniform persistence strategy across the whole domain.
 
 ---
 
 ## Architecture and Design  
 
-The observable architecture of DesignPatterns is built around **layered abstraction** and two classic design patterns: **Singleton** and **Factory**. The `GraphDatabaseAdapter` sits in the *infrastructure* layer, exposing a clean contract (`createNode`, `createRelationship`, `query`) to the *domain* layer where pattern definitions reside. By abstracting the graph database behind this adapter, the sub‑component achieves **loose coupling**; the rest of the codebase never touches the raw driver or connection details, which improves testability and allows the underlying store to be swapped with minimal ripple.
+The architecture of DesignPatterns is deliberately layered and pattern‑rich. The top‑level **MVC** separation isolates UI concerns (view) from business rules (controller) and data representation (model). This promotes testability: the controller can be exercised with mock models, while the view can be rendered independently of the persistence layer.
 
-The **Singleton** pattern is realized through the static `getInstance` method in `storage/graph-database-adapter.ts`. This design decision guarantees a single, shared connection pool and consistent configuration across all consumers. The trade‑off is a global point of access, which can make unit‑testing more involved unless the singleton is mockable, but the benefit of reduced connection overhead outweighs that risk in a typical read‑heavy, write‑light pattern catalogue.
+Two behavioural patterns are woven throughout the sub‑component:
 
-The **Factory** pattern surfaces in the way nodes and relationships are created. Rather than callers manually constructing graph‑specific objects, they invoke `createNode` and `createRelationship`. These methods encapsulate the construction logic (e.g., assigning identifiers, default properties, or validation) and return a promise that resolves to the persisted entity. This centralisation of creation logic enforces consistency across the system and shields callers from database‑specific nuances.
+1. **Observer** – the model publishes change events (e.g., “patternAdded”, “patternUpdated”) to any registered observers. UI components, logging services, or the **DesignPatternCategorizer** can subscribe and react without the model needing to know their concrete implementations.  
 
-Together, these patterns support a **modular, test‑friendly architecture** where the DesignPatterns sub‑component can evolve its domain model without breaking the persistence contract. The parent component **CodingPatterns** benefits from this modularity, as it can orchestrate multiple sub‑components (including DesignPatterns) while delegating storage concerns to the shared adapter.
+2. **Factory** – creation of concrete `DesignPattern` objects is abstracted behind a factory interface. This allows the controller to request a new pattern instance without coupling to a specific class hierarchy, making it straightforward to introduce new pattern types (e.g., “Creational”, “Structural”) in the future.
+
+Command encapsulation is used for the two primary persistence actions. The controller builds a **StorePatternCommand** or **RetrievePatternsCommand**, each implementing a common `execute()` method. This decouples the *what* (store or retrieve) from the *how* (the GraphDatabaseAdapter implementation) and enables potential future extensions such as command queuing, undo/redo, or remote execution.
+
+All classes respect the **Single Responsibility Principle (SRP)**: the model only holds pattern data, the controller only coordinates flow, the factory only constructs objects, observers only react, and commands only perform a single database operation. This disciplined separation reduces the likelihood of ripple changes when requirements evolve.
 
 ---
 
 ## Implementation Details  
 
-The heart of the implementation is the `GraphDatabaseAdapter` class in `storage/graph-database-adapter.ts`. Its public API consists of:
+* **GraphDatabaseAdapter (storage/graph-database-adapter.ts)** – Provides two public methods, `storePattern(pattern: DesignPattern)` and `retrievePatterns(): DesignPattern[]`. The adapter abstracts the underlying graph database (e.g., Neo4j) and presents a simple CRUD‑like API to the rest of the system.  
 
-* **`static getInstance(): GraphDatabaseAdapter`** – Implements the Singleton pattern. Internally it checks a private static field (often named `_instance`) and creates the adapter on first call, ensuring a single object for the application lifetime.
-* **`createNode(node: NodeDescriptor): Promise<Node>`** – Acts as a Factory for graph nodes. The method receives a plain object describing the node (label, properties, etc.), translates it into the driver‑specific command, and returns a promise that resolves to the created node metadata. This method underpins the “efficient data storage” observation and contributes to scalability by batching or reusing connections.
-* **`createRelationship(sourceId: string, targetId: string, type: string, props?: any): Promise<Relationship>`** – Mirrors `createNode` but for edges. It encapsulates relationship‑type validation and property handling, keeping the rest of the codebase agnostic of the underlying query language.
-* **`query(cypher: string, params?: Record<string, any>): Promise<QueryResult>`** – Provides a flexible retrieval mechanism. Callers can supply arbitrary Cypher (or the graph‑DB’s query language) together with parameters, allowing DesignPatterns to support a wide range of query scenarios without proliferating specialized methods.
+* **DesignPatterns MVC** –  
+  * *Model*: a plain data class (e.g., `DesignPattern`) that holds fields such as `id`, `name`, `description`, and `category`. It includes an `addObserver(observer: PatternObserver)` method and notifies observers on mutation.  
+  * *View*: a presentation layer (could be a web component or CLI formatter) that subscribes to the model’s events and re‑renders the pattern list whenever a change is announced.  
+  * *Controller*: receives UI actions (e.g., “Create Pattern”), invokes the **Factory** to obtain a new `DesignPattern` instance, wraps the operation in a **StorePatternCommand**, and calls `command.execute()`. For listing patterns, it builds a **RetrievePatternsCommand** and forwards the result to the view.  
 
-All methods return promises, indicating an **asynchronous, non‑blocking** design that aligns with typical Node.js database drivers. The adapter also serves as a **test seam**: because the class is the sole consumer of the driver, test suites can replace it with a mock implementation that records calls to `createNode` or `query`, thereby validating higher‑level pattern logic without requiring a live graph instance.
+* **Factory** – Exposed as `DesignPatternFactory.create(type: string): DesignPattern`. The factory decides which concrete subclass (e.g., `CreationalPattern`, `BehavioralPattern`) to instantiate based on the supplied type string.  
 
-The adapter’s internal state likely includes a driver instance (e.g., Neo4j driver) and connection configuration read from environment variables or a config file. By centralising this in `GraphDatabaseAdapter`, any change to connection strings, authentication, or pooling parameters is isolated to a single location, simplifying maintenance.
+* **Observer** – Implemented via a simple interface `PatternObserver { onPatternChanged(event: PatternEvent): void; }`. The view and **DesignPatternCategorizer** implement this interface to stay synchronized with the model.  
+
+* **Command** – Two concrete command classes: `StorePatternCommand` (holds a reference to a `DesignPattern` and the adapter) and `RetrievePatternsCommand` (holds a reference to the adapter). Both expose an `execute()` method that performs the respective database call.  
+
+* **DesignPatternCategorizer** – A child component that subscribes to pattern change events. When a new pattern is added, it determines the appropriate category (perhaps via a rule engine) and persists the categorisation using the same `storePattern` method, ensuring that categorisation data lives alongside the pattern itself in the graph.
+
+Because the observations do not list concrete file names for the MVC pieces, the description stays at the architectural level while still grounding every element in the observed behaviours.
 
 ---
 
 ## Integration Points  
 
-DesignPatterns integrates with the rest of the system through two primary channels:
+1. **Parent – CodingPatterns** – DesignPatterns is a child of the **CodingPatterns** component, inheriting the shared `GraphDatabaseAdapter` contract. Any change to the adapter’s API (e.g., a new `updatePattern` method) will ripple through all sibling sub‑components, so the adapter is a critical integration boundary.  
 
-1. **Parent‑Level Integration (`CodingPatterns`)** – The parent component orchestrates the overall workflow of pattern discovery, storage, and retrieval. When a new design pattern is defined, the parent delegates persistence to `DesignPatterns` which, in turn, calls `GraphDatabaseAdapter.createNode` or `createRelationship`. Conversely, queries issued by the parent (e.g., “list all patterns of type Creational”) are routed through `GraphDatabaseAdapter.query`. This contract is implicit in the hierarchy description and is reinforced by the shared use of the adapter.
+2. **Siblings – CodingConventions, BestPractices, AntiPatterns, CodeAnalysis** – All these components also invoke `storePattern` to persist domain‑specific artefacts. This common usage suggests that they could share higher‑level abstractions (e.g., a generic `PatternService`) if the system grows, but currently each sub‑component maintains its own MVC stack.  
 
-2. **Sibling‑Level Reuse (`ArchitectureGuidelines`)** – The sibling component also depends on `storage/graph-database-adapter.ts`. Because the adapter is a Singleton, both DesignPatterns and ArchitectureGuidelines share the same underlying database connection, avoiding duplicate pools. This shared dependency illustrates intentional **cross‑component reuse**; any change to the adapter’s API must be coordinated across siblings, enforcing a stable interface.
+3. **Child – DesignPatternCategorizer** – The categorizer registers as an observer on the DesignPatterns model. Its only direct integration point is the observer subscription and the reuse of `storePattern` for persisting categorisation metadata.  
 
-External dependencies are limited to the graph‑database driver (not named in the observations) and possibly a configuration module that supplies connection details. The adapter exposes a clean TypeScript interface, making it straightforward for other components to import `GraphDatabaseAdapter` from its file path and call its methods. No other files or symbols were observed, indicating a deliberately minimal integration surface.
+4. **External Consumers** – Any UI layer or API endpoint that needs to expose design pattern data will interact with the DesignPatterns controller, which in turn uses commands to talk to the adapter. This indirect path keeps external callers insulated from database specifics.  
+
+5. **Testing Hooks** – Because commands encapsulate database calls, unit tests can replace the real `GraphDatabaseAdapter` with a mock that records method invocations, enabling isolated testing of controller logic and observer notifications.
 
 ---
 
 ## Usage Guidelines  
 
-* **Obtain the adapter via `GraphDatabaseAdapter.getInstance()`** – Never instantiate the class directly. This guarantees you are using the shared Singleton and prevents accidental creation of multiple driver connections.
-* **Prefer the factory methods (`createNode`, `createRelationship`) over raw queries** – These methods encapsulate validation and default handling, ensuring consistency across all persisted pattern entities. Use them whenever you need to add new nodes or edges.
-* **Use `query` only for read‑only, complex retrievals** – Because `query` accepts arbitrary Cypher, it bypasses the safety nets of the factory methods. Limit its use to reporting, visualisation, or search features where the query is well‑controlled and audited.
-* **Handle promises correctly** – All adapter methods are asynchronous. Await the returned promise or chain `.then/.catch` to manage success and error paths. This prevents unhandled rejections and aligns with the non‑blocking design of the component.
-* **Mock the adapter in unit tests** – Replace the Singleton instance with a test double that implements the same methods. This isolates pattern‑level logic from the actual database and speeds up the test suite.
-* **Do not expose the adapter outside the DesignPatterns package unless coordinated with siblings** – Since ArchitectureGuidelines also consumes the adapter, any API change must be communicated and versioned to avoid breaking sibling functionality.
+* **Always go through the controller** – Direct manipulation of the model or the adapter bypasses the command and observer pipelines, breaking the notification chain and potentially leaving the graph in an inconsistent state.  
+
+* **Prefer the factory for new patterns** – Instantiating `DesignPattern` objects directly couples code to concrete classes. Use `DesignPatternFactory.create(type)` so that future pattern subclasses can be added without touching controller code.  
+
+* **Subscribe via the observer interface** – When extending the UI or adding analytics, implement `PatternObserver` and register with the model. Do not poll the model for changes; rely on the event‑driven mechanism to keep the system responsive.  
+
+* **Treat commands as single‑purpose objects** – A command should encapsulate *one* database operation. If a workflow requires multiple steps (e.g., store a pattern then immediately retrieve its generated ID), compose commands sequentially rather than merging logic into a monolithic command.  
+
+* **Respect SRP when extending** – New responsibilities (e.g., validation, auditing) should be introduced as separate collaborators (validators, audit loggers) that are invoked by the controller, not as additions to the model or command classes.  
+
+* **Coordinate with siblings through the adapter** – If a new sibling component needs to store a different artefact type, reuse the existing `storePattern` method rather than creating a parallel storage API. This keeps the graph schema coherent and simplifies migration.  
 
 ---
 
 ### 1. Architectural patterns identified  
-* **Singleton** – implemented via `GraphDatabaseAdapter.getInstance`.  
-* **Factory** – embodied in `createNode` and `createRelationship` which encapsulate object creation.  
-* **Layered abstraction** – the adapter forms an infrastructure layer separating domain logic from persistence.
+* Model‑View‑Controller (MVC) – structural separation of concerns.  
+* Observer – event‑driven notification of model changes.  
+* Factory – encapsulated creation of `DesignPattern` instances.  
+* Command – encapsulation of store and retrieve operations.  
+* Single Responsibility Principle (SRP) – each class/module has one reason to change.  
 
 ### 2. Design decisions and trade‑offs  
-* **Singleton for connection reuse** – reduces resource consumption but introduces a global access point that must be carefully mocked in tests.  
-* **Factory methods for node/relationship creation** – promote consistency and validation; however, they can limit flexibility if a caller needs a very custom query, which is why the generic `query` method is also provided.  
-* **Single‑file adapter** – centralises database interaction, simplifying maintenance, but places all persistence concerns in one class, which could become large if more features are added.
+* **MVC** provides clear boundaries and testability but introduces three layers that must be kept in sync, adding modest overhead.  
+* **Observer** decouples UI and categorizer from the model, enabling extensibility; however, it requires careful management of subscription lifecycles to avoid memory leaks.  
+* **Factory** future‑proofs object creation at the cost of an extra indirection layer.  
+* **Command** isolates persistence logic, allowing easy swapping of storage strategies or adding cross‑cutting concerns (logging, retries), but may lead to a proliferation of tiny command classes if not managed.  
+* **SRP** yields high maintainability but can increase the number of small classes, which may feel fragmented to newcomers.  
 
 ### 3. System structure insights  
-* **DesignPatterns** is a child of **CodingPatterns**, inheriting the parent’s intent to catalogue reusable software concepts.  
-* **GraphDatabaseAdapter** is both a child (implementation detail) of DesignPatterns and a shared service for siblings like **ArchitectureGuidelines**, illustrating intentional reuse.  
-* Siblings do not directly interact with each other; they communicate indirectly through the shared adapter when needed.
+* The **CodingPatterns** parent component defines a shared persistence contract (`GraphDatabaseAdapter`) that all child sub‑components (DesignPatterns, CodingConventions, etc.) adhere to, fostering consistency across the domain.  
+* DesignPatterns’ internal MVC stack mirrors that of its siblings, suggesting a common architectural template that could be abstracted into a reusable framework.  
+* The child **DesignPatternCategorizer** demonstrates a vertical integration pattern: it consumes events from its parent’s model and writes back to the same storage, reinforcing a tight feedback loop.  
 
 ### 4. Scalability considerations  
-* The Singleton connection pool can be tuned (pool size, timeout) to support high query volumes without spawning excess connections.  
-* Asynchronous promise‑based methods enable non‑blocking I/O, allowing the component to handle many concurrent requests.  
-* Factory methods can batch node/relationship creation if the underlying driver supports it, further improving throughput.
+* Because persistence is delegated to a graph database via a thin adapter, scaling reads/writes can be achieved by scaling the underlying graph engine without altering the sub‑component code.  
+* The command pattern enables queuing or batching of `storePattern` calls, which can be introduced later to handle high‑throughput ingestion of patterns.  
+* Observer notifications are in‑process; if the number of observers grows dramatically, a more robust event bus (e.g., message queue) might be required to avoid synchronous bottlenecks.  
 
 ### 5. Maintainability assessment  
-* **High** – The clear separation of concerns, limited public API, and use of well‑known patterns make the codebase easy to understand and evolve.  
-* **Testability** – The adapter’s single responsibility and promise‑based interface lend themselves to straightforward unit mocking.  
-* **Risk** – Because multiple components share the same Singleton, a breaking change in the adapter’s signature could ripple across siblings; strict versioning and interface contracts mitigate this risk.
+The strict adherence to SRP, combined with well‑known patterns (MVC, Observer, Factory, Command), yields a highly maintainable codebase. Each responsibility is isolated, making unit testing straightforward. The shared `GraphDatabaseAdapter` reduces duplication across siblings, but it also creates a single point of failure—any breaking change in the adapter must be coordinated across all sub‑components. Overall, the design balances extensibility with clarity, positioning the system for incremental evolution without large‑scale rewrites.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, allowing for flexible persistence and retrieval of data. This is evident in the way the GraphDatabaseAdapter class is implemented, providing methods such as createNode, createRelationship, and query, which enable the creation and retrieval of data in the graph database. For instance, the createNode method in the GraphDatabaseAdapter class takes in a node object and returns a promise that resolves to the created node. This allows for efficient data storage and retrieval, promoting a scalable and maintainable architecture.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for graph database interactions, which enables flexible data storage and retrieval. This adapter is crucial for the component's functioning, as it allows for the storage and retrieval of complex relationships between coding patterns and practices. For instance, the `storePattern` method in the GraphDatabaseAdapter class (storage/graph-database-adapter.ts) is used to store a new pattern in the graph database, while the `retrievePatterns` method is used to retrieve all patterns from the database. The use of this adapter simplifies the process of managing complex data relationships, making it easier to analyze and understand the coding patterns and practices employed throughout the project.
 
 ### Children
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- The DesignPatterns sub-component utilizes the GraphDatabaseAdapter class for graph database interactions, as mentioned in the parent context.
+- [DesignPatternCategorizer](./DesignPatternCategorizer.md) -- Based on the parent context, the DesignPatterns sub-component uses the GraphDatabaseAdapter's storePattern method to store new design patterns in the graph database, which implies a categorization mechanism.
 
 ### Siblings
-- [CodingConventions](./CodingConventions.md) -- CodingConventions utilizes the ESLint library in the .eslintrc.json configuration file to enforce coding standards and detect potential errors.
-- [ArchitectureGuidelines](./ArchitectureGuidelines.md) -- ArchitectureGuidelines utilizes the GraphDatabaseAdapter class in storage/graph-database-adapter.ts to interact with the graph database, promoting a scalable and maintainable architecture.
-- [TestingFramework](./TestingFramework.md) -- TestingFramework utilizes the Jest testing framework to write and run unit tests, as configured in the jest.config.js file.
+- [CodingConventions](./CodingConventions.md) -- CodingConventions uses the GraphDatabaseAdapter's storePattern method to store new coding conventions in the graph database
+- [BestPractices](./BestPractices.md) -- BestPractices uses the GraphDatabaseAdapter's storePattern method to store new best practices in the graph database
+- [AntiPatterns](./AntiPatterns.md) -- AntiPatterns uses the GraphDatabaseAdapter's storePattern method to store new anti-patterns in the graph database
+- [CodeAnalysis](./CodeAnalysis.md) -- CodeAnalysis uses the GraphDatabaseAdapter's storePattern method to store new code analysis results in the graph database
 
 
 ---
 
-*Generated from 6 observations*
+*Generated from 7 observations*
