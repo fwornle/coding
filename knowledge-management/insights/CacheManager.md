@@ -1,111 +1,108 @@
 # CacheManager
 
-**Type:** Detail
+**Type:** SubComponent
 
-The caching mechanism may use a time-to-live (TTL) policy, where cached metadata is updated or expired after a certain period
+The implementation of caching in CacheManager demonstrates a thoughtful approach to managing the complexity of LLM operations in the DockerizedServices component.
 
 ## What It Is  
 
-CacheManager is a dedicated caching module that lives inside several higher‑level components of the system – OntologyClassificationComponent, LSLConverterComponent, SemanticAnalysisComponent, AgentIntegrationComponent, and MetadataManagementComponent.  Although the source tree does not expose a concrete file path (the observation list reports **0 code symbols found**), the repeated “contains CacheManager” phrasing tells us that each of those components ships its own instance (or a shared implementation) of a class named **CacheManager**.  Its primary responsibility is to hold metadata that has been derived or fetched by the surrounding component and to enforce a time‑to‑live (TTL) policy so that stale entries are refreshed or evicted automatically.  In addition, the observations hint that CacheManager may expose a **caching hierarchy** – multiple levels (for example, an in‑memory fast tier and a slower, possibly distributed tier) that are selected based on the type of metadata being cached.
+CacheManager is a **sub‑component** that lives in the *LLM* domain of the code base. Its concrete implementation resides in two files under the `lib/llm` directory:
 
-Because CacheManager sits directly under **MetadataManagementComponent**, it is part of the overall metadata lifecycle managed by the **MetadataManagementFramework** (implemented in `MetadataManagementFramework.java`).  The framework defines how metadata is created, updated, and persisted, while CacheManager supplies the transient storage that speeds up repeated look‑ups.  Sibling components such as **MetadataRepository** (a database‑backed store) provide the durable backing store that CacheManager can fall back to when a cache miss occurs.
+* `lib/llm/cache-manager.ts` – defines the `CacheManager` class and contains the core caching logic.  
+* `lib/llm/llm-service.ts` – provides the `LLMService` class that CacheManager calls into for both caching and circuit‑breaking capabilities.
 
-In short, CacheManager is the system’s short‑term, TTL‑driven metadata cache, instantiated within each major processing component and coordinated with the broader metadata management framework.
+The purpose of CacheManager is to **store frequently accessed data in memory**, thereby cutting the round‑trip latency for subsequent LLM‑related requests. It does not implement caching from scratch; instead it **leverages the caching mechanism already present in `LLMService`** and also taps the circuit‑breaker feature that `LLMService` exposes. CacheManager is a child of the higher‑level **DockerizedServices** component, which treats it as the dedicated cache layer for all LLM operations.
 
 ---
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is a **modular component‑centric design**.  Each high‑level component (e.g., OntologyClassificationComponent) owns a CacheManager instance, which suggests a **composition** relationship: the component *has‑a* CacheManager.  This composition isolates caching concerns from the business logic of the component while still allowing the component to control cache configuration (TTL values, hierarchy depth, etc.) directly.
+The observations reveal a **facade‑oriented architecture**: `LLMService` acts as a high‑level façade that centralises three cross‑cutting concerns—*mode routing*, *caching*, and *circuit breaking*—for every LLM request. CacheManager is a thin, purpose‑specific wrapper that delegates to this façade rather than re‑implementing the concerns itself.  
 
-The only explicit design pattern mentioned is the **TTL‑based expiration** strategy.  By attaching a lifespan to each cached entry, CacheManager can automatically purge or refresh data without external triggers, a classic **Cache‑Aside** approach where the owning component checks the cache first, falls back to the underlying repository (MetadataRepository), and then repopulates the cache.  The hinted “caching hierarchy” points to a **multi‑level cache** pattern, where a fast in‑memory layer (perhaps a `ConcurrentHashMap` or Guava cache) sits above a slower secondary layer (maybe a local disk cache or a distributed store).  The hierarchy enables the component to obtain the best‑possible latency while still providing fallback capacity for larger datasets.
+Two classic design patterns surface from the code‑level description:
 
-Interaction flows are straightforward: a component queries CacheManager; if the entry is present and unexpired, it is returned immediately.  If the entry is missing or its TTL has elapsed, the component retrieves the metadata from the **MetadataRepository** (the sibling persistence layer) or recomputes it, then writes the fresh value back into CacheManager.  Because CacheManager is embedded within each component, there is no cross‑component cache sharing, which simplifies concurrency concerns but also means cache duplication across components.
+1. **Facade Pattern** – `LLMService` (in `lib/llm/llm-service.ts`) presents a simplified interface for complex LLM operations, hiding the internal details of routing, caching, and resilience. CacheManager consumes this façade, keeping its own responsibilities narrow.  
+
+2. **Decorator/Wrapper Pattern** – Although not a full‑blown decorator class, CacheManager **wraps** the caching and circuit‑breaking capabilities of `LLMService`. By calling into `LLMService` for these concerns, CacheManager adds a layer of indirection that can be swapped or extended without touching the underlying service logic.
+
+Interaction flow (as inferred from the observations): a consumer (e.g., one of the sibling services such as `SemanticAnalysisService`) asks CacheManager for data. CacheManager forwards the request to `LLMService`, which checks its in‑memory cache; if the entry is present, it returns it instantly. If the cache miss occurs, `LLMService` may invoke the underlying LLM model, store the result in the cache, and return it. Simultaneously, `LLMService`’s circuit‑breaker monitors health signals and can short‑circuit calls to a failing downstream LLM endpoint, protecting the rest of the system.
 
 ---
 
 ## Implementation Details  
 
-Even though no concrete symbols were listed, the observations give us a clear mental model of the implementation:
+The **core class** is `CacheManager` in `lib/llm/cache-manager.ts`. While the observation set does not enumerate individual methods, we can infer that it at least exposes:
 
-1. **Class Structure** – Each component likely declares a field such as `private CacheManager cacheManager;`.  The CacheManager class probably encapsulates a map‑like data structure keyed by a metadata identifier (e.g., transcript ID) and stores a wrapper object that includes the cached value plus a timestamp indicating when it expires.
+* A **lookup** operation that checks whether a requested datum is already cached.  
+* A **store** operation that writes fresh results back into the cache.  
+* Possibly **invalidate** or **clear** utilities to manage cache lifecycle.
 
-2. **TTL Mechanics** – When an entry is inserted, CacheManager records the current time plus the configured TTL.  Retrieval logic checks the current time against this expiry timestamp; if the entry is past its deadline, it is treated as a miss and removed.  The TTL value may be supplied by the owning component (allowing different lifetimes for different metadata types) or fall back to a default defined in a configuration file.
+All of these operations are **implemented by delegating to `LLMService`** (found in `lib/llm/llm-service.ts`). `LLMService` itself contains the actual in‑memory data structures (e.g., a `Map` or LRU cache) and the logic for **circuit breaking**—monitoring error rates, opening the circuit, and providing fallback behaviour. CacheManager therefore does not maintain its own cache store; it acts as a **coordinator** that ensures the higher‑level service’s policies are honoured.
 
-3. **Hierarchical Levels** – A two‑tier design is the most plausible:  
-   * **Level 1 (L1)** – an in‑memory cache (e.g., `ConcurrentHashMap` or a library like Caffeine) that offers nanosecond‑scale reads.  
-   * **Level 2 (L2)** – a secondary cache that could be a local file‑based store or a lightweight distributed cache (e.g., Redis) for larger payloads or for sharing across process boundaries.  
-   When a lookup is performed, CacheManager first checks L1; on miss it checks L2; on miss again it delegates to the underlying repository.
-
-4. **Expiration & Refresh** – CacheManager may expose a scheduled cleanup task (e.g., a `ScheduledExecutorService`) that periodically scans the cache and evicts expired entries, reducing memory pressure.  Alternatively, lazy eviction on access is possible, where the entry is removed only when a stale read is attempted.
-
-5. **Configuration Hooks** – Because CacheManager is embedded in multiple components, each component can configure its own cache policy (TTL duration, maximum size, hierarchy enablement) via component‑level configuration files or dependency‑injection parameters.  This flexibility allows, for example, the **SemanticAnalysisComponent** to keep short‑lived caches for rapidly changing linguistic annotations, while the **OntologyClassificationComponent** may retain longer‑lived ontology lookup results.
+Because CacheManager is situated inside the DockerizedServices component, it benefits from the **Docker container boundaries** that encapsulate the entire LLM stack. This means that the in‑memory cache lives only for the lifetime of the container, providing fast access while also resetting on container restart—an implicit trade‑off between cache warm‑up time and simplicity of deployment.
 
 ---
 
 ## Integration Points  
 
-CacheManager’s integration surface is defined by the components that own it and the persistent store it falls back to.  The primary integration points are:
+CacheManager’s primary **dependency** is `LLMService` (`lib/llm/llm-service.ts`). It calls into this façade for both caching and circuit‑breaking, making `LLMService` the single point of integration for any LLM‑related data flow.  
 
-* **Parent – MetadataManagementComponent** – CacheManager supplies the fast path for metadata look‑ups that the parent component orchestrates.  When the parent’s workflow requests metadata, it first asks its CacheManager; on miss, the parent may invoke the **MetadataManagementFramework** to recompute or retrieve the data, then push the result back into the cache.
+The **parent component**, DockerizedServices, orchestrates the lifecycle of CacheManager alongside other sub‑components. DockerizedServices likely creates a singleton instance of CacheManager (or injects it via a DI container) so that all sibling services share the same cache view.
 
-* **Sibling – MetadataRepository** – CacheManager treats the repository as the authoritative source of truth.  The repository (implemented with JDBC/Hibernate) provides CRUD operations on persisted metadata; CacheManager only reads from it on a cache miss and writes back only when the component explicitly updates the cache.
+All **sibling services**—`SemanticAnalysisService`, `ConstraintMonitoringService`, `CodeGraphAnalysisService`, and `ModeRouter`—also depend on `LLMService`. Consequently, they indirectly share the same cache and circuit‑breaker state that CacheManager manipulates. This shared usage guarantees **consistent caching semantics** across the entire LLM domain, preventing duplicate caches and reducing memory pressure.
 
-* **Other Siblings – MetadataManagementFramework** – The framework defines the lifecycle hooks (create, update, delete) that components can use to invalidate or refresh cache entries.  For example, after the framework successfully updates a transcript’s metadata, the owning component can call `cacheManager.invalidate(id)` to ensure stale data is not served.
-
-* **External Consumers** – If any component exposes an API (e.g., a REST endpoint) that returns metadata, that endpoint will indirectly depend on CacheManager for performance.  The endpoint’s handler will invoke the component’s CacheManager before delegating to the repository.
-
-Because CacheManager is instantiated per component, there is no direct inter‑component cache sharing; integration is achieved through the common contracts defined by the **MetadataManagementFramework** and the **MetadataRepository**.
+From an interface standpoint, CacheManager probably exposes methods such as `get(key)`, `set(key, value)`, and `clear()`. These are called by the sibling services when they need to retrieve or store LLM results. The integration is therefore **tight but purposeful**: CacheManager does not expose any unrelated APIs, keeping its contract focused on cache‑centric operations.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Respect TTL Settings** – When inserting or updating cache entries, always supply the appropriate TTL that matches the volatility of the metadata.  Over‑long TTLs can cause stale data to linger, while overly aggressive TTLs may defeat the purpose of caching.
+1. **Prefer the CacheManager façade** over direct calls to `LLMService` for any operation that benefits from caching. This ensures that the circuit‑breaker logic is automatically applied and that cache consistency is maintained across all services.  
 
-2. **Prefer Cache‑Aside Access** – Call `cacheManager.get(key)` first; if it returns `null` (or an expired entry), fetch the data from `MetadataRepository` or recompute it, then store the fresh value with `cacheManager.put(key, value, ttl)`.  This pattern keeps the cache consistent with the source of truth.
+2. **Treat CacheManager as a shared singleton** within the DockerizedServices container. Do not instantiate multiple CacheManager objects; doing so would fragment the in‑memory cache and defeat the design’s intention of a single source of truth for cached LLM data.  
 
-3. **Invalidate on Mutations** – Whenever a component updates or deletes metadata through the **MetadataManagementFramework**, immediately invalidate the corresponding cache entry (`cacheManager.invalidate(key)`).  This prevents readers from receiving outdated information.
+3. **Respect the cache lifecycle**: when deploying new versions of the LLM model or updating configuration, consider clearing the cache (via CacheManager’s invalidate/clear method) to avoid serving stale results.  
 
-4. **Configure Hierarchy Thoughtfully** – Enable the secondary cache level only when the volume of cached items exceeds the memory budget of the primary in‑memory tier.  For low‑traffic components, a single‑level in‑memory cache may be sufficient and simpler to manage.
+4. **Handle circuit‑breaker states gracefully**. When CacheManager reports that a request was short‑circuited (e.g., by throwing a specific error type from `LLMService`), callers should fall back to a safe default or retry after a back‑off period, as the underlying LLM endpoint may be temporarily unhealthy.  
 
-5. **Monitor Cache Health** – Expose metrics (hit ratio, eviction count, size) from each CacheManager instance.  Because each component has its own cache, per‑component metrics help identify which parts of the system benefit most from caching and where TTL values may need tuning.
+5. **Avoid storing large binary blobs** in the CacheManager. Since the cache lives in memory within a Docker container, excessive memory usage can lead to OOM kills. Use size‑limiting strategies (e.g., LRU eviction) if the underlying `LLMService` supports them, or keep large payloads in an external store.  
 
 ---
 
-### Architectural patterns identified
-* **Composition** – each component *has‑a* CacheManager.  
-* **Cache‑Aside** – components read from the cache first, fall back to the repository, then repopulate.  
-* **TTL‑based expiration** – entries carry a time‑to‑live that governs automatic eviction.  
-* **Multi‑level cache** – hinted hierarchy suggests a fast L1 in‑memory tier plus a slower L2 tier.
+### Architectural Patterns Identified  
+* Facade (LLMService as a unified interface)  
+* Wrapper/Decorator (CacheManager delegating to LLMService)  
 
-### Design decisions and trade‑offs
-* **Per‑component cache** isolates concurrency concerns and allows tailored TTLs, at the cost of duplicated cached data across components.  
-* **TTL policy** offers simplicity and automatic staleness handling but requires careful sizing to balance freshness vs. hit rate.  
-* **Optional hierarchy** provides scalability for large metadata sets, but adds complexity in synchronization and eviction policies between levels.
+### Design Decisions and Trade‑offs  
+* **Centralising caching and circuit breaking** in LLMService simplifies the system but introduces tight coupling between CacheManager and LLMService.  
+* **In‑memory cache** yields low latency but limits scalability to the memory available in a single Docker container.  
+* **Circuit‑breaker integration** improves resilience at the cost of added complexity in error handling for callers.  
 
-### System structure insights
-CacheManager sits directly under **MetadataManagementComponent**, collaborating with sibling **MetadataRepository** (persistent store) and **MetadataManagementFramework** (lifecycle manager).  The repeated “contains CacheManager” relationship across five major components shows a deliberate architectural choice to give each processing domain its own caching layer while keeping the overall metadata lifecycle centralized.
+### System Structure Insights  
+CacheManager is a child of DockerizedServices and a peer to other LLM‑aware services. All siblings converge on the same `LLMService` façade, creating a **shared cross‑cutting concern layer** (caching + resilience) that is orchestrated by DockerizedServices.  
 
-### Scalability considerations
-* **Horizontal scaling** – because caches are component‑local, adding more instances of a component automatically adds more cache capacity without coordination.  
-* **Cache size limits** – each CacheManager should enforce a maximum entry count or memory budget to prevent runaway memory usage.  
-* **Secondary tier** – enabling an L2 cache (e.g., Redis) can share cached data across multiple process instances, improving cache hit rates when the same metadata is needed by different components.
+### Scalability Considerations  
+* The in‑memory cache scales linearly with container memory; horizontal scaling (multiple containers) would require a distributed cache if cross‑instance sharing is needed.  
+* Circuit‑breaker thresholds can be tuned per deployment to balance false positives vs. protection.  
 
-### Maintainability assessment
-The design is **highly maintainable**: caching logic is encapsulated within a single class per component, reducing the surface area for bugs.  The clear TTL contract and explicit invalidation points make reasoning about data freshness straightforward.  However, the lack of a shared cache means developers must remember to keep TTLs and invalidation logic consistent across components, which can introduce duplication.  Providing a common abstract base or utility library for CacheManager could mitigate this duplication while preserving the compositional benefits.
+### Maintainability Assessment  
+* **High maintainability** for caching logic because it resides in a single place (`LLMService`).  
+* **Moderate risk** of ripple effects: changes to `LLMService`’s caching or circuit‑breaker policies automatically affect CacheManager and all sibling services, so thorough regression testing is required when modifying those mechanisms.  
+* Clear separation of concerns (CacheManager as a thin wrapper) keeps the codebase readable and makes future extensions (e.g., adding a persistent cache layer) straightforward.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [MetadataManagementComponent](./MetadataManagementComponent.md) -- MetadataManagementComponent uses a metadata management framework in MetadataManagementFramework.java to manage metadata for transcripts and observations
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the LLMService (lib/llm/llm-service.ts) as a high-level facade for all LLM operations. This design decision allows for a centralized management of mode routing, caching, and circuit breaking. For instance, the LLMService class in lib/llm/llm-service.ts handles the routing of LLM requests to different modes, such as training or inference, based on the input parameters. The caching mechanism in LLMService also ensures that frequently accessed data is stored in memory, reducing the latency of subsequent requests. Furthermore, the circuit breaking feature in LLMService prevents cascading failures by detecting and preventing requests to faulty services. The implementation of these features in LLMService demonstrates a thoughtful approach to managing the complexity of LLM operations in the DockerizedServices component.
 
 ### Siblings
-- [MetadataManagementFramework](./MetadataManagementFramework.md) -- MetadataManagementFramework is implemented in MetadataManagementFramework.java, which defines the metadata management lifecycle
-- [MetadataRepository](./MetadataRepository.md) -- MetadataRepository is likely implemented using a database access library or framework, such as JDBC or Hibernate
+- [SemanticAnalysisService](./SemanticAnalysisService.md) -- SemanticAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route semantic analysis requests to different modes, such as training or inference, based on input parameters.
+- [ConstraintMonitoringService](./ConstraintMonitoringService.md) -- ConstraintMonitoringService leverages the LLMService class in lib/llm/llm-service.ts to route constraint monitoring requests to different modes, such as training or inference, based on input parameters.
+- [CodeGraphAnalysisService](./CodeGraphAnalysisService.md) -- CodeGraphAnalysisService leverages the LLMService class in lib/llm/llm-service.ts to route code graph analysis requests to different modes, such as training or inference, based on input parameters.
+- [ModeRouter](./ModeRouter.md) -- ModeRouter utilizes the lib/llm/llm-service.ts file to handle the routing of LLM requests to different modes.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*

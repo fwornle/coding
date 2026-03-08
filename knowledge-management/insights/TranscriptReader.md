@@ -2,95 +2,120 @@
 
 **Type:** Detail
 
-The TranscriptReader interface defines methods for reading transcript data, such as readTranscript() or getTranscriptMetadata(), which are implemented by concrete reader classes.
+Given the parent context, the TranscriptReader is likely responsible for handling various data formats and sources, although specific implementation details are not available.
 
 ## What It Is  
 
-The **TranscriptReader** is an abstraction that supplies a uniform way to ingest transcript data coming from a variety of agent‑specific formats.  It is defined as an interface (or abstract base type) that declares core operations such as `readTranscript()` – which returns the raw transcript content – and `getTranscriptMetadata()` – which extracts ancillary information (e.g., timestamps, speaker identifiers).  Concrete implementations such as **JSONTranscriptReader** and **XMLTranscriptReader** live alongside this interface and each knows how to parse its respective representation.  The interface itself is the contract that the surrounding **TranscriptAdapter** component relies on, allowing the adapter to treat every format as if it were the same logical object.  Although the observations do not list explicit file‑system locations, the interface and its implementations are co‑located in the same module that also houses the **TranscriptAdapterFactory**, which is responsible for instantiating the appropriate reader based on the incoming file type.
+**TranscriptReader** is the concrete component that knows how to ingest a transcript from a raw source and turn it into the in‑memory representation used by the rest of the system. It lives under the **TranscriptManager** hierarchy – the parent component that orchestrates the overall transcript workflow. The only concrete location that the observations give us is the call site in `transcript-manager.ts`, where the manager invokes a `readTranscript` method. This method is the public entry point of **TranscriptReader**, and its purpose is to abstract away the details of *where* a transcript comes from (file, API, database, etc.) and *how* it is parsed (different formats such as JSON, SRT, VTT, plain‑text, etc.).  
 
-## Architecture and Design  
-
-The design of **TranscriptReader** follows a classic *Factory Method* pattern.  The **TranscriptAdapterFactory** examines the incoming transcript (e.g., by file extension or a format header) and decides which concrete **TranscriptReader** subclass to instantiate.  By delegating the creation logic to the factory, the system gains *open‑for‑extension, closed‑for‑modification* characteristics: adding support for a new format (for example, a CSV‑based transcript) only requires a new reader class that implements the same interface and a small registration change in the factory, without touching the existing adapters or converters.  
-
-The interface itself embodies a *Strategy*‑like separation of concerns: the algorithm for parsing a transcript is encapsulated inside each reader implementation, while the higher‑level code (the **TranscriptAdapter** and **TranscriptConverter**) works against the stable, format‑agnostic contract.  This decoupling enables the **TranscriptConverter** to operate on a unified in‑memory representation regardless of the original source format, because the converter receives data that has already been normalized by the reader.
-
-Interaction flow (as inferred from the observations):
-
-1. **TranscriptAdapter** receives a request to load a transcript.  
-2. It forwards the request to **TranscriptAdapterFactory**.  
-3. The factory selects and constructs the appropriate **TranscriptReader** (e.g., `new JSONTranscriptReader()` or `new XMLTranscriptReader()`).  
-4. The adapter calls `readTranscript()` and `getTranscriptMetadata()` on the reader.  
-5. The raw transcript and its metadata are passed to **TranscriptConverter**, which maps the data into the system‑wide unified format.
-
-No other architectural styles (e.g., event‑driven, micro‑services) are mentioned, so the analysis stays within the boundaries of the observed factory‑based, interface‑driven design.
-
-## Implementation Details  
-
-The **TranscriptReader** interface defines at least two methods:
-
-* `readTranscript(): Transcript` – parses the source file and returns a domain‑specific `Transcript` object that encapsulates the conversational turns, timestamps, and any other payload.  
-* `getTranscriptMetadata(): TranscriptMetadata` – extracts higher‑level information such as source agent, version, or creation date.
-
-Concrete classes **JSONTranscriptReader** and **XMLTranscriptReader** each implement these methods using format‑specific parsing libraries (e.g., a JSON parser for the former, an XML DOM/SAX parser for the latter).  Because the interface does not expose parsing internals, the callers remain insulated from the complexity of handling different syntaxes.
-
-The **TranscriptAdapterFactory** contains a factory method, often named something like `createReader(String format)` or `createReader(File transcriptFile)`.  Inside this method a simple conditional (or a registration map) matches the detected format to the corresponding reader class.  The factory returns the result as a **TranscriptReader** reference, enabling polymorphic use.
-
-The **TranscriptAdapter** holds a reference to a **TranscriptReader** instance (as noted in the “Related Entities” section).  Its responsibilities include orchestrating the read operation, handling any I/O errors, and forwarding the normalized transcript to the **TranscriptConverter**.  The converter then applies a mapping strategy to translate the format‑specific `Transcript` into the system’s canonical model, ensuring downstream components see a consistent structure.
-
-No concrete code symbols were supplied, so the description remains at the level of class and method signatures that are directly mentioned in the observations.
-
-## Integration Points  
-
-* **Parent – TranscriptAdapter**: The adapter composes a **TranscriptReader**.  It is the primary consumer of the reader’s API and the gateway through which external callers request transcript ingestion.  
-* **Sibling – TranscriptAdapterFactory**: The factory is the sole producer of **TranscriptReader** instances.  Its public factory method is the integration contract for adding new readers.  
-* **Sibling – TranscriptConverter**: After a reader supplies the raw transcript, the converter consumes that output to produce a unified representation.  The converter expects the data to conform to the contract defined by **TranscriptReader**, which guarantees that metadata and content are available in a predictable shape.  
-* **External Dependencies**: Each concrete reader may depend on third‑party parsing libraries (e.g., Jackson for JSON, JAXB for XML).  These dependencies are encapsulated within the reader implementations, keeping the rest of the system free from format‑specific libraries.  
-
-The overall integration forms a linear pipeline: **Adapter → Factory → Reader → Converter → Unified Model**, with clear separation at each stage.
-
-## Usage Guidelines  
-
-1. **Never instantiate a concrete reader directly** – always request a reader through **TranscriptAdapterFactory**.  This ensures that future format extensions are automatically picked up and that the factory’s registration logic stays the single source of truth.  
-2. **Handle I/O and parsing exceptions at the adapter level**.  Since the reader’s contract does not expose low‑level errors, the adapter should wrap any `IOException`, `ParseException`, or similar in a domain‑specific `TranscriptReadException` to give callers a uniform error experience.  
-3. **Do not rely on the internal structure of the returned `Transcript` object**.  Treat it as an opaque payload that will be fed to **TranscriptConverter**; any format‑specific details should stay inside the reader implementation.  
-4. **When adding a new transcript format**, create a new class that implements **TranscriptReader**, register it in **TranscriptAdapterFactory**, and write unit tests that verify `readTranscript()` and `getTranscriptMetadata()` produce correct results for representative files.  
-5. **Keep metadata extraction lightweight** – the `getTranscriptMetadata()` method should avoid re‑parsing the entire file if possible; cache results within the reader instance if the same transcript may be queried multiple times.
+Even though the source code for **TranscriptReader** itself is not listed, the surrounding context makes its role clear: it is the *data‑format and source* handler that the manager delegates to, allowing the manager to stay focused on higher‑level concerns such as caching, error handling, and coordination of multiple transcripts.
 
 ---
 
-### Architectural patterns identified
-* **Factory Method** – realized by `TranscriptAdapterFactory` to create appropriate `TranscriptReader` implementations.  
-* **Strategy (via Interface)** – `TranscriptReader` defines a family of interchangeable parsing algorithms (JSON, XML, etc.).  
+## Architecture and Design  
 
-### Design decisions and trade‑offs
-* **Interface‑driven extensibility** allows new formats to be added without touching existing adapters, at the cost of requiring each new format to implement the full interface contract.  
-* **Centralized factory** simplifies client code but introduces a single point where format detection logic lives; mis‑detection can lead to runtime errors.  
-* **Separation of parsing and conversion** keeps readers focused on I/O and syntax, while converters handle semantic mapping, improving single‑responsibility adherence.
+The limited evidence points to a **layered, separation‑of‑concerns** architecture:
 
-### System structure insights
-* Hierarchical: **TranscriptAdapter** (parent) → **TranscriptReader** (child) → concrete readers (leaf).  
-* Lateral relationships: **TranscriptAdapterFactory** and **TranscriptConverter** are siblings that both depend on the reader contract.  
-* The pipeline is linear and deterministic, facilitating straightforward debugging and profiling.
+1. **Presentation/Orchestration Layer – `TranscriptManager`**  
+   - Resides in `transcript-manager.ts`.  
+   - Calls `readTranscript` to obtain raw transcript data.  
+   - Likely handles orchestration tasks such as selecting which transcript to load, retry logic, and exposing a clean API to the rest of the application.
 
-### Scalability considerations
-* Adding new formats scales horizontally: each new format adds a new reader class and a small factory registration entry.  
-* Parsing performance is bounded by the efficiency of the underlying format libraries; heavy transcripts may benefit from streaming parsers inside the concrete readers.  
-* The factory could become a bottleneck if format detection is expensive; caching the mapping from file extension to reader class mitigates this.
+2. **Data‑Acquisition Layer – `TranscriptReader`**  
+   - Implements `readTranscript`.  
+   - Encapsulates all knowledge about supported formats and source types.  
+   - Provides a single, well‑named method that hides the complexity of parsing and source handling.
 
-### Maintainability assessment
-* High maintainability due to clear separation of concerns and adherence to the Open/Closed Principle.  
-* The limited public API (`readTranscript`, `getTranscriptMetadata`) reduces the surface area for bugs.  
-* Documentation and unit tests for each concrete reader are essential to keep the contract stable as formats evolve.
+This separation mirrors the **Facade** pattern: `TranscriptManager` presents a simple façade (`readTranscript`) while delegating the heavy lifting to the underlying reader. It also reflects the **Strategy** idea, albeit implicitly – the reader could switch between different format‑specific parsers internally, allowing the manager to remain agnostic about which strategy is in use.
+
+Interaction is straightforward: `TranscriptManager → TranscriptReader.readTranscript → (internal parsers / I/O) → transcript object`. No evidence suggests asynchronous messaging, event‑driven pipelines, or service boundaries, so the design stays within a single process, likely a monolithic TypeScript/JavaScript codebase.
+
+---
+
+## Implementation Details  
+
+* **Method Signature** – The observable entry point is `readTranscript`. While the exact signature is not disclosed, the naming convention suggests it returns a structured transcript object (or a promise thereof) after performing I/O and parsing.  
+
+* **Format Handling** – The observation that the reader “handles various data formats and sources” implies an internal dispatch mechanism. Typical implementations would maintain a map of file‑extension or MIME‑type to parser classes (e.g., `JsonTranscriptParser`, `SrtTranscriptParser`). The reader would select the appropriate parser based on the source metadata and invoke a common interface such as `parse(rawData): Transcript`.  
+
+* **Source Abstraction** – Because the manager fetches data from “external sources,” the reader likely contains adapters for each source type (filesystem, HTTP endpoint, cloud storage). These adapters would expose a uniform `fetch()` method that returns raw bytes or text, which the format parsers then consume.  
+
+* **Error Propagation** – Given the manager’s responsibility for orchestration, the reader probably throws domain‑specific errors (e.g., `UnsupportedFormatError`, `SourceUnavailableError`). The manager can then translate these into higher‑level responses (fallbacks, user messages, logging).  
+
+* **Location in Codebase** – Although no concrete file path for `TranscriptReader` is listed, the naming convention suggests a sibling file to `transcript-manager.ts`, perhaps `transcript-reader.ts`. The manager’s import statement would look like `import { TranscriptReader } from './transcript-reader';`, reinforcing the tight coupling yet clear boundary between the two.
+
+---
+
+## Integration Points  
+
+1. **Parent – `TranscriptManager`**  
+   - Directly invokes `TranscriptReader.readTranscript`.  
+   - Supplies the source identifier (e.g., URL, file path) and possibly format hints.  
+   - Receives the parsed transcript and may augment it with metadata (timestamps, IDs) before exposing it to downstream components.
+
+2. **Sibling Components** (hypothetical)  
+   - Other managers that need transcript data (e.g., `SearchIndexBuilder`, `AnalyticsProcessor`). They would obtain the transcript via the manager rather than calling the reader directly, preserving the single source of truth.
+
+3. **Child/Internal Modules**  
+   - Format‑specific parsers and source adapters are internal to **TranscriptReader**. They are not exposed outside, keeping the public contract minimal.
+
+4. **External Dependencies**  
+   - May rely on Node’s `fs` module for file access, `axios`/`fetch` for HTTP, and third‑party libraries for parsing (e.g., `srt-parser-2`). These dependencies are encapsulated within the reader, preventing leakage into the manager.
+
+---
+
+## Usage Guidelines  
+
+* **Always go through `TranscriptManager`** – Developers should request transcripts via the manager’s public API rather than instantiating `TranscriptReader` directly. This guarantees that any caching, logging, or error‑handling policies defined at the manager level are applied consistently.
+
+* **Provide Accurate Source Metadata** – When calling the manager’s method, include a clear identifier (file path, URL) and, if known, the expected format. Supplying a format hint can bypass the reader’s runtime format detection and improve performance.
+
+* **Handle Errors Gracefully** – The manager will surface errors thrown by the reader. Consumers should anticipate `UnsupportedFormatError` and `SourceUnavailableError` and decide whether to fallback to an alternative source or surface a user‑friendly message.
+
+* **Do Not Modify Internal Parsers** – The parser implementations are considered private to `TranscriptReader`. If a new transcript format is required, extend the reader by adding a new parser class and registering it in the internal map rather than altering existing parsers.
+
+* **Testing** – Unit tests for `TranscriptReader` should focus on isolated format parsing and source adapters. Integration tests for `TranscriptManager` should verify that the manager correctly delegates to the reader and handles the various error conditions.
+
+---
+
+### Architectural Patterns Identified  
+
+1. **Facade** – `TranscriptManager` offers a simple façade (`readTranscript`) while delegating complexity.  
+2. **Strategy (implicit)** – The reader likely selects different parsers at runtime based on format.  
+3. **Separation of Concerns / Layered Architecture** – Clear division between orchestration (manager) and data acquisition/parsing (reader).
+
+### Design Decisions & Trade‑offs  
+
+* **Single Responsibility** – By isolating format handling in `TranscriptReader`, the system remains easier to extend (add new formats) but introduces an extra indirection layer that can affect latency if not cached.  
+* **Encapsulation of I/O** – Centralising source adapters inside the reader protects the rest of the codebase from changes in external APIs, at the cost of a larger, more complex reader component.  
+* **Synchronous vs Asynchronous** – The observations do not specify async behavior; choosing a synchronous `readTranscript` simplifies usage but may block the event loop for large files or remote fetches. An async design would improve scalability but adds promise handling complexity.
+
+### System Structure Insights  
+
+* The hierarchy is shallow: `TranscriptManager` → `TranscriptReader` → internal parsers/adapters.  
+* The lack of additional symbols suggests a focused, purpose‑built module rather than a sprawling library.  
+* The design anticipates multiple transcripts, implying that the manager may maintain a collection or cache of transcript objects, each produced by the reader.
+
+### Scalability Considerations  
+
+* **Horizontal Scaling** – Since the reader is a pure function of its inputs (source + format), it can be duplicated across worker processes or serverless functions without state conflicts.  
+* **Caching** – To avoid repeated parsing of the same transcript, the manager could introduce an in‑memory or distributed cache keyed by source identifier. This would reduce I/O load on the reader.  
+* **Parallel Reads** – If the system needs to load many transcripts concurrently, the reader’s internal parsers must be thread‑safe (or process‑safe) and the manager should invoke them asynchronously.
+
+### Maintainability Assessment  
+
+* **High Maintainability** – The clear boundary between manager and reader means that changes to supported formats only affect `TranscriptReader`.  
+* **Extensibility** – Adding a new format is as simple as implementing a new parser class and registering it, without touching the manager.  
+* **Risk Areas** – The reader’s internal dispatch logic could become a maintenance hotspot if many formats accumulate; keeping the parser registry declarative and well‑documented mitigates this risk.  
+* **Testing Footprint** – Because responsibilities are well‑defined, unit tests can be written for each layer independently, supporting a robust CI pipeline.
+
+Overall, **TranscriptReader** embodies a disciplined, single‑purpose design that complements its parent **TranscriptManager**. The architecture favours clarity, extensibility, and straightforward integration, while leaving room for performance optimisations (caching, async I/O) as the system scales.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter uses a factory pattern to create transcript readers for different agent formats, as seen in the TranscriptAdapterFactory class
-
-### Siblings
-- [TranscriptAdapterFactory](./TranscriptAdapterFactory.md) -- The TranscriptAdapterFactory class uses a factory method to create transcript readers, allowing for easy addition of new formats without modifying existing code.
-- [TranscriptConverter](./TranscriptConverter.md) -- The TranscriptConverter uses a mapping approach to convert transcripts from various formats to a unified format, ensuring consistency and compatibility across the system.
+- [TranscriptManager](./TranscriptManager.md) -- TranscriptManager uses the readTranscript method in transcript-manager.ts to fetch transcript data from external sources
 
 
 ---

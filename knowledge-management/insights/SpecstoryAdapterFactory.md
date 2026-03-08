@@ -1,115 +1,117 @@
 # SpecstoryAdapterFactory
 
-**Type:** Detail
+**Type:** SubComponent
 
-The connectViaHTTP, connectViaIPC, and connectViaFileWatch methods are implemented in the SpecstoryAdapter class to establish connections.
+The SpecstoryAdapterFactory handles errors and exceptions that occur during SpecstoryAdapter creation and configuration.
 
 ## What It Is  
 
-**SpecstoryAdapterFactory** is the factory component that lives inside the *SpecstoryConnector* package and is responsible for instantiating concrete **SpecstoryAdapter** objects. The concrete adapter implementation resides in `lib/integrations/specstory-adapter.js`. The adapter itself exposes three connection primitives – `connectViaHTTP`, `connectViaIPC`, and `connectViaFileWatch` – that the rest of the system uses to open a link to a Specstory service. In practice, a consumer of **SpecstoryConnector** does not instantiate the adapter directly; instead it asks the connector to create an adapter through **SpecstoryAdapterFactory**, specifying the desired connection method (HTTP, IPC, or file‑watch). The factory then returns a ready‑to‑use adapter instance that implements the requested method.
+The **SpecstoryAdapterFactory** is a sub‑component that lives inside the **Trajectory** component and is responsible for the creation, configuration, and lifecycle management of **SpecstoryAdapter** instances.  Although no source files are listed directly for the factory itself, the surrounding hierarchy makes it clear that the factory works hand‑in‑hand with the concrete adapter implementation found in `lib/integrations/specstory-adapter.js`.  The factory abstracts the instantiation details so that callers—most notably the **Trajectory** component and sibling modules such as **SpecstoryConnector**—can obtain a ready‑to‑use adapter without needing to know which concrete implementation or connection protocol (HTTP, IPC, file‑watch, etc.) is being employed.
+
+In short, the factory is the “creation façade” for the **SpecstoryAdapter** family: it hides the complexity of selecting a concrete adapter, applies any required configuration, and centralises error handling for the creation pipeline.
 
 ---
 
 ## Architecture and Design  
 
-The observable design is built around a **Factory pattern**. The **SpecstoryAdapterFactory** encapsulates the logic that decides *which* concrete adapter to supply based on a configuration value (the connection method). This isolates the creation logic from the rest of the code base and gives **SpecstoryConnector** a single, stable entry point for obtaining a connection‑capable object.
+The observations point directly to a classic **Factory** design pattern.  The **SpecstoryAdapterFactory** encapsulates the logic that decides *which* `SpecstoryAdapter` implementation to instantiate and *how* to configure it before returning the instance to the caller.  This separation of concerns allows the rest of the system to depend on the abstract notion of a “SpecstoryAdapter” rather than on any particular constructor signature or protocol‑specific details.
 
-The **SpecstoryAdapter** itself behaves like an **Adapter** (in the classic GoF sense) that translates the higher‑level connector API into three concrete transport mechanisms – HTTP, inter‑process communication (IPC), and file‑system watching. Each of those transports is expressed as a separate method (`connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch`) inside the same class, which hints at a **Strategy‑like** organization: the adapter holds multiple strategies for establishing a link, and the factory selects the appropriate one at instantiation time.
+Because the concrete adapter lives in `lib/integrations/specstory-adapter.js` and already implements a **Adapter**‑style interface (providing a unified API over HTTP, IPC, or file‑watch connections), the factory sits one level above the Adapter pattern.  The parent component **Trajectory** leverages this layered approach: it calls the factory to obtain an adapter, then uses the adapter to talk to the Specstory extension.  This layering yields a clean dependency direction—*Trajectory → SpecstoryAdapterFactory → SpecstoryAdapter*—which isolates protocol‑specific changes to the adapter implementation while keeping the factory’s contract stable.
 
-Interaction flow (derived from the observations):
+Error handling is also baked into the design.  The factory “handles errors and exceptions that occur during SpecstoryAdapter creation and configuration,” suggesting that it catches construction‑time failures (e.g., missing configuration, unavailable resources) and possibly translates them into domain‑specific exceptions.  This defensive stance aligns with the broader robustness strategy seen elsewhere in the codebase (e.g., the exponential‑backoff retry logic in `lib/service-starter.js` used by **Trajectory**).
 
-1. **SpecstoryConnector** receives a request to connect using a particular method.  
-2. It delegates to **SpecstoryAdapterFactory**, passing the method identifier.  
-3. **SpecstoryAdapterFactory** creates a **SpecstoryAdapter** (or a subclass, if future extensions require it) and returns it to the connector.  
-4. The connector then invokes the matching `connectVia*` method on the returned adapter to establish the actual connection.
-
-Because the factory is *contained* within **SpecstoryConnector**, the connector owns the lifecycle of its adapters, reinforcing a clear ownership boundary and reducing the risk of orphaned connections.
+Interaction with sibling components is minimal but intentional.  **SpecstoryConnector** also consumes the same `SpecstoryAdapter` class, meaning the factory can serve as a shared provisioning point for multiple consumers, reducing duplication and ensuring consistent configuration across the system.
 
 ---
 
 ## Implementation Details  
 
-The only concrete implementation we can reference is the file `lib/integrations/specstory-adapter.js`. Inside this module lives the **SpecstoryAdapter** class, which defines three public methods:
+* **Core Classes**  
+  * `SpecstoryAdapterFactory` – the entry point that exposes public methods such as `createAdapter()` (exact method names are not listed but are implied by “provides methods for creating and configuring SpecstoryAdapters”).  
+  * `SpecstoryAdapter` – the concrete implementation located in `lib/integrations/specstory-adapter.js`.  This class encapsulates the connection logic for the Specstory extension, supporting several protocols (HTTP, IPC, file‑watch).  
 
-* `connectViaHTTP(options)`: Opens a network socket to a Specstory endpoint using standard HTTP semantics. The method likely accepts an options object containing host, port, headers, etc., although the exact signature is not disclosed in the observations.
-* `connectViaIPC(path)`: Establishes an inter‑process communication channel, probably using a Unix domain socket or named pipe identified by `path`. This method is suited for local‑only deployments where low latency is required.
-* `connectViaFileWatch(filePath)`: Sets up a file‑system watcher on `filePath` and treats file changes as a signalling mechanism for communication with Specstory. This is a lightweight, file‑based integration useful in environments where network or IPC primitives are unavailable.
+* **Creation Workflow**  
+  1. **Factory Invocation** – A consumer (e.g., **Trajectory**) calls a factory method.  
+  2. **Implementation Selection** – Inside the factory, a decision is made about which concrete `SpecstoryAdapter` to instantiate. The observation that the factory “uses a specific SpecstoryAdapter implementation” implies a single default implementation, but the design leaves room for future variants.  
+  3. **Configuration** – The factory applies configuration parameters (likely read from a configuration file or environment) to the adapter instance before returning it.  
+  4. **Error Handling** – Any exception thrown during steps 2 or 3 is caught by the factory. The factory then either re‑throws a wrapped error or returns a sentinel value, ensuring that callers receive a predictable failure mode.  
 
-The **SpecstoryAdapterFactory** (implicitly part of the *SpecstoryConnector* codebase) contains a simple decision table or switch statement that maps a string such as `"http"`, `"ipc"`, or `"fileWatch"` to the corresponding method on a newly created **SpecstoryAdapter** instance. Because no separate subclass hierarchy is mentioned, the factory most likely returns the same **SpecstoryAdapter** class each time, leaving the caller to invoke the correct `connectVia*` method based on the original request.
+* **Error Management** – The factory’s responsibility for “handling errors and exceptions that occur during SpecstoryAdapter creation and configuration” suggests the presence of try/catch blocks around the instantiation logic, possibly logging the failure and exposing a clear error message to the caller. This mirrors the retry strategy found in `lib/service-starter.js`, indicating a system‑wide emphasis on resilience.
 
-The separation of concerns is evident: the adapter knows *how* to talk to Specstory via each transport, while the factory knows *which* transport the caller wants. This keeps the connector code tidy and prevents it from being littered with transport‑specific conditionals.
+* **No Direct Code Symbols** – The “0 code symbols found” note means the exact method signatures are not enumerated in the provided observations.  Consequently, the analysis stays at the level of responsibilities rather than concrete API details.
 
 ---
 
 ## Integration Points  
 
-* **Parent – SpecstoryConnector**: The connector holds a reference to **SpecstoryAdapterFactory**. All external callers interact with the connector; they never import the adapter or the factory directly. This encapsulation ensures that any change to the underlying transport logic does not ripple out to consumer code.
-* **Sibling – Other adapters** (not observed but implied): If the system later introduces additional adapters (e.g., a WebSocket‑based adapter), they would be created by the same factory, preserving a uniform creation interface.
-* **Child – SpecstoryAdapter**: The factory’s only child is the **SpecstoryAdapter** class defined in `lib/integrations/specstory-adapter.js`. The adapter implements the three connection methods that other parts of the system rely on.
-* **External dependencies**: While not explicitly listed, the three `connectVia*` methods are expected to depend on standard Node.js modules (`http`, `net`, `fs`/`fs.watch`) or third‑party libraries that provide HTTP, IPC, and file‑watch capabilities. The factory itself likely has no external dependencies beyond the adapter module.
+* **Parent – Trajectory**  
+  * The **Trajectory** component owns the factory (“Trajectory contains SpecstoryAdapterFactory”).  When Trajectory needs to communicate with the Specstory extension, it asks the factory for an adapter, then uses the adapter’s unified interface to issue commands.  The parent also benefits from the factory’s error handling, allowing Trajectory to focus on higher‑level workflow orchestration (e.g., retry logic in `lib/service-starter.js`).  
+
+* **Sibling – SpecstoryConnector**  
+  * **SpecstoryConnector** also consumes `SpecstoryAdapter` directly.  By sharing the same adapter implementation, both the connector and any other sibling (e.g., **PipelineCoordinator**) can rely on identical connection semantics, reducing the risk of protocol mismatches.  
+
+* **Other Siblings** – While not directly tied to the factory, components such as **GraphDatabaseManager**, **LLMInitializer**, **ConcurrencyController**, **PipelineCoordinator**, and **ServiceStarter** exist in the same layer.  Their presence signals a modular architecture where each sub‑component focuses on a distinct concern (graph persistence, LLM bootstrapping, concurrency, workflow coordination, service start‑up).  The factory’s clean contract enables these siblings to remain agnostic of how Specstory connectivity is provisioned.  
+
+* **External Dependencies** – The concrete `SpecstoryAdapter` likely depends on networking libraries (for HTTP/IPC) and file‑system watchers.  The factory abstracts these dependencies away from its callers, exposing only the high‑level configuration interface.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Never instantiate SpecstoryAdapter directly** – always go through **SpecstoryConnector**. The connector will internally call **SpecstoryAdapterFactory** to obtain the correctly configured adapter.
-2. **Specify the connection method explicitly** when invoking the connector’s connect routine. The method string (e.g., `"http"`, `"ipc"`, `"fileWatch"`) determines which `connectVia*` implementation the factory will expose.
-3. **Pass transport‑specific options to the connector** that will be forwarded to the adapter’s method. For HTTP, include host/port; for IPC, include the socket path; for file‑watch, include the file path.
-4. **Handle lifecycle events** (open, error, close) on the returned connection object. Because the adapter abstracts the transport, the same event‑handling pattern can be used regardless of the underlying mechanism.
-5. **Extend via the factory** if a new transport is required. Add a new case to the factory’s selection logic and implement the corresponding `connectVia*` method in `lib/integrations/specstory-adapter.js` (or a new subclass). This preserves the existing API contract.
+1. **Obtain adapters through the factory only** – Direct instantiation of `SpecstoryAdapter` is discouraged because the factory applies required configuration and centralises error handling.  Always call the factory’s creation method (e.g., `SpecstoryAdapterFactory.createAdapter(config)`).
+
+2. **Pass configuration explicitly** – When invoking the factory, provide any environment‑specific settings (protocol choice, endpoint URLs, time‑outs).  The factory will forward these to the adapter; omitting them may trigger default behaviours that could be unsuitable for production.
+
+3. **Handle factory‑thrown errors** – Since the factory catches and re‑throws creation‑time exceptions, callers should wrap factory calls in try/catch blocks and implement fallback or retry logic as appropriate.  This mirrors the retry pattern used in `lib/service-starter.js`.
+
+4. **Share adapters when possible** – If multiple parts of the same request flow need to talk to Specstory, reuse the adapter instance returned by the factory rather than creating a new one each time.  This conserves resources and ensures consistent connection state.
+
+5. **Do not modify the concrete adapter directly** – Any protocol‑specific changes should be made inside `lib/integrations/specstory-adapter.js`.  The factory will automatically pick up the updated implementation, preserving the separation of concerns.
 
 ---
 
 ### Architectural Patterns Identified  
 
-| Pattern | Where It Appears | Rationale |
-|---------|------------------|-----------|
-| **Factory** | `SpecstoryAdapterFactory` inside *SpecstoryConnector* | Centralises creation of adapters based on a connection‑method key. |
-| **Adapter** | `SpecstoryAdapter` (`lib/integrations/specstory-adapter.js`) | Provides a uniform interface (`connectVia*`) that translates higher‑level calls into transport‑specific logic. |
-| **Strategy (implicit)** | Separate `connectViaHTTP`, `connectViaIPC`, `connectViaFileWatch` methods | Each method encapsulates a distinct algorithm for establishing a connection. |
+* **Factory Pattern** – Centralises creation and configuration of `SpecstoryAdapter` instances.  
+* **Adapter Pattern** – `SpecstoryAdapter` itself provides a unified interface over multiple connection protocols (HTTP, IPC, file‑watch).  
 
----
+### Design Decisions and Trade‑offs  
 
-### Design Decisions & Trade‑offs  
-
-* **Indirection vs. Simplicity** – Introducing a factory adds an extra layer of indirection, which can seem unnecessary for only three connection types. However, it isolates creation logic, making future extensions (new transports) painless and keeping the connector’s public API stable.  
-* **Single Adapter vs. Subclass per Transport** – The current design keeps all three transports in one class. This reduces class proliferation but can lead to a larger, more complex class file. If transport logic diverges significantly, a subclass per transport could improve separation at the cost of more files.  
-* **Method‑Based Strategy vs. Polymorphic Strategy Objects** – Using separate methods (`connectVia*`) is straightforward but forces callers (or the factory) to know which method to call. A polymorphic strategy object (e.g., `HttpAdapter`, `IpcAdapter`) would allow the caller to treat every adapter uniformly (`adapter.connect()`). The chosen approach favours minimal code overhead.
-
----
+* **Encapsulation vs. Flexibility** – By funneling all adapter creation through a factory, the system gains strong encapsulation and a single point for error handling, at the cost of a small indirection layer.  The trade‑off is justified by the need for consistent configuration across many consumers.  
+* **Single Concrete Implementation** – The observations note a “specific SpecstoryAdapter implementation,” which simplifies the factory logic but limits extensibility.  Adding alternative adapters later would require extending the factory’s selection logic, a relatively low‑impact change thanks to the existing pattern.  
+* **Error Centralisation** – Handling creation‑time errors inside the factory avoids scattering try/catch blocks throughout the codebase, improving maintainability, though it places the onus on callers to be aware that the factory may throw domain‑specific exceptions.  
 
 ### System Structure Insights  
 
-* **Vertical hierarchy** – *SpecstoryConnector* → **SpecstoryAdapterFactory** → **SpecstoryAdapter** → transport‑specific code.  
-* **Horizontal cohesion** – All transport implementations are co‑located in a single file (`lib/integrations/specstory-adapter.js`), indicating a tightly coupled adapter module.  
-* **Encapsulation boundary** – The connector is the sole public façade; the factory and adapter remain internal implementation details, which protects the system from accidental misuse.
-
----
+* **Layered Dependency Flow** – `Trajectory → SpecstoryAdapterFactory → SpecstoryAdapter → External Specstory Service`.  
+* **Sibling Cohesion** – All sibling components operate independently but share the same high‑level architectural principles (single‑purpose modules, clear interfaces).  The factory’s clean contract enables this cohesion.  
 
 ### Scalability Considerations  
 
-* **Adding new transports** scales linearly: a new `connectViaXYZ` method plus a factory case. Because the factory abstracts creation, the rest of the system does not need to change.  
-* **Concurrent connections** – Since each adapter instance encapsulates its own transport, the system can spawn many adapters in parallel without interference, assuming the underlying Node.js primitives (HTTP agents, IPC sockets, file watchers) are used responsibly.  
-* **Resource consumption** – File‑watch based connections can be heavy on the OS if many files are monitored; the design should ensure that `connectViaFileWatch` is used sparingly or with proper throttling.
-
----
+* **Adapter Reuse** – Because the factory can hand out already‑configured adapters, the system can pool adapters for high‑throughput scenarios, reducing connection churn.  
+* **Error‑Resilient Creation** – Centralised error handling prepares the system for scaling under failure conditions; callers can implement exponential backoff (as seen in `lib/service-starter.js`) around factory calls without reinventing logic.  
 
 ### Maintainability Assessment  
 
-* **Clear separation of concerns** – The factory isolates object creation, and the adapter isolates transport logic, both of which are classic, well‑understood patterns that aid maintainability.  
-* **Low code duplication** – All transport methods share the same class, reducing duplicated scaffolding (constructor, error handling). However, if the methods grow in complexity, the single class could become a maintenance hotspot.  
-* **Testability** – The factory can be unit‑tested by mocking the adapter and verifying that the correct method is selected for each connection type. Each `connectVia*` method can be tested in isolation with stubs for the underlying Node.js APIs.  
-* **Documentation surface** – Because the public API is funneled through the connector, developers only need to learn one entry point, which simplifies onboarding and reduces the chance of misuse.  
-
-Overall, **SpecstoryAdapterFactory** provides a concise, extensible mechanism for selecting among a small but well‑defined set of connection strategies, leveraging established design patterns without unnecessary complexity.
+* **High Maintainability** – The separation of creation (factory) from usage (Trajectory, connectors) isolates changes.  Updating the adapter’s internals or adding new protocols only requires modifications in `lib/integrations/specstory-adapter.js` and, if needed, a small tweak in the factory’s selection logic.  
+* **Clear Ownership** – The factory’s sole responsibility is to produce adapters, making its codebase small and easy to review.  The lack of scattered instantiation points reduces the risk of bugs introduced by inconsistent configuration.  
+* **Potential Technical Debt** – The current design mentions only a “specific” implementation, which may become a hidden assumption if future requirements demand multiple adapter variants.  Planning for an extensible selection strategy now would mitigate future refactoring effort.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector uses the SpecstoryAdapter class (lib/integrations/specstory-adapter.js) to provide methods such as connectViaHTTP, connectViaIPC, and connectViaFileWatch for establishing connections
+- [Trajectory](./Trajectory.md) -- The Trajectory component's use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js allows for flexible connection establishment with the Specstory extension via multiple protocols such as HTTP, IPC, or file watch. This is evident in the way the SpecstoryAdapter class is instantiated and used throughout the component, providing a unified interface for different connection methods. Furthermore, the retry logic with exponential backoff implemented in the startServiceWithRetry function in lib/service-starter.js ensures that connections are re-established in case of failures, enhancing the overall robustness of the component.
+
+### Siblings
+- [SpecstoryConnector](./SpecstoryConnector.md) -- The SpecstoryAdapter class in lib/integrations/specstory-adapter.js is used to establish connections to the Specstory extension.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseManager uses a graph database to store and retrieve data.
+- [LLMInitializer](./LLMInitializer.md) -- The LLMInitializer uses a constructor to initialize the LLM.
+- [ConcurrencyController](./ConcurrencyController.md) -- The ConcurrencyController uses shared atomic index counters to implement work-stealing concurrency.
+- [PipelineCoordinator](./PipelineCoordinator.md) -- The PipelineCoordinator uses a coordinator agent to coordinate tasks and workflows.
+- [ServiceStarter](./ServiceStarter.md) -- The ServiceStarter uses the startServiceWithRetry function to retry failed services.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 6 observations*

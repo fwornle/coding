@@ -2,130 +2,102 @@
 
 **Type:** SubComponent
 
-The resolveMode method in LLMService determines the LLM mode based on the agent ID and other factors, and returns the corresponding mode.
+The LLMService class in lib/llm/llm-service.ts implements a dependency injection mechanism to resolve the current LLM provider, supporting various LLM providers and making it easier to switch between different providers.
 
 ## What It Is  
 
-**LLMService** is the core sub‑component that orchestrates all Large‑Language‑Model (LLM) related operations for the system. The implementation lives in the file **`lib/llm/llm-service.ts`**, which the parent component **LLMAbstraction** treats as the single source of truth for LLM behavior. By exposing a small, well‑defined API (e.g., the `resolveMode` method) and by receiving its collaborators through dependency injection, LLMService can be swapped, mocked, or extended without touching its internal logic. Its primary responsibility is to determine which *LLM mode* should be used for a given request, based on contextual data such as the agent identifier and any other runtime factors.
-
----
+**LLMService** is the primary entry point for all language‑model operations in the *LLMAbstraction* sub‑component. Its implementation lives in **`lib/llm/llm-service.ts`**. The class orchestrates the flow of a request through a configurable pipeline that includes **mode routing** (selecting between *mock*, *local*, or *public* operation modes), **caching** of results, and **circuit‑breaking** to protect downstream providers. By exposing a set of standardized interfaces for each LLM operation, LLMService hides the concrete provider details and presents a uniform API to the rest of the system.
 
 ## Architecture and Design  
 
-The design of LLMService is deliberately **dependency‑injection (DI)‑centric**. The parent **LLMAbstraction** injects a suite of functions into LLMService—including the mode‑resolution function, a mock service, a repository path resolver, a budget tracker, a sensitivity classifier, and a quota tracker. This mirrors the pattern used by the sibling **DependencyInjector**, which exists to centralise the wiring of concrete implementations. The DI approach yields two immediate architectural benefits:
+The design of LLMService is distinctly **modular**. The service is split into focused responsibilities that are wired together at runtime. Three architectural patterns emerge from the observations:
 
-1. **Flexibility** – Different environments (development, testing, production) can provide alternative implementations for any of the injected functions, allowing the same LLMService code to operate under varied constraints.  
-2. **Testability** – Unit tests can replace heavy LLM calls with lightweight mocks simply by supplying a different function during injection, keeping the `resolveMode` logic isolated from external side‑effects.
+1. **Dependency Injection (DI)** – LLMService resolves the current LLM provider through an injected resolver, allowing the concrete provider (Anthropic, OpenAI, Groq, etc.) to be swapped without touching the service logic. This DI mechanism is implemented directly in `lib/llm/llm-service.ts`.
 
-LLMService also **contains** a child component called **ModeResolver**. While the observations do not detail ModeResolver’s internal structure, its placement under LLMService indicates a clear separation of concerns: ModeResolver encapsulates the logic that maps input parameters (e.g., agent ID) to a concrete LLM mode, while LLMService remains the façade that callers interact with.
+2. **Factory Pattern** – Although the factory lives in a sibling file (`lib/llm/llm-provider-factory.ts`), LLMService relies on it to instantiate provider objects. The factory abstracts the creation logic for each provider, keeping LLMService focused on orchestration rather than object construction.
 
-The overall architecture can be visualised as a small hierarchy:
+3. **Pluggable / Configuration‑Based Architecture** – LLMService reads a configuration object to decide which **mode** to operate in and which concrete operation implementations to invoke. The predefined modes (`mock`, `local`, `public`) are enumerated in the same file, and new modes or operations can be added by extending the configuration without modifying the core service.
 
-```
-LLMAbstraction
- ├─ LLMService (lib/llm/llm-service.ts)
- │    └─ ModeResolver
- └─ DependencyInjector (sibling, also DI‑focused)
-```
-
-No other architectural patterns (such as event‑driven or micro‑service boundaries) are mentioned, so the system’s core structural decision revolves around **composition via DI** and **encapsulation of mode‑resolution logic**.
-
----
+These patterns interact as follows: the **LLMModeResolver** (sibling component) examines the configuration and determines the active mode; the **LLMProviderFactory** creates the appropriate provider instance; LLMService then injects that provider, applies caching, and optionally triggers circuit‑breaker logic before returning the result. The parent component **LLMAbstraction** ties the whole sub‑system together, promoting reuse across the broader codebase.
 
 ## Implementation Details  
 
-### Core Class – `LLMService`  
-- Defined in **`lib/llm/llm-service.ts`**.  
-- Receives a set of injectable functions through its constructor or setter methods (the exact signature is not disclosed, but the parent LLMAbstraction supplies resolvers for mode, mock service, repository path, budget tracking, sensitivity classification, and quota tracking).  
-- Holds a reference to a **ModeResolver** instance, which it delegates to when determining the appropriate LLM mode.
+At the heart of `lib/llm/llm-service.ts` sits the **`LLMService` class**. Its constructor accepts injected collaborators—most notably a *mode resolver* and a *provider factory*. The class exposes a collection of **operation interfaces** (e.g., `generateText`, `embedDocuments`, etc.), each defined with a consistent signature so callers can rely on uniform behaviour regardless of the underlying provider.
 
-### `resolveMode` Method  
-- The public entry point for mode determination.  
-- Accepts parameters that include at least the **agent ID**; the observation notes that “other factors” are also considered, implying the method may inspect request metadata, configuration flags, or runtime state supplied via the injected functions.  
-- Calls into **ModeResolver** (or directly uses the injected mode‑resolution function) to compute the correct mode, then returns this mode to the caller.  
-- Because the method’s decision logic is externalised via DI, the concrete algorithm can be swapped without modifying LLMService itself.
+* **Mode Routing** – When an operation is invoked, LLMService consults the resolved mode (mock, local, public). The mode determines which concrete implementation class is selected. For example, in *mock* mode the service may return canned responses, while *public* mode forwards the request to a live provider.
 
-### ModeResolver (Child)  
-- Though not detailed, its existence as a child component suggests it encapsulates the mapping rules (e.g., a lookup table, conditional logic, or policy engine) that translate an agent’s context into a concrete mode identifier.  
-- By being a separate module, ModeResolver can evolve independently—adding new modes or changing resolution criteria—while LLMService’s public contract remains stable.
+* **Caching Mechanism** – Before delegating to the provider, LLMService checks an internal cache (implementation details are encapsulated within the same file). Cached results are returned instantly, reducing latency and avoiding unnecessary provider calls. Cache keys are typically derived from the operation’s input payload and the current mode.
 
-### Interaction with Parent – LLMAbstraction  
-- LLMAbstraction creates an instance of LLMService, providing all required injected functions.  
-- This parent component also likely orchestrates higher‑level flows (e.g., request handling, budgeting) and uses the mode returned by LLMService to route calls to the appropriate underlying LLM implementation.
+* **Circuit Breaking** – Although not enumerated in the raw observations, the hierarchy context notes that LLMService incorporates circuit‑breaker logic. This protects the system from cascading failures when a provider becomes unresponsive; after a configurable failure threshold the service short‑circuits further calls and may fall back to a safe mode (e.g., mock).
 
----
+* **Pluggable Architecture** – Adding a new operation or provider does not require changes to LLMService’s core. Developers can register a new provider in `LLMProviderFactory` and expose a new interface in `LLMService`; the configuration‑driven routing will automatically recognize and use it.
 
 ## Integration Points  
 
-1. **Parent – LLMAbstraction**  
-   - Supplies the DI payload (mode resolver, mock service, repository path, budget tracker, sensitivity classifier, quota tracker).  
-   - Consumes the mode returned by `LLMService.resolveMode` to decide which LLM backend to invoke.
+LLMService sits within the **LLMAbstraction** hierarchy, acting as the bridge between high‑level application code and low‑level LLM providers. Its primary integration points are:
 
-2. **Sibling – DependencyInjector**  
-   - Provides the infrastructure that assembles concrete implementations for the injectable functions.  
-   - Ensures that the same DI container can be reused across LLMAbstraction, LLMService, and any other components that need interchangeable dependencies.
+* **LLMModeResolver (`lib/llm/llm-mode-resolver.ts`)** – Supplies the active mode based on runtime configuration or environment variables. LLMService calls into this resolver each time an operation starts.
 
-3. **Child – ModeResolver**  
-   - Directly invoked (or indirectly via the injected resolver) by `LLMService.resolveMode`.  
-   - May itself depend on configuration files, feature flags, or external policy services, though those details are not disclosed.
+* **LLMProviderFactory (`lib/llm/llm-provider-factory.ts`)** – Generates concrete provider instances (Anthropic, OpenAI, Groq). LLMService depends on the factory’s `createProvider` method to obtain a ready‑to‑use client.
 
-4. **External Services**  
-   - The injected **budget tracker**, **sensitivity classifier**, and **quota tracker** hint at integration with accounting, compliance, and rate‑limiting subsystems.  
-   - By passing these as functions, LLMService remains agnostic to the underlying storage or network protocols, making it easy to replace a cloud‑based quota service with a local stub for testing.
+* **Configuration Objects** – Passed into LLMService (often via DI) to dictate mode selection, cache policies, and circuit‑breaker thresholds. Because the configuration is the single source of truth, any change to behaviour propagates automatically.
 
----
+* **Consumer Code** – Any component that needs LLM capabilities imports `LLMService` from `lib/llm/llm-service.ts` and invokes the standardized operation interfaces. The consumer remains agnostic to whether the request is fulfilled by a mock stub, a local model, or a public API.
 
 ## Usage Guidelines  
 
-- **Always instantiate LLMService through LLMAbstraction** (or the DependencyInjector) rather than using `new LLMService()` directly. This guarantees that all required functions are injected, preserving the component’s intended flexibility and testability.  
-- **When writing unit tests**, provide mock implementations for the injected functions—especially the mode‑resolution function—to isolate the behavior under test. Because `resolveMode` is the primary public method, tests can verify that given a specific agent ID the expected mode is returned without invoking real LLM back‑ends.  
-- **Do not hard‑code mode logic inside callers**; rely on `LLMService.resolveMode` to encapsulate that decision. This prevents duplication of resolution rules across the codebase and keeps future mode‑addition changes localized to ModeResolver.  
-- **If extending the system with new LLM modes**, update the ModeResolver (or the injected resolver function) rather than altering LLMService itself. The DI design ensures that the rest of the system automatically picks up the new mode as long as the parent continues to inject the updated resolver.  
-- **Monitor performance of injected collaborators** (budget tracker, sensitivity classifier, etc.) because they are called indirectly through LLMService. Inefficient implementations could degrade the latency of `resolveMode`, which is often on the critical path for request handling.
+1. **Prefer Configuration Over Code Changes** – To switch between mock, local, or public modes, adjust the configuration supplied to LLMService rather than modifying source files. This keeps the system flexible and aligns with the pluggable design.
+
+2. **Leverage Caching Wisely** – Cache keys are derived from operation inputs; ensure that inputs are deterministic when you expect cache hits. For non‑idempotent requests, consider disabling caching via configuration.
+
+3. **Respect Circuit‑Breaker Settings** – The circuit‑breaker thresholds are defined in the same configuration object. Do not set overly aggressive failure limits unless you have a fallback strategy (e.g., fallback to mock mode).
+
+4. **Add New Providers Through the Factory** – When introducing a new LLM provider, implement its client class and register it in `LLMProviderFactory`. Do not modify LLMService directly; the service will automatically pick up the new provider based on configuration.
+
+5. **Maintain Interface Consistency** – All new LLM operations should conform to the existing interface patterns exposed by LLMService. This ensures that downstream consumers continue to receive a stable contract.
 
 ---
 
-### Architectural Patterns Identified  
+### Architectural patterns identified
+* Modular design  
+* Dependency Injection (DI)  
+* Factory pattern (via `LLMProviderFactory`)  
+* Configuration‑driven routing  
+* Pluggable architecture  
+* Caching (as a cross‑cutting concern)  
+* Circuit‑breaker (as noted in hierarchy context)
 
-1. **Dependency Injection (DI)** – Central to LLMService, LLMAbstraction, and DependencyInjector.  
-2. **Composition over Inheritance** – LLMService composes child ModeResolver and injected functions rather than inheriting behavior.  
+### Design decisions and trade‑offs
+* **DI vs. hard‑coded provider selection** – Improves testability and provider swapping at the cost of added indirection.  
+* **Configuration‑based mode routing** – Enables rapid environment changes without code edits, but relies on accurate config management.  
+* **Caching** – Boosts performance and reduces provider cost; however, stale data may appear if cache invalidation is not handled.  
+* **Circuit breaking** – Increases resilience but introduces latency during failure detection windows.
 
-### Design Decisions and Trade‑offs  
+### System structure insights
+* `LLMService` is the orchestrator, sitting under the parent **LLMAbstraction** and coordinating sibling components **LLMModeResolver** and **LLMProviderFactory**.  
+* The codebase is split by responsibility: mode resolution, provider creation, and operation orchestration each live in their own module, reinforcing separation of concerns.
 
-- **Decision:** Use DI to supply all external collaborators.  
-  - *Trade‑off:* Slightly higher initial wiring complexity but gains in testability and configurability.  
-- **Decision:** Isolate mode‑resolution logic in a dedicated child (ModeResolver).  
-  - *Trade‑off:* Adds an extra indirection layer, but improves single‑responsibility and eases future extensions.  
+### Scalability considerations
+* **Horizontal scaling** – Because LLMService is stateless aside from its cache, multiple instances can be deployed behind a load balancer.  
+* **Cache scalability** – For large‑scale deployments, the in‑process cache may need to be externalized (e.g., Redis) to share state across instances.  
+* **Provider pool** – Adding more providers simply involves extending the factory; the service can route traffic to any number of back‑ends without redesign.
 
-### System Structure Insights  
-
-- The system is organised as a thin hierarchy where **LLMAbstraction** acts as the orchestrator, **LLMService** as the façade for LLM concerns, and **ModeResolver** as the policy engine for mode selection.  
-- Sibling components like **DependencyInjector** provide a shared DI mechanism, reinforcing a consistent wiring strategy across the codebase.  
-
-### Scalability Considerations  
-
-- Because mode resolution is a pure function (or delegated to a pure resolver), it can be scaled horizontally: multiple instances of LLMService can run in parallel without shared mutable state.  
-- The injected **budget tracker**, **quota tracker**, and **sensitivity classifier** may become bottlenecks if they involve remote calls; scaling those services independently will be necessary to maintain overall throughput.  
-
-### Maintainability Assessment  
-
-- The heavy reliance on DI and clear separation of concerns makes the codebase **highly maintainable**. Changes to mode‑selection rules, budgeting logic, or sensitivity checks can be made in isolated modules without ripple effects.  
-- The explicit file location (`lib/llm/llm-service.ts`) and the straightforward naming (LLMService, ModeResolver) aid discoverability.  
-- However, maintainers must keep the DI configuration up‑to‑date; missing or mismatched injected functions could lead to runtime errors that are only caught during execution. Proper documentation of the injection contract mitigates this risk.
+### Maintainability assessment
+* The heavy reliance on DI, factories, and configuration yields high maintainability: changes are localized to configuration files or factory registrations.  
+* Clear separation between mode resolution, provider creation, and operation handling reduces the risk of regression when extending functionality.  
+* The explicit interfaces for LLM operations provide a stable contract, aiding both documentation and automated testing.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component uses dependency injection to set functions that resolve the current LLM mode, mock service, repository path, budget tracker, sensitivity classifier, and quota tracker in the LLMService class (lib/llm/llm-service.ts). This design decision allows for flexibility and testability, as different implementations can be easily swapped in. The resolveMode method in LLMService, which determines the LLM mode based on the agent ID and other factors, is a good example of this. The method takes into account various parameters, such as the agent ID, to decide which LLM mode to use, and returns the corresponding mode. This approach enables the component to adapt to different scenarios and requirements.
-
-### Children
-- [ModeResolver](./ModeResolver.md) -- The LLMService sub-component uses dependency injection to set functions that resolve the current LLM mode, indicating a flexible design decision.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component utilizes a modular design, with its codebase organized into multiple modules and files, each with its own specific responsibilities and functions. For instance, the LLMService (lib/llm/llm-service.ts) serves as the primary entry point for all LLM operations, handling mode routing, caching, and circuit breaking. This modular design promotes code reusability and maintainability, as seen in the use of design patterns such as dependency injection and factory patterns. The dependency injection in LLMService (lib/llm/llm-service.ts) enables the resolution of the current LLM provider and supports various LLM modes, making it easier to switch between different providers or modes without affecting the rest of the codebase.
 
 ### Siblings
-- [DependencyInjector](./DependencyInjector.md) -- DependencyInjector uses a design pattern to allow for flexibility and testability by easily swapping in different implementations.
+- [LLMModeResolver](./LLMModeResolver.md) -- LLMModeResolver uses a modular design in lib/llm/llm-mode-resolver.ts to determine the current LLM mode, handling different modes such as mock, local, or public.
+- [LLMProviderFactory](./LLMProviderFactory.md) -- LLMProviderFactory uses a factory pattern in lib/llm/llm-provider-factory.ts to create instances of different LLM providers, such as Anthropic, OpenAI, and Groq.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*
