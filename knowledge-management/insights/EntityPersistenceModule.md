@@ -2,168 +2,110 @@
 
 **Type:** SubComponent
 
-This sub-component could utilize a transactional database, such as PostgreSQL, to ensure atomicity and consistency when storing entities.
+EntityPersistenceModule could leverage the 'getGraph' function from the GraphDatabaseAdapter to retrieve the graph database, either from the VKB API or the local LevelDB storage, depending on the configuration.
 
 ## What It Is  
 
-The **EntityPersistenceModule** is a sub‑component of the **KnowledgeManagement** system that is responsible for persisting the various entities that flow through the knowledge‑graph pipeline (e.g., manually created entities, automatically extracted entities, classified ontology items, and generated insights).  All concrete persistence work is delegated to the **PersistenceAgent** located at `src/agents/persistence-agent.ts`.  The module lives under the broader KnowledgeManagement hierarchy and is invoked by sibling modules such as **ManualLearning**, **OnlineLearning**, **OntologyClassificationModule**, and **InsightGenerationModule**, each of which calls the same agent to write its output into the central graph store.
-
-Although the source repository does not expose a dedicated file for the EntityPersistenceModule itself (the “Code Structure” section reports *0 code symbols found*), the architectural intent is clear from the observations: the module is a logical grouping that orchestrates entity‑serialization, validation, optional caching, and durable storage through the PersistenceAgent, which in turn talks to the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  
+The **EntityPersistenceModule** lives inside the **KnowledgeManagement** component and is the dedicated sub‑component that guarantees a type‑safe, end‑to‑end lifecycle for every knowledge entity (creation, update, deletion).  All persistence work is funneled through the **GraphDatabaseAdapter** defined in `storage/graph-database-adapter.ts`.  The module calls the adapter’s `saveGraph` routine to write the in‑memory graph to the local **LevelDB** store and, when configured, to push the same payload to the external **VKB API**.  Conversely, it can obtain the current graph via the adapter’s `getGraph` method, which abstracts whether the source is the remote VKB service or the local LevelDB cache.  In addition to raw storage, the module adds a thin validation/normalisation layer, maps ontology metadata into shared memory through `PersistenceAgent.mapEntityToSharedMemory`, and may optionally employ a dedicated caching sub‑module for hot‑path entity reads.
 
 ---
 
 ## Architecture and Design  
 
-### Modular, Agent‑Based Architecture  
+The design follows a **layered‑adapter architecture**.  At the core is the **GraphDatabaseAdapter** (the “adapter” pattern) that hides the dual‑source nature of the graph – VKB API vs. LevelDB – behind a single, coherent API (`getGraph`, `saveGraph`).  **EntityPersistenceModule** sits on top of this adapter, acting as a **repository** for domain entities: it exposes a type‑safe façade for CRUD operations while delegating the actual I/O to the adapter.  
 
-The overall design follows a **modular architecture** where each functional concern is encapsulated in its own directory under `src/agents`.  The PersistenceAgent acts as a façade for all persistence‑related operations, exposing a consistent API to its callers.  This façade pattern isolates the rest of the system from the details of how entities are serialized, validated, cached, or written to the underlying stores.
+Because the module is a sibling of **ManualLearning**, **OnlineLearning**, **GraphDatabaseModule**, and **PersistenceAgent**, it re‑uses the same persistence primitives (`saveGraph`, `getGraph`).  This shared reliance creates a **horizontal reuse pattern** where multiple higher‑level services converge on a single persistence contract, reducing duplication and ensuring consistency across the knowledge pipeline.  
 
-### Layered Interaction  
-
-1. **Calling Layer** – Sibling modules (ManualLearning, OnlineLearning, OntologyClassificationModule, InsightGenerationModule) invoke the PersistenceAgent to persist their results.  
-2. **Agent Layer** – `src/agents/persistence-agent.ts` performs the orchestration: it receives an entity, runs it through a validation step, serializes it, optionally looks up a cache, and forwards the payload to the storage adapter.  
-3. **Adapter Layer** – The **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) translates the agent’s request into concrete operations against the graph store (Graphology + LevelDB) and, where necessary, coordinates with external services such as PostgreSQL or Elasticsearch.
-
-Because the PersistenceAgent is the sole entry point for persistence, the system exhibits **separation of concerns**: the business logic of the sibling modules remains agnostic to storage details, while the agent can evolve its internal mechanisms (e.g., swapping JSON for Protocol Buffers) without breaking callers.
-
-### Potential Supporting Mechanisms  
-
-The observations enumerate several auxiliary technologies that the EntityPersistenceModule *may* employ:
-
-* **Serialization** – JSON or Protocol Buffers for converting in‑memory entity objects into a storable byte stream.  
-* **Caching** – Redis is mentioned as a possible cache to accelerate read/write paths.  
-* **Transactional DB** – PostgreSQL is suggested for atomic, consistent writes where ACID guarantees are required.  
-* **Validation** – A schema‑based validator ensures entities conform to the ontology classification model before they are persisted.  
-* **Indexing** – Elasticsearch could be used to create searchable indexes that speed up query operations on the persisted entities.  
-* **Replication** – Data‑replication strategies (e.g., multi‑region PostgreSQL replicas or Elasticsearch clusters) may be in place to guarantee high availability and durability.
-
-These mechanisms are not concretely coded in the repository snapshot we have, but their presence in the design documentation indicates that the module is intended to be **extensible** and **resilient**, capable of plugging in different infrastructure components as needed.
+The optional **entity‑caching sub‑module** introduces a **cache‑aside** strategy: frequently accessed entities are stored in memory, while writes still flow through the adapter to guarantee durability.  The presence of a custom validation/normalisation step indicates a **pipeline‑oriented processing model** – entities are first vetted, then normalised, then handed off to the persistence layer.
 
 ---
 
 ## Implementation Details  
 
-### PersistenceAgent (`src/agents/persistence-agent.ts`)  
+* **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – Provides `saveGraph(graph: Graph): Promise<void>` and `getGraph(): Promise<Graph>`.  Internally it decides, based on configuration, whether to write/read directly to LevelDB or to invoke the VKB HTTP API.  The “intelligent routing” mentioned in the parent hierarchy ensures seamless switching without callers needing to know the source.  
 
-The PersistenceAgent is the central class that implements the persistence contract.  While the exact method signatures are not listed, the observations imply the following responsibilities:
+* **EntityPersistenceModule** – Although no concrete file is listed, its responsibilities can be inferred from the observations:  
+  * **Type‑safe CRUD façade** – Public methods such as `createEntity<T>(entity: T): Promise<void>`, `updateEntity<T>(id: string, patch: Partial<T>)`, and `deleteEntity(id: string)`.  Generics enforce compile‑time safety, preventing accidental schema mismatches.  
+  * **Validation & Normalisation** – Before any persistence call, the module runs a custom validator (e.g., `validateEntity(entity)`) and a normaliser that aligns the payload with the ontology’s canonical form.  This step is isolated, allowing future extensions (e.g., schema version upgrades) without touching storage code.  
+  * **Metadata Mapping** – By invoking `PersistenceAgent.mapEntityToSharedMemory(entity)`, the module pre‑populates shared‑memory structures (likely a fast‑lookup table used by other components) with ontology‑specific fields.  This tight coupling to **PersistenceAgent** ensures that downstream consumers see a fully‑hydrated entity.  
+  * **Caching (optional)** – A separate caching layer (not explicitly named) stores the most recent entity objects in an in‑process map or LRU store.  Reads first query this cache; on a miss the module falls back to `getGraph` and then populates the cache.  
 
-1. **Entity Validation** – Before any storage operation, the agent validates the incoming entity against the ontology classification schema.  This step likely uses a validation library or custom schema definitions.  
-2. **Serialization** – The agent transforms the validated entity into a transport format (JSON or Protocol Buffers).  The choice of format would affect both storage size and interoperability with downstream services.  
-3. **Cache Interaction** – If a Redis cache is configured, the agent checks whether the entity (or a derived key) already exists, potentially short‑circuiting the write path or pre‑populating read‑through caches.  
-4. **Database Write** – For transactional guarantees, the agent may open a PostgreSQL transaction, write the serialized payload, and commit atomically.  Failure handling would roll back the transaction to maintain consistency.  
-5. **Graph Store Update** – Through the GraphDatabaseAdapter, the agent inserts or updates the entity in the Graphology+LevelDB knowledge graph, ensuring the graph reflects the latest state.  
-6. **Index Refresh** – When Elasticsearch is employed, the agent pushes the serialized entity to an Elasticsearch index, enabling fast full‑text and attribute‑based searches.  
-7. **Replication Trigger** – If a replication mechanism is configured, the agent may emit events or write to a replication log that downstream replicas consume.
-
-### GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)  
-
-The adapter abstracts the low‑level operations required to interact with the central graph database.  It receives the serialized entity from the PersistenceAgent and performs the necessary graph mutations (node creation, edge linking, property updates).  By isolating graph‑specific code in this adapter, the system can later replace Graphology+LevelDB with another graph engine without altering the PersistenceAgent or its callers.
-
-### Interaction Flow  
-
-A typical flow when a sibling module persists an entity looks like:
-
-1. **Caller** (e.g., `ManualLearning`) constructs an entity object.  
-2. **Caller** invokes `PersistenceAgent.persist(entity)`.  
-3. **Agent** validates → serializes → checks Redis cache (optional).  
-4. **Agent** starts a PostgreSQL transaction (if configured) and writes the payload.  
-5. **Agent** calls `GraphDatabaseAdapter.upsertNode(serializedEntity)`.  
-6. **Agent** pushes the entity to Elasticsearch (optional) and signals any replication processes.  
-7. **Agent** returns success/failure to the caller.
-
-Because the module’s code symbols are not directly visible, the above description is derived from the documented responsibilities and the surrounding architecture.
+* **Interaction with Siblings** –  
+  * **ManualLearning** and **PersistenceAgent** also call `saveGraph`; they rely on the same adapter, guaranteeing that manually created or agent‑generated entities are persisted identically to those handled by **EntityPersistenceModule**.  
+  * **OnlineLearning** pushes batch‑extracted knowledge through the same adapter, meaning that bulk imports and single‑entity operations share the same durability guarantees.  
+  * **GraphDatabaseModule** consumes `getGraph` to provide read‑only graph queries; the persistence module therefore supplies the freshest graph state for those queries.
 
 ---
 
 ## Integration Points  
 
-1. **Sibling Modules** – ManualLearning, OnlineLearning, OntologyClassificationModule, and InsightGenerationModule each depend on the PersistenceAgent to store their respective outputs.  Their contracts are therefore limited to the agent’s public API (e.g., `persist`, `update`, `delete`).  
-2. **GraphDatabaseAdapter** – The agent’s only direct dependency on the storage layer is the adapter, which abstracts the underlying graph database implementation.  This adapter is also used by other components that need direct graph access, ensuring a single source of truth for graph operations.  
-3. **External Services** – The optional Redis cache, PostgreSQL database, Elasticsearch index, and any replication services constitute external integration points.  The PersistenceAgent likely contains configuration hooks (environment variables or config files) that enable or disable each service, allowing the module to be deployed in environments with varying infrastructure.  
-4. **Parent Component – KnowledgeManagement** – As a child of KnowledgeManagement, the EntityPersistenceModule contributes to the overall knowledge‑graph lifecycle.  KnowledgeManagement orchestrates the flow from entity extraction (CodeGraphModule) through classification (OntologyClassificationModule) to persistence (EntityPersistenceModule) and finally insight generation (InsightGenerationModule).  The modular separation ensures that KnowledgeManagement can replace or upgrade any child module without cascading changes.
+1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – The sole persistence contract; all writes and reads flow through its `saveGraph` and `getGraph` methods.  Configuration flags (e.g., `useVKB`, `localOnly`) dictate the routing logic.  
+
+2. **PersistenceAgent** – Supplies the `mapEntityToSharedMemory` helper.  The module must import this function to enrich entities before they are persisted, ensuring that shared‑memory caches used by other subsystems (e.g., inference engines) are immediately consistent.  
+
+3. **Entity Caching Sub‑module** – When present, this module exposes `getFromCache(id)` and `setCache(id, entity)`.  The persistence module calls these hooks around its adapter interactions.  
+
+4. **KnowledgeManagement (parent)** – Orchestrates the lifecycle of the persistence module; it may configure the adapter (VKB vs. LevelDB) based on deployment mode (offline development vs. production).  
+
+5. **Sibling Components** – ManualLearning, OnlineLearning, GraphDatabaseModule, and PersistenceAgent all share the same adapter instance, so any change to the adapter’s routing or serialization format propagates uniformly across the entire knowledge pipeline.
 
 ---
 
 ## Usage Guidelines  
 
-* **Always invoke the PersistenceAgent** – Direct interaction with the GraphDatabaseAdapter or underlying stores is discouraged.  All persistence operations should go through `src/agents/persistence-agent.ts` to guarantee that validation, serialization, caching, and indexing are consistently applied.  
-* **Validate before persisting** – While the agent performs validation, callers should aim to construct entities that already conform to the ontology schema to reduce unnecessary validation cycles and avoid avoidable rejections.  
-* **Leverage caching wisely** – If Redis caching is enabled, callers can benefit from read‑through patterns: request an entity via the agent, which will populate the cache on the first hit.  Avoid manually writing to Redis, as the agent is responsible for cache coherence.  
-* **Transactional boundaries** – When a persistence operation involves multiple related entities (e.g., a batch insert), wrap the calls in a single transaction if PostgreSQL is used.  The PersistenceAgent should expose a transaction API or accept a transaction context to ensure atomicity.  
-* **Monitor indexing latency** – If Elasticsearch indexing is active, be aware that there may be a slight delay between a successful persistence call and the entity becoming searchable.  Design UI or downstream services to tolerate eventual consistency for search operations.  
-* **Configuration hygiene** – Enable or disable optional services (Redis, PostgreSQL, Elasticsearch, replication) through the component’s configuration files.  Changing a service should not require code changes; only the configuration needs updating, preserving the module’s portability across environments.  
+* **Prefer the type‑safe façade** – Always interact with entities through the module’s generic CRUD methods.  Directly calling `saveGraph` or `getGraph` bypasses validation, normalisation, and metadata mapping, and should be avoided except in low‑level tooling.  
+
+* **Validate before persisting** – Although the module performs its own validation, supplying pre‑validated entities (e.g., from a form or a batch job) reduces redundant work and improves throughput.  
+
+* **Respect the caching contract** – When the optional cache is enabled, never mutate cached objects in place.  Instead, retrieve, modify, and re‑store via the module’s update path so that the cache is refreshed atomically.  
+
+* **Configure the adapter consciously** – In environments with limited network connectivity, set `localOnly` to true to force LevelDB persistence only.  In cloud‑connected deployments, enable `useVKB` to keep the remote VKB graph in sync.  
+
+* **Keep ontology metadata up to date** – Because `mapEntityToSharedMemory` relies on the current ontology definition, any schema change must be reflected in the shared‑memory mapping logic before persisting new entities.  
 
 ---
 
-## Architectural Patterns Identified  
+### 1. Architectural patterns identified  
 
-| Pattern | Evidence |
-|---------|----------|
-| **Modular / Component‑Based Architecture** | Parent component *KnowledgeManagement* contains distinct child modules (EntityPersistenceModule, OntologyClassificationModule, etc.). |
-| **Facade (Agent) Pattern** | `src/agents/persistence-agent.ts` acts as a single façade for all persistence concerns. |
-| **Adapter Pattern** | `storage/graph-database-adapter.ts` adapts the generic persistence calls to the specific Graphology+LevelDB implementation. |
-| **Layered Architecture** | Clear separation between calling layer (siblings), agent layer (persistence logic), and storage adapter layer (graph DB). |
-| **Potential Cache‑Aside Pattern** | Mention of Redis caching suggests a cache‑aside strategy where the agent checks the cache before hitting the DB. |
-| **Eventual Consistency / Replication** | Reference to a “data replication mechanism” implies a replication strategy for durability. |
+* **Adapter pattern** – `GraphDatabaseAdapter` abstracts VKB API vs. LevelDB.  
+* **Repository pattern** – `EntityPersistenceModule` presents a type‑safe repository façade for entities.  
+* **Cache‑aside strategy** – Optional entity‑caching sub‑module.  
+* **Pipeline processing** – Validation → Normalisation → Metadata mapping → Persistence.
 
----
+### 2. Design decisions and trade‑offs  
 
-## Design Decisions and Trade‑offs  
+* **Single source of truth via adapter** – Guarantees consistency but introduces a runtime routing decision that must be carefully tested.  
+* **Type‑safe generics** – Improves compile‑time safety at the cost of additional generic boilerplate.  
+* **Optional caching** – Boosts read performance for hot entities; however, it adds cache‑coherency complexity when multiple writers (ManualLearning, OnlineLearning) operate concurrently.  
+* **Separate validation/normalisation layer** – Enables flexible schema evolution but adds latency for each CRUD operation.
 
-* **Single Persistence Facade vs. Direct Store Access** – Centralising all persistence logic in the PersistenceAgent simplifies the caller code and enforces uniform validation, but it creates a single point of failure and may become a performance bottleneck if not properly scaled (e.g., through stateless deployment and load balancing).  
-* **Optional External Services** – By making Redis, PostgreSQL, Elasticsearch, and replication optional, the design gains flexibility to run in lightweight environments (e.g., development) while still supporting enterprise‑grade scalability.  The trade‑off is added configuration complexity and the need for robust feature‑flag handling inside the agent.  
-* **Serialization Choice** – Supporting both JSON and Protocol Buffers provides backward compatibility and performance tuning options.  However, maintaining dual serializers increases code maintenance overhead and requires careful versioning of schema definitions.  
-* **Validation at Persistence Boundary** – Placing validation inside the PersistenceAgent ensures data integrity regardless of the caller, but it can hide validation errors from the originating module, making debugging slightly more indirect.  
+### 3. System structure insights  
 
----
+* **Vertical stack** – KnowledgeManagement → EntityPersistenceModule → GraphDatabaseAdapter → (LevelDB ↔ VKB API).  
+* **Horizontal reuse** – ManualLearning, OnlineLearning, PersistenceAgent, GraphDatabaseModule all share the same adapter, reinforcing a unified persistence contract across the knowledge pipeline.  
+* **Extensibility point** – The validation/normalisation step and the caching sub‑module are natural extension hooks for future features (e.g., versioned entities, distributed caches).
 
-## System Structure Insights  
+### 4. Scalability considerations  
 
-The system is organized around a **knowledge‑graph core** (Graphology+LevelDB) surrounded by functional satellites:
+* **Write scalability** – `saveGraph` writes the entire graph; for very large graphs this could become a bottleneck.  Batch‑or‑incremental writes may be required as the knowledge base grows.  
+* **Read scalability** – The optional cache‑aside layer mitigates read pressure on LevelDB/VKB, but cache size must be bounded to avoid memory pressure.  
+* **Network latency** – When `useVKB` is enabled, each `saveGraph` incurs a remote API round‑trip; in high‑throughput scenarios a background sync queue could decouple local writes from remote replication.
 
-* **CodeGraphModule** builds the raw code‑entity graph using the CodeGraphAgent.  
-* **OntologyClassificationModule** enriches entities with ontology tags, again via the PersistenceAgent.  
-* **EntityPersistenceModule** (our focus) guarantees that every enriched or newly created entity is stored reliably, indexed, and optionally cached.  
-* **InsightGenerationModule** consumes persisted entities to produce higher‑level insights, which it also stores through the same agent.  
+### 5. Maintainability assessment  
 
-This radial structure means that **EntityPersistenceModule** is the gateway through which all state changes flow into the central graph, making it a critical reliability and performance component.
-
----
-
-## Scalability Considerations  
-
-* **Horizontal Scaling of the PersistenceAgent** – Because the agent is stateless (aside from configuration), multiple instances can be deployed behind a load balancer to handle increased write throughput.  
-* **Redis Cache** – Introducing a Redis layer reduces read latency and smooths bursty write traffic by absorbing frequent entity lookups.  Proper key design and TTL management are essential to avoid stale data.  
-* **PostgreSQL & Elasticsearch Clusters** – Both databases can be sharded or replicated to handle larger data volumes.  The agent must be aware of connection pooling and retry logic to maintain throughput under load.  
-* **Batch Persistence** – For bulk operations (e.g., ingesting a large codebase), the agent could expose a bulk API that wraps many entity writes in a single transaction, reducing round‑trip overhead.  
-* **Replication** – A replication mechanism (e.g., streaming WAL from PostgreSQL or cross‑cluster replication in Elasticsearch) ensures high availability, but introduces eventual consistency semantics that downstream consumers must tolerate.  
-
----
-
-## Maintainability Assessment  
-
-The **modular, agent‑based design** lends itself to high maintainability:
-
-* **Isolation of Concerns** – Changes to serialization, validation rules, or storage back‑ends are confined to `src/agents/persistence-agent.ts` and `storage/graph-database-adapter.ts`.  Sibling modules remain untouched.  
-* **Clear Dependency Boundaries** – The agent’s reliance on well‑defined external services (Redis, PostgreSQL, Elasticsearch) means that upgrades or replacements of those services can be performed with minimal code changes, primarily in configuration.  
-* **Extensible Hooks** – The optional nature of caching, indexing, and replication provides natural extension points for future enhancements without breaking existing functionality.  
-* **Potential Technical Debt** – The lack of concrete code symbols in the current snapshot suggests that the persistence logic may be abstracted behind interfaces or generated at build time.  If the implementation is heavily dynamic, static analysis and type safety could be reduced, increasing the risk of runtime errors.  Maintaining comprehensive unit and integration test suites around the PersistenceAgent will be crucial to mitigate this risk.  
-
-Overall, the architecture emphasizes **separation, configurability, and extensibility**, positioning the EntityPersistenceModule as a robust, maintainable backbone for the KnowledgeManagement ecosystem.
+The module’s clear separation of concerns (validation, mapping, persistence) and reliance on a single adapter make the codebase **highly maintainable**.  Adding new entity types only requires extending the generic façade and, if needed, augmenting the validation logic.  Because all persistence pathways converge on `GraphDatabaseAdapter`, any change to storage technology (e.g., swapping LevelDB for RocksDB) is isolated to that adapter file.  The main maintenance risk lies in the cache coherence model—if multiple components write concurrently, developers must ensure cache invalidation is correctly handled.  Overall, the architecture promotes straightforward testing (unit tests for validation, integration tests for adapter routing) and future evolution.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component follows a modular architecture, with separate modules for different functionalities, such as entity persistence, ontology classification, and insight generation, as seen in the code organization of the src/agents directory, which contains the PersistenceAgent (src/agents/persistence-agent.ts) and the CodeGraphAgent (src/agents/code-graph-agent.ts). This modular approach allows for easier maintenance and scalability of the component, as each module can be updated or modified independently without affecting the rest of the component. For example, the PersistenceAgent is responsible for entity persistence, ontology classification, and content validation, and is used by the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to interact with the central Graphology+LevelDB knowledge graph.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component utilizes a GraphDatabaseAdapter (storage/graph-database-adapter.ts) to handle graph database persistence, which is a crucial aspect of the system's architecture. This adapter enables the use of Graphology and LevelDB for data storage, with automatic JSON export synchronization. The intelligent routing mechanism within the GraphDatabaseAdapter allows the system to switch between the VKB API and direct database access seamlessly, which is essential for maintaining a high level of performance and scalability. For instance, the 'getGraph' function in the GraphDatabaseAdapter class demonstrates how the system can retrieve the graph database, either from the VKB API or the local LevelDB storage, depending on the configuration. Furthermore, the 'saveGraph' function showcases the adapter's ability to persist the graph database to the local storage and synchronize it with the VKB API.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning likely utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store manually created entities in the knowledge graph.
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning likely utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store automatically extracted entities in the knowledge graph.
-- [OntologyClassificationModule](./OntologyClassificationModule.md) -- OntologyClassificationModule utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store classified entities in the knowledge graph.
-- [InsightGenerationModule](./InsightGenerationModule.md) -- InsightGenerationModule utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store generated insights in the knowledge graph.
-- [CodeGraphModule](./CodeGraphModule.md) -- CodeGraphModule utilizes the CodeGraphAgent (src/agents/code-graph-agent.ts) to construct and query the code knowledge graph.
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter utilizes the PersistenceAgent (src/agents/persistence-agent.ts) to store and retrieve data from the knowledge graph.
+- [ManualLearning](./ManualLearning.md) -- ManualLearning may use the GraphDatabaseAdapter's 'saveGraph' function to persist manually created entities to the local LevelDB storage and synchronize it with the VKB API.
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the batch analysis pipeline to extract knowledge from git history, LSL sessions, and code analysis, which is then persisted using the GraphDatabaseAdapter.
+- [GraphDatabaseModule](./GraphDatabaseModule.md) -- GraphDatabaseModule uses the GraphDatabaseAdapter's 'getGraph' function to retrieve the graph database, either from the VKB API or the local LevelDB storage, depending on the configuration.
+- [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent uses the GraphDatabaseAdapter's 'saveGraph' function to persist data to the local LevelDB storage and synchronize it with the VKB API.
 
 
 ---

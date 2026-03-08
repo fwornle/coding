@@ -2,144 +2,126 @@
 
 **Type:** SubComponent
 
-TranscriptProcessor employs the watch mechanism (lib/agent-api/transcript-api.js) for monitoring transcript updates, enabling real-time notifications and adaptations based on new entries.
+TranscriptProcessor utilizes the AgentFormatMapper class in agent-format-mapper.ts to map agent formats to the unified LSL format
 
 ## What It Is  
 
-**TranscriptProcessor** is a sub‑component that lives inside the **LiveLoggingSystem**. Its implementation is spread across a handful of core files:  
+**TranscriptProcessor** is a sub‑component that lives inside the **LiveLoggingSystem** code base. Its implementation resides in `transcript-processor.ts` and it orchestrates the end‑to‑end handling of raw agent transcripts. The processor first normalizes incoming data with the **TranscriptNormalizer** (also defined in `transcript-processor.ts`), then maps the various agent‑specific formats—enumerated in `agent-formats.ts`—to a single, unified **LSL** representation defined in `lsl-format.ts`. Once the transcript is in LSL form it is persisted through the **TranscriptRepository** (`transcript-repository.ts`). Throughout the workflow the component logs warnings and errors via the shared `logger.ts` module and delegates any exceptional conditions to the **ErrorHandlingMechanism** found in `error-handler.ts`.  
 
-* `lib/agent-api/transcript-api.js` – supplies the `TranscriptAPI` abstract base class and the **watch mechanism** used for change detection.  
-* `lib/agent-api/transcripts/lsl-converter.js` – provides the `LSLConverter` that knows how to translate agent‑specific transcript payloads into the unified **Live Session Logging (LSL)** format and back again.  
-* `integrations/mcp-server-semantic-analysis/src/logging.ts` – houses the `LoggingService` that offers async logging and log‑buffer management, which the processor relies on for non‑blocking output.  
-
-Together these pieces form a pipeline that receives raw transcript data from an agent, converts it to LSL (optionally rendering it as Markdown or JSON‑Lines via the `LSLFormatter` sibling), watches for new entries, and pushes the formatted output to the logging infrastructure without stalling the Node.js event loop.
+In short, TranscriptProcessor is the glue that turns heterogeneous, possibly noisy agent transcripts into clean, consistently‑structured LSL records that the rest of the LiveLoggingSystem can consume.
 
 ---
 
 ## Architecture and Design  
 
-The architecture that emerges from the observations is **modular and extensible**, built around a few well‑defined responsibilities:
+The observations reveal a **layered pipeline architecture** built around clear separation of concerns:
 
-1. **Abstract‑base / Strategy pattern** – `TranscriptAPI` (in `lib/agent-api/transcript-api.js`) is an abstract class that defines the contract for any agent‑specific transcript adapter. Concrete adapters (the “children” of `TranscriptProcessor`) inherit from it, allowing the system to plug in new agents without touching the core processor logic.
+1. **Normalization Layer** – The `TranscriptNormalizer` class is invoked first to bring any incoming transcript into a predictable shape. This isolates format‑specific quirks early in the flow.  
 
-2. **Adapter / Converter pattern** – `LSLConverter` (in `lib/agent-api/transcripts/lsl-converter.js`) acts as an adapter that translates heterogeneous transcript formats into the canonical LSL representation. The same converter also supports the reverse direction for downstream consumers.
+2. **Mapping Layer** – The `AgentFormatMapper` (in `agent-format-mapper.ts`) implements a **mapper/adapter pattern**. It knows how each agent format listed in `agent-formats.ts` translates to the canonical LSL schema (`lsl-format.ts`). By centralising this logic, adding a new agent format requires only extending the mapper, not touching the processor core.  
 
-3. **Observer‑like watch mechanism** – The watch functionality embedded in `TranscriptAPI` monitors transcript files or streams for changes. When a new entry appears, it emits a notification that the `TranscriptProcessor` consumes, enabling **real‑time** processing and adaptation.
+3. **Persistence Layer** – `TranscriptRepository` abstracts storage concerns, following the **repository pattern**. The processor does not manage database connections or file I/O directly; it simply calls repository methods to store or retrieve processed transcripts.  
 
-4. **Asynchronous logging (reactive I/O)** – `LoggingService` (implemented in `integrations/mcp-server-semantic-analysis/src/logging.ts`) provides an async, buffered logging API. By delegating all I/O to this service, the processor avoids blocking the event loop, which is explicitly highlighted as a design goal.
+4. **Cross‑cutting Concerns** – Logging (`logger.ts`) and error handling (`error-handler.ts`) are injected as independent modules, keeping the main processing path free of repetitive boiler‑plate.  
 
-These patterns interlock: the processor watches for updates, hands the raw payload to the appropriate `TranscriptAPI` implementation, which then uses `LSLConverter` to obtain an LSL object. The object is handed to `LSLFormatter` (a sibling) for rendering, and finally the formatted string is handed off to `LoggingService` for async persistence. The parent **LiveLoggingSystem** orchestrates the whole flow, treating each sub‑component as a plug‑in module.
+Interaction between these layers is linear: the processor receives raw data, passes it to the normalizer, hands the normalized output to the mapper, and finally persists the result. Errors at any stage are funneled to the `ErrorHandlingMechanism`, which ensures consistent failure reporting across the component.  
+
+Because **LiveLoggingSystem** contains the TranscriptProcessor, the processor fits into a larger orchestration where sibling components—**ClassificationEngine**, **SessionManager**, and **OntologySystem**—each handle their own domain (classification, session windowing, ontology definition). The shared logger and error‑handling modules provide a uniform operational surface across all siblings, reinforcing consistency throughout the system.
 
 ---
 
 ## Implementation Details  
 
-### Core Classes & Functions  
+- **`transcript-processor.ts`**  
+  - Exposes the main class (or function) that coordinates the workflow. It constructs or receives instances of `TranscriptNormalizer`, `AgentFormatMapper`, `TranscriptRepository`, the logger, and the error handler.  
+  - The processor’s public API likely includes a method such as `process(rawTranscript: any): Promise<void>` that returns a promise once the transcript is stored.  
 
-* **`TranscriptAPI` (lib/agent-api/transcript-api.js)** – Defines abstract methods such as `fetchTranscript()`, `parseEntry()`, and `watch()`. The `watch()` method sets up file‑system or stream listeners and emits events whenever a new transcript line is detected. Because it is abstract, concrete subclasses (e.g., a “ChatGPTAdapter”) implement the specifics of how to retrieve and parse their agent’s transcript.
+- **`TranscriptNormalizer` (child component)**  
+  - Implements format‑agnostic cleaning: trimming whitespace, normalising timestamps, stripping unsupported characters, and possibly converting encoding. Because it lives inside the same file, the processor can call it directly without an additional import.  
 
-* **`LSLConverter` (lib/agent-api/transcripts/lsl-converter.js)** – Exposes two primary conversion utilities:  
-  * `toLSL(agentTranscript)` – Normalises an agent‑specific structure into an LSL object containing timestamps, speaker identifiers, and content.  
-  * `fromLSL(lslObject, format)` – Serialises an LSL object into either **Markdown** or **JSON‑Lines**. The implementation contains the logic for handling markdown headings, code fences, and the line‑delimited JSON required by downstream analytics.
+- **`AgentFormatMapper` (`agent-format-mapper.ts`)**  
+  - Contains a lookup table or strategy objects keyed by agent identifiers defined in `agent-formats.ts`. Each entry knows how to translate its source fields into the LSL schema (`lsl-format.ts`). This design makes the mapper easily extensible; adding a new agent format is a matter of adding a new entry or strategy class.  
 
-* **`LSLFormatter` (sibling component)** – Consumes the output of `LSLConverter.fromLSL()` and applies any additional styling or enrichment (e.g., adding ANSI colour codes for console display). It is deliberately kept stateless so that the same formatter can be reused across multiple transcript streams.
+- **`lsl-format.ts`**  
+  - Declares TypeScript interfaces (or types) that describe the unified transcript shape. All downstream components, including the ClassificationEngine, can rely on this contract.  
 
-* **`LoggingService` (integrations/mcp-server-semantic-analysis/src/logging.ts)** – Provides `logAsync(message: string): Promise<void>` and internal buffer management. The service batches log entries and writes them to persistent storage (file, database, or remote endpoint) in a non‑blocking fashion, guaranteeing that the processor’s event loop remains responsive.
+- **`TranscriptRepository` (`transcript-repository.ts`)**  
+  - Provides methods such as `save(lslTranscript: LSLTranscript): Promise<void>` and `findById(id: string): Promise<LSLTranscript | null>`. The repository abstracts the underlying storage mechanism—whether a relational database, a document store, or a flat file—allowing the processor to remain storage‑agnostic.  
 
-### Processing Flow  
+- **`error-handler.ts`**  
+  - Defines a central `ErrorHandlingMechanism` that likely categorises errors (validation, mapping, persistence) and decides whether to retry, discard, or propagate them. By keeping error policy in one place, the processor’s core logic stays focused on happy‑path processing.  
 
-1. **Initialisation** – When `LiveLoggingSystem` starts, it creates an instance of `TranscriptProcessor`. The processor selects the appropriate concrete `TranscriptAPI` subclass based on configuration (e.g., agent type).  
+- **`logger.ts`**  
+  - Offers a lightweight logging API (`info`, `warn`, `error`). The processor logs warnings for recoverable issues (e.g., unknown optional fields) and errors when the pipeline cannot continue. Because the logger is shared with sibling components, system‑wide observability is maintained.  
 
-2. **Watch Activation** – `TranscriptProcessor` calls `apiInstance.watch()`; the watch mechanism registers callbacks that fire on every new transcript line.  
-
-3. **Conversion** – The callback receives raw data, forwards it to `LSLConverter.toLSL()`, which produces a normalized LSL object.  
-
-4. **Formatting** – The LSL object is passed to `LSLFormatter`, which selects the desired output format (Markdown or JSON‑Lines) and returns a string.  
-
-5. **Async Logging** – The formatted string is handed to `LoggingService.logAsync()`. Because the logging call returns a promise, the processor can `await` it or fire‑and‑forget, ensuring that the main thread does not block.  
-
-6. **Loop Continuation** – The watch continues to emit events, repeating steps 3‑5 for each new entry, thereby providing a **real‑time** logging pipeline.
-
-The processor explicitly avoids any synchronous file I/O or heavy CPU work inside the watch callback, a decision that directly supports the “prevent event loop blocking” observation.
+The combination of these modules yields a deterministic, testable processing chain where each step can be unit‑tested in isolation.
 
 ---
 
 ## Integration Points  
 
-* **Parent – LiveLoggingSystem** – The parent component instantiates `TranscriptProcessor` and supplies configuration (agent type, desired output format, logging destination). It also aggregates the logs produced by the processor with logs from other sub‑components (e.g., system metrics) to form a unified live‑logging view.
+- **Parent – LiveLoggingSystem**  
+  - LiveLoggingSystem instantiates TranscriptProcessor as part of its overall live‑session handling. Processed LSL transcripts are likely consumed by the **ClassificationEngine**, which classifies the content against the ontology defined by the **OntologySystem**.  
 
-* **Sibling – LoggingService** – The processor’s only external I/O dependency is `LoggingService`. By delegating all persistence to this service, the processor remains agnostic of where logs end up (file, DB, external API). The async nature of `LoggingService` is crucial for maintaining throughput.
+- **Siblings**  
+  - While ClassificationEngine focuses on semantic analysis, SessionManager deals with temporal windowing. Both may request stored transcripts from `TranscriptRepository` for their own purposes, meaning the repository acts as a shared data‑access layer across siblings.  
 
-* **Sibling – LSLFormatter** – While `LSLConverter` handles structural translation, `LSLFormatter` is responsible for the final presentation. This separation allows developers to add new renderers (e.g., HTML or CSV) without touching the conversion logic.
+- **External Agents**  
+  - The processor receives raw data from multiple external agents whose formats are listed in `agent-formats.ts`. The `AgentFormatMapper` shields the rest of the system from these external variations.  
 
-* **Sibling – TranscriptAdapter** – The abstract `TranscriptAPI` is shared with other adapters in the system. Any new agent that wishes to feed transcripts into `LiveLoggingSystem` must implement the same abstract contract, ensuring a consistent integration surface.
+- **Logging & Monitoring**  
+  - All components—including ClassificationEngine and SessionManager—use the same `logger.ts`. This creates a unified log stream that can be aggregated by operational tooling.  
 
-* **Sibling – WatchMechanism** – The watch implementation lives inside `TranscriptAPI`. Other components that need to monitor transcript changes can reuse this mechanism, reinforcing a single source of truth for change detection.
+- **Error Propagation**  
+  - Errors surfaced by the `ErrorHandlingMechanism` may bubble up to LiveLoggingSystem, which could decide to trigger alerts, retry the whole session, or mark the session as incomplete.  
 
-All interactions are performed through clearly defined method signatures and event callbacks, keeping coupling low and enabling straightforward unit testing of each piece.
+These integration points demonstrate that TranscriptProcessor is both a consumer (of raw agent data) and a provider (of clean LSL transcripts) within the broader LiveLoggingSystem ecosystem.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Select the correct adapter** – When configuring `LiveLoggingSystem`, ensure that the `agent` field matches a concrete subclass of `TranscriptAPI`. Adding a new agent requires only creating a new subclass that implements the abstract methods; no changes to `TranscriptProcessor` are needed.
+1. **Provide Raw Agent Transcripts Only** – Call the processor with the exact payload format emitted by an agent. The processor will handle normalization and mapping; do not pre‑transform the data yourself.  
 
-2. **Prefer async logging** – Always invoke `LoggingService.logAsync()` and either `await` the promise or handle rejections with `.catch()`. Synchronous logging calls are not provided and would defeat the design goal of non‑blocking operation.
+2. **Register New Agent Formats Centrally** – When a new agent type is introduced, add its descriptor to `agent-formats.ts` and extend `AgentFormatMapper` with a corresponding mapping rule. Avoid scattering format‑specific code elsewhere.  
 
-3. **Choose the output format early** – The formatter supports Markdown and JSON‑Lines. Decide which format downstream consumers expect and pass that preference to `LSLFormatter` at processor construction time. Changing the format at runtime is possible but may require re‑instantiating the formatter to avoid state leakage.
+3. **Do Not Bypass the Repository** – All persistence must go through `TranscriptRepository`. Direct database calls break the abstraction and can lead to inconsistent state across siblings.  
 
-4. **Do not perform heavy work in watch callbacks** – The watch mechanism is invoked on every transcript update. Keep the callback lightweight: delegate parsing, conversion, and logging to the dedicated classes. If additional CPU‑intensive analysis is required, off‑load it to a worker thread or separate micro‑service.
+4. **Respect Error Handling** – Allow the `ErrorHandlingMechanism` to manage failures. Catching and suppressing errors inside the processor can hide critical issues and impede observability.  
 
-5. **Handle back‑pressure** – Although `LoggingService` buffers writes, an extremely high transcript rate could overflow the buffer. Monitor the service’s `isBufferFull()` flag (if exposed) and consider throttling the watch frequency or applying batch processing when necessary.
+5. **Leverage the Shared Logger** – Use the logger’s `warn` level for non‑critical anomalies (e.g., missing optional fields) and `error` for fatal conditions. Consistent logging levels aid downstream monitoring tools.  
 
-Following these conventions ensures that the processor remains responsive, maintainable, and easy to extend.
+6. **Unit‑Test Mapping Logic Independently** – Because the mapper isolates format‑specific transformations, write dedicated tests for each agent format to guarantee that the LSL output complies with `lsl-format.ts`.  
+
+Following these conventions keeps the processing pipeline predictable, makes future extensions straightforward, and aligns the component with the architectural expectations of LiveLoggingSystem.
 
 ---
 
-### 1. Architectural patterns identified  
+### Summary of Requested Items  
 
-* **Strategy / Template Method** – `TranscriptAPI` defines a template for transcript adapters; concrete strategies implement agent‑specific logic.  
-* **Adapter** – `LSLConverter` adapts heterogeneous transcript schemas to the canonical LSL model.  
-* **Observer (publish/subscribe)** – The watch mechanism publishes change events that `TranscriptProcessor` subscribes to for real‑time handling.  
-* **Asynchronous/reactive I/O** – `LoggingService` provides non‑blocking, buffered logging, aligning with Node.js’s event‑driven architecture.
+| Item | Insight |
+|------|---------|
+| **Architectural patterns identified** | Layered processing pipeline; **Mapper/Adapter** pattern (`AgentFormatMapper`); **Repository** pattern (`TranscriptRepository`); **Normalization** step; Centralized **Error Handling** and **Logging** as cross‑cutting concerns. |
+| **Design decisions and trade‑offs** | Decoupling of normalization, mapping, and persistence improves testability and extensibility but adds a slight runtime overhead due to multiple passes. Centralizing error handling ensures consistency but requires all callers to understand the error contract. Using a shared logger simplifies observability at the cost of tighter coupling to the logging implementation. |
+| **System structure insights** | TranscriptProcessor sits under **LiveLoggingSystem**, exposing a clean LSL contract used by sibling components (ClassificationEngine, SessionManager). Its child **TranscriptNormalizer** is internal, while external collaborators interact through well‑defined interfaces (`AgentFormatMapper`, `TranscriptRepository`). |
+| **Scalability considerations** | Because each stage is stateless (normalizer, mapper) they can be parallelised across transcripts, enabling horizontal scaling. The repository layer is the primary scaling bottleneck; choosing a storage solution that supports high write throughput (e.g., bulk inserts, sharding) will be essential as live session volume grows. |
+| **Maintainability assessment** | High maintainability: clear separation of concerns, single‑responsibility classes, and explicit mapping tables make it easy to add new agent formats or adjust the LSL schema. Centralized error handling and logging reduce duplicated code. The main risk is drift between `agent-formats.ts` and the mapper implementation; keeping them in sync via automated tests mitigates this. |
 
-### 2. Design decisions and trade‑offs  
-
-* **Extensibility vs. Complexity** – Using an abstract base class for adapters makes it trivial to add new agents, but it introduces an extra inheritance layer that developers must understand.  
-* **Real‑time vs. Resource Utilization** – The watch‑driven design offers immediate processing of new entries, yet continuous file‑system or stream polling can increase CPU usage under heavy load.  
-* **Async Logging vs. Ordering Guarantees** – Buffering logs improves throughput but may slightly reorder entries if the buffer flushes out‑of‑order; the system must tolerate this or implement sequence numbers.  
-* **Single Responsibility** – By separating conversion (`LSLConverter`), formatting (`LSLFormatter`), and persistence (`LoggingService`), each module stays focused, at the cost of more inter‑module wiring.
-
-### 3. System structure insights  
-
-The system follows a **layered pipeline**:  
-1. **Input Layer** – `TranscriptAPI` + watch mechanism (captures raw data).  
-2. **Transformation Layer** – `LSLConverter` (normalises) → `LSLFormatter` (renders).  
-3. **Output Layer** – `LoggingService` (asynchronous persistence).  
-
-All layers are orchestrated by `TranscriptProcessor`, which lives under the **LiveLoggingSystem** parent. Sibling components share the same foundational contracts, allowing a cohesive ecosystem where each piece can be swapped or upgraded independently.
-
-### 4. Scalability considerations  
-
-* **Horizontal scaling** – Because each transcript stream is processed independently, multiple instances of `TranscriptProcessor` can run in parallel (e.g., per agent or per session) without contention, provided each has its own `LoggingService` buffer or a shared, thread‑safe logger.  
-* **Back‑pressure handling** – The buffered async logger mitigates spikes, but extreme burst rates may require scaling the logging backend (e.g., sharding log files or using a distributed log service).  
-* **Watch mechanism limits** – If the watch implementation relies on OS file‑system events, there may be platform‑specific limits on the number of watchers; a switch to a polling‑based or message‑queue approach could be needed for massive numbers of concurrent transcripts.
-
-### 5. Maintainability assessment  
-
-The clear separation of concerns, coupled with explicit abstract contracts, yields **high maintainability**. Adding new agents or output formats involves creating new subclasses or formatter modules without touching existing code. The reliance on async patterns reduces the risk of hard‑to‑debug blocking bugs. However, maintainers must stay aware of the interplay between the watch callbacks and the logging buffer to avoid subtle race conditions. Comprehensive unit tests for each layer (adapter, converter, formatter, logger) are essential to preserve reliability as the system evolves.
+*All statements above are directly grounded in the provided observations and file references.*
 
 
 ## Hierarchy Context
 
 ### Parent
-- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes a modular design, as seen in the TranscriptAdapter class (lib/agent-api/transcript-api.js), which serves as an abstract base class for implementing agent-specific transcript adapters. This design decision allows for the integration of different agent types and the adaptation of various transcript formats into a unified Live Session Logging (LSL) format. For instance, the TranscriptAPI (lib/agent-api/transcript-api.js) employs the LSLConverter (lib/agent-api/transcripts/lsl-converter.js) for converting between agent-specific transcript formats and the LSL format, providing functionalities for markdown and JSON-Lines conversions. The use of async logging, as implemented in the logging mechanism (integrations/mcp-server-semantic-analysis/src/logging.ts), prevents event loop blocking, ensuring efficient logging without impacting system performance. Furthermore, the watch mechanism (lib/agent-api/transcript-api.js) for monitoring transcript updates enables real-time notifications and adaptations based on new entries.
+- [LiveLoggingSystem](./LiveLoggingSystem.md) -- The LiveLoggingSystem component utilizes the OntologyClassificationAgent, located in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, to classify observations against the ontology system. This agent plays a crucial role in the system's architecture, enabling the classification of observations based on predefined ontologies. The classification process involves the agent analyzing the observations and mapping them to specific concepts within the ontology system. This mapping is essential for providing a structured representation of the observations, facilitating their storage, retrieval, and analysis. The OntologyClassificationAgent's functionality is critical to the overall operation of the LiveLoggingSystem, as it enables the system to organize and make sense of the vast amounts of data generated during live sessions.
+
+### Children
+- [TranscriptNormalizer](./TranscriptNormalizer.md) -- The TranscriptNormalizer class is utilized in the TranscriptProcessor sub-component to standardize transcript formats.
 
 ### Siblings
-- [LoggingService](./LoggingService.md) -- LoggingService implements async logging, as seen in the logging mechanism (integrations/mcp-server-semantic-analysis/src/logging.ts), to prevent event loop blocking.
-- [LSLFormatter](./LSLFormatter.md) -- LSLFormatter uses the LSLConverter (lib/agent-api/transcripts/lsl-converter.js) for converting between agent-specific transcript formats and the LSL format.
-- [TranscriptAdapter](./TranscriptAdapter.md) -- TranscriptAdapter uses the TranscriptAPI class (lib/agent-api/transcript-api.js) as an abstract base class for implementing agent-specific transcript adapters.
-- [WatchMechanism](./WatchMechanism.md) -- WatchMechanism uses the TranscriptAPI class (lib/agent-api/transcript-api.js) for monitoring transcript updates.
+- [ClassificationEngine](./ClassificationEngine.md) -- ClassificationEngine uses the OntologyClassificationAgent to classify observations against the ontology system
+- [SessionManager](./SessionManager.md) -- SessionManager uses the SessionWindowing class in session-windowing.ts to handle session windowing
+- [OntologySystem](./OntologySystem.md) -- OntologySystem uses the OntologyStructure class in ontology-structure.ts to define the ontology structure
 
 
 ---

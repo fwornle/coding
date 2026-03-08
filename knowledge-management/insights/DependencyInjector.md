@@ -2,84 +2,89 @@
 
 **Type:** SubComponent
 
-The DependencyInjector employs dependency injection for initializing providers and configuring them based on the loaded configuration.
+The DependencyInjector in the LLMService class, specifically in the llm-abstraction/dependency-injector.py file, utilizes the resolve_llm_mode function to set the current LLM mode, which is then used by the LLMAbstraction parent component to determine the appropriate service, repository, and tracker instances to inject.
 
 ## What It Is  
 
-The **DependencyInjector** is a sub‑component that lives inside the **DockerizedServices** container of the code‑base. While the concrete file path for the injector itself is not listed in the current observations, its role is clearly described in the surrounding documentation of the parent component. It follows a **provider‑based approach** (Obs 1) and acts as the central authority for **injecting**, **resolving**, and **retrieving** the runtime dependencies required by the services that run inside Docker containers. The injector is invoked by higher‑level classes such as **LLMService** (found at `lib/llm/llm-service.ts`) during their configuration phase, where the service “employs dependency injection for initializing providers and configuring them based on the loaded configuration” (parent hierarchy description). In short, DependencyInjector is the glue that wires together providers, configuration data, and the consuming services, delivering a flexible and maintainable dependency management layer.
+The **DependencyInjector** lives in its own dedicated module `llm‑abstraction/dependency‑injector.py`.  It is a small but pivotal sub‑component that supplies the **LLMService** (implemented in `lib/llm/llm-service.ts`) with the concrete objects it needs at runtime – the LLM mode resolver, the service implementation, the repository path, the budget‑tracker, the sensitivity classifier, and the quota‑tracker.  By exposing a single entry point – the `resolve_llm_mode` function – the injector allows the parent component **LLMAbstraction** to decide, based on the current agent context, which concrete implementations should be wired into **LLMService**.  In practice this means that the injector acts as the glue that translates a high‑level “mode” (e.g., production, mock, test) into a concrete set of dependencies that the service can consume without hard‑coding any of them.
+
+---
 
 ## Architecture and Design  
 
-The observations reveal a **provider‑based dependency‑injection architecture**. Providers—encapsulated objects that know how to create or supply a particular service—are registered with the injector, and the injector then makes them available through a **centralized registry** (Obs 4). This centralization gives the system a single point of truth for dependency resolution, which is a hallmark of the **Service Locator** style, albeit used here as a supportive mechanism rather than a replacement for constructor injection.
+The design is a textbook example of **Dependency Injection (DI)**.  The injector is isolated in its own file, which enforces **loose coupling** between the abstraction layer (**LLMAbstraction**) and the concrete service layer (**LLMService**).  The pattern is realized through a *provider* function – `resolve_llm_mode` – that returns a configuration object (or a collection of factories) describing which concrete classes should be instantiated for a given execution context.  
 
-Key design patterns that emerge are:
+Because the resolver is called from within **LLMService** (via the `resolveMode` method in `lib/llm/llm-service.ts`), the system also exhibits traits of the **Strategy** pattern: the mode‑resolution logic encapsulates a family of interchangeable algorithms (different ways of picking a service, repository, or tracker) and delegates the choice to the injector at runtime.  The hierarchy described in the observations – **LLMAbstraction** as the parent, **LLMService** as a sibling – shows a clean vertical separation: the parent owns the injector, the sibling consumes the injected objects, and any child components would simply request the needed dependencies from the same injector.  
 
-1. **Dependency Injection (DI)** – The injector supplies required collaborators to consumers (e.g., LLMService) at runtime, allowing those consumers to remain agnostic of concrete implementations.  
-2. **Provider Pattern** – Each dependency is represented by a provider that knows how to instantiate or fetch the concrete object, as indicated by the “provider‑based approach” (Obs 1).  
-3. **Centralized Registry / Service Locator** – The injector maintains a single map of dependencies (Obs 4), enabling any component within DockerizedServices to query for a needed service without direct coupling.
+The interaction flow is straightforward:  
+1. **LLMAbstraction** imports the injector from `llm‑abstraction/dependency‑injector.py`.  
+2. When **LLMService** starts handling a request, it calls `resolveMode` which, in turn, invokes `resolve_llm_mode`.  
+3. `resolve_llm_mode` examines inputs such as the agent ID, environment flags, or test configuration and returns the appropriate concrete implementations.  
+4. **LLMService** receives those implementations and proceeds with its business logic, completely agnostic of how the objects were chosen.
 
-Interaction flows are straightforward: a component (such as LLMService) calls the injector’s **`injectDependencies`** method during its start‑up sequence, the injector consults its internal registry, creates or retrieves the required providers, and hands them back to the caller. When a component later needs a dependency on demand, it can invoke **`resolveDependencies`** or **`getDependencies`** (Obs 6) to fetch already‑prepared instances. This design keeps the wiring logic isolated from business logic, enhancing modularity.
+---
 
 ## Implementation Details  
 
-Although the source code is not enumerated in the observations, the documented API surface gives a clear picture of the implementation:
+The core of the injector is the `resolve_llm_mode` function.  Although the source code is not listed, the observations make clear that this function **sets the current LLM mode** and returns the objects that correspond to that mode.  Typical return values include:  
 
-* **`injectDependencies`** – Likely accepts a target object (or class) and a list of dependency identifiers, then iterates over the identifiers, calling the underlying provider factory to obtain concrete instances, and finally assigns those instances to the target’s fields or constructor parameters.  
-* **`resolveDependencies`** – Appears to be a higher‑level helper that ensures all declared dependencies for a component are satisfied, possibly performing lazy initialization or checking for circular references.  
-* **`getDependencies`** – Provides read‑only access to the current dependency map, enabling introspection or debugging of the injector’s state.  
+* **LLM service implementation** – the class that actually talks to the language‑model provider.  
+* **Repository path** – a string or object that points to persistent storage for prompts, responses, or logs.  
+* **Budget tracker** – a component that monitors token usage or monetary cost.  
+* **Sensitivity classifier** – a guard that flags content requiring special handling.  
+* **Quota tracker** – a rate‑limiting helper that enforces per‑agent or per‑user limits.  
 
-The injector’s **central registry** is probably a map keyed by a string or symbol that uniquely identifies each provider. Providers themselves encapsulate the creation logic (e.g., constructing a database client, configuring an HTTP client, or instantiating a caching layer). Because the injector is described as “robust and fault‑tolerant” (Obs 5), it likely includes error handling for missing providers, failed instantiations, and possibly retry or fallback mechanisms.
+Within `lib/llm/llm-service.ts`, the `resolveMode` method pulls the agent ID (and possibly other request metadata) and forwards it to `resolve_llm_mode`.  The returned configuration is then cached or directly injected into the service’s internal fields.  Because the injector lives in a **Python** module (`dependency‑injector.py`) while the service is a **TypeScript** file (`llm-service.ts`), the system must rely on a language‑agnostic contract – most likely JSON‑serialisable objects or a shared interface definition – to pass the resolved dependencies across the language boundary.  This cross‑language arrangement further emphasizes the decision to keep the injector isolated: any change to the resolution logic stays within the Python module, while the TypeScript side only needs to respect the agreed contract.
 
-The injector is used by **LLMService** during its `configureProviders` routine (parent hierarchy description). In that context, the service loads configuration data, selects the appropriate providers (e.g., a specific LLM model implementation), and passes them to the injector for wiring. This demonstrates a **configuration‑driven** instantiation flow: the injector does not hard‑code any concrete classes but relies on external configuration to decide which providers to register.
+---
 
 ## Integration Points  
 
-DependencyInjector sits at the heart of **DockerizedServices**, acting as the bridge between configuration loading, provider registration, and the runtime services that consume those providers. The primary integration points are:
+The **DependencyInjector** sits at the nexus of three major integration paths:  
 
-* **ConfigurationLoader** – Supplies the raw configuration that determines which providers should be registered. The loader’s “provider‑based approach for loading and managing the configuration” (sibling description) suggests that it may directly feed provider definitions into the injector.  
-* **LLMService** (`lib/llm/llm-service.ts`) – Calls `configureProviders` to register LLM‑specific providers, then uses `injectDependencies` to obtain them. This shows a tight coupling where the service’s lifecycle is managed through the injector.  
-* **ServiceOrchestrator** and **LLMManager** – Both consume LLMService, and therefore indirectly depend on the injector for obtaining the correctly configured LLM components.  
-* **ProcessStateManager** – While not directly mentioned as using the injector, it likely registers its own state‑tracking providers so that other services can query process status via the central registry.  
+1. **Parent Integration – LLMAbstraction**  
+   * **LLMAbstraction** imports the injector and supplies it with any global configuration (e.g., environment variables, feature flags).  The parent therefore controls the high‑level policy that determines which mode is active.  
 
-Through these connections, the injector ensures that any component added to DockerizedServices can obtain its required collaborators without needing to know the concrete implementation details, preserving a clean separation of concerns.
+2. **Sibling Integration – LLMService**  
+   * **LLMService** consumes the objects produced by the injector.  Its `resolveMode` method is the primary integration hook; any new service, repository, or tracker added to the system must be exposed through the injector’s return contract so that **LLMService** can receive it without modification.  
+
+3. **Potential Child Integration**  
+   * Although not explicitly observed, any downstream component that needs the same set of dependencies (for example, a logging subsystem or a monitoring agent) can request the injector’s output directly, ensuring consistent configuration across the codebase.  
+
+The only explicit external interface is the `resolve_llm_mode` function.  Because the injector is defined in a separate file, other modules can import it without pulling in the entire **LLMAbstraction** hierarchy, preserving modularity and reducing import‑time side effects.
+
+---
 
 ## Usage Guidelines  
 
-1. **Register Providers Early** – All providers that a component may need should be registered with the injector during application start‑up (e.g., in the `configureProviders` step of LLMService). Delaying registration can lead to resolution failures at runtime.  
-2. **Prefer Constructor Injection** – When possible, request dependencies via the constructor and let the injector call `injectDependencies`. This makes the required dependencies explicit and aids static analysis.  
-3. **Avoid Direct Registry Access** – Use the provided `resolveDependencies` or `injectDependencies` methods rather than peeking into the internal map. This protects the injector’s invariants and maintains fault‑tolerance guarantees.  
-4. **Handle Missing Dependencies Gracefully** – The injector is designed to be robust; however, callers should still catch and log errors when a required provider is absent, allowing the system to degrade gracefully.  
-5. **Leverage Configuration‑Driven Provider Selection** – Keep provider definitions in the configuration files processed by ConfigurationLoader. This enables swapping implementations (e.g., swapping a mock LLM for a production one) without code changes.  
+* **Import from the canonical location** – always reference the injector via `llm-abstraction/dependency-injector.py`.  This guarantees that the same resolution logic is used throughout the system.  
+* **Treat the returned objects as immutable** – the injector’s purpose is to provide a snapshot of the configuration for a given request.  Mutating the injected service, repository, or tracker can lead to subtle state‑leakage across requests.  
+* **Leverage the injector for testing** – because the injector is a single function, test suites can replace `resolve_llm_mode` with a mock that returns test doubles (e.g., a mock LLM service, an in‑memory repository, or a no‑op budget tracker).  This is precisely the flexibility highlighted in the observations.  
+* **Add new modes centrally** – when a new operational mode (such as “experimental” or “high‑throughput”) is required, extend `resolve_llm_mode` rather than scattering conditional logic across **LLMService**.  This keeps the decision‑making in one place and avoids duplication.  
+* **Maintain the cross‑language contract** – any change to the shape of the object returned by `resolve_llm_mode` must be reflected in the TypeScript typings used by `llm-service.ts`.  Keeping the contract stable is essential for the Python‑to‑TypeScript boundary to remain reliable.  
 
-Following these practices will keep the dependency graph predictable, simplify testing (by allowing mock providers to be swapped in), and maintain the fault‑tolerant characteristics highlighted in the observations.
+Following these conventions ensures that the **DependencyInjector** continues to provide the intended benefits of **flexibility**, **testability**, and **loose coupling** across the LLM stack.
 
 ---
 
 ### Summary of Key Insights  
 
-| Aspect | Insight (grounded in observations) |
-|--------|--------------------------------------|
-| **Architectural patterns identified** | Provider pattern, Dependency Injection, Centralized Registry/Service Locator |
-| **Design decisions and trade‑offs** | Centralized injector gives flexibility and maintainability (Obs 4) but introduces a single point of failure that must be mitigated via robust error handling (Obs 5). Provider‑based registration decouples concrete implementations from consumers, at the cost of added indirection. |
-| **System structure insights** | DependencyInjector is the nexus inside DockerizedServices, wired by ConfigurationLoader and consumed by LLMService, ServiceOrchestrator, LLMManager, and potentially ProcessStateManager. |
-| **Scalability considerations** | Because the injector maintains a single registry, scaling to many providers is linear in lookup cost; however, the provider‑based approach allows lazy instantiation, which can mitigate memory pressure as the system grows. |
-| **Maintainability assessment** | Centralizing dependency management improves maintainability (Obs 4) by providing a single location for updates. Fault‑tolerant mechanisms (Obs 5) further reduce maintenance burden by handling missing or failing providers gracefully. The explicit methods (`injectDependencies`, `resolveDependencies`, `getDependencies`) give clear entry points for future extensions. |
-
-These observations collectively portray **DependencyInjector** as a deliberately designed, provider‑centric hub that underpins the modularity, configurability, and resilience of the DockerizedServices ecosystem.
+1. **Architectural patterns identified** – Dependency Injection (primary) and Strategy (mode resolution).  
+2. **Design decisions and trade‑offs** – isolating the injector in `llm-abstraction/dependency-injector.py` yields loose coupling and easy testability, at the cost of an extra indirection layer and a cross‑language contract to maintain.  
+3. **System structure insights** – **LLMAbstraction** owns the injector, **LLMService** consumes it, and any future child components can share the same injection point, reinforcing a clear vertical hierarchy.  
+4. **Scalability considerations** – adding new LLM modes or swapping implementations requires only changes inside the injector, allowing the system to scale horizontally (more modes) without touching the service logic.  
+5. **Maintainability assessment** – centralizing resolution logic improves maintainability; however, developers must guard the Python‑TypeScript interface and avoid mutating injected objects to keep the codebase clean and predictable.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the LLMService class (lib/llm/llm-service.ts) for managing LLM operations. This class plays a crucial role in mode routing, caching, and circuit breaking, ensuring that the system remains robust and fault-tolerant. The use of this class allows for flexibility and maintainability, as it provides a centralized location for managing these operations. For example, the LLMService class includes methods such as startMode and stopMode, which are used to manage the lifecycle of LLM operations. Additionally, the class employs dependency injection for initializing providers and configuring them based on the loaded configuration, as seen in the configureProviders method.
+- [LLMAbstraction](./LLMAbstraction.md) -- The LLMAbstraction component uses dependency injection to set functions that resolve the current LLM mode, mock service, repository path, budget tracker, sensitivity classifier, and quota tracker in the LLMService class (lib/llm/llm-service.ts). This design decision allows for flexibility and testability, as different implementations can be easily swapped in. The resolveMode method in LLMService, which determines the LLM mode based on the agent ID and other factors, is a good example of this. The method takes into account various parameters, such as the agent ID, to decide which LLM mode to use, and returns the corresponding mode. This approach enables the component to adapt to different scenarios and requirements.
 
 ### Siblings
-- [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the LLMService class to manage LLM operations, including mode routing, caching, and circuit breaking, as seen in the startMode and stopMode methods.
-- [LLMManager](./LLMManager.md) -- LLMManager uses the LLMService class to manage LLM operations, including mode routing, caching, and circuit breaking, as seen in the startMode and stopMode methods.
-- [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager uses the Process State Manager to register, unregister, and track the state of services.
-- [ConfigurationLoader](./ConfigurationLoader.md) -- ConfigurationLoader uses a provider-based approach for loading and managing the configuration of the system.
+- [LLMService](./LLMService.md) -- LLMService uses dependency injection to set functions that resolve the current LLM mode, allowing for flexibility and testability.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 3 observations*

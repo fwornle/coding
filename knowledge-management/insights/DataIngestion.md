@@ -2,152 +2,104 @@
 
 **Type:** SubComponent
 
-DataIngestionAgent.ingestData() ingests data from various sources using a data ingestion framework
+The DataIngestion sub-component relies on the ontology metadata fields (entityType, metadata.ontologyClass) to prevent redundant LLM re-classification, as seen in the PersistenceAgent.mapEntityToSharedMemory() function.
 
 ## What It Is  
 
-`DataIngestion` is a **sub‑component** of the larger **SemanticAnalysis** system. The core entry point that we can identify from the observations is the class **`DataIngestionAgent`**, whose method `ingestData()` is responsible for pulling data from a variety of external sources. The ingestion work is orchestrated through an **`IngestionFramework`** that is configured via the static‑like call `IngestionFramework.configureIngestion()`. When something goes wrong during the pull, the same agent invokes `IngestionAgent.handleIngestionFailure()`, which applies a retry strategy supplied by the **`DataIngestionRetryPolicy`** child component. Although the concrete file paths are not listed in the supplied observations, the naming convention (`DataIngestionAgent`, `IngestionFramework`, etc.) makes it clear that these classes live inside the `DataIngestion` package/module of the code‑base.  
-
-Together, these pieces form the **ingestion layer** that feeds raw data into the downstream semantic pipelines (e.g., OntologyClassification, InsightGenerator) that live in sibling components such as **Pipeline**, **Ontology**, and **Insights**. The parent component, **SemanticAnalysis**, treats `DataIngestion` as the source of truth for raw content that will later be transformed, classified, and persisted.
+**DataIngestion** is a sub‑component that lives inside the **CodingPatterns** hierarchy.  Its implementation is spread across a handful of core artefacts that are referenced directly in the source observations: the component talks to the **GraphDatabaseAdapter** defined in `storage/graph-database-adapter.ts`, it relies on ontology metadata fields such as `entityType` and `metadata.ontologyClass` (used by `PersistenceAgent.mapEntityToSharedMemory()`), and it orchestrates work through a DAG‑based batch definition found in `batch-analysis.yaml`.  In addition, the runtime execution model is driven by the work‑stealing logic of `WaveController.runWithConcurrency()`, while consistency of persisted data is guaranteed by the `JsonExportSync` mechanism.  All of these pieces together enable DataIngestion to pull raw knowledge artefacts, classify them (or skip classification when ontology metadata is already present), store them efficiently in a LevelDB‑backed graph store, and keep the JSON export up‑to‑date for downstream consumers.
 
 ---
 
 ## Architecture and Design  
 
-The observations reveal a **modular, responsibility‑segregated architecture** built around three tightly‑coupled but distinct roles:
+The architecture of **DataIngestion** is deliberately compositional.  At its core it follows a **pipeline‑oriented DAG execution model** – each step in `batch-analysis.yaml` declares explicit `depends_on` edges, allowing the BatchScheduler‑style topological sort to determine a safe execution order.  This mirrors the pattern used elsewhere in the system (e.g., the generic BatchScheduler) and gives DataIngestion a deterministic, reproducible processing flow.  
 
-1. **Agent Role** – `DataIngestionAgent` encapsulates the *operational* logic for pulling data (`ingestData()`) and for handling failure (`handleIngestionFailure()`). This aligns with the **Agent pattern**, where an autonomous unit performs a specific task in the system.  
+Concurrency is handled through a **work‑stealing scheduler** implemented in `WaveController.runWithConcurrency()`.  A shared `nextIndex` counter is atomically incremented by any idle worker, which immediately “steals” the next pending task.  This design eliminates the need for a central task queue and reduces contention, providing a lightweight form of dynamic load balancing that scales with the number of available workers.  
 
-2. **Framework/Configurator Role** – `IngestionFramework.configureIngestion()` indicates a **Configurator** or **Builder‑style** approach. The framework is set up once (or re‑configured) to understand the various source types, connection parameters, and possibly transformation hooks.  
+Persistence is abstracted behind the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`).  The adapter hides the details of the underlying LevelDB storage engine while exposing a clean, typed API for creating, reading, and updating knowledge entities.  Because the same adapter is used by sibling components **OntologyIntegration** and **GraphDatabaseManagement**, DataIngestion benefits from a shared contract and can evolve its storage strategy without touching its own business logic.  
 
-3. **Policy Role** – The presence of `DataIngestionRetryPolicy` (a child component) together with the failure‑handling method suggests the **Retry Policy pattern**. The agent delegates the “how many retries, back‑off strategy, exception filtering” to a dedicated policy object rather than hard‑coding it.
-
-The **Factory pattern** is also implied by the child component **`IngestionAgentFactory`**, which would be responsible for constructing appropriately configured `DataIngestionAgent` instances based on runtime requirements (e.g., source type, authentication method). This separation allows the parent **SemanticAnalysis** component to request an agent without needing to know the construction details.
-
-Interaction flow (as inferred from the names):
-- `SemanticAnalysis` or a higher‑level orchestrator requests an agent from `IngestionAgentFactory`.
-- The factory creates the agent, injecting the configured `IngestionFramework` and the `DataIngestionRetryPolicy`.
-- The agent calls `IngestionFramework.configureIngestion()` (typically once during startup) to register source connectors.
-- When `ingestData()` runs, it uses the framework’s connectors to pull data.
-- If a failure occurs, `handleIngestionFailure()` invokes the retry policy, possibly looping back to `ingestData()`.
-
-No explicit event‑bus, micro‑service, or message‑queue mechanisms are mentioned, so the design stays within a **single‑process, object‑oriented** boundary.
+Finally, the component leverages **ontology‑driven short‑circuiting**.  By inspecting `entityType` and `metadata.ontologyClass` before invoking any large language model (LLM) re‑classification, the `PersistenceAgent.mapEntityToSharedMemory()` function prevents unnecessary compute, which is a clear optimisation decision baked into the design.
 
 ---
 
 ## Implementation Details  
 
-### Core Classes / Functions  
+1. **GraphDatabaseAdapter (`storage/graph-database-adapter.ts`)** – This class encapsulates LevelDB operations (open, read, write, batch) and presents methods such as `saveEntity`, `fetchEntity`, and `deleteEntity`.  The adapter also triggers the **JsonExportSync** routine after each mutating operation, ensuring that a JSON snapshot of the graph is always current.  Because LevelDB provides ordered key‑value storage, queries that need range scans or prefix matches are highly performant, which is critical for the high‑throughput ingestion pipeline.  
 
-| Symbol | Responsibility | Key Method(s) |
-|--------|----------------|---------------|
-| **`DataIngestionAgent`** | Executes the ingestion workflow; owns failure handling. | `ingestData()`, `handleIngestionFailure()` |
-| **`IngestionFramework`** | Provides a pluggable infrastructure for source connectors and common ingestion utilities. | `configureIngestion()` |
-| **`IngestionAgentFactory`** (child) | Constructs `DataIngestionAgent` objects with the correct configuration and policies. | *Factory method(s) – not listed* |
-| **`DataIngestionRetryPolicy`** (child) | Encapsulates retry semantics (max attempts, back‑off, exception filters). | *Policy interface – not listed* |
-| **`IngestionFrameworkConfigurator`** (child) | Likely implements the logic behind `configureIngestion()`, mapping source definitions to concrete connector implementations. | *Configurator methods – not listed* |
+2. **Ontology‑aware Mapping (`PersistenceAgent.mapEntityToSharedMemory()`)** – Before an entity is handed off to downstream processing, this function checks the fields `entityType` and `metadata.ontologyClass`.  If they are already populated, the function bypasses the LLM classifier, directly writes the entity into shared memory, and records the mapping in the graph via the adapter.  This conditional path reduces latency and CPU usage, especially when the upstream source already supplies ontology information.  
 
-#### `DataIngestionAgent.ingestData()`  
-The method is the **entry point** for data acquisition. It probably iterates over a collection of source descriptors (registered by the framework) and invokes the appropriate connector to fetch raw payloads. Because the observation explicitly says “ingests data from various sources using a data ingestion framework,” we can infer that the agent does not contain source‑specific code; it delegates to the framework’s abstractions.
+3. **DAG Execution (`batch-analysis.yaml`)** – The YAML file lists steps such as *fetch‑raw*, *normalize*, *enrich*, and *store*.  Each step includes a `depends_on` list that the BatchScheduler parses to produce a topological order.  The scheduler then spawns workers that execute steps in parallel where dependencies allow.  Because the DAG is declarative, adding or re‑ordering steps does not require code changes—only a modification to the YAML definition.  
 
-#### `IngestionFramework.configureIngestion()`  
-This call is responsible for **initialising** the framework. Typical actions (grounded in the name) include:
-- Loading source configuration files (e.g., JSON/YAML) that describe endpoints, credentials, and polling intervals.
-- Instantiating concrete connector objects (e.g., `HttpConnector`, `FileSystemConnector`).
-- Registering those connectors in an internal registry that `DataIngestionAgent` later queries.
+4. **Work‑Stealing Scheduler (`WaveController.runWithConcurrency()`)** – Workers share a mutable `nextIndex` integer.  When a worker finishes its current task, it atomically increments `nextIndex` and claims the next batch index.  This pattern avoids the classic producer‑consumer queue bottleneck and enables near‑linear scaling up to the number of CPU cores, provided that the underlying I/O (LevelDB writes, JSON export) does not become a contention point.  
 
-#### `IngestionAgent.handleIngestionFailure()`  
-When `ingestData()` encounters an exception, control passes to this method. It uses the **`DataIngestionRetryPolicy`** to decide whether to retry, how many times, and with what delay. The method likely wraps the retry loop around the original ingestion call, catching transient errors and re‑invoking `ingestData()` until the policy signals stop or the operation succeeds.
-
-### Child Component Sketches  
-
-- **`IngestionFrameworkConfigurator`** is described as a class that would “handle data source connections” and define an interface for different data sources. This suggests an **interface‑or‑abstract‑class** (e.g., `DataSourceConnector`) that concrete connectors implement.
-
-- **`DataIngestionRetryPolicy`** is said to be “implemented using a retry library,” implying that the policy may be a thin wrapper around a third‑party retry utility, exposing configuration parameters to the agent.
-
-- **`IngestionAgentFactory`** “creates and configures ingestion agents based on the specific requirements of the application,” indicating a **Factory Method** that selects the appropriate agent subclass or configuration set (e.g., batch vs. streaming ingestion).
+5. **JsonExportSync** – Integrated inside the GraphDatabaseAdapter, this utility serialises the entire graph (or incremental deltas) to a JSON file after each successful transaction.  Downstream components that consume a static snapshot—such as reporting tools or external APIs—can rely on a consistent view without needing to query LevelDB directly.
 
 ---
 
 ## Integration Points  
 
-`DataIngestion` sits at the **upstream edge** of the SemanticAnalysis pipeline. Its primary integration contracts are:
+DataIngestion sits under the **CodingPatterns** parent component, which itself standardises graph access through the shared **GraphDatabaseAdapter**.  This common adapter means that DataIngestion, **OntologyIntegration**, and **GraphDatabaseManagement** all speak the same persistence language, simplifying cross‑component data sharing and reducing duplication of storage logic.  
 
-1. **Downstream Consumers** – Once data is ingested, it is handed off to sibling components such as **Pipeline** (which coordinates execution steps) and **Ontology** (which may classify the raw entities). The hand‑off is likely via in‑memory data structures or a shared repository (e.g., a graph database adapter referenced by the parent component).
+The component’s DAG definition (`batch-analysis.yaml`) is a contract that other subsystems can extend.  For example, a new enrichment step that pulls data from an external API could be added simply by inserting a new node with appropriate `depends_on` edges.  Because the BatchScheduler processes the DAG uniformly, the integration cost is minimal.  
 
-2. **Configuration Sources** – `IngestionFramework.configureIngestion()` must read source definitions, possibly from configuration files located alongside other pipeline configuration files (e.g., `pipeline-configuration.json`). This aligns it with the same configuration ecosystem used by **PipelineCoordinator** and **OntologyManager**.
+On the runtime side, the work‑stealing scheduler (`WaveController.runWithConcurrency()`) expects any worker to conform to a simple `executeTask(taskId)` interface.  This makes it straightforward for external services—such as a cloud‑based job orchestrator—to plug in their own workers, provided they respect the shared `nextIndex` counter semantics.  
 
-3. **Retry and Policy Services** – The `DataIngestionRetryPolicy` may rely on a generic retry library used elsewhere in the system (e.g., for database writes in **GraphDatabaseAdapter**). Sharing this library promotes consistency in error handling across components.
-
-4. **Factory Provisioning** – `IngestionAgentFactory` is likely invoked by a higher‑level orchestrator (perhaps `SemanticAnalysisPipeline.PipelineOrchestrator.orchestratePipeline()`) to obtain ready‑to‑run agents. This creates a clear **dependency direction**: the orchestrator → factory → agent → framework → data sources.
-
-No external services (message queues, external APIs) are mentioned, so the integration appears to be **direct, in‑process calls**.
+Finally, the ontology metadata check performed by `PersistenceAgent.mapEntityToSharedMemory()` creates an implicit contract with upstream data producers.  Any producer that can supply `entityType` and `metadata.ontologyClass` will automatically benefit from reduced classification overhead, encouraging a broader ecosystem of well‑annotated data sources.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Instantiate via the Factory** – Developers should never `new DataIngestionAgent()` directly. Instead, request an agent from `IngestionAgentFactory`, which guarantees that the agent is wired with the current `IngestionFramework` configuration and the appropriate `DataIngestionRetryPolicy`. This protects against mismatched configurations.
+1. **Declare DAG steps declaratively** – When extending the ingestion pipeline, edit `batch-analysis.yaml` and add new steps with explicit `depends_on` relationships.  Avoid hard‑coding ordering in code; let the BatchScheduler compute the topological sort.  
 
-2. **Configure Before First Ingestion** – Call `IngestionFramework.configureIngestion()` early in the application start‑up (e.g., in the `SemanticAnalysis` bootstrap sequence). Ensure all source connector definitions are present; otherwise `ingestData()` will have no targets to process.
+2. **Leverage ontology metadata** – Ensure that incoming entities include `entityType` and `metadata.ontologyClass` whenever possible.  This allows `PersistenceAgent.mapEntityToSharedMemory()` to skip redundant LLM classification, improving throughput and reducing cost.  
 
-3. **Observe Retry Policy Limits** – The retry behavior is controlled centrally by `DataIngestionRetryPolicy`. When adjusting retry parameters (max attempts, back‑off intervals), consider the downstream impact on pipeline throughput and on external source rate limits.
+3. **Respect the GraphDatabaseAdapter contract** – All persistence operations should go through the adapter’s public methods.  Direct LevelDB access bypasses `JsonExportSync` and can lead to stale JSON snapshots.  
 
-4. **Handle Idempotency** – Because `handleIngestionFailure()` may re‑invoke `ingestData()`, ingestion logic should be idempotent or able to detect duplicate records. This prevents data duplication when a retry succeeds after a partial failure.
+4. **Tune concurrency via WaveController** – The number of concurrent workers can be configured at startup.  For CPU‑bound workloads, match the worker count to the number of physical cores; for I/O‑bound ingestion (e.g., many LevelDB writes), a higher worker count may be beneficial, but monitor LevelDB lock contention.  
 
-5. **Monitor and Log** – Although not explicit in the observations, best practice dictates that both successful ingestion events and retry attempts be logged. Align logging conventions with those used in sibling components (e.g., `PipelineCoordinator` and `InsightGenerator`) to keep observability consistent.
+5. **Validate JSON export** – After major schema changes, run a quick sanity check on the exported JSON file to confirm that all entities are correctly serialized.  This helps catch mismatches between the graph store and the export layer early.
 
 ---
 
-### Architectural patterns identified  
+### Architectural Patterns Identified  
 
-- **Agent pattern** (`DataIngestionAgent`) – encapsulates a focused unit of work.  
-- **Factory pattern** (`IngestionAgentFactory`) – centralises creation and configuration of agents.  
-- **Configurator/Builder pattern** (`IngestionFramework.configureIngestion()`, `IngestionFrameworkConfigurator`) – separates framework setup from runtime execution.  
-- **Retry Policy pattern** (`DataIngestionRetryPolicy`) – abstracts error‑handling strategy.  
+* **DAG‑based batch orchestration** (declarative pipeline in `batch-analysis.yaml`)  
+* **Work‑stealing concurrency** (`WaveController.runWithConcurrency()`)  
+* **Adapter pattern** (GraphDatabaseAdapter abstracts LevelDB)  
+* **Metadata‑driven short‑circuiting** (ontology fields guard LLM re‑classification)  
 
-### Design decisions and trade‑offs  
+### Design Decisions & Trade‑offs  
 
-- **Separation of concerns** (agent vs. framework vs. policy) improves testability but adds indirection; developers must understand multiple collaborators to debug ingestion issues.  
-- **Factory‑based creation** enforces consistent wiring but can hide configuration details; explicit configuration files become the single source of truth.  
-- **Retry encapsulation** protects the agent from cluttering business logic with error handling, yet the policy must be carefully tuned to avoid overwhelming source systems.  
+* **LevelDB as storage** – Chosen for its high‑performance key‑value semantics; trade‑off is limited support for complex graph queries compared with a native graph DB.  
+* **JSON export sync** – Guarantees a readily consumable snapshot but adds write‑amplification after every mutation.  
+* **Work‑stealing vs. central queue** – Reduces contention and improves scaling, at the cost of requiring atomic counter management and careful handling of side‑effects.  
 
-### System structure insights  
+### System Structure Insights  
 
-`DataIngestion` is a leaf sub‑component under **SemanticAnalysis**, with three child modules that each address a cross‑cutting concern (configuration, retry, creation). Its sibling components share the same high‑level orchestration (pipeline DAG, ontology definitions), suggesting a **layered pipeline architecture** where ingestion feeds into transformation, classification, and insight generation.
+DataIngestion is a thin orchestration layer that delegates persistence to a shared adapter, relies on ontology metadata to optimise classification, and uses a declarative DAG to express processing order.  Its sibling components reuse the same storage adapter, reinforcing a **single source of truth** for knowledge entities across the CodingPatterns domain.  
 
-### Scalability considerations  
+### Scalability Considerations  
 
-- Because ingestion is performed by an agent that can be instantiated multiple times via the factory, the system can scale horizontally by launching several agents in parallel, each handling a subset of sources.  
-- The retry policy must incorporate exponential back‑off or jitter to prevent thundering‑herd effects on failing external sources.  
-- The configurator should support adding new source connectors without code changes, enabling the system to ingest additional data streams as demand grows.  
+* **Horizontal scaling** is facilitated by the work‑stealing scheduler; adding more workers linearly increases throughput until LevelDB I/O becomes the bottleneck.  
+* **DAG parallelism** allows independent steps to run concurrently, but steps with many dependencies can become serialisation points.  
+* **JSON export** may become a scalability choke point for very large graphs; incremental export strategies could be introduced if growth outpaces current sync speed.  
 
-### Maintainability assessment  
+### Maintainability Assessment  
 
-The clear division into **agent, framework, configurator, retry policy, and factory** yields high maintainability: each piece can be unit‑tested in isolation, and changes to source connectors or retry semantics do not ripple through the whole ingestion flow. However, the lack of concrete file paths in the current documentation means developers need to locate the actual implementations manually, which could hinder onboarding. Adding a mapping of class names to source files and exposing configuration schemas would further improve maintainability.
+The use of well‑named adapters, declarative YAML pipelines, and isolated concurrency logic makes the codebase **highly maintainable**.  Changes to storage (e.g., swapping LevelDB for another KV store) are confined to `storage/graph-database-adapter.ts`.  Adding new ingestion steps does not require touching core logic, only updating the DAG definition.  The only maintenance risk lies in the tight coupling between the adapter’s write path and `JsonExportSync`; any modification to persistence must preserve the export trigger to avoid stale data for downstream consumers.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component is a multi-agent system that processes git history and LSL sessions to extract and persist structured knowledge entities. It utilizes various technologies such as Node.js, TypeScript, and GraphQL to build a comprehensive semantic analysis pipeline. The component's architecture is designed to support multiple agents, each with its own specific responsibilities, such as ontology classification, semantic analysis, and content validation. Key patterns in this component include the use of intelligent routing for database interactions, graph database adapters for persistence, and work-stealing concurrency for efficient processing.
-
-### Children
-- [IngestionFrameworkConfigurator](./IngestionFrameworkConfigurator.md) -- The IngestionFrameworkConfigurator would likely be implemented in a class or module that handles data source connections, such as a DataSourceConnector class, which would define the interface for connecting to different data sources.
-- [DataIngestionRetryPolicy](./DataIngestionRetryPolicy.md) -- The DataIngestionRetryPolicy would likely be implemented using a retry library or framework, such as the Retry library in Python, which provides a simple and flexible way to implement retry logic.
-- [IngestionAgentFactory](./IngestionAgentFactory.md) -- The IngestionAgentFactory would likely be implemented as a factory class or module, which would create and configure ingestion agents based on the specific requirements of the application.
+- [CodingPatterns](./CodingPatterns.md) -- The CodingPatterns component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and retrieving knowledge entities. This adapter provides a standardized interface for interacting with the graph database, which is built on top of LevelDB for efficient data storage and retrieval. The use of LevelDB allows for high-performance data storage and querying, making it an ideal choice for the CodingPatterns component. Furthermore, the GraphDatabaseAdapter also provides automatic JSON export sync, ensuring that data is consistently up-to-date and readily available for use within the component.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- PipelineCoordinator uses a DAG-based execution model with topological sort in pipeline-configuration.json steps, each step declaring explicit depends_on edges
-- [Ontology](./Ontology.md) -- OntologyClassifier uses a hierarchical classification model with upper and lower ontology definitions in ontology-definitions.json
-- [Insights](./Insights.md) -- InsightGenerator.generateInsights() uses a rule-based system to generate insights from entity relationships
-- [OntologyManagement](./OntologyManagement.md) -- OntologyManager.loadOntology() loads ontology definitions from a graph database using a graph database adapter
-- [SemanticAnalysisPipeline](./SemanticAnalysisPipeline.md) -- PipelineOrchestrator.orchestratePipeline() coordinates the execution of pipeline steps
-- [CodeKnowledgeGraph](./CodeKnowledgeGraph.md) -- KnowledgeGraphConstructor.constructGraph() constructs a knowledge graph from code entities and relationships
-- [ContentValidation](./ContentValidation.md) -- ContentValidator.validateContent() validates entity content against a set of predefined validation rules
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter.connectToDatabase() connects to a graph database using a database connection protocol
+- [OntologyIntegration](./OntologyIntegration.md) -- OntologyIntegration uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store and retrieve knowledge entities, providing a standardized interface for interacting with the graph database.
+- [GraphDatabaseManagement](./GraphDatabaseManagement.md) -- GraphDatabaseManagement uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to provide a standardized interface for interacting with the graph database.
 
 
 ---
 
-*Generated from 3 observations*
+*Generated from 7 observations*
