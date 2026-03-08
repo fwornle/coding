@@ -1877,6 +1877,11 @@ class SystemHealthAPIServer {
                         }
                     }
 
+                    // Extract LLM metrics if present
+                    const llmProviderMatch = section.match(/\*\*LLM Provider:\*\*\s*(.+)/);
+                    const tokensUsedMatch = section.match(/\*\*Tokens Used:\*\*\s*(\d+)/);
+                    const llmCallsMatch = section.match(/\*\*LLM Calls:\*\*\s*(\d+)/);
+
                     steps.push({
                         index: parseInt(headerMatch[1]),
                         name: headerMatch[2],
@@ -1885,7 +1890,10 @@ class SystemHealthAPIServer {
                         status: headerMatch[5].toLowerCase(),
                         duration: headerMatch[6],
                         errors: errors.length > 0 ? errors : undefined,
-                        outputs: outputs
+                        outputs: outputs,
+                        llmProvider: llmProviderMatch?.[1]?.trim() || undefined,
+                        tokensUsed: tokensUsedMatch ? parseInt(tokensUsedMatch[1]) : undefined,
+                        llmCalls: llmCallsMatch ? parseInt(llmCallsMatch[1]) : undefined,
                     });
                 }
             }
