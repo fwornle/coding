@@ -576,18 +576,26 @@ const ukbSlice = createSlice({
       const existingProcessMap = new Map(state.processes.map(p => [p.pid, p]))
       const newProcessPids = new Set(newProcesses.map((p: UKBProcess) => p.pid))
 
-      // CRITICAL FIX: If new data is empty but we have existing running processes,
-      // preserve them. This prevents "No Active Workflows" flicker during data races.
-      const existingRunningProcesses = state.processes.filter(p =>
-        p.status === 'running' && !newProcessPids.has(p.pid)
-      )
+      // Preserve existing running processes briefly to prevent flicker during data races.
+      // But don't preserve indefinitely — if a process disappears from server for 2+ cycles,
+      // it's genuinely gone (completed/failed). Track with _lastSeenFromServer timestamp.
+      const now = Date.now()
+      const EVICTION_TIMEOUT_MS = 15000 // 15 seconds = ~3 poll cycles
+      const existingRunningProcesses = state.processes.filter(p => {
+        if (newProcessPids.has(p.pid)) return false // Will be in merged list
+        if (p.status !== 'running') return false // Only preserve running
+        const lastSeen = (p as any)._lastSeenFromServer || now
+        return (now - lastSeen) < EVICTION_TIMEOUT_MS
+      })
 
       const mergedNewProcesses = newProcesses.map((newProcess: UKBProcess) => {
         const existing = existingProcessMap.get(newProcess.pid)
+        // Mark as seen from server now
+        const withTimestamp = { ...newProcess, _lastSeenFromServer: now }
 
         // If new data has valid workflowName and totalSteps, use it entirely
         if (newProcess.workflowName && newProcess.totalSteps > 0) {
-          return newProcess
+          return withTimestamp
         }
 
         // If we have existing valid data and new data is incomplete, merge
@@ -595,6 +603,7 @@ const ukbSlice = createSlice({
           return {
             ...existing,
             ...newProcess,
+            _lastSeenFromServer: now,
             // Preserve these critical fields if new data is incomplete
             workflowName: newProcess.workflowName || existing.workflowName,
             totalSteps: newProcess.totalSteps > 0 ? newProcess.totalSteps : existing.totalSteps,
@@ -602,7 +611,7 @@ const ukbSlice = createSlice({
         }
 
         // Otherwise use new process as-is
-        return newProcess
+        return withTimestamp
       })
 
       // Combine: new/merged processes + preserved running processes not in new data
