@@ -2,155 +2,98 @@
 
 **Type:** SubComponent
 
-The OntologyClassificationAgent classifies observations against the ontology system using the ontology definitions from upper-ontology.ts and lower-ontology.ts
+The OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, utilizes the BaseAgent class as its abstract base class.
 
 ## What It Is  
 
-The **Ontology** sub‑component lives inside the *SemanticAnalysis* package of the MCP server (`integrations/mcp-server-semantic-analysis`). Its core runtime is the **OntologyClassificationAgent**, defined in  
-`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`.  
-This agent is responsible for taking raw observations produced by other parts of the system (e.g., the GitHistoryAnalyzer or the SemanticInsightGenerator) and classifying them against the project‑specific ontology. The ontology itself is split into two source files – `upper-ontology.ts` and `lower-ontology.ts` – which together describe the hierarchical taxonomy of entities that the system recognises.  
-
-Ontology classification is not performed ad‑hoc; the agent first **pre‑populates** a set of metadata fields (e.g., canonical type, confidence hints) so that downstream Large Language Model (LLM) calls do not need to repeat the same reasoning. Validation of the resulting classification is carried out by the shared **Validator** (`validator.ts`). Entity‑type resolution is delegated to the **EntityTypeResolver** (`entity-type-resolver.ts`). All of these pieces are wired together through a common **BaseAgent** abstraction (`base-agent.ts`), the same abstraction used by the Coordinator agent and the AgentManager, ensuring a uniform contract for request handling and response envelope creation across the entire multi‑agent system.
-
----
+The **Ontology** sub‑component lives inside the **SemanticAnalysis** domain of the MCP server. Its concrete implementation is anchored in the file  
+`integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts`, which defines the **OntologyClassificationAgent**. This agent inherits from the abstract **BaseAgent** class located at `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts`. The Ontology layer supplies two complementary definition sets: an **upper ontology** that standardises the response envelope returned by every agent, and a **lower ontology** that encodes explicit `depends_on` edges to drive the execution order of downstream tasks. Together they enable the system to classify incoming observations against a shared semantic model while avoiding unnecessary re‑classification of entities that already carry the required ontology metadata (`entityType`, `metadata.ontologyClass`).
 
 ## Architecture and Design  
 
-### BaseAgent Pattern  
-The observations repeatedly point to a **BaseAgent pattern** (see `base-agent.ts`). Both the OntologyClassificationAgent and the Coordinator/AgentManager inherit from this base class, which encapsulates common concerns such as request parsing, error handling, logging, and the construction of a standard response envelope. By centralising these cross‑cutting concerns, the codebase gains **consistency** and **low entry friction** for new agents, a design decision that mirrors the broader multi‑agent architecture of *SemanticAnalysis*.
+The Ontology sub‑component follows a **template‑method inheritance pattern**: concrete agents such as **OntologyClassificationAgent** extend **BaseAgent**, inheriting common plumbing (logging, error handling, response‑envelope construction) and overriding the `execute` method that contains the domain‑specific logic. This mirrors the pattern used by the sibling **SemanticAnalysisAgent** and the **Pipeline** component, reinforcing a uniform agent contract across the entire **AgentFramework** sibling.
 
-### Multi‑Agent System with Shared Coordination  
-*SemanticAnalysis* orchestrates several specialised agents (OntologyClassificationAgent, GitHistoryAnalyzer, SemanticInsightGenerator, etc.). The Ontology system introduces a **shared `nextIndex` counter** that enables idle workers to “pull” the next classification task instantly. This lightweight coordination mechanism avoids a heavyweight queue manager while still providing back‑pressure‑free parallelism. The design trades sophisticated scheduling for simplicity and low latency, fitting the typical bursty workload of code‑analysis pipelines.
+Execution is orchestrated as a **dependency‑graph (DAG) model**. The lower‑ontology definitions explicitly declare `depends_on` edges, which the runtime scheduler respects when invoking agents. This guarantees that prerequisite agents (e.g., entity‑type resolution) complete before dependent agents (e.g., classification) start, eliminating race conditions and ensuring deterministic results.
 
-### Ontology Definition Split (Upper/Lower)  
-Splitting the taxonomy into `upper-ontology.ts` and `lower-ontology.ts` reflects a **layered taxonomy** approach. The upper layer likely holds high‑level abstract concepts (e.g., “Component”, “Service”), while the lower layer captures concrete domain‑specific types (e.g., “GitHistoryAnalyzer”, “PipelineStep”). This separation supports **extensibility**: adding a new concrete type only requires editing the lower file, leaving the stable upper hierarchy untouched.
+Concurrency is handled via a **work‑stealing scheduler**. Validation steps inside the Ontology system maintain a shared counter; idle workers can atomically pull the next task, keeping CPU utilisation high without centralised task queues. This design choice reduces latency for high‑throughput workloads, especially when many observations arrive simultaneously.
 
-### Validation & Type Resolution as First‑Class Services  
-The Ontology subsystem delegates **entity‑type resolution** to `EntityTypeResolver` and **validation** to `Validator`. Both are isolated services rather than inline logic, which indicates a **separation‑of‑concerns** design. The Resolver translates raw observation identifiers into canonical ontology types, while the Validator enforces schema rules before an observation is accepted. This modularity makes the system easier to test and to replace (e.g., swapping in a stricter validator without touching the agent).
-
-### Shared Patterns with Siblings  
-Sibling components such as **Pipeline** (DAG‑based execution) and **AgentManager** (also based on BaseAgent) demonstrate a **consistent architectural language** across the *SemanticAnalysis* tree. The Pipeline’s topological‑sort execution model and the Ontology agent’s task‑pulling via `nextIndex` both aim at deterministic, parallelisable work distribution, reinforcing a unified design philosophy.
-
----
+Finally, the system employs **field pre‑population and metadata gating** as optimisation shortcuts. When an observation already contains `entityType` or `metadata.ontologyClass`, the OntologyClassificationAgent short‑circuits the LLM re‑classification step, preventing duplicate expensive calls. This is a form of **idempotent processing** that improves throughput and cost efficiency.
 
 ## Implementation Details  
 
-1. **OntologyClassificationAgent (`ontology-classification-agent.ts`)**  
-   - Extends `BaseAgent`. The constructor calls `super()` to inherit request/response handling.  
-   - On invocation, the agent first **pre‑populates ontology metadata** (e.g., `entityType`, `sourceId`) to avoid redundant LLM classification. This is a performance optimisation that reduces token consumption and latency.  
-   - It then loads the ontology definitions from `upper-ontology.ts` and `lower-ontology.ts`. The two files are merged (or consulted hierarchically) to build a complete lookup table.  
+- **BaseAgent (`base-agent.ts`)** supplies the abstract contract: a constructor that receives a context object, a protected `prepare()` hook, and an abstract `execute()` method. It also builds the **standard response envelope** defined by the upper ontology, guaranteeing that every agent returns a payload with the same shape (status, data, diagnostics).  
+- **OntologyClassificationAgent (`ontology-classification-agent.ts`)** overrides `execute()` to perform three logical stages:  
+  1. **Entity‑type resolution** – reads the incoming observation, checks for existing `entityType` and `metadata.ontologyClass`, and populates them if missing.  
+  2. **Dependency check** – consults the lower‑ontology graph to verify that any `depends_on` edges are satisfied before proceeding.  
+  3. **Classification** – invokes the LLM only when metadata is absent, then writes the resulting ontology class back into the observation.  
+- **Upper ontology definitions** (not a separate file in the observations but conceptually present) dictate the fields of the response envelope (`response.status`, `response.payload`, `response.metadata`). All agents, including **Pipeline** and **Insights**, rely on this envelope to exchange data.  
+- **Lower ontology definitions** embed the `depends_on` relationships; the scheduler reads these edges to build the execution order.  
+- **Work‑stealing validation** uses a shared atomic counter (likely a `SharedArrayBuffer` or similar construct) that workers decrement to claim a task. When the counter reaches zero, workers automatically poll for new work, ensuring minimal idle time.  
 
-2. **EntityTypeResolver (`entity-type-resolver.ts`)**  
-   - Provides a method like `resolve(observation: Observation): EntityType`.  
-   - Uses the merged ontology map to map raw observation strings to the nearest defined type, handling fallback to a generic “unknown” type when no match exists.  
-
-3. **Validator (`validator.ts`)**  
-   - Exposes `validate(classifiedObservation: ClassifiedObservation): ValidationResult`.  
-   - Checks required fields, type conformity, and any custom constraints defined in the ontology (e.g., “Component” must have a `modulePath`).  
-   - Returns a structured result that the BaseAgent envelope can embed (success flag, error messages).  
-
-4. **Shared `nextIndex` Counter**  
-   - Implemented as a simple atomic integer (likely a `number` stored in a shared in‑memory module).  
-   - Each idle worker reads the current value, increments it atomically, and treats the resulting index as the next task identifier. This eliminates the need for a message broker while still providing **work‑stealing** capability.  
-
-5. **BaseAgent (`base-agent.ts`)**  
-   - Supplies `handle(request: Request): ResponseEnvelope`.  
-   - Wraps the specific agent logic (e.g., OntologyClassificationAgent’s `classify`) inside a try/catch, logs timing, and returns a uniform envelope `{ status, payload, diagnostics }`.  
-   - The same base class is used by the Coordinator agent and the AgentManager, ensuring that any new agent automatically conforms to the system‑wide contract.  
-
-6. **Interaction with Parent & Siblings**  
-   - The parent **SemanticAnalysis** component orchestrates the agents via a central manager (likely `AgentManager`). The manager creates an instance of OntologyClassificationAgent and passes observations downstream from the GitHistoryAnalyzer or the SemanticInsightGenerator.  
-   - The **Pipeline** component may schedule the ontology classification step as one node in its DAG, respecting the `depends_on` relationships defined in `batch-analysis.yaml`.  
-   - The **KnowledgeGraph** sibling could consume the validated classifications to enrich a graph representation of the codebase, though this is not directly mentioned in the observations.  
-
----
+The combination of inheritance, DAG‑based scheduling, and concurrency primitives creates a tightly coupled yet modular processing pipeline that can be extended by adding new agents that simply extend **BaseAgent** and declare their dependencies.
 
 ## Integration Points  
 
-- **Upstream Producers**:  
-  - *GitHistoryAnalyzer* (via `git-history.ts`) emits raw change events that become observations for classification.  
-  - *SemanticInsightGenerator* may also feed higher‑level textual insights that need ontology tagging.  
+Ontology is tightly coupled to its **parent component**, **SemanticAnalysis**, which provides the overall orchestration framework and injects the shared context (configuration, logger, LLM client). The **Pipeline** sibling also extends **BaseAgent**, meaning it can be composed in the same execution graph and share the same response envelope conventions. The **Insights** component consumes the classified observations produced by the Ontology sub‑system to generate higher‑level business insights; it therefore expects the envelope fields defined by the upper ontology.  
 
-- **Downstream Consumers**:  
-  - The **KnowledgeGraph** component can ingest the validated ontology classifications to build relationships between entities.  
-  - The **Insights** pipeline may use the classification results to filter or prioritize generated semantic insights.  
+From an interface perspective, the OntologyClassificationAgent receives its input via the standard agent contract (a JSON payload wrapped in the response envelope) and returns the same envelope after classification. The explicit `depends_on` edges expose a clear contract for any downstream consumer: they must declare their dependencies in the lower‑ontology definition file so that the scheduler can respect ordering.  
 
-- **Shared Services**:  
-  - `EntityTypeResolver` and `Validator` are reusable across other agents that need type resolution or validation (e.g., the Coordinator agent).  
-  - The `nextIndex` counter is a global coordination primitive used by any worker that pulls tasks, ensuring that the Ontology agent can scale horizontally with other agents.  
-
-- **Configuration Files**:  
-  - The DAG definition in `batch-analysis.yaml` references the Ontology classification step, guaranteeing that the step runs after prerequisite analyses (e.g., after Git history extraction).  
-
-- **LLM Interaction**:  
-  - By pre‑populating metadata, the Ontology agent reduces the number of LLM calls required downstream. Any LLM‑based component that consumes the agent’s output can assume that the core classification is already resolved.  
-
----
+The **AgentFramework** sibling provides the abstract base class and the scheduler implementation; any new agent that wishes to participate in the Ontology workflow must import `BaseAgent` from `integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts` and register its dependencies accordingly.
 
 ## Usage Guidelines  
 
-1. **Instantiate via the AgentManager** – Do not create the OntologyClassificationAgent directly. Use the central `AgentManager` (which also follows the BaseAgent pattern) to obtain a properly wired instance. This guarantees that the shared `nextIndex` counter and logging infrastructure are correctly initialised.  
-
-2. **Supply Fully‑Formed Observations** – Observations should contain at least the raw identifier and any contextual fields required by the ontology (e.g., file path, line number). The agent will enrich these with pre‑populated metadata; missing required fields will cause the `Validator` to reject the payload.  
-
-3. **Do Not Modify Upper Ontology Directly** – Treat `upper-ontology.ts` as the stable core taxonomy. Extensions and project‑specific types belong in `lower-ontology.ts`. This separation prevents accidental breaking changes to shared concepts.  
-
-4. **Leverage the EntityTypeResolver When Building Custom Logic** – If a new component needs to map strings to ontology types outside the classification flow, reuse `EntityTypeResolver` rather than duplicating lookup logic.  
-
-5. **Respect the Shared `nextIndex` Counter** – When implementing additional workers that pull tasks from the Ontology queue, always use the atomic increment pattern demonstrated in the existing agents. Directly mutating the counter without atomicity can lead to duplicate work or missed tasks.  
-
-6. **Testing** – Unit‑test the OntologyClassificationAgent by mocking `upper-ontology.ts` and `lower-ontology.ts` and asserting that the response envelope contains the expected metadata and validation status. Also write integration tests that run the agent through the `AgentManager` to verify correct coordination with the shared `nextIndex`.  
+1. **Extend BaseAgent** – When creating a new Ontology‑related agent, inherit from `BaseAgent` and implement only the `execute()` method. Re‑use the constructor pattern shown in `ontology-classification-agent.ts` to receive the shared context.  
+2. **Declare Dependencies** – Add explicit `depends_on` entries in the lower‑ontology definition for any prerequisite work (e.g., entity‑type resolution) so the scheduler can order execution correctly.  
+3. **Leverage Metadata Guarding** – Always check `entityType` and `metadata.ontologyClass` before invoking an LLM. This prevents redundant classification and aligns with the optimisation strategy already baked into the Ontology system.  
+4. **Respect the Response Envelope** – Return data wrapped in the upper‑ontology envelope (`status`, `payload`, `metadata`). This ensures downstream components like **Insights** can parse results without custom adapters.  
+5. **Design for Concurrency** – If the agent performs heavy computation, rely on the existing work‑stealing mechanism by updating the shared counter rather than implementing a bespoke thread‑pool. This preserves the system’s scalability characteristics.
 
 ---
 
-### Architectural patterns identified  
+### Summary of Key Architectural Insights  
 
-1. **BaseAgent pattern** – a shared abstract class for all agents (OntologyClassificationAgent, Coordinator, AgentManager).  
-2. **Shared counter coordination** – a lightweight task‑pulling mechanism using a global `nextIndex`.  
-3. **Layered ontology definition** – split into `upper-ontology.ts` (core concepts) and `lower-ontology.ts` (project‑specific extensions).  
-4. **Separation of concerns** – distinct services for entity‑type resolution (`EntityTypeResolver`) and validation (`Validator`).  
+1. **Architectural patterns identified**  
+   * Template‑method inheritance via `BaseAgent`  
+   * DAG‑based execution driven by explicit `depends_on` edges (lower ontology)  
+   * Work‑stealing concurrency with shared counters (validation phase)  
+   * Idempotent processing through metadata pre‑population  
 
-### Design decisions and trade‑offs  
+2. **Design decisions and trade‑offs**  
+   * Centralising common agent behaviour in `BaseAgent` reduces duplication but couples all agents to a single inheritance hierarchy.  
+   * Explicit dependency edges give deterministic ordering at the cost of requiring careful maintenance of the lower‑ontology graph.  
+   * Work‑stealing improves throughput for bursty loads but introduces complexity in debugging task allocation.  
+   * Skipping LLM calls when metadata exists saves cost, yet relies on the correctness of upstream metadata population.  
 
-- **Uniform agent interface** (BaseAgent) simplifies onboarding but adds a rigid envelope structure that may be overkill for very simple agents.  
-- **Atomic counter** avoids external queuing systems, reducing operational complexity, yet it limits fine‑grained scheduling (e.g., priority handling).  
-- **Pre‑populating metadata** saves LLM tokens and latency, at the cost of extra upfront processing in the agent.  
-- **Two‑file ontology split** eases extensibility but introduces the need for a merge step at runtime, which could become a performance hotspot if the ontology grows very large.  
+3. **System structure insights**  
+   * Ontology sits as a child of **SemanticAnalysis**, sharing the same agent framework with siblings **Pipeline**, **Insights**, and **AgentFramework**.  
+   * The upper ontology enforces a uniform contract across all agents, while the lower ontology orchestrates execution order.  
+   * The **OntologyClassificationAgent** is the primary consumer of the ontology definitions, acting as the bridge between raw observations and downstream insight generation.  
 
-### System structure insights  
+4. **Scalability considerations**  
+   * The work‑stealing scheduler allows the system to scale horizontally across many worker threads or processes, keeping CPU utilisation high.  
+   * Dependency‑graph execution can become a bottleneck if a critical upstream agent (e.g., entity‑type resolution) slows down; careful profiling and possible parallelisation of independent sub‑graphs are advisable.  
+   * Metadata‑based short‑circuiting reduces LLM load, which is a major scalability factor given the cost and latency of external language models.  
 
-- Ontology is a **sub‑component** of the larger *SemanticAnalysis* domain, tightly coupled to the multi‑agent orchestration layer.  
-- Sibling components share the same BaseAgent foundation, indicating a **horizontal modularity** where each functional area (pipeline execution, insight generation, git analysis) is encapsulated as an independent agent.  
-- The **Pipeline** DAG model provides deterministic ordering, while the Ontology agent’s counter‑based pulling supplies the parallelism needed for high‑throughput classification.  
+5. **Maintainability assessment**  
+   * The clear inheritance hierarchy and standard response envelope make it straightforward for new developers to add agents.  
+   * However, the explicit `depends_on` declarations require diligent documentation; missing or circular dependencies could cause subtle runtime failures.  
+   * Centralising concurrency logic in the validation step means changes to the work‑stealing mechanism propagate automatically to all agents, aiding maintainability but also increasing the impact radius of bugs in that subsystem.  
 
-### Scalability considerations  
-
-- The **counter‑based task pulling** scales linearly with the number of workers, provided the atomic increment remains low‑contention (e.g., using `Atomics` in a SharedArrayBuffer or a single‑threaded Node.js event loop).  
-- As the ontology size grows, lookup time in `EntityTypeResolver` may increase; caching the merged map or using a trie could mitigate this.  
-- Pre‑populating metadata reduces downstream LLM load, indirectly improving system scalability under heavy insight‑generation workloads.  
-
-### Maintainability assessment  
-
-- **High maintainability** due to the centralized BaseAgent logic: bug fixes or logging enhancements propagate automatically to all agents.  
-- Clear separation of validation and type resolution encourages isolated unit testing and easier future refactoring.  
-- The split ontology files enforce a clean boundary between stable core concepts and mutable project‑specific types, reducing accidental regressions.  
-- The only potential maintenance burden is the **global counter**; if the system evolves to require more sophisticated scheduling (e.g., priority queues), the current mechanism may need to be replaced, which would affect all agents that rely on it.  
-
-Overall, the Ontology sub‑component exemplifies a disciplined, pattern‑driven design that aligns with the broader multi‑agent architecture of *SemanticAnalysis*, offering a solid foundation for future extensions while keeping the implementation approachable for new contributors.
+By adhering to the patterns and guidelines outlined above, developers can extend the Ontology sub‑component confidently while preserving the consistency, performance, and maintainability that the current architecture provides.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component utilizes a multi-agent system architecture, which allows for the integration of various agents, each with its own specific responsibilities. For instance, the OntologyClassificationAgent (integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts) is responsible for classifying observations against the ontology system. This agent follows the BaseAgent (integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts) pattern, which standardizes agent behavior and response envelope creation. The use of this pattern ensures consistency across all agents, making it easier for new developers to understand and contribute to the codebase.
+- [SemanticAnalysis](./SemanticAnalysis.md) -- The SemanticAnalysis component employs a modular architecture, with each agent having its own specific responsibilities and interfaces. For instance, the OntologyClassificationAgent, defined in integrations/mcp-server-semantic-analysis/src/agents/ontology-classification-agent.ts, is responsible for classifying observations against the ontology system. This agent utilizes the BaseAgent class, found in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, as its abstract base class, providing common functionality and a standard response envelope. The use of this base class allows for a consistent interface across all agents, making it easier to develop and maintain new agents. Furthermore, the OntologyClassificationAgent follows a pattern of constructor initialization and execute method invocation, as seen in the SemanticAnalysisAgent and other agents, which helps to simplify the process of creating and executing new agents.
+
+### Children
+- [OntologyClassificationAgent](./OntologyClassificationAgent.md) -- The OntologyClassificationAgent utilizes the BaseAgent class as its abstract base class, indicating a modular design approach.
 
 ### Siblings
-- [Pipeline](./Pipeline.md) -- The Pipeline uses a DAG-based execution model with topological sort in batch-analysis.yaml steps, each step declaring explicit depends_on edges
-- [Insights](./Insights.md) -- The SemanticInsightGenerator uses the LLM and code graph context to generate semantic insights
-- [SemanticInsightGenerator](./SemanticInsightGenerator.md) -- The SemanticInsightGenerator uses the LLM and code graph context to generate semantic insights
-- [GitHistoryAnalyzer](./GitHistoryAnalyzer.md) -- The GitHistoryAnalyzer uses the GitHistory class from git-history.ts to analyze git history
-- [AgentManager](./AgentManager.md) -- The AgentManager uses the BaseAgent pattern from base-agent.ts to standardize agent behavior and response envelope creation
-- [KnowledgeGraph](./KnowledgeGraph.md) -- The KnowledgeGraph uses the GraphDatabase class from graph-database.ts to store and manage knowledge graph data
+- [Pipeline](./Pipeline.md) -- The Pipeline uses the BaseAgent class, found in integrations/mcp-server-semantic-analysis/src/agents/base-agent.ts, as its abstract base class, providing common functionality and a standard response envelope.
+- [Insights](./Insights.md) -- The Insights component utilizes the classified observations from the Ontology system to generate insights.
+- [AgentFramework](./AgentFramework.md) -- The AgentFramework component provides a standard interface for all agents through the BaseAgent class.
 
 
 ---

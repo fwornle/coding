@@ -2,132 +2,80 @@
 
 **Type:** SubComponent
 
-OntologyClassifier's 'ontologyValidator' function in ontology-classifier.ts ensures entities adhere to the project's ontology
+OntologyClassifier uses the GraphDatabaseAdapter to store and retrieve classified entities, utilizing Graphology+LevelDB persistence with automatic JSON export sync
 
 ## What It Is  
 
-OntologyClassifier is a **sub‑component** that lives inside the `ontology-classifier.ts` source file. It is the logical unit responsible for taking raw entities, detecting their type, validating them against the project‑wide ontology, and finally persisting the classification results in the graph database. The component is directly embedded in two higher‑level containers – **LiveLoggingSystem** and **KnowledgeManagement** – which means every logging session and every knowledge‑management workflow automatically gains the ability to classify incoming entities.  
-
-All interactions with the underlying graph store are mediated through two concrete storage helpers:  
-
-* **GraphDatabaseManager** (`storage/graph-database-manager.ts`) – the higher‑level service that orchestrates read/write transactions.  
-* **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) – the low‑level adapter that talks to Graphology/LevelDB and also provides the `syncJSONExport` capability described in the parent component’s documentation.  
-
-OntologyClassifier therefore sits at the intersection of **entity detection**, **ontology validation**, and **graph persistence**, exposing a small but focused public API that the parent containers invoke.
-
----
+**OntologyClassifier** is a sub‑component that lives inside the **KnowledgeManagement** domain.  Its implementation is spread across the same repository that houses the persistence and graph‑database layers, most notably in the files that define the *GraphDatabaseAdapter* (`storage/graph-database-adapter.ts`) and the *PersistenceAgent* (`integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`).  The classifier’s primary responsibility is to take raw entities—produced by the **ManualLearning** and **OnlineLearning** pipelines—and assign them to ontology classes, enriching each entity with relationship metadata that can later be queried from a graph store.  To fulfil this role it leans heavily on two shared services: the **GraphDatabaseAdapter** for durable graph storage (Graphology + LevelDB with automatic JSON export sync) and the **PersistenceAgent** for in‑memory mapping of entity metadata.  
 
 ## Architecture and Design  
 
-The observations reveal a **layered architecture** built around clear separation of concerns:
+The overall architecture of **OntologyClassifier** follows a **modular, lock‑free, work‑stealing** design.  Modularity is achieved through **dynamic import mechanisms** that defer loading of heavy dependencies (e.g., the `VkbApiClient` imported inside the GraphDatabaseAdapter) until they are actually needed, thereby sidestepping TypeScript compilation constraints and keeping the classifier’s bundle lightweight.  The component participates in a **lock‑free concurrency model** that is also employed by its parent **KnowledgeManagement** and sibling agents.  An atomic index counter drives a **work‑stealing scheduler**: idle worker threads can immediately pull pending classification tasks, which eliminates idle time and reduces contention on shared resources such as LevelDB.  
 
-1. **Adapter Layer** – `GraphDatabaseAdapter` implements the concrete persistence mechanics (Graphology, LevelDB, JSON sync).  
-2. **Manager Layer** – `GraphDatabaseManager` builds on the adapter to provide higher‑level transaction semantics and reusable graph‑operation primitives.  
-3. **Classifier Layer** – `OntologyClassifier` consumes the manager (and, indirectly, the adapter) to perform domain‑specific logic.
-
-This layering follows an **Adapter‑Manager pattern**: the adapter abstracts the storage technology, the manager abstracts graph‑oriented operations, and the classifier abstracts ontology‑specific workflows.  
-
-Within the classifier itself, the code adopts a **pipeline pattern**. The `ontologyClassifierPipeline` function (in `ontology-classifier.ts`) strings together a series of processing steps – detection (`entityTypeDetector`), validation (`ontologyValidator`), and final classification (`classifyEntity`). Each step is a pure function that receives an entity, performs a focused transformation, and forwards the result downstream. This design encourages composability and makes it straightforward to insert, remove, or reorder steps without touching the core logic.
-
-Because the classifier is used by both **LiveLoggingSystem** and **KnowledgeManagement**, it is effectively a **shared library** rather than a tightly coupled service. The component does not expose any networking or asynchronous messaging primitives; all coordination happens through direct function calls and shared in‑process objects.
-
----
+Interaction with other parts of the system is explicit.  **ManualLearning** and **OnlineLearning** invoke the classifier to obtain ontology labels; the classifier, in turn, calls `PersistenceAgent.mapEntityToSharedMemory()` to pre‑populate fields like `entityType` and `metadata.ontologyClass`.  Once classification is complete, the enriched entity is persisted through the **GraphDatabaseAdapter**, which writes to the Graphology‑LevelDB backend and triggers the automatic JSON export sync.  The same adapter is reused by sibling components—**GraphDatabaseManager**, **CodeKnowledgeGraphConstructor**, and **PersistenceAgent**—ensuring a single source of truth for graph persistence across the KnowledgeManagement stack.  
 
 ## Implementation Details  
 
-### Core Functions (all in `ontology-classifier.ts`)
+At the heart of the classifier is a set of functions (not explicitly named in the observations) that orchestrate three key steps:  
 
-| Function | Purpose | Interaction |
-|----------|---------|--------------|
-| `entityTypeDetector` | Inspects a raw entity (e.g., a log entry or a knowledge artifact) and determines its semantic type (e.g., *concept*, *relation*, *event*). | Calls `classifyEntity` once a type is resolved. |
-| `ontologyValidator` | Checks that the detected entity conforms to the rules defined in the project ontology (type hierarchy, required attributes, cardinality). | Throws or flags violations before classification proceeds. |
-| `classifyEntity` | Persists the validated entity into the graph database, assigning it the appropriate ontology label(s). | Uses **GraphDatabaseManager** to issue create/update commands. |
-| `ontologyConfig` | Provides configuration data (e.g., ontology version, rule sets) that drives both validation and classification. | Read by `ontologyValidator` and `classifyEntity`. |
-| `ontologyClassifierPipeline` | Orchestrates the end‑to‑end flow: `entityTypeDetector → ontologyValidator → classifyEntity`. | Serves as the public entry point for parent components. |
+1. **Entity Retrieval & Mapping** – The classifier calls `PersistenceAgent.mapEntityToSharedMemory()` (implemented in `integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts`).  This method injects ontology‑specific metadata into the shared‑memory representation of the entity, preventing redundant re‑classification by downstream LLM calls.  
 
-### Storage Interaction  
+2. **Ontology Determination** – Although the concrete algorithm is not detailed, the classifier leverages the **CodeKnowledgeGraphConstructor** (which builds knowledge graphs from code repositories via AST analysis) to enrich the context used for classification.  This suggests that the classifier can draw on structural code information when deciding an entity’s ontology class.  
 
-* **GraphDatabaseManager** (`storage/graph-database-manager.ts`) is injected (or imported) by the classifier. The manager supplies methods such as `createNode`, `updateNode`, or `queryGraph` that the classifier calls inside `classifyEntity`.  
-* **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) is used indirectly because the manager delegates all low‑level I/O to the adapter. The adapter’s `syncJSONExport` capability, described in the parent component’s context, ensures that any classification operation automatically propagates to a JSON export, keeping external analytics pipelines in sync.
+3. **Graph Persistence** – Once an entity is labeled, the classifier hands it off to `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`).  The adapter abstracts Graphology operations on top of LevelDB and automatically synchronises a JSON export, guaranteeing that the graph state is both durable and readily consumable by external tools.  The adapter’s internal use of dynamic imports (e.g., loading `VkbApiClient` only when network calls are required) keeps the classifier’s start‑up time low and avoids circular type dependencies.  
 
-### Configuration  
-
-`ontologyConfig` centralises all ontology‑related settings. Because it lives in the same file as the classifier, the configuration is version‑controlled alongside the logic, guaranteeing that any change to the ontology rules is immediately reflected in validation and classification behavior.
-
----
+Concurrency is managed via a **work‑stealing queue** backed by atomic counters.  Workers that finish their current batch query the shared counter for the next task index; if work is available they “steal” it, guaranteeing load‑balancing without locks.  This lock‑free approach directly addresses LevelDB’s sensitivity to file‑system locks, a design decision echoed throughout the parent KnowledgeManagement component.  
 
 ## Integration Points  
 
-1. **Parent Containers** – Both **LiveLoggingSystem** and **KnowledgeManagement** embed OntologyClassifier. When a new log entry arrives, LiveLoggingSystem invokes `ontologyClassifierPipeline` to immediately type‑detect, validate, and store the entry. KnowledgeManagement uses the same pipeline when ingesting newly curated knowledge artifacts.  
-
-2. **Storage Stack** – The classifier relies on `GraphDatabaseManager` (`storage/graph-database-manager.ts`). The manager, in turn, depends on `GraphDatabaseAdapter` (`storage/graph-database-adapter.ts`). This chain ensures that any classification operation benefits from the adapter’s `syncJSONExport`, keeping the graph and its JSON representation consistent.  
-
-3. **Sibling Components** – Several siblings share the same storage foundation:  
-   * **ManualLearning** and **OnlineLearning** also call the adapter/manager for persistence, but they focus on learning‑specific data rather than ontology classification.  
-   * **EntityPersistenceAgent**, **KnowledgeGraphAnalyzer**, and **CheckpointTracker** similarly use the manager, indicating a common transaction model across the system.  
-
-4. **Potential Extension Hooks** – Because the pipeline is a sequence of pure functions, other components (e.g., a future **RuleEngine** or **AuditLogger**) could be inserted between detection and validation without altering existing code. The existing siblings already demonstrate that the manager can serve diverse purposes, suggesting that the classifier could be reused by any component that needs ontology‑aware persistence.
-
----
+- **ManualLearning & OnlineLearning** – Both invoke the classifier to obtain ontology tags.  Their contracts expect the classifier to return an entity enriched with `metadata.ontologyClass` and relationship links.  
+- **PersistenceAgent** – Provides the `mapEntityToSharedMemory` API used by the classifier to seed ontology fields before any heavy processing.  The agent also shares the same GraphDatabaseAdapter instance, ensuring consistent persistence semantics.  
+- **GraphDatabaseAdapter** – The sole persistence façade for the classifier.  It is also used by **GraphDatabaseManager**, **CodeKnowledgeGraphConstructor**, and **PersistenceAgent**, making it a critical integration hub.  
+- **CodeKnowledgeGraphConstructor** – Supplies code‑level knowledge graphs that the classifier may consult during ontology determination, linking static analysis results to runtime classification.  
+- **KnowledgeManagement (parent)** – Supplies the overarching lock‑free, work‑stealing infrastructure.  The classifier inherits the atomic index counter and LevelDB lock‑avoidance strategy from this parent, guaranteeing that its operations scale in lock‑contention‑free environments.  
 
 ## Usage Guidelines  
 
-* **Always invoke through the pipeline** – Call `ontologyClassifierPipeline` rather than the individual functions. This guarantees that detection, validation, and persistence happen in the correct order and that the entity is stored using the manager’s transaction semantics.  
-
-* **Provide a complete `ontologyConfig`** – Before running the pipeline, ensure that `ontologyConfig` reflects the current ontology version and rule set. Missing or stale configuration will cause `ontologyValidator` to reject otherwise valid entities.  
-
-* **Do not bypass the manager** – Directly using `GraphDatabaseAdapter` from within the classifier would break the abstraction layer and skip the `syncJSONExport` step. All graph writes must go through `GraphDatabaseManager`.  
-
-* **Handle validation errors explicitly** – `ontologyValidator` may throw or return error objects when an entity violates ontology constraints. Caller code (e.g., LiveLoggingSystem) should capture these errors, log them via the system’s logging facilities, and decide whether to discard or remediate the entity.  
-
-* **Keep the classifier stateless** – The functions are designed as pure operations; avoid storing mutable state inside the module. This simplifies testing and allows multiple concurrent pipelines (e.g., parallel log processing) without race conditions.
+1. **Prefer the shared `PersistenceAgent.mapEntityToSharedMemory` call** before invoking the classifier.  This guarantees that ontology metadata fields (`entityType`, `metadata.ontologyClass`) are populated once and reused across the pipeline, reducing unnecessary LLM re‑classification.  
+2. **Do not instantiate the GraphDatabaseAdapter directly**; rely on the dependency injection pattern used throughout KnowledgeManagement.  The adapter’s dynamic import of heavy clients (e.g., `VkbApiClient`) assumes a lazy‑load context that can be broken if constructed manually.  
+3. **Run classification tasks within the work‑stealing scheduler** provided by the parent component.  Submitting jobs to this scheduler ensures lock‑free execution and optimal CPU utilisation, especially when processing large batches of entities.  
+4. **Avoid mutating LevelDB files directly**.  All writes must flow through the GraphDatabaseAdapter to keep the automatic JSON export sync in place and to preserve the lock‑free guarantees.  
+5. **When extending ontology rules**, add them as pure functions that accept the enriched entity object; keep them stateless so they can be safely executed by any worker thread without additional synchronization.  
 
 ---
 
 ### Architectural Patterns Identified  
-
-1. **Adapter‑Manager pattern** – separation of low‑level storage (Adapter) from higher‑level graph operations (Manager).  
-2. **Pipeline pattern** – `ontologyClassifierPipeline` composes detection, validation, and classification steps.  
-3. **Layered architecture** – clear vertical layering from storage up to domain‑specific classification.  
+- **Modular design with dynamic imports** (to bypass TypeScript compilation limits)  
+- **Lock‑free concurrency** using atomic counters  
+- **Work‑stealing scheduler** for load‑balanced task distribution  
+- **Adapter pattern** (GraphDatabaseAdapter) for abstracting Graphology + LevelDB persistence  
 
 ### Design Decisions & Trade‑offs  
-
-* **Explicit layering** improves testability (each layer can be mocked) but adds indirection; a single‑class implementation would be faster but less modular.  
-* **Pipeline composition** offers flexibility at the cost of slightly higher call‑stack depth; however, the overhead is negligible compared to graph I/O.  
-* **Shared storage components** across siblings reduce code duplication but create a coupling point; any change to the manager or adapter must be backward compatible with all consumers.  
+- *Dynamic imports* reduce compile‑time coupling but add a runtime cost the first time a module is loaded.  
+- *Lock‑free design* eliminates contention on LevelDB but requires careful use of atomic primitives; debugging race conditions can be harder.  
+- *Work‑stealing* improves throughput on heterogeneous workloads but may lead to increased cache misses as workers hop between tasks.  
 
 ### System Structure Insights  
-
-* OntologyClassifier sits under **KnowledgeManagement**, which itself owns the graph storage stack.  
-* Siblings (ManualLearning, OnlineLearning, etc.) demonstrate a **horizontal reuse** of the storage stack, confirming a system‑wide commitment to a single graph persistence strategy.  
-* Child entities are absent; the classifier is a leaf node that provides services to its parents and siblings.  
+OntologyClassifier sits at the intersection of **entity enrichment** (via PersistenceAgent), **knowledge graph construction** (via CodeKnowledgeGraphConstructor), and **persistent storage** (via GraphDatabaseAdapter).  Its sibling components share the same persistence adapter, reinforcing a single‑source‑of‑truth model for graph data across KnowledgeManagement.  
 
 ### Scalability Considerations  
-
-* Because classification ultimately writes to the graph database via the manager, scalability hinges on the performance of **GraphDatabaseAdapter** (Graphology + LevelDB). The adapter’s `syncJSONExport` runs after each write; in high‑throughput scenarios (e.g., massive live logging), batching writes or deferring JSON sync could be necessary.  
-* The pipeline is stateless, allowing horizontal scaling: multiple instances of LiveLoggingSystem can run in parallel, each invoking the same pipeline without contention, provided the underlying graph store can handle concurrent writes.  
+The lock‑free, work‑stealing architecture enables the classifier to scale horizontally across many CPU cores without the typical bottlenecks of file‑system locks in LevelDB.  Automatic JSON export sync ensures that downstream consumers can ingest the graph without additional transformation steps, supporting high‑throughput pipelines.  
 
 ### Maintainability Assessment  
-
-* **High maintainability** – clear separation of concerns, pure functions, and a single entry point (`ontologyClassifierPipeline`) make the code easy to understand and modify.  
-* **Configuration centralisation** (`ontologyConfig`) reduces the risk of divergent rule sets.  
-* **Shared dependencies** (manager & adapter) mean that bug fixes or performance improvements in the storage layer benefit all consumers, including the classifier, without additional changes.  
-* Potential risk: tight coupling to the specific manager/adapter implementation; a future shift to a different graph engine would require updating both layers, but the classifier itself would remain unchanged thanks to its abstracted usage pattern.
+Because the classifier delegates most heavy lifting to well‑encapsulated agents (PersistenceAgent, GraphDatabaseAdapter) and relies on dynamic imports, the codebase remains loosely coupled and easy to modify.  However, the reliance on atomic counters and lock‑free primitives demands rigorous testing to avoid subtle concurrency bugs.  Clear documentation of the dynamic‑import contracts and the work‑stealing scheduler API is essential to keep the component maintainable as the system evolves.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component's reliance on the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for persistence and automatic JSON export sync enables efficient data management. This is evident in the way the adapter leverages Graphology and LevelDB for robust graph database interactions. For instance, the 'syncJSONExport' function in graph-database-adapter.ts ensures that data remains consistent across different storage formats, thus supporting the project's data analysis goals.
+- [KnowledgeManagement](./KnowledgeManagement.md) -- The KnowledgeManagement component employs a lock-free architecture to prevent LevelDB lock conflicts, as seen in the use of shared atomic index counters in the work-stealing concurrency mechanism. This design decision is crucial in ensuring efficient and scalable processing of large datasets, and is implemented in the PersistenceAgent (integrations/mcp-server-semantic-analysis/src/agents/persistence-agent.ts). The GraphDatabaseAdapter (storage/graph-database-adapter.ts) also plays a key role in this architecture, providing Graphology+LevelDB persistence with automatic JSON export sync. Furthermore, the dynamic import mechanism used in the GraphDatabaseAdapter, such as the import of VkbApiClient, helps to avoid TypeScript compilation issues and ensures a modular design pattern.
 
 ### Siblings
-- [ManualLearning](./ManualLearning.md) -- ManualLearning uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to store manually created entities
-- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the GraphDatabaseManager (storage/graph-database-manager.ts) to store extracted knowledge
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter (storage/graph-database-adapter.ts) to interact with the graph database
-- [EntityPersistenceAgent](./EntityPersistenceAgent.md) -- EntityPersistenceAgent uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [KnowledgeGraphAnalyzer](./KnowledgeGraphAnalyzer.md) -- KnowledgeGraphAnalyzer uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [CheckpointTracker](./CheckpointTracker.md) -- CheckpointTracker uses the GraphDatabaseManager (storage/graph-database-manager.ts) to interact with the graph database
-- [GraphDatabaseAdapter](./GraphDatabaseAdapter.md) -- GraphDatabaseAdapter uses the LevelDB database (storage/leveldb.ts) to store graph data
+- [ManualLearning](./ManualLearning.md) -- PersistenceAgent.mapEntityToSharedMemory() pre-populates ontology metadata fields (entityType, metadata.ontologyClass) to prevent redundant LLM re-classification
+- [OnlineLearning](./OnlineLearning.md) -- OnlineLearning uses the GraphDatabaseAdapter to store and retrieve extracted knowledge, utilizing Graphology+LevelDB persistence with automatic JSON export sync
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the GraphDatabaseAdapter to provide Graphology+LevelDB persistence with automatic JSON export sync
+- [CodeKnowledgeGraphConstructor](./CodeKnowledgeGraphConstructor.md) -- CodeKnowledgeGraphConstructor uses the GraphDatabaseAdapter to store and retrieve constructed knowledge graphs, utilizing Graphology+LevelDB persistence with automatic JSON export sync
+- [PersistenceAgent](./PersistenceAgent.md) -- PersistenceAgent uses the GraphDatabaseAdapter to store and retrieve entities, utilizing Graphology+LevelDB persistence with automatic JSON export sync
 
 
 ---

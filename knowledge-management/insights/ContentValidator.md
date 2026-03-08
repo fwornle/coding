@@ -1,141 +1,147 @@
 # ContentValidator
 
-**Type:** MCPAgent
+**Type:** SubComponent
 
-The ContentValidator uses a combination of asynchronous processing and concurrency control to ensure efficient validation of entities, which is evident in the use of async/await in the ContentValidationAgent.
+The validation logic in ContentValidator is modularized into separate modules for each entity type, allowing for easy extension and customization.
 
 ## What It Is  
 
-**ContentValidator** is the core validation component of the **ConstraintSystem**. Its implementation lives inside the *ContentValidationAgent* located at  
-
-```
-integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts
-```  
-
-The agent orchestrates entity‑level validation and staleness detection for the MCP server.  Validation logic is encapsulated in a `validateEntity()` function, while staleness detection is provided by a `detectStaleness()` function.  Both functions accept an entity object and return a typed result that indicates either a successful validation or a detected staleness condition.  Persistence of validation metadata is performed through the **GraphDatabaseAdapter** ( `storage/graph-database-adapter.ts` ), which gives the validator access to a graph‑backed store capable of representing complex relationships between entities, constraints, and violations.  
-
-In addition to the pure validation algorithm, the validator is designed to be performant: a local cache (implicitly referenced) holds recent validation outcomes to reduce round‑trips to the graph database, and the whole flow is built on asynchronous `async/await` constructs that enable concurrent processing of many entities without blocking the event loop.
+**ContentValidator** is a sub‑component that lives inside the **ConstraintSystem** hierarchy. Its implementation is spread across a handful of focused files, the most notable being `storage/graph-database-adapter.ts` (the adapter used for persisting validation metadata) and `cache-validation.ts` (the module that houses the validation‑caching logic). The public entry point for the validator is the `validateEntityContent` function, which prepares entity‑level metadata before the actual validation runs. In addition to the core validation routine, ContentValidator contains a **staleObservationDetector** that applies a heuristic to flag out‑of‑date observations, and it collaborates with the **HookManager** so that registered hooks fire automatically whenever entity content is updated. The validation logic itself is split into separate modules per entity type, making the system extensible without touching the core validator. Finally, ContentValidator owns a child component – **ValidationCacheManager** – that encapsulates the cache‑related responsibilities.
 
 ---
 
 ## Architecture and Design  
 
-The **ContentValidator** sits at the intersection of three architectural concerns that are explicitly visible in the observations:
+The architecture of ContentValidator is **modular and layered**. At the lowest layer, the **GraphDatabaseAdapter** (`storage/graph-database-adapter.ts`) provides a generic persistence façade that both the parent **ConstraintSystem** and ContentValidator reuse for storing validation‑specific metadata. This reuse signals a **shared‑adapter pattern**: a single adapter implementation is injected wherever graph‑based storage is required, avoiding duplicate persistence code across siblings such as **ViolationDetector** and **GraphDatabaseManager**.
 
-1. **Event‑driven & request‑response patterns** – The surrounding **ConstraintSystem** employs an event‑driven model (e.g., entities emit *validation‑requested* events that the `ContentValidationAgent` consumes) while also supporting synchronous request‑response calls for on‑demand validation. This duality lets callers choose the most appropriate interaction style.
+Above the storage layer sits a **caching subsystem** (`cache-validation.ts`). The presence of a dedicated cache file and the child component **ValidationCacheManager** indicate a **cache‑aside** strategy: validation results (or intermediate metadata) are written to the cache after a successful run and consulted before re‑validating the same entity. This design reduces redundant work, especially when `validateEntityContent` pre‑populates entity metadata to short‑circuit repeated checks.
 
-2. **Asynchronous processing with concurrency control** – The agent’s methods are `async` and make extensive use of `await`. Concurrency control is implied by the need to coordinate multiple simultaneous validations, likely through promises, semaphore‑like guards, or the underlying Node.js event loop. This design keeps the system responsive under load and avoids blocking I/O when accessing the graph database.
+The **validation logic** is organized by entity type, each living in its own module. This reflects a **strategy pattern** where the validator selects the appropriate “validation strategy” based on the entity’s type at runtime. Because the strategies are isolated, adding a new entity type simply means dropping a new module into the validation package—no changes to the core validator are required.
 
-3. **Separation of persistence via GraphDatabaseAdapter** – All reads and writes to the underlying graph store are funneled through `GraphDatabaseAdapter`. This adapter abstracts the concrete graph database (e.g., Neo4j, JanusGraph) and presents a clean API to the validator, allowing the validation logic to remain database‑agnostic.
+Interaction with **HookManager** shows a **publisher‑subscriber** style integration: ContentValidator publishes validation events (e.g., “entity‑content‑updated”) and HookManager’s registry (`hook-registry.ts`) notifies any subscribed hooks. This decouples validation from side‑effects such as logging, auditing, or external notifications.
 
-The validator also follows a **configuration‑driven rule engine** approach. Validation rules are not hard‑coded; they are loaded from a configuration file or a dedicated database table, making the system extensible without code changes. This aligns with the sibling component **EntityValidator**, which likewise uses a rules engine, suggesting a shared design language across the validation family.
-
-Finally, the **UnifiedHookManager** (`lib/agent-api/hooks/hook-manager.js`) provides a hook registration mechanism that the validator can tap into, enabling custom pre‑ or post‑validation logic without modifying the core validator code.
+Finally, the **staleObservationDetector** implements a **heuristic‑based detection** mechanism. While the exact heuristic is not detailed, the function’s placement inside ContentValidator suggests that stale‑data detection is considered part of the validation pipeline rather than a separate service, reinforcing the component’s responsibility for data‑quality enforcement.
 
 ---
 
 ## Implementation Details  
 
-### Core Functions  
+1. **Persistence via GraphDatabaseAdapter** – Both ContentValidator and its parent ConstraintSystem import the adapter from `storage/graph-database-adapter.ts`. The adapter abstracts Graphology‑LevelDB interactions, exposing methods such as `saveMetadata`, `loadMetadata`, and query helpers. ContentValidator uses these methods to persist *validation metadata* (e.g., timestamps of last successful validation, rule‑application results). Because the same adapter is used by siblings like **ViolationDetector**, the underlying graph schema is shared, allowing cross‑component queries if needed.
 
-* **`validateEntity(entity)`** – Located inside `content-validation-agent.ts`, this async function receives a domain entity, extracts its identifier, and queries the graph database (via `GraphDatabaseAdapter`) for any existing constraint definitions. It then iterates over the loaded validation rules, applying each rule to the entity’s data. Results are accumulated into a `ValidationResult` object, which may include a list of `Violation` objects. If a cache entry for the same entity and rule set exists, the function short‑circuits and returns the cached result, thereby avoiding unnecessary database access.
+2. **validateEntityContent** – This is the primary public function of ContentValidator. Before invoking any type‑specific validation module, it **pre‑populates** fields on the entity’s metadata object (e.g., `lastValidatedAt`, `validationVersion`). This pre‑population enables the caching layer to quickly determine whether the entity’s content has changed since the last validation run, thereby avoiding unnecessary recomputation.
 
-* **`detectStaleness(entity)`** – Also in `content-validation-agent.ts`, this async routine checks timestamps, version markers, or dependency edges in the graph to decide whether the entity’s data is out‑of‑date with respect to the latest schema or constraint definitions. The staleness result is a simple flag (`true/false`) together with a reason string.
+3. **Cache‑Validation Layer** – Implemented in `cache-validation.ts`, the caching mechanism stores validation outcomes keyed by entity identifiers. The **ValidationCacheManager** child component encapsulates cache reads/writes, exposing methods like `getCachedResult(entityId)` and `storeResult(entityId, result)`. The cache is consulted early in `validateEntityContent`; if a fresh cached result exists, the validator returns it immediately.
 
-### Persistence Layer  
+4. **Stale Observation Detection** – The `staleObservationDetector` function runs a heuristic (e.g., comparing observation timestamps against a configurable freshness window). When it flags an observation as stale, the validator can either reject the content outright or trigger a re‑validation path. This heuristic is embedded directly in the validation flow, ensuring that stale data never slips through unnoticed.
 
-`storage/graph-database-adapter.ts` implements a thin wrapper around the graph database driver. It exposes methods such as `fetchEntity(id)`, `fetchConstraints(entityType)`, and `persistViolation(violation)`. By centralising all graph interactions, the validator can focus on business rules while delegating transaction handling, connection pooling, and query construction to the adapter.
+5. **Hook Integration** – ContentValidator calls into the **HookManager** (via its public API) after a successful validation. HookManager’s modular registry (`hook-registry.ts`) allows other parts of the system to register callbacks for events like `onValidationSuccess` or `onValidationFailure`. Because HookManager is a sibling component, the integration remains loose‑coupled: ContentValidator does not need to know the specifics of each hook, only that the manager will invoke them.
 
-### Caching  
-
-Although the cache implementation is not explicitly listed, the observations indicate that the validator “may use a cache to store validation results.” In practice this is likely a lightweight in‑memory map keyed by a composite of `entityId + ruleSetVersion`. The cache is consulted before any database call and is invalidated when a rule set is updated (a change that would be propagated via the event‑driven system).
-
-### Configuration  
-
-Validation rules are sourced from an external configuration artifact. The agent reads this artifact at startup (or on a configuration‑change event) and stores the parsed rule objects in memory. Each rule object contains a predicate function, severity level, and optional hook identifiers that the `UnifiedHookManager` can execute before or after the rule runs.
-
-### Concurrency Control  
-
-Because multiple validation requests can arrive simultaneously, the agent likely uses a semaphore or a per‑entity lock to prevent race conditions when updating shared structures such as the cache or the graph database. The `async/await` pattern ensures that while one validation is awaiting I/O, other validations can continue processing.
+6. **Entity‑Type Specific Modules** – Each entity type (e.g., `User`, `Device`, `Policy`) has its own validation module, typically exposing a single `validate(entity)` function. ContentValidator dynamically loads the appropriate module based on the entity’s `type` property, applying the **strategy pattern**. This modularization enables straightforward extension: developers add a new file under the validation package, implement the `validate` contract, and register the type in a simple lookup map.
 
 ---
 
 ## Integration Points  
 
-* **Parent – ConstraintSystem** – The validator is a child component of the `ConstraintSystem`. The system’s event bus forwards *entity‑changed* and *validation‑requested* events to the `ContentValidationAgent`. Conversely, the validator emits *validation‑completed* and *staleness‑detected* events that other parts of the system (e.g., UI dashboards, audit services) may consume.
+ContentValidator sits at the intersection of several system concerns:
 
-* **Sibling – GraphDatabaseManager** – Both the validator and the `GraphDatabaseManager` rely on the same `GraphDatabaseAdapter`. This shared persistence layer guarantees that constraint definitions, entity snapshots, and violation records are stored consistently.
+* **Parent – ConstraintSystem** – The parent component also relies on the same `GraphDatabaseAdapter`. This shared dependency means that any schema evolution in the graph database must be coordinated across both ConstraintSystem and ContentValidator to avoid breaking queries. ConstraintSystem may invoke ContentValidator indirectly when constraints are evaluated against entity content.
 
-* **Sibling – HookManager** – The `UnifiedHookManager` (`lib/agent-api/hooks/hook-manager.js`) supplies hook registration points that the validator invokes. Custom hooks can augment validation (e.g., enrich the entity with external data) or react to validation outcomes (e.g., send alerts).
+* **Siblings** –  
+  * **HookManager** provides the event‑driven hook execution path; ContentValidator publishes validation events that HookManager distributes.  
+  * **ViolationDetector** also uses the GraphDatabaseAdapter for violation metadata; there is a natural data‑flow where ContentValidator’s validation results could feed into ViolationDetector’s violation‑recording logic.  
+  * **GraphDatabaseManager**, **ConstraintMetadataManager**, and **AgentManager** each maintain their own repositories via the same LevelDB‑backed graph store, implying that ContentValidator’s cache keys must be namespaced to avoid collisions with other components’ caches.
 
-* **Sibling – ViolationCaptureManager** – After `validateEntity` produces a list of violations, those objects are handed off to the `ViolationCaptureService` (`scripts/violation-capture-service.js`) for durable storage and reporting. This separation keeps the validator focused on rule evaluation while delegating persistence of violations to a dedicated manager.
+* **Child – ValidationCacheManager** – This component abstracts cache operations for ContentValidator. Other components do not directly interact with the cache; they rely on ContentValidator’s public API to retrieve validation status. This encapsulation protects the cache implementation from external churn.
 
-* **Sibling – EntityValidator** – The `EntityValidator` uses a rules engine similar to the ContentValidator. In practice, the two may share rule definitions or even delegate to a common rule‑evaluation library, promoting reuse and consistency across different validation domains.
-
-* **Sibling – WorkflowLayoutManager** – While not directly involved in validation, the `WorkflowLayoutManager` consumes the graph data that the validator may also query (e.g., to understand entity dependencies). This illustrates a broader graph‑centric architecture where multiple services read from the same graph store.
+* **External Interfaces** – While not explicitly listed, the presence of a caching layer and hook system suggests that ContentValidator exposes at least two public interfaces: a synchronous `validateEntityContent(entity)` call and an asynchronous event stream (`validationCompleted`, `validationFailed`) consumed by HookManager subscribers.
 
 ---
 
 ## Usage Guidelines  
 
-1. **Prefer the asynchronous API** – Call `validateEntity` and `detectStaleness` using `await` to allow the event loop to process other work while the validator performs I/O. Synchronous wrappers are not provided and would block the server.
+1. **Never bypass `validateEntityContent`** – All entity content should be validated through this entry point because it handles metadata pre‑population, cache checks, and hook triggering. Directly invoking type‑specific validators will skip these essential steps and can lead to inconsistent cache state.
 
-2. **Leverage the cache** – When building higher‑level services that repeatedly validate the same entity (e.g., in a batch job), avoid re‑creating the validator instance. Re‑use a singleton or dependency‑injected instance so the in‑memory cache remains effective.
+2. **Register Hooks Early** – When extending the system, add your validation‑related hooks to the **HookManager** during application bootstrap. Because HookManager uses a modular registration system (`hook-registry.ts`), hooks will automatically fire for every validation event without further changes to ContentValidator.
 
-3. **Keep validation rules external** – Add or modify rules through the designated configuration source rather than editing code. After a rule change, publish a *validation‑rules‑updated* event so the validator can refresh its in‑memory rule set and invalidate stale cache entries.
+3. **Respect Cache Semantics** – The **ValidationCacheManager** caches results based on entity identifiers and metadata version. If you modify an entity’s validation‑relevant fields outside of the normal update flow, manually invalidate the cache (e.g., `ValidationCacheManager.invalidate(entityId)`) to avoid stale results.
 
-4. **Register hooks responsibly** – Use `UnifiedHookManager` to attach pre‑validation hooks (e.g., data enrichment) or post‑validation hooks (e.g., metrics collection). Ensure hooks are non‑blocking; if a hook performs heavy I/O, make it async and return a promise.
+4. **Add New Entity Types via Strategy Modules** – To support a new entity type, create a new validation module that exports a `validate(entity)` function and add the type to the validator’s lookup map. Do not edit the core `validateEntityContent` logic; the modular design ensures future extensions remain isolated.
 
-5. **Handle staleness signals** – When `detectStaleness` returns `true`, downstream components should trigger a refresh of the entity’s data or recompute dependent workflows. Ignoring staleness can lead to constraint violations that the system would otherwise catch.
-
-6. **Error handling** – All validator methods propagate errors as rejected promises. Consumers should catch these errors, log them, and optionally route them to the `ViolationCaptureService` for audit purposes.
+5. **Configure Stale Detection Parameters** – The heuristic inside `staleObservationDetector` may expose configurable thresholds (e.g., maximum age). Adjust these settings in the component’s configuration file rather than hard‑coding values, so that the detection logic can be tuned without recompiling the validator.
 
 ---
 
-### Architectural patterns identified  
+## Architectural Patterns Identified  
 
-* Event‑driven communication (entity‑change events, validation‑completed events)  
-* Request‑response style API for on‑demand validation  
-* Asynchronous processing with `async/await` and concurrency control  
-* Adapter pattern (`GraphDatabaseAdapter`) for persistence abstraction  
-* Configuration‑driven rule engine (external rule source)  
-* Hook/plug‑in pattern via `UnifiedHookManager`  
+| Pattern | Evidence from Observations |
+|---------|----------------------------|
+| **Shared Adapter** (GraphDatabaseAdapter) | Both ContentValidator and ConstraintSystem use `storage/graph-database-adapter.ts` for persistence. |
+| **Cache‑Aside** | `cache-validation.ts` and the child **ValidationCacheManager** store and retrieve validation results outside the primary validation flow. |
+| **Strategy** (entity‑type validation) | Validation logic is modularized per entity type, allowing easy extension. |
+| **Publisher‑Subscriber** (Hook integration) | ContentValidator triggers validation hooks via **HookManager**, which manages subscriptions in `hook-registry.ts`. |
+| **Heuristic Detection** | `staleObservationDetector` applies a heuristic to identify stale observations. |
 
-### Design decisions and trade‑offs  
+---
 
-* **Event‑driven vs. synchronous** – Providing both styles gives flexibility but adds complexity in keeping the two paths consistent.  
-* **Graph database as the source of truth** – Enables rich relationship queries but introduces a dependency on graph‑specific tooling and may affect latency for simple lookups.  
-* **In‑memory cache** – Improves throughput for hot entities but requires careful invalidation logic when rules or data change.  
-* **External rule configuration** – Maximises extensibility; however, rule parsing and validation become a runtime concern and may impact startup time.  
+## Design Decisions and Trade‑offs  
 
-### System structure insights  
+* **Centralized Graph Adapter vs. Multiple Stores** – Using a single `GraphDatabaseAdapter` simplifies data consistency and reduces code duplication, but it couples all sibling components to the same underlying graph schema. Any schema change must be coordinated across the entire subsystem, potentially slowing independent evolution.
 
-The validator is a leaf component under `ConstraintSystem`, sharing the graph persistence layer with `GraphDatabaseManager` and collaborating through events and hooks with its siblings. The overall system is built around a central graph store, a unified hook manager, and a set of rule‑engine‑based validators (ContentValidator, EntityValidator).  
+* **Cache‑Aside Placement** – Placing the cache in a separate file (`cache-validation.ts`) and encapsulating it in **ValidationCacheManager** isolates caching concerns, improving maintainability. However, cache coherence relies on correct metadata pre‑population; a bug in `validateEntityContent` could cause stale cache hits.
 
-### Scalability considerations  
+* **Modular Validation Strategies** – Splitting validation per entity type yields high extensibility and clear separation of concerns. The trade‑off is a slight runtime overhead for dynamic module resolution, though this is mitigated by the cache.
 
-* **Horizontal scaling** – Because validation is stateless apart from the optional cache, multiple instances of `ContentValidationAgent` can run behind a load balancer, each connecting to the same graph database.  
-* **Cache coherence** – In a multi‑instance deployment, caches are per‑process; stale entries could appear if rule updates are not broadcast. A distributed cache (e.g., Redis) would mitigate this but adds operational overhead.  
-* **Graph DB load** – Heavy validation workloads generate many read queries; indexing the constraint and entity relationship sub‑graphs is essential to keep latency low.  
+* **Heuristic Stale Detection** – A heuristic approach is lightweight and fast, suitable for real‑time validation pipelines. The downside is that false positives/negatives can occur if the heuristic parameters are not well‑tuned.
 
-### Maintainability assessment  
+* **Hook‑Based Extensibility** – Leveraging HookManager decouples side‑effects from core validation, allowing plugins without altering validator code. The trade‑off is that the order of hook execution and potential side‑effect errors must be managed by the HookManager.
 
-The separation of concerns (validation logic, persistence, hook management, rule configuration) makes the codebase approachable. The use of well‑named adapters and agents reduces coupling, and the reliance on external configuration means business rule changes rarely require code changes. The main maintenance risk lies in the cache invalidation strategy and ensuring that event‑driven updates keep all instances synchronized. Proper unit tests around `validateEntity`, `detectStaleness`, and the rule‑loading pipeline are essential to preserve reliability as the rule set evolves.
+---
+
+## System Structure Insights  
+
+The overall system forms a **tree‑like hierarchy**: `ConstraintSystem` (parent) → `ContentValidator` (sub‑component) → `ValidationCacheManager` (child). Sibling components share the same storage adapter and LevelDB‑backed graph database, indicating a **common data‑layer foundation**. The modular design (entity‑type strategies, hook registry) suggests the system was built with future growth in mind, allowing new validation rules, observation types, or external integrations to be added with minimal friction.
+
+---
+
+## Scalability Considerations  
+
+* **Horizontal Scaling of Validation** – Because validation results are cached, scaling out the validator (e.g., running multiple instances) requires a **distributed cache** or a cache‑coherency mechanism. The current file‑based `cache-validation.ts` is likely in‑process; moving to a shared cache (Redis, etc.) would be necessary for true horizontal scaling.
+
+* **Graph Database Load** – All validation metadata passes through the same `GraphDatabaseAdapter`. As the volume of validation records grows, LevelDB’s performance characteristics (log‑structured merge tree) will handle write‑heavy workloads, but read latency may increase. Partitioning the graph by namespace (e.g., per entity type) could mitigate contention.
+
+* **Heuristic Detection Cost** – The stale observation heuristic runs per validation pass; its complexity should remain O(1) or O(log N) to avoid bottlenecks. If the heuristic becomes more sophisticated (e.g., statistical analysis), it may need to be off‑loaded to a background worker.
+
+---
+
+## Maintainability Assessment  
+
+The component scores **high** on maintainability:
+
+* **Clear Separation of Concerns** – Persistence, caching, validation logic, stale detection, and hook integration are each isolated in dedicated files or modules.
+* **Extensible Strategy Modules** – Adding new entity types does not touch existing code, reducing regression risk.
+* **Explicit Interfaces** – The use of `validateEntityContent`, the cache manager API, and HookManager’s registration contract provide well‑defined entry points.
+* **Shared Adapter Consistency** – Reusing `GraphDatabaseAdapter` across siblings reduces duplicated code but introduces a single point of failure; thorough unit tests for the adapter are essential.
+* **Documentation Footprint** – The observations already enumerate the key files and interactions, making onboarding easier.
+
+Potential maintenance pain points include the need to keep cache invalidation logic in sync with any direct metadata mutations and ensuring that heuristic parameters for stale detection remain appropriate as data patterns evolve. Regular review of the shared graph schema and cache strategy will help keep the system robust as it scales.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem's architecture is notable for its use of event-driven and request-response patterns, which is evident in the ContentValidationAgent (integrations/mcp-server-semantic-analysis/src/agents/content-validation-agent.ts) that handles entity validation and staleness detection. This agent utilizes a combination of asynchronous processing and concurrency control to ensure efficient validation of entities. The GraphDatabaseAdapter (storage/graph-database-adapter.ts) is also used for graph database interactions and persistence, demonstrating the system's ability to handle complex data structures. Furthermore, the UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) provides a hook management system that allows for custom hook registration and execution, enabling developers to extend the system's functionality. The ViolationCaptureService (scripts/violation-capture-service.js) is responsible for capturing and persisting constraint violations, which is crucial for maintaining data integrity.
+- [ConstraintSystem](./ConstraintSystem.md) -- The ConstraintSystem component utilizes the GraphDatabaseAdapter (storage/graph-database-adapter.ts) for storing and managing constraint metadata. This allows for efficient persistence and retrieval of constraint data, leveraging the capabilities of Graphology and LevelDB. The automatic JSON export sync feature ensures that the data remains consistent and up-to-date. Furthermore, the GraphDatabaseAdapter provides a flexible and scalable solution for handling large amounts of constraint metadata, making it an ideal choice for the ConstraintSystem.
+
+### Children
+- [ValidationCacheManager](./ValidationCacheManager.md) -- The GraphDatabaseAdapter in storage/graph-database-adapter.ts is utilized by ContentValidator for storing and retrieving validation metadata, indicating a caching mechanism.
 
 ### Siblings
-- [GraphDatabaseManager](./GraphDatabaseManager.md) -- The GraphDatabaseAdapter (storage/graph-database-adapter.ts) is used for graph database interactions and persistence, demonstrating the system's ability to handle complex data structures.
-- [HookManager](./HookManager.md) -- The UnifiedHookManager (lib/agent-api/hooks/hook-manager.js) provides a hook management system that allows for custom hook registration and execution, enabling developers to extend the system's functionality.
-- [ViolationCaptureManager](./ViolationCaptureManager.md) -- The ViolationCaptureService (scripts/violation-capture-service.js) is responsible for capturing and persisting constraint violations, which is crucial for maintaining data integrity.
-- [WorkflowLayoutManager](./WorkflowLayoutManager.md) -- The WorkflowLayoutManager uses a graph library to compute workflow layouts, which provides a robust and scalable way to compute and visualize graph data.
-- [EntityValidator](./EntityValidator.md) -- The EntityValidator uses a rules engine to evaluate validation rules against entity data, which provides a robust and scalable way to validate entity data.
+- [HookManager](./HookManager.md) -- HookManager uses a modular hook registration system in hook-registry.ts to manage hook subscriptions.
+- [ViolationDetector](./ViolationDetector.md) -- ViolationDetector uses the GraphDatabaseAdapter in storage/graph-database-adapter.ts to store and retrieve violation metadata.
+- [GraphDatabaseManager](./GraphDatabaseManager.md) -- GraphDatabaseManager uses the LevelDB database in leveldb-database.ts to store graph data.
+- [ConstraintMetadataManager](./ConstraintMetadataManager.md) -- ConstraintMetadataManager uses a metadata repository in metadata-repository.ts to store constraint configuration and registration data.
+- [AgentManager](./AgentManager.md) -- AgentManager uses an agent repository in agent-repository.ts to store agent configuration and registration data.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

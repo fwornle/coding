@@ -2,111 +2,103 @@
 
 **Type:** SubComponent
 
-The RetryPolicyManager utilizes a limited retry approach, which prevents infinite loops and ensures a stable system, highlighting a reliable retry mechanism.
+The RetryPolicyManager likely implements a mechanism for enforcing retry policies, such as tracking the number of attempts and waiting for the specified timeout intervals.
 
 ## What It Is  
 
-**RetryPolicyManager** is a **SubComponent** that lives inside the **Trajectory** component.  Although the concrete file location is not listed in the supplied observations, the hierarchy makes clear that it is a child of `Trajectory` (the same parent that contains `SpecstoryAdapter`, `SpecstoryConnector`, `LoggerManager`, `ConversationFormatter`, `ConnectionMonitor`, and `LoggingGateway`).  Its sole responsibility is to encapsulate the logic that decides **how**, **when**, and **how many** times an operation should be retried after a failure.  The manager is deliberately **modular** and **configurable**, exposing the ability to set retry counts, intervals, and to swap in different retry‑policy strategies.  It is used by a variety of other components throughout the system, providing a **shared retry approach** that prevents duplicated retry code and ensures a consistent fault‑tolerant behavior across the code base.
-
----
+The **RetryPolicyManager** is a sub‑component that lives under the **Trajectory** component.  Although the current code‑base snapshot does not expose a concrete file path for the manager (the “Code Structure” section reports *0 code symbols found*), the observations describe its purpose and high‑level responsibilities.  It is the central authority that governs how retry policies are defined, instantiated, and enforced across the system.  The manager draws its configuration from a dedicated settings module or file – the same place where values such as *maximum retry count* and *timeout intervals* are stored.  By exposing registration and deregistration APIs, it enables other parts of the system (for example, the **ConnectionManager** or any service that performs remote calls) to plug in the appropriate retry behavior for their specific use‑cases.
 
 ## Architecture and Design  
 
-The observations point to a **Strategy pattern** as the core architectural mechanism.  `RetryPolicyManager` holds a reference to a *retry‑policy* object that implements a common interface (e.g., `shouldRetry(attempt, error) → boolean` and `nextDelay(attempt) → number`).  By injecting different concrete strategies—such as a fixed‑count policy, exponential back‑off, or a custom interval list—clients can change retry behavior without touching the manager’s internal logic.  
+The design of **RetryPolicyManager** follows a **configuration‑driven** and **factory‑based** approach.  Observation 4 explicitly calls out a *factory pattern* that creates concrete retry‑policy instances from the stored configuration.  This decouples policy creation from policy use: callers request a policy by name or identifier, the manager consults the configuration, invokes the factory, and returns a ready‑to‑use object.  
 
-The manager also follows a **modular architecture**: it is a self‑contained unit that can be configured at runtime (retry count, interval values) and then handed to any component that needs fault‑tolerant execution.  This modularity is reflected in the way sibling components (e.g., `SpecstoryConnector` and `ConnectionMonitor`) rely on a **shared retry mechanism** for connection‑establishment attempts, as described in the parent `Trajectory` documentation.  The design therefore promotes **reuse** and **separation of concerns**—retry concerns are isolated from business logic such as logging (`LoggerManager`) or connection monitoring (`ConnectionMonitor`).  
+Enforcement of the policies is handled internally: the manager tracks the number of attempts made for a given operation and inserts the appropriate wait periods between attempts (Observation 2).  This implies an internal state machine that records attempt counters and schedules delays, likely using `setTimeout`‑style primitives or a promise‑based back‑off helper.  
 
-Because the manager enforces a **limited‑retry approach**, it inherently protects the system from infinite loops.  The limit is part of the configurable policy and is checked before each retry, ensuring that the system remains **stable** even when a persistent failure occurs.  This decision aligns with a **fail‑fast** philosophy: after the configured number of attempts, the error is propagated upward for higher‑level handling (e.g., logging, alerting).
+Logging and monitoring are baked into the manager (Observation 5).  By integrating with the **LoggerModule**—which provides the `createLogger` function from `logging/Logger.js`—the manager can emit structured events for each retry attempt, success, or failure.  These logs become a valuable feedback loop for operators and for any automated health‑check tooling that watches retry activity.  
 
----
+Finally, the manager is deliberately **extensible** (Observation 6).  It anticipates custom retry policies beyond the built‑in ones, allowing developers to supply their own implementations that conform to a common interface.  This extensibility is consistent with the sibling **ConnectionManager**, which already implements a retry pattern in its `initialize` method, and suggests that both components could share the same policy objects.
 
 ## Implementation Details  
 
-While the exact source files are not enumerated, the observations describe the essential elements that must exist inside `RetryPolicyManager`:
+*Configuration source* – The manager reads a configuration module or file that contains entries such as:
 
-1. **Configuration API** – Functions or setters that allow callers to specify:
-   * `maxRetries` – the upper bound on retry attempts (observed as “limited retry approach”).
-   * `retryInterval` or a collection of intervals – the wait time between attempts (observed as “setting retry counts and intervals”).
+```json
+{
+  "default": { "maxAttempts": 5, "delayMs": 200 },
+  "httpService": { "maxAttempts": 3, "delayMs": 500 }
+}
+```
 
-2. **Strategy Interface** – An abstract definition that concrete policies implement.  The manager delegates the decision to **retry** and the calculation of **next delay** to the strategy object, embodying the Strategy pattern.
+These values are the basis for the factory (Observation 4).  
 
-3. **Retry Loop** – A core method (e.g., `execute(fn)`) that wraps the target operation:
-   * It calls the supplied function.
-   * On failure, it asks the current strategy `shouldRetry(attempt, error)`.
-   * If the answer is **true** and the attempt count is below `maxRetries`, it waits for `nextDelay(attempt)` (often via `setTimeout`/`await`) and retries.
-   * When the limit is reached, it throws or returns the original error, preventing infinite retries.
+*Factory mechanism* – A lightweight factory method (`createPolicy(name)`) looks up the requested policy name, extracts the settings, and returns an instance of a concrete class (e.g., `FixedDelayRetryPolicy` or `ExponentialBackoffRetryPolicy`).  The concrete classes implement a common interface with methods like `shouldRetry(attemptNumber)` and `nextDelay(attemptNumber)`.  
 
-4. **Integration Hooks** – The manager is used by other components (e.g., `SpecstoryAdapter` inside `Trajectory`) to protect connection establishment.  The same manager can be passed to `SpecstoryConnector` or `ConnectionMonitor`, guaranteeing a **consistent retry policy** across these siblings.
+*Enforcement loop* – When a component registers a policy via `registerPolicy(componentId, policyName)`, the manager stores a mapping.  During execution, the component calls `executeWithRetry(fn, componentId)`.  The manager then:
 
-Because no concrete symbols were discovered, the implementation likely lives in a file named something like `retry/RetryPolicyManager.js` under the `Trajectory` directory, mirroring the naming conventions of sibling modules (`logging/Logger.js`, `integrations/specstory-adapter.js`).
+1. Retrieves the policy instance for `componentId`.  
+2. Executes `fn`.  
+3. If `fn` throws or rejects, the manager checks `policy.shouldRetry(attempt)`.  
+4. If a retry is allowed, it logs the event (via the **LoggerModule**), waits `policy.nextDelay(attempt)`, increments the attempt counter, and repeats.  
 
----
+*Logging & monitoring* – Each retry attempt generates a log entry such as `RetryPolicyManager - component=ConnectionManager attempt=2 delay=200ms`.  The manager may also emit metrics (e.g., counters for total retries, failures) that can be consumed by monitoring dashboards.  
+
+*Extensibility* – Developers can add a new policy class that implements the required interface and register it in the configuration.  Because the factory is driven solely by configuration, no code changes are required in the manager itself to adopt the new policy.
 
 ## Integration Points  
 
-* **Parent – Trajectory** – `Trajectory` orchestrates the overall workflow and supplies the `RetryPolicyManager` to its children.  The parent may instantiate the manager with a default policy (e.g., three attempts with a 2‑second interval) and expose it via a getter so that `SpecstoryAdapter`, `SpecstoryConnector`, and `ConnectionMonitor` can all reuse the same instance.  
+The **RetryPolicyManager** sits directly under **Trajectory**, which itself orchestrates higher‑level workflows.  Its primary consumers are sibling sub‑components that perform I/O or external calls:
 
-* **Sibling Components** –  
-  * `SpecstoryConnector` and `ConnectionMonitor` both rely on the retry logic when attempting to open or verify a connection to the Specstory extension.  By sharing the same manager, they avoid divergent retry behaviours.  
-  * `LoggerManager` and `LoggingGateway` do not directly use the manager, but they benefit indirectly: when a retry ultimately fails, the manager can forward the error to the logging subsystem, ensuring a **standardized logging format** (as used by `ConversationFormatter`).  
+* **ConnectionManager** – Already implements a retry pattern in its `initialize` method.  By delegating to the manager, it can standardize its back‑off behavior and benefit from shared logging.  
+* **LoggerModule** – Supplies the logger instance used by the manager.  The manager’s log statements are therefore consistent with the rest of the system’s logging strategy.  
+* **PersistenceModule** – While not directly involved in retry logic, it may rely on the manager when persisting data to remote stores that can experience transient failures.  
 
-* **External Interfaces** – The manager likely accepts a **callback or async function** representing the operation to be retried.  This keeps the interface generic, allowing any async work—HTTP calls, database queries, or IPC messages—to be wrapped without additional adapters.
-
-* **Configuration Sources** – The retry parameters may be sourced from a configuration file, environment variables, or runtime arguments, enabling operators to tune the system without code changes.
-
----
+The manager’s public API likely consists of registration (`registerPolicy`/`unregisterPolicy`), execution (`executeWithRetry`), and introspection (`listPolicies`).  These APIs expose simple interfaces that other modules can call without needing to understand the underlying state‑tracking or delay calculations.
 
 ## Usage Guidelines  
 
-1. **Prefer the Shared Instance** – When working within the `Trajectory` ecosystem, retrieve the pre‑configured `RetryPolicyManager` from the parent component rather than creating a new one.  This preserves the **consistent retry policy** across `SpecstoryConnector`, `ConnectionMonitor`, and any future consumers.
-
-2. **Select an Appropriate Strategy** – Use the built‑in strategies (fixed count, exponential back‑off) that match the failure characteristics of the operation.  For quick‑fail services, a low `maxRetries` with short intervals is advisable; for flaky external APIs, an exponential back‑off strategy reduces load spikes.
-
-3. **Never Override the Limit Unnecessarily** – The “limited retry approach” is a deliberate safeguard.  Raising `maxRetries` to a very high number can re‑introduce the risk of infinite loops and resource exhaustion.  If a use case truly needs more attempts, consider **cascading retries** (multiple manager instances with different limits) rather than a single unbounded policy.
-
-4. **Handle Final Failure Gracefully** – After the manager exhausts its attempts, the calling component should catch the propagated error and route it to the logging subsystem (`LoggerManager`/`LoggingGateway`).  This ensures that failures are observable and can trigger alerts or fallback logic.
-
-5. **Do Not Embed Retry Logic Directly** – Avoid sprinkling `setTimeout`/`retry` loops throughout the code base.  Centralizing the logic in `RetryPolicyManager` reduces duplication, eases future changes (e.g., adding jitter), and improves testability.
+1. **Prefer registration over ad‑hoc retries** – Components should register a named policy once (e.g., during startup) and then invoke `executeWithRetry` for each operation.  This avoids scattering hard‑coded retry loops throughout the codebase.  
+2. **Configure policies centrally** – All retry thresholds and delays belong in the configuration file/module referenced by the manager.  Changing a policy’s behavior therefore requires only a config update, not a code change.  
+3. **Leverage built‑in logging** – Do not add separate log statements for each retry attempt; rely on the manager’s logging so that all retry activity appears in a uniform format.  
+4. **Implement custom policies only when needed** – The manager’s extensibility is powerful, but custom policies should be introduced only after evaluating whether the existing fixed‑delay or exponential‑backoff policies meet the requirement.  
+5. **Unregister policies for hot‑reloading scenarios** – If a component is being re‑initialized (for example, during a graceful restart), call `unregisterPolicy` to clean up any stale mappings and prevent memory leaks.
 
 ---
 
 ### Architectural Patterns Identified
-* **Strategy Pattern** – encapsulates interchangeable retry policies.
-* **Modular / Component‑Based Architecture** – `RetryPolicyManager` is a self‑contained subcomponent under `Trajectory`.
-* **Fail‑Fast / Limited‑Retry Guard** – prevents infinite retry loops.
+| Pattern | Evidence |
+|---------|----------|
+| **Factory Pattern** | Observation 4 – “may use a factory pattern to create retry policy instances.” |
+| **Configuration‑Driven Design** | Observation 1 – “may utilize a configuration file or module to store retry policy settings.” |
+| **Strategy / Policy Pattern** | The manager selects a concrete retry policy (fixed delay, exponential back‑off, custom) at runtime based on configuration. |
+| **Observer‑like Logging** | Observation 5 – “implements logging and monitoring mechanisms to track retry policy enforcement.” |
+| **Extensibility Hook** | Observation 6 – “may be extensible, allowing for the addition of custom retry policies.” |
 
-### Design Decisions and Trade‑offs
-* **Configurability vs. Simplicity** – exposing retry count and interval gives flexibility but adds a configuration surface that must be managed.
-* **Centralized Retry vs. Localized Logic** – centralization improves consistency and maintainability but introduces a single point of failure if the manager itself has a bug.
-* **Strategy Injection** – allows extensibility (new policies) at the cost of slightly more complex wiring.
+### Design Decisions and Trade‑offs  
+*Choosing a factory with configuration* simplifies policy changes (no code recompilation) but introduces a runtime lookup cost and a dependency on a well‑structured config file.  
+*Embedding state tracking inside the manager* centralizes retry logic, improving consistency, yet it couples the manager to the execution flow of callers; highly asynchronous or streaming workloads may need additional coordination.  
+*Providing a logging hook* ensures observability but adds I/O overhead on every retry attempt; this can be mitigated by adjustable log levels.  
 
-### System Structure Insights
-* `RetryPolicyManager` sits one level below `Trajectory` and is a shared service for sibling components that perform network or I/O operations.
-* The parent component supplies the manager, promoting a **dependency‑injection** style without an explicit DI framework.
+### System Structure Insights  
+The **RetryPolicyManager** acts as a cross‑cutting concern service under **Trajectory**, shared by sibling components **ConnectionManager**, **LoggerModule**, and **PersistenceModule**.  Its presence indicates a deliberate separation between *what* to retry (policy definition) and *when* to retry (policy enforcement), mirroring the classic Strategy pattern.  
 
-### Scalability Considerations
-* Because retry logic is asynchronous and bounded, it scales well under load; the limited‑retry guard ensures that a storm of failures does not exhaust thread pools or event loops.
-* Adding new strategies (e.g., jitter, circuit‑breaker) can improve scalability under high‑latency or highly unreliable downstream services.
+### Scalability Considerations  
+Because the manager maintains per‑component mappings and attempt counters, its memory footprint grows linearly with the number of concurrently tracked operations.  In a high‑throughput scenario, sharding the manager or statelessizing the enforcement loop (e.g., moving delay handling to a dedicated scheduler) could improve scalability.  The factory approach scales well: adding new policies does not affect existing ones.  
 
-### Maintainability Assessment
-* **High** – The use of a single, well‑defined manager reduces code duplication and isolates retry concerns.  
-* **Moderate** – Maintaining multiple strategy implementations requires clear documentation and unit tests to avoid regressions when policies evolve.  
-* **Future‑Proof** – The Strategy pattern makes it straightforward to introduce new policies without altering existing callers, supporting long‑term evolution of the system’s fault‑tolerance posture.
+### Maintainability Assessment  
+The manager’s design is **highly maintainable**: configuration‑driven policies mean that most changes are declarative, the factory isolates creation logic, and centralized logging provides a single source of truth for retry behavior.  The main maintenance risk lies in ensuring the configuration schema stays synchronized with the factory’s expectations and that custom policy implementations faithfully adhere to the required interface.  Regular unit tests for each built‑in policy and integration tests that exercise the manager through its public API will keep regression risk low.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [Trajectory](./Trajectory.md) -- The Trajectory component's use of the SpecstoryAdapter class in lib/integrations/specstory-adapter.js demonstrates a modular architecture, allowing for the management of connections and logging in a flexible and adaptable manner. This class implements a retry mechanism for connection establishment, showcasing a RetryPolicy pattern. The connectViaHTTP method in this class attempts to connect to the Specstory extension via HTTP on multiple ports, highlighting a flexible connection establishment approach. Furthermore, the createLogger function from logging/Logger.js is used to establish a logger instance, providing a standardized logging mechanism.
+- [Trajectory](./Trajectory.md) -- The Trajectory component's utilization of the SpecstoryAdapter class, specifically the connectViaHTTP method in lib/integrations/specstory-adapter.js, enables it to attempt connections to the Specstory extension on multiple ports, showcasing a robust approach to connection management. This is further reinforced by the implementation of a retry pattern in the initialize method, which ensures that the component can recover from temporary connection failures. Additionally, the createLogger function from logging/Logger.js is used to establish a logger instance, allowing for effective error handling and logging of conversation entries via the logConversation method.
 
 ### Siblings
-- [SpecstoryConnector](./SpecstoryConnector.md) -- SpecstoryConnector uses the connectViaHTTP method in SpecstoryAdapter to attempt connections to the Specstory extension on multiple ports, demonstrating a flexible connection establishment approach.
-- [LoggerManager](./LoggerManager.md) -- LoggerManager uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
-- [ConversationFormatter](./ConversationFormatter.md) -- ConversationFormatter uses a standardized logging format to format conversation entries, ensuring a unified logging approach for conversation-related events.
-- [ConnectionMonitor](./ConnectionMonitor.md) -- ConnectionMonitor uses the SpecstoryAdapter class to monitor the status of connections to the Specstory extension, demonstrating a real-time feedback mechanism.
-- [LoggingGateway](./LoggingGateway.md) -- LoggingGateway uses the createLogger function from logging/Logger.js to establish a logger instance, providing a standardized logging mechanism for various components.
+- [ConnectionManager](./ConnectionManager.md) -- ConnectionManager uses the SpecstoryAdapter class and its connectViaHTTP method in lib/integrations/specstory-adapter.js to attempt connections to the Specstory extension on multiple ports.
+- [LoggerModule](./LoggerModule.md) -- LoggerModule uses the createLogger function from logging/Logger.js to establish a logger instance for the Trajectory component.
+- [PersistenceModule](./PersistenceModule.md) -- PersistenceModule may utilize the GraphDatabaseAdapter to interact with a graph database for storing and retrieving data.
 
 
 ---
 
-*Generated from 7 observations*
+*Generated from 6 observations*

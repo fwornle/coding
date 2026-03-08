@@ -2,94 +2,72 @@
 
 **Type:** Detail
 
-Given the lack of source files, we can infer that the RetryPolicy would be responsible for defining the retry interval and the maximum number of retries, based on common practices in similar systems.
+The retry policy's implementation details, such as the backoff strategy and retry count, are not explicitly defined in the provided context, but are crucial for the ServiceStarter's functionality.
 
 ## What It Is  
 
-`RetryPolicy` is the logical component that governs how the **RetryMechanism** decides to repeat an operation when a transient failure is detected.  The only concrete anchor we have is the statement that *“RetryMechanism contains RetryPolicy”* and that the **RetryMechanism** is exercised by the `connectViaHTTP` method inside the `SpecstoryAdapter`.  From these clues we can infer that `RetryPolicy` lives in the same package or module that defines the retry infrastructure – it is not a standalone file that appears in the source tree (the observation list reports **0 code symbols found** and no explicit file paths).  Its purpose is therefore to encapsulate two primary pieces of configuration:  
-
-1. **Maximum number of attempts** – a hard ceiling that prevents an endless loop of retries.  
-2. **Retry interval** – the delay (or back‑off strategy) applied between successive attempts.  
-
-These settings are applied whenever the `RetryMechanism` encounters a transient error, ensuring that the system makes a bounded, predictable number of re‑execution attempts before surfacing the failure to the caller.
-
----
+The **RetryPolicy** is the retry‑and‑backoff mechanism that powers the *ServiceStarter* sub‑component.  According to the observations, the concrete implementation lives in the start‑up scripts for the two services that make up the system – `scripts/api‑service.js` and `scripts/dashboard‑service.js`.  Those scripts embed a **RetryPolicy** that attempts to start the underlying service repeatedly, inserting a delay that grows according to a back‑off algorithm, until the service reports successful initialization or a hard limit is reached.  Because the source files do not expose explicit symbols, the policy is expressed directly in the script logic rather than as a reusable class or module, but it is nonetheless a distinct logical entity that the *ServiceStarter* relies on.
 
 ## Architecture and Design  
 
-Even though the source does not expose concrete classes, the description of `RetryPolicy` reveals a classic **policy‑based design**.  The `RetryMechanism` delegates the “how‑often” and “when‑to‑wait” decisions to an injected or composed `RetryPolicy` object.  This separation of concerns follows the **Strategy pattern**: the mechanism (the *context*) remains agnostic of the specific retry rules, while the policy (the *strategy*) encapsulates those rules.  
+From the limited view we can infer a **retry‑with‑back‑off** architectural pattern.  The pattern is applied at the *service‑initialization* layer: the *ServiceStarter* orchestrates the launch of a service and, rather than failing outright on the first error, it delegates to the **RetryPolicy** to manage subsequent attempts.  This design isolates the resilience concern (handling transient start‑up failures) from the core start‑up code, allowing the same policy to be reused across the two sibling start‑up scripts (`api‑service.js` and `dashboard‑service.js`).  
 
-The interaction flow can be visualized as:
-
-1. `SpecstoryAdapter.connectViaHTTP` initiates an HTTP call.  
-2. The call is wrapped by `RetryMechanism`.  
-3. On a transient failure, `RetryMechanism` queries its `RetryPolicy` for the next delay and whether the retry count has been exhausted.  
-4. If the policy permits, the mechanism sleeps for the prescribed interval and retries; otherwise it propagates the error.  
-
-Because the observations explicitly mention “handling transient errors,” the design likely assumes that the policy can distinguish between retry‑eligible exceptions and fatal ones, although the exact detection logic is not enumerated in the provided material.
-
----
+The interaction is straightforward: the *ServiceStarter* invokes a start routine; on failure it calls into the **RetryPolicy**, which decides whether to retry, computes the next delay (the back‑off), and then re‑invokes the start routine.  Because the policy is embedded in the same script files, the coupling is tight – the retry loop and the service launch share the same execution context, which simplifies data sharing (e.g., error objects, attempt counters) but also means the policy cannot be swapped out without editing the script.
 
 ## Implementation Details  
 
-The concrete implementation details are not present in the observation set (no class definitions, methods, or file locations are listed).  What we can state with confidence is that `RetryPolicy` must expose at least two members:
+Although no concrete symbols are listed, the observations point to the following logical components inside `scripts/api‑service.js` and `scripts/dashboard‑service.js`:
 
-* **`maxAttempts: int`** – the ceiling for retry attempts.  
-* **`getDelay(attemptNumber: int): Duration`** – a method (or property) that returns the interval to wait before the next attempt.  
+1. **Retry Loop** – a `while` or `for` construct that tracks the current attempt number.  
+2. **Back‑off Calculation** – a function or inline expression that derives the delay for the next attempt.  The description mentions “backoff” but does not specify exponential, linear, or jitter; the implementation likely multiplies a base interval by the attempt count or a power of two.  
+3. **Retry Count Limit** – a configurable ceiling that stops the loop after a predefined number of attempts, preventing an infinite retry storm.  The exact value is not disclosed, but the observation stresses that the count is “crucial for the ServiceStarter’s functionality.”  
+4. **Error Handling** – the loop captures any exception or non‑zero exit status from the service start command, logs it (implicitly, as robust start‑up scripts normally do), and then yields control to the back‑off logic.
 
-A typical implementation would store these values in immutable fields, possibly supplied via constructor injection so that callers of `RetryMechanism` can provide custom policies (e.g., exponential back‑off versus fixed delay).  The policy could be a simple data holder or a full‑featured class that implements an interface such as `IRetryPolicy`.  The `RetryMechanism` would then loop, incrementing an internal attempt counter, consulting `policy.maxAttempts` and `policy.getDelay(attempt)` on each iteration.
-
-Because the observations do not mention any sibling entities, we cannot point to alternative policies or shared utilities.  The only concrete anchor is the `connectViaHTTP` method, which presumably catches exceptions, checks the policy, and decides whether to retry.
-
----
+Because the policy is defined inside the start‑up scripts, any helper functions (e.g., `sleep(ms)`, `logRetry(attempt, err)`) are scoped to those files.  The lack of a dedicated module means the **RetryPolicy** cannot be imported elsewhere, but it also eliminates the overhead of module resolution for this critical path.
 
 ## Integration Points  
 
-`RetryPolicy` is tightly coupled with the **RetryMechanism** – it is the only child entity mentioned.  The parent component, `RetryMechanism`, uses the policy to drive its control flow.  The only external integration point highlighted in the observations is the `SpecstoryAdapter.connectViaHTTP` method, which triggers the retry flow.  Consequently, the integration chain looks like:
+The **RetryPolicy** sits directly beneath the *ServiceStarter* component.  Its primary integration point is the *service start* command that each script executes – typically a child‑process spawn, a Docker `run`, or a Node.js server `listen`.  When the start command returns an error, control is handed to the **RetryPolicy**.  Conversely, when the policy decides to give up, it propagates the failure back to *ServiceStarter*, which may then abort the overall deployment or trigger a higher‑level alert.  
 
-```
-SpecstoryAdapter.connectViaHTTP  -->  RetryMechanism (contains RetryPolicy)  -->  HTTP client / external service
-```
-
-No other modules, libraries, or configuration files are referenced, so we cannot enumerate additional dependencies.  The policy is likely instantiated or configured at the point where the `RetryMechanism` is created, possibly via dependency injection or a factory method inside the adapter layer.
-
----
+Other parts of the system that may indirectly depend on this policy include any orchestration tooling that monitors the health of the API or dashboard services; those tools assume that the services will eventually become reachable if the **RetryPolicy** succeeds.  No external libraries or configuration files are mentioned, so the policy’s dependencies appear limited to the Node.js runtime and the standard utilities available in the scripts.
 
 ## Usage Guidelines  
 
-1. **Define a sensible `maxAttempts`** – choose a ceiling that balances resilience with latency.  Because the policy is the gatekeeper for retry loops, setting this value too high can cause prolonged hangs; too low may surface recoverable errors prematurely.  
-2. **Select an appropriate delay strategy** – a fixed short delay works for quick‑recovering services, whereas exponential back‑off (if supported) reduces load on flaky downstream systems.  The `RetryPolicy` should expose a method to compute the delay based on the current attempt number.  
-3. **Inject the policy into `RetryMechanism`** – rather than hard‑coding values inside the mechanism, pass a `RetryPolicy` instance so that different callers (e.g., different adapters) can tailor their retry behavior.  
-4. **Do not retry non‑transient errors** – the surrounding `RetryMechanism` must inspect the exception type before consulting the policy.  If the error is permanent (e.g., authentication failure), the policy should be bypassed and the exception propagated immediately.  
-5. **Document the policy parameters** – because the observations do not show any configuration files, developers should keep the chosen values (max attempts, base delay) close to the code that constructs the policy, with clear comments explaining the rationale.
+* **Do not modify the retry limits without understanding the start‑up latency** – the back‑off count and maximum attempts are central to preventing endless loops while still tolerating transient failures.  
+* **Keep the back‑off calculation deterministic** – if you need to change the algorithm (e.g., add jitter), do it in both `api‑service.js` and `dashboard‑service.js` to maintain consistent behaviour across siblings.  
+* **Log each retry attempt** – because the policy is embedded, explicit `console.log` or a logger call should be added before each sleep to aid troubleshooting.  
+* **Avoid heavy synchronous work inside the retry loop** – the policy’s effectiveness relies on yielding control (via `await` or `setTimeout`) so that other processes can make progress while a service is still booting.  
+* **Test the policy under failure injection** – simulate start‑up failures to verify that the back‑off behaves as expected and that the maximum‑retry threshold is respected.
 
 ---
 
 ### Architectural patterns identified
-* **Strategy (Policy) pattern** – `RetryMechanism` delegates retry rules to a `RetryPolicy`.
-* **Separation of concerns** – retry control flow is isolated from the policy definition.
+* **Retry‑with‑Back‑off** pattern applied at service initialization.
+* Implicit **Synchronous Loop** pattern (retry loop inside the same script).
 
 ### Design decisions and trade‑offs
-* **Explicit limit on retries** prevents infinite loops but may cut off recovery in pathological cases.
-* **Configurable interval** allows flexibility (fixed vs. back‑off) at the cost of added complexity in the policy implementation.
+* **Embedding the policy in start‑up scripts** – simplifies data sharing and eliminates an extra module, but reduces reusability and makes swapping the policy harder.
+* **Tight coupling to ServiceStarter** – ensures the policy has immediate access to start‑up state, at the cost of lower modularity.
+* **Unspecified back‑off strategy** – leaves flexibility for future tuning but also creates ambiguity for maintainers.
 
 ### System structure insights
-* `RetryPolicy` is a child of `RetryMechanism`, which itself is invoked by `SpecstoryAdapter.connectViaHTTP`.  
-* No sibling policies are described, implying a single, possibly default, policy per mechanism instance.
+* The system’s resilience for service start‑up is centralized in the *ServiceStarter* component, with the **RetryPolicy** acting as its child.
+* Both the API and Dashboard services share the same resilience approach, indicating a design intent for uniform start‑up behaviour across siblings.
 
 ### Scalability considerations
-* Because the policy is evaluated locally for each attempt, the retry logic scales linearly with the number of concurrent operations; there is no shared state that could become a bottleneck.  
-* Choosing an exponential back‑off strategy (if the policy supports it) can reduce load on downstream services under high contention.
+* Because the retry logic runs in the same process that launches the service, scaling to many concurrent service starts could saturate the Node.js event loop if many retries happen simultaneously.  A future refactor could extract the policy into an asynchronous worker or shared library to better handle high‑concurrency scenarios.
+* The back‑off delay naturally throttles rapid retry storms, which helps the system remain stable under load spikes or transient infrastructure failures.
 
 ### Maintainability assessment
-* The clear separation between mechanism and policy makes the retry logic easy to test in isolation.  
-* Absence of concrete code means future developers must rely on documentation (such as this insight) to understand the expected fields (`maxAttempts`, delay calculation).  Providing a simple interface for `RetryPolicy` would further improve maintainability.
+* **Positive** – the policy’s location inside the start‑up scripts makes it easy to locate and edit for developers familiar with those files.
+* **Negative** – lack of a dedicated, documented module means new contributors must infer behaviour from the script flow, and any change must be duplicated across the two sibling scripts, raising the risk of inconsistency.
+* Overall, the current design is maintainable for a small codebase but would benefit from extracting the **RetryPolicy** into a shared utility module as the system grows.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [RetryMechanism](./RetryMechanism.md) -- The connectViaHTTP method in the SpecstoryAdapter implements a retry mechanism to handle transient errors.
+- [ServiceStarter](./ServiceStarter.md) -- Service starter scripts (scripts/api-service.js, scripts/dashboard-service.js) implement retry logic with backoff to ensure robust service initialization
 
 
 ---

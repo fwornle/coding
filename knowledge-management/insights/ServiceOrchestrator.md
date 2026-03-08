@@ -2,105 +2,118 @@
 
 **Type:** SubComponent
 
-The ServiceOrchestrator employs dependency injection for initializing providers and configuring them based on the loaded configuration, as implemented in the configureProviders method.
+The ServiceOrchestrator sub-component is designed to be modular, allowing developers to modify or replace individual components without affecting the entire system
 
 ## What It Is  
 
-**ServiceOrchestrator** is a sub‑component that lives inside the **DockerizedServices** component.  Its implementation is centred around the `LLMService` class (found in `lib/llm/llm-service.ts`).  ServiceOrchestrator is the “brain” that brings together all runtime services—LLM‑related workers, auxiliary processes, and any Docker‑hosted micro‑services—by registering them, configuring them through providers, and managing their full lifecycle (startup, health‑checking, shutdown).  The orchestration logic is deliberately placed in a single, well‑defined location so that the rest of the codebase can rely on a consistent, fault‑tolerant entry point for service control.
+ServiceOrchestrator is a **sub‑component** that lives inside the DockerizedServices package. Its source code is split between two concrete files:  
 
-## Architecture and Design  
+* **`lib/service-orchestrator.ts`** – the TypeScript definition of the public interface and the core orchestration logic (e.g., `startService`, `stopService`).  
+* **`lib/service-starter.js`** – a JavaScript helper that implements the low‑level start‑up and shut‑down mechanics, including retry logic with exponential backoff.  
 
-The design of ServiceOrchestrator follows a **provider‑based, dependency‑injection** architecture.  The `configureProviders` method reads a loaded configuration (the same configuration that `ConfigurationLoader` supplies) and wires concrete provider instances into the orchestrator.  This mirrors the pattern used by the sibling **DependencyInjector** component, reinforcing a system‑wide convention of decoupling concrete implementations from their consumers.
-
-ServiceOrchestrator also embodies a **centralized service registry**.  Methods such as `registerService` and `unregisterService` maintain an internal catalogue of active services, which the orchestrator later iterates over for lifecycle actions (`startService`, `stopService`).  This registry is shared conceptually with the **ProcessStateManager**, which tracks the state of each registered service, but ServiceOrchestrator owns the authoritative “start/stop” authority.
-
-Fault tolerance is built in through explicit **circuit‑breaker** and **caching** mechanisms that are delegated to the `LLMService` class.  The orchestrator invokes `LLMService.startMode` and `LLMService.stopMode`, which internally handle mode routing, cache population, and circuit‑breaker state transitions.  By keeping these concerns inside `LLMService` yet invoking them from the orchestrator, the architecture achieves separation of concerns while still providing a single point of control.
-
-## Implementation Details  
-
-- **LLMService (`lib/llm/llm-service.ts`)** – The core utility that knows how to start and stop specific LLM modes.  Its methods `startMode` and `stopMode` encapsulate mode routing logic, cache look‑ups, and circuit‑breaker checks.  ServiceOrchestrator calls these methods whenever an LLM‑related service is started or stopped, ensuring that the same robustness guarantees apply across the system.
-
-- **Dependency Injection (`configureProviders`)** – ServiceOrchestrator receives a configuration object (populated by **ConfigurationLoader**) and uses it to instantiate provider objects (e.g., database connectors, external API clients).  Each provider is injected into the orchestrator’s internal structures, allowing later calls such as `startService` to reference fully‑initialised dependencies without hard‑coding concrete classes.
-
-- **Lifecycle Management** – The orchestrator exposes `startService` and `stopService`.  Internally these iterate over the service registry, invoke the appropriate `LLMService` mode methods, and perform health‑check callbacks (mirroring the health‑check responsibilities of **ProcessStateManager**).  The shutdown path also ensures that any cached data is flushed and that circuit‑breaker state is gracefully reset.
-
-- **Service Registry (`registerService` / `unregisterService`)** – These methods maintain a map keyed by service identifiers.  Registration typically occurs during the bootstrap phase when Docker containers are spun up (as orchestrated by the parent **DockerizedServices** component).  Unregistration is invoked either on graceful shutdown or when a circuit‑breaker trips, allowing the orchestrator to keep an up‑to‑date view of the active topology.
-
-- **Fault‑Tolerance** – By delegating caching and circuit‑breaker logic to `LLMService`, ServiceOrchestrator does not need to implement these mechanisms itself.  This reduces code duplication and centralises resilience policies, making it easier to tune parameters (e.g., cache TTL, circuit‑breaker thresholds) in a single location.
-
-## Integration Points  
-
-ServiceOrchestrator sits at the nexus of several sibling components:
-
-* **DockerizedServices (parent)** – Provides the container‑level context in which ServiceOrchestrator runs.  DockerizedServices launches the orchestrator after the LLM containers are ready, and relies on the orchestrator to keep those containers healthy.
-
-* **LLMManager (sibling)** – Also consumes `LLMService` for mode routing, but focuses on higher‑level business workflows.  The orchestrator supplies LLMManager with the same `LLMService` instance, guaranteeing consistent caching and circuit‑breaker behaviour across both components.
-
-* **ProcessStateManager (sibling)** – Tracks the runtime state of each service that the orchestrator registers.  When ServiceOrchestrator calls `registerService`, it typically also notifies ProcessStateManager so that state transitions (e.g., “starting”, “running”, “failed”) are recorded.
-
-* **ConfigurationLoader (sibling)** – Supplies the raw configuration that `configureProviders` consumes.  Any change to configuration (e.g., adding a new provider) propagates through ConfigurationLoader → ServiceOrchestrator → the concrete providers.
-
-* **DependencyInjector (sibling)** – Shares the same provider‑based injection philosophy.  In practice, ServiceOrchestrator may request additional dependencies from DependencyInjector during dynamic service registration.
-
-External consumers (e.g., API gateways or CLI tools) interact with ServiceOrchestrator through its public methods (`startService`, `stopService`, `registerService`).  The orchestrator, in turn, calls into `LLMService` and the registered providers, forming a clean, layered call stack.
-
-## Usage Guidelines  
-
-1. **Always configure before registering** – Invoke `configureProviders` with a fully‑loaded configuration (from ConfigurationLoader) **prior** to calling `registerService`.  This guarantees that every service has its required dependencies injected.
-
-2. **Prefer the orchestrator for lifecycle actions** – Do not call `LLMService.startMode` or `stopMode` directly from other components.  Use `startService` / `stopService` so that the central registry stays in sync and health‑check callbacks fire correctly.
-
-3. **Handle circuit‑breaker signals** – When a service fails and the circuit‑breaker trips, ServiceOrchestrator will automatically prevent further `startService` attempts for that mode.  Developers should listen for the orchestrator’s error events and decide whether to retry, fallback, or alert.
-
-4. **Leverage caching wisely** – The caching layer inside `LLMService` is transparent to callers, but cache invalidation policies are defined centrally.  If a service requires fresh data on each call, configure the provider with a cache‑TTL of zero rather than trying to bypass the cache manually.
-
-5. **Maintain the service registry** – Always unregister a service via `unregisterService` when a Docker container is removed or a feature flag disables it.  Leaving stale entries can cause health‑check loops or erroneous start attempts.
-
-6. **Keep configuration declarative** – Add new providers or modify existing ones in the configuration files consumed by ConfigurationLoader.  Avoid hard‑coding provider instantiation inside ServiceOrchestrator; this preserves the provider‑based design and eases testing.
+Together these files give developers a standardized, event‑driven façade for bringing arbitrary services up and down inside a Dockerised environment. The component is deliberately modular: it can be swapped, extended, or partially overridden without rippling changes through the rest of the system.
 
 ---
 
-### Architectural Patterns Identified  
+## Architecture and Design  
 
-1. **Provider‑Based Configuration** – Services are supplied via configurable provider objects (`configureProviders`).  
-2. **Dependency Injection** – Concrete implementations are injected rather than instantiated inline.  
-3. **Centralized Service Registry** – `registerService` / `unregisterService` maintain a single source of truth for active services.  
-4. **Circuit‑Breaker Pattern** – Implemented inside `LLMService` and invoked by the orchestrator for fault tolerance.  
-5. **Caching Layer** – Also encapsulated within `LLMService`, providing transparent performance optimisation.
+The observable design of ServiceOrchestrator follows a **modular, event‑driven architecture**. The orchestration layer (`service-orchestrator.ts`) exposes a clean contract that other parts of the system invoke, while the heavy‑lifting of starting and stopping services is delegated to its child component, **ServiceStarter** (`service-starter.js`). This separation of concerns mirrors the “separation of responsibilities” pattern: orchestration versus lifecycle management.
 
-### Design Decisions and Trade‑offs  
+Event‑driven programming is explicit in the observations – ServiceOrchestrator “handles service startup and shutdown events”. By emitting and listening to events, the component decouples the timing of actions from the callers, allowing asynchronous coordination without tight coupling.  
 
-* **Centralisation vs. Modularity** – By centralising lifecycle control, the system gains a clear authority point but introduces a single point of failure; the circuit‑breaker mitigates this risk.  
-* **Provider‑Based Injection** – Increases flexibility and testability (mock providers can be swapped) at the cost of added indirection and the need for a robust configuration schema.  
-* **Delegating Resilience to LLMService** – Keeps the orchestrator lightweight but couples it tightly to the behaviour of `LLMService`.  Any change to caching or circuit‑breaker logic must be coordinated across both components.
+A resilience pattern is also evident: **retry with exponential backoff** is implemented inside `service-starter.js`. This protects the system from transient failures during container launch, ensuring that a service is given multiple, increasingly spaced attempts before being declared unavailable.  
 
-### System Structure Insights  
+Within the broader DockerizedServices hierarchy, ServiceOrchestrator shares the same modular philosophy as its siblings **LLMFacade** and **LLMService**, both of which rely on their own dedicated libraries (`lib/llm/llm-service.ts`). The parent component’s description underscores a consistent design language—each sub‑component owns a distinct responsibility, facilitating scalability and maintainability.
 
-* **Parent‑Child Relationship** – DockerizedServices launches ServiceOrchestrator; ServiceOrchestrator, in turn, manages child services (LLM workers, auxiliary containers).  
-* **Sibling Collaboration** – ServiceOrchestrator shares the provider‑based approach with ConfigurationLoader, DependencyInjector, and ProcessStateManager, forming a cohesive subsystem for configuration, dependency management, and state tracking.  
-* **Vertical Stack** – Configuration → Provider Injection → Service Registry → Lifecycle Management → Resilience (circuit‑breaker, cache).
+---
 
-### Scalability Considerations  
+## Implementation Details  
 
-* Adding new services is a matter of extending the configuration and invoking `registerService`; the orchestrator’s registry scales linearly with the number of services.  
-* Circuit‑breaker and caching are per‑mode, so scaling the number of LLM modes does not degrade performance; each mode maintains its own resilience state.  
-* Because ServiceOrchestrator runs inside DockerizedServices, horizontal scaling (multiple orchestrator instances) would require a shared state store for the service registry—something not described in the current observations.
+`lib/service-orchestrator.ts` defines the **ServiceOrchestrator interface**. The interface declares at least two public methods observed in the notes:  
 
-### Maintainability Assessment  
+* **`startService(serviceId: string): Promise<void>`** – initiates the start‑up sequence for a named service.  
+* **`stopService(serviceId: string): Promise<void>`** – gracefully shuts the service down.  
 
-The use of dependency injection and provider‑based configuration makes the codebase highly **maintainable**: developers can replace or upgrade individual providers without touching the orchestrator logic.  Centralising lifecycle operations reduces duplication and eases debugging, as all start/stop pathways funnel through a single set of methods.  The clear separation of concerns—resilience in `LLMService`, state tracking in `ProcessStateManager`, configuration in `ConfigurationLoader`—further supports modular maintenance.  The primary maintenance risk lies in the tight coupling to `LLMService` for fault tolerance; any major redesign of caching or circuit‑breaker behaviour will ripple through the orchestrator and its siblings.
+Both methods are thin wrappers that forward the request to the **ServiceStarter** child. The TypeScript file also registers listeners for lifecycle events (e.g., *serviceStarted*, *serviceFailed*), allowing external consumers to react to state changes.
+
+`lib/service-starter.js` contains the concrete implementation of the start‑up algorithm. Its responsibilities include:  
+
+1. **Launching the Docker container** (or whatever runtime representation the system uses).  
+2. **Applying retry logic**: on a failure, it waits for a backoff interval that grows exponentially (e.g., 1 s, 2 s, 4 s, …) before retrying, up to a configurable maximum.  
+3. **Emitting events** back to ServiceOrchestrator to signal success, failure, or intermediate status.  
+
+Error handling is centralized in ServiceOrchestrator: any exception bubbling up from ServiceStarter is caught, logged, and re‑emitted as a failure event. This guarantees that callers see a consistent error surface regardless of the underlying JavaScript implementation details.
+
+Because ServiceStarter lives in a **JavaScript** file while ServiceOrchestrator is **TypeScript**, the build pipeline must compile both languages and expose the JS module to the TS code via a declaration (`declare module`). This mixed‑language approach allows reuse of an existing, battle‑tested starter script without rewriting it in TypeScript.
+
+---
+
+## Integration Points  
+
+ServiceOrchestrator sits directly beneath the **DockerizedServices** parent component. DockerizedServices orchestrates the overall container ecosystem and delegates individual service lifecycle concerns to ServiceOrchestrator. Consequently, any Docker‑related configuration (networking, volumes, environment variables) is prepared by DockerizedServices before ServiceOrchestrator receives a start request.
+
+The **child component** ServiceStarter is the only internal dependency. All start/stop calls funnel through the exported functions of `lib/service-starter.js`. Because ServiceStarter is responsible for the retry/backoff algorithm, developers can replace it with a custom implementation (e.g., a version that integrates with a cloud‑provider API) without touching the orchestrator’s public interface.
+
+Sibling components **LLMFacade** and **LLMService** do not directly interact with ServiceOrchestrator, but they share the same modular philosophy. Each sibling uses its own library (`lib/llm/llm-service.ts`) to encapsulate domain‑specific behavior (mode routing, caching, circuit breaking). This parallel structure suggests that a new sub‑component could be added in the same fashion—define a TypeScript façade, delegate low‑level work to a dedicated helper module, and wire events through DockerizedServices.
+
+External consumers (e.g., CLI tools, CI pipelines) invoke ServiceOrchestrator through its TypeScript interface, typically by importing `lib/service-orchestrator.ts`. The event‑driven nature means that callers can also subscribe to lifecycle events via an event emitter exposed by the orchestrator, enabling reactive handling (e.g., triggering health checks once a service reports *serviceStarted*).
+
+---
+
+## Usage Guidelines  
+
+1. **Always interact through the TypeScript façade** (`service-orchestrator.ts`). Directly calling functions in `service-starter.js` bypasses the centralized error handling and event emission, defeating the design’s intent.  
+
+2. **Handle asynchronous outcomes**. Both `startService` and `stopService` return promises that resolve only after the corresponding event (`serviceStarted` or `serviceStopped`) has been emitted. Consumers should `await` these calls or attach `.then/.catch` handlers to manage success and failure paths.  
+
+3. **Respect the retry semantics**. The exponential backoff in ServiceStarter is configurable (max retries, base delay). Changing these values should be done in the `service-starter.js` configuration block, not by wrapping calls in additional retry logic, to avoid double‑backoff and unnecessary latency.  
+
+4. **Leverage events for observability**. Subscribe to the orchestrator’s event emitter to log state transitions, trigger downstream workflows, or update monitoring dashboards. Because the component is event‑driven, missing an event can lead to stale state in dependent systems.  
+
+5. **Do not modify the child module unless necessary**. If a new startup strategy is required (e.g., Kubernetes pod creation), replace ServiceStarter with a new module that adheres to the same exported contract (`start(serviceId)`, `stop(serviceId)`). This preserves the orchestrator’s public API and keeps sibling components unaffected.  
+
+---
+
+### Architectural patterns identified  
+* **Event‑driven architecture** – ServiceOrchestrator emits and listens to lifecycle events.  
+* **Modular/component‑based design** – Clear separation between ServiceOrchestrator (orchestration) and ServiceStarter (lifecycle mechanics).  
+* **Retry with exponential backoff** – Resilience pattern implemented in `service-starter.js`.  
+* **Separation of concerns** – Interface definition (`service-orchestrator.ts`) vs. concrete implementation (`service-starter.js`).  
+
+### Design decisions and trade‑offs  
+* **Dedicated ServiceStarter module** isolates retry/backoff logic, making it reusable and testable, but introduces a cross‑language dependency (JS vs. TS) that requires careful build configuration.  
+* **Event‑driven communication** decouples callers from the orchestrator’s internal timing, improving flexibility; however, it adds complexity for developers who must understand and correctly handle asynchronous events.  
+* **Exponential backoff** improves robustness against transient failures but can increase overall start‑up latency in failure‑heavy environments.  
+* **Modular placement under DockerizedServices** enables independent evolution of each sub‑component, at the cost of a slightly deeper call chain (parent → orchestrator → starter).  
+
+### System structure insights  
+* **Hierarchy** – DockerizedServices (parent) → ServiceOrchestrator (sub‑component) → ServiceStarter (child).  
+* **Sibling parity** – LLMFacade and LLMService follow the same “interface + helper” pattern, indicating a consistent architectural language across the package.  
+* **File organization** – Core orchestration lives in a TypeScript file (`service-orchestrator.ts`), while the low‑level starter resides in a JavaScript file (`service-starter.js`). This split suggests an incremental evolution where existing JS utilities were wrapped rather than rewritten.  
+
+### Scalability considerations  
+* The **modular design** allows additional services to be added without touching existing orchestrator code, supporting horizontal scaling of the system’s service catalogue.  
+* **Event‑driven handling** can accommodate a high volume of lifecycle events, provided the event loop remains unblocked and listeners are efficient.  
+* **Exponential backoff** protects against cascading failures during massive simultaneous starts, but the backoff intervals must be tuned to avoid excessive delays when scaling out many containers at once.  
+
+### Maintainability assessment  
+* **High maintainability** – Clear interface, isolated retry logic, and event‑driven decoupling make the codebase approachable for new contributors.  
+* **Potential friction** – Mixed language modules (TS + JS) require consistent tooling and type declarations; any change to ServiceStarter’s API must be reflected in the TypeScript façade.  
+* **Error handling centralization** in ServiceOrchestrator simplifies debugging, as all startup/shutdown exceptions funnel through a single point.  
+* **Modularity** ensures that updates to ServiceStarter (e.g., new backoff strategy) can be rolled out without impacting callers, reinforcing long‑term maintainability.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the LLMService class (lib/llm/llm-service.ts) for managing LLM operations. This class plays a crucial role in mode routing, caching, and circuit breaking, ensuring that the system remains robust and fault-tolerant. The use of this class allows for flexibility and maintainability, as it provides a centralized location for managing these operations. For example, the LLMService class includes methods such as startMode and stopMode, which are used to manage the lifecycle of LLM operations. Additionally, the class employs dependency injection for initializing providers and configuring them based on the loaded configuration, as seen in the configureProviders method.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component employs a modular design, with each sub-component having its own specific responsibilities, to facilitate scalability and maintainability. For instance, the LLMService (lib/llm/llm-service.ts) handles mode routing, caching, and circuit breaking, while the ServiceStarter (lib/service-starter.js) is responsible for robust service startup with retry logic and exponential backoff. This separation of concerns enables developers to modify or replace individual components without affecting the entire system. Furthermore, the use of dependency injection in LLMService (lib/llm/llm-service.ts) provides a flexible and modular design, allowing for easy integration of new language models or services.
+
+### Children
+- [ServiceStarter](./ServiceStarter.md) -- The ServiceOrchestrator uses the lib/service-starter.js file to start services, indicating a dependency on this module for service startup.
 
 ### Siblings
-- [LLMManager](./LLMManager.md) -- LLMManager uses the LLMService class to manage LLM operations, including mode routing, caching, and circuit breaking, as seen in the startMode and stopMode methods.
-- [ProcessStateManager](./ProcessStateManager.md) -- ProcessStateManager uses the Process State Manager to register, unregister, and track the state of services.
-- [ConfigurationLoader](./ConfigurationLoader.md) -- ConfigurationLoader uses a provider-based approach for loading and managing the configuration of the system.
-- [DependencyInjector](./DependencyInjector.md) -- DependencyInjector uses a provider-based approach for managing the dependencies of the system.
+- [LLMFacade](./LLMFacade.md) -- LLMFacade utilizes the lib/llm/llm-service.ts file to handle mode routing, caching, and circuit breaking for language model operations
+- [LLMService](./LLMService.md) -- LLMService utilizes the lib/llm/llm-service.ts file to handle mode routing, caching, and circuit breaking for language model operations
 
 
 ---

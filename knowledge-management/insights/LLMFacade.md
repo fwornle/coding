@@ -2,95 +2,86 @@
 
 **Type:** SubComponent
 
-The LLMFacade sub-component provides a caching mechanism to improve performance and reduce the overhead of LLM operations, allowing for faster and more efficient interaction with LLMs.
+The LLMFacade sub-component is designed to be modular, allowing developers to modify or replace individual components without affecting the entire system
 
 ## What It Is  
 
-**LLMFacade** is a sub‑component that lives in the file **`lib/llm-facade.js`**.  It supplies a **modular, language‑agnostic façade** for interacting with large language models (LLMs).  The façade hides the concrete details of each underlying LLM implementation behind a single, unified API, allowing developers to instantiate, invoke, and manage any supported model without changing their application code.  Because it sits inside the **DockerizedServices** component, LLMFacade benefits from the same container‑level reliability mechanisms (e.g., the retry‑with‑backoff logic found in `lib/service-starter.js`) that the rest of the system uses.
-
-The component is deliberately **extensible**: new LLM providers can be added or removed by plugging in a new concrete class that conforms to the façade’s contract.  It also embeds a **caching layer** to reduce the cost of repeated model calls, and it centralises **error‑handling** so that consumer code receives a consistent set of exceptions regardless of which backend model generated the failure.  All of these capabilities are exposed through a highly **customisable interface**, letting developers tailor behaviour (such as cache policies or error‑translation strategies) to their specific needs.
-
----
+**LLMFacade** is the façade layer that provides a unified, high‑level API for interacting with language‑model services inside the **DockerizedServices** component. Its contract is defined in `lib/llm/llm-facade.ts`, where methods such as `getLanguageModel` and `postLanguageModel` expose request‑/response‑oriented operations. Internally the façade delegates the heavy lifting to the **LLMService** implementation located in `lib/llm/llm-service.ts`. By centralising routing, caching, circuit‑breaking, and error handling, LLMFacade shields callers from the underlying complexity of multiple language‑model back‑ends while remaining interchangeable and testable.
 
 ## Architecture and Design  
 
-The observations point to a **modular architecture** built around a **Factory pattern**.  `lib/llm-facade.js` contains a factory that knows how to create concrete LLM instances (e.g., OpenAI, Anthropic, local models).  By delegating construction to the factory, the façade guarantees a **standardised creation path** and isolates the rest of the system from the particulars of each provider’s constructor signatures or configuration requirements.
+The design follows a classic **Facade pattern** combined with **Dependency Injection**. The façade (`LLMFacade`) offers a simple, stable surface while the concrete service (`LLMService`) encapsulates the operational concerns—mode routing, result caching, and circuit‑breaker logic. Dependency injection is explicitly mentioned in observation 3: LLMFacade receives an instance of the service from `lib/llm/llm-service.ts`, making it trivial to swap in alternative language‑model providers or mock implementations for testing.  
 
-The façade itself acts as an **adapter** that presents a **language‑agnostic, unified API**.  This abstraction layer decouples callers from any LLM‑specific SDKs, enabling the rest of the codebase (including sibling components like **ServiceStarter** and **ContainerManager**) to treat all LLM interactions uniformly.  The design also incorporates **cross‑cutting concerns**—caching and error handling—directly inside the façade, rather than scattering them across callers.  This centralisation follows the **Single Responsibility Principle** for the callers (they only need to request a model operation) while the façade assumes responsibility for performance optimisation and robustness.
+Modularity is a core architectural decision. Observation 6 notes that the sub‑component is “designed to be modular, allowing developers to modify or replace individual components without affecting the entire system.” This modularity is reinforced by the parent **DockerizedServices** component, which groups together independent sub‑components (e.g., `ServiceOrchestrator`, `LLMService`) each with a single responsibility. The separation of concerns between the façade (public API) and the service (operational logic) mirrors the **Separation‑of‑Concerns** principle, improving both readability and replaceability.
 
-Because LLMFacade is a child of **DockerizedServices**, it inherits the parent’s operational context: services are launched inside Docker containers, and any transient failures in the underlying LLM services can be mitigated by the parent’s **retry‑with‑backoff** logic (implemented in `lib/service-starter.js:104`).  This shared reliability strategy aligns LLMFacade with its siblings—**ServiceStarter** (which orchestrates service start‑up) and **ContainerManager** (which manipulates Docker containers)—creating a cohesive ecosystem where each sub‑component contributes a distinct, well‑defined capability.
-
----
+Circuit breaking, caching, and routing are all implemented inside `lib/llm/llm-service.ts`. These concerns are encapsulated away from the façade, allowing LLMFacade to focus on request validation and error propagation (observation 7). The presence of these resilience mechanisms indicates an intent to support production‑grade workloads where language‑model latency or failure can be mitigated.
 
 ## Implementation Details  
 
-The core of LLMFacade resides in **`lib/llm-facade.js`**.  Although the source file does not expose individual symbols in the observations, the documented behaviours reveal the following internal pieces:
+* **Facade Interface (`lib/llm/llm-facade.ts`)** – Declares the public methods `getLanguageModel` and `postLanguageModel`. These methods accept request payloads, forward them to the injected service, and return the processed responses. The file also defines the shape of the façade’s contract, ensuring that any consumer (including sibling components like `ServiceOrchestrator`) interacts with language models through a consistent API.  
 
-1. **Factory Module** – A function or class that receives a configuration object (e.g., model name, API key, endpoint) and returns an instantiated LLM client that conforms to a common interface (`generate`, `embed`, etc.).  This factory abstracts away provider‑specific SDK imports and initialisation steps.
+* **Service Layer (`lib/llm/llm-service.ts`)** – Implements the core operational logic. It performs **mode routing**, deciding which language‑model variant (e.g., “chat”, “completion”) should handle a request. It also maintains a **cache** of recent model responses, reducing duplicate calls and improving throughput (observation 5). The service incorporates a **circuit‑breaker** that tracks failure rates and temporarily halts calls to a misbehaving model, protecting downstream systems.  
 
-2. **Facade Interface** – A set of methods that expose LLM operations in a **language‑agnostic** way.  Callers invoke these methods without needing to know whether the request will be routed to OpenAI, a self‑hosted model, or any future provider.
+* **Dependency Injection** – The façade does not instantiate `LLMService` directly; instead, it receives an instance (likely via a constructor or a DI container). This design choice, highlighted in observation 3, enables easy substitution of alternative implementations—such as a mock service for unit tests or a future third‑party model provider—without changing façade code.  
 
-3. **Error‑Handling Layer** – Wrappers around the raw SDK calls that catch provider‑specific exceptions and re‑throw them as façade‑level error types.  This normalises failure semantics across providers, simplifying downstream error‑handling logic.
-
-4. **Caching Mechanism** – An in‑memory (or optionally pluggable) cache that stores recent request‑response pairs.  The cache key typically comprises the model identifier, prompt text, and any relevant parameters, enabling rapid retrieval of identical queries and reducing API usage costs.
-
-5. **Customization Hooks** – Configuration options that let developers adjust cache TTL, choose a different error‑translation strategy, or inject custom logging.  Because the façade is **highly customizable**, these hooks are exposed either through the factory’s options object or via setter methods on the façade instance.
-
-All of these pieces cooperate to deliver a single, cohesive API surface.  When a consumer calls a façade method, the flow is: **(i)** façade validates input → **(ii)** checks the cache → **(iii)** if a miss, the factory‑produced LLM client executes the request → **(iv)** response is cached → **(v)** any provider‑specific error is caught and translated before being returned.
-
----
+* **Error Handling** – LLMFacade centralises exception translation (observation 7). When the underlying service throws an error—whether from a cache miss, a circuit‑breaker trip, or an unexpected model response—the façade catches it, enriches the context, and propagates a controlled error object to the caller. This guarantees a robust and predictable interface even under adverse conditions.
 
 ## Integration Points  
 
-LLMFacade integrates with the broader system at several well‑defined boundaries:
+LLMFacade lives inside the **DockerizedServices** parent component, which orchestrates multiple sub‑components. Its primary integration point is the **LLMService** sibling, which resides in the same `lib/llm/` directory and provides the concrete implementation. Calls to LLMFacade are likely made by higher‑level orchestrators (e.g., `ServiceOrchestrator`) that need language‑model capabilities as part of broader workflows.  
 
-* **Parent – DockerizedServices** – LLMFacade runs inside the DockerizedServices environment, meaning its lifecycle (container start/stop) is governed by the same **retry‑with‑backoff** logic that ServiceStarter employs (`lib/service-starter.js:104`).  If the underlying LLM service becomes temporarily unavailable, DockerizedServices will attempt to restart it using exponential back‑off, shielding the façade from abrupt failures.
+Because the façade is injected with a service instance, any component that can supply an implementation of the service interface can plug into LLMFacade. This includes test harnesses, alternative model adapters, or future extensions. The façade’s methods (`getLanguageModel`, `postLanguageModel`) serve as the contract surface for any consumer, ensuring that integration remains stable even if the underlying service evolves.  
 
-* **Sibling – ServiceStarter** – While ServiceStarter focuses on orchestrating service start‑up, it indirectly supports LLMFacade by ensuring that any required LLM containers (e.g., a locally hosted model) are up and reachable before façade calls are made.
-
-* **Sibling – ContainerManager** – ContainerManager provides the low‑level Docker API calls that DockerizedServices uses to spin up containers.  When LLMFacade needs to launch a new LLM container (for a newly added provider), it does so through the ContainerManager’s standardized container‑lifecycle methods.
-
-* **External SDKs / APIs** – The factory inside `lib/llm-facade.js` imports and wraps third‑party LLM SDKs (OpenAI, Anthropic, etc.).  These SDKs are treated as **implementation details**; the rest of the system only sees the façade’s abstract methods.
-
-* **Cache Store** – The caching layer may rely on an in‑process store (e.g., a JavaScript `Map`) or an external cache (Redis) if the configuration is extended.  This cache is a dependency that can be swapped without altering the façade’s public contract.
-
----
+The parent **DockerizedServices** component also provides containerisation and lifecycle management, meaning that LLMFacade is packaged together with its service and any required runtime dependencies. This encapsulation simplifies deployment and aligns with the modular philosophy described in the hierarchy context.
 
 ## Usage Guidelines  
 
-1. **Instantiate via the Factory** – Always create LLM instances through the provided factory in `lib/llm-facade.js`.  Supplying a configuration object that specifies the target model and any required credentials ensures that the façade can manage the instance uniformly.
-
-2. **Leverage Caching Wisely** – For high‑throughput workloads, enable the built‑in caching and tune the TTL to balance freshness against cost savings.  Remember that cached responses are keyed on the full request payload; even minor prompt variations will bypass the cache.
-
-3. **Handle Facade‑Level Errors** – Catch the façade’s standardized error types rather than provider‑specific exceptions.  This practice future‑proofs your code against provider swaps or upgrades.
-
-4. **Customize Through Options** – If you need non‑default behaviour (e.g., a custom logger, different back‑off strategy, or alternative cache backend), pass those options to the factory or use the façade’s setter methods.  The component is designed to be **highly customizable**, so leveraging these hooks reduces the need for ad‑hoc patches.
-
-5. **Respect DockerizedServices Lifecycle** – When deploying new LLM providers, ensure that any required containers are defined in the DockerizedServices configuration so that ServiceStarter and ContainerManager can manage them automatically.  This keeps the system’s reliability guarantees (retry‑with‑backoff, graceful shutdown) intact.
+1. **Always obtain LLMFacade through the DI container** (or the factory that supplies the injected `LLMService`). Direct instantiation bypasses the injection mechanism and defeats the modularity guarantees.  
+2. **Prefer the façade’s high‑level methods** (`getLanguageModel`, `postLanguageModel`) for all language‑model interactions. Avoid reaching into `llm-service.ts` directly; doing so couples callers to caching or circuit‑breaker internals and reduces future flexibility.  
+3. **Handle errors at the façade level**. Since LLMFacade normalises exceptions, callers should catch the façade‑thrown errors and inspect the enriched error payload rather than trying to interpret low‑level service exceptions.  
+4. **Do not modify the cache or circuit‑breaker settings** from outside the façade. Those concerns are deliberately encapsulated inside `llm-service.ts`. If tuning is required, expose configuration through the façade’s constructor or a dedicated configuration object.  
+5. **When adding a new language‑model provider**, implement a new service class that conforms to the same interface expected by LLMFacade and register it via the DI mechanism. No changes to the façade code are needed, preserving backward compatibility.
 
 ---
 
-### Summary of Key Architectural Insights  
+### Architectural patterns identified  
+* Facade pattern (LLMFacade abstracts LLMService)  
+* Dependency Injection (service injected into façade)  
+* Separation‑of‑Concerns (routing, caching, circuit‑breaking isolated in service)  
+* Resilience patterns – caching and circuit‑breaker (implemented in LLMService)
 
-| Aspect | Observation‑Based Finding |
-|--------|---------------------------|
-| **Primary Architectural Pattern** | **Factory pattern** for LLM instance creation, combined with a **Facade/Adapter** that presents a language‑agnostic API. |
-| **Design Decisions** | Modular, extensible design; centralised error handling; built‑in caching; high customisability. |
-| **System Structure** | Child of **DockerizedServices**, shares reliability mechanisms (retry‑with‑backoff) with siblings **ServiceStarter** and **ContainerManager**. |
-| **Scalability** | Caching reduces repeated LLM calls, and the modular factory allows horizontal scaling by adding more provider containers without code changes. |
-| **Maintainability** | Single point of change for LLM‑specific logic (factory, error translation, cache) improves maintainability; clear separation from container orchestration logic handled by siblings. |
+### Design decisions and trade‑offs  
+* **Modular façade vs. monolithic service** – improves testability and replaceability but adds an indirection layer.  
+* **Centralised error handling** – simplifies consumer code but requires careful design to preserve error semantics.  
+* **Caching inside the service** – reduces external calls and latency, at the cost of added memory usage and cache‑invalidation complexity.  
+* **Circuit‑breaker logic** – protects downstream systems, yet may introduce latency when opening/closing circuits.
 
-All statements above are derived directly from the supplied observations and the documented code paths. No additional patterns or assumptions have been introduced.
+### System structure insights  
+* LLMFacade sits under the **DockerizedServices** parent, alongside sibling components (`ServiceOrchestrator`, `LLMService`).  
+* The façade is a thin, stable API surface; the heavy operational logic resides in `lib/llm/llm-service.ts`.  
+* All language‑model concerns are encapsulated within the `lib/llm/` package, reinforcing a clear domain boundary.
+
+### Scalability considerations  
+* **Cache** reduces repeated model invocations, supporting higher request volumes without proportional load on the external model APIs.  
+* **Circuit‑breaker** prevents cascading failures under load spikes, enabling graceful degradation.  
+* Because the façade is stateless and relies on injected services, horizontal scaling of the Docker container is straightforward—multiple instances can share a distributed cache if needed.
+
+### Maintainability assessment  
+* High maintainability: clear separation between façade and service, explicit DI, and modular file layout (`llm-facade.ts`, `llm-service.ts`).  
+* Adding new models or swapping implementations requires only a new service class and DI registration—no façade changes.  
+* Centralised error handling and resilience logic are confined to `llm-service.ts`, making future adjustments localized.  
+
+Overall, LLMFacade exemplifies a well‑structured, modular façade that cleanly abstracts language‑model operations while providing built‑in resilience and extensibility.
 
 
 ## Hierarchy Context
 
 ### Parent
-- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component utilizes the retry-with-backoff pattern in the startServiceWithRetry function (lib/service-starter.js:104) to prevent endless loops and provide a more robust solution when optional services fail. This pattern allows the component to handle temporary failures and provides a way to recover from them. The implementation of this pattern is crucial for the overall reliability of the component, as it prevents cascading failures and ensures that the system remains operational even when some services are temporarily unavailable. Furthermore, the use of exponential backoff in the retry logic helps to prevent overwhelming the system with repeated requests, which can lead to further failures and decreased performance.
+- [DockerizedServices](./DockerizedServices.md) -- The DockerizedServices component employs a modular design, with each sub-component having its own specific responsibilities, to facilitate scalability and maintainability. For instance, the LLMService (lib/llm/llm-service.ts) handles mode routing, caching, and circuit breaking, while the ServiceStarter (lib/service-starter.js) is responsible for robust service startup with retry logic and exponential backoff. This separation of concerns enables developers to modify or replace individual components without affecting the entire system. Furthermore, the use of dependency injection in LLMService (lib/llm/llm-service.ts) provides a flexible and modular design, allowing for easy integration of new language models or services.
 
 ### Siblings
-- [ServiceStarter](./ServiceStarter.md) -- ServiceStarter uses the startServiceWithRetry function (lib/service-starter.js:104) to implement the retry-with-backoff pattern, preventing endless loops and providing a more robust solution when optional services fail.
-- [ContainerManager](./ContainerManager.md) -- ContainerManager uses the Docker API to create, start, and stop containers, providing a standardized and reliable way to manage container lifecycles.
+- [ServiceOrchestrator](./ServiceOrchestrator.md) -- ServiceOrchestrator uses the lib/service-starter.js file to start services with retry logic and exponential backoff
+- [LLMService](./LLMService.md) -- LLMService utilizes the lib/llm/llm-service.ts file to handle mode routing, caching, and circuit breaking for language model operations
 
 
 ---
